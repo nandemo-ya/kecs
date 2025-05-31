@@ -1,6 +1,6 @@
 module github.com/nandemo-ya/kecs
 
-go 1.23.0
+go 1.24.3
 
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
