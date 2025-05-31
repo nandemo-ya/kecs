@@ -39,7 +39,12 @@ func init() {
 	// Add server-specific flags
 	serverCmd.Flags().StringVar(&kubeconfig, "kubeconfig", "", "Path to the kubeconfig file (default is $HOME/.kube/config)")
 	serverCmd.Flags().IntVar(&adminPort, "admin-port", 8081, "Port for the admin server")
-	serverCmd.Flags().StringVar(&dataDir, "data-dir", "/var/lib/kecs", "Directory for storing persistent data")
+	// Default to user's home directory
+	defaultDataDir := "~/.kecs/data"
+	if home, err := os.UserHomeDir(); err == nil {
+		defaultDataDir = filepath.Join(home, ".kecs", "data")
+	}
+	serverCmd.Flags().StringVar(&dataDir, "data-dir", defaultDataDir, "Directory for storing persistent data")
 }
 
 func runServer() {
