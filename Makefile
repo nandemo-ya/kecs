@@ -81,11 +81,13 @@ docker-push: docker-build
 	$(DOCKER) push $(DOCKER_IMAGE):$(VERSION)
 	$(DOCKER) push $(DOCKER_IMAGE):latest
 
-# Generate OpenAPI code
+# Generate API code from Smithy models
 .PHONY: gen-api
 gen-api:
-	@echo "Generating API code from OpenAPI spec..."
-	# TODO: Add OpenAPI code generation command here
+	@echo "Downloading latest ECS Smithy model..."
+	curl -s https://raw.githubusercontent.com/aws/aws-sdk-go-v2/main/codegen/sdk-codegen/aws-models/ecs.json -o api-models/ecs.json
+	@echo "Generating API code from Smithy models..."
+	$(GO) run ./cmd/codegen -model=api-models/ecs.json -output=internal/controlplane/api/generated
 
 # Help target
 .PHONY: help
@@ -102,5 +104,5 @@ help:
 	@echo "  deps           - Install dependencies"
 	@echo "  docker-build   - Build Docker image"
 	@echo "  docker-push    - Push Docker image"
-	@echo "  gen-api        - Generate API code from OpenAPI spec"
+	@echo "  gen-api        - Generate API code from Smithy models"
 	@echo "  help           - Show this help message"
