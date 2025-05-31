@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -81,14 +82,18 @@ func (s *Server) handleECSRequest(w http.ResponseWriter, r *http.Request) {
 // handleECSListClusters handles the ListClusters operation
 func (s *Server) handleECSListClusters(w http.ResponseWriter, body []byte) {
 	var req generated.ListClustersRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "Invalid request format", http.StatusBadRequest)
-		return
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
 	}
 
-	// For now, return a mock response
-	response := map[string]interface{}{
-		"clusterArns": []string{},
+	ctx := context.Background()
+	response, err := s.ListClustersWithStorage(ctx, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -98,18 +103,18 @@ func (s *Server) handleECSListClusters(w http.ResponseWriter, body []byte) {
 // handleECSCreateCluster handles the CreateCluster operation
 func (s *Server) handleECSCreateCluster(w http.ResponseWriter, body []byte) {
 	var req generated.CreateClusterRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "Invalid request format", http.StatusBadRequest)
-		return
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
 	}
 
-	// For now, return a mock response
-	response := map[string]interface{}{
-		"cluster": map[string]interface{}{
-			"clusterArn":  "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
-			"clusterName": "default",
-			"status":      "ACTIVE",
-		},
+	ctx := context.Background()
+	response, err := s.CreateClusterWithStorage(ctx, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -119,30 +124,43 @@ func (s *Server) handleECSCreateCluster(w http.ResponseWriter, body []byte) {
 // handleECSDescribeClusters handles the DescribeClusters operation
 func (s *Server) handleECSDescribeClusters(w http.ResponseWriter, body []byte) {
 	var req generated.DescribeClustersRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "Invalid request format", http.StatusBadRequest)
-		return
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
 	}
 
-	// For now, return a mock response
-	response := map[string]interface{}{
-		"clusters": []map[string]interface{}{
-			{
-				"clusterArn":  "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
-				"clusterName": "default",
-				"status":      "ACTIVE",
-			},
-		},
-		"failures": []interface{}{},
+	ctx := context.Background()
+	response, err := s.DescribeClustersWithStorage(ctx, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
 
-// Placeholder handlers for other operations
+// handleECSDeleteCluster handles the DeleteCluster operation
 func (s *Server) handleECSDeleteCluster(w http.ResponseWriter, body []byte) {
-	s.writeEmptyResponse(w)
+	var req generated.DeleteClusterRequest
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
+	}
+
+	ctx := context.Background()
+	response, err := s.DeleteClusterWithStorage(ctx, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (s *Server) handleECSRunTask(w http.ResponseWriter, body []byte) {
