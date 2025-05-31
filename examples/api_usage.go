@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -18,9 +17,8 @@ func main() {
 	ctx := context.Background()
 	
 	// リクエストを作成
-	clusterName := "my-test-cluster"
 	createClusterReq := &generated.CreateClusterRequest{
-		// clusterName フィールドは生成されたスタブの型定義に従って設定
+		// フィールドは生成されたスタブの型定義に従って設定
 		// 注意: 実際の型定義は generated/types.go を確認してください
 	}
 
@@ -71,25 +69,25 @@ func demonstrateHTTPUsage() {
 	//   -d '{"taskDefinition": "my-task:1", "cluster": "my-cluster"}'
 }
 
+// CustomECSService は生成されたECSServiceInterfaceを実装したカスタムサービス
+type CustomECSService struct {
+	*generated.ECSService
+}
+
+// CreateCluster の実装をオーバーライド
+func (s *CustomECSService) CreateCluster(ctx context.Context, req *generated.CreateClusterRequest) (*generated.CreateClusterResponse, error) {
+	fmt.Printf("Custom CreateCluster called with: %+v\n", req)
+	
+	// カスタムロジックをここに実装
+	// 例: Kubernetesクラスターとの連携、データベースへの保存など
+	
+	return &generated.CreateClusterResponse{
+		// 実際のレスポンスフィールドは generated/types.go を確認
+	}, nil
+}
+
 // 生成されたインターfaces使用例
 func demonstrateInterfaceUsage() {
-	// 生成されたECSServiceInterfaceを実装したカスタムサービス
-	type CustomECSService struct {
-		*generated.ECSService
-	}
-
-	// CreateClusterの実装をオーバーライド
-	func (s *CustomECSService) CreateCluster(ctx context.Context, req *generated.CreateClusterRequest) (*generated.CreateClusterResponse, error) {
-		fmt.Printf("Custom CreateCluster called with: %+v\n", req)
-		
-		// カスタムロジックをここに実装
-		// 例: Kubernetesクラスターとの連携、データベースへの保存など
-		
-		return &generated.CreateClusterResponse{
-			// 実際のレスポンスフィールドは generated/types.go を確認
-		}, nil
-	}
-
 	// カスタムサービスの使用
 	customService := &CustomECSService{
 		ECSService: generated.NewECSService(),
