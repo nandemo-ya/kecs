@@ -25,7 +25,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage) *Server {
 	return &Server{
 		port:       port,
 		kubeconfig: kubeconfig,
-		ecsService: generated.NewECSService(),
+		ecsService: generated.NewECSServiceWithStorage(storage),
 		storage:    storage,
 	}
 }

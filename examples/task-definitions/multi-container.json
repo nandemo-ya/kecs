@@ -1,0 +1,109 @@
+{
+  "family": "multi-container-app",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "myapp:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "DATABASE_HOST",
+          "value": "localhost"
+        },
+        {
+          "name": "DATABASE_PORT",
+          "value": "5432"
+        }
+      ],
+      "dependsOn": [
+        {
+          "containerName": "database",
+          "condition": "HEALTHY"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/multi-container-app",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "app"
+        }
+      }
+    },
+    {
+      "name": "database",
+      "image": "postgres:13",
+      "essential": true,
+      "environment": [
+        {
+          "name": "POSTGRES_DB",
+          "value": "myapp"
+        },
+        {
+          "name": "POSTGRES_USER",
+          "value": "appuser"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "POSTGRES_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:db-password"
+        }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "pg_isready -U appuser"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/multi-container-app",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "database"
+        }
+      }
+    },
+    {
+      "name": "sidecar",
+      "image": "datadog/agent:latest",
+      "essential": false,
+      "environment": [
+        {
+          "name": "DD_APM_ENABLED",
+          "value": "true"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DD_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:datadog-api-key"
+        }
+      ]
+    }
+  ],
+  "executionRoleArn": "arn:aws:iam::123456789012:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::123456789012:role/multiContainerTaskRole",
+  "tags": [
+    {
+      "key": "Environment",
+      "value": "staging"
+    },
+    {
+      "key": "Application",
+      "value": "multi-container-app"
+    }
+  ]
+}

@@ -4,7 +4,13 @@ package generated
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/nandemo-ya/kecs/internal/storage"
 )
 
 // ECSServiceInterface defines the interface for all ECS operations
@@ -72,11 +78,18 @@ type ECSServiceInterface interface {
 }
 
 // ECSService implements the ECS service operations
-type ECSService struct{}
+type ECSService struct{
+	storage storage.Storage
+}
 
 // NewECSService creates a new ECS service instance
 func NewECSService() *ECSService {
 	return &ECSService{}
+}
+
+// NewECSServiceWithStorage creates a new ECS service instance with storage
+func NewECSServiceWithStorage(storage storage.Storage) *ECSService {
+	return &ECSService{storage: storage}
 }
 
 // CreateCapacityProvider implements the CreateCapacityProvider operation
@@ -285,8 +298,63 @@ func (s *ECSService) ListTaskDefinitionFamilies(ctx context.Context, req *ListTa
 
 // ListTaskDefinitions implements the ListTaskDefinitions operation
 func (s *ECSService) ListTaskDefinitions(ctx context.Context, req *ListTaskDefinitionsRequest) (*ListTaskDefinitionsResponse, error) {
-	// TODO: Implement ListTaskDefinitions operation
-	return &ListTaskDefinitionsResponse{}, nil
+	if s.storage == nil {
+		return &ListTaskDefinitionsResponse{
+			taskDefinitionArns: []string{},
+		}, nil
+	}
+
+	// Set default values
+	familyPrefix := ""
+	if req.familyPrefix != nil {
+		familyPrefix = *req.familyPrefix
+	}
+
+	status := ""
+	if req.status != nil {
+		if statusStr, ok := req.status.(string); ok {
+			status = statusStr
+		}
+	}
+
+	limit := 0
+	if req.maxResults != nil {
+		limit = int(*req.maxResults)
+	}
+
+	nextToken := ""
+	if req.nextToken != nil {
+		nextToken = *req.nextToken
+	}
+
+	// Get task definition families from storage
+	families, newNextToken, err := s.storage.TaskDefinitionStore().ListFamilies(ctx, familyPrefix, status, limit, nextToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list task definition families: %w", err)
+	}
+
+	// Convert to ARN list
+	var arns []string
+	for _, family := range families {
+		// Get all revisions for this family
+		revisions, _, err := s.storage.TaskDefinitionStore().ListRevisions(ctx, family.Family, status, 0, "")
+		if err != nil {
+			continue // Skip on error
+		}
+		for _, rev := range revisions {
+			arns = append(arns, rev.ARN)
+		}
+	}
+
+	var respNextToken *string
+	if newNextToken != "" {
+		respNextToken = &newNextToken
+	}
+
+	return &ListTaskDefinitionsResponse{
+		taskDefinitionArns: arns,
+		nextToken:         respNextToken,
+	}, nil
 }
 
 // ListTasks implements the ListTasks operation
@@ -327,8 +395,32 @@ func (s *ECSService) RegisterContainerInstance(ctx context.Context, req *Registe
 
 // RegisterTaskDefinition implements the RegisterTaskDefinition operation
 func (s *ECSService) RegisterTaskDefinition(ctx context.Context, req *RegisterTaskDefinitionRequest) (*RegisterTaskDefinitionResponse, error) {
-	// TODO: Implement RegisterTaskDefinition operation
-	return &RegisterTaskDefinitionResponse{}, nil
+	if s.storage == nil {
+		return &RegisterTaskDefinitionResponse{}, nil
+	}
+
+	// Convert request to storage format
+	storageTaskDef, err := s.convertToStorageTaskDefinition(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert task definition: %w", err)
+	}
+
+	// Register in storage
+	registered, err := s.storage.TaskDefinitionStore().Register(ctx, storageTaskDef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register task definition: %w", err)
+	}
+
+	// Convert back to API format
+	apiTaskDef, err := s.convertFromStorageTaskDefinition(registered)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert stored task definition: %w", err)
+	}
+
+	return &RegisterTaskDefinitionResponse{
+		taskDefinition: apiTaskDef,
+		tags:          req.tags,
+	}, nil
 }
 
 // RunTask implements the RunTask operation
@@ -1159,4 +1251,252 @@ func HandleUpdateTaskSet(service ECSServiceInterface) http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("{}"))
 	}
+}
+
+// convertToStorageTaskDefinition converts API request to storage format
+func (s *ECSService) convertToStorageTaskDefinition(req *RegisterTaskDefinitionRequest) (*storage.TaskDefinition, error) {
+	// Marshal complex fields to JSON
+	containerDefs, err := json.Marshal(req.containerDefinitions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal container definitions: %w", err)
+	}
+
+	var volumesJSON string
+	if req.volumes != nil {
+		volumes, err := json.Marshal(req.volumes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal volumes: %w", err)
+		}
+		volumesJSON = string(volumes)
+	}
+
+	var tagsJSON string
+	if req.tags != nil {
+		tags, err := json.Marshal(req.tags)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal tags: %w", err)
+		}
+		tagsJSON = string(tags)
+	}
+
+	var requiresCompatibilitiesJSON string
+	if req.requiresCompatibilities != nil {
+		compat, err := json.Marshal(req.requiresCompatibilities)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal requires compatibilities: %w", err)
+		}
+		requiresCompatibilitiesJSON = string(compat)
+	}
+
+	var placementConstraintsJSON string
+	if req.placementConstraints != nil {
+		constraints, err := json.Marshal(req.placementConstraints)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal placement constraints: %w", err)
+		}
+		placementConstraintsJSON = string(constraints)
+	}
+
+	var inferenceAcceleratorsJSON string
+	if req.inferenceAccelerators != nil {
+		accelerators, err := json.Marshal(req.inferenceAccelerators)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal inference accelerators: %w", err)
+		}
+		inferenceAcceleratorsJSON = string(accelerators)
+	}
+
+	var proxyConfigJSON string
+	if req.proxyConfiguration != nil {
+		proxy, err := json.Marshal(req.proxyConfiguration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal proxy configuration: %w", err)
+		}
+		proxyConfigJSON = string(proxy)
+	}
+
+	var runtimePlatformJSON string
+	if req.runtimePlatform != nil {
+		platform, err := json.Marshal(req.runtimePlatform)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal runtime platform: %w", err)
+		}
+		runtimePlatformJSON = string(platform)
+	}
+
+	// Get string values from pointers
+	var taskRoleArn, executionRoleArn, networkMode, cpu, memory, pidMode, ipcMode string
+	if req.taskRoleArn != nil {
+		taskRoleArn = *req.taskRoleArn
+	}
+	if req.executionRoleArn != nil {
+		executionRoleArn = *req.executionRoleArn
+	}
+	if req.networkMode != nil {
+		if networkModeStr, ok := req.networkMode.(string); ok {
+			networkMode = networkModeStr
+		}
+	}
+	if req.cpu != nil {
+		cpu = *req.cpu
+	}
+	if req.memory != nil {
+		memory = *req.memory
+	}
+	if req.pidMode != nil {
+		if pidModeStr, ok := req.pidMode.(string); ok {
+			pidMode = pidModeStr
+		}
+	}
+	if req.ipcMode != nil {
+		if ipcModeStr, ok := req.ipcMode.(string); ok {
+			ipcMode = ipcModeStr
+		}
+	}
+
+	// Default network mode to bridge if not specified
+	if networkMode == "" {
+		networkMode = "bridge"
+	}
+
+	family := ""
+	if req.family != nil {
+		family = *req.family
+	}
+
+	return &storage.TaskDefinition{
+		ID:                       uuid.New().String(),
+		Family:                   family,
+		TaskRoleARN:              taskRoleArn,
+		ExecutionRoleARN:         executionRoleArn,
+		NetworkMode:              networkMode,
+		ContainerDefinitions:     string(containerDefs),
+		Volumes:                  volumesJSON,
+		PlacementConstraints:     placementConstraintsJSON,
+		RequiresCompatibilities:  requiresCompatibilitiesJSON,
+		CPU:                      cpu,
+		Memory:                   memory,
+		Tags:                     tagsJSON,
+		PidMode:                  pidMode,
+		IpcMode:                  ipcMode,
+		ProxyConfiguration:       proxyConfigJSON,
+		InferenceAccelerators:    inferenceAcceleratorsJSON,
+		RuntimePlatform:          runtimePlatformJSON,
+		Region:                   "us-east-1",
+		AccountID:                "123456789012",
+	}, nil
+}
+
+// convertFromStorageTaskDefinition converts storage format to API response
+func (s *ECSService) convertFromStorageTaskDefinition(stored *storage.TaskDefinition) (interface{}, error) {
+	// Parse JSON fields back to interface{}
+	var containerDefs interface{}
+	if err := json.Unmarshal([]byte(stored.ContainerDefinitions), &containerDefs); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal container definitions: %w", err)
+	}
+
+	var volumes interface{}
+	if stored.Volumes != "" {
+		if err := json.Unmarshal([]byte(stored.Volumes), &volumes); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal volumes: %w", err)
+		}
+	}
+
+	var tags interface{}
+	if stored.Tags != "" {
+		if err := json.Unmarshal([]byte(stored.Tags), &tags); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal tags: %w", err)
+		}
+	}
+
+	var requiresCompatibilities interface{}
+	if stored.RequiresCompatibilities != "" {
+		if err := json.Unmarshal([]byte(stored.RequiresCompatibilities), &requiresCompatibilities); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal requires compatibilities: %w", err)
+		}
+	}
+
+	var placementConstraints interface{}
+	if stored.PlacementConstraints != "" {
+		if err := json.Unmarshal([]byte(stored.PlacementConstraints), &placementConstraints); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal placement constraints: %w", err)
+		}
+	}
+
+	var inferenceAccelerators interface{}
+	if stored.InferenceAccelerators != "" {
+		if err := json.Unmarshal([]byte(stored.InferenceAccelerators), &inferenceAccelerators); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal inference accelerators: %w", err)
+		}
+	}
+
+	var proxyConfiguration interface{}
+	if stored.ProxyConfiguration != "" {
+		if err := json.Unmarshal([]byte(stored.ProxyConfiguration), &proxyConfiguration); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal proxy configuration: %w", err)
+		}
+	}
+
+	var runtimePlatform interface{}
+	if stored.RuntimePlatform != "" {
+		if err := json.Unmarshal([]byte(stored.RuntimePlatform), &runtimePlatform); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal runtime platform: %w", err)
+		}
+	}
+
+	// Build the response task definition
+	taskDef := map[string]interface{}{
+		"taskDefinitionArn":      stored.ARN,
+		"family":                 stored.Family,
+		"revision":               stored.Revision,
+		"status":                 stored.Status,
+		"networkMode":            stored.NetworkMode,
+		"containerDefinitions":   containerDefs,
+		"registeredAt":           stored.RegisteredAt.Format(time.RFC3339),
+		"registeredBy":           "kecs",
+	}
+
+	// Add optional fields if they exist
+	if stored.TaskRoleARN != "" {
+		taskDef["taskRoleArn"] = stored.TaskRoleARN
+	}
+	if stored.ExecutionRoleARN != "" {
+		taskDef["executionRoleArn"] = stored.ExecutionRoleARN
+	}
+	if stored.CPU != "" {
+		taskDef["cpu"] = stored.CPU
+	}
+	if stored.Memory != "" {
+		taskDef["memory"] = stored.Memory
+	}
+	if volumes != nil {
+		taskDef["volumes"] = volumes
+	}
+	if requiresCompatibilities != nil {
+		taskDef["requiresCompatibilities"] = requiresCompatibilities
+		taskDef["compatibilities"] = requiresCompatibilities
+	}
+	if placementConstraints != nil {
+		taskDef["placementConstraints"] = placementConstraints
+	}
+	if inferenceAccelerators != nil {
+		taskDef["inferenceAccelerators"] = inferenceAccelerators
+	}
+	if proxyConfiguration != nil {
+		taskDef["proxyConfiguration"] = proxyConfiguration
+	}
+	if runtimePlatform != nil {
+		taskDef["runtimePlatform"] = runtimePlatform
+	}
+	if stored.PidMode != "" {
+		taskDef["pidMode"] = stored.PidMode
+	}
+	if stored.IpcMode != "" {
+		taskDef["ipcMode"] = stored.IpcMode
+	}
+	if stored.DeregisteredAt != nil {
+		taskDef["deregisteredAt"] = stored.DeregisteredAt.Format(time.RFC3339)
+	}
+
+	return taskDef, nil
 }

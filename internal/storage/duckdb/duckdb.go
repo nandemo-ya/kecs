@@ -13,9 +13,10 @@ import (
 
 // DuckDBStorage implements storage.Storage using DuckDB
 type DuckDBStorage struct {
-	db           *sql.DB
-	dbPath       string
-	clusterStore *clusterStore
+	db                  *sql.DB
+	dbPath              string
+	clusterStore        *clusterStore
+	taskDefinitionStore *taskDefinitionStore
 }
 
 // NewDuckDBStorage creates a new DuckDB storage instance
@@ -45,6 +46,7 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 
 	// Create stores
 	s.clusterStore = &clusterStore{db: db}
+	s.taskDefinitionStore = &taskDefinitionStore{db: db}
 
 	return s, nil
 }
@@ -56,6 +58,11 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 	// Create clusters table
 	if err := s.createClustersTable(ctx); err != nil {
 		return fmt.Errorf("failed to create clusters table: %w", err)
+	}
+
+	// Create task definitions table
+	if err := createTaskDefinitionTable(s.db); err != nil {
+		return fmt.Errorf("failed to create task definitions table: %w", err)
 	}
 
 	log.Println("DuckDB storage initialized successfully")
@@ -73,6 +80,11 @@ func (s *DuckDBStorage) Close() error {
 // ClusterStore returns the cluster store
 func (s *DuckDBStorage) ClusterStore() storage.ClusterStore {
 	return s.clusterStore
+}
+
+// TaskDefinitionStore returns the task definition store
+func (s *DuckDBStorage) TaskDefinitionStore() storage.TaskDefinitionStore {
+	return s.taskDefinitionStore
 }
 
 // BeginTx starts a new transaction
