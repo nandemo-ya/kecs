@@ -3,14 +3,17 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/nandemo-ya/kecs/internal/controlplane/admin"
 	"github.com/nandemo-ya/kecs/internal/controlplane/api"
+	"github.com/nandemo-ya/kecs/internal/storage/duckdb"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +21,7 @@ var (
 	// Additional server-specific flags
 	kubeconfig string
 	adminPort  int
+	dataDir    string
 
 	// serverCmd represents the server command
 	serverCmd = &cobra.Command{
@@ -35,6 +39,12 @@ func init() {
 	// Add server-specific flags
 	serverCmd.Flags().StringVar(&kubeconfig, "kubeconfig", "", "Path to the kubeconfig file (default is $HOME/.kube/config)")
 	serverCmd.Flags().IntVar(&adminPort, "admin-port", 8081, "Port for the admin server")
+	// Default to user's home directory
+	defaultDataDir := "~/.kecs/data"
+	if home, err := os.UserHomeDir(); err == nil {
+		defaultDataDir = filepath.Join(home, ".kecs", "data")
+	}
+	serverCmd.Flags().StringVar(&dataDir, "data-dir", defaultDataDir, "Directory for storing persistent data")
 }
 
 func runServer() {
@@ -46,8 +56,29 @@ func runServer() {
 		fmt.Println("Using in-cluster configuration or default kubeconfig")
 	}
 
+	// Initialize storage
+	dbPath := filepath.Join(dataDir, "kecs.db")
+	fmt.Printf("Using database: %s\n", dbPath)
+	
+	// Create data directory if it doesn't exist
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		log.Fatalf("Failed to create data directory: %v", err)
+	}
+	
+	storage, err := duckdb.NewDuckDBStorage(dbPath)
+	if err != nil {
+		log.Fatalf("Failed to initialize storage: %v", err)
+	}
+	defer storage.Close()
+	
+	// Initialize storage tables
+	ctx := context.Background()
+	if err := storage.Initialize(ctx); err != nil {
+		log.Fatalf("Failed to initialize storage tables: %v", err)
+	}
+
 	// Initialize the API and Admin servers
-	apiServer := api.NewServer(port, kubeconfig)
+	apiServer := api.NewServer(port, kubeconfig, storage)
 	adminServer := admin.NewServer(adminPort)
 	
 	// Set up graceful shutdown

@@ -22,20 +22,10 @@ type CreateCapacityProviderResponse struct {
 }
 
 // CreateClusterRequest represents the CreateClusterRequest structure
-type CreateClusterRequest struct {
-	clusterName *string `json:"clusterName,omitempty"`
-	tags interface{} `json:"tags,omitempty"`
-	settings interface{} `json:"settings,omitempty"`
-	configuration interface{} `json:"configuration,omitempty"`
-	capacityProviders interface{} `json:"capacityProviders,omitempty"`
-	defaultCapacityProviderStrategy interface{} `json:"defaultCapacityProviderStrategy,omitempty"`
-	serviceConnectDefaults interface{} `json:"serviceConnectDefaults,omitempty"`
-}
+type CreateClusterRequest map[string]interface{}
 
 // CreateClusterResponse represents the CreateClusterResponse structure
-type CreateClusterResponse struct {
-	cluster interface{} `json:"cluster,omitempty"`
-}
+type CreateClusterResponse map[string]interface{}
 
 // CreateServiceRequest represents the CreateServiceRequest structure
 type CreateServiceRequest struct {
@@ -127,14 +117,10 @@ type DeleteCapacityProviderResponse struct {
 }
 
 // DeleteClusterRequest represents the DeleteClusterRequest structure
-type DeleteClusterRequest struct {
-	cluster *string `json:"cluster"`
-}
+type DeleteClusterRequest map[string]interface{}
 
 // DeleteClusterResponse represents the DeleteClusterResponse structure
-type DeleteClusterResponse struct {
-	cluster interface{} `json:"cluster,omitempty"`
-}
+type DeleteClusterResponse map[string]interface{}
 
 // DeleteServiceRequest represents the DeleteServiceRequest structure
 type DeleteServiceRequest struct {
@@ -210,16 +196,10 @@ type DescribeCapacityProvidersResponse struct {
 }
 
 // DescribeClustersRequest represents the DescribeClustersRequest structure
-type DescribeClustersRequest struct {
-	clusters interface{} `json:"clusters,omitempty"`
-	include interface{} `json:"include,omitempty"`
-}
+type DescribeClustersRequest map[string]interface{}
 
 // DescribeClustersResponse represents the DescribeClustersResponse structure
-type DescribeClustersResponse struct {
-	clusters interface{} `json:"clusters,omitempty"`
-	failures interface{} `json:"failures,omitempty"`
-}
+type DescribeClustersResponse map[string]interface{}
 
 // DescribeContainerInstancesRequest represents the DescribeContainerInstancesRequest structure
 type DescribeContainerInstancesRequest struct {
@@ -385,16 +365,10 @@ type ListAttributesResponse struct {
 }
 
 // ListClustersRequest represents the ListClustersRequest structure
-type ListClustersRequest struct {
-	nextToken *string `json:"nextToken,omitempty"`
-	maxResults *int32 `json:"maxResults,omitempty"`
-}
+type ListClustersRequest map[string]interface{}
 
 // ListClustersResponse represents the ListClustersResponse structure
-type ListClustersResponse struct {
-	clusterArns interface{} `json:"clusterArns,omitempty"`
-	nextToken *string `json:"nextToken,omitempty"`
-}
+type ListClustersResponse map[string]interface{}
 
 // ListContainerInstancesRequest represents the ListContainerInstancesRequest structure
 type ListContainerInstancesRequest struct {
