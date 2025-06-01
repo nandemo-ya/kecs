@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/nandemo-ya/kecs/internal/storage"
@@ -425,8 +426,296 @@ func (s *Server) handleECSRegisterTaskDefinition(w http.ResponseWriter, body []b
 
 // handleECSDescribeTaskDefinition handles the DescribeTaskDefinition operation
 func (s *Server) handleECSDescribeTaskDefinition(w http.ResponseWriter, body []byte) {
+	fmt.Printf("DescribeTaskDefinition called with body: %s\n", string(body))
+	
+	// Parse body as a generic map
+	var requestData map[string]interface{}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &requestData); err != nil {
+			fmt.Printf("Failed to unmarshal request: %v\n", err)
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
+	}
+
+	fmt.Printf("Parsed request data: %+v\n", requestData)
+
+	if s.storage == nil {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("{}"))
+		return
+	}
+
+	ctx := context.Background()
+
+	// Extract task definition ARN or family:revision from request
+	taskDefArn := ""
+	if td, ok := requestData["taskDefinition"].(string); ok {
+		taskDefArn = td
+	}
+
+	if taskDefArn == "" {
+		http.Error(w, "taskDefinition parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	// Parse the ARN to extract family and revision
+	family, revision, err := s.parseTaskDefinitionIdentifier(taskDefArn)
+	if err != nil {
+		fmt.Printf("Failed to parse task definition identifier: %v\n", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var taskDef *storage.TaskDefinition
+	if revision > 0 {
+		// Get specific revision
+		taskDef, err = s.storage.TaskDefinitionStore().Get(ctx, family, revision)
+	} else {
+		// Get latest revision
+		taskDef, err = s.storage.TaskDefinitionStore().GetLatest(ctx, family)
+	}
+
+	if err != nil {
+		fmt.Printf("TaskDefinition not found: %v\n", err)
+		http.Error(w, "TaskDefinition not found", http.StatusNotFound)
+		return
+	}
+
+	// Convert back to API format
+	apiTaskDef, err := s.convertFromStorageTaskDefinitionToMap(taskDef)
+	if err != nil {
+		fmt.Printf("Failed to convert response: %v\n", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	responseMap := map[string]interface{}{
+		"taskDefinition": apiTaskDef,
+	}
+
+	// Add tags if requested
+	if include, ok := requestData["include"].([]interface{}); ok {
+		for _, item := range include {
+			if includeStr, ok := item.(string); ok && includeStr == "TAGS" {
+				if taskDef.Tags != "" {
+					var tags interface{}
+					if err := json.Unmarshal([]byte(taskDef.Tags), &tags); err == nil {
+						responseMap["tags"] = tags
+					}
+				}
+				break
+			}
+		}
+	}
+
+	fmt.Printf("DescribeTaskDefinition response: %+v\n", responseMap)
+
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("{}"))
+	json.NewEncoder(w).Encode(responseMap)
+}
+
+// handleECSDeregisterTaskDefinition handles the DeregisterTaskDefinition operation
+func (s *Server) handleECSDeregisterTaskDefinition(w http.ResponseWriter, body []byte) {
+	fmt.Printf("DeregisterTaskDefinition called with body: %s\n", string(body))
+	
+	// Parse body as a generic map
+	var requestData map[string]interface{}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &requestData); err != nil {
+			fmt.Printf("Failed to unmarshal request: %v\n", err)
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
+	}
+
+	fmt.Printf("Parsed request data: %+v\n", requestData)
+
+	if s.storage == nil {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("{}"))
+		return
+	}
+
+	ctx := context.Background()
+
+	// Extract task definition ARN or family:revision from request
+	taskDefArn := ""
+	if td, ok := requestData["taskDefinition"].(string); ok {
+		taskDefArn = td
+	}
+
+	if taskDefArn == "" {
+		http.Error(w, "taskDefinition parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	// Parse the ARN to extract family and revision
+	family, revision, err := s.parseTaskDefinitionIdentifier(taskDefArn)
+	if err != nil {
+		fmt.Printf("Failed to parse task definition identifier: %v\n", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get the task definition before deregistering it
+	var taskDef *storage.TaskDefinition
+	if revision > 0 {
+		taskDef, err = s.storage.TaskDefinitionStore().Get(ctx, family, revision)
+	} else {
+		taskDef, err = s.storage.TaskDefinitionStore().GetLatest(ctx, family)
+	}
+
+	if err != nil {
+		fmt.Printf("TaskDefinition not found: %v\n", err)
+		http.Error(w, "TaskDefinition not found", http.StatusNotFound)
+		return
+	}
+
+	// Only call deregister, don't create new objects
+	fmt.Printf("About to deregister: family=%s, revision=%d\n", taskDef.Family, taskDef.Revision)
+	err = s.storage.TaskDefinitionStore().Deregister(ctx, taskDef.Family, taskDef.Revision)
+	if err != nil {
+		fmt.Printf("DeregisterTaskDefinition error: %v\n", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	fmt.Printf("Deregistration successful for %s:%d\n", taskDef.Family, taskDef.Revision)
+
+	// Convert to API format using the original task definition and update status manually
+	apiTaskDef, err := s.convertFromStorageTaskDefinitionToMap(taskDef)
+	if err != nil {
+		fmt.Printf("Failed to convert response: %v\n", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Manually update the status and deregistration time
+	apiTaskDef["status"] = "INACTIVE"
+	apiTaskDef["deregisteredAt"] = time.Now().Format(time.RFC3339)
+
+	responseMap := map[string]interface{}{
+		"taskDefinition": apiTaskDef,
+	}
+
+	fmt.Printf("DeregisterTaskDefinition response: %+v\n", responseMap)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(responseMap)
+}
+
+// handleECSDeleteTaskDefinitions handles the DeleteTaskDefinitions operation
+func (s *Server) handleECSDeleteTaskDefinitions(w http.ResponseWriter, body []byte) {
+	fmt.Printf("DeleteTaskDefinitions called with body: %s\n", string(body))
+	
+	// Parse body as a generic map
+	var requestData map[string]interface{}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &requestData); err != nil {
+			fmt.Printf("Failed to unmarshal request: %v\n", err)
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
+	}
+
+	fmt.Printf("Parsed request data: %+v\n", requestData)
+
+	if s.storage == nil {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"taskDefinitions": []interface{}{},
+			"failures":        []interface{}{},
+		})
+		return
+	}
+
+	ctx := context.Background()
+
+	// Extract task definition ARNs from request
+	taskDefinitions := []string{}
+	if td, ok := requestData["taskDefinitions"].([]interface{}); ok {
+		for _, item := range td {
+			if tdStr, ok := item.(string); ok {
+				taskDefinitions = append(taskDefinitions, tdStr)
+			}
+		}
+	}
+
+	if len(taskDefinitions) == 0 {
+		http.Error(w, "taskDefinitions parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	var deletedTaskDefs []interface{}
+	var failures []interface{}
+
+	for _, taskDefArn := range taskDefinitions {
+		// Parse the ARN to extract family and revision
+		family, revision, err := s.parseTaskDefinitionIdentifier(taskDefArn)
+		if err != nil {
+			failures = append(failures, map[string]interface{}{
+				"arn":    taskDefArn,
+				"reason": "INVALID_ARN",
+				"detail": err.Error(),
+			})
+			continue
+		}
+
+		// Get the task definition before deleting
+		var taskDef *storage.TaskDefinition
+		if revision > 0 {
+			taskDef, err = s.storage.TaskDefinitionStore().Get(ctx, family, revision)
+		} else {
+			taskDef, err = s.storage.TaskDefinitionStore().GetLatest(ctx, family)
+		}
+
+		if err != nil {
+			failures = append(failures, map[string]interface{}{
+				"arn":    taskDefArn,
+				"reason": "TASK_DEFINITION_NOT_FOUND",
+				"detail": err.Error(),
+			})
+			continue
+		}
+
+		// Convert to API format before deletion
+		apiTaskDef, err := s.convertFromStorageTaskDefinitionToMap(taskDef)
+		if err != nil {
+			failures = append(failures, map[string]interface{}{
+				"arn":    taskDefArn,
+				"reason": "INTERNAL_ERROR",
+				"detail": err.Error(),
+			})
+			continue
+		}
+
+		// Note: This is a soft delete operation - we mark as INACTIVE
+		// In a real implementation, you might want to implement actual deletion
+		err = s.storage.TaskDefinitionStore().Deregister(ctx, taskDef.Family, taskDef.Revision)
+		if err != nil {
+			failures = append(failures, map[string]interface{}{
+				"arn":    taskDefArn,
+				"reason": "DELETION_FAILED",
+				"detail": err.Error(),
+			})
+			continue
+		}
+
+		// Mark as deleted status and add deregistered timestamp
+		apiTaskDef["status"] = "DELETE_IN_PROGRESS"
+		apiTaskDef["deregisteredAt"] = time.Now().Format(time.RFC3339)
+		deletedTaskDefs = append(deletedTaskDefs, apiTaskDef)
+	}
+
+	responseMap := map[string]interface{}{
+		"taskDefinitions": deletedTaskDefs,
+		"failures":        failures,
+	}
+
+	fmt.Printf("DeleteTaskDefinitions response: %+v\n", responseMap)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(responseMap)
 }
 
 // handleECSListTaskDefinitions handles the ListTaskDefinitions operation
@@ -667,5 +956,47 @@ func (s *Server) convertFromStorageTaskDefinitionToMap(stored *storage.TaskDefin
 	}
 
 	return taskDef, nil
+}
+
+// parseTaskDefinitionIdentifier parses a task definition identifier (ARN, family, or family:revision)
+// and returns the family name and revision (0 for latest)
+func (s *Server) parseTaskDefinitionIdentifier(identifier string) (family string, revision int, err error) {
+	// Handle different formats:
+	// 1. ARN: arn:aws:ecs:region:account:task-definition/family:revision
+	// 2. family:revision
+	// 3. family (returns revision 0 for latest)
+	
+	if strings.HasPrefix(identifier, "arn:aws:ecs:") {
+		// Parse ARN format
+		parts := strings.Split(identifier, "/")
+		if len(parts) < 2 {
+			return "", 0, fmt.Errorf("invalid task definition ARN format")
+		}
+		familyRevision := parts[len(parts)-1]
+		return s.parseFamilyRevision(familyRevision)
+	}
+	
+	// Parse family or family:revision format
+	return s.parseFamilyRevision(identifier)
+}
+
+// parseFamilyRevision parses "family:revision" or "family" format
+func (s *Server) parseFamilyRevision(familyRevision string) (family string, revision int, err error) {
+	parts := strings.Split(familyRevision, ":")
+	if len(parts) == 1 {
+		// Just family name, return revision 0 for latest
+		return parts[0], 0, nil
+	} else if len(parts) == 2 {
+		// family:revision format
+		family = parts[0]
+		var rev int
+		n, err := fmt.Sscanf(parts[1], "%d", &rev)
+		if err != nil || n != 1 || rev <= 0 {
+			return "", 0, fmt.Errorf("invalid revision number: %s", parts[1])
+		}
+		return family, rev, nil
+	}
+	
+	return "", 0, fmt.Errorf("invalid task definition identifier format: %s", familyRevision)
 }
 
