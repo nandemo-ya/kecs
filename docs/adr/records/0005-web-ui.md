@@ -1,4 +1,4 @@
-# Web UI Integration
+# ADR-0005: Web UI Integration
 
 **Date:** 2025-06-01
 
