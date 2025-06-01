@@ -15,16 +15,21 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./controlplane
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version-file: 'controlplane/go.mod'
           cache: true
-      - run: go mod verify
-      - run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+      - name: Verify dependencies
+        run: go mod verify
+      - name: Run tests
+        run: go test -v -race -coverprofile=../coverage.txt -covermode=atomic ./...
       - uses: codecov/codecov-action@v4
         with:
           file: ./coverage.txt
@@ -55,7 +60,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./controlplane
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: |

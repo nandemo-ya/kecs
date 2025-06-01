@@ -2,16 +2,17 @@
 
 # Variables
 BINARY_NAME=kecs
-MAIN_PKG=./cmd/controlplane
+MAIN_PKG=./controlplane/cmd/controlplane
 GO=go
 GOFMT=gofmt
 DOCKER=docker
 DOCKER_IMAGE=ghcr.io/nandemo-ya/kecs
 VERSION=$(shell git describe --tags --always --dirty)
-LDFLAGS=-ldflags "-X github.com/nandemo-ya/kecs/internal/controlplane/cmd.Version=$(VERSION)"
+LDFLAGS=-ldflags "-X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version=$(VERSION)"
 GOTEST=$(GO) test
 GOVET=$(GO) vet
 PLATFORMS=linux/amd64 linux/arm64
+CONTROLPLANE_DIR=./controlplane
 
 # Default target
 .PHONY: all
@@ -21,7 +22,7 @@ all: clean fmt vet test build
 .PHONY: build
 build:
 	@echo "Building $(BINARY_NAME)..."
-	$(GO) build $(LDFLAGS) -o bin/$(BINARY_NAME) $(MAIN_PKG)
+	cd $(CONTROLPLANE_DIR) && $(GO) build $(LDFLAGS) -o ../bin/$(BINARY_NAME) ./cmd/controlplane
 
 # Run the application
 .PHONY: run
@@ -40,38 +41,38 @@ clean:
 .PHONY: fmt
 fmt:
 	@echo "Formatting code..."
-	$(GOFMT) -s -w .
+	$(GOFMT) -s -w $(CONTROLPLANE_DIR)
 
 # Run tests
 .PHONY: test
 test:
 	@echo "Running tests..."
-	$(GOTEST) -v -race ./...
+	cd $(CONTROLPLANE_DIR) && $(GOTEST) -v -race ./...
 
 # Run tests with coverage
 .PHONY: test-coverage
 test-coverage:
 	@echo "Running tests with coverage..."
-	$(GOTEST) -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+	cd $(CONTROLPLANE_DIR) && $(GOTEST) -v -race -coverprofile=../coverage.txt -covermode=atomic ./...
 
 # Vet code
 .PHONY: vet
 vet:
 	@echo "Vetting code..."
-	$(GOVET) ./...
+	cd $(CONTROLPLANE_DIR) && $(GOVET) ./...
 
 # Install dependencies
 .PHONY: deps
 deps:
 	@echo "Installing dependencies..."
-	$(GO) mod download
-	$(GO) mod verify
+	cd $(CONTROLPLANE_DIR) && $(GO) mod download
+	cd $(CONTROLPLANE_DIR) && $(GO) mod verify
 
 # Build Docker image
 .PHONY: docker-build
 docker-build:
 	@echo "Building Docker image..."
-	$(DOCKER) build -t $(DOCKER_IMAGE):$(VERSION) .
+	$(DOCKER) build -t $(DOCKER_IMAGE):$(VERSION) $(CONTROLPLANE_DIR)
 	$(DOCKER) tag $(DOCKER_IMAGE):$(VERSION) $(DOCKER_IMAGE):latest
 
 # Push Docker image
@@ -87,7 +88,7 @@ gen-api:
 	@echo "Downloading latest ECS Smithy model..."
 	curl -s https://raw.githubusercontent.com/aws/aws-sdk-go-v2/main/codegen/sdk-codegen/aws-models/ecs.json -o api-models/ecs.json
 	@echo "Generating API code from Smithy models..."
-	$(GO) run ./cmd/codegen -model=api-models/ecs.json -output=internal/controlplane/api/generated
+	cd $(CONTROLPLANE_DIR) && $(GO) run ./cmd/codegen -model=../api-models/ecs.json -output=internal/controlplane/api/generated
 
 # Help target
 .PHONY: help

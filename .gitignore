@@ -23,3 +23,32 @@ go.work.sum
 
 # env file
 .env
+
+# Build output
+bin/
+
+# Coverage reports
+coverage.txt
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Web UI dependencies and build files
+web-ui/node_modules/
+web-ui/dist/
+web-ui/build/
+web-ui/.env.local
+web-ui/.env.development.local
+web-ui/.env.test.local
+web-ui/.env.production.local
+web-ui/npm-debug.log*
+web-ui/yarn-debug.log*
+web-ui/yarn-error.log*
