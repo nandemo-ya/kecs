@@ -61,8 +61,12 @@ func (s *Server) handleECSRequest(w http.ResponseWriter, r *http.Request) {
 		s.handleECSRegisterTaskDefinition(w, body)
 	case "DescribeTaskDefinition":
 		s.handleECSDescribeTaskDefinition(w, body)
+	case "DeregisterTaskDefinition":
+		s.handleECSDeregisterTaskDefinition(w, body)
 	case "ListTaskDefinitions":
 		s.handleECSListTaskDefinitions(w, body)
+	case "DeleteTaskDefinitions":
+		s.handleECSDeleteTaskDefinitions(w, body)
 	case "CreateService":
 		s.handleECSCreateService(w, body)
 	case "DescribeServices":

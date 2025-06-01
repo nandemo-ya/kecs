@@ -1,0 +1,15 @@
+{
+  "family": "test-new-family",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "new-container",
+      "image": "alpine:latest",
+      "essential": true,
+      "command": ["echo", "hello world"]
+    }
+  ]
+}
