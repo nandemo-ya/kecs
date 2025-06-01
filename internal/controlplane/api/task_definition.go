@@ -1,8 +1,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"time"
+
+	"github.com/nandemo-ya/kecs/internal/storage"
 )
 
 // TaskDefinition represents an ECS task definition
@@ -353,150 +358,314 @@ type DeleteTaskDefinitionsResponse struct {
 	Failures        []Failure        `json:"failures,omitempty"`
 }
 
-// registerTaskDefinitionEndpoints registers all task definition-related API endpoints
-func (s *Server) registerTaskDefinitionEndpoints(mux *http.ServeMux) {
-	mux.HandleFunc("/v1/registertaskdefinition", s.handleRegisterTaskDefinition)
-	mux.HandleFunc("/v1/deregistertaskdefinition", s.handleDeregisterTaskDefinition)
-	mux.HandleFunc("/v1/describetaskdefinition", s.handleDescribeTaskDefinition)
-	mux.HandleFunc("/v1/listtaskdefinitions", s.handleListTaskDefinitions)
-	mux.HandleFunc("/v1/deletetaskdefinitions", s.handleDeleteTaskDefinitions)
+
+// HTTP Handlers for ECS Task Definition operations
+
+// handleECSRegisterTaskDefinition handles the RegisterTaskDefinition operation
+func (s *Server) handleECSRegisterTaskDefinition(w http.ResponseWriter, body []byte) {
+	fmt.Printf("RegisterTaskDefinition called with body: %s\n", string(body))
+	
+	// Parse body as a generic map to handle generated type limitations
+	var requestData map[string]interface{}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &requestData); err != nil {
+			fmt.Printf("Failed to unmarshal request: %v\n", err)
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
+	}
+
+	fmt.Printf("Parsed request data: %+v\n", requestData)
+
+	if s.storage == nil {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{})
+		return
+	}
+
+	ctx := context.Background()
+
+	// Manually call storage service with converted data
+	storageTaskDef, err := s.convertMapToStorageTaskDefinition(requestData)
+	if err != nil {
+		fmt.Printf("Failed to convert request: %v\n", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	registered, err := s.storage.TaskDefinitionStore().Register(ctx, storageTaskDef)
+	if err != nil {
+		fmt.Printf("RegisterTaskDefinition error: %v\n", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Convert back to API format
+	apiTaskDef, err := s.convertFromStorageTaskDefinitionToMap(registered)
+	if err != nil {
+		fmt.Printf("Failed to convert response: %v\n", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	responseMap := map[string]interface{}{
+		"taskDefinition": apiTaskDef,
+	}
+	
+	if tags, ok := requestData["tags"]; ok && tags != nil {
+		responseMap["tags"] = tags
+	}
+
+	fmt.Printf("RegisterTaskDefinition response: %+v\n", responseMap)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(responseMap)
 }
 
-// handleRegisterTaskDefinition handles the RegisterTaskDefinition API endpoint
-func (s *Server) handleRegisterTaskDefinition(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
 
-	var req RegisterTaskDefinitionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// TODO: Implement actual task definition registration logic
-
-	// For now, return a mock response
-	resp := RegisterTaskDefinitionResponse{
-		TaskDefinition: TaskDefinition{
-			TaskDefinitionArn:    "arn:aws:ecs:region:account:task-definition/" + req.Family + ":1",
-			Family:               req.Family,
-			ContainerDefinitions: req.ContainerDefinitions,
-			Revision:             1,
-			Status:               "ACTIVE",
-		},
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+// handleECSDescribeTaskDefinition handles the DescribeTaskDefinition operation
+func (s *Server) handleECSDescribeTaskDefinition(w http.ResponseWriter, body []byte) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("{}"))
 }
 
-// handleDeregisterTaskDefinition handles the DeregisterTaskDefinition API endpoint
-func (s *Server) handleDeregisterTaskDefinition(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+// handleECSListTaskDefinitions handles the ListTaskDefinitions operation
+func (s *Server) handleECSListTaskDefinitions(w http.ResponseWriter, body []byte) {
+	fmt.Printf("ListTaskDefinitions called with body: %s\n", string(body))
+	
+	// Parse body as a generic map
+	var requestData map[string]interface{}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &requestData); err != nil {
+			fmt.Printf("Failed to unmarshal request: %v\n", err)
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
+	}
+
+	fmt.Printf("Parsed request data: %+v\n", requestData)
+
+	if s.storage == nil {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"taskDefinitionArns": []string{},
+		})
 		return
 	}
 
-	var req DeregisterTaskDefinitionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	ctx := context.Background()
+
+	// Extract parameters from request
+	familyPrefix := ""
+	if fp, ok := requestData["familyPrefix"].(string); ok {
+		familyPrefix = fp
+	}
+
+	status := ""
+	if st, ok := requestData["status"].(string); ok {
+		status = st
+	}
+
+	limit := 0
+	if mr, ok := requestData["maxResults"].(float64); ok {
+		limit = int(mr)
+	}
+
+	nextToken := ""
+	if nt, ok := requestData["nextToken"].(string); ok {
+		nextToken = nt
+	}
+
+	families, newNextToken, err := s.storage.TaskDefinitionStore().ListFamilies(ctx, familyPrefix, status, limit, nextToken)
+	if err != nil {
+		fmt.Printf("Storage error: %v\n", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// TODO: Implement actual task definition deregistration logic
-
-	// For now, return a mock response
-	resp := DeregisterTaskDefinitionResponse{
-		TaskDefinition: TaskDefinition{
-			TaskDefinitionArn: req.TaskDefinition,
-			Status:            "INACTIVE",
-		},
+	var arns []string
+	for _, family := range families {
+		revisions, _, err := s.storage.TaskDefinitionStore().ListRevisions(ctx, family.Family, status, 0, "")
+		if err != nil {
+			continue
+		}
+		for _, rev := range revisions {
+			arns = append(arns, rev.ARN)
+		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	responseMap := map[string]interface{}{
+		"taskDefinitionArns": arns,
+	}
+	
+	if newNextToken != "" {
+		responseMap["nextToken"] = newNextToken
+	}
+
+	fmt.Printf("ListTaskDefinitions response: %+v\n", responseMap)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(responseMap)
 }
 
-// handleDescribeTaskDefinition handles the DescribeTaskDefinition API endpoint
-func (s *Server) handleDescribeTaskDefinition(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+// Conversion helper functions
+
+// convertMapToStorageTaskDefinition converts a map to storage.TaskDefinition
+func (s *Server) convertMapToStorageTaskDefinition(requestData map[string]interface{}) (*storage.TaskDefinition, error) {
+	// Get family
+	family := ""
+	if f, ok := requestData["family"].(string); ok {
+		family = f
 	}
 
-	var req DescribeTaskDefinitionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	// Marshal container definitions
+	containerDefs, err := json.Marshal(requestData["containerDefinitions"])
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal container definitions: %w", err)
 	}
 
-	// TODO: Implement actual task definition description logic
+	// Optional fields
+	var volumesJSON, tagsJSON, requiresCompatibilitiesJSON, placementConstraintsJSON string
+	var inferenceAcceleratorsJSON, proxyConfigJSON, runtimePlatformJSON string
 
-	// For now, return a mock response
-	resp := DescribeTaskDefinitionResponse{
-		TaskDefinition: TaskDefinition{
-			TaskDefinitionArn: req.TaskDefinition,
-			Family:            "sample-family",
-			Revision:          1,
-			Status:            "ACTIVE",
-		},
+	if volumes := requestData["volumes"]; volumes != nil {
+		v, _ := json.Marshal(volumes)
+		volumesJSON = string(v)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if tags := requestData["tags"]; tags != nil {
+		t, _ := json.Marshal(tags)
+		tagsJSON = string(t)
+	}
+
+	if reqCompat := requestData["requiresCompatibilities"]; reqCompat != nil {
+		rc, _ := json.Marshal(reqCompat)
+		requiresCompatibilitiesJSON = string(rc)
+	}
+
+	if placementConstraints := requestData["placementConstraints"]; placementConstraints != nil {
+		pc, _ := json.Marshal(placementConstraints)
+		placementConstraintsJSON = string(pc)
+	}
+
+	if inferenceAccelerators := requestData["inferenceAccelerators"]; inferenceAccelerators != nil {
+		ia, _ := json.Marshal(inferenceAccelerators)
+		inferenceAcceleratorsJSON = string(ia)
+	}
+
+	if proxyConfig := requestData["proxyConfiguration"]; proxyConfig != nil {
+		p, _ := json.Marshal(proxyConfig)
+		proxyConfigJSON = string(p)
+	}
+
+	if runtimePlatform := requestData["runtimePlatform"]; runtimePlatform != nil {
+		rp, _ := json.Marshal(runtimePlatform)
+		runtimePlatformJSON = string(rp)
+	}
+
+	// Get string values
+	taskRoleArn, _ := requestData["taskRoleArn"].(string)
+	executionRoleArn, _ := requestData["executionRoleArn"].(string)
+	networkMode, _ := requestData["networkMode"].(string)
+	cpu, _ := requestData["cpu"].(string)
+	memory, _ := requestData["memory"].(string)
+	pidMode, _ := requestData["pidMode"].(string)
+	ipcMode, _ := requestData["ipcMode"].(string)
+
+	if networkMode == "" {
+		networkMode = "bridge"
+	}
+
+	return &storage.TaskDefinition{
+		ID:                       fmt.Sprintf("td-%d", time.Now().UnixNano()),
+		Family:                   family,
+		TaskRoleARN:              taskRoleArn,
+		ExecutionRoleARN:         executionRoleArn,
+		NetworkMode:              networkMode,
+		ContainerDefinitions:     string(containerDefs),
+		Volumes:                  volumesJSON,
+		PlacementConstraints:     placementConstraintsJSON,
+		RequiresCompatibilities:  requiresCompatibilitiesJSON,
+		CPU:                      cpu,
+		Memory:                   memory,
+		Tags:                     tagsJSON,
+		PidMode:                  pidMode,
+		IpcMode:                  ipcMode,
+		ProxyConfiguration:       proxyConfigJSON,
+		InferenceAccelerators:    inferenceAcceleratorsJSON,
+		RuntimePlatform:          runtimePlatformJSON,
+		Region:                   "us-east-1",
+		AccountID:                "123456789012",
+	}, nil
 }
 
-// handleListTaskDefinitions handles the ListTaskDefinitions API endpoint
-func (s *Server) handleListTaskDefinitions(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+// convertFromStorageTaskDefinitionToMap converts storage.TaskDefinition to a map
+func (s *Server) convertFromStorageTaskDefinitionToMap(stored *storage.TaskDefinition) (map[string]interface{}, error) {
+	// Parse JSON fields back to interface{}
+	var containerDefs interface{}
+	if err := json.Unmarshal([]byte(stored.ContainerDefinitions), &containerDefs); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal container definitions: %w", err)
 	}
 
-	var req ListTaskDefinitionsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	taskDef := map[string]interface{}{
+		"taskDefinitionArn":      stored.ARN,
+		"family":                 stored.Family,
+		"revision":               stored.Revision,
+		"status":                 stored.Status,
+		"networkMode":            stored.NetworkMode,
+		"containerDefinitions":   containerDefs,
+		"registeredAt":           stored.RegisteredAt.Format(time.RFC3339),
+		"registeredBy":           "kecs",
 	}
 
-	// TODO: Implement actual task definition listing logic
-
-	// For now, return a mock response
-	resp := ListTaskDefinitionsResponse{
-		TaskDefinitionArns: []string{"arn:aws:ecs:region:account:task-definition/sample-family:1"},
+	// Add optional fields if they exist
+	if stored.TaskRoleARN != "" {
+		taskDef["taskRoleArn"] = stored.TaskRoleARN
+	}
+	if stored.ExecutionRoleARN != "" {
+		taskDef["executionRoleArn"] = stored.ExecutionRoleARN
+	}
+	if stored.CPU != "" {
+		taskDef["cpu"] = stored.CPU
+	}
+	if stored.Memory != "" {
+		taskDef["memory"] = stored.Memory
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	// Parse and add JSON fields
+	if stored.Volumes != "" {
+		var volumes interface{}
+		if err := json.Unmarshal([]byte(stored.Volumes), &volumes); err == nil {
+			taskDef["volumes"] = volumes
+		}
+	}
+
+	if stored.RequiresCompatibilities != "" {
+		var reqCompat interface{}
+		if err := json.Unmarshal([]byte(stored.RequiresCompatibilities), &reqCompat); err == nil {
+			taskDef["requiresCompatibilities"] = reqCompat
+			taskDef["compatibilities"] = reqCompat
+		}
+	}
+
+	if stored.PlacementConstraints != "" {
+		var placementConstraints interface{}
+		if err := json.Unmarshal([]byte(stored.PlacementConstraints), &placementConstraints); err == nil {
+			taskDef["placementConstraints"] = placementConstraints
+		}
+	}
+
+	if stored.PidMode != "" {
+		taskDef["pidMode"] = stored.PidMode
+	}
+	if stored.IpcMode != "" {
+		taskDef["ipcMode"] = stored.IpcMode
+	}
+
+	if stored.DeregisteredAt != nil {
+		taskDef["deregisteredAt"] = stored.DeregisteredAt.Format(time.RFC3339)
+	}
+
+	return taskDef, nil
 }
 
-// handleDeleteTaskDefinitions handles the DeleteTaskDefinitions API endpoint
-func (s *Server) handleDeleteTaskDefinitions(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req DeleteTaskDefinitionsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// TODO: Implement actual task definition deletion logic
-
-	// For now, return a mock response
-	resp := DeleteTaskDefinitionsResponse{
-		TaskDefinitions: []TaskDefinition{
-			{
-				TaskDefinitionArn: req.TaskDefinitions[0],
-				Status:            "DELETE_IN_PROGRESS",
-			},
-		},
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
-}

@@ -5,11 +5,98 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/nandemo-ya/kecs/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/internal/storage"
 )
+
+// HTTP Handlers for ECS Cluster operations
+
+// handleECSListClusters handles the ListClusters operation
+func (s *Server) handleECSListClusters(w http.ResponseWriter, body []byte) {
+	var req generated.ListClustersRequest
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
+	}
+
+	ctx := context.Background()
+	response, err := s.ListClustersWithStorage(ctx, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleECSCreateCluster handles the CreateCluster operation
+func (s *Server) handleECSCreateCluster(w http.ResponseWriter, body []byte) {
+	var req generated.CreateClusterRequest
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
+	}
+
+	ctx := context.Background()
+	response, err := s.CreateClusterWithStorage(ctx, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleECSDescribeClusters handles the DescribeClusters operation
+func (s *Server) handleECSDescribeClusters(w http.ResponseWriter, body []byte) {
+	var req generated.DescribeClustersRequest
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
+	}
+
+	ctx := context.Background()
+	response, err := s.DescribeClustersWithStorage(ctx, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleECSDeleteCluster handles the DeleteCluster operation
+func (s *Server) handleECSDeleteCluster(w http.ResponseWriter, body []byte) {
+	var req generated.DeleteClusterRequest
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			return
+		}
+	}
+
+	ctx := context.Background()
+	response, err := s.DeleteClusterWithStorage(ctx, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
 
 // CreateClusterWithStorage implements the CreateCluster operation with storage
 func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.CreateClusterRequest) (*generated.CreateClusterResponse, error) {
