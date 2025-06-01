@@ -20,6 +20,18 @@ KECS (Kubernetes-based ECS Compatible Service) is a standalone service that prov
 
 KECS will adopt the following architecture:
 
+### Container Runtime Decision
+
+KECS will use **Kubernetes (via kind)** as the exclusive container runtime for the following reasons:
+
+1. **Service Management**: Kubernetes Services naturally map to ECS Services, providing built-in load balancing
+2. **Health Checks**: Kubernetes probes (liveness/readiness) align with ECS health check mechanisms
+3. **Auto-scaling**: Horizontal Pod Autoscaler (HPA) can implement ECS Service Auto Scaling
+4. **Service Discovery**: CoreDNS provides service discovery equivalent to ECS Service Discovery
+5. **Deployment Strategies**: Kubernetes supports rolling updates and other deployment patterns similar to ECS
+
+KECS will embed and manage kind clusters to provide a complete, self-contained solution.
+
 ### Overall Architecture
 
 ```mermaid
@@ -51,7 +63,7 @@ graph TD
         API --> ServiceManager[Service Manager]
         API --> ClusterManager[Cluster Manager]
         
-        TaskManager --> ContainerAdapter[Container Adapter]
+        TaskManager --> K8sAdapter[Kubernetes Adapter]
         ServiceManager --> TaskManager
         
         TaskManager --> Persistence[Persistence Layer]
@@ -59,13 +71,14 @@ graph TD
         ClusterManager --> Persistence
         
         Persistence --> DuckDB[(DuckDB)]
+        
+        KindManager[Kind Manager] --> K8sAdapter
     end
     
-    ContainerAdapter -->|Docker API| DockerRuntime[Docker Runtime]
-    ContainerAdapter -->|Kubernetes API| K8sRuntime[Kubernetes Runtime]
+    K8sAdapter -->|Kubernetes API| KindCluster[Kind Cluster]
+    KindManager -->|Manage| KindCluster
     
-    DockerRuntime --> Containers[User Containers]
-    K8sRuntime --> Pods[Kubernetes Pods]
+    KindCluster --> Pods[Kubernetes Pods]
 ```
 
 ### Sequence Diagram (Task Execution Example)
@@ -75,7 +88,7 @@ sequenceDiagram
     participant Client as AWS CLI/SDK Client
     participant CP as Control Plane
     participant DB as DuckDB
-    participant Runtime as Container Runtime
+    participant K8s as Kubernetes (Kind)
     
     Client->>CP: RegisterTaskDefinition
     CP->>DB: Store Task Definition
@@ -85,8 +98,8 @@ sequenceDiagram
     Client->>CP: RunTask
     CP->>DB: Retrieve Task Definition
     DB-->>CP: Task Definition
-    CP->>Runtime: Create Container(s)
-    Runtime-->>CP: Container ID(s)
+    CP->>K8s: Create Pod
+    K8s-->>CP: Pod Name
     CP->>DB: Store Task State
     DB-->>CP: Confirmation
     CP-->>Client: Task ARN
@@ -94,11 +107,13 @@ sequenceDiagram
     Client->>CP: DescribeTasks
     CP->>DB: Retrieve Task State
     DB-->>CP: Task State
+    CP->>K8s: Get Pod Status
+    K8s-->>CP: Pod Status
     CP-->>Client: Task Details
     
     Client->>CP: StopTask
-    CP->>Runtime: Stop Container(s)
-    Runtime-->>CP: Confirmation
+    CP->>K8s: Delete Pod
+    K8s-->>CP: Confirmation
     CP->>DB: Update Task State
     DB-->>CP: Confirmation
     CP-->>Client: Success
@@ -111,14 +126,14 @@ sequenceDiagram
     participant Client as AWS CLI/SDK Client
     participant CP as Control Plane
     participant DB as DuckDB
-    participant Runtime as Container Runtime
+    participant K8s as Kubernetes (Kind)
     
     Client->>CP: CreateService
     CP->>DB: Store Service Definition
     DB-->>CP: Confirmation
     CP->>CP: Calculate Desired State
-    CP->>Runtime: Create Container(s)
-    Runtime-->>CP: Container ID(s)
+    CP->>K8s: Create Deployment/Service
+    K8s-->>CP: Resource Names
     CP->>DB: Store Service State
     DB-->>CP: Confirmation
     CP-->>Client: Service ARN
@@ -127,17 +142,18 @@ sequenceDiagram
     loop Reconciliation
         CP->>DB: Get Service Definition
         DB-->>CP: Service Definition
-        CP->>DB: Get Current Tasks
-        DB-->>CP: Current Tasks
+        CP->>K8s: Get Deployment Status
+        K8s-->>CP: Current Replicas
         CP->>CP: Compare Desired vs Actual
-        alt Need to scale up
-            CP->>Runtime: Create Container(s)
-            Runtime-->>CP: Container ID(s)
+        alt Need to scale
+            CP->>K8s: Update Deployment Replicas
+            K8s-->>CP: Confirmation
             CP->>DB: Update Service State
-        else Need to scale down
-            CP->>Runtime: Stop Container(s)
-            Runtime-->>CP: Confirmation
-            CP->>DB: Update Service State
+        end
+        alt Health Check Failed
+            CP->>K8s: Replace Unhealthy Pod
+            K8s-->>CP: New Pod Created
+            CP->>DB: Update Task States
         end
     end
 ```
@@ -147,16 +163,17 @@ sequenceDiagram
 ### Benefits
 
 - **AWS Compatibility**: KECS can be operated using AWS CLI and SDKs
-- **Portability**: Can run on both Docker and Kubernetes
-- **Standalone**: Minimal external dependencies, distributable as a single binary
+- **Production-Grade Features**: Leverages Kubernetes' built-in capabilities for load balancing, health checks, auto-scaling, and service discovery
+- **Standalone**: Minimal external dependencies, distributable as a single binary with embedded kind
 - **Persistence**: Data can be persisted without external databases using DuckDB
-- **Extensibility**: Support for different container runtimes through container adapters
+- **Local Development**: kind provides a lightweight, local Kubernetes environment perfect for development and testing
 
 ### Challenges
 
 - **Feature Limitations**: Not all ECS features will be supported
 - **Performance**: Embedded DuckDB may become a bottleneck for large-scale workloads
-- **Security**: Requires access permissions to container runtime
+- **Kubernetes Dependency**: Requires Kubernetes knowledge for debugging and advanced configurations
+- **Resource Usage**: kind clusters consume more resources than direct Docker containers
 
 ## Alternatives Considered
 
@@ -175,6 +192,14 @@ We also considered architectures using serverless technologies like AWS Lambda, 
 - Dependency on AWS
 - Complexity in local development environments
 - Limited direct control over container management
+
+### Docker-only Runtime
+
+We considered using Docker directly as the container runtime but chose Kubernetes for the following reasons:
+
+- Docker alone lacks built-in service discovery and load balancing
+- Would require implementing health checks, auto-scaling, and deployment strategies from scratch
+- Kubernetes provides these features out-of-the-box, allowing KECS to focus on ECS API compatibility
 
 ## References
 
