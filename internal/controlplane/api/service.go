@@ -321,26 +321,11 @@ func (s *Server) handleCreateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement actual service creation logic
-
-	// For now, return a mock response
-	cluster := "default"
-	if req.Cluster != "" {
-		cluster = req.Cluster
-	}
-
-	resp := CreateServiceResponse{
-		Service: Service{
-			ServiceArn:     "arn:aws:ecs:region:account:service/" + cluster + "/" + req.ServiceName,
-			ServiceName:    req.ServiceName,
-			ClusterArn:     "arn:aws:ecs:region:account:cluster/" + cluster,
-			Status:         "ACTIVE",
-			DesiredCount:   req.DesiredCount,
-			RunningCount:   0,
-			PendingCount:   req.DesiredCount,
-			TaskDefinition: req.TaskDefinition,
-			CreatedAt:      "2025-05-15T00:40:35+09:00",
-		},
+	ctx := r.Context()
+	resp, err := s.CreateServiceWithStorage(ctx, req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -360,25 +345,11 @@ func (s *Server) handleUpdateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement actual service update logic
-
-	// For now, return a mock response
-	cluster := "default"
-	if req.Cluster != "" {
-		cluster = req.Cluster
-	}
-
-	resp := UpdateServiceResponse{
-		Service: Service{
-			ServiceArn:     "arn:aws:ecs:region:account:service/" + cluster + "/" + req.Service,
-			ServiceName:    req.Service,
-			ClusterArn:     "arn:aws:ecs:region:account:cluster/" + cluster,
-			Status:         "ACTIVE",
-			DesiredCount:   req.DesiredCount,
-			RunningCount:   req.DesiredCount,
-			PendingCount:   0,
-			TaskDefinition: req.TaskDefinition,
-		},
+	ctx := r.Context()
+	resp, err := s.UpdateServiceWithStorage(ctx, req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -398,24 +369,11 @@ func (s *Server) handleDeleteService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement actual service deletion logic
-
-	// For now, return a mock response
-	cluster := "default"
-	if req.Cluster != "" {
-		cluster = req.Cluster
-	}
-
-	resp := DeleteServiceResponse{
-		Service: Service{
-			ServiceArn:     "arn:aws:ecs:region:account:service/" + cluster + "/" + req.Service,
-			ServiceName:    req.Service,
-			ClusterArn:     "arn:aws:ecs:region:account:cluster/" + cluster,
-			Status:         "DRAINING",
-			DesiredCount:   0,
-			RunningCount:   0,
-			PendingCount:   0,
-		},
+	ctx := r.Context()
+	resp, err := s.DeleteServiceWithStorage(ctx, req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -435,28 +393,11 @@ func (s *Server) handleDescribeServices(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// TODO: Implement actual service description logic
-
-	// For now, return a mock response
-	cluster := "default"
-	if req.Cluster != "" {
-		cluster = req.Cluster
-	}
-
-	resp := DescribeServicesResponse{
-		Services: []Service{
-			{
-				ServiceArn:     "arn:aws:ecs:region:account:service/" + cluster + "/" + req.Services[0],
-				ServiceName:    req.Services[0],
-				ClusterArn:     "arn:aws:ecs:region:account:cluster/" + cluster,
-				Status:         "ACTIVE",
-				DesiredCount:   1,
-				RunningCount:   1,
-				PendingCount:   0,
-				TaskDefinition: "arn:aws:ecs:region:account:task-definition/family:1",
-				CreatedAt:      "2025-05-15T00:40:35+09:00",
-			},
-		},
+	ctx := r.Context()
+	resp, err := s.DescribeServicesWithStorage(ctx, req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -476,16 +417,11 @@ func (s *Server) handleListServices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement actual service listing logic
-
-	// For now, return a mock response
-	cluster := "default"
-	if req.Cluster != "" {
-		cluster = req.Cluster
-	}
-
-	resp := ListServicesResponse{
-		ServiceArns: []string{"arn:aws:ecs:region:account:service/" + cluster + "/sample-service"},
+	ctx := r.Context()
+	resp, err := s.ListServicesWithStorage(ctx, req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -19,6 +19,9 @@ type Storage interface {
 	// Task Definition operations
 	TaskDefinitionStore() TaskDefinitionStore
 	
+	// Service operations
+	ServiceStore() ServiceStore
+	
 	// Transaction support
 	BeginTx(ctx context.Context) (Transaction, error)
 }
@@ -198,4 +201,116 @@ type TaskDefinitionRevision struct {
 	Revision     int       `json:"revision"`
 	Status       string    `json:"status"`
 	RegisteredAt time.Time `json:"registeredAt"`
+}
+
+// ServiceStore defines service-specific storage operations
+type ServiceStore interface {
+	// Create a new service
+	Create(ctx context.Context, service *Service) error
+	
+	// Get a service by cluster and service name
+	Get(ctx context.Context, cluster, serviceName string) (*Service, error)
+	
+	// List services with filtering
+	List(ctx context.Context, cluster string, serviceName string, launchType string, limit int, nextToken string) ([]*Service, string, error)
+	
+	// Update a service
+	Update(ctx context.Context, service *Service) error
+	
+	// Delete a service
+	Delete(ctx context.Context, cluster, serviceName string) error
+	
+	// Get service by ARN
+	GetByARN(ctx context.Context, arn string) (*Service, error)
+}
+
+// Service represents an ECS service in storage
+type Service struct {
+	// Unique identifier
+	ID string `json:"id"`
+	
+	// Service ARN
+	ARN string `json:"arn"`
+	
+	// Service name
+	ServiceName string `json:"serviceName"`
+	
+	// Cluster ARN
+	ClusterARN string `json:"clusterArn"`
+	
+	// Task definition ARN
+	TaskDefinitionARN string `json:"taskDefinitionArn"`
+	
+	// Desired count
+	DesiredCount int `json:"desiredCount"`
+	
+	// Running count
+	RunningCount int `json:"runningCount"`
+	
+	// Pending count
+	PendingCount int `json:"pendingCount"`
+	
+	// Launch type (EC2, FARGATE, EXTERNAL)
+	LaunchType string `json:"launchType"`
+	
+	// Platform version
+	PlatformVersion string `json:"platformVersion,omitempty"`
+	
+	// Status
+	Status string `json:"status"`
+	
+	// Role ARN
+	RoleARN string `json:"roleArn,omitempty"`
+	
+	// Load balancers as JSON
+	LoadBalancers string `json:"loadBalancers,omitempty"`
+	
+	// Service registries as JSON
+	ServiceRegistries string `json:"serviceRegistries,omitempty"`
+	
+	// Network configuration as JSON
+	NetworkConfiguration string `json:"networkConfiguration,omitempty"`
+	
+	// Deployment configuration as JSON
+	DeploymentConfiguration string `json:"deploymentConfiguration,omitempty"`
+	
+	// Placement constraints as JSON
+	PlacementConstraints string `json:"placementConstraints,omitempty"`
+	
+	// Placement strategy as JSON
+	PlacementStrategy string `json:"placementStrategy,omitempty"`
+	
+	// Capacity provider strategy as JSON
+	CapacityProviderStrategy string `json:"capacityProviderStrategy,omitempty"`
+	
+	// Tags as JSON
+	Tags string `json:"tags,omitempty"`
+	
+	// Scheduling strategy (REPLICA, DAEMON)
+	SchedulingStrategy string `json:"schedulingStrategy"`
+	
+	// Service connect configuration as JSON
+	ServiceConnectConfiguration string `json:"serviceConnectConfiguration,omitempty"`
+	
+	// Enable ECS managed tags
+	EnableECSManagedTags bool `json:"enableECSManagedTags"`
+	
+	// Propagate tags (TASK_DEFINITION, SERVICE, NONE)
+	PropagateTags string `json:"propagateTags,omitempty"`
+	
+	// Enable execute command
+	EnableExecuteCommand bool `json:"enableExecuteCommand"`
+	
+	// Health check grace period
+	HealthCheckGracePeriodSeconds int `json:"healthCheckGracePeriodSeconds,omitempty"`
+	
+	// Region
+	Region string `json:"region"`
+	
+	// Account ID
+	AccountID string `json:"accountId"`
+	
+	// Timestamps
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
 }
