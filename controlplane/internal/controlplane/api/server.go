@@ -8,25 +8,28 @@ import (
 	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // Server represents the HTTP API server for KECS Control Plane
 type Server struct {
-	httpServer *http.Server
-	port       int
-	kubeconfig string
-	ecsService generated.ECSServiceInterface
-	storage    storage.Storage
+	httpServer  *http.Server
+	port        int
+	kubeconfig  string
+	ecsService  generated.ECSServiceInterface
+	storage     storage.Storage
+	kindManager *kubernetes.KindManager
 }
 
 // NewServer creates a new API server instance
 func NewServer(port int, kubeconfig string, storage storage.Storage) *Server {
 	return &Server{
-		port:       port,
-		kubeconfig: kubeconfig,
-		ecsService: generated.NewECSServiceWithStorage(storage),
-		storage:    storage,
+		port:        port,
+		kubeconfig:  kubeconfig,
+		ecsService:  generated.NewECSServiceWithStorage(storage),
+		storage:     storage,
+		kindManager: kubernetes.NewKindManager(),
 	}
 }
 

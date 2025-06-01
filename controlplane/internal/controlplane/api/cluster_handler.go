@@ -9,7 +9,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 )
 
 // HTTP Handlers for ECS Cluster operations
@@ -115,14 +117,23 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 	accountID := "123456789012" // TODO: Get from actual account
 	arn := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", region, accountID, clusterName)
 
+	// Generate a random kind cluster name
+	kindClusterName, err := utils.GenerateClusterName()
+	if err != nil {
+		// Fallback to deterministic name if random generation fails
+		log.Printf("Failed to generate random cluster name: %v, using fallback", err)
+		kindClusterName = fmt.Sprintf("kecs-%s", clusterName)
+	}
+
 	// Create cluster object
 	cluster := &storage.Cluster{
-		ID:        uuid.New().String(),
-		ARN:       arn,
-		Name:      clusterName,
-		Status:    "ACTIVE",
-		Region:    region,
-		AccountID: accountID,
+		ID:              uuid.New().String(),
+		ARN:             arn,
+		Name:            clusterName,
+		Status:          "ACTIVE",
+		Region:          region,
+		AccountID:       accountID,
+		KindClusterName: kindClusterName,
 		RegisteredContainerInstancesCount: 0,
 		RunningTasksCount:                 0,
 		PendingTasksCount:                 0,
@@ -150,6 +161,33 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 		log.Printf("Failed to create cluster: %v", err)
 		return nil, fmt.Errorf("failed to create cluster: %w", err)
 	}
+
+	// Create kind cluster and namespace
+	go func() {
+		ctx := context.Background()
+		
+		// Create kind cluster using the generated kind cluster name
+		if err := s.kindManager.CreateCluster(ctx, cluster.KindClusterName); err != nil {
+			log.Printf("Failed to create kind cluster %s for ECS cluster %s: %v", cluster.KindClusterName, clusterName, err)
+			return
+		}
+		
+		// Get Kubernetes client
+		kubeClient, err := s.kindManager.GetKubeClient(cluster.KindClusterName)
+		if err != nil {
+			log.Printf("Failed to get kubernetes client for %s: %v", cluster.KindClusterName, err)
+			return
+		}
+		
+		// Create namespace
+		namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
+		if err := namespaceManager.CreateNamespace(ctx, clusterName, region); err != nil {
+			log.Printf("Failed to create namespace for %s: %v", clusterName, err)
+			return
+		}
+		
+		log.Printf("Successfully created kind cluster %s and namespace for ECS cluster %s", cluster.KindClusterName, clusterName)
+	}()
 
 	// Build response
 	response := &generated.CreateClusterResponse{
@@ -284,6 +322,29 @@ func (s *Server) DeleteClusterWithStorage(ctx context.Context, req *generated.De
 		log.Printf("Failed to delete cluster: %v", err)
 		return nil, fmt.Errorf("failed to delete cluster: %w", err)
 	}
+
+	// Delete kind cluster and namespace
+	go func() {
+		ctx := context.Background()
+		
+		// Get Kubernetes client before deleting cluster
+		kubeClient, err := s.kindManager.GetKubeClient(cluster.KindClusterName)
+		if err == nil {
+			// Delete namespace
+			namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
+			if err := namespaceManager.DeleteNamespace(ctx, clusterName, cluster.Region); err != nil {
+				log.Printf("Failed to delete namespace for %s: %v", clusterName, err)
+			}
+		}
+		
+		// Delete kind cluster
+		if err := s.kindManager.DeleteCluster(ctx, cluster.KindClusterName); err != nil {
+			log.Printf("Failed to delete kind cluster %s for ECS cluster %s: %v", cluster.KindClusterName, clusterName, err)
+			return
+		}
+		
+		log.Printf("Successfully deleted kind cluster %s and namespace for ECS cluster %s", cluster.KindClusterName, clusterName)
+	}()
 
 	// Build response
 	response := &generated.DeleteClusterResponse{

@@ -31,16 +31,17 @@ func (s *clusterStore) Create(ctx context.Context, cluster *storage.Cluster) err
 	query := `
 		INSERT INTO clusters (
 			id, arn, name, status, region, account_id,
-			configuration, settings, tags,
+			configuration, settings, tags, kind_cluster_name,
 			registered_container_instances_count, running_tasks_count,
 			pending_tasks_count, active_services_count,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	// Convert empty strings to NULL for JSON fields
 	configuration := sql.NullString{String: cluster.Configuration, Valid: cluster.Configuration != ""}
 	settings := sql.NullString{String: cluster.Settings, Valid: cluster.Settings != ""}
 	tags := sql.NullString{String: cluster.Tags, Valid: cluster.Tags != ""}
+	kindClusterName := sql.NullString{String: cluster.KindClusterName, Valid: cluster.KindClusterName != ""}
 
 	_, err := s.db.ExecContext(ctx, query,
 		cluster.ID,
@@ -52,6 +53,7 @@ func (s *clusterStore) Create(ctx context.Context, cluster *storage.Cluster) err
 		configuration,
 		settings,
 		tags,
+		kindClusterName,
 		cluster.RegisteredContainerInstancesCount,
 		cluster.RunningTasksCount,
 		cluster.PendingTasksCount,
@@ -72,7 +74,7 @@ func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, 
 	query := `
 		SELECT 
 			id, arn, name, status, region, account_id,
-			configuration, settings, tags,
+			configuration, settings, tags, kind_cluster_name,
 			registered_container_instances_count, running_tasks_count,
 			pending_tasks_count, active_services_count,
 			created_at, updated_at
@@ -80,7 +82,7 @@ func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, 
 		WHERE name = ?`
 
 	cluster := &storage.Cluster{}
-	var configuration, settings, tags sql.NullString
+	var configuration, settings, tags, kindClusterName sql.NullString
 
 	err := s.db.QueryRowContext(ctx, query, name).Scan(
 		&cluster.ID,
@@ -92,6 +94,7 @@ func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, 
 		&configuration,
 		&settings,
 		&tags,
+		&kindClusterName,
 		&cluster.RegisteredContainerInstancesCount,
 		&cluster.RunningTasksCount,
 		&cluster.PendingTasksCount,
@@ -111,6 +114,7 @@ func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, 
 	cluster.Configuration = configuration.String
 	cluster.Settings = settings.String
 	cluster.Tags = tags.String
+	cluster.KindClusterName = kindClusterName.String
 
 	return cluster, nil
 }
@@ -120,7 +124,7 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 	query := `
 		SELECT 
 			id, arn, name, status, region, account_id,
-			configuration, settings, tags,
+			configuration, settings, tags, kind_cluster_name,
 			registered_container_instances_count, running_tasks_count,
 			pending_tasks_count, active_services_count,
 			created_at, updated_at
@@ -137,7 +141,7 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 
 	for rows.Next() {
 		cluster := &storage.Cluster{}
-		var configuration, settings, tags sql.NullString
+		var configuration, settings, tags, kindClusterName sql.NullString
 
 		err := rows.Scan(
 			&cluster.ID,
@@ -149,6 +153,7 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 			&configuration,
 			&settings,
 			&tags,
+			&kindClusterName,
 			&cluster.RegisteredContainerInstancesCount,
 			&cluster.RunningTasksCount,
 			&cluster.PendingTasksCount,
@@ -164,6 +169,7 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 		cluster.Configuration = configuration.String
 		cluster.Settings = settings.String
 		cluster.Tags = tags.String
+		cluster.KindClusterName = kindClusterName.String
 
 		clusters = append(clusters, cluster)
 	}
@@ -189,6 +195,7 @@ func (s *clusterStore) Update(ctx context.Context, cluster *storage.Cluster) err
 			configuration = ?,
 			settings = ?,
 			tags = ?,
+			kind_cluster_name = ?,
 			registered_container_instances_count = ?,
 			running_tasks_count = ?,
 			pending_tasks_count = ?,
@@ -200,6 +207,7 @@ func (s *clusterStore) Update(ctx context.Context, cluster *storage.Cluster) err
 	configuration := sql.NullString{String: cluster.Configuration, Valid: cluster.Configuration != ""}
 	settings := sql.NullString{String: cluster.Settings, Valid: cluster.Settings != ""}
 	tags := sql.NullString{String: cluster.Tags, Valid: cluster.Tags != ""}
+	kindClusterName := sql.NullString{String: cluster.KindClusterName, Valid: cluster.KindClusterName != ""}
 
 	result, err := s.db.ExecContext(ctx, query,
 		cluster.ARN,
@@ -209,6 +217,7 @@ func (s *clusterStore) Update(ctx context.Context, cluster *storage.Cluster) err
 		configuration,
 		settings,
 		tags,
+		kindClusterName,
 		cluster.RegisteredContainerInstancesCount,
 		cluster.RunningTasksCount,
 		cluster.PendingTasksCount,

@@ -79,6 +79,9 @@ type Cluster struct {
 	// Tags as JSON
 	Tags string `json:"tags,omitempty"`
 	
+	// Kind cluster name (kecs-<cluster-name>)
+	KindClusterName string `json:"kindClusterName,omitempty"`
+	
 	// Statistics
 	RegisteredContainerInstancesCount int `json:"registeredContainerInstancesCount"`
 	RunningTasksCount                 int `json:"runningTasksCount"`
