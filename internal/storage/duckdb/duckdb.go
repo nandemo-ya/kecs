@@ -17,6 +17,7 @@ type DuckDBStorage struct {
 	dbPath              string
 	clusterStore        *clusterStore
 	taskDefinitionStore *taskDefinitionStore
+	serviceStore        *serviceStore
 }
 
 // NewDuckDBStorage creates a new DuckDB storage instance
@@ -47,6 +48,7 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 	// Create stores
 	s.clusterStore = &clusterStore{db: db}
 	s.taskDefinitionStore = &taskDefinitionStore{db: db}
+	s.serviceStore = &serviceStore{db: db}
 
 	return s, nil
 }
@@ -63,6 +65,11 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 	// Create task definitions table
 	if err := createTaskDefinitionTable(s.db); err != nil {
 		return fmt.Errorf("failed to create task definitions table: %w", err)
+	}
+
+	// Create services table
+	if err := s.createServicesTable(ctx); err != nil {
+		return fmt.Errorf("failed to create services table: %w", err)
 	}
 
 	log.Println("DuckDB storage initialized successfully")
@@ -85,6 +92,11 @@ func (s *DuckDBStorage) ClusterStore() storage.ClusterStore {
 // TaskDefinitionStore returns the task definition store
 func (s *DuckDBStorage) TaskDefinitionStore() storage.TaskDefinitionStore {
 	return s.taskDefinitionStore
+}
+
+// ServiceStore returns the service store
+func (s *DuckDBStorage) ServiceStore() storage.ServiceStore {
+	return s.serviceStore
 }
 
 // BeginTx starts a new transaction
@@ -127,6 +139,66 @@ func (s *DuckDBStorage) createClustersTable(ctx context.Context) error {
 		"CREATE INDEX IF NOT EXISTS idx_clusters_status ON clusters(status)",
 		"CREATE INDEX IF NOT EXISTS idx_clusters_region ON clusters(region)",
 		"CREATE INDEX IF NOT EXISTS idx_clusters_account_id ON clusters(account_id)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// createServicesTable creates the services table
+func (s *DuckDBStorage) createServicesTable(ctx context.Context) error {
+	query := `
+	CREATE TABLE IF NOT EXISTS services (
+		id VARCHAR PRIMARY KEY,
+		arn VARCHAR NOT NULL UNIQUE,
+		service_name VARCHAR NOT NULL,
+		cluster_arn VARCHAR NOT NULL,
+		task_definition_arn VARCHAR NOT NULL,
+		desired_count INTEGER NOT NULL DEFAULT 0,
+		running_count INTEGER NOT NULL DEFAULT 0,
+		pending_count INTEGER NOT NULL DEFAULT 0,
+		launch_type VARCHAR NOT NULL,
+		platform_version VARCHAR,
+		status VARCHAR NOT NULL,
+		role_arn VARCHAR,
+		load_balancers VARCHAR,
+		service_registries VARCHAR,
+		network_configuration VARCHAR,
+		deployment_configuration VARCHAR,
+		placement_constraints VARCHAR,
+		placement_strategy VARCHAR,
+		capacity_provider_strategy VARCHAR,
+		tags VARCHAR,
+		scheduling_strategy VARCHAR NOT NULL DEFAULT 'REPLICA',
+		service_connect_configuration VARCHAR,
+		enable_ecs_managed_tags BOOLEAN NOT NULL DEFAULT false,
+		propagate_tags VARCHAR,
+		enable_execute_command BOOLEAN NOT NULL DEFAULT false,
+		health_check_grace_period_seconds INTEGER,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		created_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL
+	)`
+
+	if _, err := s.db.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("failed to create services table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_services_cluster_name ON services(cluster_arn, service_name)",
+		"CREATE INDEX IF NOT EXISTS idx_services_name ON services(service_name)",
+		"CREATE INDEX IF NOT EXISTS idx_services_cluster ON services(cluster_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_services_status ON services(status)",
+		"CREATE INDEX IF NOT EXISTS idx_services_launch_type ON services(launch_type)",
+		"CREATE INDEX IF NOT EXISTS idx_services_region ON services(region)",
+		"CREATE INDEX IF NOT EXISTS idx_services_account_id ON services(account_id)",
 	}
 
 	for _, idx := range indexes {
