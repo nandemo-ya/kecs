@@ -121,6 +121,7 @@ func (s *DuckDBStorage) createClustersTable(ctx context.Context) error {
 		configuration JSON,
 		settings JSON,
 		tags JSON,
+		kind_cluster_name VARCHAR,
 		registered_container_instances_count INTEGER DEFAULT 0,
 		running_tasks_count INTEGER DEFAULT 0,
 		pending_tasks_count INTEGER DEFAULT 0,
