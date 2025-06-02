@@ -30,6 +30,9 @@ bin/
 # Coverage reports
 coverage.txt
 
+# Database files
+*.db
+
 # IDE files
 .idea/
 .vscode/
