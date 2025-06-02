@@ -1,222 +1,16 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
+	"strings"
+	"time"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
-
-// Task represents an ECS task
-type Task struct {
-	TaskArn           string            `json:"taskArn,omitempty"`
-	ClusterArn        string            `json:"clusterArn,omitempty"`
-	TaskDefinitionArn string            `json:"taskDefinitionArn,omitempty"`
-	ContainerInstanceArn string         `json:"containerInstanceArn,omitempty"`
-	OverrideId        string            `json:"overrideId,omitempty"`
-	LastStatus        string            `json:"lastStatus,omitempty"`
-	DesiredStatus     string            `json:"desiredStatus,omitempty"`
-	Cpu               string            `json:"cpu,omitempty"`
-	Memory            string            `json:"memory,omitempty"`
-	Containers        []Container       `json:"containers,omitempty"`
-	StartedBy         string            `json:"startedBy,omitempty"`
-	Version           int               `json:"version,omitempty"`
-	StoppedReason     string            `json:"stoppedReason,omitempty"`
-	Connectivity      string            `json:"connectivity,omitempty"`
-	ConnectivityAt    string            `json:"connectivityAt,omitempty"`
-	PullStartedAt     string            `json:"pullStartedAt,omitempty"`
-	PullStoppedAt     string            `json:"pullStoppedAt,omitempty"`
-	ExecutionStoppedAt string           `json:"executionStoppedAt,omitempty"`
-	CreatedAt         string            `json:"createdAt,omitempty"`
-	StartedAt         string            `json:"startedAt,omitempty"`
-	StoppingAt        string            `json:"stoppingAt,omitempty"`
-	StoppedAt         string            `json:"stoppedAt,omitempty"`
-	Group             string            `json:"group,omitempty"`
-	LaunchType        string            `json:"launchType,omitempty"`
-	CapacityProviderName string         `json:"capacityProviderName,omitempty"`
-	PlatformVersion   string            `json:"platformVersion,omitempty"`
-	PlatformFamily    string            `json:"platformFamily,omitempty"`
-	Attachments       []Attachment      `json:"attachments,omitempty"`
-	Attributes        []Attribute       `json:"attributes,omitempty"`
-	Tags              []Tag             `json:"tags,omitempty"`
-	EnableExecuteCommand bool           `json:"enableExecuteCommand,omitempty"`
-	Overrides         TaskOverride      `json:"overrides,omitempty"`
-	EphemeralStorage  EphemeralStorage  `json:"ephemeralStorage,omitempty"`
-	HealthStatus      string            `json:"healthStatus,omitempty"`
-}
-
-// Container represents a container in a task
-type Container struct {
-	ContainerArn      string            `json:"containerArn,omitempty"`
-	TaskArn           string            `json:"taskArn,omitempty"`
-	Name              string            `json:"name,omitempty"`
-	Image             string            `json:"image,omitempty"`
-	ImageDigest       string            `json:"imageDigest,omitempty"`
-	RuntimeId         string            `json:"runtimeId,omitempty"`
-	LastStatus        string            `json:"lastStatus,omitempty"`
-	ExitCode          int               `json:"exitCode,omitempty"`
-	Reason            string            `json:"reason,omitempty"`
-	NetworkBindings   []NetworkBinding  `json:"networkBindings,omitempty"`
-	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
-	HealthStatus      string            `json:"healthStatus,omitempty"`
-	Cpu               string            `json:"cpu,omitempty"`
-	Memory            string            `json:"memory,omitempty"`
-	MemoryReservation string            `json:"memoryReservation,omitempty"`
-	GpuIds            []string          `json:"gpuIds,omitempty"`
-}
-
-// NetworkBinding represents a network binding for a container
-type NetworkBinding struct {
-	BindIP        string `json:"bindIP,omitempty"`
-	ContainerPort int    `json:"containerPort,omitempty"`
-	HostPort      int    `json:"hostPort,omitempty"`
-	Protocol      string `json:"protocol,omitempty"`
-}
-
-// NetworkInterface represents a network interface for a container
-type NetworkInterface struct {
-	AttachmentId       string   `json:"attachmentId,omitempty"`
-	PrivateIpv4Address string   `json:"privateIpv4Address,omitempty"`
-	Ipv6Address        string   `json:"ipv6Address,omitempty"`
-}
-
-// TaskOverride represents overrides for a task
-type TaskOverride struct {
-	ContainerOverrides []ContainerOverride `json:"containerOverrides,omitempty"`
-	TaskRoleArn        string              `json:"taskRoleArn,omitempty"`
-	ExecutionRoleArn   string              `json:"executionRoleArn,omitempty"`
-	Cpu                string              `json:"cpu,omitempty"`
-	Memory             string              `json:"memory,omitempty"`
-	EphemeralStorage   *EphemeralStorage   `json:"ephemeralStorage,omitempty"`
-}
-
-// ContainerOverride represents an override for a container
-type ContainerOverride struct {
-	Name              string             `json:"name"`
-	Command           []string           `json:"command,omitempty"`
-	Environment       []KeyValuePair     `json:"environment,omitempty"`
-	EnvironmentFiles  []EnvironmentFile  `json:"environmentFiles,omitempty"`
-	Cpu               int                `json:"cpu,omitempty"`
-	Memory            int                `json:"memory,omitempty"`
-	MemoryReservation int                `json:"memoryReservation,omitempty"`
-	ResourceRequirements []ResourceRequirement `json:"resourceRequirements,omitempty"`
-}
-
-// RunTaskRequest represents the request to run a task
-type RunTaskRequest struct {
-	Cluster                 string        `json:"cluster,omitempty"`
-	TaskDefinition          string        `json:"taskDefinition"`
-	Count                   int           `json:"count,omitempty"`
-	Group                   string        `json:"group,omitempty"`
-	StartedBy               string        `json:"startedBy,omitempty"`
-	LaunchType              string        `json:"launchType,omitempty"`
-	CapacityProviderStrategy []CapacityStrategy `json:"capacityProviderStrategy,omitempty"`
-	PlacementConstraints    []TaskPlacementConstraint `json:"placementConstraints,omitempty"`
-	PlacementStrategy       []PlacementStrategy `json:"placementStrategy,omitempty"`
-	PlatformVersion         string        `json:"platformVersion,omitempty"`
-	EnableECSManagedTags    bool          `json:"enableECSManagedTags,omitempty"`
-	PropagateTags           string        `json:"propagateTags,omitempty"`
-	ReferenceId             string        `json:"referenceId,omitempty"`
-	Tags                    []Tag         `json:"tags,omitempty"`
-	EnableExecuteCommand    bool          `json:"enableExecuteCommand,omitempty"`
-	Overrides               TaskOverride  `json:"overrides,omitempty"`
-}
-
-// PlacementStrategy represents a placement strategy for a task
-type PlacementStrategy struct {
-	Type  string `json:"type"`
-	Field string `json:"field,omitempty"`
-}
-
-// RunTaskResponse represents the response from running a task
-type RunTaskResponse struct {
-	Tasks    []Task    `json:"tasks"`
-	Failures []Failure `json:"failures,omitempty"`
-}
-
-// StartTaskRequest represents the request to start a task
-type StartTaskRequest struct {
-	Cluster              string       `json:"cluster,omitempty"`
-	TaskDefinition       string       `json:"taskDefinition"`
-	ContainerInstances   []string     `json:"containerInstances"`
-	Group                string       `json:"group,omitempty"`
-	StartedBy            string       `json:"startedBy,omitempty"`
-	EnableECSManagedTags bool         `json:"enableECSManagedTags,omitempty"`
-	PropagateTags        string       `json:"propagateTags,omitempty"`
-	ReferenceId          string       `json:"referenceId,omitempty"`
-	Tags                 []Tag        `json:"tags,omitempty"`
-	EnableExecuteCommand bool         `json:"enableExecuteCommand,omitempty"`
-	Overrides            TaskOverride `json:"overrides,omitempty"`
-}
-
-// StartTaskResponse represents the response from starting a task
-type StartTaskResponse struct {
-	Tasks    []Task    `json:"tasks"`
-	Failures []Failure `json:"failures,omitempty"`
-}
-
-// StopTaskRequest represents the request to stop a task
-type StopTaskRequest struct {
-	Cluster string `json:"cluster,omitempty"`
-	Task    string `json:"task"`
-	Reason  string `json:"reason,omitempty"`
-}
-
-// StopTaskResponse represents the response from stopping a task
-type StopTaskResponse struct {
-	Task Task `json:"task"`
-}
-
-// DescribeTasksRequest represents the request to describe tasks
-type DescribeTasksRequest struct {
-	Cluster string   `json:"cluster,omitempty"`
-	Tasks   []string `json:"tasks"`
-	Include []string `json:"include,omitempty"`
-}
-
-// DescribeTasksResponse represents the response from describing tasks
-type DescribeTasksResponse struct {
-	Tasks    []Task    `json:"tasks"`
-	Failures []Failure `json:"failures,omitempty"`
-}
-
-// ListTasksRequest represents the request to list tasks
-type ListTasksRequest struct {
-	Cluster          string `json:"cluster,omitempty"`
-	ContainerInstance string `json:"containerInstance,omitempty"`
-	Family           string `json:"family,omitempty"`
-	StartedBy        string `json:"startedBy,omitempty"`
-	ServiceName      string `json:"serviceName,omitempty"`
-	DesiredStatus    string `json:"desiredStatus,omitempty"`
-	LaunchType       string `json:"launchType,omitempty"`
-	MaxResults       int    `json:"maxResults,omitempty"`
-	NextToken        string `json:"nextToken,omitempty"`
-}
-
-// ListTasksResponse represents the response from listing tasks
-type ListTasksResponse struct {
-	TaskArns  []string `json:"taskArns"`
-	NextToken string   `json:"nextToken,omitempty"`
-}
-
-// GetTaskProtectionRequest represents the request to get task protection
-type GetTaskProtectionRequest struct {
-	Cluster string   `json:"cluster,omitempty"`
-	Tasks   []string `json:"tasks"`
-}
-
-// ProtectionResult represents a protection result for a task
-type ProtectionResult struct {
-	TaskArn                string `json:"taskArn"`
-	ProtectionEnabled      bool   `json:"protectionEnabled"`
-	ExpirationDate         string `json:"expirationDate,omitempty"`
-	ProtectedFromScaleIn   bool   `json:"protectedFromScaleIn,omitempty"`
-	ProtectedFromScaleOut  bool   `json:"protectedFromScaleOut,omitempty"`
-}
-
-// GetTaskProtectionResponse represents the response from getting task protection
-type GetTaskProtectionResponse struct {
-	ProtectedTasks   []ProtectionResult `json:"protectedTasks"`
-	Failures         []Failure          `json:"failures,omitempty"`
-}
 
 // registerTaskEndpoints registers all task-related API endpoints
 func (s *Server) registerTaskEndpoints(mux *http.ServeMux) {
@@ -241,20 +35,22 @@ func (s *Server) handleRunTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement actual task running logic
+	// TODO: Implement actual task running logic with the implementations from task_handler.go
 
-	// For now, return a mock response
+	// For now, return a simple mock response that matches the local types
 	cluster := "default"
 	if req.Cluster != "" {
 		cluster = req.Cluster
 	}
+
+	taskDefinitionArn := req.TaskDefinition
 
 	resp := RunTaskResponse{
 		Tasks: []Task{
 			{
 				TaskArn:           "arn:aws:ecs:region:account:task/" + cluster + "/task-id",
 				ClusterArn:        "arn:aws:ecs:region:account:cluster/" + cluster,
-				TaskDefinitionArn: req.TaskDefinition,
+				TaskDefinitionArn: taskDefinitionArn,
 				LastStatus:        "PENDING",
 				DesiredStatus:     "RUNNING",
 				CreatedAt:         "2025-05-15T00:40:35+09:00",
@@ -287,13 +83,20 @@ func (s *Server) handleStartTask(w http.ResponseWriter, r *http.Request) {
 		cluster = req.Cluster
 	}
 
+	taskDefinitionArn := req.TaskDefinition
+
+	containerInstance := ""
+	if len(req.ContainerInstances) > 0 {
+		containerInstance = req.ContainerInstances[0]
+	}
+
 	resp := StartTaskResponse{
 		Tasks: []Task{
 			{
 				TaskArn:              "arn:aws:ecs:region:account:task/" + cluster + "/task-id",
 				ClusterArn:           "arn:aws:ecs:region:account:cluster/" + cluster,
-				TaskDefinitionArn:    req.TaskDefinition,
-				ContainerInstanceArn: "arn:aws:ecs:region:account:container-instance/" + cluster + "/" + req.ContainerInstances[0],
+				TaskDefinitionArn:    taskDefinitionArn,
+				ContainerInstanceArn: "arn:aws:ecs:region:account:container-instance/" + cluster + "/" + containerInstance,
 				LastStatus:           "PENDING",
 				DesiredStatus:        "RUNNING",
 				CreatedAt:            "2025-05-15T00:40:35+09:00",
@@ -326,14 +129,17 @@ func (s *Server) handleStopTask(w http.ResponseWriter, r *http.Request) {
 		cluster = req.Cluster
 	}
 
+	taskArn := req.Task
+	reason := req.Reason
+
 	resp := StopTaskResponse{
 		Task: Task{
-			TaskArn:           req.Task,
-			ClusterArn:        "arn:aws:ecs:region:account:cluster/" + cluster,
-			LastStatus:        "STOPPING",
-			DesiredStatus:     "STOPPED",
-			StoppedReason:     req.Reason,
-			StoppingAt:        "2025-05-15T00:40:35+09:00",
+			TaskArn:       taskArn,
+			ClusterArn:    "arn:aws:ecs:region:account:cluster/" + cluster,
+			LastStatus:    "STOPPING",
+			DesiredStatus: "STOPPED",
+			StoppedReason: reason,
+			StoppingAt:    "2025-05-15T00:40:35+09:00",
 		},
 	}
 
@@ -362,10 +168,15 @@ func (s *Server) handleDescribeTasks(w http.ResponseWriter, r *http.Request) {
 		cluster = req.Cluster
 	}
 
+	taskArn := ""
+	if len(req.Tasks) > 0 {
+		taskArn = req.Tasks[0]
+	}
+
 	resp := DescribeTasksResponse{
 		Tasks: []Task{
 			{
-				TaskArn:           req.Tasks[0],
+				TaskArn:           taskArn,
 				ClusterArn:        "arn:aws:ecs:region:account:cluster/" + cluster,
 				TaskDefinitionArn: "arn:aws:ecs:region:account:task-definition/family:1",
 				LastStatus:        "RUNNING",
@@ -425,13 +236,173 @@ func (s *Server) handleGetTaskProtection(w http.ResponseWriter, r *http.Request)
 	// TODO: Implement actual task protection logic
 
 	// For now, return a mock response
+	taskArn := ""
+	if len(req.Tasks) > 0 {
+		taskArn = req.Tasks[0]
+	}
+
 	resp := GetTaskProtectionResponse{
 		ProtectedTasks: []ProtectionResult{
 			{
-				TaskArn:            req.Tasks[0],
-				ProtectionEnabled:  false,
+				TaskArn:           taskArn,
+				ProtectionEnabled: false,
 			},
 		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// ECS API handlers (called from ecs_handler.go)
+
+// handleRunTaskECS handles the RunTask operation for ECS API
+func (s *Server) handleRunTaskECS(w http.ResponseWriter, body []byte) {
+	var req RunTaskRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Step 1: Validate and get cluster
+	clusterName := "default"
+	if req.Cluster != "" {
+		clusterName = req.Cluster
+	}
+
+	cluster, err := s.storage.ClusterStore().Get(context.Background(), clusterName)
+	if err != nil || cluster == nil {
+		http.Error(w, fmt.Sprintf("Cluster not found: %s", clusterName), http.StatusBadRequest)
+		return
+	}
+
+	// Step 2: Get task definition
+	taskDefArn := req.TaskDefinition
+	if !strings.HasPrefix(taskDefArn, "arn:aws:ecs:") {
+		// Convert family:revision to ARN
+		taskDefArn = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", s.region, s.accountID, req.TaskDefinition)
+	}
+
+	log.Printf("Looking for task definition with ARN: %s", taskDefArn)
+	taskDef, err := s.storage.TaskDefinitionStore().GetByARN(context.Background(), taskDefArn)
+	if err != nil || taskDef == nil {
+		log.Printf("Task definition not found. Error: %v, TaskDef: %v", err, taskDef)
+		http.Error(w, fmt.Sprintf("Task definition not found: %s (searched ARN: %s)", req.TaskDefinition, taskDefArn), http.StatusBadRequest)
+		return
+	}
+
+	// Step 3: Create a simple Kubernetes pod
+	taskID := generateSimpleTaskID()
+	taskArn := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", s.region, s.accountID, cluster.Name, taskID)
+
+	// Create basic pod
+	pod, err := s.createBasicPod(taskDef, cluster, taskID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create pod: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Step 4: Store task in database
+	now := time.Now()
+	task := &storage.Task{
+		ID:                taskID,
+		ARN:               taskArn,
+		ClusterARN:        cluster.ARN,
+		TaskDefinitionARN: taskDef.ARN,
+		LastStatus:        "PENDING",
+		DesiredStatus:     "RUNNING",
+		LaunchType:        "FARGATE",
+		Version:           1,
+		CreatedAt:         now,
+		Region:            s.region,
+		AccountID:         s.accountID,
+		Containers:        "[]",
+		PodName:           pod.Name,
+		Namespace:         pod.Namespace,
+	}
+
+	if err := s.storage.TaskStore().Create(context.Background(), task); err != nil {
+		log.Printf("Failed to store task: %v", err)
+		// Continue anyway for now
+	}
+
+	// Step 5: Return response
+	resp := RunTaskResponse{
+		Tasks: []Task{
+			{
+				TaskArn:           taskArn,
+				ClusterArn:        cluster.ARN,
+				TaskDefinitionArn: taskDef.ARN,
+				LastStatus:        "PENDING",
+				DesiredStatus:     "RUNNING",
+				CreatedAt:         now.Format(time.RFC3339),
+				LaunchType:        "FARGATE",
+				Version:           1,
+			},
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// handleDescribeTasksECS handles the DescribeTasks operation for ECS API
+func (s *Server) handleDescribeTasksECS(w http.ResponseWriter, body []byte) {
+	var req DescribeTasksRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Implement actual task description logic
+
+	// For now, return a mock response
+	cluster := "default"
+	if req.Cluster != "" {
+		cluster = req.Cluster
+	}
+
+	taskArn := ""
+	if len(req.Tasks) > 0 {
+		taskArn = req.Tasks[0]
+	}
+
+	resp := DescribeTasksResponse{
+		Tasks: []Task{
+			{
+				TaskArn:           taskArn,
+				ClusterArn:        "arn:aws:ecs:region:account:cluster/" + cluster,
+				TaskDefinitionArn: "arn:aws:ecs:region:account:task-definition/family:1",
+				LastStatus:        "RUNNING",
+				DesiredStatus:     "RUNNING",
+				CreatedAt:         "2025-05-15T00:40:35+09:00",
+				StartedAt:         "2025-05-15T00:40:40+09:00",
+			},
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// handleListTasksECS handles the ListTasks operation for ECS API
+func (s *Server) handleListTasksECS(w http.ResponseWriter, body []byte) {
+	var req ListTasksRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Implement actual task listing logic
+
+	// For now, return a mock response
+	cluster := "default"
+	if req.Cluster != "" {
+		cluster = req.Cluster
+	}
+
+	resp := ListTasksResponse{
+		TaskArns: []string{"arn:aws:ecs:region:account:task/" + cluster + "/task-id"},
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -22,6 +22,9 @@ type Storage interface {
 	// Service operations
 	ServiceStore() ServiceStore
 	
+	// Task operations
+	TaskStore() TaskStore
+	
 	// Transaction support
 	BeginTx(ctx context.Context) (Transaction, error)
 }
@@ -316,4 +319,172 @@ type Service struct {
 	// Timestamps
 	CreatedAt time.Time  `json:"createdAt"`
 	UpdatedAt time.Time  `json:"updatedAt"`
+}
+
+// TaskStore defines task-specific storage operations
+type TaskStore interface {
+	// Create a new task
+	Create(ctx context.Context, task *Task) error
+	
+	// Get a task by cluster and task ID/ARN
+	Get(ctx context.Context, cluster, taskID string) (*Task, error)
+	
+	// List tasks with filtering
+	List(ctx context.Context, cluster string, filters TaskFilters) ([]*Task, error)
+	
+	// Update a task (status, etc.)
+	Update(ctx context.Context, task *Task) error
+	
+	// Delete a task
+	Delete(ctx context.Context, cluster, taskID string) error
+	
+	// Get tasks by ARNs
+	GetByARNs(ctx context.Context, arns []string) ([]*Task, error)
+}
+
+// TaskFilters defines filters for listing tasks
+type TaskFilters struct {
+	// Filter by service name
+	ServiceName string
+	
+	// Filter by task definition family
+	Family string
+	
+	// Filter by container instance
+	ContainerInstance string
+	
+	// Filter by launch type
+	LaunchType string
+	
+	// Filter by status
+	DesiredStatus string
+	
+	// Filter by started by
+	StartedBy string
+	
+	// Maximum results
+	MaxResults int
+	
+	// Next token for pagination
+	NextToken string
+}
+
+// Task represents an ECS task in storage
+type Task struct {
+	// Unique identifier
+	ID string `json:"id"`
+	
+	// Task ARN
+	ARN string `json:"arn"`
+	
+	// Cluster ARN
+	ClusterARN string `json:"clusterArn"`
+	
+	// Task definition ARN
+	TaskDefinitionARN string `json:"taskDefinitionArn"`
+	
+	// Container instance ARN (for EC2 launch type)
+	ContainerInstanceARN string `json:"containerInstanceArn,omitempty"`
+	
+	// Overrides as JSON
+	Overrides string `json:"overrides,omitempty"`
+	
+	// Last status
+	LastStatus string `json:"lastStatus"`
+	
+	// Desired status
+	DesiredStatus string `json:"desiredStatus"`
+	
+	// CPU
+	CPU string `json:"cpu,omitempty"`
+	
+	// Memory
+	Memory string `json:"memory,omitempty"`
+	
+	// Containers as JSON (status information)
+	Containers string `json:"containers"`
+	
+	// Started by (service name, user, etc.)
+	StartedBy string `json:"startedBy,omitempty"`
+	
+	// Version
+	Version int64 `json:"version"`
+	
+	// Stop code
+	StopCode string `json:"stopCode,omitempty"`
+	
+	// Stop reason
+	StoppedReason string `json:"stoppedReason,omitempty"`
+	
+	// Stopping at
+	StoppingAt *time.Time `json:"stoppingAt,omitempty"`
+	
+	// Stopped at
+	StoppedAt *time.Time `json:"stoppedAt,omitempty"`
+	
+	// Connectivity
+	Connectivity string `json:"connectivity,omitempty"`
+	
+	// Connectivity at
+	ConnectivityAt *time.Time `json:"connectivityAt,omitempty"`
+	
+	// Pull started at
+	PullStartedAt *time.Time `json:"pullStartedAt,omitempty"`
+	
+	// Pull stopped at
+	PullStoppedAt *time.Time `json:"pullStoppedAt,omitempty"`
+	
+	// Execution stopped at
+	ExecutionStoppedAt *time.Time `json:"executionStoppedAt,omitempty"`
+	
+	// Created at
+	CreatedAt time.Time `json:"createdAt"`
+	
+	// Started at
+	StartedAt *time.Time `json:"startedAt,omitempty"`
+	
+	// Launch type
+	LaunchType string `json:"launchType"`
+	
+	// Platform version
+	PlatformVersion string `json:"platformVersion,omitempty"`
+	
+	// Platform family
+	PlatformFamily string `json:"platformFamily,omitempty"`
+	
+	// Group
+	Group string `json:"group,omitempty"`
+	
+	// Attachments as JSON
+	Attachments string `json:"attachments,omitempty"`
+	
+	// Health status
+	HealthStatus string `json:"healthStatus,omitempty"`
+	
+	// Tags as JSON
+	Tags string `json:"tags,omitempty"`
+	
+	// Attributes as JSON
+	Attributes string `json:"attributes,omitempty"`
+	
+	// Enable execute command
+	EnableExecuteCommand bool `json:"enableExecuteCommand"`
+	
+	// Capacity provider name
+	CapacityProviderName string `json:"capacityProviderName,omitempty"`
+	
+	// Ephemeral storage as JSON
+	EphemeralStorage string `json:"ephemeralStorage,omitempty"`
+	
+	// Region
+	Region string `json:"region"`
+	
+	// Account ID
+	AccountID string `json:"accountId"`
+	
+	// Kubernetes Pod name
+	PodName string `json:"podName,omitempty"`
+	
+	// Kubernetes namespace
+	Namespace string `json:"namespace,omitempty"`
 }

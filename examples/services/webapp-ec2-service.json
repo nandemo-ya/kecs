@@ -1,0 +1,56 @@
+{
+  "serviceName": "webapp-ec2-service", 
+  "cluster": "production-cluster",
+  "taskDefinition": "webapp-ec2:2",
+  "desiredCount": 3,
+  "launchType": "EC2",
+  "role": "arn:aws:iam::123456789012:role/ecsServiceRole",
+  "loadBalancers": [
+    {
+      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/webapp-tg/abcdef1234567890",
+      "containerName": "webapp",
+      "containerPort": 3000
+    }
+  ],
+  "placementConstraints": [
+    {
+      "type": "memberOf",
+      "expression": "attribute:ecs.instance-type =~ t3.*"
+    }
+  ],
+  "placementStrategy": [
+    {
+      "type": "spread",
+      "field": "attribute:ecs.availability-zone"
+    },
+    {
+      "type": "spread", 
+      "field": "instanceId"
+    }
+  ],
+  "deploymentConfiguration": {
+    "maximumPercent": 150,
+    "minimumHealthyPercent": 50,
+    "deploymentCircuitBreaker": {
+      "enable": true,
+      "rollback": false
+    }
+  },
+  "healthCheckGracePeriodSeconds": 120,
+  "enableECSManagedTags": false,
+  "propagateTags": "TASK_DEFINITION",
+  "tags": [
+    {
+      "key": "Environment",
+      "value": "production"
+    },
+    {
+      "key": "Application",
+      "value": "webapp"
+    },
+    {
+      "key": "Team",
+      "value": "backend"
+    }
+  ]
+}

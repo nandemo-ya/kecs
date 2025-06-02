@@ -18,6 +18,7 @@ type DuckDBStorage struct {
 	clusterStore        *clusterStore
 	taskDefinitionStore *taskDefinitionStore
 	serviceStore        *serviceStore
+	taskStore           *taskStore
 }
 
 // NewDuckDBStorage creates a new DuckDB storage instance
@@ -49,6 +50,7 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 	s.clusterStore = &clusterStore{db: db}
 	s.taskDefinitionStore = &taskDefinitionStore{db: db}
 	s.serviceStore = &serviceStore{db: db}
+	s.taskStore = &taskStore{db: db}
 
 	return s, nil
 }
@@ -70,6 +72,11 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 	// Create services table
 	if err := s.createServicesTable(ctx); err != nil {
 		return fmt.Errorf("failed to create services table: %w", err)
+	}
+
+	// Create tasks table
+	if err := s.createTasksTable(ctx); err != nil {
+		return fmt.Errorf("failed to create tasks table: %w", err)
 	}
 
 	log.Println("DuckDB storage initialized successfully")
@@ -97,6 +104,11 @@ func (s *DuckDBStorage) TaskDefinitionStore() storage.TaskDefinitionStore {
 // ServiceStore returns the service store
 func (s *DuckDBStorage) ServiceStore() storage.ServiceStore {
 	return s.serviceStore
+}
+
+// TaskStore returns the task store
+func (s *DuckDBStorage) TaskStore() storage.TaskStore {
+	return s.taskStore
 }
 
 // BeginTx starts a new transaction
@@ -200,6 +212,78 @@ func (s *DuckDBStorage) createServicesTable(ctx context.Context) error {
 		"CREATE INDEX IF NOT EXISTS idx_services_launch_type ON services(launch_type)",
 		"CREATE INDEX IF NOT EXISTS idx_services_region ON services(region)",
 		"CREATE INDEX IF NOT EXISTS idx_services_account_id ON services(account_id)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// createTasksTable creates the tasks table
+func (s *DuckDBStorage) createTasksTable(ctx context.Context) error {
+	query := `
+	CREATE TABLE IF NOT EXISTS tasks (
+		id VARCHAR PRIMARY KEY,
+		arn VARCHAR NOT NULL UNIQUE,
+		cluster_arn VARCHAR NOT NULL,
+		task_definition_arn VARCHAR NOT NULL,
+		container_instance_arn VARCHAR,
+		overrides VARCHAR,
+		last_status VARCHAR NOT NULL,
+		desired_status VARCHAR NOT NULL,
+		cpu VARCHAR,
+		memory VARCHAR,
+		containers VARCHAR NOT NULL,
+		started_by VARCHAR,
+		version BIGINT NOT NULL DEFAULT 1,
+		stop_code VARCHAR,
+		stopped_reason VARCHAR,
+		stopping_at TIMESTAMP,
+		stopped_at TIMESTAMP,
+		connectivity VARCHAR,
+		connectivity_at TIMESTAMP,
+		pull_started_at TIMESTAMP,
+		pull_stopped_at TIMESTAMP,
+		execution_stopped_at TIMESTAMP,
+		created_at TIMESTAMP NOT NULL,
+		started_at TIMESTAMP,
+		launch_type VARCHAR NOT NULL,
+		platform_version VARCHAR,
+		platform_family VARCHAR,
+		task_group VARCHAR,
+		attachments VARCHAR,
+		health_status VARCHAR,
+		tags VARCHAR,
+		attributes VARCHAR,
+		enable_execute_command BOOLEAN NOT NULL DEFAULT false,
+		capacity_provider_name VARCHAR,
+		ephemeral_storage VARCHAR,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		pod_name VARCHAR,
+		namespace VARCHAR
+	)`
+
+	if _, err := s.db.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("failed to create tasks table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_tasks_cluster ON tasks(cluster_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_cluster_id ON tasks(cluster_arn, id)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_task_definition ON tasks(task_definition_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_container_instance ON tasks(container_instance_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_started_by ON tasks(started_by)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(last_status)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_desired_status ON tasks(desired_status)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_launch_type ON tasks(launch_type)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_pod ON tasks(pod_name, namespace)",
 	}
 
 	for _, idx := range indexes {

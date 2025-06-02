@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/kind/pkg/cluster"
 	"sigs.k8s.io/kind/pkg/cluster/nodes"
@@ -125,4 +126,25 @@ func (k *KindManager) GetClusterNodes(clusterName string) ([]nodes.Node, error) 
 func (k *KindManager) getKubeconfigPath(kecsClusterName string) string {
 	homeDir, _ := os.UserHomeDir()
 	return filepath.Join(homeDir, ".kube", fmt.Sprintf("kecs-%s.config", kecsClusterName))
+}
+
+// GetKubeConfig returns a kubernetes config for the current context
+func GetKubeConfig() (*rest.Config, error) {
+	// Try to use in-cluster config first
+	config, err := rest.InClusterConfig()
+	if err == nil {
+		return config, nil
+	}
+
+	// Fall back to kubeconfig file
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, err
+		}
+		kubeconfig = filepath.Join(home, ".kube", "config")
+	}
+
+	return clientcmd.BuildConfigFromFlags("", kubeconfig)
 }

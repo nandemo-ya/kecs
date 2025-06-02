@@ -1,0 +1,41 @@
+{
+  "serviceName": "redis-daemon",
+  "cluster": "cache-cluster", 
+  "taskDefinition": "redis:1",
+  "schedulingStrategy": "DAEMON",
+  "launchType": "EC2",
+  "platformVersion": "LATEST",
+  "placementConstraints": [
+    {
+      "type": "memberOf",
+      "expression": "attribute:ecs.instance-type =~ m5.*"
+    }
+  ],
+  "placementStrategy": [
+    {
+      "type": "spread",
+      "field": "attribute:ecs.availability-zone"
+    }
+  ],
+  "deploymentConfiguration": {
+    "maximumPercent": 100,
+    "minimumHealthyPercent": 0
+  },
+  "enableECSManagedTags": true,
+  "propagateTags": "SERVICE",
+  "enableExecuteCommand": true,
+  "tags": [
+    {
+      "key": "Environment", 
+      "value": "development"
+    },
+    {
+      "key": "Service",
+      "value": "cache"
+    },
+    {
+      "key": "SchedulingStrategy",
+      "value": "DAEMON"
+    }
+  ]
+}

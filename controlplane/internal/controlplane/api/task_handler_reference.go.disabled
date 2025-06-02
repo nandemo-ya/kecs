@@ -1,0 +1,497 @@
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
+	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
+)
+
+// HTTP Handlers for ECS Task operations
+
+// Helper functions
+
+// sendError sends an ECS-style error response
+func sendError(w http.ResponseWriter, errorType, message string) {
+	errorResponse := map[string]interface{}{
+		"__type": errorType,
+		"message": message,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(errorResponse)
+}
+
+// parseTaskDefinitionReference parses task definition reference (family:revision or ARN)
+func parseTaskDefinitionReference(taskDef, region, accountID string) string {
+	// If it's already an ARN, return as is
+	if strings.HasPrefix(taskDef, "arn:aws:ecs:") {
+		return taskDef
+	}
+	
+	// If it contains a colon, it's family:revision
+	if strings.Contains(taskDef, ":") {
+		return fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", region, accountID, taskDef)
+	}
+	
+	// Otherwise, it's just a family name, use latest revision
+	return fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", region, accountID, taskDef)
+}
+
+// handleECSRunTask handles the RunTask operation (with full container deployment)
+func (s *Server) handleECSRunTaskFull(w http.ResponseWriter, body []byte) {
+	var req RunTaskRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		sendError(w, "InvalidParameterValue", "Invalid request body")
+		return
+	}
+
+	// Validate required fields
+	if req.TaskDefinition == "" {
+		sendError(w, "InvalidParameterValue", "TaskDefinition is required")
+		return
+	}
+
+	// Default cluster if not specified
+	clusterName := "default"
+	if req.Cluster != "" {
+		clusterName = req.Cluster
+	}
+
+	// Get cluster from storage
+	cluster, err := s.storage.ClusterStore().Get(context.Background(), clusterName)
+	if err != nil {
+		sendError(w, "ServerException", "Failed to get cluster")
+		return
+	}
+	if cluster == nil {
+		sendError(w, "ClusterNotFoundException", fmt.Sprintf("Cluster not found: %s", clusterName))
+		return
+	}
+
+	// Parse task definition reference (family:revision or ARN)
+	taskDefArn := parseTaskDefinitionReference(req.TaskDefinition, s.region, s.accountID)
+	
+	// Get task definition from storage
+	taskDef, err := s.storage.TaskDefinitionStore().GetByARN(context.Background(), taskDefArn)
+	if err != nil {
+		sendError(w, "ServerException", "Failed to get task definition")
+		return
+	}
+	if taskDef == nil || taskDef.Status != "ACTIVE" {
+		sendError(w, "InvalidParameterValue", fmt.Sprintf("Task definition not found or inactive: %s", *req.TaskDefinition))
+		return
+	}
+
+	// Create task manager
+	taskManager, err := kubernetes.NewTaskManager(s.storage)
+	if err != nil {
+		sendError(w, "ServerException", "Failed to create task manager")
+		return
+	}
+
+	// Create converter
+	converter := converters.NewTaskConverter(s.region, s.accountID)
+
+	// Determine how many tasks to create
+	count := 1
+	if req.Count > 0 {
+		count = req.Count
+	}
+
+	var tasks []Task
+	var failures []Failure
+
+	for i := 0; i < count; i++ {
+		// Generate task ID
+		taskID := utils.GenerateShortID()
+		taskArn := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s",
+			s.region, s.accountID, cluster.Name, taskID)
+
+		// Serialize request to JSON for converter
+		reqJSON, err := json.Marshal(req)
+		if err != nil {
+			failures = append(failures, Failure{
+				Arn:    taskArn,
+				Reason: "RESOURCE:MEMORY",
+				Detail: fmt.Sprintf("Failed to serialize request: %v", err),
+			})
+			continue
+		}
+		
+		// Convert to pod
+		pod, err := converter.ConvertTaskToPod(taskDef, reqJSON, cluster, taskID)
+		if err != nil {
+			failures = append(failures, Failure{
+				Arn:    &taskArn,
+				Reason: strPtr("RESOURCE:MEMORY"),
+				Detail: strPtr(fmt.Sprintf("Failed to convert task: %v", err)),
+			})
+			continue
+		}
+
+		// Create storage task object
+		now := time.Now()
+		storageTask := &storage.Task{
+			ID:                taskID,
+			ARN:               taskArn,
+			ClusterARN:        cluster.ARN,
+			TaskDefinitionARN: taskDef.ARN,
+			LastStatus:        "PROVISIONING",
+			DesiredStatus:     "RUNNING",
+			LaunchType:        getLaunchType(&req),
+			Version:           1,
+			CreatedAt:         now,
+			Region:            s.region,
+			AccountID:         s.accountID,
+			Containers:        "[]", // Will be updated by task manager
+		}
+
+		// Apply overrides if any
+		if req.Overrides != nil {
+			overridesJSON, _ := json.Marshal(req.Overrides)
+			storageTask.Overrides = string(overridesJSON)
+		}
+
+		// Set group if specified
+		if req.Group != nil {
+			storageTask.Group = *req.Group
+		}
+
+		// Set started by if specified
+		if req.StartedBy != nil {
+			storageTask.StartedBy = *req.StartedBy
+		}
+
+		// Create the task
+		if err := taskManager.CreateTask(context.Background(), pod, storageTask); err != nil {
+			failures = append(failures, Failure{
+				Arn:    &taskArn,
+				Reason: strPtr("RESOURCE:MEMORY"),
+				Detail: strPtr(fmt.Sprintf("Failed to create task: %v", err)),
+			})
+			continue
+		}
+
+		// Build task response
+		task := Task{
+			TaskArn:           taskArn,
+			ClusterArn:        cluster.ARN,
+			TaskDefinitionArn: taskDef.ARN,
+			Overrides:         req.Overrides,
+			LastStatus:        "PROVISIONING",
+			DesiredStatus:     "RUNNING",
+			LaunchType:        getLaunchType(&req),
+			Version:           1,
+			CreatedAt:         &now,
+			Attachments:       []Attachment{},
+			Attributes:        []Attribute{},
+			Containers:        []Container{},
+			Tags:              req.Tags,
+		}
+
+		// Add CPU/Memory from task definition
+		if taskDef.CPU != "" {
+			task.Cpu = taskDef.CPU
+		}
+		if taskDef.Memory != "" {
+			task.Memory = taskDef.Memory
+		}
+
+		// Add group if specified
+		if req.Group != nil {
+			task.Group = *req.Group
+		}
+
+		// Add started by if specified
+		if req.StartedBy != nil {
+			task.StartedBy = *req.StartedBy
+		}
+
+		tasks = append(tasks, task)
+	}
+
+	// Build response
+	response := RunTaskResponse{
+		Tasks:    tasks,
+		Failures: failures,
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleECSDescribeTasks handles the DescribeTasks operation
+func (s *Server) handleECSDescribeTasks(w http.ResponseWriter, body []byte) {
+	var req DescribeTasksRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		sendError(w, "InvalidParameterValue", "Invalid request body")
+		return
+	}
+
+	// Validate required fields
+	if req.Tasks == nil || len(req.Tasks) == 0 {
+		sendError(w, "InvalidParameterValue", "Tasks is required")
+		return
+	}
+
+	// Default cluster if not specified
+	clusterName := "default"
+	if req.Cluster != nil {
+		clusterName = *req.Cluster
+	}
+
+	// Get cluster from storage
+	cluster, err := s.storage.ClusterStore().Get(context.Background(), clusterName)
+	if err != nil {
+		sendError(w, "ServerException", "Failed to get cluster")
+		return
+	}
+	if cluster == nil {
+		sendError(w, "ClusterNotFoundException", fmt.Sprintf("Cluster not found: %s", clusterName))
+		return
+	}
+
+	var tasks []Task
+	var failures []Failure
+
+	// Get tasks from storage
+	for _, taskRef := range req.Tasks {
+		task, err := s.storage.TaskStore().Get(context.Background(), cluster.ARN, taskRef)
+		if err != nil {
+			failures = append(failures, Failure{
+				Arn:    &taskRef,
+				Reason: strPtr("MISSING"),
+				Detail: strPtr("Task not found"),
+			})
+			continue
+		}
+		if task == nil {
+			failures = append(failures, Failure{
+				Arn:    &taskRef,
+				Reason: strPtr("MISSING"),
+				Detail: strPtr("Task not found"),
+			})
+			continue
+		}
+
+		// Convert storage task to API task
+		apiTask := convertStorageTaskToAPI(task)
+		tasks = append(tasks, apiTask)
+	}
+
+	// Build response
+	response := DescribeTasksResponse{
+		Tasks:    tasks,
+		Failures: failures,
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleECSListTasks handles the ListTasks operation
+func (s *Server) handleECSListTasks(w http.ResponseWriter, body []byte) {
+	var req ListTasksRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		sendError(w, "InvalidParameterValue", "Invalid request body")
+		return
+	}
+
+	// Default cluster if not specified
+	clusterName := "default"
+	if req.Cluster != nil {
+		clusterName = *req.Cluster
+	}
+
+	// Get cluster from storage
+	cluster, err := s.storage.ClusterStore().Get(context.Background(), clusterName)
+	if err != nil {
+		sendError(w, "ServerException", "Failed to get cluster")
+		return
+	}
+	if cluster == nil {
+		sendError(w, "ClusterNotFoundException", fmt.Sprintf("Cluster not found: %s", clusterName))
+		return
+	}
+
+	// Build filters
+	filters := storage.TaskFilters{
+		MaxResults: 100, // Default
+	}
+
+	if req.MaxResults != nil {
+		filters.MaxResults = *req.MaxResults
+	}
+	if req.NextToken != nil {
+		filters.NextToken = *req.NextToken
+	}
+	if req.ServiceName != nil {
+		filters.ServiceName = *req.ServiceName
+	}
+	if req.Family != nil {
+		filters.Family = *req.Family
+	}
+	if req.ContainerInstance != nil {
+		filters.ContainerInstance = *req.ContainerInstance
+	}
+	if req.LaunchType != nil {
+		filters.LaunchType = *req.LaunchType
+	}
+	if req.DesiredStatus != nil {
+		filters.DesiredStatus = *req.DesiredStatus
+	}
+	if req.StartedBy != nil {
+		filters.StartedBy = *req.StartedBy
+	}
+
+	// Get tasks from storage
+	tasks, err := s.storage.TaskStore().List(context.Background(), cluster.ARN, filters)
+	if err != nil {
+		sendError(w, "ServerException", "Failed to list tasks")
+		return
+	}
+
+	// Extract task ARNs
+	taskArns := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		taskArns = append(taskArns, task.ARN)
+	}
+
+	// Build response
+	response := ListTasksResponse{
+		TaskArns: taskArns,
+	}
+
+	// Add next token if there are more results
+	// TODO: Implement proper pagination
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// Helper functions
+
+func getLaunchType(req *RunTaskRequest) string {
+	if req.LaunchType != nil {
+		return *req.LaunchType
+	}
+	// Default to FARGATE
+	return "FARGATE"
+}
+
+func convertStorageTaskToAPI(task *storage.Task) Task {
+	apiTask := Task{
+		TaskArn:           task.ARN,
+		ClusterArn:        task.ClusterARN,
+		TaskDefinitionArn: task.TaskDefinitionARN,
+		LastStatus:        task.LastStatus,
+		DesiredStatus:     task.DesiredStatus,
+		LaunchType:        task.LaunchType,
+		Version:           task.Version,
+		CreatedAt:         &task.CreatedAt,
+		Attachments:       []Attachment{},
+		Attributes:        []Attribute{},
+		Tags:              []Tag{},
+	}
+
+	// Add overrides if any
+	if task.Overrides != "" {
+		var overrides TaskOverride
+		if err := json.Unmarshal([]byte(task.Overrides), &overrides); err == nil {
+			apiTask.Overrides = &overrides
+		}
+	}
+
+	// Add containers
+	if task.Containers != "" {
+		var containers []Container
+		if err := json.Unmarshal([]byte(task.Containers), &containers); err == nil {
+			apiTask.Containers = containers
+		}
+	}
+
+	// Add optional fields
+	if task.ContainerInstanceARN != "" {
+		apiTask.ContainerInstanceArn = task.ContainerInstanceARN
+	}
+	if task.CPU != "" {
+		apiTask.Cpu = task.CPU
+	}
+	if task.Memory != "" {
+		apiTask.Memory = task.Memory
+	}
+	if task.Group != "" {
+		apiTask.Group = task.Group
+	}
+	if task.StartedBy != "" {
+		apiTask.StartedBy = task.StartedBy
+	}
+	if task.StopCode != "" {
+		apiTask.StopCode = task.StopCode
+	}
+	if task.StoppedReason != "" {
+		apiTask.StoppedReason = task.StoppedReason
+	}
+	if task.Connectivity != "" {
+		apiTask.Connectivity = task.Connectivity
+	}
+	if task.PlatformVersion != "" {
+		apiTask.PlatformVersion = task.PlatformVersion
+	}
+	if task.PlatformFamily != "" {
+		apiTask.PlatformFamily = task.PlatformFamily
+	}
+	if task.HealthStatus != "" {
+		apiTask.HealthStatus = task.HealthStatus
+	}
+	if task.CapacityProviderName != "" {
+		apiTask.CapacityProviderName = task.CapacityProviderName
+	}
+
+	// Add timestamps
+	if task.StartedAt != nil {
+		apiTask.StartedAt = task.StartedAt
+	}
+	if task.StoppingAt != nil {
+		apiTask.StoppingAt = task.StoppingAt
+	}
+	if task.StoppedAt != nil {
+		apiTask.StoppedAt = task.StoppedAt
+	}
+	if task.ConnectivityAt != nil {
+		apiTask.ConnectivityAt = task.ConnectivityAt
+	}
+	if task.PullStartedAt != nil {
+		apiTask.PullStartedAt = task.PullStartedAt
+	}
+	if task.PullStoppedAt != nil {
+		apiTask.PullStoppedAt = task.PullStoppedAt
+	}
+	if task.ExecutionStoppedAt != nil {
+		apiTask.ExecutionStoppedAt = task.ExecutionStoppedAt
+	}
+
+	// Set enable execute command
+	apiTask.EnableExecuteCommand = task.EnableExecuteCommand
+
+	// Add ephemeral storage if any
+	if task.EphemeralStorage != "" {
+		var ephemeralStorage EphemeralStorage
+		if err := json.Unmarshal([]byte(task.EphemeralStorage), &ephemeralStorage); err == nil {
+			apiTask.EphemeralStorage = &ephemeralStorage
+		}
+	}
+
+	// Add inference accelerators if any
+	// TODO: Implement when needed
+
+	return apiTask
+}

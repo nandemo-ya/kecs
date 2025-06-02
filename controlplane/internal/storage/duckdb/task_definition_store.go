@@ -263,23 +263,21 @@ func (s *taskDefinitionStore) GetByARN(ctx context.Context, arn string) (*storag
 	// Parse ARN to extract family and revision
 	// Format: arn:aws:ecs:region:account:task-definition/family:revision
 	parts := strings.Split(arn, ":")
-	if len(parts) < 6 {
+	if len(parts) < 7 {
 		return nil, fmt.Errorf("invalid task definition ARN: %s", arn)
 	}
 
+	// For an ARN like "arn:aws:ecs:us-east-1:123456789012:task-definition/nginx-fargate:2"
+	// parts[5] = "task-definition/nginx-fargate"
+	// parts[6] = "2" (revision)
 	taskDefPart := parts[5]
+	revisionStr := parts[6]
 	if !strings.HasPrefix(taskDefPart, "task-definition/") {
 		return nil, fmt.Errorf("invalid task definition ARN: %s", arn)
 	}
 
-	familyRevision := strings.TrimPrefix(taskDefPart, "task-definition/")
-	lastColon := strings.LastIndex(familyRevision, ":")
-	if lastColon == -1 {
-		return nil, fmt.Errorf("invalid task definition ARN: missing revision: %s", arn)
-	}
-
-	family := familyRevision[:lastColon]
-	revisionStr := familyRevision[lastColon+1:]
+	// Extract "nginx-fargate" from "task-definition/nginx-fargate"
+	family := strings.TrimPrefix(taskDefPart, "task-definition/")
 	revision, err := strconv.Atoi(revisionStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid task definition revision: %s", revisionStr)

@@ -20,6 +20,8 @@ type Server struct {
 	ecsService  generated.ECSServiceInterface
 	storage     storage.Storage
 	kindManager *kubernetes.KindManager
+	region      string
+	accountID   string
 }
 
 // NewServer creates a new API server instance
@@ -27,6 +29,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage) *Server {
 	return &Server{
 		port:        port,
 		kubeconfig:  kubeconfig,
+		region:      "ap-northeast-1", // Default region
+		accountID:   "123456789012",   // Default account ID
 		ecsService:  generated.NewECSServiceWithStorage(storage),
 		storage:     storage,
 		kindManager: kubernetes.NewKindManager(),
