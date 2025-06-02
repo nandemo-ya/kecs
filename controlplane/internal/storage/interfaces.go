@@ -316,6 +316,10 @@ type Service struct {
 	// Account ID
 	AccountID string `json:"accountId"`
 	
+	// Kubernetes Deployment information (for tracking)
+	DeploymentName string `json:"deploymentName,omitempty"`
+	Namespace      string `json:"namespace,omitempty"`
+	
 	// Timestamps
 	CreatedAt time.Time  `json:"createdAt"`
 	UpdatedAt time.Time  `json:"updatedAt"`

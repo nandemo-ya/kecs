@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
+	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -121,14 +124,32 @@ func (s *Server) handleECSDeleteService(w http.ResponseWriter, body []byte) {
 // CreateServiceWithStorage creates a new service using storage
 func (s *Server) CreateServiceWithStorage(ctx context.Context, req CreateServiceRequest) (*CreateServiceResponse, error) {
 	// Default cluster if not specified
-	cluster := "default"
+	clusterName := "default"
 	if req.Cluster != "" {
-		cluster = req.Cluster
+		clusterName = req.Cluster
+	}
+
+	// Get cluster from storage
+	cluster, err := s.storage.ClusterStore().Get(context.Background(), clusterName)
+	if err != nil || cluster == nil {
+		return nil, fmt.Errorf("cluster not found: %s", clusterName)
+	}
+
+	// Get task definition
+	taskDefArn := req.TaskDefinition
+	if !strings.HasPrefix(taskDefArn, "arn:aws:ecs:") {
+		// Convert family:revision to ARN
+		taskDefArn = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", s.region, s.accountID, req.TaskDefinition)
+	}
+
+	taskDef, err := s.storage.TaskDefinitionStore().GetByARN(context.Background(), taskDefArn)
+	if err != nil || taskDef == nil {
+		return nil, fmt.Errorf("task definition not found: %s", req.TaskDefinition)
 	}
 
 	// Generate ARNs
-	serviceARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:service/%s/%s", cluster, req.ServiceName)
-	clusterARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/%s", cluster)
+	serviceARN := fmt.Sprintf("arn:aws:ecs:%s:%s:service/%s/%s", s.region, s.accountID, cluster.Name, req.ServiceName)
+	clusterARN := cluster.ARN
 
 	// Set default values
 	if req.LaunchType == "" {
@@ -149,18 +170,35 @@ func (s *Server) CreateServiceWithStorage(ctx context.Context, req CreateService
 	tagsJSON, _ := json.Marshal(req.Tags)
 	serviceConnectConfigJSON, _ := json.Marshal(req.ServiceConnectConfiguration)
 
-	// Create storage service
+	// Create service converter and manager
+	serviceConverter := converters.NewServiceConverter(s.region, s.accountID)
+	serviceManager := kubernetes.NewServiceManager(s.storage, s.kindManager)
+
+	// Convert ECS service to Kubernetes Deployment
+	deployment, kubeService, err := serviceConverter.ConvertServiceToDeployment(
+		&storage.Service{ServiceName: req.ServiceName, DesiredCount: req.DesiredCount, LaunchType: req.LaunchType},
+		taskDef,
+		cluster,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert service to deployment: %w", err)
+	}
+
+	// Create storage service with deployment information
+	namespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
+	deploymentName := fmt.Sprintf("ecs-service-%s", req.ServiceName)
+	
 	storageService := &storage.Service{
 		ARN:                           serviceARN,
 		ServiceName:                   req.ServiceName,
 		ClusterARN:                    clusterARN,
-		TaskDefinitionARN:             req.TaskDefinition,
+		TaskDefinitionARN:             taskDefArn,
 		DesiredCount:                  req.DesiredCount,
 		RunningCount:                  0,
 		PendingCount:                  req.DesiredCount,
 		LaunchType:                    req.LaunchType,
 		PlatformVersion:               req.PlatformVersion,
-		Status:                        "ACTIVE",
+		Status:                        "PENDING",
 		RoleARN:                       req.Role,
 		LoadBalancers:                 string(loadBalancersJSON),
 		ServiceRegistries:             string(serviceRegistriesJSON),
@@ -176,13 +214,26 @@ func (s *Server) CreateServiceWithStorage(ctx context.Context, req CreateService
 		PropagateTags:                 req.PropagateTags,
 		EnableExecuteCommand:          req.EnableExecuteCommand,
 		HealthCheckGracePeriodSeconds: req.HealthCheckGracePeriodSeconds,
-		Region:                        "us-east-1",
-		AccountID:                     "123456789012",
+		Region:                        s.region,
+		AccountID:                     s.accountID,
+		DeploymentName:                deploymentName,
+		Namespace:                     namespace,
 	}
 
-	// Save to storage
+	// Save to storage first
 	if err := s.storage.ServiceStore().Create(ctx, storageService); err != nil {
 		return nil, fmt.Errorf("failed to create service: %w", err)
+	}
+
+	// Create Kubernetes Deployment and Service
+	if err := serviceManager.CreateService(ctx, deployment, kubeService, cluster, storageService); err != nil {
+		// Service was created in storage but Kubernetes deployment failed
+		// Update status to indicate failure - get fresh service data first
+		if freshService, getErr := s.storage.ServiceStore().Get(ctx, cluster.ARN, storageService.ServiceName); getErr == nil {
+			freshService.Status = "FAILED"
+			s.storage.ServiceStore().Update(ctx, freshService)
+		}
+		return nil, fmt.Errorf("failed to create kubernetes deployment: %w", err)
 	}
 
 	// Convert back to API response
@@ -201,7 +252,7 @@ func (s *Server) UpdateServiceWithStorage(ctx context.Context, req UpdateService
 		cluster = req.Cluster
 	}
 
-	clusterARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/%s", cluster)
+	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", s.region, s.accountID, cluster)
 
 	// Get existing service
 	existingService, err := s.storage.ServiceStore().Get(ctx, clusterARN, req.Service)
@@ -281,7 +332,7 @@ func (s *Server) DeleteServiceWithStorage(ctx context.Context, req DeleteService
 		cluster = req.Cluster
 	}
 
-	clusterARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/%s", cluster)
+	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", s.region, s.accountID, cluster)
 
 	// Get existing service to return in response
 	existingService, err := s.storage.ServiceStore().Get(ctx, clusterARN, req.Service)
@@ -322,7 +373,7 @@ func (s *Server) DescribeServicesWithStorage(ctx context.Context, req DescribeSe
 		cluster = req.Cluster
 	}
 
-	clusterARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/%s", cluster)
+	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", s.region, s.accountID, cluster)
 
 	var services []Service
 	var failures []Failure
@@ -331,7 +382,7 @@ func (s *Server) DescribeServicesWithStorage(ctx context.Context, req DescribeSe
 		storageService, err := s.storage.ServiceStore().Get(ctx, clusterARN, serviceName)
 		if err != nil {
 			failures = append(failures, Failure{
-				Arn:    fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:service/%s/%s", cluster, serviceName),
+				Arn:    fmt.Sprintf("arn:aws:ecs:%s:%s:service/%s/%s", s.region, s.accountID, cluster, serviceName),
 				Reason: "MISSING",
 				Detail: err.Error(),
 			})
@@ -356,7 +407,7 @@ func (s *Server) ListServicesWithStorage(ctx context.Context, req ListServicesRe
 		cluster = req.Cluster
 	}
 
-	clusterARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/%s", cluster)
+	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", s.region, s.accountID, cluster)
 
 	// Set default limit if not specified
 	limit := req.MaxResults
