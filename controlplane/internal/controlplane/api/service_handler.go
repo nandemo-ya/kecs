@@ -378,15 +378,19 @@ func (s *Server) UpdateServiceWithStorage(ctx context.Context, req UpdateService
 // DeleteServiceWithStorage deletes a service using storage
 func (s *Server) DeleteServiceWithStorage(ctx context.Context, req DeleteServiceRequest) (*DeleteServiceResponse, error) {
 	// Default cluster if not specified
-	cluster := "default"
+	clusterName := "default"
 	if req.Cluster != "" {
-		cluster = req.Cluster
+		clusterName = req.Cluster
 	}
 
-	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", s.region, s.accountID, cluster)
+	// Get cluster from storage
+	cluster, err := s.storage.ClusterStore().Get(ctx, clusterName)
+	if err != nil || cluster == nil {
+		return nil, fmt.Errorf("cluster not found: %s", clusterName)
+	}
 
 	// Get existing service to return in response
-	existingService, err := s.storage.ServiceStore().Get(ctx, clusterARN, req.Service)
+	existingService, err := s.storage.ServiceStore().Get(ctx, cluster.ARN, req.Service)
 	if err != nil {
 		return nil, fmt.Errorf("service not found: %w", err)
 	}
@@ -403,12 +407,26 @@ func (s *Server) DeleteServiceWithStorage(ctx context.Context, req DeleteService
 		log.Printf("Warning: failed to update service status to DRAINING: %v", err)
 	}
 
+	// Delete Kubernetes resources
+	serviceManager := kubernetes.NewServiceManager(s.storage, s.kindManager)
+	if err := serviceManager.DeleteService(ctx, cluster, existingService); err != nil {
+		log.Printf("Warning: failed to delete Kubernetes resources for service %s: %v", 
+			existingService.ServiceName, err)
+		// Continue with deletion even if Kubernetes deletion fails
+		// This matches AWS ECS behavior where the service is marked for deletion
+		// even if underlying resources might still exist
+	}
+
 	// Delete from storage
-	if err := s.storage.ServiceStore().Delete(ctx, clusterARN, req.Service); err != nil {
+	if err := s.storage.ServiceStore().Delete(ctx, cluster.ARN, req.Service); err != nil {
 		return nil, fmt.Errorf("failed to delete service: %w", err)
 	}
 
+	log.Printf("Successfully deleted service %s from cluster %s", 
+		existingService.ServiceName, clusterName)
+
 	// Convert back to API response
+	// The service is returned with DRAINING status as per AWS ECS behavior
 	service := storageServiceToAPIService(existingService)
 
 	return &DeleteServiceResponse{
