@@ -95,7 +95,7 @@ export function useApiData<T>(
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiCall, ...dependencies]);
+  }, dependencies);
 
   useEffect(() => {
     fetchData();

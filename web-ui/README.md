@@ -10,11 +10,14 @@ The KECS Web UI provides a modern, intuitive interface for managing and monitori
 
 ### Current Implementation
 - ✅ **Dashboard**: Real-time overview of clusters, services, tasks, and task definitions
+- ✅ **Detail Views**: Individual cluster, service, and task detail pages with comprehensive information
+- ✅ **Navigation**: React Router-based SPA with proper URL routing and navigation
 - ✅ **API Integration**: Full integration with KECS Control Plane REST API
 - ✅ **Health Monitoring**: Real-time connection status and health checks
 - ✅ **Auto-refresh**: Automatic data updates every 30 seconds
 - ✅ **Error Handling**: Graceful error handling with retry functionality
 - ✅ **Loading States**: Visual feedback during API calls
+- ✅ **Quick Access**: Direct links to resources from dashboard
 - ✅ **Responsive Design**: Mobile-friendly interface
 - ✅ **Modern UI**: Clean, professional design with Tailwind-inspired styling
 
@@ -24,11 +27,12 @@ The KECS Web UI provides a modern, intuitive interface for managing and monitori
 - 📝 **Log Viewer**: Real-time container and service logs
 - 🌐 **WebSocket Support**: Real-time updates without polling
 - 🔧 **Service Management**: Create, update, and delete services through the UI
-- 📋 **Detailed Views**: Individual cluster, service, and task detail pages
+- 📋 **List Views**: Comprehensive list pages for all resource types
 
 ## Technology Stack
 
 - **React 19** with **TypeScript** - Modern React with type safety
+- **React Router** - Client-side routing for SPA navigation
 - **Create React App** - Standard React development environment
 - **CSS3** - Custom styling with modern design patterns
 - **Future additions**: Recharts, React Flow, WebSocket client
