@@ -4,8 +4,11 @@ import './App.css';
 import { Dashboard } from './components/Dashboard';
 import { ClusterList } from './components/ClusterList';
 import { ClusterDetail } from './components/ClusterDetail';
+import { ServiceList } from './components/ServiceList';
 import { ServiceDetail } from './components/ServiceDetail';
+import { TaskList } from './components/TaskList';
 import { TaskDetail } from './components/TaskDetail';
+import { TaskDefinitionList } from './components/TaskDefinitionList';
 
 function Navigation() {
   const location = useLocation();
@@ -73,11 +76,11 @@ function AppContent() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/clusters" element={<ClusterList />} />
         <Route path="/clusters/:clusterName" element={<ClusterDetail />} />
+        <Route path="/services" element={<ServiceList />} />
         <Route path="/services/:serviceName" element={<ServiceDetail />} />
+        <Route path="/tasks" element={<TaskList />} />
         <Route path="/tasks/:taskId" element={<TaskDetail />} />
-        <Route path="/services" element={<div className="placeholder">Services List (Coming Soon)</div>} />
-        <Route path="/tasks" element={<div className="placeholder">Tasks List (Coming Soon)</div>} />
-        <Route path="/task-definitions" element={<div className="placeholder">Task Definitions List (Coming Soon)</div>} />
+        <Route path="/task-definitions" element={<TaskDefinitionList />} />
         <Route path="*" element={<div className="placeholder">Page Not Found</div>} />
       </Routes>
       
