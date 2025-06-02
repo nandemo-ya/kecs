@@ -107,6 +107,43 @@ export interface DescribeTaskDefinitionResponse {
   taskDefinition: TaskDefinition;
 }
 
+// Service Management Types
+export interface CreateServiceRequest {
+  cluster: string;
+  serviceName: string;
+  taskDefinition: string;
+  desiredCount: number;
+  launchType?: string;
+  platformVersion?: string;
+  schedulingStrategy?: string;
+}
+
+export interface CreateServiceResponse {
+  service: Service;
+}
+
+export interface UpdateServiceRequest {
+  cluster: string;
+  service: string;
+  desiredCount?: number;
+  taskDefinition?: string;
+  platformVersion?: string;
+}
+
+export interface UpdateServiceResponse {
+  service: Service;
+}
+
+export interface DeleteServiceRequest {
+  cluster: string;
+  service: string;
+  force?: boolean;
+}
+
+export interface DeleteServiceResponse {
+  service: Service;
+}
+
 // Dashboard Summary Types
 export interface DashboardStats {
   clusters: number;

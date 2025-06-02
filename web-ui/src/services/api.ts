@@ -9,6 +9,12 @@ import {
   DescribeTasksResponse,
   ListTaskDefinitionsResponse,
   DescribeTaskDefinitionResponse,
+  CreateServiceRequest,
+  CreateServiceResponse,
+  UpdateServiceRequest,
+  UpdateServiceResponse,
+  DeleteServiceRequest,
+  DeleteServiceResponse,
 } from '../types/api';
 
 // In development, use empty string to leverage proxy
@@ -188,6 +194,31 @@ class KECSApiClient {
         taskDefinitions: 0,
       };
     }
+  }
+
+  // Service Management Operations
+  async createService(request: CreateServiceRequest): Promise<CreateServiceResponse> {
+    return this.makeRequest<CreateServiceResponse>(
+      '/v1/CreateService',
+      'AmazonEC2ContainerServiceV20141113.CreateService',
+      request
+    );
+  }
+
+  async updateService(request: UpdateServiceRequest): Promise<UpdateServiceResponse> {
+    return this.makeRequest<UpdateServiceResponse>(
+      '/v1/UpdateService',
+      'AmazonEC2ContainerServiceV20141113.UpdateService',
+      request
+    );
+  }
+
+  async deleteService(request: DeleteServiceRequest): Promise<DeleteServiceResponse> {
+    return this.makeRequest<DeleteServiceResponse>(
+      '/v1/DeleteService',
+      'AmazonEC2ContainerServiceV20141113.DeleteService',
+      request
+    );
   }
 }
 
