@@ -9,6 +9,9 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -121,26 +124,12 @@ func (s *Server) handleStopTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement actual task stopping logic
-
-	// For now, return a mock response
-	cluster := "default"
-	if req.Cluster != "" {
-		cluster = req.Cluster
-	}
-
-	taskArn := req.Task
-	reason := req.Reason
-
-	resp := StopTaskResponse{
-		Task: Task{
-			TaskArn:       taskArn,
-			ClusterArn:    "arn:aws:ecs:region:account:cluster/" + cluster,
-			LastStatus:    "STOPPING",
-			DesiredStatus: "STOPPED",
-			StoppedReason: reason,
-			StoppingAt:    "2025-05-15T00:40:35+09:00",
-		},
+	ctx := context.Background()
+	resp, err := s.StopTaskWithStorage(ctx, req)
+	if err != nil {
+		log.Printf("Error stopping task: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -160,31 +149,12 @@ func (s *Server) handleDescribeTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement actual task description logic
-
-	// For now, return a mock response
-	cluster := "default"
-	if req.Cluster != "" {
-		cluster = req.Cluster
-	}
-
-	taskArn := ""
-	if len(req.Tasks) > 0 {
-		taskArn = req.Tasks[0]
-	}
-
-	resp := DescribeTasksResponse{
-		Tasks: []Task{
-			{
-				TaskArn:           taskArn,
-				ClusterArn:        "arn:aws:ecs:region:account:cluster/" + cluster,
-				TaskDefinitionArn: "arn:aws:ecs:region:account:task-definition/family:1",
-				LastStatus:        "RUNNING",
-				DesiredStatus:     "RUNNING",
-				CreatedAt:         "2025-05-15T00:40:35+09:00",
-				StartedAt:         "2025-05-15T00:40:40+09:00",
-			},
-		},
+	ctx := context.Background()
+	resp, err := s.DescribeTasksWithStorage(ctx, req)
+	if err != nil {
+		log.Printf("Error describing tasks: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -354,31 +324,12 @@ func (s *Server) handleDescribeTasksECS(w http.ResponseWriter, body []byte) {
 		return
 	}
 
-	// TODO: Implement actual task description logic
-
-	// For now, return a mock response
-	cluster := "default"
-	if req.Cluster != "" {
-		cluster = req.Cluster
-	}
-
-	taskArn := ""
-	if len(req.Tasks) > 0 {
-		taskArn = req.Tasks[0]
-	}
-
-	resp := DescribeTasksResponse{
-		Tasks: []Task{
-			{
-				TaskArn:           taskArn,
-				ClusterArn:        "arn:aws:ecs:region:account:cluster/" + cluster,
-				TaskDefinitionArn: "arn:aws:ecs:region:account:task-definition/family:1",
-				LastStatus:        "RUNNING",
-				DesiredStatus:     "RUNNING",
-				CreatedAt:         "2025-05-15T00:40:35+09:00",
-				StartedAt:         "2025-05-15T00:40:40+09:00",
-			},
-		},
+	ctx := context.Background()
+	resp, err := s.DescribeTasksWithStorage(ctx, req)
+	if err != nil {
+		log.Printf("Error describing tasks: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -407,4 +358,298 @@ func (s *Server) handleListTasksECS(w http.ResponseWriter, body []byte) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// handleStopTaskECS handles the StopTask operation for ECS API
+func (s *Server) handleStopTaskECS(w http.ResponseWriter, body []byte) {
+	var req StopTaskRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	ctx := context.Background()
+	resp, err := s.StopTaskWithStorage(ctx, req)
+	if err != nil {
+		log.Printf("Error stopping task: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// DescribeTasksWithStorage describes tasks using storage and Kubernetes status
+func (s *Server) DescribeTasksWithStorage(ctx context.Context, req DescribeTasksRequest) (*DescribeTasksResponse, error) {
+	// Default cluster if not specified
+	clusterName := "default"
+	if req.Cluster != "" {
+		clusterName = req.Cluster
+	}
+
+	// Get cluster from storage
+	cluster, err := s.storage.ClusterStore().Get(ctx, clusterName)
+	if err != nil || cluster == nil {
+		return nil, fmt.Errorf("cluster not found: %s", clusterName)
+	}
+
+	var tasks []Task
+	var failures []Failure
+
+	for _, taskIdentifier := range req.Tasks {
+		// taskIdentifier can be either task ARN or task ID
+		var taskARN string
+		if strings.HasPrefix(taskIdentifier, "arn:aws:ecs:") {
+			taskARN = taskIdentifier
+		} else {
+			// Convert task ID to ARN
+			taskARN = fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", s.region, s.accountID, cluster.Name, taskIdentifier)
+		}
+
+		// Get task from storage
+		storageTask, err := s.storage.TaskStore().Get(ctx, cluster.ARN, taskIdentifier)
+		if err != nil {
+			failures = append(failures, Failure{
+				Arn:    taskARN,
+				Reason: "MISSING",
+				Detail: err.Error(),
+			})
+			continue
+		}
+
+		if storageTask == nil {
+			failures = append(failures, Failure{
+				Arn:    taskARN,
+				Reason: "MISSING", 
+				Detail: "Task not found",
+			})
+			continue
+		}
+
+		// Get current status from Kubernetes if pod exists
+		if storageTask.PodName != "" && storageTask.Namespace != "" {
+			if err := s.updateTaskStatusFromKubernetes(ctx, storageTask, cluster); err != nil {
+				log.Printf("Warning: failed to update task status from Kubernetes: %v", err)
+				// Continue with stored status
+			}
+		}
+
+		// Convert storage task to API task
+		task := s.storageTaskToAPITask(storageTask)
+		tasks = append(tasks, task)
+	}
+
+	return &DescribeTasksResponse{
+		Tasks:    tasks,
+		Failures: failures,
+	}, nil
+}
+
+// updateTaskStatusFromKubernetes updates task status by checking Kubernetes pod
+func (s *Server) updateTaskStatusFromKubernetes(ctx context.Context, task *storage.Task, cluster *storage.Cluster) error {
+	// Get Kubernetes client for the cluster
+	kubeClient, err := s.kindManager.GetKubeClient(cluster.KindClusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	// Get Pod status
+	pod, err := kubeClient.CoreV1().Pods(task.Namespace).Get(
+		ctx, task.PodName, metav1.GetOptions{})
+	if err != nil {
+		// Pod not found - task is stopped
+		task.LastStatus = "STOPPED"
+		task.DesiredStatus = "STOPPED"
+		if task.StoppedReason == "" {
+			task.StoppedReason = "Pod not found"
+		}
+		return nil
+	}
+
+	// Map Pod phase to ECS status
+	previousStatus := task.LastStatus
+	switch pod.Status.Phase {
+	case corev1.PodPending:
+		task.LastStatus = "PENDING"
+	case corev1.PodRunning:
+		task.LastStatus = "RUNNING"
+		if task.StartedAt == nil && pod.Status.StartTime != nil {
+			startTime := pod.Status.StartTime.Time
+			task.StartedAt = &startTime
+		}
+	case corev1.PodSucceeded:
+		task.LastStatus = "STOPPED"
+		task.DesiredStatus = "STOPPED"
+		if task.StoppedReason == "" {
+			task.StoppedReason = "Task completed successfully"
+		}
+	case corev1.PodFailed:
+		task.LastStatus = "STOPPED"
+		task.DesiredStatus = "STOPPED"
+		if task.StoppedReason == "" {
+			task.StoppedReason = "Task failed"
+		}
+	}
+
+	// Update task in storage if status changed
+	if previousStatus != task.LastStatus {
+		task.Version++
+		now := time.Now()
+		if task.LastStatus == "STOPPED" && task.StoppedAt == nil {
+			task.StoppedAt = &now
+			task.ExecutionStoppedAt = &now
+		}
+
+		if err := s.storage.TaskStore().Update(ctx, task); err != nil {
+			log.Printf("Warning: failed to update task in storage: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// storageTaskToAPITask converts a storage.Task to an API Task
+func (s *Server) storageTaskToAPITask(storageTask *storage.Task) Task {
+	task := Task{
+		TaskArn:           storageTask.ARN,
+		ClusterArn:        storageTask.ClusterARN,
+		TaskDefinitionArn: storageTask.TaskDefinitionARN,
+		LastStatus:        storageTask.LastStatus,
+		DesiredStatus:     storageTask.DesiredStatus,
+		CreatedAt:         storageTask.CreatedAt.Format(time.RFC3339),
+		LaunchType:        storageTask.LaunchType,
+		PlatformVersion:   storageTask.PlatformVersion,
+		Group:             storageTask.Group,
+		StoppedReason:     storageTask.StoppedReason,
+		HealthStatus:      storageTask.HealthStatus,
+		Cpu:               storageTask.CPU,
+		Memory:            storageTask.Memory,
+	}
+
+	// Add timestamps if available
+	if storageTask.StartedAt != nil {
+		task.StartedAt = storageTask.StartedAt.Format(time.RFC3339)
+	}
+	if storageTask.StoppedAt != nil {
+		task.StoppedAt = storageTask.StoppedAt.Format(time.RFC3339)
+	}
+	if storageTask.PullStartedAt != nil {
+		task.PullStartedAt = storageTask.PullStartedAt.Format(time.RFC3339)
+	}
+	if storageTask.PullStoppedAt != nil {
+		task.PullStoppedAt = storageTask.PullStoppedAt.Format(time.RFC3339)
+	}
+
+	// Parse containers JSON
+	if storageTask.Containers != "" && storageTask.Containers != "[]" {
+		var containers []Container
+		if err := json.Unmarshal([]byte(storageTask.Containers), &containers); err == nil {
+			task.Containers = containers
+		}
+	}
+
+	// Parse overrides if available
+	if storageTask.Overrides != "" {
+		var overrides TaskOverride
+		if err := json.Unmarshal([]byte(storageTask.Overrides), &overrides); err == nil {
+			task.Overrides = &overrides
+		}
+	}
+
+	return task
+}
+
+// StopTaskWithStorage stops a running task by deleting its Kubernetes pod
+func (s *Server) StopTaskWithStorage(ctx context.Context, req StopTaskRequest) (*StopTaskResponse, error) {
+	// Default cluster if not specified
+	clusterName := "default"
+	if req.Cluster != "" {
+		clusterName = req.Cluster
+	}
+
+	// Get cluster from storage
+	cluster, err := s.storage.ClusterStore().Get(ctx, clusterName)
+	if err != nil || cluster == nil {
+		return nil, fmt.Errorf("cluster not found: %s", clusterName)
+	}
+
+	// Get task from storage (task identifier can be ARN or ID)
+	taskIdentifier := req.Task
+	storageTask, err := s.storage.TaskStore().Get(ctx, cluster.ARN, taskIdentifier)
+	if err != nil || storageTask == nil {
+		return nil, fmt.Errorf("task not found: %s", taskIdentifier)
+	}
+
+	// Update task status to STOPPING
+	now := time.Now()
+	storageTask.DesiredStatus = "STOPPED"
+	storageTask.LastStatus = "STOPPING"
+	storageTask.StoppedReason = req.Reason
+	if storageTask.StoppedReason == "" {
+		storageTask.StoppedReason = "Task stopped by user"
+	}
+	storageTask.StoppingAt = &now
+	storageTask.Version++
+
+	// Update task in storage
+	if err := s.storage.TaskStore().Update(ctx, storageTask); err != nil {
+		log.Printf("Warning: failed to update task status to STOPPING: %v", err)
+	}
+
+	// Delete the Kubernetes pod if it exists
+	if storageTask.PodName != "" && storageTask.Namespace != "" {
+		if err := s.deleteTaskPod(ctx, storageTask, cluster); err != nil {
+			log.Printf("Warning: failed to delete pod for task %s: %v", storageTask.ARN, err)
+			// Continue anyway - the pod might already be gone
+		}
+	}
+
+	// Update final task status
+	storageTask.LastStatus = "STOPPED"
+	storageTask.StoppedAt = &now
+	storageTask.ExecutionStoppedAt = &now
+	storageTask.Version++
+
+	// Update task in storage with final status
+	if err := s.storage.TaskStore().Update(ctx, storageTask); err != nil {
+		log.Printf("Warning: failed to update task status to STOPPED: %v", err)
+	}
+
+	// Convert to API response
+	task := s.storageTaskToAPITask(storageTask)
+
+	return &StopTaskResponse{
+		Task: task,
+	}, nil
+}
+
+// deleteTaskPod deletes the Kubernetes pod for a task
+func (s *Server) deleteTaskPod(ctx context.Context, task *storage.Task, cluster *storage.Cluster) error {
+	// Get Kubernetes client for the cluster
+	kubeClient, err := s.kindManager.GetKubeClient(cluster.KindClusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	// Delete the pod
+	deletePolicy := metav1.DeletePropagationForeground
+	deleteOptions := metav1.DeleteOptions{
+		PropagationPolicy: &deletePolicy,
+	}
+
+	err = kubeClient.CoreV1().Pods(task.Namespace).Delete(ctx, task.PodName, deleteOptions)
+	if err != nil {
+		// Check if the pod is already gone
+		if !strings.Contains(err.Error(), "not found") {
+			return fmt.Errorf("failed to delete pod: %w", err)
+		}
+		// Pod not found is OK - it might have already been deleted
+		log.Printf("Pod %s in namespace %s was already deleted", task.PodName, task.Namespace)
+	} else {
+		log.Printf("Successfully deleted pod %s in namespace %s for task %s", 
+			task.PodName, task.Namespace, task.ARN)
+	}
+
+	return nil
 }
