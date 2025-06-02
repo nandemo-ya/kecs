@@ -26,13 +26,13 @@ func (n *NamespaceManager) CreateNamespace(ctx context.Context, clusterName, reg
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespaceName,
 			Labels: map[string]string{
-				"kecs.io/managed":     "true",
-				"kecs.io/cluster":     clusterName,
-				"kecs.io/region":      region,
-				"kecs.io/type":        "ecs-cluster",
+				"kecs.dev/managed":     "true",
+				"kecs.dev/cluster":     clusterName,
+				"kecs.dev/region":      region,
+				"kecs.dev/type":        "ecs-cluster",
 			},
 			Annotations: map[string]string{
-				"kecs.io/created-by": "kecs-controlplane",
+				"kecs.dev/created-by": "kecs-controlplane",
 			},
 		},
 	}
@@ -73,7 +73,7 @@ func (n *NamespaceManager) GetNamespace(ctx context.Context, clusterName, region
 }
 
 func (n *NamespaceManager) ListNamespacesForCluster(ctx context.Context, clusterName string) ([]corev1.Namespace, error) {
-	labelSelector := fmt.Sprintf("kecs.io/cluster=%s", clusterName)
+	labelSelector := fmt.Sprintf("kecs.dev/cluster=%s", clusterName)
 	
 	namespaceList, err := n.clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
