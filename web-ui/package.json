@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Web UI for KECS (Kubernetes-based ECS Compatible Service)",
   "homepage": "/ui",
+  "proxy": "http://localhost:8080",
   "private": true,
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
