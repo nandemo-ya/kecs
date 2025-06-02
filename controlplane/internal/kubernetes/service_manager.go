@@ -79,6 +79,7 @@ func (sm *ServiceManager) CreateService(
 func (sm *ServiceManager) UpdateService(
 	ctx context.Context,
 	deployment *appsv1.Deployment,
+	kubeService *corev1.Service,
 	cluster *storage.Cluster,
 	storageService *storage.Service,
 ) error {
@@ -95,10 +96,24 @@ func (sm *ServiceManager) UpdateService(
 		return fmt.Errorf("failed to update deployment: %w", err)
 	}
 
-	// Update storage service
-	storageService.Status = "ACTIVE"
-	if err := sm.storage.ServiceStore().Update(ctx, storageService); err != nil {
-		log.Printf("Warning: failed to update service in storage: %v", err)
+	// Update Service if provided
+	if kubeService != nil {
+		existingService, err := kubeClient.CoreV1().Services(kubeService.Namespace).Get(
+			ctx, kubeService.Name, metav1.GetOptions{})
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				log.Printf("Warning: failed to get existing kubernetes service: %v", err)
+			}
+		} else {
+			// Preserve ClusterIP and update other fields
+			kubeService.Spec.ClusterIP = existingService.Spec.ClusterIP
+			kubeService.ResourceVersion = existingService.ResourceVersion
+			_, err = kubeClient.CoreV1().Services(kubeService.Namespace).Update(
+				ctx, kubeService, metav1.UpdateOptions{})
+			if err != nil {
+				log.Printf("Warning: failed to update kubernetes service: %v", err)
+			}
+		}
 	}
 
 	log.Printf("Successfully updated service %s deployment %s in namespace %s",
