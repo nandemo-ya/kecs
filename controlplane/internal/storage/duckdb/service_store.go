@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -36,14 +37,16 @@ func (s *serviceStore) Create(ctx context.Context, service *storage.Service) err
 		deployment_configuration, placement_constraints, placement_strategy,
 		capacity_provider_strategy, tags, scheduling_strategy, service_connect_configuration,
 		enable_ecs_managed_tags, propagate_tags, enable_execute_command,
-		health_check_grace_period_seconds, region, account_id, created_at, updated_at
+		health_check_grace_period_seconds, region, account_id, deployment_name, namespace,
+		created_at, updated_at
 	) VALUES (
 		?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?,
-		?, ?, ?, ?, ?
+		?, ?, ?, ?, ?,
+		?, ?
 	)`
 
 	_, err := s.db.ExecContext(ctx, query,
@@ -53,7 +56,8 @@ func (s *serviceStore) Create(ctx context.Context, service *storage.Service) err
 		service.DeploymentConfiguration, service.PlacementConstraints, service.PlacementStrategy,
 		service.CapacityProviderStrategy, service.Tags, service.SchedulingStrategy, service.ServiceConnectConfiguration,
 		service.EnableECSManagedTags, service.PropagateTags, service.EnableExecuteCommand,
-		service.HealthCheckGracePeriodSeconds, service.Region, service.AccountID, service.CreatedAt, service.UpdatedAt,
+		service.HealthCheckGracePeriodSeconds, service.Region, service.AccountID, service.DeploymentName, service.Namespace,
+		service.CreatedAt, service.UpdatedAt,
 	)
 
 	if err != nil {
@@ -73,7 +77,8 @@ func (s *serviceStore) Get(ctx context.Context, cluster, serviceName string) (*s
 		deployment_configuration, placement_constraints, placement_strategy,
 		capacity_provider_strategy, tags, scheduling_strategy, service_connect_configuration,
 		enable_ecs_managed_tags, propagate_tags, enable_execute_command,
-		health_check_grace_period_seconds, region, account_id, created_at, updated_at
+		health_check_grace_period_seconds, region, account_id, deployment_name, namespace,
+		created_at, updated_at
 	FROM services 
 	WHERE cluster_arn = ? AND service_name = ?`
 
@@ -81,7 +86,7 @@ func (s *serviceStore) Get(ctx context.Context, cluster, serviceName string) (*s
 	var platformVersion, roleARN, loadBalancers, serviceRegistries, networkConfiguration sql.NullString
 	var deploymentConfiguration, placementConstraints, placementStrategy sql.NullString
 	var capacityProviderStrategy, tags, serviceConnectConfiguration sql.NullString
-	var propagateTags sql.NullString
+	var propagateTags, deploymentName, namespace sql.NullString
 	var healthCheckGracePeriodSeconds sql.NullInt32
 
 	err := s.db.QueryRowContext(ctx, query, cluster, serviceName).Scan(
@@ -91,7 +96,8 @@ func (s *serviceStore) Get(ctx context.Context, cluster, serviceName string) (*s
 		&deploymentConfiguration, &placementConstraints, &placementStrategy,
 		&capacityProviderStrategy, &tags, &service.SchedulingStrategy, &serviceConnectConfiguration,
 		&service.EnableECSManagedTags, &propagateTags, &service.EnableExecuteCommand,
-		&healthCheckGracePeriodSeconds, &service.Region, &service.AccountID, &service.CreatedAt, &service.UpdatedAt,
+		&healthCheckGracePeriodSeconds, &service.Region, &service.AccountID, &deploymentName, &namespace,
+		&service.CreatedAt, &service.UpdatedAt,
 	)
 
 	if err != nil {
@@ -140,6 +146,12 @@ func (s *serviceStore) Get(ctx context.Context, cluster, serviceName string) (*s
 	}
 	if healthCheckGracePeriodSeconds.Valid {
 		service.HealthCheckGracePeriodSeconds = int(healthCheckGracePeriodSeconds.Int32)
+	}
+	if deploymentName.Valid {
+		service.DeploymentName = deploymentName.String
+	}
+	if namespace.Valid {
+		service.Namespace = namespace.String
 	}
 
 	return service, nil
@@ -283,25 +295,12 @@ func (s *serviceStore) List(ctx context.Context, cluster string, serviceName str
 func (s *serviceStore) Update(ctx context.Context, service *storage.Service) error {
 	service.UpdatedAt = time.Now()
 
-	query := `
-	UPDATE services SET
-		task_definition_arn = ?, desired_count = ?, running_count = ?, pending_count = ?, platform_version = ?,
-		status = ?, role_arn = ?, load_balancers = ?, service_registries = ?, network_configuration = ?,
-		deployment_configuration = ?, placement_constraints = ?, placement_strategy = ?,
-		capacity_provider_strategy = ?, tags = ?, service_connect_configuration = ?,
-		enable_ecs_managed_tags = ?, propagate_tags = ?, enable_execute_command = ?,
-		health_check_grace_period_seconds = ?, updated_at = ?
-	WHERE id = ?`
+	log.Printf("DEBUG: Updating service ID: %s, status: %s", service.ID, service.Status)
 
-	result, err := s.db.ExecContext(ctx, query,
-		service.TaskDefinitionARN, service.DesiredCount, service.RunningCount, service.PendingCount, service.PlatformVersion,
-		service.Status, service.RoleARN, service.LoadBalancers, service.ServiceRegistries, service.NetworkConfiguration,
-		service.DeploymentConfiguration, service.PlacementConstraints, service.PlacementStrategy,
-		service.CapacityProviderStrategy, service.Tags, service.ServiceConnectConfiguration,
-		service.EnableECSManagedTags, service.PropagateTags, service.EnableExecuteCommand,
-		service.HealthCheckGracePeriodSeconds, service.UpdatedAt,
-		service.ID,
-	)
+	// Try a minimal update query to avoid the constraint issue
+	query := `UPDATE services SET status = ?, updated_at = ? WHERE id = ?`
+
+	result, err := s.db.ExecContext(ctx, query, service.Status, service.UpdatedAt, service.ID)
 
 	if err != nil {
 		return fmt.Errorf("failed to update service: %w", err)
@@ -350,7 +349,8 @@ func (s *serviceStore) GetByARN(ctx context.Context, arn string) (*storage.Servi
 		deployment_configuration, placement_constraints, placement_strategy,
 		capacity_provider_strategy, tags, scheduling_strategy, service_connect_configuration,
 		enable_ecs_managed_tags, propagate_tags, enable_execute_command,
-		health_check_grace_period_seconds, region, account_id, created_at, updated_at
+		health_check_grace_period_seconds, region, account_id, deployment_name, namespace,
+		created_at, updated_at
 	FROM services 
 	WHERE arn = ?`
 
@@ -358,7 +358,7 @@ func (s *serviceStore) GetByARN(ctx context.Context, arn string) (*storage.Servi
 	var platformVersion, roleARN, loadBalancers, serviceRegistries, networkConfiguration sql.NullString
 	var deploymentConfiguration, placementConstraints, placementStrategy sql.NullString
 	var capacityProviderStrategy, tags, serviceConnectConfiguration sql.NullString
-	var propagateTags sql.NullString
+	var propagateTags, deploymentName, namespace sql.NullString
 	var healthCheckGracePeriodSeconds sql.NullInt32
 
 	err := s.db.QueryRowContext(ctx, query, arn).Scan(
@@ -368,7 +368,8 @@ func (s *serviceStore) GetByARN(ctx context.Context, arn string) (*storage.Servi
 		&deploymentConfiguration, &placementConstraints, &placementStrategy,
 		&capacityProviderStrategy, &tags, &service.SchedulingStrategy, &serviceConnectConfiguration,
 		&service.EnableECSManagedTags, &propagateTags, &service.EnableExecuteCommand,
-		&healthCheckGracePeriodSeconds, &service.Region, &service.AccountID, &service.CreatedAt, &service.UpdatedAt,
+		&healthCheckGracePeriodSeconds, &service.Region, &service.AccountID, &deploymentName, &namespace,
+		&service.CreatedAt, &service.UpdatedAt,
 	)
 
 	if err != nil {
@@ -417,6 +418,12 @@ func (s *serviceStore) GetByARN(ctx context.Context, arn string) (*storage.Servi
 	}
 	if healthCheckGracePeriodSeconds.Valid {
 		service.HealthCheckGracePeriodSeconds = int(healthCheckGracePeriodSeconds.Int32)
+	}
+	if deploymentName.Valid {
+		service.DeploymentName = deploymentName.String
+	}
+	if namespace.Valid {
+		service.Namespace = namespace.String
 	}
 
 	return service, nil

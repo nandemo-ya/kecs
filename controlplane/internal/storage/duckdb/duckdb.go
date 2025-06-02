@@ -195,6 +195,8 @@ func (s *DuckDBStorage) createServicesTable(ctx context.Context) error {
 		health_check_grace_period_seconds INTEGER,
 		region VARCHAR NOT NULL,
 		account_id VARCHAR NOT NULL,
+		deployment_name VARCHAR,
+		namespace VARCHAR,
 		created_at TIMESTAMP NOT NULL,
 		updated_at TIMESTAMP NOT NULL
 	)`
