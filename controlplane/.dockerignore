@@ -1,0 +1,89 @@
+# Documentation
+*.md
+docs/
+README*
+LICENSE
+
+# Version control
+.git/
+.gitignore
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+controlplane
+
+# Test files and coverage
+*_test.go
+*.test
+*.out
+coverage.*
+.coverage/
+
+# Examples and non-production code
+examples/
+
+# Docker files (prevent recursion)
+Dockerfile*
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Go specific
+vendor/
+*.mod.backup
+*.sum.backup
+
+# Development environment
+.env
+.env.*
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Kubernetes manifests (if any)
+*.yaml
+*.yml
+!go.mod
+!go.sum
+
+# Package management
+Makefile
+*.mk
+
+# Archives
+*.tar
+*.tar.gz
+*.zip
+*.rar
+
+# macOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux specific
+.directory
+.Trash-*
