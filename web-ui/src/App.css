@@ -1,0 +1,167 @@
+/* KECS Web UI Styles */
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.App-header {
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  color: white;
+  padding: 1rem 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.App-header h1 {
+  margin: 0 0 0.5rem 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.App-header p {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+/* Navigation */
+.App-header nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+}
+
+.App-header nav a {
+  color: white;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.App-header nav a:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Main Content */
+.App-main {
+  flex: 1;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.App-main h2 {
+  color: #1e3a8a;
+  margin-bottom: 1.5rem;
+  font-size: 1.8rem;
+}
+
+/* Dashboard Cards */
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.card {
+  background: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+  border: 1px solid #e5e7eb;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.card h3 {
+  margin: 0 0 0.5rem 0;
+  color: #374151;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.card .metric {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #3b82f6;
+  margin: 0.5rem 0;
+  line-height: 1;
+}
+
+.card small {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+/* Status Section */
+#status {
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.status-info p {
+  margin: 0.75rem 0;
+  font-size: 1rem;
+  color: #374151;
+}
+
+.status-indicator {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.status-indicator.connected {
+  color: #10b981;
+}
+
+.status-indicator.error {
+  color: #ef4444;
+}
+
+/* Footer */
+.App-footer {
+  background-color: #f3f4f6;
+  border-top: 1px solid #e5e7eb;
+  padding: 1rem 2rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .App-header {
+    padding: 1rem;
+  }
+  
+  .App-header h1 {
+    font-size: 2rem;
+  }
+  
+  .App-header nav ul {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .App-main {
+    padding: 1rem;
+  }
+  
+  .dashboard-cards {
+    grid-template-columns: 1fr;
+  }
+}
