@@ -295,12 +295,68 @@ func (s *serviceStore) List(ctx context.Context, cluster string, serviceName str
 func (s *serviceStore) Update(ctx context.Context, service *storage.Service) error {
 	service.UpdatedAt = time.Now()
 
-	log.Printf("DEBUG: Updating service ID: %s, status: %s", service.ID, service.Status)
+	log.Printf("DEBUG: Updating service ID: %s, ARN: %s, status: %s, desiredCount: %d", service.ID, service.ARN, service.Status, service.DesiredCount)
+	
+	// Small delay to avoid DuckDB concurrency issues
+	time.Sleep(50 * time.Millisecond)
+	
+	// First, let's check if the record exists
+	var count int
+	checkQuery := `SELECT COUNT(*) FROM services WHERE id = ?`
+	err := s.db.QueryRowContext(ctx, checkQuery, service.ID).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check service existence: %w", err)
+	}
+	log.Printf("DEBUG: Found %d records with ID %s", count, service.ID)
 
-	// Try a minimal update query to avoid the constraint issue
-	query := `UPDATE services SET status = ?, updated_at = ? WHERE id = ?`
+	// Update all relevant fields that might change
+	query := `UPDATE services SET 
+		task_definition_arn = ?,
+		desired_count = ?,
+		running_count = ?,
+		pending_count = ?,
+		platform_version = ?,
+		status = ?,
+		load_balancers = ?,
+		service_registries = ?,
+		network_configuration = ?,
+		deployment_configuration = ?,
+		placement_constraints = ?,
+		placement_strategy = ?,
+		capacity_provider_strategy = ?,
+		tags = ?,
+		service_connect_configuration = ?,
+		enable_ecs_managed_tags = ?,
+		propagate_tags = ?,
+		enable_execute_command = ?,
+		health_check_grace_period_seconds = ?,
+		updated_at = ?
+		WHERE arn = ? AND id = ?`
 
-	result, err := s.db.ExecContext(ctx, query, service.Status, service.UpdatedAt, service.ID)
+	result, err := s.db.ExecContext(ctx, query,
+		service.TaskDefinitionARN,
+		service.DesiredCount,
+		service.RunningCount,
+		service.PendingCount,
+		nullString(service.PlatformVersion),
+		service.Status,
+		nullString(service.LoadBalancers),
+		nullString(service.ServiceRegistries),
+		nullString(service.NetworkConfiguration),
+		nullString(service.DeploymentConfiguration),
+		nullString(service.PlacementConstraints),
+		nullString(service.PlacementStrategy),
+		nullString(service.CapacityProviderStrategy),
+		nullString(service.Tags),
+		nullString(service.ServiceConnectConfiguration),
+		service.EnableECSManagedTags,
+		nullString(service.PropagateTags),
+		service.EnableExecuteCommand,
+		service.HealthCheckGracePeriodSeconds,
+		service.UpdatedAt,
+		service.ARN,
+		service.ID,
+	)
 
 	if err != nil {
 		return fmt.Errorf("failed to update service: %w", err)

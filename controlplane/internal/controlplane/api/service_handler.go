@@ -247,25 +247,40 @@ func (s *Server) CreateServiceWithStorage(ctx context.Context, req CreateService
 // UpdateServiceWithStorage updates an existing service using storage
 func (s *Server) UpdateServiceWithStorage(ctx context.Context, req UpdateServiceRequest) (*UpdateServiceResponse, error) {
 	// Default cluster if not specified
-	cluster := "default"
+	clusterName := "default"
 	if req.Cluster != "" {
-		cluster = req.Cluster
+		clusterName = req.Cluster
 	}
 
-	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", s.region, s.accountID, cluster)
+	// Get cluster from storage
+	cluster, err := s.storage.ClusterStore().Get(ctx, clusterName)
+	if err != nil || cluster == nil {
+		return nil, fmt.Errorf("cluster not found: %s", clusterName)
+	}
 
 	// Get existing service
-	existingService, err := s.storage.ServiceStore().Get(ctx, clusterARN, req.Service)
+	existingService, err := s.storage.ServiceStore().Get(ctx, cluster.ARN, req.Service)
 	if err != nil {
 		return nil, fmt.Errorf("service not found: %w", err)
 	}
 
+	// Track if we need to update Kubernetes resources
+	needsKubernetesUpdate := false
+	oldDesiredCount := existingService.DesiredCount
+	oldTaskDefinitionARN := existingService.TaskDefinitionARN
+
 	// Update fields
-	if req.DesiredCount > 0 {
+	if req.DesiredCount > 0 && req.DesiredCount != existingService.DesiredCount {
 		existingService.DesiredCount = req.DesiredCount
+		needsKubernetesUpdate = true
 	}
-	if req.TaskDefinition != "" {
+	if req.TaskDefinition != "" && req.TaskDefinition != existingService.TaskDefinitionARN {
+		// Convert short format to full ARN if necessary
+		if !strings.HasPrefix(req.TaskDefinition, "arn:aws:ecs:") {
+			req.TaskDefinition = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", s.region, s.accountID, req.TaskDefinition)
+		}
 		existingService.TaskDefinitionARN = req.TaskDefinition
+		needsKubernetesUpdate = true
 	}
 	if req.PlatformVersion != "" {
 		existingService.PlatformVersion = req.PlatformVersion
@@ -275,6 +290,7 @@ func (s *Server) UpdateServiceWithStorage(ctx context.Context, req UpdateService
 	if req.NetworkConfiguration != nil {
 		networkConfigJSON, _ := json.Marshal(req.NetworkConfiguration)
 		existingService.NetworkConfiguration = string(networkConfigJSON)
+		needsKubernetesUpdate = true
 	}
 	if req.DeploymentConfiguration != nil {
 		deploymentConfigJSON, _ := json.Marshal(req.DeploymentConfiguration)
@@ -295,6 +311,7 @@ func (s *Server) UpdateServiceWithStorage(ctx context.Context, req UpdateService
 	if req.LoadBalancers != nil {
 		loadBalancersJSON, _ := json.Marshal(req.LoadBalancers)
 		existingService.LoadBalancers = string(loadBalancersJSON)
+		needsKubernetesUpdate = true
 	}
 	if req.ServiceRegistries != nil {
 		serviceRegistriesJSON, _ := json.Marshal(req.ServiceRegistries)
@@ -311,7 +328,41 @@ func (s *Server) UpdateServiceWithStorage(ctx context.Context, req UpdateService
 		existingService.HealthCheckGracePeriodSeconds = req.HealthCheckGracePeriodSeconds
 	}
 
-	// Update in storage
+	// Update Kubernetes resources if needed
+	if needsKubernetesUpdate {
+		// Update status to show update in progress
+		existingService.Status = "PENDING"
+		// Get the task definition if it was updated
+		taskDef := existingService.TaskDefinitionARN
+		taskDefinition, err := s.storage.TaskDefinitionStore().GetByARN(ctx, taskDef)
+		if err != nil {
+			log.Printf("Failed to get task definition %s: %v", taskDef, err)
+			// Restore old values on failure
+			existingService.DesiredCount = oldDesiredCount
+			existingService.TaskDefinitionARN = oldTaskDefinitionARN
+			return nil, fmt.Errorf("failed to get task definition: %w", err)
+		}
+
+		// Create service converter and manager
+		converter := converters.NewServiceConverter(s.region, s.accountID)
+		deployment, kubeService, err := converter.ConvertServiceToDeployment(existingService, taskDefinition, cluster)
+		if err != nil {
+			log.Printf("Failed to convert service to deployment: %v", err)
+			return nil, fmt.Errorf("failed to convert service: %w", err)
+		}
+
+		// Create service manager and update Kubernetes resources
+		serviceManager := kubernetes.NewServiceManager(s.storage, s.kindManager)
+		if err := serviceManager.UpdateService(ctx, deployment, kubeService, cluster, existingService); err != nil {
+			log.Printf("Failed to update kubernetes deployment: %v", err)
+			return nil, fmt.Errorf("failed to update kubernetes deployment: %w", err)
+		}
+
+		// Update status to ACTIVE after successful update
+		existingService.Status = "ACTIVE"
+	}
+	
+	// Single update at the end
 	if err := s.storage.ServiceStore().Update(ctx, existingService); err != nil {
 		return nil, fmt.Errorf("failed to update service: %w", err)
 	}
