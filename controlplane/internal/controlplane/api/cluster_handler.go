@@ -166,6 +166,12 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 	go func() {
 		ctx := context.Background()
 		
+		// Skip kind cluster creation if kindManager is nil (test mode)
+		if s.kindManager == nil {
+			log.Printf("Skipping kind cluster creation for %s (kindManager is nil)", clusterName)
+			return
+		}
+		
 		// Create kind cluster using the generated kind cluster name
 		if err := s.kindManager.CreateCluster(ctx, cluster.KindClusterName); err != nil {
 			log.Printf("Failed to create kind cluster %s for ECS cluster %s: %v", cluster.KindClusterName, clusterName, err)
@@ -326,6 +332,12 @@ func (s *Server) DeleteClusterWithStorage(ctx context.Context, req *generated.De
 	// Delete kind cluster and namespace
 	go func() {
 		ctx := context.Background()
+		
+		// Skip kind cluster deletion if kindManager is nil (test mode)
+		if s.kindManager == nil {
+			log.Printf("Skipping kind cluster deletion for %s (kindManager is nil)", clusterName)
+			return
+		}
 		
 		// Get Kubernetes client before deleting cluster
 		kubeClient, err := s.kindManager.GetKubeClient(cluster.KindClusterName)

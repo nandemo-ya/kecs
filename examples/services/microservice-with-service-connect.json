@@ -1,0 +1,86 @@
+{
+  "serviceName": "api-service",
+  "cluster": "microservices-cluster",
+  "taskDefinition": "api-service:3",
+  "desiredCount": 5,
+  "launchType": "FARGATE",
+  "platformVersion": "1.4.0",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": [
+        "subnet-private-1a",
+        "subnet-private-1b",
+        "subnet-private-1c"
+      ],
+      "securityGroups": [
+        "sg-microservice-internal"
+      ],
+      "assignPublicIp": "DISABLED"
+    }
+  },
+  "serviceConnectConfiguration": {
+    "enabled": true,
+    "namespace": "microservices",
+    "services": [
+      {
+        "portName": "http",
+        "discoveryName": "api-service",
+        "clientAliases": [
+          {
+            "port": 8080,
+            "dnsName": "api.microservices.local"
+          }
+        ]
+      }
+    ]
+  },
+  "capacityProviderStrategy": [
+    {
+      "capacityProvider": "FARGATE",
+      "weight": 70,
+      "base": 2
+    },
+    {
+      "capacityProvider": "FARGATE_SPOT",
+      "weight": 30,
+      "base": 0
+    }
+  ],
+  "deploymentConfiguration": {
+    "maximumPercent": 200,
+    "minimumHealthyPercent": 100,
+    "deploymentCircuitBreaker": {
+      "enable": true,
+      "rollback": true
+    },
+    "alarms": {
+      "alarmNames": [
+        "api-service-high-cpu",
+        "api-service-high-memory"
+      ],
+      "enable": true,
+      "rollback": true
+    }
+  },
+  "enableECSManagedTags": true,
+  "propagateTags": "SERVICE",
+  "enableExecuteCommand": true,
+  "tags": [
+    {
+      "key": "Environment",
+      "value": "production"
+    },
+    {
+      "key": "Service",
+      "value": "api"
+    },
+    {
+      "key": "Architecture",
+      "value": "microservices"
+    },
+    {
+      "key": "CostCenter",
+      "value": "engineering"
+    }
+  ]
+}

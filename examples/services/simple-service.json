@@ -1,0 +1,12 @@
+{
+  "serviceName": "simple-service",
+  "cluster": "default",
+  "taskDefinition": "nginx-fargate",
+  "desiredCount": 1,
+  "tags": [
+    {
+      "key": "Environment",
+      "value": "test"
+    }
+  ]
+}

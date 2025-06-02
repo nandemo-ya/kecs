@@ -52,11 +52,11 @@ func (s *Server) handleECSRequest(w http.ResponseWriter, r *http.Request) {
 	case "DeleteCluster":
 		s.handleECSDeleteCluster(w, body)
 	case "RunTask":
-		s.handleECSRunTask(w, body)
+		s.handleRunTaskECS(w, body)
 	case "DescribeTasks":
-		s.handleECSDescribeTasks(w, body)
+		s.handleDescribeTasksECS(w, body)
 	case "ListTasks":
-		s.handleECSListTasks(w, body)
+		s.handleListTasksECS(w, body)
 	case "RegisterTaskDefinition":
 		s.handleECSRegisterTaskDefinition(w, body)
 	case "DescribeTaskDefinition":
