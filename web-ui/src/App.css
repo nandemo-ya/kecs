@@ -63,6 +63,68 @@
   font-size: 1.8rem;
 }
 
+/* Dashboard Header */
+.dashboard-header, .status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+/* Refresh Button */
+.refresh-button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.refresh-button:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.refresh-button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.refresh-button:disabled:hover {
+  background: #9ca3af;
+}
+
+/* Error Banner */
+.error-banner {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  color: #dc2626;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.error-banner button {
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.error-banner button:hover {
+  background: #b91c1c;
+}
+
 /* Dashboard Cards */
 .dashboard-cards {
   display: grid;
