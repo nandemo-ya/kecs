@@ -25,14 +25,31 @@
   opacity: 0.9;
 }
 
+/* Header Title */
+.header-title {
+  color: white;
+  text-decoration: none;
+  flex-grow: 1;
+}
+
+.header-title:hover {
+  color: white;
+  text-decoration: none;
+}
+
 /* Navigation */
+.App-header {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
 .App-header nav ul {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
-  gap: 2rem;
-  justify-content: center;
+  gap: 1rem;
 }
 
 .App-header nav a {
@@ -41,10 +58,16 @@
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
   transition: background-color 0.2s;
+  font-weight: 500;
 }
 
 .App-header nav a:hover {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+.App-header nav a.active {
+  background-color: rgba(255, 255, 255, 0.2);
+  font-weight: 600;
 }
 
 /* Main Content */
@@ -147,6 +170,17 @@
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
+.card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.card-link:hover {
+  text-decoration: none;
+  color: inherit;
+}
+
 .card h3 {
   margin: 0 0 0.5rem 0;
   color: #374151;
@@ -204,6 +238,50 @@
   font-size: 0.875rem;
 }
 
+/* Quick Access */
+.quick-access {
+  margin-top: 2rem;
+}
+
+.quick-access h3 {
+  color: #1e3a8a;
+  margin-bottom: 1rem;
+}
+
+.quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.quick-link {
+  background: #f3f4f6;
+  color: #374151;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.quick-link:hover {
+  background: #e5e7eb;
+  text-decoration: none;
+  color: #374151;
+}
+
+/* Placeholder Pages */
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  color: #6b7280;
+  font-size: 1.25rem;
+  font-style: italic;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .App-header {
@@ -226,4 +304,54 @@
   .dashboard-cards {
     grid-template-columns: 1fr;
   }
+}
+
+/* Cluster List Styles */
+.cluster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cluster-item {
+  padding: 1.5rem;
+}
+
+.cluster-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.cluster-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.cluster-link {
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.cluster-link:hover {
+  text-decoration: underline;
+}
+
+.cluster-arn {
+  color: #6b7280;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.75rem;
+  background-color: #f3f4f6;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  margin-bottom: 1rem;
+  word-break: break-all;
+}
+
+.cluster-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
 }
