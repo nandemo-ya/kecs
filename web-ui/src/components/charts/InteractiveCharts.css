@@ -1,0 +1,511 @@
+/* Interactive Charts Common Styles */
+
+/* Chart Container */
+.interactive-chart {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.interactive-chart:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Chart Header */
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.chart-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.total-value {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.segment-count {
+  color: #6b7280;
+}
+
+.chart-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.export-button {
+  padding: 6px 10px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.export-button:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+/* Interactive Pie Chart Specific */
+.interactive-pie-chart {
+  position: relative;
+  width: 100%;
+}
+
+.interactive-pie-chart .recharts-wrapper {
+  margin: 0 auto;
+}
+
+.interactive-pie-chart .recharts-responsive-container {
+  margin: 0 auto;
+}
+
+.pie-segment {
+  transition: all 0.2s ease;
+}
+
+.pie-segment.has-children {
+  cursor: pointer;
+}
+
+.pie-segment.selected {
+  filter: drop-shadow(0 2px 8px rgba(59, 130, 246, 0.3));
+}
+
+.pie-center-text {
+  font-size: 18px;
+  font-weight: 600;
+  fill: #1f2937;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.pie-label-text {
+  font-size: 14px;
+  font-weight: 500;
+  fill: #374151;
+}
+
+.pie-value-text {
+  font-size: 12px;
+  fill: #6b7280;
+}
+
+/* Drill-down controls */
+.drill-up-button {
+  padding: 6px 12px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.drill-up-button:hover {
+  background: #2563eb;
+  transform: translateX(-2px);
+}
+
+.drill-down-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+  font-size: 14px;
+  overflow-x: auto;
+}
+
+.breadcrumb-item {
+  color: #3b82f6;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.breadcrumb-item:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.breadcrumb-separator {
+  color: #9ca3af;
+}
+
+/* Segment Details */
+.segment-details {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.segment-details h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.detail-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* Interactive Bar Chart */
+.interactive-bar-chart {
+  position: relative;
+}
+
+.bar-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+}
+
+.sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sort-button {
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sort-button:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.sort-button.active {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-select {
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.filter-select:hover {
+  border-color: #d1d5db;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* Bar hover effects */
+.bar-segment {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.bar-segment:hover {
+  filter: brightness(1.1);
+}
+
+.bar-segment.selected {
+  stroke: #3b82f6;
+  stroke-width: 2;
+}
+
+/* Sankey Diagram */
+.interactive-sankey {
+  position: relative;
+}
+
+.sankey-node {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sankey-node:hover {
+  opacity: 0.8;
+}
+
+.sankey-link {
+  fill: none;
+  stroke-opacity: 0.5;
+  transition: all 0.2s ease;
+}
+
+.sankey-link:hover {
+  stroke-opacity: 0.8;
+}
+
+.sankey-link.highlighted {
+  stroke-opacity: 0.8;
+  stroke-width: 3;
+}
+
+/* Treemap */
+.interactive-treemap {
+  position: relative;
+}
+
+.treemap-node {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.treemap-node:hover {
+  filter: brightness(1.1);
+  stroke: #3b82f6;
+  stroke-width: 2;
+}
+
+.treemap-label {
+  font-size: 12px;
+  font-weight: 500;
+  fill: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.treemap-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+/* Radar Chart */
+.interactive-radar {
+  position: relative;
+}
+
+.radar-polygon {
+  fill-opacity: 0.3;
+  stroke-width: 2;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.radar-polygon:hover {
+  fill-opacity: 0.5;
+  stroke-width: 3;
+}
+
+.radar-polygon.selected {
+  fill-opacity: 0.6;
+  stroke-width: 3;
+}
+
+.radar-axis {
+  stroke: #e5e7eb;
+  stroke-width: 1;
+}
+
+.radar-grid {
+  stroke: #f3f4f6;
+  stroke-width: 1;
+  fill: none;
+}
+
+.radar-dot {
+  fill: white;
+  stroke-width: 2;
+  transition: all 0.2s ease;
+}
+
+.radar-dot:hover {
+  r: 6;
+}
+
+/* Interactive Tooltip */
+.interactive-chart-tooltip {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 14px;
+  max-width: 250px;
+}
+
+.tooltip-label {
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+  font-size: 16px;
+}
+
+.tooltip-value {
+  margin: 0 0 4px 0;
+  color: #6b7280;
+}
+
+.tooltip-value span {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.tooltip-percent {
+  margin: 0 0 4px 0;
+  color: #6b7280;
+}
+
+.tooltip-percent span {
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+.tooltip-metadata {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.tooltip-meta-item {
+  margin: 0 0 2px 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.tooltip-meta-item span {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Chart Loading State */
+.chart-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: #6b7280;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f4f6;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Chart Empty State */
+.chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: #9ca3af;
+}
+
+.chart-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.chart-empty-text {
+  font-size: 16px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .chart-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .bar-controls {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .detail-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .drill-down-breadcrumb {
+    padding: 8px;
+    font-size: 12px;
+  }
+
+  .interactive-chart-tooltip {
+    max-width: 200px;
+    font-size: 12px;
+  }
+}
