@@ -238,7 +238,7 @@ export function MetricsDashboard() {
       </div>
 
       {/* Specialized Dashboards */}
-      <div className="charts-grid charts-grid-2">
+      <div className="charts-grid charts-grid-3">
         <div className="chart-container">
           <div className="chart-header">
             <h3>🖥️ Resource Usage</h3>
@@ -254,6 +254,25 @@ export function MetricsDashboard() {
               style={{ textDecoration: 'none' }}
             >
               View Resource Usage Dashboard →
+            </Link>
+          </div>
+        </div>
+        
+        <div className="chart-container">
+          <div className="chart-header">
+            <h3>📈 Time Series Analytics</h3>
+            <p>Advanced temporal data visualization</p>
+          </div>
+          <div style={{ padding: '1rem 0', textAlign: 'center' }}>
+            <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
+              Multi-series charts, heatmaps, and real-time data streaming
+            </p>
+            <Link 
+              to="/metrics/timeseries" 
+              className="btn btn-primary"
+              style={{ textDecoration: 'none' }}
+            >
+              View Time Series Dashboard →
             </Link>
           </div>
         </div>
@@ -292,6 +311,8 @@ export function MetricsDashboard() {
             <li>Cluster resource allocation</li>
             <li>CPU and memory usage monitoring</li>
             <li>Resource efficiency and utilization patterns</li>
+            <li>Multi-series time series analytics</li>
+            <li>Temporal pattern heatmaps</li>
             <li>Service health and availability</li>
             <li>Performance monitoring (network/storage coming soon)</li>
           </ul>
@@ -301,7 +322,11 @@ export function MetricsDashboard() {
             <li>Auto-refresh with configurable intervals</li>
             <li>Multiple time range views</li>
             <li>Interactive charts with tooltips</li>
-            <li>Real-time data updates</li>
+            <li>Real-time data updates and streaming</li>
+            <li>Advanced time series aggregation and smoothing</li>
+            <li>Multi-axis charts with different metrics</li>
+            <li>Heatmap visualization for temporal patterns</li>
+            <li>Zoom, pan, and brush selection</li>
             <li>Responsive design for all devices</li>
           </ul>
         </div>
