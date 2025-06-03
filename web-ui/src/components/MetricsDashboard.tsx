@@ -279,20 +279,20 @@ export function MetricsDashboard() {
         
         <div className="chart-container">
           <div className="chart-header">
-            <h3>📊 Performance Metrics</h3>
-            <p>Network and storage performance</p>
+            <h3>🔗 Service Topology</h3>
+            <p>Interactive service relationship diagrams</p>
           </div>
           <div style={{ padding: '1rem 0', textAlign: 'center' }}>
             <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
-              Network throughput, storage I/O, and latency metrics (coming soon)
+              Visualize service dependencies and connections with React Flow
             </p>
-            <button 
-              className="btn btn-secondary" 
-              disabled
-              style={{ opacity: 0.5 }}
+            <Link 
+              to="/metrics/topology" 
+              className="btn btn-primary"
+              style={{ textDecoration: 'none' }}
             >
-              Coming Soon
-            </button>
+              View Service Topology →
+            </Link>
           </div>
         </div>
       </div>

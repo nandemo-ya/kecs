@@ -1,0 +1,212 @@
+/* Service Edge Styles */
+.service-edge {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.service-edge:hover {
+  stroke-width: 3px !important;
+  stroke-opacity: 1 !important;
+}
+
+/* Traffic Animation */
+.service-edge.has-traffic .traffic-flow {
+  animation: flow 2s linear infinite;
+}
+
+@keyframes flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -30;
+  }
+}
+
+/* Edge Label Styles */
+.edge-label {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  max-width: 150px;
+}
+
+.edge-label:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transform: scale(1.05);
+  z-index: 10;
+}
+
+.edge-label.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.edge-label.high-latency {
+  border-color: #f59e0b;
+  background-color: #fef3c7;
+}
+
+.edge-label.high-error {
+  border-color: #ef4444;
+  background-color: #fee2e2;
+}
+
+.edge-label-text {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.edge-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.edge-metrics .metric {
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.edge-protocol {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+}
+
+/* Connection Type Icon */
+.edge-type-icon {
+  background: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  pointer-events: none;
+}
+
+.connection-icon {
+  font-size: 14px;
+  filter: grayscale(0.2);
+}
+
+/* Bidirectional Indicator */
+.bidirectional-indicator {
+  font-size: 12px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* React Flow Edge Path Customization */
+.react-flow__edge-path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #3b82f6 !important;
+  stroke-width: 3 !important;
+}
+
+/* Connection Type Specific Styles */
+.react-flow__edge[data-connection-type="http"] .react-flow__edge-path {
+  stroke: #3b82f6;
+}
+
+.react-flow__edge[data-connection-type="grpc"] .react-flow__edge-path {
+  stroke: #8b5cf6;
+}
+
+.react-flow__edge[data-connection-type="tcp"] .react-flow__edge-path {
+  stroke: #6b7280;
+}
+
+.react-flow__edge[data-connection-type="database"] .react-flow__edge-path {
+  stroke: #059669;
+}
+
+.react-flow__edge[data-connection-type="cache"] .react-flow__edge-path {
+  stroke: #f59e0b;
+}
+
+.react-flow__edge[data-connection-type="queue"] .react-flow__edge-path {
+  stroke: #ec4899;
+}
+
+/* Error State Styles */
+.service-edge.high-error {
+  animation: pulse-error 2s infinite;
+}
+
+@keyframes pulse-error {
+  0%, 100% {
+    stroke-opacity: 0.7;
+  }
+  50% {
+    stroke-opacity: 1;
+    filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.5));
+  }
+}
+
+/* Interactive States */
+.edge-label:active {
+  transform: scale(0.98);
+}
+
+/* Tooltip-like hover info */
+.edge-hover-info {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 1000;
+  white-space: nowrap;
+  transform: translate(-50%, -150%);
+}
+
+.edge-hover-info::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.8);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .edge-label {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+  
+  .edge-type-icon {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .connection-icon {
+    font-size: 12px;
+  }
+}
