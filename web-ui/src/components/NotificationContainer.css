@@ -1,0 +1,140 @@
+.notification-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+  pointer-events: none;
+}
+
+.notification {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  pointer-events: auto;
+  position: relative;
+  animation: slideIn 0.3s ease-out;
+  transition: all 0.3s ease-out;
+}
+
+.notification:hover {
+  transform: translateX(-5px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: white;
+}
+
+.notification-success .notification-icon {
+  background-color: #10b981;
+}
+
+.notification-error .notification-icon {
+  background-color: #ef4444;
+}
+
+.notification-warning .notification-icon {
+  background-color: #f59e0b;
+}
+
+.notification-info .notification-icon {
+  background-color: #3b82f6;
+}
+
+.notification-content {
+  flex: 1;
+}
+
+.notification-title {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.notification-message {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.notification-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.notification-close:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #374151;
+}
+
+/* Border colors for notification types */
+.notification-success {
+  border-left: 4px solid #10b981;
+}
+
+.notification-error {
+  border-left: 4px solid #ef4444;
+}
+
+.notification-warning {
+  border-left: 4px solid #f59e0b;
+}
+
+.notification-info {
+  border-left: 4px solid #3b82f6;
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+  .notification-container {
+    left: 10px;
+    right: 10px;
+    max-width: none;
+  }
+  
+  .notification {
+    font-size: 14px;
+  }
+}
