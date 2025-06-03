@@ -15,6 +15,7 @@ import { TaskDefinitionDetail } from './components/TaskDefinitionDetail';
 import { RegisterTaskDefinition } from './components/RegisterTaskDefinition';
 import { MetricsDashboard } from './components/MetricsDashboard';
 import { ResourceUsageDashboard } from './components/ResourceUsageDashboard';
+import { TimeSeriesDashboard } from './components/TimeSeriesDashboard';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { NotificationContainer } from './components/NotificationContainer';
 
@@ -103,6 +104,7 @@ function AppContent() {
         <Route path="/task-definitions/:family/:revision" element={<TaskDefinitionDetail />} />
         <Route path="/metrics" element={<MetricsDashboard />} />
         <Route path="/metrics/resource-usage" element={<ResourceUsageDashboard />} />
+        <Route path="/metrics/timeseries" element={<TimeSeriesDashboard />} />
         <Route path="*" element={<div className="placeholder">Page Not Found</div>} />
       </Routes>
       
