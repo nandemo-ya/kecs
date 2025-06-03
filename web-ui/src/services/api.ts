@@ -15,6 +15,10 @@ import {
   UpdateServiceResponse,
   DeleteServiceRequest,
   DeleteServiceResponse,
+  RegisterTaskDefinitionRequest,
+  RegisterTaskDefinitionResponse,
+  DeregisterTaskDefinitionRequest,
+  DeregisterTaskDefinitionResponse,
 } from '../types/api';
 
 // In development, use empty string to leverage proxy
@@ -138,6 +142,22 @@ class KECSApiClient {
       '/v1/DescribeTaskDefinition',
       'AmazonEC2ContainerServiceV20141113.DescribeTaskDefinition',
       { taskDefinition }
+    );
+  }
+
+  async registerTaskDefinition(request: RegisterTaskDefinitionRequest): Promise<RegisterTaskDefinitionResponse> {
+    return this.makeRequest<RegisterTaskDefinitionResponse>(
+      '/v1/RegisterTaskDefinition',
+      'AmazonEC2ContainerServiceV20141113.RegisterTaskDefinition',
+      request
+    );
+  }
+
+  async deregisterTaskDefinition(request: DeregisterTaskDefinitionRequest): Promise<DeregisterTaskDefinitionResponse> {
+    return this.makeRequest<DeregisterTaskDefinitionResponse>(
+      '/v1/DeregisterTaskDefinition',
+      'AmazonEC2ContainerServiceV20141113.DeregisterTaskDefinition',
+      request
     );
   }
 

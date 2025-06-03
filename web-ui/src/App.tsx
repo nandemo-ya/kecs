@@ -11,6 +11,8 @@ import { UpdateService } from './components/UpdateService';
 import { TaskList } from './components/TaskList';
 import { TaskDetail } from './components/TaskDetail';
 import { TaskDefinitionList } from './components/TaskDefinitionList';
+import { TaskDefinitionDetail } from './components/TaskDefinitionDetail';
+import { RegisterTaskDefinition } from './components/RegisterTaskDefinition';
 
 function Navigation() {
   const location = useLocation();
@@ -85,6 +87,8 @@ function AppContent() {
         <Route path="/tasks" element={<TaskList />} />
         <Route path="/tasks/:taskId" element={<TaskDetail />} />
         <Route path="/task-definitions" element={<TaskDefinitionList />} />
+        <Route path="/task-definitions/register" element={<RegisterTaskDefinition />} />
+        <Route path="/task-definitions/:family/:revision" element={<TaskDefinitionDetail />} />
         <Route path="*" element={<div className="placeholder">Page Not Found</div>} />
       </Routes>
       

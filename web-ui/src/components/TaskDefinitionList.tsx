@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { apiClient } from '../services/api';
 import { ListTaskDefinitionsResponse, DescribeTaskDefinitionResponse } from '../types/api';
 
@@ -103,9 +104,14 @@ export function TaskDefinitionList() {
     <main className="App-main">
       <div className="dashboard-header">
         <h2>Task Definitions</h2>
-        <button className="refresh-button" onClick={loadTaskDefinitions}>
-          Refresh
-        </button>
+        <div className="header-actions">
+          <Link to="/task-definitions/register" className="btn btn-primary">
+            Register Task Definition
+          </Link>
+          <button className="refresh-button" onClick={loadTaskDefinitions}>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {taskDefinitions.length === 0 ? (
@@ -118,9 +124,12 @@ export function TaskDefinitionList() {
             <div key={taskDef.taskDefinitionArn} className="resource-item-card card">
               <div className="resource-header">
                 <h3>
-                  <span className="resource-name">
+                  <Link 
+                    to={`/task-definitions/${taskDef.family}/${taskDef.revision}`} 
+                    className="resource-link"
+                  >
                     {taskDef.family}:{taskDef.revision}
-                  </span>
+                  </Link>
                 </h3>
                 <span className={`status-badge ${getStatusClass(taskDef.status)}`}>
                   {taskDef.status}
