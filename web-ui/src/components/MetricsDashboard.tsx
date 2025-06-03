@@ -316,6 +316,30 @@ export function MetricsDashboard() {
         </div>
       </div>
 
+      {/* Interactive Charts Dashboard */}
+      <div className="charts-grid">
+        <div className="chart-full-width">
+          <div className="chart-container">
+            <div className="chart-header">
+              <h3>📊 Interactive Charts</h3>
+              <p>Advanced interactive data visualization components</p>
+            </div>
+            <div style={{ padding: '1rem 0', textAlign: 'center' }}>
+              <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
+                Explore interactive pie charts with drill-down, sortable bar charts, Sankey diagrams, treemaps, and radar charts
+              </p>
+              <Link 
+                to="/metrics/interactive-charts" 
+                className="btn btn-primary"
+                style={{ textDecoration: 'none' }}
+              >
+                View Interactive Charts →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Additional Information */}
       <div className="chart-container">
         <div className="chart-header">
