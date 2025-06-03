@@ -714,3 +714,63 @@
     gap: 0.5rem;
   }
 }
+
+/* Task Definition Detail Styles */
+.container-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.container-item {
+  background: #f9fafb;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+}
+
+.container-item h3 {
+  margin: 0 0 1rem 0;
+  color: #1e3a8a;
+  font-size: 1.25rem;
+}
+
+.sub-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.sub-section h4 {
+  margin: 0 0 0.5rem 0;
+  color: #374151;
+  font-size: 1rem;
+}
+
+.port-mappings,
+.env-vars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.port-mapping {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.env-var {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.env-name {
+  color: #374151;
+  font-weight: 600;
+}
+
+.env-value {
+  color: #6b7280;
+}

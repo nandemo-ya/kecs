@@ -54,6 +54,55 @@ export interface TaskDefinition {
   memory?: string;
   networkMode?: string;
   requiresCompatibilities?: string[];
+  containerDefinitions?: ContainerDefinition[];
+}
+
+export interface ContainerDefinition {
+  name: string;
+  image: string;
+  cpu?: number;
+  memory?: number;
+  memoryReservation?: number;
+  portMappings?: PortMapping[];
+  essential?: boolean;
+  environment?: EnvironmentVariable[];
+  mountPoints?: MountPoint[];
+  volumesFrom?: VolumeFrom[];
+  command?: string[];
+  entryPoint?: string[];
+  workingDirectory?: string;
+  user?: string;
+  privileged?: boolean;
+  dockerLabels?: { [key: string]: string };
+  ulimits?: Ulimit[];
+}
+
+export interface PortMapping {
+  containerPort: number;
+  hostPort?: number;
+  protocol?: string;
+}
+
+export interface EnvironmentVariable {
+  name: string;
+  value: string;
+}
+
+export interface MountPoint {
+  sourceVolume: string;
+  containerPath: string;
+  readOnly?: boolean;
+}
+
+export interface VolumeFrom {
+  sourceContainer: string;
+  readOnly?: boolean;
+}
+
+export interface Ulimit {
+  name: string;
+  softLimit: number;
+  hardLimit: number;
 }
 
 export interface Tag {
@@ -105,6 +154,45 @@ export interface ListTaskDefinitionsResponse {
 
 export interface DescribeTaskDefinitionResponse {
   taskDefinition: TaskDefinition;
+}
+
+// Task Definition Management Types
+export interface RegisterTaskDefinitionRequest {
+  family: string;
+  taskRoleArn?: string;
+  executionRoleArn?: string;
+  networkMode?: string;
+  containerDefinitions: ContainerDefinition[];
+  volumes?: Volume[];
+  placementConstraints?: PlacementConstraint[];
+  requiresCompatibilities?: string[];
+  cpu?: string;
+  memory?: string;
+  tags?: Tag[];
+}
+
+export interface RegisterTaskDefinitionResponse {
+  taskDefinition: TaskDefinition;
+}
+
+export interface DeregisterTaskDefinitionRequest {
+  taskDefinition: string;
+}
+
+export interface DeregisterTaskDefinitionResponse {
+  taskDefinition: TaskDefinition;
+}
+
+export interface Volume {
+  name: string;
+  host?: {
+    sourcePath?: string;
+  };
+}
+
+export interface PlacementConstraint {
+  type?: string;
+  expression?: string;
 }
 
 // Service Management Types
