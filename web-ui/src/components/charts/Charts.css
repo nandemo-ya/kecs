@@ -267,3 +267,124 @@
 .metric-card-change.neutral {
   color: #6b7280;
 }
+
+/* Resource Usage Indicators */
+.resource-indicators {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.resource-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.indicator-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.indicator-dot.cpu {
+  background-color: #3b82f6;
+}
+
+.indicator-dot.memory {
+  background-color: #10b981;
+}
+
+.indicator-dot.warning {
+  background-color: #f59e0b;
+}
+
+.indicator-dot.critical {
+  background-color: #ef4444;
+}
+
+/* Gauge Chart Styles */
+.gauge-chart-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 1rem;
+}
+
+.gauge-chart {
+  position: relative;
+  width: 100%;
+}
+
+.gauge-center {
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.gauge-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1;
+}
+
+.gauge-subtitle {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.gauge-labels {
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.gauge-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+}
+
+.gauge-thresholds {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  pointer-events: none;
+}
+
+.threshold-marker {
+  font-size: 0.75rem;
+  transition: opacity 0.3s ease;
+}
+
+.threshold-marker.warning {
+  color: #f59e0b;
+}
+
+.threshold-marker.critical {
+  color: #ef4444;
+}
+
+.gauge-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+}

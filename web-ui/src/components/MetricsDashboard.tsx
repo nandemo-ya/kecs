@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { LineChart } from './charts/LineChart';
 import { PieChart } from './charts/PieChart';
 import { BarChart } from './charts/BarChart';
@@ -236,6 +237,47 @@ export function MetricsDashboard() {
         />
       </div>
 
+      {/* Specialized Dashboards */}
+      <div className="charts-grid charts-grid-2">
+        <div className="chart-container">
+          <div className="chart-header">
+            <h3>🖥️ Resource Usage</h3>
+            <p>Monitor CPU and memory utilization</p>
+          </div>
+          <div style={{ padding: '1rem 0', textAlign: 'center' }}>
+            <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
+              View detailed CPU and memory usage patterns across your cluster
+            </p>
+            <Link 
+              to="/metrics/resource-usage" 
+              className="btn btn-primary"
+              style={{ textDecoration: 'none' }}
+            >
+              View Resource Usage Dashboard →
+            </Link>
+          </div>
+        </div>
+        
+        <div className="chart-container">
+          <div className="chart-header">
+            <h3>📊 Performance Metrics</h3>
+            <p>Network and storage performance</p>
+          </div>
+          <div style={{ padding: '1rem 0', textAlign: 'center' }}>
+            <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
+              Network throughput, storage I/O, and latency metrics (coming soon)
+            </p>
+            <button 
+              className="btn btn-secondary" 
+              disabled
+              style={{ opacity: 0.5 }}
+            >
+              Coming Soon
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Additional Information */}
       <div className="chart-container">
         <div className="chart-header">
@@ -248,8 +290,10 @@ export function MetricsDashboard() {
             <li>Resource count trends over time</li>
             <li>Task status distribution</li>
             <li>Cluster resource allocation</li>
+            <li>CPU and memory usage monitoring</li>
+            <li>Resource efficiency and utilization patterns</li>
             <li>Service health and availability</li>
-            <li>Performance monitoring (coming soon)</li>
+            <li>Performance monitoring (network/storage coming soon)</li>
           </ul>
           
           <h4 style={{ marginTop: '1.5rem' }}>Features:</h4>
