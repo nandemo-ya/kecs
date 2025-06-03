@@ -238,7 +238,7 @@ export function MetricsDashboard() {
       </div>
 
       {/* Specialized Dashboards */}
-      <div className="charts-grid charts-grid-3">
+      <div className="charts-grid charts-grid-4">
         <div className="chart-container">
           <div className="chart-header">
             <h3>🖥️ Resource Usage</h3>
@@ -292,6 +292,25 @@ export function MetricsDashboard() {
               style={{ textDecoration: 'none' }}
             >
               View Service Topology →
+            </Link>
+          </div>
+        </div>
+        
+        <div className="chart-container">
+          <div className="chart-header">
+            <h3>🔗 Network Dependencies</h3>
+            <p>Network dependency analysis and security</p>
+          </div>
+          <div style={{ padding: '1rem 0', textAlign: 'center' }}>
+            <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
+              Analyze network dependencies, security vulnerabilities, and performance
+            </p>
+            <Link 
+              to="/metrics/network-dependencies" 
+              className="btn btn-primary"
+              style={{ textDecoration: 'none' }}
+            >
+              View Network Dependencies →
             </Link>
           </div>
         </div>

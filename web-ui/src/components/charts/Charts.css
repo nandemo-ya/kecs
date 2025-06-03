@@ -111,6 +111,10 @@
   grid-template-columns: repeat(3, 1fr);
 }
 
+.charts-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .chart-full-width {
   grid-column: 1 / -1;
 }
@@ -119,7 +123,8 @@
 @media (max-width: 768px) {
   .charts-grid,
   .charts-grid-2,
-  .charts-grid-3 {
+  .charts-grid-3,
+  .charts-grid-4 {
     grid-template-columns: 1fr;
     gap: 1rem;
   }

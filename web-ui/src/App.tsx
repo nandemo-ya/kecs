@@ -17,6 +17,7 @@ import { MetricsDashboard } from './components/MetricsDashboard';
 import { ResourceUsageDashboard } from './components/ResourceUsageDashboard';
 import { TimeSeriesDashboard } from './components/TimeSeriesDashboard';
 import { ServiceTopologyDashboard } from './components/ServiceTopologyDashboard';
+import { NetworkDependencyDashboard } from './components/NetworkDependencyDashboard';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { NotificationContainer } from './components/NotificationContainer';
 
@@ -107,6 +108,7 @@ function AppContent() {
         <Route path="/metrics/resource-usage" element={<ResourceUsageDashboard />} />
         <Route path="/metrics/timeseries" element={<TimeSeriesDashboard />} />
         <Route path="/metrics/topology" element={<ServiceTopologyDashboard />} />
+        <Route path="/metrics/network-dependencies" element={<NetworkDependencyDashboard />} />
         <Route path="*" element={<div className="placeholder">Page Not Found</div>} />
       </Routes>
       
