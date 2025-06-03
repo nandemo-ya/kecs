@@ -1,0 +1,480 @@
+/* Network Dependency Graph Container */
+.network-dependency-graph-container {
+  width: 100%;
+  height: 800px;
+  background: #f8fafc;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+  border: 1px solid #e2e8f0;
+  position: relative;
+}
+
+.network-dependency-flow {
+  width: 100%;
+  height: 100%;
+}
+
+/* React Flow Customization */
+.react-flow__renderer {
+  background: #f8fafc;
+}
+
+.react-flow__controls {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  margin: 16px;
+}
+
+.react-flow__controls-button {
+  background: white;
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+  color: #64748b;
+  transition: all 0.2s;
+  font-size: 16px;
+}
+
+.react-flow__controls-button:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+
+.react-flow__minimap {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  margin: 16px;
+}
+
+/* Network Metrics Panel */
+.network-metrics-panel {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  margin: 16px;
+  min-width: 200px;
+}
+
+.network-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.network-metrics .metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.network-metrics .metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1;
+}
+
+.network-metrics .metric-label {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+/* Action Buttons Panel */
+.network-actions-panel {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  margin: 16px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.action-button {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.action-button:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.action-button.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.action-button.active::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+/* Selection and Highlight Effects */
+.react-flow__node.selected {
+  outline: 3px solid #3b82f6;
+  outline-offset: 3px;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #3b82f6;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.4));
+}
+
+/* Critical Path Highlighting */
+.react-flow__node.critical-path {
+  outline: 3px solid #dc2626;
+  outline-offset: 3px;
+  animation: critical-pulse 2s ease-in-out infinite;
+}
+
+.react-flow__edge.critical-path .react-flow__edge-path {
+  stroke: #dc2626;
+  stroke-width: 4;
+  animation: critical-flow 2s linear infinite;
+  filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.4));
+}
+
+@keyframes critical-pulse {
+  0%, 100% {
+    outline-color: #dc2626;
+  }
+  50% {
+    outline-color: #ef4444;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes critical-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+/* Security Warning Overlay */
+.security-warning-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(239, 68, 68, 0.1);
+  border: 2px dashed #ef4444;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #991b1b;
+  font-weight: 600;
+  z-index: 1000;
+  animation: security-warning 2s ease-in-out infinite;
+}
+
+@keyframes security-warning {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+}
+
+/* Loading States */
+.network-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  z-index: 1000;
+}
+
+.network-loading-spinner {
+  width: 64px;
+  height: 64px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.network-loading-text {
+  font-size: 16px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* Empty State */
+.network-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #64748b;
+  z-index: 1000;
+}
+
+.network-empty-icon {
+  font-size: 72px;
+  opacity: 0.3;
+  margin-bottom: 16px;
+}
+
+.network-empty-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.network-empty-description {
+  font-size: 16px;
+  color: #64748b;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* Error State */
+.network-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #dc2626;
+  z-index: 1000;
+}
+
+.network-error-icon {
+  font-size: 72px;
+  margin-bottom: 16px;
+}
+
+.network-error-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.network-error-description {
+  font-size: 16px;
+  color: #64748b;
+  max-width: 400px;
+  margin: 0 auto 16px;
+}
+
+.network-error-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.error-action-button {
+  padding: 8px 16px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.error-action-button:hover {
+  background: #b91c1c;
+  transform: translateY(-1px);
+}
+
+.error-action-button.secondary {
+  background: white;
+  color: #dc2626;
+  border: 1px solid #dc2626;
+}
+
+.error-action-button.secondary:hover {
+  background: #fef2f2;
+}
+
+/* Performance Indicators */
+.performance-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  z-index: 10;
+}
+
+.performance-indicator.excellent {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.performance-indicator.good {
+  background: #84cc16;
+  box-shadow: 0 0 8px rgba(132, 204, 22, 0.4);
+}
+
+.performance-indicator.fair {
+  background: #eab308;
+  box-shadow: 0 0 8px rgba(234, 179, 8, 0.4);
+}
+
+.performance-indicator.poor {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+  animation: performance-warning 2s ease-in-out infinite;
+}
+
+@keyframes performance-warning {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+}
+
+/* Traffic Flow Animation */
+.traffic-flow-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.traffic-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #3b82f6;
+  border-radius: 50%;
+  animation: traffic-move 2s linear infinite;
+}
+
+@keyframes traffic-move {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  90% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .network-metrics {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .network-metrics .metric {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  
+  .network-metrics .metric-value {
+    font-size: 20px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .network-dependency-graph-container {
+    height: 600px;
+    border-radius: 8px;
+  }
+  
+  .network-metrics-panel,
+  .network-actions-panel {
+    margin: 8px;
+    padding: 8px;
+  }
+  
+  .action-button {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+  
+  .react-flow__controls,
+  .react-flow__minimap {
+    margin: 8px;
+  }
+  
+  .react-flow__minimap {
+    width: 120px;
+    height: 80px;
+  }
+}
