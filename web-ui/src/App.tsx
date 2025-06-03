@@ -19,6 +19,7 @@ import { TimeSeriesDashboard } from './components/TimeSeriesDashboard';
 import { ServiceTopologyDashboard } from './components/ServiceTopologyDashboard';
 import { NetworkDependencyDashboard } from './components/NetworkDependencyDashboard';
 import { InteractiveChartsDashboard } from './components/charts/InteractiveChartsDashboard';
+import { LogViewerDashboard } from './components/LogViewerDashboard';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { NotificationContainer } from './components/NotificationContainer';
 
@@ -81,6 +82,14 @@ function Navigation() {
               Metrics
             </Link>
           </li>
+          <li>
+            <Link 
+              to="/logs" 
+              className={location.pathname.startsWith('/logs') ? 'active' : ''}
+            >
+              Logs
+            </Link>
+          </li>
         </ul>
       </nav>
     </header>
@@ -111,6 +120,10 @@ function AppContent() {
         <Route path="/metrics/topology" element={<ServiceTopologyDashboard />} />
         <Route path="/metrics/network-dependencies" element={<NetworkDependencyDashboard />} />
         <Route path="/metrics/interactive-charts" element={<InteractiveChartsDashboard />} />
+        <Route path="/logs" element={<LogViewerDashboard />} />
+        <Route path="/logs/task/:taskId" element={<LogViewerDashboard />} />
+        <Route path="/logs/service/:serviceName" element={<LogViewerDashboard />} />
+        <Route path="/logs/container/:containerId" element={<LogViewerDashboard />} />
         <Route path="*" element={<div className="placeholder">Page Not Found</div>} />
       </Routes>
       
