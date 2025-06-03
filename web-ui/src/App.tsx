@@ -6,6 +6,8 @@ import { ClusterList } from './components/ClusterList';
 import { ClusterDetail } from './components/ClusterDetail';
 import { ServiceList } from './components/ServiceList';
 import { ServiceDetail } from './components/ServiceDetail';
+import { CreateService } from './components/CreateService';
+import { UpdateService } from './components/UpdateService';
 import { TaskList } from './components/TaskList';
 import { TaskDetail } from './components/TaskDetail';
 import { TaskDefinitionList } from './components/TaskDefinitionList';
@@ -77,7 +79,9 @@ function AppContent() {
         <Route path="/clusters" element={<ClusterList />} />
         <Route path="/clusters/:clusterName" element={<ClusterDetail />} />
         <Route path="/services" element={<ServiceList />} />
+        <Route path="/services/create" element={<CreateService />} />
         <Route path="/services/:serviceName" element={<ServiceDetail />} />
+        <Route path="/services/:serviceName/update" element={<UpdateService />} />
         <Route path="/tasks" element={<TaskList />} />
         <Route path="/tasks/:taskId" element={<TaskDetail />} />
         <Route path="/task-definitions" element={<TaskDefinitionList />} />

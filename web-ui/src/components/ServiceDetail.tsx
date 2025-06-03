@@ -1,5 +1,5 @@
-import React from 'react';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useApiData } from '../hooks/useApi';
 import { apiClient } from '../services/api';
 import './DetailPages.css';
@@ -8,6 +8,8 @@ export function ServiceDetail() {
   const { serviceName } = useParams<{ serviceName: string }>();
   const [searchParams] = useSearchParams();
   const clusterName = searchParams.get('cluster') || 'default';
+  const navigate = useNavigate();
+  const [deleteLoading, setDeleteLoading] = useState(false);
   
   const { data: services, loading: servicesLoading, error: servicesError } = useApiData(
     () => apiClient.describeServices([serviceName || ''], clusterName),
@@ -56,6 +58,31 @@ export function ServiceDetail() {
     }
   };
 
+  const handleDeleteService = async () => {
+    if (!serviceName) return;
+    
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the service "${serviceName}"? This action cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+    
+    setDeleteLoading(true);
+    try {
+      await apiClient.deleteService({
+        cluster: clusterName,
+        service: serviceName,
+      });
+      
+      // Navigate back to services list
+      navigate('/services');
+    } catch (err) {
+      alert('Failed to delete service: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   // Extract task definition family and revision
   const taskDefParts = service.taskDefinition.split('/').pop()?.split(':');
   const taskDefFamily = taskDefParts?.[0];
@@ -66,8 +93,23 @@ export function ServiceDetail() {
       <div className="detail-header">
         <Link to="/" className="back-link">← Back to Dashboard</Link>
         <h1>Service: {service.serviceName}</h1>
-        <div className={`status-badge ${getStatusClass(service.status)}`}>
-          {service.status}
+        <div className="header-actions">
+          <Link 
+            to={`/services/${serviceName}/update?cluster=${clusterName}`}
+            className="btn btn-secondary"
+          >
+            Update Service
+          </Link>
+          <button
+            onClick={handleDeleteService}
+            disabled={deleteLoading}
+            className="btn btn-danger"
+          >
+            {deleteLoading ? 'Deleting...' : 'Delete Service'}
+          </button>
+          <div className={`status-badge ${getStatusClass(service.status)}`}>
+            {service.status}
+          </div>
         </div>
       </div>
 

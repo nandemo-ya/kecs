@@ -122,9 +122,14 @@ export function ServiceList() {
     <main className="App-main">
       <div className="dashboard-header">
         <h2>Services</h2>
-        <button className="refresh-button" onClick={loadServices}>
-          Refresh
-        </button>
+        <div className="header-actions">
+          <Link to="/services/create" className="btn btn-primary">
+            + Create Service
+          </Link>
+          <button className="refresh-button" onClick={loadServices}>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {services.length === 0 ? (
