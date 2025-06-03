@@ -1,0 +1,56 @@
+.auto-refresh-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.auto-refresh-toggle:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.auto-refresh-toggle.enabled {
+  background: #dbeafe;
+  border-color: #3b82f6;
+  color: #1e40af;
+}
+
+.auto-refresh-toggle.enabled:hover {
+  background: #bfdbfe;
+}
+
+.auto-refresh-toggle.refreshing .refresh-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.refresh-icon {
+  font-size: 1rem;
+  transition: transform 0.2s;
+}
+
+.refresh-text {
+  font-size: 0.875rem;
+}
+
+.refresh-indicator {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}

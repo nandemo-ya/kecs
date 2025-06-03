@@ -2,10 +2,21 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useDashboardStats, useHealthStatus, useApiData } from '../hooks/useApi';
 import { apiClient } from '../services/api';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { AutoRefreshToggle } from './AutoRefreshToggle';
 
 export function Dashboard() {
   const { stats, loading: statsLoading, error: statsError, refresh: refreshStats } = useDashboardStats();
   const { health, refresh: refreshHealth } = useHealthStatus();
+  
+  const refreshAll = () => {
+    refreshStats();
+    refreshHealth();
+  };
+  
+  const { isAutoRefreshEnabled, isRefreshing, toggleRefresh } = useAutoRefresh(refreshAll, {
+    interval: 10000, // 10 seconds for dashboard
+  });
   
   // Get actual cluster and service data for linking
   const { data: clusters } = useApiData(() => apiClient.listClusters(), []);
@@ -41,14 +52,22 @@ export function Dashboard() {
       <section id="dashboard">
         <div className="dashboard-header">
           <h2>Dashboard</h2>
-          <button 
-            className="refresh-button" 
-            onClick={refreshStats}
-            disabled={statsLoading}
-            title="Refresh dashboard data"
-          >
-            {statsLoading ? '⟳' : '↻'}
-          </button>
+          <div className="header-actions">
+            <AutoRefreshToggle
+              isEnabled={isAutoRefreshEnabled}
+              isRefreshing={isRefreshing}
+              onToggle={toggleRefresh}
+              interval={10000}
+            />
+            <button 
+              className="refresh-button" 
+              onClick={refreshAll}
+              disabled={statsLoading}
+              title="Refresh dashboard data"
+            >
+              {statsLoading ? '⟳' : '↻'}
+            </button>
+          </div>
         </div>
         
         {statsError && (

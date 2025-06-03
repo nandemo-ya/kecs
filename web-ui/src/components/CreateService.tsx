@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../services/api';
 import { CreateServiceRequest, ListClustersResponse, ListTaskDefinitionsResponse } from '../types/api';
+import { useOperationNotification } from '../hooks/useOperationNotification';
 
 interface FormData {
   cluster: string;
@@ -17,6 +18,7 @@ export function CreateService() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialCluster = searchParams.get('cluster') || '';
+  const { executeWithNotification } = useOperationNotification();
 
   const [formData, setFormData] = useState<FormData>({
     cluster: initialCluster,
@@ -79,25 +81,34 @@ export function CreateService() {
     setSubmitLoading(true);
     setError(null);
 
-    try {
-      const request: CreateServiceRequest = {
-        cluster: formData.cluster,
-        serviceName: formData.serviceName,
-        taskDefinition: formData.taskDefinition,
-        desiredCount: formData.desiredCount,
-        launchType: formData.launchType,
-        platformVersion: formData.platformVersion,
-        schedulingStrategy: formData.schedulingStrategy,
-      };
+    const result = await executeWithNotification(
+      async () => {
+        const request: CreateServiceRequest = {
+          cluster: formData.cluster,
+          serviceName: formData.serviceName,
+          taskDefinition: formData.taskDefinition,
+          desiredCount: formData.desiredCount,
+          launchType: formData.launchType,
+          platformVersion: formData.platformVersion,
+          schedulingStrategy: formData.schedulingStrategy,
+        };
 
-      await apiClient.createService(request);
-      
+        return await apiClient.createService(request);
+      },
+      {
+        inProgressTitle: 'Creating Service',
+        inProgressMessage: `Creating service "${formData.serviceName}" in cluster "${formData.cluster}"...`,
+        successTitle: 'Service Created Successfully',
+        successMessage: `Service "${formData.serviceName}" has been created in cluster "${formData.cluster}".`,
+        errorTitle: 'Failed to Create Service',
+      }
+    );
+
+    setSubmitLoading(false);
+
+    if (result) {
       // Navigate to service detail page
       navigate(`/services/${formData.serviceName}?cluster=${formData.cluster}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create service');
-    } finally {
-      setSubmitLoading(false);
     }
   };
 

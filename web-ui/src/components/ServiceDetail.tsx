@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useApiData } from '../hooks/useApi';
 import { apiClient } from '../services/api';
+import { useOperationNotification } from '../hooks/useOperationNotification';
 import './DetailPages.css';
 
 export function ServiceDetail() {
@@ -10,6 +11,7 @@ export function ServiceDetail() {
   const clusterName = searchParams.get('cluster') || 'default';
   const navigate = useNavigate();
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const { executeWithNotification } = useOperationNotification();
   
   const { data: services, loading: servicesLoading, error: servicesError } = useApiData(
     () => apiClient.describeServices([serviceName || ''], clusterName),
@@ -68,18 +70,28 @@ export function ServiceDetail() {
     if (!confirmed) return;
     
     setDeleteLoading(true);
-    try {
-      await apiClient.deleteService({
-        cluster: clusterName,
-        service: serviceName,
-      });
-      
+
+    const result = await executeWithNotification(
+      async () => {
+        return await apiClient.deleteService({
+          cluster: clusterName,
+          service: serviceName,
+        });
+      },
+      {
+        inProgressTitle: 'Deleting Service',
+        inProgressMessage: `Deleting service "${serviceName}" from cluster "${clusterName}"...`,
+        successTitle: 'Service Deleted Successfully',
+        successMessage: `Service "${serviceName}" has been deleted from cluster "${clusterName}".`,
+        errorTitle: 'Failed to Delete Service',
+      }
+    );
+
+    setDeleteLoading(false);
+
+    if (result) {
       // Navigate back to services list
       navigate('/services');
-    } catch (err) {
-      alert('Failed to delete service: ' + (err instanceof Error ? err.message : 'Unknown error'));
-    } finally {
-      setDeleteLoading(false);
     }
   };
 

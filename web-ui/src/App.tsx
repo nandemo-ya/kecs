@@ -13,6 +13,8 @@ import { TaskDetail } from './components/TaskDetail';
 import { TaskDefinitionList } from './components/TaskDefinitionList';
 import { TaskDefinitionDetail } from './components/TaskDefinitionDetail';
 import { RegisterTaskDefinition } from './components/RegisterTaskDefinition';
+import { NotificationProvider } from './contexts/NotificationContext';
+import { NotificationContainer } from './components/NotificationContainer';
 
 function Navigation() {
   const location = useLocation();
@@ -92,6 +94,8 @@ function AppContent() {
         <Route path="*" element={<div className="placeholder">Page Not Found</div>} />
       </Routes>
       
+      <NotificationContainer />
+      
       <footer className="App-footer">
         <p>&copy; 2025 KECS - Kubernetes-based ECS Compatible Service</p>
       </footer>
@@ -101,9 +105,11 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <NotificationProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </NotificationProvider>
   );
 }
 
