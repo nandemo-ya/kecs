@@ -13,6 +13,7 @@ import { TaskDetail } from './components/TaskDetail';
 import { TaskDefinitionList } from './components/TaskDefinitionList';
 import { TaskDefinitionDetail } from './components/TaskDefinitionDetail';
 import { RegisterTaskDefinition } from './components/RegisterTaskDefinition';
+import { MetricsDashboard } from './components/MetricsDashboard';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { NotificationContainer } from './components/NotificationContainer';
 
@@ -67,6 +68,14 @@ function Navigation() {
               Task Definitions
             </Link>
           </li>
+          <li>
+            <Link 
+              to="/metrics" 
+              className={location.pathname.startsWith('/metrics') ? 'active' : ''}
+            >
+              Metrics
+            </Link>
+          </li>
         </ul>
       </nav>
     </header>
@@ -91,6 +100,7 @@ function AppContent() {
         <Route path="/task-definitions" element={<TaskDefinitionList />} />
         <Route path="/task-definitions/register" element={<RegisterTaskDefinition />} />
         <Route path="/task-definitions/:family/:revision" element={<TaskDefinitionDetail />} />
+        <Route path="/metrics" element={<MetricsDashboard />} />
         <Route path="*" element={<div className="placeholder">Page Not Found</div>} />
       </Routes>
       
