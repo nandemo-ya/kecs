@@ -1,0 +1,62 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kecs-controlplane
+  namespace: kecs-system
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    # WebSocket support
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+spec:
+  rules:
+  - host: kecs.example.com  # Change to your domain
+    http:
+      paths:
+      # Web UI
+      - path: /ui
+        pathType: Prefix
+        backend:
+          service:
+            name: kecs-controlplane
+            port:
+              number: 80
+      # WebSocket endpoints
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: kecs-controlplane
+            port:
+              number: 80
+      # API endpoints
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: kecs-controlplane
+            port:
+              number: 80
+      # ECS API (root path)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kecs-controlplane
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - kecs.example.com
+    secretName: kecs-tls
