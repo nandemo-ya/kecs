@@ -69,6 +69,22 @@ Once the Control Plane is running, access the Web UI at:
 http://localhost:8080/ui/
 ```
 
+### Custom UI Base Path
+
+You can configure a custom base path for the Web UI using the `KECS_UI_BASE_PATH` environment variable:
+
+```bash
+# Serve UI at /admin/
+export KECS_UI_BASE_PATH=/admin
+./bin/kecs
+
+# Serve UI at /dashboard/
+export KECS_UI_BASE_PATH=/dashboard
+./bin/kecs
+```
+
+The Web UI will handle all subpaths under the base path, supporting client-side routing for single-page applications.
+
 ## Security
 
 ### CORS

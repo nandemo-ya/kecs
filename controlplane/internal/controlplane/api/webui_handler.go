@@ -31,13 +31,7 @@ func (h *WebUIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	upath = path.Clean(upath)
 
-	// Remove /ui prefix if present
-	if strings.HasPrefix(upath, "/ui") {
-		upath = strings.TrimPrefix(upath, "/ui")
-		if upath == "" {
-			upath = "/"
-		}
-	}
+	// The /ui prefix is already stripped by http.StripPrefix in server.go
 
 	// Try to serve the file
 	file, err := h.fileSystem.Open(strings.TrimPrefix(upath, "/"))
