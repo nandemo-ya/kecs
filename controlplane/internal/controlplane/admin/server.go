@@ -7,19 +7,34 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // Server represents the HTTP admin server for KECS Control Plane
 type Server struct {
-	httpServer *http.Server
-	port       int
+	httpServer      *http.Server
+	port            int
+	healthChecker   *HealthChecker
+	metricsCollector *MetricsCollector
 }
 
 // NewServer creates a new admin server instance
-func NewServer(port int) *Server {
-	return &Server{
-		port: port,
+func NewServer(port int, storage storage.Storage) *Server {
+	s := &Server{
+		port:             port,
+		metricsCollector: NewMetricsCollector(),
 	}
+	
+	// Initialize health checker if storage is provided
+	if storage != nil {
+		s.healthChecker = NewHealthChecker(storage)
+	} else {
+		// Create health checker without storage
+		s.healthChecker = NewHealthChecker(nil)
+	}
+	
+	return s
 }
 
 // Start starts the HTTP admin server
@@ -48,8 +63,16 @@ func (s *Server) Stop(ctx context.Context) error {
 func (s *Server) setupRoutes() http.Handler {
 	mux := http.NewServeMux()
 
-	// Health check endpoint
-	mux.HandleFunc("/healthz", s.handleHealthCheck)
+	// Health check endpoints
+	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/healthz", s.handleHealthCheck) // Legacy endpoint
+	mux.HandleFunc("/live", s.handleLiveness)
+	mux.HandleFunc("/ready", s.handleReadiness(s.healthChecker))
+	mux.HandleFunc("/health/detailed", s.handleHealthDetailed(s.healthChecker))
+	
+	// Metrics endpoints
+	mux.HandleFunc("/metrics", s.handleMetrics(s.metricsCollector))
+	mux.HandleFunc("/metrics/prometheus", s.handlePrometheusMetrics(s.metricsCollector))
 
 	return mux
 }
@@ -61,12 +84,12 @@ type HealthResponse struct {
 	Version   string    `json:"version"`
 }
 
-// handleHealthCheck handles the health check endpoint
+// handleHealthCheck handles the legacy health check endpoint
 func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	response := HealthResponse{
 		Status:    "OK",
 		Timestamp: time.Now(),
-		Version:   "1.0.0", // TODO: Use actual version from build info
+		Version:   getVersion(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

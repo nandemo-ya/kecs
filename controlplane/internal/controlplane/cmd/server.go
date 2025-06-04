@@ -79,7 +79,7 @@ func runServer() {
 
 	// Initialize the API and Admin servers
 	apiServer := api.NewServer(port, kubeconfig, storage)
-	adminServer := admin.NewServer(adminPort)
+	adminServer := admin.NewServer(adminPort, storage)
 	
 	// Set up graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())

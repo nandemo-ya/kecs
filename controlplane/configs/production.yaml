@@ -1,0 +1,71 @@
+# Production configuration for KECS Control Plane
+
+# Server configuration
+server:
+  port: 8080
+  adminPort: 8081
+  readTimeout: 30s
+  writeTimeout: 30s
+  idleTimeout: 120s
+  shutdownTimeout: 30s
+
+# Web UI configuration
+webui:
+  enabled: true
+  basePath: "/ui"
+  
+# Security configuration
+security:
+  cors:
+    enabled: true
+    allowedOrigins:
+      - "*"  # In production, specify actual domains
+    allowedMethods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+      - PATCH
+    allowedHeaders:
+      - Accept
+      - Authorization
+      - Content-Type
+      - X-CSRF-Token
+      - X-Amz-Target
+      - X-Amz-Date
+      - X-Amz-Security-Token
+      - X-Amz-User-Agent
+    allowCredentials: true
+    maxAge: 86400
+
+# Storage configuration
+storage:
+  type: duckdb
+  duckdb:
+    path: "/data/kecs.db"
+    inMemory: false
+    readOnly: false
+
+# Kubernetes configuration
+kubernetes:
+  inCluster: true  # Use in-cluster config when running in Kubernetes
+  kubeconfig: ""   # Empty for in-cluster
+
+# Logging configuration
+logging:
+  level: info
+  format: json
+  output: stdout
+
+# Metrics configuration
+metrics:
+  enabled: true
+  path: /metrics
+  
+# Health check configuration
+health:
+  enabled: true
+  path: /health
+  readinessPath: /ready
+  livenessPath: /live
