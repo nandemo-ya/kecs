@@ -19,6 +19,7 @@ type DuckDBStorage struct {
 	taskDefinitionStore *taskDefinitionStore
 	serviceStore        *serviceStore
 	taskStore           *taskStore
+	accountSettingStore *accountSettingStore
 }
 
 // NewDuckDBStorage creates a new DuckDB storage instance
@@ -51,6 +52,7 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 	s.taskDefinitionStore = &taskDefinitionStore{db: db}
 	s.serviceStore = &serviceStore{db: db}
 	s.taskStore = &taskStore{db: db}
+	s.accountSettingStore = &accountSettingStore{db: db}
 
 	return s, nil
 }
@@ -77,6 +79,11 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 	// Create tasks table
 	if err := s.createTasksTable(ctx); err != nil {
 		return fmt.Errorf("failed to create tasks table: %w", err)
+	}
+
+	// Create account settings table
+	if err := s.accountSettingStore.CreateSchema(ctx); err != nil {
+		return fmt.Errorf("failed to create account settings table: %w", err)
 	}
 
 	log.Println("DuckDB storage initialized successfully")
@@ -109,6 +116,11 @@ func (s *DuckDBStorage) ServiceStore() storage.ServiceStore {
 // TaskStore returns the task store
 func (s *DuckDBStorage) TaskStore() storage.TaskStore {
 	return s.taskStore
+}
+
+// AccountSettingStore returns the account setting store
+func (s *DuckDBStorage) AccountSettingStore() storage.AccountSettingStore {
+	return s.accountSettingStore
 }
 
 // BeginTx starts a new transaction

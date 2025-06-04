@@ -2,7 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // AccountSetting represents an ECS account setting
@@ -82,13 +86,65 @@ func (s *Server) handlePutAccountSetting(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// TODO: Implement actual account setting update logic
+	// Validate the setting name
+	validSettings := []string{
+		"serviceLongArnFormat",
+		"taskLongArnFormat",
+		"containerInstanceLongArnFormat",
+		"awsvpcTrunking",
+		"containerInsights",
+		"fargateFIPSMode",
+		"guardDutyActivate",
+		"tagResourceAuthorization",
+	}
+	
+	isValid := false
+	for _, valid := range validSettings {
+		if req.Name == valid {
+			isValid = true
+			break
+		}
+	}
+	
+	if !isValid {
+		http.Error(w, fmt.Sprintf("Invalid setting name: %s", req.Name), http.StatusBadRequest)
+		return
+	}
 
-	// For now, return a mock response
+	// Validate the value
+	if req.Value != "enabled" && req.Value != "disabled" {
+		http.Error(w, fmt.Sprintf("Invalid value: %s. Must be 'enabled' or 'disabled'", req.Value), http.StatusBadRequest)
+		return
+	}
+
+	// Use principal ARN if provided, otherwise use default
+	principalArn := req.PrincipalArn
+	if principalArn == "" {
+		principalArn = fmt.Sprintf("arn:aws:iam::%s:root", s.accountID)
+	}
+
+	// Create the account setting
+	setting := &storage.AccountSetting{
+		Name:         req.Name,
+		Value:        req.Value,
+		PrincipalARN: principalArn,
+		IsDefault:    false,
+		Region:       s.region,
+		AccountID:    s.accountID,
+	}
+
+	// Store in database
+	if err := s.storage.AccountSettingStore().Upsert(r.Context(), setting); err != nil {
+		log.Printf("Failed to store account setting: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Return response
 	resp := PutAccountSettingResponse{
 		Setting: AccountSetting{
-			Name:  req.Name,
-			Value: req.Value,
+			Name:  setting.Name,
+			Value: setting.Value,
 		},
 	}
 
@@ -109,9 +165,45 @@ func (s *Server) handlePutAccountSettingDefault(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// TODO: Implement actual account setting default update logic
+	// Validate the setting name
+	validSettings := []string{
+		"serviceLongArnFormat",
+		"taskLongArnFormat",
+		"containerInstanceLongArnFormat",
+		"awsvpcTrunking",
+		"containerInsights",
+		"fargateFIPSMode",
+		"guardDutyActivate",
+		"tagResourceAuthorization",
+	}
+	
+	isValid := false
+	for _, valid := range validSettings {
+		if req.Name == valid {
+			isValid = true
+			break
+		}
+	}
+	
+	if !isValid {
+		http.Error(w, fmt.Sprintf("Invalid setting name: %s", req.Name), http.StatusBadRequest)
+		return
+	}
 
-	// For now, return a mock response
+	// Validate the value
+	if req.Value != "enabled" && req.Value != "disabled" {
+		http.Error(w, fmt.Sprintf("Invalid value: %s. Must be 'enabled' or 'disabled'", req.Value), http.StatusBadRequest)
+		return
+	}
+
+	// Set default account setting
+	if err := s.storage.AccountSettingStore().SetDefault(r.Context(), req.Name, req.Value); err != nil {
+		log.Printf("Failed to set default account setting: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Return response
 	resp := PutAccountSettingDefaultResponse{
 		Setting: AccountSetting{
 			Name:  req.Name,
@@ -136,13 +228,37 @@ func (s *Server) handleDeleteAccountSetting(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// TODO: Implement actual account setting deletion logic
+	// Use principal ARN if provided, otherwise use default
+	principalArn := req.PrincipalArn
+	if principalArn == "" {
+		principalArn = fmt.Sprintf("arn:aws:iam::%s:root", s.accountID)
+	}
 
-	// For now, return a mock response
+	// Get the setting before deletion for the response
+	setting, err := s.storage.AccountSettingStore().Get(r.Context(), principalArn, req.Name)
+	if err != nil {
+		log.Printf("Failed to get account setting: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if setting == nil {
+		http.Error(w, fmt.Sprintf("Setting not found: %s", req.Name), http.StatusNotFound)
+		return
+	}
+
+	// Delete the setting
+	if err := s.storage.AccountSettingStore().Delete(r.Context(), principalArn, req.Name); err != nil {
+		log.Printf("Failed to delete account setting: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Return response
 	resp := DeleteAccountSettingResponse{
 		Setting: AccountSetting{
-			Name:  req.Name,
-			Value: "",
+			Name:  setting.Name,
+			Value: setting.Value,
 		},
 	}
 
@@ -163,11 +279,42 @@ func (s *Server) handleListAccountSettings(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// TODO: Implement actual account setting listing logic
+	// Use principal ARN if provided, otherwise use default
+	principalArn := req.PrincipalArn
+	if principalArn == "" && !req.EffectiveSettings {
+		principalArn = fmt.Sprintf("arn:aws:iam::%s:root", s.accountID)
+	}
 
-	// For now, return a mock response with some default settings
-	resp := ListAccountSettingsResponse{
-		Settings: []AccountSetting{
+	// Build filters
+	filters := storage.AccountSettingFilters{
+		Name:              req.Name,
+		Value:             req.Value,
+		PrincipalARN:      principalArn,
+		EffectiveSettings: req.EffectiveSettings,
+		MaxResults:        req.MaxResults,
+		NextToken:         req.NextToken,
+	}
+
+	// List settings from storage
+	settings, nextToken, err := s.storage.AccountSettingStore().List(r.Context(), filters)
+	if err != nil {
+		log.Printf("Failed to list account settings: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Convert to API response format
+	apiSettings := make([]AccountSetting, 0, len(settings))
+	for _, setting := range settings {
+		apiSettings = append(apiSettings, AccountSetting{
+			Name:  setting.Name,
+			Value: setting.Value,
+		})
+	}
+
+	// If no settings found and we haven't set defaults yet, return common defaults
+	if len(apiSettings) == 0 && req.EffectiveSettings {
+		apiSettings = []AccountSetting{
 			{
 				Name:  "serviceLongArnFormat",
 				Value: "enabled",
@@ -180,7 +327,13 @@ func (s *Server) handleListAccountSettings(w http.ResponseWriter, r *http.Reques
 				Name:  "containerInstanceLongArnFormat",
 				Value: "enabled",
 			},
-		},
+		}
+	}
+
+	// Return response
+	resp := ListAccountSettingsResponse{
+		Settings:  apiSettings,
+		NextToken: nextToken,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -37,6 +37,10 @@ func (m *MockStorage) TaskStore() storage.TaskStore {
 	return nil // Not needed for this test
 }
 
+func (m *MockStorage) AccountSettingStore() storage.AccountSettingStore {
+	return nil // Not needed for this test
+}
+
 func (m *MockStorage) Initialize(ctx context.Context) error {
 	return nil
 }

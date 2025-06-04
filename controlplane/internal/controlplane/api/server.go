@@ -177,10 +177,7 @@ func (s *Server) registerGeneratedECSEndpoints(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/updatecapacityprovider", generated.HandleUpdateCapacityProvider(s.ecsService))
 
 	// Account Settings operations
-	mux.HandleFunc("/v1/putaccountsetting", generated.HandlePutAccountSetting(s.ecsService))
-	mux.HandleFunc("/v1/putaccountsettingdefault", generated.HandlePutAccountSettingDefault(s.ecsService))
-	mux.HandleFunc("/v1/deleteaccountsetting", generated.HandleDeleteAccountSetting(s.ecsService))
-	mux.HandleFunc("/v1/listaccountsettings", generated.HandleListAccountSettings(s.ecsService))
+	s.registerAccountSettingEndpoints(mux)
 
 	// Tag operations
 	mux.HandleFunc("/v1/tagresource", generated.HandleTagResource(s.ecsService))

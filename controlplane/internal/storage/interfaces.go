@@ -25,6 +25,9 @@ type Storage interface {
 	// Task operations
 	TaskStore() TaskStore
 	
+	// Account setting operations
+	AccountSettingStore() AccountSettingStore
+	
 	// Transaction support
 	BeginTx(ctx context.Context) (Transaction, error)
 }
@@ -491,4 +494,74 @@ type Task struct {
 	
 	// Kubernetes namespace
 	Namespace string `json:"namespace,omitempty"`
+}
+
+// AccountSettingStore defines account setting-specific storage operations
+type AccountSettingStore interface {
+	// Create or update an account setting
+	Upsert(ctx context.Context, setting *AccountSetting) error
+	
+	// Get an account setting by principal ARN and name
+	Get(ctx context.Context, principalARN, name string) (*AccountSetting, error)
+	
+	// Get default account setting by name
+	GetDefault(ctx context.Context, name string) (*AccountSetting, error)
+	
+	// List account settings with filtering
+	List(ctx context.Context, filters AccountSettingFilters) ([]*AccountSetting, string, error)
+	
+	// Delete an account setting
+	Delete(ctx context.Context, principalARN, name string) error
+	
+	// Set default account setting
+	SetDefault(ctx context.Context, name, value string) error
+}
+
+// AccountSetting represents an account setting in storage
+type AccountSetting struct {
+	// Unique identifier
+	ID string `json:"id"`
+	
+	// Setting name
+	Name string `json:"name"`
+	
+	// Setting value
+	Value string `json:"value"`
+	
+	// Principal ARN (user/role ARN or "default" for default settings)
+	PrincipalARN string `json:"principalArn"`
+	
+	// Is this a default setting
+	IsDefault bool `json:"isDefault"`
+	
+	// Region
+	Region string `json:"region"`
+	
+	// Account ID
+	AccountID string `json:"accountId"`
+	
+	// Timestamps
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// AccountSettingFilters defines filters for listing account settings
+type AccountSettingFilters struct {
+	// Filter by setting name
+	Name string
+	
+	// Filter by value
+	Value string
+	
+	// Filter by principal ARN
+	PrincipalARN string
+	
+	// Include effective settings (defaults + overrides)
+	EffectiveSettings bool
+	
+	// Maximum results
+	MaxResults int
+	
+	// Next token for pagination
+	NextToken string
 }
