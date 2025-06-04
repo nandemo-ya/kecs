@@ -22,6 +22,8 @@ import { InteractiveChartsDashboard } from './components/charts/InteractiveChart
 import { LogViewerDashboard } from './components/LogViewerDashboard';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { NotificationContainer } from './components/NotificationContainer';
+import { WebSocketProvider } from './contexts/WebSocketContext';
+import { WebSocketDemo } from './components/WebSocketDemo';
 
 function Navigation() {
   const location = useLocation();
@@ -124,6 +126,7 @@ function AppContent() {
         <Route path="/logs/task/:taskId" element={<LogViewerDashboard />} />
         <Route path="/logs/service/:serviceName" element={<LogViewerDashboard />} />
         <Route path="/logs/container/:containerId" element={<LogViewerDashboard />} />
+        <Route path="/websocket-demo" element={<WebSocketDemo />} />
         <Route path="*" element={<div className="placeholder">Page Not Found</div>} />
       </Routes>
       
@@ -139,9 +142,11 @@ function AppContent() {
 function App() {
   return (
     <NotificationProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <WebSocketProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </WebSocketProvider>
     </NotificationProvider>
   );
 }

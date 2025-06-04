@@ -3,7 +3,7 @@ import { LogEntry } from './LogEntry';
 import { LogFilter } from './LogFilter';
 import { LogStats } from './LogStats';
 import { AdvancedSearch } from './AdvancedSearch';
-import { useMockLogStream } from '../../hooks/useLogStream';
+import { useWebSocketLogStream } from '../../hooks/useWebSocketLogStream';
 import { 
   LogEntry as LogEntryType, 
   LogFilter as LogFilterType,
@@ -49,7 +49,7 @@ export function LogViewer({
   
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Use mock log stream for development
+  // Use WebSocket log stream
   const {
     logs,
     isConnected,
@@ -61,8 +61,12 @@ export function LogViewer({
     pause,
     resume,
     isPaused,
-  } = useMockLogStream({
-    enabled: enableStreaming,
+    setFilter: setStreamFilter,
+  } = useWebSocketLogStream({
+    taskId,
+    serviceName,
+    containerId,
+    follow: enableStreaming,
     maxBufferSize: 1000,
   });
 
@@ -98,6 +102,15 @@ export function LogViewer({
   // Handle filter change
   const handleFilterChange = useCallback((newFilter: LogFilterType) => {
     setFilter(newFilter);
+    
+    // Update WebSocket stream filter
+    setStreamFilter({
+      taskIds: newFilter.taskIds,
+      serviceNames: newFilter.serviceNames,
+      containerIds: newFilter.containerIds,
+      levels: newFilter.levels,
+      search: newFilter.search,
+    });
   }, []);
 
   // Handle entry selection
