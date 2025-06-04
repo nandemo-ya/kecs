@@ -1,5 +1,7 @@
 # ADR-0007: ECS-Kubernetes Resource Mapping
 
+Date: 2025-01-04
+
 ## Status
 Proposed
 
