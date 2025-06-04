@@ -14,31 +14,47 @@ import (
 
 // Server represents the HTTP API server for KECS Control Plane
 type Server struct {
-	httpServer  *http.Server
-	port        int
-	kubeconfig  string
-	ecsService  generated.ECSServiceInterface
-	storage     storage.Storage
-	kindManager *kubernetes.KindManager
-	region      string
-	accountID   string
+	httpServer    *http.Server
+	port          int
+	kubeconfig    string
+	ecsService    generated.ECSServiceInterface
+	storage       storage.Storage
+	kindManager   *kubernetes.KindManager
+	region        string
+	accountID     string
+	webSocketHub  *WebSocketHub
+	webUIHandler  *WebUIHandler
 }
 
 // NewServer creates a new API server instance
 func NewServer(port int, kubeconfig string, storage storage.Storage) *Server {
-	return &Server{
-		port:        port,
-		kubeconfig:  kubeconfig,
-		region:      "ap-northeast-1", // Default region
-		accountID:   "123456789012",   // Default account ID
-		ecsService:  generated.NewECSServiceWithStorage(storage),
-		storage:     storage,
-		kindManager: kubernetes.NewKindManager(),
+	s := &Server{
+		port:         port,
+		kubeconfig:   kubeconfig,
+		region:       "ap-northeast-1", // Default region
+		accountID:    "123456789012",   // Default account ID
+		ecsService:   generated.NewECSServiceWithStorage(storage),
+		storage:      storage,
+		kindManager:  kubernetes.NewKindManager(),
+		webSocketHub: NewWebSocketHub(),
 	}
+
+	// Initialize Web UI handler if enabled
+	if EnableWebUI() && GetWebUIFS != nil {
+		if fs := GetWebUIFS(); fs != nil {
+			s.webUIHandler = NewWebUIHandler(fs)
+		}
+	}
+
+	return s
 }
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
+	// Start WebSocket hub
+	ctx := context.Background()
+	go s.webSocketHub.Run(ctx)
+
 	router := s.setupRoutes()
 
 	s.httpServer = &http.Server{
@@ -50,6 +66,9 @@ func (s *Server) Start() error {
 	}
 
 	log.Printf("Starting API server on port %d", s.port)
+	if s.webUIHandler != nil {
+		log.Printf("Web UI available at http://localhost:%d/ui/", s.port)
+	}
 	return s.httpServer.ListenAndServe()
 }
 
@@ -69,7 +88,30 @@ func (s *Server) setupRoutes() http.Handler {
 	// Health check endpoint
 	mux.HandleFunc("/health", s.handleHealthCheck)
 
-	return mux
+	// WebSocket endpoints
+	mux.HandleFunc("/ws", s.HandleWebSocket(s.webSocketHub))
+	mux.HandleFunc("/ws/logs", s.HandleWebSocket(s.webSocketHub))
+	mux.HandleFunc("/ws/metrics", s.HandleWebSocket(s.webSocketHub))
+	mux.HandleFunc("/ws/notifications", s.HandleWebSocket(s.webSocketHub))
+	mux.HandleFunc("/ws/tasks", s.HandleWebSocket(s.webSocketHub))
+
+	// Web UI endpoint (must be last to catch all)
+	if s.webUIHandler != nil {
+		mux.Handle("/ui/", http.StripPrefix("/ui", s.webUIHandler))
+		// Redirect root to UI
+		mux.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/ui/", http.StatusMovedPermanently)
+		})
+	}
+
+	// Apply middleware
+	handler := http.Handler(mux)
+	handler = APIProxyMiddleware(handler)
+	handler = SecurityHeadersMiddleware(handler)
+	handler = CORSMiddleware(handler)
+	handler = LoggingMiddleware(handler)
+
+	return handler
 }
 
 // registerGeneratedECSEndpoints registers all generated ECS API endpoints

@@ -13,6 +13,7 @@ GOTEST=$(GO) test
 GOVET=$(GO) vet
 PLATFORMS=linux/amd64 linux/arm64
 CONTROLPLANE_DIR=./controlplane
+WEBUI_DIR=./web-ui
 
 # Default target
 .PHONY: all
@@ -23,6 +24,25 @@ all: clean fmt vet test build
 build:
 	@echo "Building $(BINARY_NAME)..."
 	cd $(CONTROLPLANE_DIR) && $(GO) build $(LDFLAGS) -o ../bin/$(BINARY_NAME) ./cmd/controlplane
+
+# Build with Web UI embedded
+.PHONY: build-with-ui
+build-with-ui: build-webui
+	@echo "Building $(BINARY_NAME) with embedded Web UI..."
+	cd $(CONTROLPLANE_DIR) && $(GO) build -tags embed_webui $(LDFLAGS) -o ../bin/$(BINARY_NAME) ./cmd/controlplane
+
+# Build Web UI
+.PHONY: build-webui
+build-webui:
+	@echo "Building Web UI..."
+	@if [ -d "$(WEBUI_DIR)" ]; then \
+		cd $(WEBUI_DIR) && npm install && npm run build; \
+		rm -rf $(CONTROLPLANE_DIR)/internal/controlplane/api/webui_dist; \
+		mkdir -p $(CONTROLPLANE_DIR)/internal/controlplane/api/webui_dist; \
+		cp -r $(WEBUI_DIR)/build/* $(CONTROLPLANE_DIR)/internal/controlplane/api/webui_dist/; \
+	else \
+		echo "Web UI directory not found, skipping..."; \
+	fi
 
 # Run the application
 .PHONY: run
@@ -36,6 +56,7 @@ clean:
 	@echo "Cleaning..."
 	rm -rf bin/
 	rm -f coverage.txt
+	rm -rf $(CONTROLPLANE_DIR)/internal/controlplane/api/webui_dist
 
 # Format code
 .PHONY: fmt
@@ -106,4 +127,6 @@ help:
 	@echo "  docker-build   - Build Docker image"
 	@echo "  docker-push    - Push Docker image"
 	@echo "  gen-api        - Generate API code from Smithy models"
+	@echo "  build-webui    - Build Web UI"
+	@echo "  build-with-ui  - Build with embedded Web UI"
 	@echo "  help           - Show this help message"
