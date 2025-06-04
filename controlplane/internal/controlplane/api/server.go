@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
@@ -67,7 +69,11 @@ func (s *Server) Start() error {
 
 	log.Printf("Starting API server on port %d", s.port)
 	if s.webUIHandler != nil {
-		log.Printf("Web UI available at http://localhost:%d/ui/", s.port)
+		uiBasePath := os.Getenv("KECS_UI_BASE_PATH")
+		if uiBasePath == "" {
+			uiBasePath = "/ui"
+		}
+		log.Printf("Web UI available at http://localhost:%d%s/", s.port, uiBasePath)
 	}
 	return s.httpServer.ListenAndServe()
 }
@@ -97,10 +103,24 @@ func (s *Server) setupRoutes() http.Handler {
 
 	// Web UI endpoint (must be last to catch all)
 	if s.webUIHandler != nil {
-		mux.Handle("/ui/", http.StripPrefix("/ui", s.webUIHandler))
-		// Redirect root to UI
-		mux.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/ui/", http.StatusMovedPermanently)
+		// Support configurable UI base path
+		uiBasePath := os.Getenv("KECS_UI_BASE_PATH")
+		if uiBasePath == "" {
+			uiBasePath = "/ui"
+		}
+		// Ensure base path starts with /
+		if !strings.HasPrefix(uiBasePath, "/") {
+			uiBasePath = "/" + uiBasePath
+		}
+		// Remove trailing slash
+		uiBasePath = strings.TrimSuffix(uiBasePath, "/")
+		
+		// Handle UI routes - this will match /ui/* paths
+		mux.Handle(uiBasePath+"/", http.StripPrefix(uiBasePath, s.webUIHandler))
+		
+		// Redirect /ui to /ui/
+		mux.HandleFunc(uiBasePath, func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, uiBasePath+"/", http.StatusMovedPermanently)
 		})
 	}
 
