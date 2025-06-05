@@ -93,6 +93,14 @@ func (s *Server) handleECSRequest(w http.ResponseWriter, r *http.Request) {
 		s.handleECSDeleteCapacityProvider(w, body)
 	case "DescribeCapacityProviders":
 		s.handleECSDescribeCapacityProviders(w, body)
+	case "RegisterContainerInstance":
+		s.handleECSRegisterContainerInstance(w, body)
+	case "DeregisterContainerInstance":
+		s.handleECSDeregisterContainerInstance(w, body)
+	case "DescribeContainerInstances":
+		s.handleECSDescribeContainerInstances(w, body)
+	case "ListContainerInstances":
+		s.handleECSListContainerInstances(w, body)
 	default:
 		// Return a basic empty response for unsupported operations
 		s.handleUnsupportedOperation(w, operation)
