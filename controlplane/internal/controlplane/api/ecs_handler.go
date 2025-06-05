@@ -103,6 +103,14 @@ func (s *Server) handleECSRequest(w http.ResponseWriter, r *http.Request) {
 		s.handleECSDescribeContainerInstances(w, body)
 	case "ListContainerInstances":
 		s.handleECSListContainerInstances(w, body)
+	case "CreateTaskSet":
+		s.handleECSCreateTaskSet(w, body)
+	case "DeleteTaskSet":
+		s.handleECSDeleteTaskSet(w, body)
+	case "DescribeTaskSets":
+		s.handleECSDescribeTaskSets(w, body)
+	case "UpdateTaskSet":
+		s.handleECSUpdateTaskSet(w, body)
 	default:
 		// Return a basic empty response for unsupported operations
 		s.handleUnsupportedOperation(w, operation)
