@@ -653,3 +653,100 @@ func (s *Server) deleteTaskPod(ctx context.Context, task *storage.Task, cluster 
 
 	return nil
 }
+
+// handleStartTaskECS handles the StartTask operation for ECS API
+func (s *Server) handleStartTaskECS(w http.ResponseWriter, body []byte) {
+	var req StartTaskRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// StartTask is used to start tasks on specific container instances
+	// For now, we'll treat it similarly to RunTask but with container instance constraints
+	
+	// Step 1: Validate and get cluster
+	clusterName := "default"
+	if req.Cluster != "" {
+		clusterName = req.Cluster
+	}
+
+	cluster, err := s.storage.ClusterStore().Get(context.Background(), clusterName)
+	if err != nil || cluster == nil {
+		http.Error(w, fmt.Sprintf("Cluster not found: %s", clusterName), http.StatusBadRequest)
+		return
+	}
+
+	// Step 2: Get task definition
+	taskDefArn := req.TaskDefinition
+	if !strings.HasPrefix(taskDefArn, "arn:aws:ecs:") {
+		// Convert family:revision to ARN
+		taskDefArn = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", s.region, s.accountID, req.TaskDefinition)
+	}
+
+	taskDef, err := s.storage.TaskDefinitionStore().GetByARN(context.Background(), taskDefArn)
+	if err != nil || taskDef == nil {
+		http.Error(w, fmt.Sprintf("Task definition not found: %s", req.TaskDefinition), http.StatusBadRequest)
+		return
+	}
+
+	// Step 3: Create tasks for each container instance
+	tasks := []Task{}
+	failures := []Failure{}
+
+	for _, containerInstance := range req.ContainerInstances {
+		// Create task ID and ARN
+		taskID := generateSimpleTaskID()
+		taskArn := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", s.region, s.accountID, cluster.Name, taskID)
+
+		// Create basic pod
+		pod, err := s.createBasicPod(taskDef, cluster, taskID)
+		if err != nil {
+			failures = append(failures, Failure{
+				Arn:    containerInstance,
+				Reason: fmt.Sprintf("Failed to create pod: %v", err),
+			})
+			continue
+		}
+
+		// Store task in database
+		now := time.Now()
+		storageTask := &storage.Task{
+			ARN:                  taskArn,
+			ClusterARN:           cluster.ARN,
+			TaskDefinitionARN:    taskDef.ARN,
+			ContainerInstanceARN: containerInstance,
+			DesiredStatus:        "RUNNING",
+			LastStatus:           "PENDING",
+			LaunchType:           "EC2", // StartTask always uses EC2 launch type
+			Version:              1,
+			CreatedAt:            now,
+			PodName:              pod.Name,
+			Namespace:            pod.Namespace,
+			Group:                req.Group,
+			StartedBy:            req.StartedBy,
+		}
+
+		// Store task
+		if err := s.storage.TaskStore().Create(context.Background(), storageTask); err != nil {
+			failures = append(failures, Failure{
+				Arn:    containerInstance,
+				Reason: fmt.Sprintf("Failed to store task: %v", err),
+			})
+			continue
+		}
+
+		// Convert to API task
+		apiTask := s.storageTaskToAPITask(storageTask)
+		tasks = append(tasks, apiTask)
+	}
+
+	// Return response
+	resp := StartTaskResponse{
+		Tasks:    tasks,
+		Failures: failures,
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
