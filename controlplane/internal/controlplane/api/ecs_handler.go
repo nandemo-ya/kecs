@@ -85,6 +85,14 @@ func (s *Server) handleECSRequest(w http.ResponseWriter, r *http.Request) {
 		s.handleECSDeleteAttributes(w, body)
 	case "ListAttributes":
 		s.handleECSListAttributes(w, body)
+	case "CreateCapacityProvider":
+		s.handleECSCreateCapacityProvider(w, body)
+	case "UpdateCapacityProvider":
+		s.handleECSUpdateCapacityProvider(w, body)
+	case "DeleteCapacityProvider":
+		s.handleECSDeleteCapacityProvider(w, body)
+	case "DescribeCapacityProviders":
+		s.handleECSDescribeCapacityProviders(w, body)
 	default:
 		// Return a basic empty response for unsupported operations
 		s.handleUnsupportedOperation(w, operation)
