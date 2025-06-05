@@ -53,6 +53,8 @@ func (s *Server) handleECSRequest(w http.ResponseWriter, r *http.Request) {
 		s.handleECSDeleteCluster(w, body)
 	case "RunTask":
 		s.handleRunTaskECS(w, body)
+	case "StartTask":
+		s.handleStartTaskECS(w, body)
 	case "DescribeTasks":
 		s.handleDescribeTasksECS(w, body)
 	case "ListTasks":
