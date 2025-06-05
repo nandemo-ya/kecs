@@ -130,3 +130,66 @@ func (s *Server) handleListAttributes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
+
+// handleECSPutAttributes handles the PutAttributes API endpoint in AWS ECS format
+func (s *Server) handleECSPutAttributes(w http.ResponseWriter, body []byte) {
+	var req PutAttributesRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid request format", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Implement actual attribute creation logic
+	// For now, return the attributes that were sent
+	resp := PutAttributesResponse{
+		Attributes: req.Attributes,
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+// handleECSDeleteAttributes handles the DeleteAttributes API endpoint in AWS ECS format
+func (s *Server) handleECSDeleteAttributes(w http.ResponseWriter, body []byte) {
+	var req DeleteAttributesRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid request format", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Implement actual attribute deletion logic
+	// For now, return the attributes that were sent
+	resp := DeleteAttributesResponse{
+		Attributes: req.Attributes,
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+// handleECSListAttributes handles the ListAttributes API endpoint in AWS ECS format
+func (s *Server) handleECSListAttributes(w http.ResponseWriter, body []byte) {
+	var req ListAttributesRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid request format", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Implement actual attribute listing logic
+	// For now, return mock attributes
+	resp := ListAttributesResponse{
+		Attributes: []Attribute{
+			{
+				Name:  "ecs.instance-type",
+				Value: "t3.medium",
+			},
+			{
+				Name:  "ecs.availability-zone",
+				Value: "us-west-2a",
+			},
+		},
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}

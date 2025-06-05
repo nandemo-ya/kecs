@@ -79,6 +79,12 @@ func (s *Server) handleECSRequest(w http.ResponseWriter, r *http.Request) {
 		s.handleECSListServices(w, body)
 	case "StopTask":
 		s.handleStopTaskECS(w, body)
+	case "PutAttributes":
+		s.handleECSPutAttributes(w, body)
+	case "DeleteAttributes":
+		s.handleECSDeleteAttributes(w, body)
+	case "ListAttributes":
+		s.handleECSListAttributes(w, body)
 	default:
 		// Return a basic empty response for unsupported operations
 		s.handleUnsupportedOperation(w, operation)
