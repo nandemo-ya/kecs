@@ -12,7 +12,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	
+	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
 
 // registerTaskEndpoints registers all task-related API endpoints
@@ -261,16 +263,80 @@ func (s *Server) handleRunTaskECS(w http.ResponseWriter, body []byte) {
 		return
 	}
 
-	// Step 3: Create a simple Kubernetes pod
+	// Step 3: Create a task with proper conversion
 	taskID := generateSimpleTaskID()
 	taskArn := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", s.region, s.accountID, cluster.Name, taskID)
 
-	// Create basic pod
-	pod, err := s.createBasicPod(taskDef, cluster, taskID)
+	// Use task converter to create pod
+	converter := converters.NewTaskConverter(s.region, s.accountID)
+	
+	// Marshal the request to JSON for the converter
+	reqJSON, err := json.Marshal(req)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create pod: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to marshal request: %v", err), http.StatusInternalServerError)
 		return
 	}
+	
+	pod, err := converter.ConvertTaskToPod(taskDef, reqJSON, cluster, taskID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to convert task to pod: %v", err), http.StatusInternalServerError)
+		return
+	}
+	
+	// Parse container definitions to collect secrets
+	var containerDefs []types.ContainerDefinition
+	if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to parse container definitions: %v", err), http.StatusInternalServerError)
+		return
+	}
+	
+	// Collect secrets from container definitions
+	secrets := converter.CollectSecrets(containerDefs)
+	
+	// For now, use the simple pod creation without task manager
+	// TODO: Replace with task manager once it's fully integrated
+	kubeClient, err := s.getKubeClient(cluster.KindClusterName)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get kubernetes client: %v", err), http.StatusInternalServerError)
+		return
+	}
+	
+	// Create secrets if any
+	if len(secrets) > 0 && s.taskManager != nil {
+		// Use a temporary approach to create secrets
+		for _, secretInfo := range secrets {
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretInfo.SecretName,
+					Namespace: pod.Namespace,
+					Labels: map[string]string{
+						"kecs.dev/managed-by": "kecs",
+						"kecs.dev/source":     secretInfo.Source,
+					},
+				},
+				Type: corev1.SecretTypeOpaque,
+				Data: map[string][]byte{
+					secretInfo.Key: []byte("placeholder-secret-value"), // TODO: Fetch actual secret
+				},
+			}
+			
+			_, err = kubeClient.CoreV1().Secrets(pod.Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+			if err != nil {
+				log.Printf("Warning: Failed to create secret %s: %v", secretInfo.SecretName, err)
+				// Continue anyway
+			}
+		}
+	}
+	
+	// Create the pod in Kubernetes
+	createdPod, err := kubeClient.CoreV1().Pods(pod.Namespace).Create(context.Background(), pod, metav1.CreateOptions{})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create pod in kubernetes: %v", err), http.StatusInternalServerError)
+		return
+	}
+	
+	log.Printf("Successfully created pod %s in namespace %s", createdPod.Name, createdPod.Namespace)
+	pod = createdPod
 
 	// Step 4: Store task in database
 	now := time.Now()

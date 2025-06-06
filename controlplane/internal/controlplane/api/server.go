@@ -22,6 +22,7 @@ type Server struct {
 	ecsService    generated.ECSServiceInterface
 	storage       storage.Storage
 	kindManager   *kubernetes.KindManager
+	taskManager   *kubernetes.TaskManager
 	region        string
 	accountID     string
 	webSocketHub  *WebSocketHub
@@ -39,6 +40,15 @@ func NewServer(port int, kubeconfig string, storage storage.Storage) *Server {
 		storage:      storage,
 		kindManager:  kubernetes.NewKindManager(),
 		webSocketHub: NewWebSocketHub(),
+	}
+
+	// Initialize task manager
+	taskManager, err := kubernetes.NewTaskManager(storage)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize task manager: %v", err)
+		// Continue without task manager - some features may not work
+	} else {
+		s.taskManager = taskManager
 	}
 
 	// Initialize Web UI handler if enabled

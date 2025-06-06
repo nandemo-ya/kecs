@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
@@ -47,7 +48,14 @@ func NewTaskManager(storage storage.Storage) (*TaskManager, error) {
 }
 
 // CreateTask creates a new task by deploying a pod
-func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *storage.Task) error {
+func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *storage.Task, secrets map[string]*converters.SecretInfo) error {
+	// Create secrets first if any
+	if len(secrets) > 0 {
+		if err := tm.createSecrets(ctx, pod.Namespace, secrets); err != nil {
+			return fmt.Errorf("failed to create secrets: %w", err)
+		}
+	}
+
 	// Create the pod
 	createdPod, err := tm.clientset.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
@@ -293,3 +301,41 @@ func mapPodPhaseToTaskStatus(phase corev1.PodPhase) string {
 	}
 }
 
+// createSecrets creates Kubernetes secrets for the task
+func (tm *TaskManager) createSecrets(ctx context.Context, namespace string, secrets map[string]*converters.SecretInfo) error {
+	for arn, info := range secrets {
+		// Check if secret already exists
+		existingSecret, err := tm.clientset.CoreV1().Secrets(namespace).Get(ctx, info.SecretName, metav1.GetOptions{})
+		if err == nil && existingSecret != nil {
+			// Secret already exists, skip creation
+			continue
+		}
+		
+		// Create the secret with placeholder data
+		// In a real implementation, this would fetch the actual secret value from AWS
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      info.SecretName,
+				Namespace: namespace,
+				Labels: map[string]string{
+					"kecs.dev/managed-by": "kecs",
+					"kecs.dev/source":     info.Source,
+				},
+				Annotations: map[string]string{
+					"kecs.dev/arn": arn,
+				},
+			},
+			Type: corev1.SecretTypeOpaque,
+			Data: map[string][]byte{
+				info.Key: []byte("placeholder-secret-value"), // TODO: Fetch actual secret from AWS
+			},
+		}
+		
+		_, err = tm.clientset.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+		if err != nil && !errors.IsAlreadyExists(err) {
+			return fmt.Errorf("failed to create secret %s: %w", info.SecretName, err)
+		}
+	}
+	
+	return nil
+}
