@@ -42,13 +42,18 @@ KECS implements a clean architecture with the following key components:
 ### Dual Server Design
 - **API Server (port 8080)**: Handles ECS-compatible API requests at `/v1/<action>` endpoints
 - **Admin Server (port 8081)**: Provides operational endpoints like `/health`
+- **Web UI (embedded)**: React-based dashboard served at `/` (when enabled)
 
 ### Directory Structure
 - `cmd/controlplane/`: Entry point for the control plane binary
 - `internal/controlplane/cmd/`: CLI command implementations using Cobra
 - `internal/controlplane/api/`: ECS API endpoint implementations
 - `internal/controlplane/admin/`: Admin server with health checks
+- `internal/converters/`: Task definition to Kubernetes resource converters
+- `internal/kubernetes/`: Kubernetes client and resource managers
+- `internal/storage/`: Storage interfaces and DuckDB implementation
 - `docs/adr/records/`: Architectural Decision Records
+- `web-ui/`: React/TypeScript Web UI application
 
 ### API Implementation Pattern
 Each ECS resource type has its own file in `internal/controlplane/api/` with:
@@ -60,14 +65,71 @@ Each ECS resource type has its own file in `internal/controlplane/api/` with:
 - Uses standard `net/http` for HTTP servers
 - Graceful shutdown with 10-second timeout
 - Context-based cancellation throughout
-- Planned: DuckDB for persistence, Kubernetes client for container operations
+- DuckDB for persistence (storage layer implemented)
+- Kubernetes client for container operations (Kind integration)
+- WebSocket support for real-time updates
+- Embedded Web UI with conditional compilation
+
+## Web UI Development
+
+KECS includes a modern React/TypeScript Web UI for managing ECS resources:
+
+### Web UI Features
+- **Dashboard**: Real-time overview of clusters, services, tasks
+- **Resource Management**: Create, view, update services and task definitions
+- **Real-time Updates**: WebSocket integration for live status updates
+- **Visualization**: Service topology, metrics charts, log viewer
+- **Responsive Design**: Works on desktop and mobile devices
+
+### Web UI Build Process
+```bash
+# Build Web UI (from web-ui directory)
+cd web-ui && npm run build
+
+# Build control plane with embedded UI
+./scripts/build-webui.sh  # Builds UI and embeds into binary
+```
+
+### Web UI Architecture
+- React 19 with TypeScript for type safety
+- React Router for SPA navigation
+- Custom hooks for API integration and WebSocket connections
+- Component-based architecture with reusable UI elements
+- Real-time data synchronization with control plane
 
 ## Development Notes
 
-When implementing new ECS API endpoints:
+### Development Workflow Rules
+1. **Always create a feature branch before starting implementation work**
+   ```bash
+   git checkout -b feat/feature-name  # For features
+   git checkout -b fix/bug-name       # For bug fixes
+   ```
+
+2. **Run all tests before creating a Pull Request**
+   ```bash
+   # Control plane tests
+   cd controlplane && go test ./...
+   
+   # Web UI tests
+   cd web-ui && npm test
+   ```
+
+3. **Only create PR after all tests pass**
+   - Both controlplane and web-ui unit tests must pass
+   - Fix any failing tests before proceeding with PR
+
+### When implementing new ECS API endpoints:
 1. Add type definitions to the appropriate file in `internal/controlplane/api/`
 2. Implement the handler function following existing patterns
 3. Register the handler in `api/server.go`
 4. Follow AWS ECS API naming conventions exactly
+5. Update Web UI types in `web-ui/src/types/` if needed
+6. Add corresponding UI components if user-facing
 
-The codebase is in early development with mock implementations. Actual business logic for Kubernetes integration is pending implementation.
+### Current Implementation Status
+- **Implemented**: Clusters, Services, Tasks, Task Definitions, Tags, Attributes
+- **Storage**: DuckDB integration for persistence
+- **Kubernetes**: Task converter with secret management
+- **Web UI**: Dashboard, detail views, WebSocket support
+- **In Progress**: Full Kubernetes task lifecycle management
