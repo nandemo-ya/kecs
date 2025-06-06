@@ -3,6 +3,7 @@ package converters
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -18,6 +19,13 @@ import (
 type TaskConverter struct {
 	region    string
 	accountID string
+}
+
+// SecretInfo holds parsed information from a secret ARN
+type SecretInfo struct {
+	SecretName string
+	Key        string
+	Source     string // "secretsmanager" or "ssm"
 }
 
 // NewTaskConverter creates a new task converter
@@ -251,9 +259,38 @@ func (c *TaskConverter) convertEnvironment(env []types.KeyValuePair) []corev1.En
 
 // convertSecrets converts ECS secrets to Kubernetes environment variables
 func (c *TaskConverter) convertSecrets(secrets []types.Secret) []corev1.EnvVar {
-	// TODO: Implement proper secret handling with Kubernetes secrets
-	// For now, we'll skip secrets as they need proper integration
-	return []corev1.EnvVar{}
+	envVars := make([]corev1.EnvVar, 0, len(secrets))
+	
+	for _, secret := range secrets {
+		if secret.Name == nil || secret.ValueFrom == nil {
+			continue
+		}
+		
+		// Parse the valueFrom ARN to extract secret information
+		// Format: arn:aws:secretsmanager:region:account:secret:name-xxxx:key::
+		// or arn:aws:ssm:region:account:parameter/path
+		secretInfo := c.parseSecretARN(*secret.ValueFrom)
+		
+		if secretInfo != nil {
+			envVar := corev1.EnvVar{
+				Name: *secret.Name,
+			}
+			
+			// Reference the Kubernetes secret
+			envVar.ValueFrom = &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretInfo.SecretName,
+					},
+					Key: secretInfo.Key,
+				},
+			}
+			
+			envVars = append(envVars, envVar)
+		}
+	}
+	
+	return envVars
 }
 
 // convertPortMappings converts ECS port mappings to Kubernetes
@@ -453,4 +490,91 @@ func parseInt64(s string) (int64, error) {
 	var i int64
 	_, err := fmt.Sscanf(s, "%d", &i)
 	return i, err
+}
+
+// parseSecretARN parses an AWS secret ARN and returns secret information
+func (c *TaskConverter) parseSecretARN(arn string) *SecretInfo {
+	// Pattern for Secrets Manager ARN: arn:aws:secretsmanager:region:account:secret:name-xxxx:jsonkey::
+	secretsManagerPattern := regexp.MustCompile(`^arn:aws:secretsmanager:[^:]+:[^:]+:secret:([^:]+)(?::([^:]+))?`)
+	
+	// Pattern for SSM Parameter Store ARN: arn:aws:ssm:region:account:parameter/path/to/param
+	ssmPattern := regexp.MustCompile(`^arn:aws:ssm:[^:]+:[^:]+:parameter/(.+)$`)
+	
+	// Check Secrets Manager pattern
+	if matches := secretsManagerPattern.FindStringSubmatch(arn); matches != nil {
+		info := &SecretInfo{
+			Source: "secretsmanager",
+		}
+		
+		// Extract secret name (remove the random suffix like -AbCdEf)
+		secretFullName := matches[1]
+		parts := strings.Split(secretFullName, "-")
+		if len(parts) > 1 && len(parts[len(parts)-1]) == 6 {
+			// Remove the random suffix
+			info.SecretName = strings.Join(parts[:len(parts)-1], "-")
+		} else {
+			info.SecretName = secretFullName
+		}
+		
+		// JSON key is optional
+		if len(matches) > 2 && matches[2] != "" {
+			info.Key = matches[2]
+		} else {
+			info.Key = "value" // Default key
+		}
+		
+		// Convert to Kubernetes-compatible secret name
+		info.SecretName = c.sanitizeSecretName(info.SecretName)
+		
+		return info
+	}
+	
+	// Check SSM pattern
+	if matches := ssmPattern.FindStringSubmatch(arn); matches != nil {
+		paramPath := matches[1]
+		
+		info := &SecretInfo{
+			Source: "ssm",
+			Key:    "value", // Default key for SSM parameters
+		}
+		
+		// Convert path to secret name (replace / with -)
+		info.SecretName = c.sanitizeSecretName(strings.ReplaceAll(paramPath, "/", "-"))
+		
+		return info
+	}
+	
+	return nil
+}
+
+// sanitizeSecretName converts a name to be Kubernetes-compatible
+func (c *TaskConverter) sanitizeSecretName(name string) string {
+	// Kubernetes names must be lowercase alphanumeric or '-'
+	// and must start and end with alphanumeric
+	name = strings.ToLower(name)
+	name = regexp.MustCompile(`[^a-z0-9-]`).ReplaceAllString(name, "-")
+	name = strings.Trim(name, "-")
+	
+	// Prefix with kecs to avoid conflicts
+	return fmt.Sprintf("kecs-secret-%s", name)
+}
+
+// CollectSecrets collects all secrets used in a task definition
+func (c *TaskConverter) CollectSecrets(containerDefs []types.ContainerDefinition) map[string]*SecretInfo {
+	secrets := make(map[string]*SecretInfo)
+	
+	for _, def := range containerDefs {
+		if def.Secrets != nil {
+			for _, secret := range def.Secrets {
+				if secret.ValueFrom != nil {
+					if info := c.parseSecretARN(*secret.ValueFrom); info != nil {
+						// Use the ARN as key to avoid duplicates
+						secrets[*secret.ValueFrom] = info
+					}
+				}
+			}
+		}
+	}
+	
+	return secrets
 }
