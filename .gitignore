@@ -55,3 +55,9 @@ web-ui/.env.production.local
 web-ui/npm-debug.log*
 web-ui/yarn-debug.log*
 web-ui/yarn-error.log*
+
+# Log files
+*.log
+
+# Temporary test files
+test-*.md
