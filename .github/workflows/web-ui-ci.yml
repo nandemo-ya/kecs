@@ -49,6 +49,8 @@ jobs:
       
       - name: Build
         run: npm run build
+        env:
+          CI: false
       
       - name: Upload test coverage
         if: matrix.node-version == '20.x' && success()
