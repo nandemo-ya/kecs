@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ServiceTopology } from './topology/ServiceTopology';
+import ServiceTopology from './topology/ServiceTopology';
 import { ServiceFlowNode, ServiceFlowEdge, ServiceNodeData } from '../types/topology';
 
 // Mock data for demonstration
