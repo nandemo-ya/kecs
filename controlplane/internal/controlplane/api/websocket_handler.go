@@ -14,10 +14,20 @@ import (
 
 // WebSocketMessage represents a WebSocket message
 type WebSocketMessage struct {
-	Type      string          `json:"type"`
-	Payload   json.RawMessage `json:"payload,omitempty"`
-	ID        string          `json:"id,omitempty"`
-	Timestamp time.Time       `json:"timestamp,omitempty"`
+	Type         string          `json:"type"`
+	Payload      json.RawMessage `json:"payload,omitempty"`
+	ID           string          `json:"id,omitempty"`
+	Timestamp    time.Time       `json:"timestamp,omitempty"`
+	ResourceType string          `json:"resourceType,omitempty"`
+	ResourceID   string          `json:"resourceId,omitempty"`
+}
+
+// EventFilter represents a filter for WebSocket events
+type EventFilter struct {
+	EventTypes    []string          `json:"eventTypes,omitempty"`    // Empty means all event types
+	ResourceTypes []string          `json:"resourceTypes,omitempty"` // Empty means all resource types
+	ResourceIDs   []string          `json:"resourceIds,omitempty"`   // Empty means all resource IDs
+	Metadata      map[string]string `json:"metadata,omitempty"`      // Additional filter criteria
 }
 
 // WebSocketHub manages WebSocket connections
@@ -39,6 +49,7 @@ type WebSocketClient struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	subscriptions map[string]map[string]bool // resourceType -> resourceID -> subscribed
+	filters       []EventFilter              // Event filters for this client
 	mu            sync.RWMutex
 }
 
@@ -82,17 +93,7 @@ func (h *WebSocketHub) Run(ctx context.Context) {
 			}
 
 		case message := <-h.broadcast:
-			h.mu.RLock()
-			for client := range h.clients {
-				select {
-				case client.send <- message:
-				default:
-					// Client's send channel is full, close it
-					close(client.send)
-					delete(h.clients, client)
-				}
-			}
-			h.mu.RUnlock()
+			h.BroadcastWithFiltering(message)
 		}
 	}
 }
@@ -128,6 +129,7 @@ func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
 			ctx:           ctx,
 			cancel:        cancel,
 			subscriptions: make(map[string]map[string]bool),
+			filters:       []EventFilter{},
 		}
 
 		client.hub.register <- client
@@ -250,6 +252,20 @@ func (c *WebSocketClient) handleMessage(message WebSocketMessage) {
 			}
 		}
 
+	case "setFilters":
+		// Handle filter configuration
+		var filters []EventFilter
+		if err := json.Unmarshal(message.Payload, &filters); err == nil {
+			c.SetFilters(filters)
+			// Send confirmation
+			c.send <- WebSocketMessage{
+				Type:      "filtersSet",
+				ID:        message.ID,
+				Timestamp: time.Now(),
+				Payload:   message.Payload,
+			}
+		}
+
 	default:
 		log.Printf("Unknown message type: %s", message.Type)
 	}
@@ -264,12 +280,14 @@ func (h *WebSocketHub) BroadcastTaskUpdate(taskID string, update interface{}) {
 	}
 
 	message := WebSocketMessage{
-		Type:      "task_update",
-		Payload:   payload,
-		Timestamp: time.Now(),
+		Type:         "task_update",
+		Payload:      payload,
+		Timestamp:    time.Now(),
+		ResourceType: "task",
+		ResourceID:   taskID,
 	}
 
-	h.broadcast <- message
+	h.BroadcastWithFiltering(message)
 }
 
 // BroadcastLogEntry sends log entry to all connected clients
@@ -378,4 +396,106 @@ func (h *WebSocketHub) BroadcastTaskUpdateToSubscribed(taskID string, update int
 	}
 
 	h.BroadcastToSubscribed("task", taskID, message)
+}
+
+// SetFilters sets the event filters for the client
+func (c *WebSocketClient) SetFilters(filters []EventFilter) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	
+	c.filters = filters
+	log.Printf("Client %s updated filters: %d filters set", c.id, len(filters))
+}
+
+// MatchesFilter checks if a message matches the client's filters
+func (c *WebSocketClient) MatchesFilter(message WebSocketMessage) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	// If no filters are set, accept all messages
+	if len(c.filters) == 0 {
+		return true
+	}
+	
+	// Check each filter - if any filter matches, accept the message
+	for _, filter := range c.filters {
+		if c.matchesSingleFilter(message, filter) {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// matchesSingleFilter checks if a message matches a single filter
+func (c *WebSocketClient) matchesSingleFilter(message WebSocketMessage, filter EventFilter) bool {
+	// Check event type
+	if len(filter.EventTypes) > 0 {
+		found := false
+		for _, eventType := range filter.EventTypes {
+			if message.Type == eventType {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	
+	// Check resource type
+	if len(filter.ResourceTypes) > 0 {
+		found := false
+		for _, resourceType := range filter.ResourceTypes {
+			if message.ResourceType == resourceType {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	
+	// Check resource ID
+	if len(filter.ResourceIDs) > 0 {
+		found := false
+		for _, resourceID := range filter.ResourceIDs {
+			if message.ResourceID == resourceID || resourceID == "*" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	
+	// Check metadata if present
+	if len(filter.Metadata) > 0 {
+		// For now, we'll need to parse the payload to check metadata
+		// This is a simplified implementation
+		// In a real implementation, you might want to add metadata fields to WebSocketMessage
+		return true // Simplified for now
+	}
+	
+	return true
+}
+
+// BroadcastWithFiltering sends a message to all clients that match the filter criteria
+func (h *WebSocketHub) BroadcastWithFiltering(message WebSocketMessage) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	
+	for client := range h.clients {
+		// Check if the message passes the filter
+		if client.MatchesFilter(message) {
+			select {
+			case client.send <- message:
+			default:
+				// Client's send channel is full, skip
+				log.Printf("Client %s send channel full, skipping message", client.id)
+			}
+		}
+	}
 }

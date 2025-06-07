@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -32,6 +33,7 @@ func TestWebSocketHub_Run(t *testing.T) {
 		send:          make(chan WebSocketMessage, 1),
 		id:            "test-client",
 		subscriptions: make(map[string]map[string]bool),
+		filters:       []EventFilter{},
 	}
 	
 	hub.register <- client
@@ -166,6 +168,7 @@ func TestWebSocketClient_handleMessage(t *testing.T) {
 		send:          make(chan WebSocketMessage, 10),
 		id:            "test-client",
 		subscriptions: make(map[string]map[string]bool),
+		filters:       []EventFilter{},
 	}
 	
 	tests := []struct {
@@ -247,6 +250,7 @@ func TestWebSocketHub_Broadcast(t *testing.T) {
 			send:          make(chan WebSocketMessage, 10),
 			id:            fmt.Sprintf("client-%d", i),
 			subscriptions: make(map[string]map[string]bool),
+			filters:       []EventFilter{},
 		}
 		hub.register <- clients[i]
 	}
@@ -307,6 +311,206 @@ func TestWebSocketHub_Broadcast(t *testing.T) {
 	}
 }
 
+func TestWebSocketEventFiltering(t *testing.T) {
+	client := &WebSocketClient{
+		id:      "test-client",
+		filters: []EventFilter{},
+	}
+
+	// Test with no filters - should accept all messages
+	msg := WebSocketMessage{
+		Type:         "task_update",
+		ResourceType: "task",
+		ResourceID:   "task-123",
+	}
+	assert.True(t, client.MatchesFilter(msg))
+
+	// Test with event type filter
+	client.SetFilters([]EventFilter{
+		{EventTypes: []string{"task_update", "service_update"}},
+	})
+	assert.True(t, client.MatchesFilter(msg))
+	
+	msg.Type = "log_entry"
+	assert.False(t, client.MatchesFilter(msg))
+
+	// Test with resource type filter
+	client.SetFilters([]EventFilter{
+		{ResourceTypes: []string{"task", "service"}},
+	})
+	msg.Type = "task_update"
+	assert.True(t, client.MatchesFilter(msg))
+	
+	msg.ResourceType = "cluster"
+	assert.False(t, client.MatchesFilter(msg))
+
+	// Test with resource ID filter
+	client.SetFilters([]EventFilter{
+		{ResourceIDs: []string{"task-123", "task-456"}},
+	})
+	msg.ResourceType = "task"
+	msg.ResourceID = "task-123"
+	assert.True(t, client.MatchesFilter(msg))
+	
+	msg.ResourceID = "task-789"
+	assert.False(t, client.MatchesFilter(msg))
+
+	// Test with wildcard resource ID
+	client.SetFilters([]EventFilter{
+		{ResourceIDs: []string{"*"}},
+	})
+	assert.True(t, client.MatchesFilter(msg))
+
+	// Test with combined filters (AND logic within a filter)
+	client.SetFilters([]EventFilter{
+		{
+			EventTypes:    []string{"task_update"},
+			ResourceTypes: []string{"task"},
+			ResourceIDs:   []string{"task-123"},
+		},
+	})
+	msg.Type = "task_update"
+	msg.ResourceType = "task"
+	msg.ResourceID = "task-123"
+	assert.True(t, client.MatchesFilter(msg))
+	
+	msg.ResourceID = "task-456"
+	assert.False(t, client.MatchesFilter(msg))
+
+	// Test with multiple filters (OR logic between filters)
+	client.SetFilters([]EventFilter{
+		{EventTypes: []string{"task_update"}},
+		{ResourceTypes: []string{"service"}},
+	})
+	msg.Type = "task_update"
+	msg.ResourceType = "cluster"
+	assert.True(t, client.MatchesFilter(msg)) // Matches first filter
+	
+	msg.Type = "cluster_update"
+	msg.ResourceType = "service"
+	assert.True(t, client.MatchesFilter(msg)) // Matches second filter
+	
+	msg.Type = "cluster_update"
+	msg.ResourceType = "cluster"
+	assert.False(t, client.MatchesFilter(msg)) // Matches neither filter
+}
+
+func TestWebSocketClient_handleMessage_SetFilters(t *testing.T) {
+	client := &WebSocketClient{
+		send:    make(chan WebSocketMessage, 10),
+		id:      "test-client",
+		filters: []EventFilter{},
+	}
+
+	// Test setFilters message
+	filters := []EventFilter{
+		{
+			EventTypes:    []string{"task_update", "service_update"},
+			ResourceTypes: []string{"task", "service"},
+		},
+	}
+	
+	filtersJSON, _ := json.Marshal(filters)
+	setFiltersMsg := WebSocketMessage{
+		Type:    "setFilters",
+		ID:      "msg-789",
+		Payload: filtersJSON,
+	}
+	
+	client.handleMessage(setFiltersMsg)
+	
+	// Check filters were set
+	assert.Equal(t, 1, len(client.filters))
+	assert.Equal(t, filters[0].EventTypes, client.filters[0].EventTypes)
+	assert.Equal(t, filters[0].ResourceTypes, client.filters[0].ResourceTypes)
+	
+	// Check confirmation was sent
+	select {
+	case msg := <-client.send:
+		assert.Equal(t, "filtersSet", msg.Type)
+		assert.Equal(t, "msg-789", msg.ID)
+		assert.Equal(t, setFiltersMsg.Payload, msg.Payload)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("No confirmation message received")
+	}
+}
+
+func TestWebSocketHub_BroadcastWithFiltering(t *testing.T) {
+	hub := NewWebSocketHub()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go hub.Run(ctx)
+
+	// Create clients with different filters
+	clientWithTaskFilter := &WebSocketClient{
+		hub:           hub,
+		send:          make(chan WebSocketMessage, 10),
+		id:            "task-filter-client",
+		subscriptions: make(map[string]map[string]bool),
+		filters: []EventFilter{
+			{EventTypes: []string{"task_update"}},
+		},
+	}
+	
+	clientWithServiceFilter := &WebSocketClient{
+		hub:           hub,
+		send:          make(chan WebSocketMessage, 10),
+		id:            "service-filter-client",
+		subscriptions: make(map[string]map[string]bool),
+		filters: []EventFilter{
+			{EventTypes: []string{"service_update"}},
+		},
+	}
+	
+	clientWithNoFilter := &WebSocketClient{
+		hub:           hub,
+		send:          make(chan WebSocketMessage, 10),
+		id:            "no-filter-client",
+		subscriptions: make(map[string]map[string]bool),
+		filters:       []EventFilter{},
+	}
+
+	hub.register <- clientWithTaskFilter
+	hub.register <- clientWithServiceFilter
+	hub.register <- clientWithNoFilter
+	time.Sleep(10 * time.Millisecond)
+
+	// Broadcast a task update
+	taskMessage := WebSocketMessage{
+		Type:         "task_update",
+		ResourceType: "task",
+		ResourceID:   "task-123",
+		Payload:      []byte(`{"status":"RUNNING"}`),
+		Timestamp:    time.Now(),
+	}
+	hub.BroadcastWithFiltering(taskMessage)
+
+	// Client with task filter should receive it
+	select {
+	case msg := <-clientWithTaskFilter.send:
+		assert.Equal(t, "task_update", msg.Type)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Client with task filter did not receive task update")
+	}
+
+	// Client with service filter should not receive it
+	select {
+	case <-clientWithServiceFilter.send:
+		t.Fatal("Client with service filter should not receive task update")
+	case <-time.After(50 * time.Millisecond):
+		// Expected timeout
+	}
+
+	// Client with no filter should receive it
+	select {
+	case msg := <-clientWithNoFilter.send:
+		assert.Equal(t, "task_update", msg.Type)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Client with no filter did not receive task update")
+	}
+}
+
 func TestWebSocketSubscription(t *testing.T) {
 	hub := NewWebSocketHub()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -320,6 +524,7 @@ func TestWebSocketSubscription(t *testing.T) {
 		send:          make(chan WebSocketMessage, 10),
 		id:            "subscribed-client",
 		subscriptions: make(map[string]map[string]bool),
+		filters:       []EventFilter{},
 	}
 	
 	unsubscribedClient := &WebSocketClient{
@@ -327,6 +532,7 @@ func TestWebSocketSubscription(t *testing.T) {
 		send:          make(chan WebSocketMessage, 10),
 		id:            "unsubscribed-client",
 		subscriptions: make(map[string]map[string]bool),
+		filters:       []EventFilter{},
 	}
 
 	hub.register <- subscribedClient
@@ -397,6 +603,7 @@ func TestWebSocketClient_handleMessage_Subscribe(t *testing.T) {
 		send:          make(chan WebSocketMessage, 10),
 		id:            "test-client",
 		subscriptions: make(map[string]map[string]bool),
+		filters:       []EventFilter{},
 	}
 
 	// Test subscribe message
