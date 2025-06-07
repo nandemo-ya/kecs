@@ -31,6 +31,27 @@ type Server struct {
 
 // NewServer creates a new API server instance
 func NewServer(port int, kubeconfig string, storage storage.Storage) *Server {
+	// Create WebSocket configuration
+	wsConfig := &WebSocketConfig{
+		AllowedOrigins: []string{
+			"http://localhost:3000",      // React development server
+			"http://localhost:8080",      // API server
+			fmt.Sprintf("http://localhost:%d", port), // Dynamic port
+		},
+		AllowCredentials: true,
+	}
+	
+	// Add environment-specific origins
+	if envOrigins := os.Getenv("KECS_ALLOWED_ORIGINS"); envOrigins != "" {
+		additionalOrigins := strings.Split(envOrigins, ",")
+		for _, origin := range additionalOrigins {
+			origin = strings.TrimSpace(origin)
+			if origin != "" {
+				wsConfig.AllowedOrigins = append(wsConfig.AllowedOrigins, origin)
+			}
+		}
+	}
+	
 	s := &Server{
 		port:         port,
 		kubeconfig:   kubeconfig,
@@ -39,7 +60,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage) *Server {
 		ecsService:   generated.NewECSServiceWithStorage(storage),
 		storage:      storage,
 		kindManager:  kubernetes.NewKindManager(),
-		webSocketHub: NewWebSocketHub(),
+		webSocketHub: NewWebSocketHubWithConfig(wsConfig),
 	}
 
 	// Initialize task manager
