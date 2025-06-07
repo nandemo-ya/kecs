@@ -33,12 +33,14 @@ type EventFilter struct {
 
 // WebSocketHub manages WebSocket connections
 type WebSocketHub struct {
-	clients    map[*WebSocketClient]bool
-	register   chan *WebSocketClient
-	unregister chan *WebSocketClient
-	broadcast  chan WebSocketMessage
-	mu         sync.RWMutex
-	config     *WebSocketConfig
+	clients           map[*WebSocketClient]bool
+	register          chan *WebSocketClient
+	unregister        chan *WebSocketClient
+	broadcast         chan WebSocketMessage
+	mu                sync.RWMutex
+	config            *WebSocketConfig
+	rateLimiter       *RateLimiter
+	connectionLimiter *ConnectionLimiter
 }
 
 // WebSocketClient represents a WebSocket client connection
@@ -52,6 +54,8 @@ type WebSocketClient struct {
 	subscriptions map[string]map[string]bool // resourceType -> resourceID -> subscribed
 	filters       []EventFilter              // Event filters for this client
 	authInfo      *AuthInfo                  // Authentication information
+	request       *http.Request              // Original HTTP request for IP tracking
+	lastActivity  time.Time                  // Last activity timestamp
 	mu            sync.RWMutex
 }
 
@@ -62,17 +66,34 @@ func NewWebSocketHub() *WebSocketHub {
 
 // NewWebSocketHubWithConfig creates a new WebSocket hub with custom configuration
 func NewWebSocketHubWithConfig(config *WebSocketConfig) *WebSocketHub {
-	return &WebSocketHub{
+	hub := &WebSocketHub{
 		clients:    make(map[*WebSocketClient]bool),
 		register:   make(chan *WebSocketClient),
 		unregister: make(chan *WebSocketClient),
 		broadcast:  make(chan WebSocketMessage),
 		config:     config,
 	}
+
+	// Initialize rate limiter if configured
+	if config.RateLimitConfig != nil {
+		hub.rateLimiter = NewRateLimiter(config.RateLimitConfig)
+	}
+
+	// Initialize connection limiter if configured
+	if config.ConnectionLimitConfig != nil {
+		hub.connectionLimiter = NewConnectionLimiter(config.ConnectionLimitConfig)
+	}
+
+	return hub
 }
 
 // Run starts the WebSocket hub
 func (h *WebSocketHub) Run(ctx context.Context) {
+	// Start connection cleanup if configured
+	if h.config.ConnectionLimitConfig != nil && h.config.ConnectionLimitConfig.ConnectionTimeout > 0 {
+		go h.cleanupInactiveConnections(ctx)
+	}
+	
 	for {
 		select {
 		case <-ctx.Done():
@@ -89,6 +110,17 @@ func (h *WebSocketHub) Run(ctx context.Context) {
 				delete(h.clients, client)
 				close(client.send)
 				h.mu.Unlock()
+				
+				// Clean up rate limiter
+				if h.rateLimiter != nil {
+					h.rateLimiter.Remove(client.id)
+				}
+				
+				// Remove from connection limiter
+				if h.connectionLimiter != nil && client.request != nil {
+					h.connectionLimiter.RemoveConnection(client.request, client.authInfo)
+				}
+				
 				log.Printf("WebSocket client unregistered: %s", client.id)
 			} else {
 				h.mu.Unlock()
@@ -135,10 +167,27 @@ func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
 			log.Printf("WebSocket authenticated user: %s", authInfo.Username)
 		}
 		
+		// Check connection limits
+		if hub.connectionLimiter != nil && !hub.connectionLimiter.CanConnect(r, authInfo) {
+			username := "anonymous"
+			if authInfo != nil {
+				username = authInfo.Username
+			}
+			log.Printf("WebSocket connection limit exceeded for user %s from %s", 
+				username, getClientIP(r))
+			http.Error(w, "Connection limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+		
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Printf("WebSocket upgrade error from origin %s: %v", origin, err)
 			return
+		}
+		
+		// Add to connection limiter after successful upgrade
+		if hub.connectionLimiter != nil && r != nil {
+			hub.connectionLimiter.AddConnection(r, authInfo)
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -152,6 +201,8 @@ func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
 			subscriptions: make(map[string]map[string]bool),
 			filters:       []EventFilter{},
 			authInfo:      authInfo,
+			request:       r,
+			lastActivity:  time.Now(),
 		}
 
 		client.hub.register <- client
@@ -170,9 +221,16 @@ func (c *WebSocketClient) readPump() {
 		c.conn.Close()
 	}()
 
-	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	// Set initial read deadline
+	readTimeout := c.hub.config.PongTimeout
+	if readTimeout == 0 {
+		readTimeout = 60 * time.Second
+	}
+	c.conn.SetReadDeadline(time.Now().Add(readTimeout))
+	
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		c.conn.SetReadDeadline(time.Now().Add(readTimeout))
+		c.updateLastActivity()
 		return nil
 	})
 
@@ -186,6 +244,20 @@ func (c *WebSocketClient) readPump() {
 			break
 		}
 
+		// Check rate limit
+		if c.hub.rateLimiter != nil && !c.hub.rateLimiter.Allow(c.id, c.authInfo) {
+			// Send rate limit error
+			c.send <- WebSocketMessage{
+				Type:      "error",
+				Timestamp: time.Now(),
+				Payload:   []byte(`{"error":"rate_limit_exceeded","message":"Too many requests"}`),
+			}
+			continue
+		}
+
+		// Update last activity
+		c.updateLastActivity()
+
 		// Handle different message types
 		c.handleMessage(message)
 	}
@@ -193,7 +265,19 @@ func (c *WebSocketClient) readPump() {
 
 // writePump pumps messages from the hub to the WebSocket connection
 func (c *WebSocketClient) writePump() {
-	ticker := time.NewTicker(54 * time.Second)
+	// Use configured ping interval
+	pingInterval := c.hub.config.PingInterval
+	if pingInterval == 0 {
+		pingInterval = 54 * time.Second
+	}
+	ticker := time.NewTicker(pingInterval)
+	
+	// Use configured write timeout
+	writeTimeout := c.hub.config.WriteTimeout
+	if writeTimeout == 0 {
+		writeTimeout = 10 * time.Second
+	}
+	
 	defer func() {
 		ticker.Stop()
 		c.conn.Close()
@@ -202,7 +286,7 @@ func (c *WebSocketClient) writePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			c.conn.SetWriteDeadline(time.Now().Add(writeTimeout))
 			if !ok {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
@@ -213,7 +297,7 @@ func (c *WebSocketClient) writePump() {
 			}
 
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			c.conn.SetWriteDeadline(time.Now().Add(writeTimeout))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
@@ -714,4 +798,80 @@ func toJSON(v interface{}) string {
 		return "[]"
 	}
 	return string(b)
+}
+
+// updateLastActivity updates the client's last activity timestamp
+func (c *WebSocketClient) updateLastActivity() {
+	c.mu.Lock()
+	c.lastActivity = time.Now()
+	c.mu.Unlock()
+}
+
+// GetLastActivity returns the client's last activity timestamp
+func (c *WebSocketClient) GetLastActivity() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.lastActivity
+}
+
+// IsActive checks if the client is still active based on connection timeout
+func (c *WebSocketClient) IsActive() bool {
+	if c.hub.config.ConnectionLimitConfig == nil {
+		return true // No connection limit configured
+	}
+	
+	timeout := c.hub.config.ConnectionLimitConfig.ConnectionTimeout
+	if timeout == 0 {
+		return true // No timeout configured
+	}
+	
+	return time.Since(c.GetLastActivity()) < timeout
+}
+
+// ConnectionStats returns statistics about current connections
+func (h *WebSocketHub) ConnectionStats() map[string]interface{} {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	
+	stats := map[string]interface{}{
+		"total_clients": len(h.clients),
+	}
+	
+	if h.connectionLimiter != nil {
+		connectionStats := h.connectionLimiter.GetConnectionStats()
+		for k, v := range connectionStats {
+			stats[k] = v
+		}
+	}
+	
+	return stats
+}
+
+// cleanupInactiveConnections periodically checks for and removes inactive connections
+func (h *WebSocketHub) cleanupInactiveConnections(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			h.mu.RLock()
+			inactiveClients := make([]*WebSocketClient, 0)
+			
+			for client := range h.clients {
+				if !client.IsActive() {
+					inactiveClients = append(inactiveClients, client)
+				}
+			}
+			h.mu.RUnlock()
+			
+			// Close inactive connections
+			for _, client := range inactiveClients {
+				log.Printf("Closing inactive connection: %s", client.id)
+				client.conn.Close() // This will trigger cleanup via readPump
+			}
+		}
+	}
 }
