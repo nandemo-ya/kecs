@@ -18,6 +18,26 @@ type WebSocketConfig struct {
 	// CheckOriginFunc is a custom function to check origin
 	// If nil, the default origin check based on AllowedOrigins is used
 	CheckOriginFunc func(r *http.Request) bool
+
+	// AuthEnabled enables authentication for WebSocket connections
+	AuthEnabled bool
+
+	// AuthFunc is a custom function to authenticate WebSocket connections
+	// Returns user info and whether authentication succeeded
+	AuthFunc func(r *http.Request) (*AuthInfo, bool)
+
+	// AuthorizeFunc is a custom function to authorize operations
+	// Returns whether the user is authorized for the operation
+	AuthorizeFunc func(authInfo *AuthInfo, operation string, resource string) bool
+}
+
+// AuthInfo represents authenticated user information
+type AuthInfo struct {
+	UserID      string
+	Username    string
+	Roles       []string
+	Permissions []string
+	Metadata    map[string]interface{}
 }
 
 // DefaultWebSocketConfig returns a default WebSocket configuration

@@ -16,14 +16,16 @@ import (
 
 // TestDeleteServiceWithStorage tests the DeleteService API implementation
 func TestDeleteServiceWithStorage(t *testing.T) {
-	// Initialize storage
-	dbStorage, err := duckdb.NewDuckDBStorage("test.db")
+	// Initialize in-memory storage for testing
+	dbStorage, err := duckdb.NewDuckDBStorage(":memory:")
 	if err != nil {
 		t.Fatalf("Failed to create storage: %v", err)
 	}
 	defer dbStorage.Close()
 
 	ctx := context.Background()
+	
+	// Initialize database schema
 	if err := dbStorage.Initialize(ctx); err != nil {
 		t.Fatalf("Failed to initialize storage: %v", err)
 	}
@@ -164,14 +166,16 @@ func TestDeleteServiceWithStorage(t *testing.T) {
 
 // TestDeleteServiceAPIEndpoint tests the HTTP endpoint for DeleteService
 func TestDeleteServiceAPIEndpoint(t *testing.T) {
-	// Initialize storage
-	dbStorage, err := duckdb.NewDuckDBStorage("test_api.db")
+	// Initialize in-memory storage for testing
+	dbStorage, err := duckdb.NewDuckDBStorage(":memory:")
 	if err != nil {
 		t.Fatalf("Failed to create storage: %v", err)
 	}
 	defer dbStorage.Close()
 
 	ctx := context.Background()
+	
+	// Initialize database schema
 	if err := dbStorage.Initialize(ctx); err != nil {
 		t.Fatalf("Failed to initialize storage: %v", err)
 	}

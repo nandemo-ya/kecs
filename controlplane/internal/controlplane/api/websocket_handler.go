@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -50,6 +51,7 @@ type WebSocketClient struct {
 	cancel        context.CancelFunc
 	subscriptions map[string]map[string]bool // resourceType -> resourceID -> subscribed
 	filters       []EventFilter              // Event filters for this client
+	authInfo      *AuthInfo                  // Authentication information
 	mu            sync.RWMutex
 }
 
@@ -113,6 +115,25 @@ func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
 		if origin != "" {
 			log.Printf("WebSocket connection attempt from origin: %s", origin)
 		}
+
+		// Authenticate if enabled
+		var authInfo *AuthInfo
+		if hub.config.AuthEnabled {
+			authenticated := false
+			if hub.config.AuthFunc != nil {
+				authInfo, authenticated = hub.config.AuthFunc(r)
+			} else {
+				// Default authentication using Authorization header
+				authInfo, authenticated = defaultAuthFunc(r)
+			}
+			
+			if !authenticated {
+				log.Printf("WebSocket authentication failed from origin %s", origin)
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			log.Printf("WebSocket authenticated user: %s", authInfo.Username)
+		}
 		
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -120,7 +141,7 @@ func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
 			return
 		}
 
-		ctx, cancel := context.WithCancel(r.Context())
+		ctx, cancel := context.WithCancel(context.Background())
 		client := &WebSocketClient{
 			hub:           hub,
 			conn:          conn,
@@ -130,6 +151,7 @@ func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
 			cancel:        cancel,
 			subscriptions: make(map[string]map[string]bool),
 			filters:       []EventFilter{},
+			authInfo:      authInfo,
 		}
 
 		client.hub.register <- client
@@ -225,6 +247,19 @@ func (c *WebSocketClient) handleMessage(message WebSocketMessage) {
 			ResourceID   string `json:"resourceId"`
 		}
 		if err := json.Unmarshal(message.Payload, &payload); err == nil {
+			// Check authorization for subscription
+			resource := fmt.Sprintf("%s/%s", payload.ResourceType, payload.ResourceID)
+			if !c.IsAuthorized("subscribe", resource) {
+				// Send error response
+				c.send <- WebSocketMessage{
+					Type:      "error",
+					ID:        message.ID,
+					Timestamp: time.Now(),
+					Payload:   []byte(`{"error":"unauthorized","message":"Not authorized to subscribe to this resource"}`),
+				}
+				return
+			}
+			
 			c.Subscribe(payload.ResourceType, payload.ResourceID)
 			// Send confirmation
 			c.send <- WebSocketMessage{
@@ -242,6 +277,19 @@ func (c *WebSocketClient) handleMessage(message WebSocketMessage) {
 			ResourceID   string `json:"resourceId"`
 		}
 		if err := json.Unmarshal(message.Payload, &payload); err == nil {
+			// Check authorization for unsubscription
+			resource := fmt.Sprintf("%s/%s", payload.ResourceType, payload.ResourceID)
+			if !c.IsAuthorized("unsubscribe", resource) {
+				// Send error response
+				c.send <- WebSocketMessage{
+					Type:      "error",
+					ID:        message.ID,
+					Timestamp: time.Now(),
+					Payload:   []byte(`{"error":"unauthorized","message":"Not authorized to unsubscribe from this resource"}`),
+				}
+				return
+			}
+			
 			c.Unsubscribe(payload.ResourceType, payload.ResourceID)
 			// Send confirmation
 			c.send <- WebSocketMessage{
@@ -256,6 +304,18 @@ func (c *WebSocketClient) handleMessage(message WebSocketMessage) {
 		// Handle filter configuration
 		var filters []EventFilter
 		if err := json.Unmarshal(message.Payload, &filters); err == nil {
+			// Check authorization for setting filters
+			if !c.IsAuthorized("setFilters", "websocket") {
+				// Send error response
+				c.send <- WebSocketMessage{
+					Type:      "error",
+					ID:        message.ID,
+					Timestamp: time.Now(),
+					Payload:   []byte(`{"error":"unauthorized","message":"Not authorized to set filters"}`),
+				}
+				return
+			}
+			
 			c.SetFilters(filters)
 			// Send confirmation
 			c.send <- WebSocketMessage{
@@ -263,6 +323,50 @@ func (c *WebSocketClient) handleMessage(message WebSocketMessage) {
 				ID:        message.ID,
 				Timestamp: time.Now(),
 				Payload:   message.Payload,
+			}
+		}
+
+	case "authenticate":
+		// Handle authentication/token refresh
+		var payload struct {
+			Token string `json:"token"`
+		}
+		if err := json.Unmarshal(message.Payload, &payload); err == nil {
+			// Validate the token and update auth info
+			if c.hub.config.AuthEnabled && c.hub.config.AuthFunc != nil {
+				// Create a mock request with the token
+				req, _ := http.NewRequest("GET", "/", nil)
+				req.Header.Set("Authorization", "Bearer "+payload.Token)
+				
+				if authInfo, authenticated := c.hub.config.AuthFunc(req); authenticated {
+					c.mu.Lock()
+					c.authInfo = authInfo
+					c.mu.Unlock()
+					
+					// Send success response
+					c.send <- WebSocketMessage{
+						Type:      "authenticated",
+						ID:        message.ID,
+						Timestamp: time.Now(),
+						Payload:   []byte(fmt.Sprintf(`{"username":"%s","roles":%s}`, authInfo.Username, toJSON(authInfo.Roles))),
+					}
+				} else {
+					// Send error response
+					c.send <- WebSocketMessage{
+						Type:      "error",
+						ID:        message.ID,
+						Timestamp: time.Now(),
+						Payload:   []byte(`{"error":"authentication_failed","message":"Invalid token"}`),
+					}
+				}
+			} else {
+				// Auth not enabled, send success
+				c.send <- WebSocketMessage{
+					Type:      "authenticated",
+					ID:        message.ID,
+					Timestamp: time.Now(),
+					Payload:   []byte(`{"message":"Authentication not required"}`),
+				}
 			}
 		}
 
@@ -329,6 +433,9 @@ func (c *WebSocketClient) Subscribe(resourceType, resourceID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	
+	if c.subscriptions == nil {
+		c.subscriptions = make(map[string]map[string]bool)
+	}
 	if c.subscriptions[resourceType] == nil {
 		c.subscriptions[resourceType] = make(map[string]bool)
 	}
@@ -396,6 +503,106 @@ func (h *WebSocketHub) BroadcastTaskUpdateToSubscribed(taskID string, update int
 	}
 
 	h.BroadcastToSubscribed("task", taskID, message)
+}
+
+// defaultAuthFunc provides basic authentication using Authorization header
+func defaultAuthFunc(r *http.Request) (*AuthInfo, bool) {
+	// Check for Authorization header
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return nil, false
+	}
+	
+	// Extract token (Bearer token format)
+	const bearerPrefix = "Bearer "
+	if !strings.HasPrefix(authHeader, bearerPrefix) {
+		return nil, false
+	}
+	
+	token := strings.TrimPrefix(authHeader, bearerPrefix)
+	
+	// In a real implementation, validate the token
+	// For now, we'll create a simple auth info based on the token
+	// TODO: Implement proper token validation (JWT, API key, etc.)
+	
+	// Mock implementation - DO NOT USE IN PRODUCTION
+	if token == "" {
+		return nil, false
+	}
+	
+	return &AuthInfo{
+		UserID:   "user-" + token[:8], // Use first 8 chars as user ID
+		Username: "user-" + token[:8],
+		Roles:    []string{"user"},
+		Permissions: []string{
+			"websocket:connect",
+			"task:read",
+			"service:read",
+		},
+		Metadata: map[string]interface{}{
+			"token": token,
+		},
+	}, true
+}
+
+// IsAuthorized checks if the client is authorized for an operation
+func (c *WebSocketClient) IsAuthorized(operation string, resource string) bool {
+	// If auth is not enabled, allow all operations
+	if c.hub.config.AuthEnabled == false {
+		return true
+	}
+	
+	if c.authInfo == nil {
+		return false
+	}
+	
+	// Use custom authorize function if provided
+	if c.hub.config.AuthorizeFunc != nil {
+		return c.hub.config.AuthorizeFunc(c.authInfo, operation, resource)
+	}
+	
+	// Default authorization logic
+	return c.defaultAuthorize(operation, resource)
+}
+
+// defaultAuthorize provides basic authorization logic
+func (c *WebSocketClient) defaultAuthorize(operation string, resource string) bool {
+	// Check permissions
+	requiredPermission := fmt.Sprintf("%s:%s", getResourceType(resource), operation)
+	
+	for _, perm := range c.authInfo.Permissions {
+		if perm == requiredPermission || perm == "*:*" {
+			return true
+		}
+		
+		// Check wildcard permissions
+		parts := strings.Split(perm, ":")
+		if len(parts) == 2 {
+			if (parts[0] == "*" || parts[0] == getResourceType(resource)) &&
+			   (parts[1] == "*" || parts[1] == operation) {
+				return true
+			}
+		}
+	}
+	
+	// Check role-based permissions
+	for _, role := range c.authInfo.Roles {
+		if role == "admin" {
+			return true // Admins can do everything
+		}
+	}
+	
+	return false
+}
+
+// getResourceType extracts resource type from resource string
+func getResourceType(resource string) string {
+	// Simple implementation - extract first part before slash
+	parts := strings.Split(resource, "/")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return resource
 }
 
 // SetFilters sets the event filters for the client
@@ -498,4 +705,13 @@ func (h *WebSocketHub) BroadcastWithFiltering(message WebSocketMessage) {
 			}
 		}
 	}
+}
+
+// toJSON is a helper function to convert data to JSON string
+func toJSON(v interface{}) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
 }
