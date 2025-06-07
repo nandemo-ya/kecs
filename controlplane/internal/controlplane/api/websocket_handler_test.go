@@ -164,7 +164,15 @@ func TestWebSocketOriginCheck(t *testing.T) {
 }
 
 func TestWebSocketClient_handleMessage(t *testing.T) {
+	// Create a hub with auth disabled for testing
+	hub := &WebSocketHub{
+		config: &WebSocketConfig{
+			AuthEnabled: false,
+		},
+	}
+	
 	client := &WebSocketClient{
+		hub:           hub,
 		send:          make(chan WebSocketMessage, 10),
 		id:            "test-client",
 		subscriptions: make(map[string]map[string]bool),
@@ -312,7 +320,15 @@ func TestWebSocketHub_Broadcast(t *testing.T) {
 }
 
 func TestWebSocketEventFiltering(t *testing.T) {
+	// Create a hub with auth disabled for testing
+	hub := &WebSocketHub{
+		config: &WebSocketConfig{
+			AuthEnabled: false,
+		},
+	}
+	
 	client := &WebSocketClient{
+		hub:     hub,
 		id:      "test-client",
 		filters: []EventFilter{},
 	}
@@ -396,7 +412,15 @@ func TestWebSocketEventFiltering(t *testing.T) {
 }
 
 func TestWebSocketClient_handleMessage_SetFilters(t *testing.T) {
+	// Create a hub with auth disabled for testing
+	hub := &WebSocketHub{
+		config: &WebSocketConfig{
+			AuthEnabled: false,
+		},
+	}
+	
 	client := &WebSocketClient{
+		hub:     hub,
 		send:    make(chan WebSocketMessage, 10),
 		id:      "test-client",
 		filters: []EventFilter{},
@@ -567,7 +591,15 @@ func TestWebSocketSubscription(t *testing.T) {
 }
 
 func TestWebSocketClient_Subscribe(t *testing.T) {
+	// Create a hub with auth disabled for testing
+	hub := &WebSocketHub{
+		config: &WebSocketConfig{
+			AuthEnabled: false,
+		},
+	}
+	
 	client := &WebSocketClient{
+		hub:           hub,
 		id:            "test-client",
 		subscriptions: make(map[string]map[string]bool),
 	}
@@ -599,7 +631,15 @@ func TestWebSocketClient_Subscribe(t *testing.T) {
 }
 
 func TestWebSocketClient_handleMessage_Subscribe(t *testing.T) {
+	// Create a hub with auth disabled for testing
+	hub := &WebSocketHub{
+		config: &WebSocketConfig{
+			AuthEnabled: false,
+		},
+	}
+	
 	client := &WebSocketClient{
+		hub:           hub,
 		send:          make(chan WebSocketMessage, 10),
 		id:            "test-client",
 		subscriptions: make(map[string]map[string]bool),
