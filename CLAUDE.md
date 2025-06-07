@@ -54,6 +54,7 @@ KECS implements a clean architecture with the following key components:
 - `internal/storage/`: Storage interfaces and DuckDB implementation
 - `docs/adr/records/`: Architectural Decision Records
 - `web-ui/`: React/TypeScript Web UI application
+- `docs-site/`: VitePress-based documentation site
 
 ### API Implementation Pattern
 Each ECS resource type has its own file in `internal/controlplane/api/` with:
@@ -96,6 +97,37 @@ cd web-ui && npm run build
 - Custom hooks for API integration and WebSocket connections
 - Component-based architecture with reusable UI elements
 - Real-time data synchronization with control plane
+
+## Documentation Site
+
+KECS documentation is built using VitePress (SSG - Static Site Generator):
+
+### Documentation Development
+```bash
+# Install dependencies and start dev server
+cd docs-site
+npm install
+npm run docs:dev  # Access at http://localhost:5173
+```
+
+### Documentation Build
+```bash
+# Build documentation site
+./scripts/build-docs.sh  # Output in docs-site/.vitepress/dist/
+
+# Or manually from docs-site directory
+cd docs-site && npm run docs:build
+```
+
+### Documentation Structure
+- `docs-site/`: VitePress documentation root
+  - `.vitepress/config.js`: Site configuration
+  - `index.md`: Home page
+  - `guides/`: User guides and tutorials
+  - `api/`: API reference documentation
+  - `architecture/`: Architecture documentation
+  - `deployment/`: Deployment guides
+  - `development/`: Developer documentation
 
 ## Development Notes
 
