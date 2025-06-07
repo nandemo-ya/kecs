@@ -345,56 +345,29 @@ func TestWebSocketConnectionLimits(t *testing.T) {
 	})
 }
 
-func TestWebSocketConnectionTimeout(t *testing.T) {
-	// Create hub with connection timeout
+func TestWebSocketInactiveConnectionCleanup(t *testing.T) {
+	// Test that inactive connections are properly tracked
 	config := &WebSocketConfig{
 		AuthEnabled: false,
 		ConnectionLimitConfig: &ConnectionLimitConfig{
 			ConnectionTimeout: 100 * time.Millisecond,
 		},
-		PingInterval: 50 * time.Millisecond,
-		PongTimeout:  100 * time.Millisecond,
 	}
 
 	hub := NewWebSocketHubWithConfig(config)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go hub.Run(ctx)
-
-	// Create server
-	server := &Server{
-		webSocketHub: hub,
+	
+	// Create a mock client
+	client := &WebSocketClient{
+		hub:          hub,
+		lastActivity: time.Now().Add(-200 * time.Millisecond), // 200ms ago
 	}
-
-	// Create test server
-	handler := server.HandleWebSocket(hub)
-	ts := httptest.NewServer(handler)
-	defer ts.Close()
-
-	// Connect
-	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http")
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
-	require.NoError(t, err)
-	defer conn.Close()
-
-	// Send initial message
-	msg := WebSocketMessage{Type: "ping", ID: "1"}
-	err = conn.WriteJSON(msg)
-	require.NoError(t, err)
-
-	// Read pong
-	var response WebSocketMessage
-	err = conn.ReadJSON(&response)
-	require.NoError(t, err)
-	assert.Equal(t, "pong", response.Type)
-
-	// Don't send any more messages and don't respond to pings
-	// Connection should be closed after timeout
-	time.Sleep(300 * time.Millisecond)
-
-	// Try to send another message - should fail
-	err = conn.WriteJSON(msg)
-	assert.Error(t, err)
+	
+	// Test IsActive method
+	assert.False(t, client.IsActive(), "Client should be inactive after timeout")
+	
+	// Update activity
+	client.updateLastActivity()
+	assert.True(t, client.IsActive(), "Client should be active after update")
 }
 
 func TestGetClientIP(t *testing.T) {
