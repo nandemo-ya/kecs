@@ -158,6 +158,46 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 
 	// Save to storage
 	if err := s.storage.ClusterStore().Create(ctx, cluster); err != nil {
+		// Check if cluster already exists
+		existingCluster, getErr := s.storage.ClusterStore().Get(ctx, clusterName)
+		if getErr == nil && existingCluster != nil {
+			// Cluster already exists, return existing cluster info (AWS ECS behavior)
+			log.Printf("Cluster %s already exists, returning existing cluster info", clusterName)
+			
+			// Build response with existing cluster
+			response := &generated.CreateClusterResponse{
+				"cluster": map[string]interface{}{
+					"clusterArn":                        existingCluster.ARN,
+					"clusterName":                       existingCluster.Name,
+					"status":                            existingCluster.Status,
+					"registeredContainerInstancesCount": existingCluster.RegisteredContainerInstancesCount,
+					"runningTasksCount":                 existingCluster.RunningTasksCount,
+					"pendingTasksCount":                 existingCluster.PendingTasksCount,
+					"activeServicesCount":               existingCluster.ActiveServicesCount,
+				},
+			}
+
+			// Add optional fields
+			if existingCluster.Settings != "" {
+				var settings interface{}
+				json.Unmarshal([]byte(existingCluster.Settings), &settings)
+				(*response)["cluster"].(map[string]interface{})["settings"] = settings
+			}
+			if existingCluster.Configuration != "" {
+				var config interface{}
+				json.Unmarshal([]byte(existingCluster.Configuration), &config)
+				(*response)["cluster"].(map[string]interface{})["configuration"] = config
+			}
+			if existingCluster.Tags != "" {
+				var tags interface{}
+				json.Unmarshal([]byte(existingCluster.Tags), &tags)
+				(*response)["cluster"].(map[string]interface{})["tags"] = tags
+			}
+			
+			return response, nil
+		}
+		
+		// Some other error occurred
 		log.Printf("Failed to create cluster: %v", err)
 		return nil, fmt.Errorf("failed to create cluster: %w", err)
 	}
