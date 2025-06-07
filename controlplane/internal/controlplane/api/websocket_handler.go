@@ -32,12 +32,14 @@ type WebSocketHub struct {
 
 // WebSocketClient represents a WebSocket client connection
 type WebSocketClient struct {
-	hub    *WebSocketHub
-	conn   *websocket.Conn
-	send   chan WebSocketMessage
-	id     string
-	ctx    context.Context
-	cancel context.CancelFunc
+	hub           *WebSocketHub
+	conn          *websocket.Conn
+	send          chan WebSocketMessage
+	id            string
+	ctx           context.Context
+	cancel        context.CancelFunc
+	subscriptions map[string]map[string]bool // resourceType -> resourceID -> subscribed
+	mu            sync.RWMutex
 }
 
 // NewWebSocketHub creates a new WebSocket hub with default configuration
@@ -119,12 +121,13 @@ func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
 
 		ctx, cancel := context.WithCancel(r.Context())
 		client := &WebSocketClient{
-			hub:    hub,
-			conn:   conn,
-			send:   make(chan WebSocketMessage, 256),
-			id:     fmt.Sprintf("%d", time.Now().UnixNano()),
-			ctx:    ctx,
-			cancel: cancel,
+			hub:           hub,
+			conn:          conn,
+			send:          make(chan WebSocketMessage, 256),
+			id:            fmt.Sprintf("%d", time.Now().UnixNano()),
+			ctx:           ctx,
+			cancel:        cancel,
+			subscriptions: make(map[string]map[string]bool),
 		}
 
 		client.hub.register <- client
@@ -220,8 +223,14 @@ func (c *WebSocketClient) handleMessage(message WebSocketMessage) {
 			ResourceID   string `json:"resourceId"`
 		}
 		if err := json.Unmarshal(message.Payload, &payload); err == nil {
-			// TODO: Implement subscription logic
-			log.Printf("Client %s subscribed to %s:%s", c.id, payload.ResourceType, payload.ResourceID)
+			c.Subscribe(payload.ResourceType, payload.ResourceID)
+			// Send confirmation
+			c.send <- WebSocketMessage{
+				Type:      "subscribed",
+				ID:        message.ID,
+				Timestamp: time.Now(),
+				Payload:   message.Payload,
+			}
 		}
 
 	case "unsubscribe":
@@ -231,8 +240,14 @@ func (c *WebSocketClient) handleMessage(message WebSocketMessage) {
 			ResourceID   string `json:"resourceId"`
 		}
 		if err := json.Unmarshal(message.Payload, &payload); err == nil {
-			// TODO: Implement unsubscription logic
-			log.Printf("Client %s unsubscribed from %s:%s", c.id, payload.ResourceType, payload.ResourceID)
+			c.Unsubscribe(payload.ResourceType, payload.ResourceID)
+			// Send confirmation
+			c.send <- WebSocketMessage{
+				Type:      "unsubscribed",
+				ID:        message.ID,
+				Timestamp: time.Now(),
+				Payload:   message.Payload,
+			}
 		}
 
 	default:
@@ -289,4 +304,78 @@ func (h *WebSocketHub) BroadcastMetricUpdate(metrics interface{}) {
 	}
 
 	h.broadcast <- message
+}
+
+// Subscribe adds a subscription for the client
+func (c *WebSocketClient) Subscribe(resourceType, resourceID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	
+	if c.subscriptions[resourceType] == nil {
+		c.subscriptions[resourceType] = make(map[string]bool)
+	}
+	c.subscriptions[resourceType][resourceID] = true
+	
+	log.Printf("Client %s subscribed to %s:%s", c.id, resourceType, resourceID)
+}
+
+// Unsubscribe removes a subscription for the client
+func (c *WebSocketClient) Unsubscribe(resourceType, resourceID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	
+	if c.subscriptions[resourceType] != nil {
+		delete(c.subscriptions[resourceType], resourceID)
+		if len(c.subscriptions[resourceType]) == 0 {
+			delete(c.subscriptions, resourceType)
+		}
+	}
+	
+	log.Printf("Client %s unsubscribed from %s:%s", c.id, resourceType, resourceID)
+}
+
+// IsSubscribed checks if a client is subscribed to a resource
+func (c *WebSocketClient) IsSubscribed(resourceType, resourceID string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	if resources, ok := c.subscriptions[resourceType]; ok {
+		// Check specific resource or wildcard subscription
+		return resources[resourceID] || resources["*"]
+	}
+	return false
+}
+
+// BroadcastToSubscribed sends a message to clients subscribed to a specific resource
+func (h *WebSocketHub) BroadcastToSubscribed(resourceType, resourceID string, message WebSocketMessage) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	
+	for client := range h.clients {
+		if client.IsSubscribed(resourceType, resourceID) {
+			select {
+			case client.send <- message:
+			default:
+				// Client's send channel is full, skip
+				log.Printf("Client %s send channel full, skipping message", client.id)
+			}
+		}
+	}
+}
+
+// BroadcastTaskUpdateToSubscribed sends task update to subscribed clients only
+func (h *WebSocketHub) BroadcastTaskUpdateToSubscribed(taskID string, update interface{}) {
+	payload, err := json.Marshal(update)
+	if err != nil {
+		log.Printf("Error marshaling task update: %v", err)
+		return
+	}
+
+	message := WebSocketMessage{
+		Type:      "task_update",
+		Payload:   payload,
+		Timestamp: time.Now(),
+	}
+
+	h.BroadcastToSubscribed("task", taskID, message)
 }
