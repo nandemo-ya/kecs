@@ -28,9 +28,10 @@ func TestWebSocketHub_Run(t *testing.T) {
 	
 	// Test client registration
 	client := &WebSocketClient{
-		hub:  hub,
-		send: make(chan WebSocketMessage, 1),
-		id:   "test-client",
+		hub:           hub,
+		send:          make(chan WebSocketMessage, 1),
+		id:            "test-client",
+		subscriptions: make(map[string]map[string]bool),
 	}
 	
 	hub.register <- client
@@ -162,8 +163,9 @@ func TestWebSocketOriginCheck(t *testing.T) {
 
 func TestWebSocketClient_handleMessage(t *testing.T) {
 	client := &WebSocketClient{
-		send: make(chan WebSocketMessage, 10),
-		id:   "test-client",
+		send:          make(chan WebSocketMessage, 10),
+		id:            "test-client",
+		subscriptions: make(map[string]map[string]bool),
 	}
 	
 	tests := []struct {
@@ -241,9 +243,10 @@ func TestWebSocketHub_Broadcast(t *testing.T) {
 	clients := make([]*WebSocketClient, 3)
 	for i := 0; i < 3; i++ {
 		clients[i] = &WebSocketClient{
-			hub:  hub,
-			send: make(chan WebSocketMessage, 10),
-			id:   fmt.Sprintf("client-%d", i),
+			hub:           hub,
+			send:          make(chan WebSocketMessage, 10),
+			id:            fmt.Sprintf("client-%d", i),
+			subscriptions: make(map[string]map[string]bool),
 		}
 		hub.register <- clients[i]
 	}
@@ -301,5 +304,142 @@ func TestWebSocketHub_Broadcast(t *testing.T) {
 		case <-time.After(100 * time.Millisecond):
 			t.Fatalf("Client %d did not receive metric update", i)
 		}
+	}
+}
+
+func TestWebSocketSubscription(t *testing.T) {
+	hub := NewWebSocketHub()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go hub.Run(ctx)
+
+	// Create and register clients
+	subscribedClient := &WebSocketClient{
+		hub:           hub,
+		send:          make(chan WebSocketMessage, 10),
+		id:            "subscribed-client",
+		subscriptions: make(map[string]map[string]bool),
+	}
+	
+	unsubscribedClient := &WebSocketClient{
+		hub:           hub,
+		send:          make(chan WebSocketMessage, 10),
+		id:            "unsubscribed-client",
+		subscriptions: make(map[string]map[string]bool),
+	}
+
+	hub.register <- subscribedClient
+	hub.register <- unsubscribedClient
+	time.Sleep(10 * time.Millisecond)
+
+	// Subscribe one client to task-123
+	subscribedClient.Subscribe("task", "task-123")
+
+	// Test targeted broadcast
+	hub.BroadcastTaskUpdateToSubscribed("task-123", map[string]interface{}{
+		"status": "RUNNING",
+		"cpu":    "50%",
+	})
+
+	// Only subscribed client should receive the update
+	select {
+	case msg := <-subscribedClient.send:
+		assert.Equal(t, "task_update", msg.Type)
+		assert.NotNil(t, msg.Payload)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Subscribed client did not receive task update")
+	}
+
+	// Unsubscribed client should not receive anything
+	select {
+	case <-unsubscribedClient.send:
+		t.Fatal("Unsubscribed client should not receive task update")
+	case <-time.After(50 * time.Millisecond):
+		// Expected timeout
+	}
+}
+
+func TestWebSocketClient_Subscribe(t *testing.T) {
+	client := &WebSocketClient{
+		id:            "test-client",
+		subscriptions: make(map[string]map[string]bool),
+	}
+
+	// Test subscription
+	client.Subscribe("task", "task-123")
+	assert.True(t, client.IsSubscribed("task", "task-123"))
+	assert.False(t, client.IsSubscribed("task", "task-456"))
+	assert.False(t, client.IsSubscribed("service", "service-123"))
+
+	// Test wildcard subscription
+	client.Subscribe("service", "*")
+	assert.True(t, client.IsSubscribed("service", "service-123"))
+	assert.True(t, client.IsSubscribed("service", "any-service"))
+
+	// Test unsubscription
+	client.Unsubscribe("task", "task-123")
+	assert.False(t, client.IsSubscribed("task", "task-123"))
+
+	// Test unsubscribing from all resources of a type
+	client.Subscribe("cluster", "cluster-1")
+	client.Subscribe("cluster", "cluster-2")
+	client.Unsubscribe("cluster", "cluster-1")
+	assert.False(t, client.IsSubscribed("cluster", "cluster-1"))
+	assert.True(t, client.IsSubscribed("cluster", "cluster-2"))
+	
+	client.Unsubscribe("cluster", "cluster-2")
+	assert.False(t, client.IsSubscribed("cluster", "cluster-2"))
+}
+
+func TestWebSocketClient_handleMessage_Subscribe(t *testing.T) {
+	client := &WebSocketClient{
+		send:          make(chan WebSocketMessage, 10),
+		id:            "test-client",
+		subscriptions: make(map[string]map[string]bool),
+	}
+
+	// Test subscribe message
+	subscribeMsg := WebSocketMessage{
+		Type:    "subscribe",
+		ID:      "msg-123",
+		Payload: []byte(`{"resourceType":"task","resourceId":"task-123"}`),
+	}
+	
+	client.handleMessage(subscribeMsg)
+	
+	// Check subscription was added
+	assert.True(t, client.IsSubscribed("task", "task-123"))
+	
+	// Check confirmation was sent
+	select {
+	case msg := <-client.send:
+		assert.Equal(t, "subscribed", msg.Type)
+		assert.Equal(t, "msg-123", msg.ID)
+		assert.Equal(t, subscribeMsg.Payload, msg.Payload)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("No confirmation message received")
+	}
+
+	// Test unsubscribe message
+	unsubscribeMsg := WebSocketMessage{
+		Type:    "unsubscribe",
+		ID:      "msg-456",
+		Payload: []byte(`{"resourceType":"task","resourceId":"task-123"}`),
+	}
+	
+	client.handleMessage(unsubscribeMsg)
+	
+	// Check subscription was removed
+	assert.False(t, client.IsSubscribed("task", "task-123"))
+	
+	// Check confirmation was sent
+	select {
+	case msg := <-client.send:
+		assert.Equal(t, "unsubscribed", msg.Type)
+		assert.Equal(t, "msg-456", msg.ID)
+		assert.Equal(t, unsubscribeMsg.Payload, msg.Payload)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("No confirmation message received")
 	}
 }
