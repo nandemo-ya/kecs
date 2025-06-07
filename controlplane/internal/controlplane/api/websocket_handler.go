@@ -117,7 +117,7 @@ func (h *WebSocketHub) Run(ctx context.Context) {
 				}
 				
 				// Remove from connection limiter
-				if h.connectionLimiter != nil {
+				if h.connectionLimiter != nil && client.request != nil {
 					h.connectionLimiter.RemoveConnection(client.request, client.authInfo)
 				}
 				
@@ -169,8 +169,12 @@ func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
 		
 		// Check connection limits
 		if hub.connectionLimiter != nil && !hub.connectionLimiter.CanConnect(r, authInfo) {
+			username := "anonymous"
+			if authInfo != nil {
+				username = authInfo.Username
+			}
 			log.Printf("WebSocket connection limit exceeded for user %s from %s", 
-				authInfo.Username, getClientIP(r))
+				username, getClientIP(r))
 			http.Error(w, "Connection limit exceeded", http.StatusTooManyRequests)
 			return
 		}
@@ -182,7 +186,7 @@ func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
 		}
 		
 		// Add to connection limiter after successful upgrade
-		if hub.connectionLimiter != nil {
+		if hub.connectionLimiter != nil && r != nil {
 			hub.connectionLimiter.AddConnection(r, authInfo)
 		}
 

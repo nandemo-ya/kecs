@@ -173,7 +173,7 @@ func (c *ConnectionLimiter) AddConnection(r *http.Request, authInfo *AuthInfo) {
 
 // RemoveConnection removes a connection
 func (c *ConnectionLimiter) RemoveConnection(r *http.Request, authInfo *AuthInfo) {
-	if c == nil {
+	if c == nil || r == nil {
 		return
 	}
 
@@ -255,6 +255,10 @@ func (c *ConnectionLimiter) CleanupStaleConnections(ctx context.Context) {
 
 // getClientIP extracts the client IP address from the request
 func getClientIP(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	
 	// Check X-Forwarded-For header first (for proxied connections)
 	forwarded := r.Header.Get("X-Forwarded-For")
 	if forwarded != "" {
