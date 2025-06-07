@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // WebSocketConfig holds WebSocket configuration
@@ -29,6 +30,24 @@ type WebSocketConfig struct {
 	// AuthorizeFunc is a custom function to authorize operations
 	// Returns whether the user is authorized for the operation
 	AuthorizeFunc func(authInfo *AuthInfo, operation string, resource string) bool
+
+	// RateLimitConfig holds rate limiting configuration
+	RateLimitConfig *RateLimitConfig
+
+	// ConnectionLimitConfig holds connection limit configuration
+	ConnectionLimitConfig *ConnectionLimitConfig
+
+	// ReadTimeout is the maximum time allowed to read a message
+	ReadTimeout time.Duration
+
+	// WriteTimeout is the maximum time allowed to write a message
+	WriteTimeout time.Duration
+
+	// PingInterval is the interval for sending ping messages
+	PingInterval time.Duration
+
+	// PongTimeout is the maximum time to wait for a pong response
+	PongTimeout time.Duration
 }
 
 // AuthInfo represents authenticated user information
@@ -40,11 +59,65 @@ type AuthInfo struct {
 	Metadata    map[string]interface{}
 }
 
+// RateLimitConfig holds rate limiting configuration
+type RateLimitConfig struct {
+	// MessagesPerMinute is the maximum number of messages per minute per connection
+	MessagesPerMinute int
+
+	// BurstSize is the maximum burst size for rate limiting
+	BurstSize int
+
+	// GlobalMessagesPerMinute is the global rate limit across all connections
+	GlobalMessagesPerMinute int
+
+	// GlobalBurstSize is the global burst size
+	GlobalBurstSize int
+
+	// BypassRoles are roles that bypass rate limiting
+	BypassRoles []string
+}
+
+// ConnectionLimitConfig holds connection limit configuration
+type ConnectionLimitConfig struct {
+	// MaxConnectionsPerUser is the maximum number of connections per user
+	MaxConnectionsPerUser int
+
+	// MaxConnectionsPerIP is the maximum number of connections per IP address
+	MaxConnectionsPerIP int
+
+	// MaxTotalConnections is the maximum total number of connections
+	MaxTotalConnections int
+
+	// ConnectionTimeout is the maximum idle time for a connection
+	ConnectionTimeout time.Duration
+
+	// BypassRoles are roles that bypass connection limits
+	BypassRoles []string
+}
+
 // DefaultWebSocketConfig returns a default WebSocket configuration
 func DefaultWebSocketConfig() *WebSocketConfig {
 	return &WebSocketConfig{
 		AllowedOrigins:   []string{},
 		AllowCredentials: true,
+		ReadTimeout:      60 * time.Second,
+		WriteTimeout:     10 * time.Second,
+		PingInterval:     54 * time.Second,
+		PongTimeout:      60 * time.Second,
+		RateLimitConfig: &RateLimitConfig{
+			MessagesPerMinute:       60,  // 1 message per second
+			BurstSize:               10,  // Allow burst of 10 messages
+			GlobalMessagesPerMinute: 600, // 10 messages per second globally
+			GlobalBurstSize:         100,
+			BypassRoles:             []string{"admin"},
+		},
+		ConnectionLimitConfig: &ConnectionLimitConfig{
+			MaxConnectionsPerUser: 5,
+			MaxConnectionsPerIP:   10,
+			MaxTotalConnections:   1000,
+			ConnectionTimeout:     30 * time.Minute,
+			BypassRoles:           []string{"admin"},
+		},
 	}
 }
 
