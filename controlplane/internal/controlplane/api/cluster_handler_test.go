@@ -65,6 +65,9 @@ type MockClusterStore struct {
 }
 
 func (m *MockClusterStore) Create(ctx context.Context, cluster *storage.Cluster) error {
+	if _, exists := m.storage.clusters[cluster.Name]; exists {
+		return errors.New("cluster already exists")
+	}
 	m.storage.clusters[cluster.Name] = cluster
 	return nil
 }
@@ -163,4 +166,86 @@ func TestCreateClusterWithRandomName(t *testing.T) {
 	}
 
 	t.Logf("Created second cluster 'another-cluster' with kind cluster name '%s'", cluster2.KindClusterName)
+}
+
+func TestCreateClusterIdempotency(t *testing.T) {
+	// Create a server with mock storage
+	server := &Server{
+		storage:     NewMockStorage(),
+		kindManager: nil, // Skip actual kind cluster creation in tests
+	}
+
+	// Test: Create cluster twice with the same name should return same cluster
+	req := &generated.CreateClusterRequest{
+		"clusterName": "idempotent-test",
+	}
+
+	// First call - should create the cluster
+	resp1, err := server.CreateClusterWithStorage(context.Background(), req)
+	if err != nil {
+		t.Fatalf("First CreateClusterWithStorage() error = %v", err)
+	}
+
+	// Verify first response
+	clusterData1, ok := (*resp1)["cluster"].(map[string]interface{})
+	if !ok {
+		t.Fatal("First response doesn't contain cluster data")
+	}
+
+	clusterArn1, _ := clusterData1["clusterArn"].(string)
+	clusterName1, _ := clusterData1["clusterName"].(string)
+	status1, _ := clusterData1["status"].(string)
+
+	if clusterName1 != "idempotent-test" {
+		t.Errorf("Expected cluster name 'idempotent-test', got %s", clusterName1)
+	}
+	if status1 != "ACTIVE" {
+		t.Errorf("Expected status 'ACTIVE', got %s", status1)
+	}
+
+	// Second call - should return the existing cluster (idempotent)
+	resp2, err := server.CreateClusterWithStorage(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Second CreateClusterWithStorage() error = %v", err)
+	}
+
+	// Verify second response
+	clusterData2, ok := (*resp2)["cluster"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Second response doesn't contain cluster data")
+	}
+
+	clusterArn2, _ := clusterData2["clusterArn"].(string)
+	clusterName2, _ := clusterData2["clusterName"].(string)
+	status2, _ := clusterData2["status"].(string)
+
+	// Verify both responses are identical
+	if clusterArn1 != clusterArn2 {
+		t.Errorf("ClusterArn mismatch: first=%s, second=%s", clusterArn1, clusterArn2)
+	}
+	if clusterName1 != clusterName2 {
+		t.Errorf("ClusterName mismatch: first=%s, second=%s", clusterName1, clusterName2)
+	}
+	if status1 != status2 {
+		t.Errorf("Status mismatch: first=%s, second=%s", status1, status2)
+	}
+
+	// Verify only one cluster exists in storage
+	clusters, err := server.storage.ClusterStore().List(context.Background())
+	if err != nil {
+		t.Fatalf("Failed to list clusters: %v", err)
+	}
+
+	clusterCount := 0
+	for _, cluster := range clusters {
+		if cluster.Name == "idempotent-test" {
+			clusterCount++
+		}
+	}
+
+	if clusterCount != 1 {
+		t.Errorf("Expected exactly 1 cluster with name 'idempotent-test', found %d", clusterCount)
+	}
+
+	t.Logf("Idempotent CreateCluster test passed - second call returned existing cluster")
 }
