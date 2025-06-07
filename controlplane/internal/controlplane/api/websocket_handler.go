@@ -27,6 +27,7 @@ type WebSocketHub struct {
 	unregister chan *WebSocketClient
 	broadcast  chan WebSocketMessage
 	mu         sync.RWMutex
+	config     *WebSocketConfig
 }
 
 // WebSocketClient represents a WebSocket client connection
@@ -39,22 +40,19 @@ type WebSocketClient struct {
 	cancel context.CancelFunc
 }
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		// TODO: Implement proper origin checking
-		return true
-	},
+// NewWebSocketHub creates a new WebSocket hub with default configuration
+func NewWebSocketHub() *WebSocketHub {
+	return NewWebSocketHubWithConfig(DefaultWebSocketConfig())
 }
 
-// NewWebSocketHub creates a new WebSocket hub
-func NewWebSocketHub() *WebSocketHub {
+// NewWebSocketHubWithConfig creates a new WebSocket hub with custom configuration
+func NewWebSocketHubWithConfig(config *WebSocketConfig) *WebSocketHub {
 	return &WebSocketHub{
 		clients:    make(map[*WebSocketClient]bool),
 		register:   make(chan *WebSocketClient),
 		unregister: make(chan *WebSocketClient),
 		broadcast:  make(chan WebSocketMessage),
+		config:     config,
 	}
 }
 
@@ -99,10 +97,23 @@ func (h *WebSocketHub) Run(ctx context.Context) {
 
 // HandleWebSocket handles WebSocket connections
 func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
+	// Create upgrader with the hub's configuration
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     hub.config.CheckOrigin,
+	}
+	
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Log origin for debugging
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			log.Printf("WebSocket connection attempt from origin: %s", origin)
+		}
+		
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Printf("WebSocket upgrade error: %v", err)
+			log.Printf("WebSocket upgrade error from origin %s: %v", origin, err)
 			return
 		}
 
