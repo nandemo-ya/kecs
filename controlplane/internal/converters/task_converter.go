@@ -123,6 +123,9 @@ func (c *TaskConverter) ConvertTaskToPod(
 		c.applyTags(pod, runTaskReq.Tags)
 	}
 
+	// Add volume configuration annotations
+	c.addVolumeAnnotations(pod, volumes)
+
 	return pod, nil
 }
 
@@ -342,21 +345,34 @@ func (c *TaskConverter) convertVolumes(volumes []types.Volume) []corev1.Volume {
 			Name: *vol.Name,
 		}
 		
-		// Handle host volumes
-		if vol.Host != nil && vol.Host.SourcePath != nil {
+		// Handle different volume types
+		switch {
+		case vol.Host != nil && vol.Host.SourcePath != nil:
+			// Host volume
 			k8sVol.VolumeSource = corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
 					Path: *vol.Host.SourcePath,
 				},
 			}
-		} else {
-			// Default to emptyDir for volumes without host path
+			
+		case vol.EfsVolumeConfiguration != nil:
+			// EFS volume - convert to NFS in Kubernetes
+			k8sVol.VolumeSource = c.convertEFSVolume(vol.EfsVolumeConfiguration)
+			
+		case vol.DockerVolumeConfiguration != nil:
+			// Docker volume - convert based on driver
+			k8sVol.VolumeSource = c.convertDockerVolume(vol.DockerVolumeConfiguration, *vol.Name)
+			
+		case vol.FsxWindowsFileServerVolumeConfiguration != nil:
+			// FSx Windows File Server - convert to CIFS/SMB
+			k8sVol.VolumeSource = c.convertFSxWindowsVolume(vol.FsxWindowsFileServerVolumeConfiguration)
+			
+		default:
+			// Default to emptyDir for volumes without specific configuration
 			k8sVol.VolumeSource = corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			}
 		}
-		
-		// TODO: Handle other volume types like EFS, Docker volumes, etc.
 		
 		k8sVolumes = append(k8sVolumes, k8sVol)
 	}
@@ -1044,4 +1060,219 @@ func (c *TaskConverter) parseValueList(valueList string) []string {
 	}
 	
 	return result
+}
+
+// convertEFSVolume converts ECS EFS volume to Kubernetes NFS volume
+func (c *TaskConverter) convertEFSVolume(efsConfig *types.EFSVolumeConfiguration) corev1.VolumeSource {
+	if efsConfig.FileSystemId == nil {
+		return corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		}
+	}
+	
+	// EFS is essentially NFS v4, so we can use NFS volume in Kubernetes
+	// The server would be: <file-system-id>.efs.<region>.amazonaws.com
+	server := fmt.Sprintf("%s.efs.%s.amazonaws.com", *efsConfig.FileSystemId, c.region)
+	
+	// Root directory defaults to "/"
+	path := "/"
+	if efsConfig.RootDirectory != nil && *efsConfig.RootDirectory != "" {
+		path = *efsConfig.RootDirectory
+	}
+	
+	nfsVolume := &corev1.NFSVolumeSource{
+		Server: server,
+		Path:   path,
+	}
+	
+	// Note: Transit encryption and IAM authorization would need to be handled
+	// at the pod level with appropriate sidecars or init containers
+	
+	return corev1.VolumeSource{
+		NFS: nfsVolume,
+	}
+}
+
+// convertDockerVolume converts ECS Docker volume to appropriate Kubernetes volume
+func (c *TaskConverter) convertDockerVolume(dockerConfig *types.DockerVolumeConfiguration, volumeName string) corev1.VolumeSource {
+	// Check the scope of the volume
+	scope := "task"
+	if dockerConfig.Scope != nil {
+		scope = *dockerConfig.Scope
+	}
+	
+	// Check the driver
+	driver := "local"
+	if dockerConfig.Driver != nil {
+		driver = *dockerConfig.Driver
+	}
+	
+	switch driver {
+	case "local":
+		// Local Docker volumes map to PersistentVolumeClaim or emptyDir
+		if scope == "shared" {
+			// Shared volumes should use PVC
+			return corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: c.sanitizeVolumeName(volumeName),
+				},
+			}
+		}
+		// Task-scoped local volumes use emptyDir
+		return corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		}
+		
+	case "rexray/ebs":
+		// EBS volume - use AWS EBS volume source
+		if ebsVolumeId, ok := dockerConfig.DriverOpts["volumeID"]; ok {
+			return corev1.VolumeSource{
+				AWSElasticBlockStore: &corev1.AWSElasticBlockStoreVolumeSource{
+					VolumeID: ebsVolumeId,
+					FSType:   "ext4", // Default filesystem
+				},
+			}
+		}
+		
+	case "nfs":
+		// NFS driver
+		if server, ok := dockerConfig.DriverOpts["server"]; ok {
+			path := "/"
+			if p, ok := dockerConfig.DriverOpts["path"]; ok {
+				path = p
+			}
+			return corev1.VolumeSource{
+				NFS: &corev1.NFSVolumeSource{
+					Server: server,
+					Path:   path,
+				},
+			}
+		}
+	}
+	
+	// Default fallback
+	return corev1.VolumeSource{
+		EmptyDir: &corev1.EmptyDirVolumeSource{},
+	}
+}
+
+// convertFSxWindowsVolume converts FSx Windows File Server to CIFS/SMB volume
+func (c *TaskConverter) convertFSxWindowsVolume(fsxConfig *types.FSxWindowsFileServerVolumeConfiguration) corev1.VolumeSource {
+	// FSx Windows File Server is not directly supported in Kubernetes
+	// We'll need to use a FlexVolume or CSI driver that supports SMB/CIFS
+	// For now, we'll store the configuration as annotations
+	
+	// In a real implementation, you would use a CSI driver like:
+	// - Azure File CSI driver (supports SMB)
+	// - AWS FSx CSI driver
+	
+	// Fallback to emptyDir with a note that this needs proper CSI driver
+	return corev1.VolumeSource{
+		EmptyDir: &corev1.EmptyDirVolumeSource{
+			Medium: corev1.StorageMediumDefault,
+		},
+	}
+}
+
+// sanitizeVolumeName converts a volume name to be Kubernetes-compatible
+func (c *TaskConverter) sanitizeVolumeName(name string) string {
+	// Kubernetes names must be lowercase alphanumeric or '-'
+	// and must start and end with alphanumeric
+	name = strings.ToLower(name)
+	name = regexp.MustCompile(`[^a-z0-9-]`).ReplaceAllString(name, "-")
+	name = strings.Trim(name, "-")
+	
+	// Prefix with kecs to avoid conflicts
+	return fmt.Sprintf("kecs-volume-%s", name)
+}
+
+// addVolumeAnnotations adds annotations for volume configurations that need special handling
+func (c *TaskConverter) addVolumeAnnotations(pod *corev1.Pod, volumes []types.Volume) {
+	for _, vol := range volumes {
+		if vol.Name == nil {
+			continue
+		}
+		
+		// Add EFS-specific annotations
+		if vol.EfsVolumeConfiguration != nil {
+			efsConfig := vol.EfsVolumeConfiguration
+			if efsConfig.FileSystemId != nil {
+				annotationPrefix := fmt.Sprintf("kecs.dev/volume-%s-efs", *vol.Name)
+				
+				pod.Annotations[annotationPrefix+"-filesystem-id"] = *efsConfig.FileSystemId
+				
+				if efsConfig.TransitEncryption != nil {
+					pod.Annotations[annotationPrefix+"-transit-encryption"] = *efsConfig.TransitEncryption
+				}
+				
+				if efsConfig.TransitEncryptionPort != nil {
+					pod.Annotations[annotationPrefix+"-transit-encryption-port"] = fmt.Sprintf("%d", *efsConfig.TransitEncryptionPort)
+				}
+				
+				if efsConfig.AuthorizationConfig != nil {
+					if efsConfig.AuthorizationConfig.AccessPointId != nil {
+						pod.Annotations[annotationPrefix+"-access-point-id"] = *efsConfig.AuthorizationConfig.AccessPointId
+					}
+					if efsConfig.AuthorizationConfig.Iam != nil {
+						pod.Annotations[annotationPrefix+"-iam"] = *efsConfig.AuthorizationConfig.Iam
+					}
+				}
+			}
+		}
+		
+		// Add Docker volume annotations
+		if vol.DockerVolumeConfiguration != nil {
+			dockerConfig := vol.DockerVolumeConfiguration
+			annotationPrefix := fmt.Sprintf("kecs.dev/volume-%s-docker", *vol.Name)
+			
+			if dockerConfig.Scope != nil {
+				pod.Annotations[annotationPrefix+"-scope"] = *dockerConfig.Scope
+			}
+			
+			if dockerConfig.Driver != nil {
+				pod.Annotations[annotationPrefix+"-driver"] = *dockerConfig.Driver
+			}
+			
+			if dockerConfig.Autoprovision != nil {
+				pod.Annotations[annotationPrefix+"-autoprovision"] = fmt.Sprintf("%t", *dockerConfig.Autoprovision)
+			}
+			
+			// Store driver options as JSON
+			if len(dockerConfig.DriverOpts) > 0 {
+				if optsJSON, err := json.Marshal(dockerConfig.DriverOpts); err == nil {
+					pod.Annotations[annotationPrefix+"-driver-opts"] = string(optsJSON)
+				}
+			}
+			
+			// Store labels as JSON
+			if len(dockerConfig.Labels) > 0 {
+				if labelsJSON, err := json.Marshal(dockerConfig.Labels); err == nil {
+					pod.Annotations[annotationPrefix+"-labels"] = string(labelsJSON)
+				}
+			}
+		}
+		
+		// Add FSx Windows annotations
+		if vol.FsxWindowsFileServerVolumeConfiguration != nil {
+			fsxConfig := vol.FsxWindowsFileServerVolumeConfiguration
+			annotationPrefix := fmt.Sprintf("kecs.dev/volume-%s-fsx", *vol.Name)
+			
+			if fsxConfig.FileSystemId != nil {
+				pod.Annotations[annotationPrefix+"-filesystem-id"] = *fsxConfig.FileSystemId
+			}
+			
+			if fsxConfig.RootDirectory != nil {
+				pod.Annotations[annotationPrefix+"-root-directory"] = *fsxConfig.RootDirectory
+			}
+			
+			if fsxConfig.AuthorizationConfig != nil {
+				if fsxConfig.AuthorizationConfig.CredentialsParameter != nil {
+					pod.Annotations[annotationPrefix+"-credentials-parameter"] = *fsxConfig.AuthorizationConfig.CredentialsParameter
+				}
+				if fsxConfig.AuthorizationConfig.Domain != nil {
+					pod.Annotations[annotationPrefix+"-domain"] = *fsxConfig.AuthorizationConfig.Domain
+				}
+			}
+		}
+	}
 }
