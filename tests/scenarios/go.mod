@@ -4,6 +4,8 @@ go 1.23.0
 
 toolchain go1.24.3
 
+tool github.com/onsi/ginkgo/v2/ginkgo
+
 require (
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0

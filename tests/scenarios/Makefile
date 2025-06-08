@@ -19,7 +19,7 @@ test-verbose:
 deps:
 	go mod download
 	go mod tidy
-	@which ginkgo > /dev/null || go install github.com/onsi/ginkgo/v2/ginkgo@v2.23.4
+	# Ginkgo is automatically available via Go 1.24 tool directive
 
 # Clean test artifacts
 clean:
