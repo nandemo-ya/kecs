@@ -150,6 +150,8 @@ func (s *DuckDBStorage) createClustersTable(ctx context.Context) error {
 		running_tasks_count INTEGER DEFAULT 0,
 		pending_tasks_count INTEGER DEFAULT 0,
 		active_services_count INTEGER DEFAULT 0,
+		capacity_providers JSON,
+		default_capacity_provider_strategy JSON,
 		created_at TIMESTAMP NOT NULL,
 		updated_at TIMESTAMP NOT NULL
 	)`
