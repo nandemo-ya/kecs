@@ -1,0 +1,11 @@
+{
+  "label": "MCP Server",
+  "position": 7,
+  "link": {
+    "type": "doc",
+    "id": "mcp-server/overview"
+  },
+  "customProps": {
+    "description": "Model Context Protocol server for AI-powered ECS management"
+  }
+}
