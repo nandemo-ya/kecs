@@ -23,6 +23,25 @@ make vet            # Run go vet
 make fmt            # Format code with gofmt
 ```
 
+#### Testing Framework
+KECS uses **Ginkgo** as the primary testing framework for Go tests:
+- Ginkgo provides BDD-style testing with descriptive test specifications
+- Tests should be written using Ginkgo's `Describe`, `Context`, `It` patterns
+- Use Gomega matchers for assertions
+- Place test files as `*_test.go` alongside the code they test
+
+Example test structure:
+```go
+var _ = Describe("ClusterHandler", func() {
+    Context("when creating a cluster", func() {
+        It("should return existing cluster when name already exists", func() {
+            // Test implementation
+            Expect(response).To(Equal(expectedResponse))
+        })
+    })
+})
+```
+
 ### Docker Operations
 ```bash
 make docker-build   # Build Docker image
@@ -140,7 +159,9 @@ cd docs-site && npm run docs:build
 
 2. **Run all tests before creating a Pull Request**
    ```bash
-   # Control plane tests
+   # Control plane tests (using Ginkgo)
+   cd controlplane && ginkgo -r
+   # Or using go test
    cd controlplane && go test ./...
    
    # Web UI tests
@@ -158,6 +179,11 @@ cd docs-site && npm run docs:build
 4. Follow AWS ECS API naming conventions exactly
 5. Update Web UI types in `web-ui/src/types/` if needed
 6. Add corresponding UI components if user-facing
+7. Write Ginkgo tests for the new endpoint covering:
+   - Success cases
+   - Error cases
+   - Edge cases (e.g., idempotency, empty inputs)
+   - AWS ECS compatibility behavior
 
 ### Current Implementation Status
 - **Implemented**: Clusters, Services, Tasks, Task Definitions, Tags, Attributes

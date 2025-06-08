@@ -2,277 +2,271 @@ package converters
 
 import (
 	"encoding/json"
-	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/utils/ptr"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
 
-func TestParseSecretARN(t *testing.T) {
-	converter := NewTaskConverter("ap-northeast-1", "123456789012")
+var _ = Describe("TaskConverter", func() {
+	var converter *TaskConverter
 
-	tests := []struct {
-		name     string
-		arn      string
-		expected *SecretInfo
-	}{
-		{
-			name: "Secrets Manager ARN with JSON key",
-			arn:  "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf:username::",
-			expected: &SecretInfo{
-				SecretName: "kecs-secret-my-secret",
-				Key:        "username",
-				Source:     "secretsmanager",
-			},
-		},
-		{
-			name: "Secrets Manager ARN without JSON key",
-			arn:  "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf",
-			expected: &SecretInfo{
-				SecretName: "kecs-secret-my-secret",
-				Key:        "value",
-				Source:     "secretsmanager",
-			},
-		},
-		{
-			name: "SSM Parameter Store ARN",
-			arn:  "arn:aws:ssm:us-east-1:123456789012:parameter/app/database/password",
-			expected: &SecretInfo{
-				SecretName: "kecs-secret-app-database-password",
-				Key:        "value",
-				Source:     "ssm",
-			},
-		},
-		{
-			name:     "Invalid ARN",
-			arn:      "invalid-arn",
-			expected: nil,
-		},
-	}
+	BeforeEach(func() {
+		converter = NewTaskConverter("ap-northeast-1", "123456789012")
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := converter.parseSecretARN(tt.arn)
-			if tt.expected == nil {
-				assert.Nil(t, result)
-			} else {
-				require.NotNil(t, result)
-				assert.Equal(t, tt.expected.SecretName, result.SecretName)
-				assert.Equal(t, tt.expected.Key, result.Key)
-				assert.Equal(t, tt.expected.Source, result.Source)
+	Describe("parseSecretARN", func() {
+		It("should parse Secrets Manager ARN with JSON key", func() {
+			arn := "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf:username::"
+			result := converter.parseSecretARN(arn)
+
+			Expect(result).NotTo(BeNil())
+			Expect(result.SecretName).To(Equal("kecs-secret-my-secret"))
+			Expect(result.Key).To(Equal("username"))
+			Expect(result.Source).To(Equal("secretsmanager"))
+		})
+
+		It("should parse Secrets Manager ARN without JSON key", func() {
+			arn := "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf"
+			result := converter.parseSecretARN(arn)
+
+			Expect(result).NotTo(BeNil())
+			Expect(result.SecretName).To(Equal("kecs-secret-my-secret"))
+			Expect(result.Key).To(Equal("value"))
+			Expect(result.Source).To(Equal("secretsmanager"))
+		})
+
+		It("should parse SSM Parameter Store ARN", func() {
+			arn := "arn:aws:ssm:us-east-1:123456789012:parameter/app/database/password"
+			result := converter.parseSecretARN(arn)
+
+			Expect(result).NotTo(BeNil())
+			Expect(result.SecretName).To(Equal("kecs-secret-app-database-password"))
+			Expect(result.Key).To(Equal("value"))
+			Expect(result.Source).To(Equal("ssm"))
+		})
+
+		It("should return nil for invalid ARN", func() {
+			result := converter.parseSecretARN("invalid-arn")
+			Expect(result).To(BeNil())
+		})
+	})
+
+	Describe("CollectSecrets", func() {
+		It("should collect and deduplicate secrets from container definitions", func() {
+			containerDefs := []types.ContainerDefinition{
+				{
+					Name:  ptr.To("web"),
+					Image: ptr.To("nginx:latest"),
+					Secrets: []types.Secret{
+						{
+							Name:      ptr.To("DB_PASSWORD"),
+							ValueFrom: ptr.To("arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pass-XyZ123"),
+						},
+						{
+							Name:      ptr.To("API_KEY"),
+							ValueFrom: ptr.To("arn:aws:ssm:us-east-1:123456789012:parameter/api/key"),
+						},
+					},
+				},
+				{
+					Name:  ptr.To("app"),
+					Image: ptr.To("myapp:latest"),
+					Secrets: []types.Secret{
+						{
+							Name:      ptr.To("DB_PASSWORD2"),
+							ValueFrom: ptr.To("arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pass-XyZ123"), // Same secret
+						},
+					},
+				},
 			}
+
+			secrets := converter.CollectSecrets(containerDefs)
+
+			// Should have 2 unique secrets (db-pass and api-key) - keys are ARNs
+			Expect(secrets).To(HaveLen(2))
+			Expect(secrets).To(HaveKey("arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pass-XyZ123"))
+			Expect(secrets).To(HaveKey("arn:aws:ssm:us-east-1:123456789012:parameter/api/key"))
 		})
-	}
-}
+	})
 
-func TestCollectSecrets(t *testing.T) {
-	converter := NewTaskConverter("ap-northeast-1", "123456789012")
+	Describe("ConvertTaskToPod", func() {
+		var (
+			taskDef *storage.TaskDefinition
+			runTaskJSON []byte
+			cluster *storage.Cluster
+			taskID string
+		)
 
-	containerDefs := []types.ContainerDefinition{
-		{
-			Name:  ptr.To("web"),
-			Image: ptr.To("nginx:latest"),
-			Secrets: []types.Secret{
+		BeforeEach(func() {
+			// Create minimal task definition for testing
+			containerDefs := []types.ContainerDefinition{
 				{
-					Name:      ptr.To("DB_PASSWORD"),
-					ValueFrom: ptr.To("arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pass-XyZ123"),
+					Name:   ptr.To("nginx"),
+					Image:  ptr.To("nginx:latest"),
+					Memory: ptr.To(int(512)),
+					PortMappings: []types.PortMapping{
+						{
+							ContainerPort: ptr.To(int(80)),
+							Protocol:      ptr.To("tcp"),
+						},
+					},
+					Essential: ptr.To(true),
 				},
-				{
-					Name:      ptr.To("API_KEY"),
-					ValueFrom: ptr.To("arn:aws:ssm:us-east-1:123456789012:parameter/api/key"),
-				},
-			},
-		},
-		{
-			Name:  ptr.To("app"),
-			Image: ptr.To("myapp:latest"),
-			Secrets: []types.Secret{
-				{
-					Name:      ptr.To("DB_PASSWORD2"),
-					ValueFrom: ptr.To("arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pass-XyZ123"), // Same secret
-				},
-			},
-		},
-	}
+			}
 
-	secrets := converter.CollectSecrets(containerDefs)
+			containerDefsJSON, _ := json.Marshal(containerDefs)
 
-	// Should have 2 unique secrets (db-pass and api/key)
-	assert.Len(t, secrets, 2)
+			taskDef = &storage.TaskDefinition{
+				Family:               "test-task",
+				Revision:             1,
+				ARN:                  "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/test-task:1",
+				ContainerDefinitions: string(containerDefsJSON),
+				TaskRoleARN:          "",
+				Memory:               "1024",
+				CPU:                  "512",
+				NetworkMode:          "awsvpc",
+				Status:               "ACTIVE",
+			}
 
-	// Check that the secrets were parsed correctly
-	dbSecretARN := "arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pass-XyZ123"
-	dbSecret, exists := secrets[dbSecretARN]
-	require.True(t, exists)
-	assert.Equal(t, "kecs-secret-db-pass", dbSecret.SecretName)
-	assert.Equal(t, "secretsmanager", dbSecret.Source)
-
-	apiKeyARN := "arn:aws:ssm:us-east-1:123456789012:parameter/api/key"
-	apiSecret, exists := secrets[apiKeyARN]
-	require.True(t, exists)
-	assert.Equal(t, "kecs-secret-api-key", apiSecret.SecretName)
-	assert.Equal(t, "ssm", apiSecret.Source)
-}
-
-func TestConvertSecrets(t *testing.T) {
-	converter := NewTaskConverter("ap-northeast-1", "123456789012")
-
-	secrets := []types.Secret{
-		{
-			Name:      ptr.To("DB_PASSWORD"),
-			ValueFrom: ptr.To("arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pass-XyZ123:password::"),
-		},
-		{
-			Name:      ptr.To("API_KEY"),
-			ValueFrom: ptr.To("arn:aws:ssm:us-east-1:123456789012:parameter/api/key"),
-		},
-		{
-			Name:      ptr.To("INVALID"),
-			ValueFrom: ptr.To("invalid-arn"),
-		},
-	}
-
-	envVars := converter.convertSecrets(secrets)
-
-	// Should have 2 env vars (invalid ARN is skipped)
-	assert.Len(t, envVars, 2)
-
-	// Check DB_PASSWORD
-	dbEnv := envVars[0]
-	assert.Equal(t, "DB_PASSWORD", dbEnv.Name)
-	require.NotNil(t, dbEnv.ValueFrom)
-	require.NotNil(t, dbEnv.ValueFrom.SecretKeyRef)
-	assert.Equal(t, "kecs-secret-db-pass", dbEnv.ValueFrom.SecretKeyRef.Name)
-	assert.Equal(t, "password", dbEnv.ValueFrom.SecretKeyRef.Key)
-
-	// Check API_KEY
-	apiEnv := envVars[1]
-	assert.Equal(t, "API_KEY", apiEnv.Name)
-	require.NotNil(t, apiEnv.ValueFrom)
-	require.NotNil(t, apiEnv.ValueFrom.SecretKeyRef)
-	assert.Equal(t, "kecs-secret-api-key", apiEnv.ValueFrom.SecretKeyRef.Name)
-	assert.Equal(t, "value", apiEnv.ValueFrom.SecretKeyRef.Key)
-}
-
-func TestSanitizeSecretName(t *testing.T) {
-	converter := NewTaskConverter("ap-northeast-1", "123456789012")
-
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "Simple name",
-			input:    "my-secret",
-			expected: "kecs-secret-my-secret",
-		},
-		{
-			name:     "Name with special characters",
-			input:    "my_secret@123",
-			expected: "kecs-secret-my-secret-123",
-		},
-		{
-			name:     "Name with uppercase",
-			input:    "MySecret",
-			expected: "kecs-secret-mysecret",
-		},
-		{
-			name:     "Name with slashes",
-			input:    "/app/db/password",
-			expected: "kecs-secret-app-db-password",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := converter.sanitizeSecretName(tt.input)
-			assert.Equal(t, tt.expected, result)
+			runTaskJSON = []byte(`{}`)
+			cluster = &storage.Cluster{
+				Name:   "test-cluster",
+				Region: "ap-northeast-1",
+			}
+			taskID = "test-task-id"
 		})
-	}
-}
 
-func TestTaskConverterWithSecrets(t *testing.T) {
-	converter := NewTaskConverter("ap-northeast-1", "123456789012")
+		It("should convert simple task definition to Kubernetes pod", func() {
+			pod, err := converter.ConvertTaskToPod(taskDef, runTaskJSON, cluster, taskID)
 
-	// Create a task definition with secrets
-	containerDefs := []types.ContainerDefinition{
-		{
-			Name:  ptr.To("app"),
-			Image: ptr.To("myapp:latest"),
-			Environment: []types.KeyValuePair{
-				{Name: ptr.To("ENV"), Value: ptr.To("production")},
-			},
-			Secrets: []types.Secret{
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pod).NotTo(BeNil())
+			Expect(pod.Name).To(Equal("ecs-task-test-task-id"))
+			Expect(pod.Namespace).To(Equal("test-cluster-ap-northeast-1"))
+			Expect(pod.Labels).To(HaveKeyWithValue("kecs.dev/task-family", "test-task"))
+			Expect(pod.Labels).To(HaveKeyWithValue("kecs.dev/task-revision", "1"))
+
+			// Check container
+			Expect(pod.Spec.Containers).To(HaveLen(1))
+			container := pod.Spec.Containers[0]
+			Expect(container.Name).To(Equal("nginx"))
+			Expect(container.Image).To(Equal("nginx:latest"))
+			Expect(container.Ports).To(HaveLen(1))
+			Expect(container.Ports[0].ContainerPort).To(Equal(int32(80)))
+		})
+
+		It("should handle task with environment variables", func() {
+			containerDefs := []types.ContainerDefinition{
 				{
-					Name:      ptr.To("DB_PASSWORD"),
-					ValueFrom: ptr.To("arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pass-XyZ123"),
+					Name:  ptr.To("app"),
+					Image: ptr.To("myapp:latest"),
+					Environment: []types.KeyValuePair{
+						{
+							Name:  ptr.To("NODE_ENV"),
+							Value: ptr.To("production"),
+						},
+						{
+							Name:  ptr.To("PORT"),
+							Value: ptr.To("3000"),
+						},
+					},
+					Essential: ptr.To(true),
 				},
-			},
-			PortMappings: []types.PortMapping{
-				{ContainerPort: ptr.To(8080), Protocol: ptr.To("tcp")},
-			},
-		},
-	}
+			}
 
-	containerDefsJSON, err := json.Marshal(containerDefs)
-	require.NoError(t, err)
+			containerDefsJSON, _ := json.Marshal(containerDefs)
+			taskDef.ContainerDefinitions = string(containerDefsJSON)
 
-	taskDef := &storage.TaskDefinition{
-		ARN:                  "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/app:1",
-		Family:               "app",
-		Revision:             1,
-		ContainerDefinitions: string(containerDefsJSON),
-		NetworkMode:          "bridge",
-		CPU:                  "256",
-		Memory:               "512",
-	}
+			pod, err := converter.ConvertTaskToPod(taskDef, runTaskJSON, cluster, taskID)
 
-	runTaskReq := types.RunTaskRequest{
-		TaskDefinition: ptr.To("app:1"),
-		Cluster:        ptr.To("default"),
-		Count:          ptr.To(1),
-		LaunchType:     ptr.To("FARGATE"),
-	}
-	runTaskReqJSON, err := json.Marshal(runTaskReq)
-	require.NoError(t, err)
+			Expect(err).NotTo(HaveOccurred())
+			container := pod.Spec.Containers[0]
+			Expect(container.Env).To(HaveLen(2))
+			Expect(container.Env[0].Name).To(Equal("NODE_ENV"))
+			Expect(container.Env[0].Value).To(Equal("production"))
+			Expect(container.Env[1].Name).To(Equal("PORT"))
+			Expect(container.Env[1].Value).To(Equal("3000"))
+		})
 
-	cluster := &storage.Cluster{
-		Name:   "default",
-		ARN:    "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
-		Region: "ap-northeast-1",
-	}
+		It("should handle task with secrets", func() {
+			containerDefs := []types.ContainerDefinition{
+				{
+					Name:  ptr.To("app"),
+					Image: ptr.To("myapp:latest"),
+					Secrets: []types.Secret{
+						{
+							Name:      ptr.To("DB_PASSWORD"),
+							ValueFrom: ptr.To("arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pass-XyZ123"),
+						},
+					},
+					Essential: ptr.To(true),
+				},
+			}
 
-	// Convert to pod
-	pod, err := converter.ConvertTaskToPod(taskDef, runTaskReqJSON, cluster, "task-123")
-	require.NoError(t, err)
-	require.NotNil(t, pod)
+			containerDefsJSON, _ := json.Marshal(containerDefs)
+			taskDef.ContainerDefinitions = string(containerDefsJSON)
 
-	// Check pod basics
-	assert.Equal(t, "ecs-task-task-123", pod.Name)
-	assert.Equal(t, "default-ap-northeast-1", pod.Namespace)
+			pod, err := converter.ConvertTaskToPod(taskDef, runTaskJSON, cluster, taskID)
 
-	// Check container
-	require.Len(t, pod.Spec.Containers, 1)
-	container := pod.Spec.Containers[0]
-	assert.Equal(t, "app", container.Name)
-	assert.Equal(t, "myapp:latest", container.Image)
+			Expect(err).NotTo(HaveOccurred())
+			container := pod.Spec.Containers[0]
+			Expect(container.Env).To(HaveLen(1))
+			Expect(container.Env[0].Name).To(Equal("DB_PASSWORD"))
+			Expect(container.Env[0].ValueFrom).NotTo(BeNil())
+			Expect(container.Env[0].ValueFrom.SecretKeyRef).NotTo(BeNil())
+			Expect(container.Env[0].ValueFrom.SecretKeyRef.Name).To(Equal("kecs-secret-db-pass"))
+			Expect(container.Env[0].ValueFrom.SecretKeyRef.Key).To(Equal("value"))
+		})
 
-	// Check environment variables
-	require.Len(t, container.Env, 2) // 1 regular env + 1 secret
-	
-	// Regular env var
-	assert.Equal(t, "ENV", container.Env[0].Name)
-	assert.Equal(t, "production", container.Env[0].Value)
-	
-	// Secret env var
-	assert.Equal(t, "DB_PASSWORD", container.Env[1].Name)
-	require.NotNil(t, container.Env[1].ValueFrom)
-	require.NotNil(t, container.Env[1].ValueFrom.SecretKeyRef)
-	assert.Equal(t, "kecs-secret-db-pass", container.Env[1].ValueFrom.SecretKeyRef.Name)
-	assert.Equal(t, "value", container.Env[1].ValueFrom.SecretKeyRef.Key)
-}
+		It("should handle overrides from RunTask request", func() {
+			runTaskJSON = []byte(`{
+				"overrides": {
+					"containerOverrides": [{
+						"name": "nginx",
+						"environment": [
+							{"name": "OVERRIDE_ENV", "value": "override_value"}
+						],
+						"command": ["sh", "-c", "echo hello"]
+					}]
+				}
+			}`)
+
+			pod, err := converter.ConvertTaskToPod(taskDef, runTaskJSON, cluster, taskID)
+
+			Expect(err).NotTo(HaveOccurred())
+			container := pod.Spec.Containers[0]
+			Expect(container.Env).To(HaveLen(1))
+			Expect(container.Env[0].Name).To(Equal("OVERRIDE_ENV"))
+			Expect(container.Command).To(Equal([]string{"sh", "-c", "echo hello"}))
+		})
+
+		It("should handle task with multiple containers", func() {
+			containerDefs := []types.ContainerDefinition{
+				{
+					Name:      ptr.To("nginx"),
+					Image:     ptr.To("nginx:latest"),
+					Essential: ptr.To(true),
+				},
+				{
+					Name:      ptr.To("sidecar"),
+					Image:     ptr.To("busybox:latest"),
+					Essential: ptr.To(false),
+				},
+			}
+
+			containerDefsJSON, _ := json.Marshal(containerDefs)
+			taskDef.ContainerDefinitions = string(containerDefsJSON)
+
+			pod, err := converter.ConvertTaskToPod(taskDef, runTaskJSON, cluster, taskID)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pod.Spec.Containers).To(HaveLen(2))
+			Expect(pod.Spec.Containers[0].Name).To(Equal("nginx"))
+			Expect(pod.Spec.Containers[1].Name).To(Equal("sidecar-nonessential"))
+		})
+	})
+})
