@@ -224,3 +224,61 @@ npm test
 - **Claude Desktop**: Configure in `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Claude Code**: Configure in `~/Library/Application Support/Claude/claude_code_config.json`
 - Documentation available in `mcp-server/docs/` and `docs-site/docs/mcp-server/`
+
+## Scenario Tests
+
+### Running Scenario Tests
+```bash
+# Navigate to scenario tests directory
+cd tests/scenarios
+
+# Run all scenario tests
+make test
+
+# Run only cluster tests
+make test-cluster
+
+# Run with debug logging
+make test-verbose
+
+# Run specific test
+make test-one TEST=TestClusterCreateAndDelete
+```
+
+### Test Structure
+- **Phase 1 (Foundation)**: Basic cluster management tests - COMPLETED
+  - Testcontainers integration for isolated test environments
+  - AWS CLI wrapper for ECS operations
+  - Test helpers and utilities
+- **Phase 2**: Task definition and basic service operations
+- **Phase 3**: Task lifecycle and status tracking
+- **Phase 4**: Advanced service operations (rolling updates, scaling)
+- **Phase 5**: Failure scenarios
+- **Phase 6**: ecspresso integration
+- **Phase 7**: Performance tests
+- **Phase 8**: CI/CD integration
+
+### Prerequisites
+- Docker
+- AWS CLI v2
+- Go 1.21+
+
+### Test Implementation Pattern
+Scenario tests use standard Go testing with helper utilities:
+```go
+func TestClusterLifecycle(t *testing.T) {
+    // Start KECS container
+    kecs := utils.StartKECS(t)
+    defer kecs.Cleanup()
+    
+    // Create ECS client
+    client := utils.NewECSClient(kecs.Endpoint())
+    
+    // Test implementation
+    err := client.CreateCluster("test-cluster")
+    require.NoError(t, err)
+    
+    // Assertions
+    utils.AssertClusterActive(t, client, "test-cluster")
+}
+```
