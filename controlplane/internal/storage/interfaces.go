@@ -94,6 +94,12 @@ type Cluster struct {
 	PendingTasksCount                 int `json:"pendingTasksCount"`
 	ActiveServicesCount               int `json:"activeServicesCount"`
 	
+	// Capacity providers as JSON
+	CapacityProviders string `json:"capacityProviders,omitempty"`
+	
+	// Default capacity provider strategy as JSON
+	DefaultCapacityProviderStrategy string `json:"defaultCapacityProviderStrategy,omitempty"`
+	
 	// Timestamps
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`

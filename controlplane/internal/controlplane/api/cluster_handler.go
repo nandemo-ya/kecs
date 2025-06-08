@@ -142,7 +142,7 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 
 	// Extract settings and configuration from request
 	if req != nil {
-		if settings, ok := (*req)["settings"].(map[string]interface{}); ok {
+		if settings, ok := (*req)["settings"].([]interface{}); ok {
 			settingsJSON, _ := json.Marshal(settings)
 			cluster.Settings = string(settingsJSON)
 		}
@@ -153,6 +153,14 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 		if tags, ok := (*req)["tags"].([]interface{}); ok {
 			tagsJSON, _ := json.Marshal(tags)
 			cluster.Tags = string(tagsJSON)
+		}
+		if capacityProviders, ok := (*req)["capacityProviders"].([]interface{}); ok {
+			capacityProvidersJSON, _ := json.Marshal(capacityProviders)
+			cluster.CapacityProviders = string(capacityProvidersJSON)
+		}
+		if defaultCapacityProviderStrategy, ok := (*req)["defaultCapacityProviderStrategy"].([]interface{}); ok {
+			strategyJSON, _ := json.Marshal(defaultCapacityProviderStrategy)
+			cluster.DefaultCapacityProviderStrategy = string(strategyJSON)
 		}
 	}
 
@@ -174,6 +182,13 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 					"runningTasksCount":                 existingCluster.RunningTasksCount,
 					"pendingTasksCount":                 existingCluster.PendingTasksCount,
 					"activeServicesCount":               existingCluster.ActiveServicesCount,
+					// Add statistics sub-object
+					"statistics": map[string]interface{}{
+						"registeredContainerInstancesCount": existingCluster.RegisteredContainerInstancesCount,
+						"runningTasksCount":                 existingCluster.RunningTasksCount,
+						"pendingTasksCount":                 existingCluster.PendingTasksCount,
+						"activeServicesCount":               existingCluster.ActiveServicesCount,
+					},
 				},
 			}
 
@@ -192,6 +207,16 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 				var tags interface{}
 				json.Unmarshal([]byte(existingCluster.Tags), &tags)
 				(*response)["cluster"].(map[string]interface{})["tags"] = tags
+			}
+			if existingCluster.CapacityProviders != "" {
+				var capacityProviders interface{}
+				json.Unmarshal([]byte(existingCluster.CapacityProviders), &capacityProviders)
+				(*response)["cluster"].(map[string]interface{})["capacityProviders"] = capacityProviders
+			}
+			if existingCluster.DefaultCapacityProviderStrategy != "" {
+				var defaultCapacityProviderStrategy interface{}
+				json.Unmarshal([]byte(existingCluster.DefaultCapacityProviderStrategy), &defaultCapacityProviderStrategy)
+				(*response)["cluster"].(map[string]interface{})["defaultCapacityProviderStrategy"] = defaultCapacityProviderStrategy
 			}
 			
 			return response, nil
@@ -245,6 +270,13 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 			"runningTasksCount":                 cluster.RunningTasksCount,
 			"pendingTasksCount":                 cluster.PendingTasksCount,
 			"activeServicesCount":               cluster.ActiveServicesCount,
+			// Add statistics sub-object
+			"statistics": map[string]interface{}{
+				"registeredContainerInstancesCount": cluster.RegisteredContainerInstancesCount,
+				"runningTasksCount":                 cluster.RunningTasksCount,
+				"pendingTasksCount":                 cluster.PendingTasksCount,
+				"activeServicesCount":               cluster.ActiveServicesCount,
+			},
 		},
 	}
 
@@ -263,6 +295,16 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 		var tags interface{}
 		json.Unmarshal([]byte(cluster.Tags), &tags)
 		(*response)["cluster"].(map[string]interface{})["tags"] = tags
+	}
+	if cluster.CapacityProviders != "" {
+		var capacityProviders interface{}
+		json.Unmarshal([]byte(cluster.CapacityProviders), &capacityProviders)
+		(*response)["cluster"].(map[string]interface{})["capacityProviders"] = capacityProviders
+	}
+	if cluster.DefaultCapacityProviderStrategy != "" {
+		var defaultCapacityProviderStrategy interface{}
+		json.Unmarshal([]byte(cluster.DefaultCapacityProviderStrategy), &defaultCapacityProviderStrategy)
+		(*response)["cluster"].(map[string]interface{})["defaultCapacityProviderStrategy"] = defaultCapacityProviderStrategy
 	}
 
 	return response, nil
@@ -470,6 +512,13 @@ func buildDescribeClustersResponse(clusters []*storage.Cluster, failures []map[s
 			"runningTasksCount":                 cluster.RunningTasksCount,
 			"pendingTasksCount":                 cluster.PendingTasksCount,
 			"activeServicesCount":               cluster.ActiveServicesCount,
+			// Add statistics sub-object
+			"statistics": map[string]interface{}{
+				"registeredContainerInstancesCount": cluster.RegisteredContainerInstancesCount,
+				"runningTasksCount":                 cluster.RunningTasksCount,
+				"pendingTasksCount":                 cluster.PendingTasksCount,
+				"activeServicesCount":               cluster.ActiveServicesCount,
+			},
 		}
 
 		// Add optional fields
@@ -487,6 +536,16 @@ func buildDescribeClustersResponse(clusters []*storage.Cluster, failures []map[s
 			var tags interface{}
 			json.Unmarshal([]byte(cluster.Tags), &tags)
 			clusterMap["tags"] = tags
+		}
+		if cluster.CapacityProviders != "" {
+			var capacityProviders interface{}
+			json.Unmarshal([]byte(cluster.CapacityProviders), &capacityProviders)
+			clusterMap["capacityProviders"] = capacityProviders
+		}
+		if cluster.DefaultCapacityProviderStrategy != "" {
+			var defaultCapacityProviderStrategy interface{}
+			json.Unmarshal([]byte(cluster.DefaultCapacityProviderStrategy), &defaultCapacityProviderStrategy)
+			clusterMap["defaultCapacityProviderStrategy"] = defaultCapacityProviderStrategy
 		}
 
 		clusterList[i] = clusterMap

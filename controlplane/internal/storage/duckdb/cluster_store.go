@@ -34,14 +34,17 @@ func (s *clusterStore) Create(ctx context.Context, cluster *storage.Cluster) err
 			configuration, settings, tags, kind_cluster_name,
 			registered_container_instances_count, running_tasks_count,
 			pending_tasks_count, active_services_count,
+			capacity_providers, default_capacity_provider_strategy,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	// Convert empty strings to NULL for JSON fields
 	configuration := sql.NullString{String: cluster.Configuration, Valid: cluster.Configuration != ""}
 	settings := sql.NullString{String: cluster.Settings, Valid: cluster.Settings != ""}
 	tags := sql.NullString{String: cluster.Tags, Valid: cluster.Tags != ""}
 	kindClusterName := sql.NullString{String: cluster.KindClusterName, Valid: cluster.KindClusterName != ""}
+	capacityProviders := sql.NullString{String: cluster.CapacityProviders, Valid: cluster.CapacityProviders != ""}
+	defaultCapacityProviderStrategy := sql.NullString{String: cluster.DefaultCapacityProviderStrategy, Valid: cluster.DefaultCapacityProviderStrategy != ""}
 
 	_, err := s.db.ExecContext(ctx, query,
 		cluster.ID,
@@ -58,6 +61,8 @@ func (s *clusterStore) Create(ctx context.Context, cluster *storage.Cluster) err
 		cluster.RunningTasksCount,
 		cluster.PendingTasksCount,
 		cluster.ActiveServicesCount,
+		capacityProviders,
+		defaultCapacityProviderStrategy,
 		cluster.CreatedAt,
 		cluster.UpdatedAt,
 	)
@@ -77,12 +82,13 @@ func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, 
 			configuration, settings, tags, kind_cluster_name,
 			registered_container_instances_count, running_tasks_count,
 			pending_tasks_count, active_services_count,
+			capacity_providers, default_capacity_provider_strategy,
 			created_at, updated_at
 		FROM clusters
 		WHERE name = ?`
 
 	cluster := &storage.Cluster{}
-	var configuration, settings, tags, kindClusterName sql.NullString
+	var configuration, settings, tags, kindClusterName, capacityProviders, defaultCapacityProviderStrategy sql.NullString
 
 	err := s.db.QueryRowContext(ctx, query, name).Scan(
 		&cluster.ID,
@@ -99,6 +105,8 @@ func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, 
 		&cluster.RunningTasksCount,
 		&cluster.PendingTasksCount,
 		&cluster.ActiveServicesCount,
+		&capacityProviders,
+		&defaultCapacityProviderStrategy,
 		&cluster.CreatedAt,
 		&cluster.UpdatedAt,
 	)
@@ -115,6 +123,8 @@ func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, 
 	cluster.Settings = settings.String
 	cluster.Tags = tags.String
 	cluster.KindClusterName = kindClusterName.String
+	cluster.CapacityProviders = capacityProviders.String
+	cluster.DefaultCapacityProviderStrategy = defaultCapacityProviderStrategy.String
 
 	return cluster, nil
 }
@@ -127,6 +137,7 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 			configuration, settings, tags, kind_cluster_name,
 			registered_container_instances_count, running_tasks_count,
 			pending_tasks_count, active_services_count,
+			capacity_providers, default_capacity_provider_strategy,
 			created_at, updated_at
 		FROM clusters
 		ORDER BY created_at DESC`
@@ -141,7 +152,7 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 
 	for rows.Next() {
 		cluster := &storage.Cluster{}
-		var configuration, settings, tags, kindClusterName sql.NullString
+		var configuration, settings, tags, kindClusterName, capacityProviders, defaultCapacityProviderStrategy sql.NullString
 
 		err := rows.Scan(
 			&cluster.ID,
@@ -158,6 +169,8 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 			&cluster.RunningTasksCount,
 			&cluster.PendingTasksCount,
 			&cluster.ActiveServicesCount,
+			&capacityProviders,
+			&defaultCapacityProviderStrategy,
 			&cluster.CreatedAt,
 			&cluster.UpdatedAt,
 		)
@@ -170,6 +183,8 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 		cluster.Settings = settings.String
 		cluster.Tags = tags.String
 		cluster.KindClusterName = kindClusterName.String
+		cluster.CapacityProviders = capacityProviders.String
+		cluster.DefaultCapacityProviderStrategy = defaultCapacityProviderStrategy.String
 
 		clusters = append(clusters, cluster)
 	}
@@ -200,6 +215,8 @@ func (s *clusterStore) Update(ctx context.Context, cluster *storage.Cluster) err
 			running_tasks_count = ?,
 			pending_tasks_count = ?,
 			active_services_count = ?,
+			capacity_providers = ?,
+			default_capacity_provider_strategy = ?,
 			updated_at = ?
 		WHERE name = ?`
 
@@ -208,6 +225,8 @@ func (s *clusterStore) Update(ctx context.Context, cluster *storage.Cluster) err
 	settings := sql.NullString{String: cluster.Settings, Valid: cluster.Settings != ""}
 	tags := sql.NullString{String: cluster.Tags, Valid: cluster.Tags != ""}
 	kindClusterName := sql.NullString{String: cluster.KindClusterName, Valid: cluster.KindClusterName != ""}
+	capacityProviders := sql.NullString{String: cluster.CapacityProviders, Valid: cluster.CapacityProviders != ""}
+	defaultCapacityProviderStrategy := sql.NullString{String: cluster.DefaultCapacityProviderStrategy, Valid: cluster.DefaultCapacityProviderStrategy != ""}
 
 	result, err := s.db.ExecContext(ctx, query,
 		cluster.ARN,
@@ -222,6 +241,8 @@ func (s *clusterStore) Update(ctx context.Context, cluster *storage.Cluster) err
 		cluster.RunningTasksCount,
 		cluster.PendingTasksCount,
 		cluster.ActiveServicesCount,
+		capacityProviders,
+		defaultCapacityProviderStrategy,
 		cluster.UpdatedAt,
 		cluster.Name,
 	)
