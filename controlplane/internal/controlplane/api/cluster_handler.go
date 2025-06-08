@@ -11,7 +11,6 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 )
 
 // HTTP Handlers for ECS Cluster operations
@@ -117,13 +116,9 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 	accountID := "123456789012" // TODO: Get from actual account
 	arn := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", region, accountID, clusterName)
 
-	// Generate a random kind cluster name
-	kindClusterName, err := utils.GenerateClusterName()
-	if err != nil {
-		// Fallback to deterministic name if random generation fails
-		log.Printf("Failed to generate random cluster name: %v, using fallback", err)
-		kindClusterName = fmt.Sprintf("kecs-%s", clusterName)
-	}
+	// Generate a deterministic kind cluster name based on ECS cluster name
+	// This ensures the same ECS cluster always maps to the same kind cluster
+	kindClusterName := fmt.Sprintf("kecs-%s", clusterName)
 
 	// Create cluster object
 	cluster := &storage.Cluster{
@@ -171,6 +166,39 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 		if getErr == nil && existingCluster != nil {
 			// Cluster already exists, return existing cluster info (AWS ECS behavior)
 			log.Printf("Cluster %s already exists, returning existing cluster info", clusterName)
+			
+			// Ensure the kind cluster exists (it might have been deleted manually)
+			go func() {
+				ctx := context.Background()
+				
+				// Skip kind cluster creation if kindManager is nil (test mode)
+				if s.kindManager == nil {
+					return
+				}
+				
+				// Check if kind cluster exists, create if it doesn't
+				if _, err := s.kindManager.GetKubeClient(existingCluster.KindClusterName); err != nil {
+					log.Printf("Kind cluster %s for existing ECS cluster %s is missing, recreating...", existingCluster.KindClusterName, clusterName)
+					if err := s.kindManager.CreateCluster(ctx, existingCluster.KindClusterName); err != nil {
+						log.Printf("Failed to recreate kind cluster %s: %v", existingCluster.KindClusterName, err)
+						return
+					}
+					
+					// Get Kubernetes client and create namespace
+					kubeClient, err := s.kindManager.GetKubeClient(existingCluster.KindClusterName)
+					if err != nil {
+						log.Printf("Failed to get kubernetes client for %s: %v", existingCluster.KindClusterName, err)
+						return
+					}
+					
+					namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
+					if err := namespaceManager.CreateNamespace(ctx, clusterName, existingCluster.Region); err != nil {
+						log.Printf("Failed to create namespace for %s: %v", clusterName, err)
+						return
+					}
+					log.Printf("Successfully recreated kind cluster %s for ECS cluster %s", existingCluster.KindClusterName, clusterName)
+				}
+			}()
 			
 			// Build response with existing cluster
 			response := &generated.CreateClusterResponse{
@@ -237,10 +265,17 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 			return
 		}
 		
-		// Create kind cluster using the generated kind cluster name
-		if err := s.kindManager.CreateCluster(ctx, cluster.KindClusterName); err != nil {
-			log.Printf("Failed to create kind cluster %s for ECS cluster %s: %v", cluster.KindClusterName, clusterName, err)
-			return
+		// Check if kind cluster already exists
+		// First, try to get kubeconfig for the cluster - if it succeeds, cluster exists
+		if _, err := s.kindManager.GetKubeClient(cluster.KindClusterName); err != nil {
+			// Cluster doesn't exist, create it
+			log.Printf("Kind cluster %s doesn't exist, creating...", cluster.KindClusterName)
+			if err := s.kindManager.CreateCluster(ctx, cluster.KindClusterName); err != nil {
+				log.Printf("Failed to create kind cluster %s for ECS cluster %s: %v", cluster.KindClusterName, clusterName, err)
+				return
+			}
+		} else {
+			log.Printf("Reusing existing kind cluster %s for ECS cluster %s", cluster.KindClusterName, clusterName)
 		}
 		
 		// Get Kubernetes client
