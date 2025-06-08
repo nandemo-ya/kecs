@@ -190,4 +190,37 @@ cd docs-site && npm run docs:build
 - **Storage**: DuckDB integration for persistence
 - **Kubernetes**: Task converter with secret management
 - **Web UI**: Dashboard, detail views, WebSocket support
+- **MCP Server**: TypeScript-based Model Context Protocol server for AI assistant integration
 - **In Progress**: Full Kubernetes task lifecycle management
+
+## MCP Server Development
+
+KECS includes a Model Context Protocol (MCP) server for AI assistant integration:
+
+### MCP Server Overview
+The MCP server enables AI assistants like Claude to interact with KECS through natural language:
+- Located in `mcp-server/` directory
+- Built with TypeScript and the official MCP SDK
+- Provides tools for all ECS operations (clusters, services, tasks, task definitions)
+- Supports Claude Desktop and Claude Code (VS Code) integration
+
+### MCP Server Development
+```bash
+# Install dependencies
+cd mcp-server
+npm install
+
+# Development mode with hot-reloading
+npm run dev
+
+# Build for production
+npm run build
+
+# Run tests
+npm test
+```
+
+### MCP Server Configuration
+- **Claude Desktop**: Configure in `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Claude Code**: Configure in `~/Library/Application Support/Claude/claude_code_config.json`
+- Documentation available in `mcp-server/docs/` and `docs-site/docs/mcp-server/`

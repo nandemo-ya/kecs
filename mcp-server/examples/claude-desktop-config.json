@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "kecs": {
+      "command": "node",
+      "args": ["/path/to/kecs/mcp-server/dist/index.js"],
+      "env": {
+        "KECS_API_URL": "http://localhost:8080",
+        "LOG_LEVEL": "info"
+      }
+    },
+    "kecs-with-auth": {
+      "command": "node",
+      "args": ["/path/to/kecs/mcp-server/dist/index.js"],
+      "env": {
+        "KECS_API_URL": "https://kecs.example.com",
+        "KECS_API_TOKEN": "your-auth-token",
+        "LOG_LEVEL": "info"
+      }
+    },
+    "kecs-development": {
+      "command": "npm",
+      "args": ["run", "dev"],
+      "cwd": "/path/to/kecs/mcp-server",
+      "env": {
+        "KECS_API_URL": "http://localhost:8080",
+        "LOG_LEVEL": "debug",
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}
