@@ -29,7 +29,7 @@
    docker build -t kecs:test .
    ```
 
-2. Install AWS CLI:
+2. Install AWS CLI (optional - only needed for future phases):
    ```bash
    # macOS
    brew install awscli
@@ -39,6 +39,8 @@
    unzip awscliv2.zip
    sudo ./aws/install
    ```
+
+Note: Phase 1 tests use curl directly, but AWS CLI will be needed for future test phases.
 
 ### Run Tests
 ```bash
