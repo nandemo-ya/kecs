@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Production Dockerfile with embedded Web UI
 
 # Stage 1: Build Web UI
@@ -11,13 +12,7 @@ RUN npm ci --only=production
 COPY web-ui/ ./
 RUN npm run build
 
-# Stage 2: Build Go dependencies cache
-FROM --platform=$BUILDPLATFORM golang:1.24.3 AS go-deps
-WORKDIR /app
-COPY controlplane/go.mod controlplane/go.sum ./
-RUN go mod download && go mod verify
-
-# Stage 3: Build the Go application with embedded Web UI
+# Stage 2: Build the Go application with embedded Web UI
 FROM --platform=$BUILDPLATFORM golang:1.24.3 AS go-builder
 WORKDIR /app
 
@@ -25,21 +20,19 @@ ARG TARGETOS=linux
 ARG TARGETARCH
 ARG VERSION=dev
 
-# Install cross-compilers
-RUN apt-get update && \
-    if [ "$TARGETARCH" = "arm64" ]; then \
-        apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu; \
-    elif [ "$TARGETARCH" = "amd64" ]; then \
-        apt-get install -y gcc-x86-64-linux-gnu g++-x86-64-linux-gnu; \
-    fi && \
-    rm -rf /var/lib/apt/lists/*
+# Install cross-compilers with cache
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
+    case "$TARGETARCH" in \
+        arm64) apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu ;; \
+        amd64) apt-get install -y gcc-x86-64-linux-gnu g++-x86-64-linux-gnu ;; \
+    esac
 
-# Copy dependencies from cache
-COPY --from=go-deps /go/pkg /go/pkg
-
-# Copy go.mod and go.sum
+# Copy go mod files for dependency caching
 COPY controlplane/go.mod controlplane/go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download && go mod verify
 
 # Copy Web UI build artifacts
 COPY --from=webui-builder /app/build ./internal/controlplane/api/webui_dist/
@@ -48,27 +41,20 @@ COPY --from=webui-builder /app/build ./internal/controlplane/api/webui_dist/
 COPY controlplane/cmd/ ./cmd/
 COPY controlplane/internal/ ./internal/
 
-# Build with embedded Web UI
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        export CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++; \
-    elif [ "$TARGETARCH" = "amd64" ]; then \
-        export CC=x86_64-linux-gnu-gcc CXX=x86_64-linux-gnu-g++; \
-    fi && \
+# Build with embedded Web UI using cache mount
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    case "$TARGETARCH" in \
+        arm64) export CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ ;; \
+        amd64) export CC=x86_64-linux-gnu-gcc CXX=x86_64-linux-gnu-g++ ;; \
+    esac && \
     CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -tags embed_webui \
     -ldflags="-s -w -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version=${VERSION}" \
     -o controlplane ./cmd/controlplane
 
-# Stage 4: Runtime base
-FROM debian:bookworm-slim AS runtime-base
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd -u 65532 -m nonroot
-
-# Stage 5: Final production image
-FROM runtime-base
+# Stage 3: Final production image (distroless)
+FROM gcr.io/distroless/base-debian12:nonroot
 
 # Copy binary
 COPY --from=go-builder /app/controlplane /controlplane
@@ -79,12 +65,6 @@ LABEL org.opencontainers.image.title="KECS Control Plane" \
       org.opencontainers.image.vendor="KECS Project" \
       org.opencontainers.image.licenses="Apache-2.0"
 
-# Create necessary directories
-RUN mkdir -p /data && chown nonroot:nonroot /data
-
-# Switch to non-root user
-USER nonroot
-
 # Environment variables
 ENV PORT=8080 \
     ADMIN_PORT=8081 \
@@ -92,15 +72,13 @@ ENV PORT=8080 \
     KECS_LOG_LEVEL=info \
     KECS_DATA_DIR=/data
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${ADMIN_PORT}/health || exit 1
-
 # Expose ports
 EXPOSE 8080 8081
 
-# Volume for persistent data
-VOLUME ["/data"]
+# Note: distroless doesn't support:
+# - Health check with curl (no shell/curl in distroless)
+# - Creating directories at runtime
+# - Volume declaration (handled by orchestrator)
 
 # Entry point
 ENTRYPOINT ["/controlplane"]
