@@ -49,7 +49,7 @@ clean:
 
 # Build KECS docker image for testing
 docker-build:
-	cd ../../controlplane && docker build -t kecs:test .
+	cd ../../controlplane && docker build -f Dockerfile.test -t kecs:test .
 
 # Run specific test
 test-one:

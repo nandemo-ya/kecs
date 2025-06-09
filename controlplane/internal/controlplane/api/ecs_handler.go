@@ -60,6 +60,7 @@ func (s *Server) handleECSRequest(w http.ResponseWriter, r *http.Request) {
 	case "ListTasks":
 		s.handleListTasksECS(w, body)
 	case "RegisterTaskDefinition":
+		fmt.Printf("DEBUG: Routing to handleECSRegisterTaskDefinition\n")
 		s.handleECSRegisterTaskDefinition(w, body)
 	case "DescribeTaskDefinition":
 		s.handleECSDescribeTaskDefinition(w, body)

@@ -34,12 +34,13 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w" -o controlplane ./cmd/controlplane
 
-# Stage 3: Final image (distroless)
-FROM gcr.io/distroless/base-debian12:nonroot
+# Stage 3: Final image - use distroless/cc for CGO dependencies
+FROM gcr.io/distroless/cc-debian12:nonroot
 COPY --from=builder /app/controlplane /controlplane
 
 ENV PORT=8080
 ENV ADMIN_PORT=8081
 
 EXPOSE 8080 8081
+
 ENTRYPOINT ["/controlplane", "server"]

@@ -59,8 +59,14 @@ func NewServer(port int, kubeconfig string, storage storage.Storage) *Server {
 		accountID:    "123456789012",   // Default account ID
 		ecsService:   generated.NewECSServiceWithStorage(storage),
 		storage:      storage,
-		kindManager:  kubernetes.NewKindManager(),
 		webSocketHub: NewWebSocketHubWithConfig(wsConfig),
+	}
+	
+	// Initialize kindManager only if not in test mode
+	if os.Getenv("KECS_TEST_MODE") != "true" {
+		s.kindManager = kubernetes.NewKindManager()
+	} else {
+		log.Println("Running in test mode - Kubernetes operations will be simulated")
 	}
 
 	// Initialize task manager

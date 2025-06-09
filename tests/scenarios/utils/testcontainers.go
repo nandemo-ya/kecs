@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -22,17 +23,39 @@ type KECSContainer struct {
 func StartKECS(t TestingT) *KECSContainer {
 	ctx := context.Background()
 
+	// Check if running in test mode
+	testMode := getEnvOrDefault("KECS_TEST_MODE", "false")
+	disableKind := "false"
+	if testMode == "true" {
+		disableKind = "true" // Disable Kind cluster in test mode
+	}
+	
+	// Debug: Print environment variable
+	fmt.Printf("DEBUG: KECS_TEST_MODE from environment: %s\n", testMode)
+
 	// Container request configuration
 	req := testcontainers.ContainerRequest{
 		Image:        getEnvOrDefault("KECS_IMAGE", "kecs:test"),
 		ExposedPorts: []string{"8080/tcp", "8081/tcp"},
 		Env: map[string]string{
 			"LOG_LEVEL":                 getEnvOrDefault("KECS_LOG_LEVEL", "info"),
-			"KECS_DISABLE_KIND_CLUSTER": "false", // Enable kind cluster creation
+			"KECS_DISABLE_KIND_CLUSTER": disableKind,
+			"KECS_TEST_MODE":            testMode,
 		},
 		WaitingFor: wait.ForHTTP("/health").
 			WithPort("8081/tcp").
-			WithStartupTimeout(30*time.Second),
+			WithStartupTimeout(60*time.Second),
+	}
+	
+	// Debug: Print environment being set
+	fmt.Printf("DEBUG: Setting container env KECS_TEST_MODE=%s\n", testMode)
+	
+	// Only bind Docker socket if not in test mode
+	if testMode != "true" {
+		req.HostConfigModifier = func(hc *container.HostConfig) {
+			hc.Binds = []string{"/var/run/docker.sock:/var/run/docker.sock"}
+		}
+		req.User = "root" // Run as root to access Docker socket
 	}
 
 	// Start container
@@ -66,7 +89,13 @@ func StartKECS(t TestingT) *KECSContainer {
 	endpoint := fmt.Sprintf("http://%s:%s", apiHost, apiPort.Port())
 
 	// Wait a bit for KECS to be fully ready
-	time.Sleep(5 * time.Second)
+	if testMode != "true" {
+		// Wait for Kind cluster creation
+		time.Sleep(10 * time.Second)
+	} else {
+		// Shorter wait in test mode
+		time.Sleep(2 * time.Second)
+	}
 
 	return &KECSContainer{
 		container: container,
@@ -94,7 +123,8 @@ func (k *KECSContainer) GetLogs() (string, error) {
 		return "", fmt.Errorf("failed to get logs: %w", err)
 	}
 	
-	buf := make([]byte, 10000)
+	// Read all available logs
+	buf := make([]byte, 100000)
 	n, _ := logs.Read(buf)
 	return string(buf[:n]), nil
 }
