@@ -386,6 +386,42 @@ func (c *ECSClient) DeleteService(cluster, service string) (map[string]interface
 	return result, nil
 }
 
+// DescribeService describes an ECS service
+func (c *ECSClient) DescribeService(cluster, service string) (map[string]interface{}, error) {
+	// Use curl directly
+	payload := fmt.Sprintf(`{"cluster": "%s", "services": ["%s"]}`, cluster, service)
+	cmd := exec.Command("curl", "-s", "-X", "POST",
+		fmt.Sprintf("%s/v1/DescribeServices", c.endpoint),
+		"-H", "Content-Type: application/x-amz-json-1.1",
+		"-H", "X-Amz-Target: AmazonEC2ContainerServiceV20141113.DescribeServices",
+		"-d", payload,
+	)
+	
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe service: %w\nOutput: %s", err, output)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w\nOutput: %s", err, output)
+	}
+
+	// Check for errors
+	if errMsg, ok := result["__type"]; ok {
+		return nil, fmt.Errorf("API error: %v - %v", errMsg, result["message"])
+	}
+
+	// Extract the first service
+	if services, ok := result["services"].([]interface{}); ok && len(services) > 0 {
+		return map[string]interface{}{
+			"service": services[0],
+		}, nil
+	}
+
+	return nil, fmt.Errorf("service not found: %s", service)
+}
+
 // DeleteServiceForce force deletes an ECS service
 func (c *ECSClient) DeleteServiceForce(cluster, service string) (map[string]interface{}, error) {
 	// Use curl directly
