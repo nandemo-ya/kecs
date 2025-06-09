@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -364,19 +365,19 @@ type DeleteTaskDefinitionsResponse struct {
 
 // handleECSRegisterTaskDefinition handles the RegisterTaskDefinition operation
 func (s *Server) handleECSRegisterTaskDefinition(w http.ResponseWriter, body []byte) {
-	fmt.Printf("RegisterTaskDefinition called with body: %s\n", string(body))
-	
 	// Parse body as a generic map to handle generated type limitations
 	var requestData map[string]interface{}
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &requestData); err != nil {
-			fmt.Printf("Failed to unmarshal request: %v\n", err)
-			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			errorResponse := map[string]interface{}{
+				"__type": "InvalidParameterException",
+				"message": "Invalid request format",
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(errorResponse)
 			return
 		}
 	}
-
-	fmt.Printf("Parsed request data: %+v\n", requestData)
 
 	if s.storage == nil {
 		w.WriteHeader(http.StatusOK)
@@ -386,26 +387,97 @@ func (s *Server) handleECSRegisterTaskDefinition(w http.ResponseWriter, body []b
 
 	ctx := context.Background()
 
+	// Validate required fields
+	if family, ok := requestData["family"].(string); !ok || family == "" {
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": "Invalid request: Missing required field 'family'",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
+		return
+	}
+
+	if containerDefs, ok := requestData["containerDefinitions"].([]interface{}); !ok || len(containerDefs) == 0 {
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": "Invalid request: Missing required field 'containerDefinitions'",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
+		return
+	}
+
+	// Validate container definitions
+	containerDefs := requestData["containerDefinitions"].([]interface{})
+	for _, containerDefInterface := range containerDefs {
+		containerDef, ok := containerDefInterface.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		
+		// Validate memory if specified
+		if memoryInterface, ok := containerDef["memory"]; ok {
+			var memory int
+			switch v := memoryInterface.(type) {
+			case float64:
+				memory = int(v)
+			case int:
+				memory = v
+			default:
+				errorResponse := map[string]interface{}{
+					"__type": "InvalidParameterException",
+					"message": "Invalid memory value",
+				}
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(errorResponse)
+				return
+			}
+			
+			if memory <= 0 {
+				errorResponse := map[string]interface{}{
+					"__type": "InvalidParameterException",
+					"message": "Container memory must be greater than 0",
+				}
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(errorResponse)
+				return
+			}
+		}
+	}
+
 	// Manually call storage service with converted data
 	storageTaskDef, err := s.convertMapToStorageTaskDefinition(requestData)
 	if err != nil {
-		fmt.Printf("Failed to convert request: %v\n", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
 	registered, err := s.storage.TaskDefinitionStore().Register(ctx, storageTaskDef)
 	if err != nil {
-		fmt.Printf("RegisterTaskDefinition error: %v\n", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorResponse := map[string]interface{}{
+			"__type": "InternalServerErrorException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
 	// Convert back to API format
 	apiTaskDef, err := s.convertFromStorageTaskDefinitionToMap(registered)
 	if err != nil {
-		fmt.Printf("Failed to convert response: %v\n", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorResponse := map[string]interface{}{
+			"__type": "InternalServerErrorException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -417,8 +489,6 @@ func (s *Server) handleECSRegisterTaskDefinition(w http.ResponseWriter, body []b
 		responseMap["tags"] = tags
 	}
 
-	fmt.Printf("RegisterTaskDefinition response: %+v\n", responseMap)
-
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(responseMap)
 }
@@ -426,19 +496,21 @@ func (s *Server) handleECSRegisterTaskDefinition(w http.ResponseWriter, body []b
 
 // handleECSDescribeTaskDefinition handles the DescribeTaskDefinition operation
 func (s *Server) handleECSDescribeTaskDefinition(w http.ResponseWriter, body []byte) {
-	fmt.Printf("DescribeTaskDefinition called with body: %s\n", string(body))
 	
 	// Parse body as a generic map
 	var requestData map[string]interface{}
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &requestData); err != nil {
-			fmt.Printf("Failed to unmarshal request: %v\n", err)
-			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			errorResponse := map[string]interface{}{
+				"__type": "InvalidParameterException",
+				"message": "Invalid request format",
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(errorResponse)
 			return
 		}
 	}
 
-	fmt.Printf("Parsed request data: %+v\n", requestData)
 
 	if s.storage == nil {
 		w.WriteHeader(http.StatusOK)
@@ -455,15 +527,24 @@ func (s *Server) handleECSDescribeTaskDefinition(w http.ResponseWriter, body []b
 	}
 
 	if taskDefArn == "" {
-		http.Error(w, "taskDefinition parameter is required", http.StatusBadRequest)
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": "taskDefinition parameter is required",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
 	// Parse the ARN to extract family and revision
 	family, revision, err := s.parseTaskDefinitionIdentifier(taskDefArn)
 	if err != nil {
-		fmt.Printf("Failed to parse task definition identifier: %v\n", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -477,16 +558,24 @@ func (s *Server) handleECSDescribeTaskDefinition(w http.ResponseWriter, body []b
 	}
 
 	if err != nil {
-		fmt.Printf("TaskDefinition not found: %v\n", err)
-		http.Error(w, "TaskDefinition not found", http.StatusNotFound)
+		errorResponse := map[string]interface{}{
+			"__type": "ClientException",
+			"message": "TaskDefinition not found",
+		}
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
 	// Convert back to API format
 	apiTaskDef, err := s.convertFromStorageTaskDefinitionToMap(taskDef)
 	if err != nil {
-		fmt.Printf("Failed to convert response: %v\n", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorResponse := map[string]interface{}{
+			"__type": "InternalServerErrorException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -509,7 +598,6 @@ func (s *Server) handleECSDescribeTaskDefinition(w http.ResponseWriter, body []b
 		}
 	}
 
-	fmt.Printf("DescribeTaskDefinition response: %+v\n", responseMap)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(responseMap)
@@ -517,19 +605,21 @@ func (s *Server) handleECSDescribeTaskDefinition(w http.ResponseWriter, body []b
 
 // handleECSDeregisterTaskDefinition handles the DeregisterTaskDefinition operation
 func (s *Server) handleECSDeregisterTaskDefinition(w http.ResponseWriter, body []byte) {
-	fmt.Printf("DeregisterTaskDefinition called with body: %s\n", string(body))
 	
 	// Parse body as a generic map
 	var requestData map[string]interface{}
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &requestData); err != nil {
-			fmt.Printf("Failed to unmarshal request: %v\n", err)
-			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			errorResponse := map[string]interface{}{
+				"__type": "InvalidParameterException",
+				"message": "Invalid request format",
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(errorResponse)
 			return
 		}
 	}
 
-	fmt.Printf("Parsed request data: %+v\n", requestData)
 
 	if s.storage == nil {
 		w.WriteHeader(http.StatusOK)
@@ -546,15 +636,24 @@ func (s *Server) handleECSDeregisterTaskDefinition(w http.ResponseWriter, body [
 	}
 
 	if taskDefArn == "" {
-		http.Error(w, "taskDefinition parameter is required", http.StatusBadRequest)
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": "taskDefinition parameter is required",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
 	// Parse the ARN to extract family and revision
 	family, revision, err := s.parseTaskDefinitionIdentifier(taskDefArn)
 	if err != nil {
-		fmt.Printf("Failed to parse task definition identifier: %v\n", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -567,26 +666,36 @@ func (s *Server) handleECSDeregisterTaskDefinition(w http.ResponseWriter, body [
 	}
 
 	if err != nil {
-		fmt.Printf("TaskDefinition not found: %v\n", err)
-		http.Error(w, "TaskDefinition not found", http.StatusNotFound)
+		errorResponse := map[string]interface{}{
+			"__type": "ClientException",
+			"message": "TaskDefinition not found",
+		}
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
 	// Only call deregister, don't create new objects
-	fmt.Printf("About to deregister: family=%s, revision=%d\n", taskDef.Family, taskDef.Revision)
 	err = s.storage.TaskDefinitionStore().Deregister(ctx, taskDef.Family, taskDef.Revision)
 	if err != nil {
-		fmt.Printf("DeregisterTaskDefinition error: %v\n", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorResponse := map[string]interface{}{
+			"__type": "InternalServerErrorException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
-	fmt.Printf("Deregistration successful for %s:%d\n", taskDef.Family, taskDef.Revision)
 
 	// Convert to API format using the original task definition and update status manually
 	apiTaskDef, err := s.convertFromStorageTaskDefinitionToMap(taskDef)
 	if err != nil {
-		fmt.Printf("Failed to convert response: %v\n", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorResponse := map[string]interface{}{
+			"__type": "InternalServerErrorException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -598,7 +707,6 @@ func (s *Server) handleECSDeregisterTaskDefinition(w http.ResponseWriter, body [
 		"taskDefinition": apiTaskDef,
 	}
 
-	fmt.Printf("DeregisterTaskDefinition response: %+v\n", responseMap)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(responseMap)
@@ -606,19 +714,21 @@ func (s *Server) handleECSDeregisterTaskDefinition(w http.ResponseWriter, body [
 
 // handleECSDeleteTaskDefinitions handles the DeleteTaskDefinitions operation
 func (s *Server) handleECSDeleteTaskDefinitions(w http.ResponseWriter, body []byte) {
-	fmt.Printf("DeleteTaskDefinitions called with body: %s\n", string(body))
 	
 	// Parse body as a generic map
 	var requestData map[string]interface{}
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &requestData); err != nil {
-			fmt.Printf("Failed to unmarshal request: %v\n", err)
-			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			errorResponse := map[string]interface{}{
+				"__type": "InvalidParameterException",
+				"message": "Invalid request format",
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(errorResponse)
 			return
 		}
 	}
 
-	fmt.Printf("Parsed request data: %+v\n", requestData)
 
 	if s.storage == nil {
 		w.WriteHeader(http.StatusOK)
@@ -642,7 +752,12 @@ func (s *Server) handleECSDeleteTaskDefinitions(w http.ResponseWriter, body []by
 	}
 
 	if len(taskDefinitions) == 0 {
-		http.Error(w, "taskDefinitions parameter is required", http.StatusBadRequest)
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": "taskDefinitions parameter is required",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -712,7 +827,6 @@ func (s *Server) handleECSDeleteTaskDefinitions(w http.ResponseWriter, body []by
 		"failures":        failures,
 	}
 
-	fmt.Printf("DeleteTaskDefinitions response: %+v\n", responseMap)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(responseMap)
@@ -720,19 +834,21 @@ func (s *Server) handleECSDeleteTaskDefinitions(w http.ResponseWriter, body []by
 
 // handleECSListTaskDefinitions handles the ListTaskDefinitions operation
 func (s *Server) handleECSListTaskDefinitions(w http.ResponseWriter, body []byte) {
-	fmt.Printf("ListTaskDefinitions called with body: %s\n", string(body))
 	
 	// Parse body as a generic map
 	var requestData map[string]interface{}
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &requestData); err != nil {
-			fmt.Printf("Failed to unmarshal request: %v\n", err)
-			http.Error(w, "Invalid request format", http.StatusBadRequest)
+			errorResponse := map[string]interface{}{
+				"__type": "InvalidParameterException",
+				"message": "Invalid request format",
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(errorResponse)
 			return
 		}
 	}
 
-	fmt.Printf("Parsed request data: %+v\n", requestData)
 
 	if s.storage == nil {
 		w.WriteHeader(http.StatusOK)
@@ -767,8 +883,12 @@ func (s *Server) handleECSListTaskDefinitions(w http.ResponseWriter, body []byte
 
 	families, newNextToken, err := s.storage.TaskDefinitionStore().ListFamilies(ctx, familyPrefix, status, limit, nextToken)
 	if err != nil {
-		fmt.Printf("Storage error: %v\n", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorResponse := map[string]interface{}{
+			"__type": "InternalServerErrorException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -791,13 +911,26 @@ func (s *Server) handleECSListTaskDefinitions(w http.ResponseWriter, body []byte
 		responseMap["nextToken"] = newNextToken
 	}
 
-	fmt.Printf("ListTaskDefinitions response: %+v\n", responseMap)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(responseMap)
 }
 
 // Conversion helper functions
+
+// generateUniqueID generates a unique ID for task definitions
+func generateUniqueID() string {
+	// Use UUID-like approach for better uniqueness
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		// Fallback to timestamp with microseconds if random fails
+		return fmt.Sprintf("td-%d-%d", time.Now().UnixNano(), time.Now().Nanosecond())
+	}
+	// Format as UUID-like string
+	return fmt.Sprintf("td-%x-%x-%x-%x-%x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
 
 // convertMapToStorageTaskDefinition converts a map to storage.TaskDefinition
 func (s *Server) convertMapToStorageTaskDefinition(requestData map[string]interface{}) (*storage.TaskDefinition, error) {
@@ -866,7 +999,7 @@ func (s *Server) convertMapToStorageTaskDefinition(requestData map[string]interf
 	}
 
 	return &storage.TaskDefinition{
-		ID:                       fmt.Sprintf("td-%d", time.Now().UnixNano()),
+		ID:                       generateUniqueID(),
 		Family:                   family,
 		TaskRoleARN:              taskRoleArn,
 		ExecutionRoleARN:         executionRoleArn,
@@ -956,6 +1089,99 @@ func (s *Server) convertFromStorageTaskDefinitionToMap(stored *storage.TaskDefin
 	}
 
 	return taskDef, nil
+}
+
+// ListTaskDefinitionFamiliesRequest represents the request to list task definition families
+type ListTaskDefinitionFamiliesRequest struct {
+	FamilyPrefix string `json:"familyPrefix,omitempty"`
+	Status       string `json:"status,omitempty"`
+	MaxResults   int    `json:"maxResults,omitempty"`
+	NextToken    string `json:"nextToken,omitempty"`
+}
+
+// ListTaskDefinitionFamiliesResponse represents the response from listing task definition families
+type ListTaskDefinitionFamiliesResponse struct {
+	Families  []string `json:"families"`
+	NextToken string   `json:"nextToken,omitempty"`
+}
+
+// handleECSListTaskDefinitionFamilies handles the ListTaskDefinitionFamilies operation
+func (s *Server) handleECSListTaskDefinitionFamilies(w http.ResponseWriter, body []byte) {
+	
+	// Parse body as a generic map
+	var requestData map[string]interface{}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &requestData); err != nil {
+			errorResponse := map[string]interface{}{
+				"__type": "InvalidParameterException",
+				"message": "Invalid request format",
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(errorResponse)
+			return
+		}
+	}
+
+
+	if s.storage == nil {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"families": []string{},
+		})
+		return
+	}
+
+	ctx := context.Background()
+
+	// Extract parameters from request
+	familyPrefix := ""
+	if fp, ok := requestData["familyPrefix"].(string); ok {
+		familyPrefix = fp
+	}
+
+	status := ""
+	if st, ok := requestData["status"].(string); ok {
+		status = st
+	}
+
+	limit := 0
+	if mr, ok := requestData["maxResults"].(float64); ok {
+		limit = int(mr)
+	}
+
+	nextToken := ""
+	if nt, ok := requestData["nextToken"].(string); ok {
+		nextToken = nt
+	}
+
+	families, newNextToken, err := s.storage.TaskDefinitionStore().ListFamilies(ctx, familyPrefix, status, limit, nextToken)
+	if err != nil {
+		errorResponse := map[string]interface{}{
+			"__type": "InternalServerErrorException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
+		return
+	}
+
+	// Extract family names
+	familyNames := make([]string, 0, len(families))
+	for _, family := range families {
+		familyNames = append(familyNames, family.Family)
+	}
+
+	responseMap := map[string]interface{}{
+		"families": familyNames,
+	}
+	
+	if newNextToken != "" {
+		responseMap["nextToken"] = newNextToken
+	}
+
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(responseMap)
 }
 
 // parseTaskDefinitionIdentifier parses a task definition identifier (ARN, family, or family:revision)

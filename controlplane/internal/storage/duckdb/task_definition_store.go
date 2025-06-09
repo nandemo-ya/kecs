@@ -237,12 +237,55 @@ func (s *taskDefinitionStore) ListRevisions(ctx context.Context, family string, 
 
 // Deregister marks a task definition revision as INACTIVE
 func (s *taskDefinitionStore) Deregister(ctx context.Context, family string, revision int) error {
+	// DuckDB has a known issue with UPDATE on tables with primary key constraints
+	// See: https://github.com/duckdb/duckdb/issues/8764
+	// The error happens even when not updating the primary key column
+	
+	// First check if it exists and is active
+	var currentStatus string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT status FROM task_definitions 
+		WHERE family = ? AND revision = ?
+	`, family, revision).Scan(&currentStatus)
+	
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("task definition not found: %s:%d", family, revision)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to check task definition status: %w", err)
+	}
+	
+	if currentStatus == "INACTIVE" {
+		// Already inactive, return success (idempotent)
+		return nil
+	}
+	
+	// Try the UPDATE
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE task_definitions 
 		SET status = 'INACTIVE', deregistered_at = ?
 		WHERE family = ? AND revision = ? AND status = 'ACTIVE'
 	`, time.Now(), family, revision)
+	
 	if err != nil {
+		// Check if this is the known DuckDB constraint error
+		if strings.Contains(err.Error(), "Duplicate key") && strings.Contains(err.Error(), "violates primary key constraint") {
+			// This is the known DuckDB bug - the UPDATE actually succeeded
+			// but DuckDB incorrectly reports a constraint violation
+			// We'll verify the update worked
+			var updatedStatus string
+			err2 := s.db.QueryRowContext(ctx, `
+				SELECT status FROM task_definitions 
+				WHERE family = ? AND revision = ?
+			`, family, revision).Scan(&updatedStatus)
+			
+			if err2 == nil && updatedStatus == "INACTIVE" {
+				// The update actually worked despite the error
+				return nil
+			}
+			// If we can't verify, return the original error
+			return fmt.Errorf("failed to deregister task definition due to DuckDB bug: %w", err)
+		}
 		return fmt.Errorf("failed to deregister task definition: %w", err)
 	}
 
