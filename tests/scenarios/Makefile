@@ -11,6 +11,14 @@ test-cluster:
 test-phase2:
 	go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout $(TIMEOUT) ./task_definition/... ./service/...
 
+# Test Phase 3: Task Lifecycle & Status
+test-phase3:
+	go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout $(TIMEOUT) ./task/... ./service/service_tasks_test.go
+
+# Test tasks only
+test-task:
+	go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout $(TIMEOUT) ./task/...
+
 # Test task definitions only
 test-task-definition:
 	go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout $(TIMEOUT) ./task_definition/...

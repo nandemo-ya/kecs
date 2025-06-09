@@ -474,6 +474,152 @@ func (c *ECSClient) DescribeServices(cluster string, services []string) (map[str
 	return result, nil
 }
 
+// RunTask runs a one-off task using a task definition
+func (c *ECSClient) RunTask(runTaskConfig map[string]interface{}) (map[string]interface{}, error) {
+	// Use curl directly
+	data, err := json.Marshal(runTaskConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal run task config: %w", err)
+	}
+
+	cmd := exec.Command("curl", "-s", "-X", "POST",
+		fmt.Sprintf("%s/v1/RunTask", c.endpoint),
+		"-H", "Content-Type: application/x-amz-json-1.1",
+		"-H", "X-Amz-Target: AmazonEC2ContainerServiceV20141113.RunTask",
+		"-d", string(data),
+	)
+	
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run task: %w\nOutput: %s", err, output)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w\nOutput: %s", err, output)
+	}
+
+	// Check for errors
+	if errMsg, ok := result["__type"]; ok {
+		return nil, fmt.Errorf("API error: %v - %v", errMsg, result["message"])
+	}
+
+	return result, nil
+}
+
+// StopTask stops a running task
+func (c *ECSClient) StopTask(cluster, task string, reason string) (map[string]interface{}, error) {
+	// Use curl directly
+	payload := map[string]interface{}{
+		"cluster": cluster,
+		"task":    task,
+	}
+	if reason != "" {
+		payload["reason"] = reason
+	}
+	
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	cmd := exec.Command("curl", "-s", "-X", "POST",
+		fmt.Sprintf("%s/v1/StopTask", c.endpoint),
+		"-H", "Content-Type: application/x-amz-json-1.1",
+		"-H", "X-Amz-Target: AmazonEC2ContainerServiceV20141113.StopTask",
+		"-d", string(data),
+	)
+	
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to stop task: %w\nOutput: %s", err, output)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w\nOutput: %s", err, output)
+	}
+
+	// Check for errors
+	if errMsg, ok := result["__type"]; ok {
+		return nil, fmt.Errorf("API error: %v - %v", errMsg, result["message"])
+	}
+
+	return result, nil
+}
+
+// DescribeTasks describes one or more tasks
+func (c *ECSClient) DescribeTasks(cluster string, tasks []string) (map[string]interface{}, error) {
+	// Use curl directly
+	tasksJSON, _ := json.Marshal(tasks)
+	payload := fmt.Sprintf(`{"cluster": "%s", "tasks": %s}`, cluster, tasksJSON)
+	cmd := exec.Command("curl", "-s", "-X", "POST",
+		fmt.Sprintf("%s/v1/DescribeTasks", c.endpoint),
+		"-H", "Content-Type: application/x-amz-json-1.1",
+		"-H", "X-Amz-Target: AmazonEC2ContainerServiceV20141113.DescribeTasks",
+		"-d", payload,
+	)
+	
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe tasks: %w\nOutput: %s", err, output)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w\nOutput: %s", err, output)
+	}
+
+	// Check for errors
+	if errMsg, ok := result["__type"]; ok {
+		return nil, fmt.Errorf("API error: %v - %v", errMsg, result["message"])
+	}
+
+	return result, nil
+}
+
+// ListTasks lists tasks in a cluster
+func (c *ECSClient) ListTasks(cluster string, options map[string]interface{}) (map[string]interface{}, error) {
+	// Use curl directly
+	payload := map[string]interface{}{
+		"cluster": cluster,
+	}
+	// Add optional parameters
+	for k, v := range options {
+		payload[k] = v
+	}
+	
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	cmd := exec.Command("curl", "-s", "-X", "POST",
+		fmt.Sprintf("%s/v1/ListTasks", c.endpoint),
+		"-H", "Content-Type: application/x-amz-json-1.1",
+		"-H", "X-Amz-Target: AmazonEC2ContainerServiceV20141113.ListTasks",
+		"-d", string(data),
+	)
+	
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tasks: %w\nOutput: %s", err, output)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w\nOutput: %s", err, output)
+	}
+
+	// Check for errors
+	if errMsg, ok := result["__type"]; ok {
+		return nil, fmt.Errorf("API error: %v - %v", errMsg, result["message"])
+	}
+
+	return result, nil
+}
+
+
 // runCommand executes an AWS ECS CLI command
 func (c *ECSClient) runCommand(args ...string) (string, error) {
 	// Build command arguments

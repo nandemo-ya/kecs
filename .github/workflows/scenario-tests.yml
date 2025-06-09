@@ -75,6 +75,23 @@ jobs:
         env:
           KECS_LOG_LEVEL: info
 
+      - name: Run Phase 3 tests (Task Lifecycle & Status)
+        id: test-phase3
+        if: success() || failure()
+        run: |
+          cd tests/scenarios
+          echo "## Running Phase 3: Task Lifecycle & Status tests ##"
+          go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout 30m \
+            --no-color \
+            --junit-report=junit-phase3.xml \
+            --output-dir=. \
+            ./task/... ./service/service_tasks_test.go | tee test-output-phase3.log
+          
+          # Capture exit code
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        env:
+          KECS_LOG_LEVEL: info
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -99,6 +116,15 @@ jobs:
         with:
           name: Phase 2 - Core Operations Tests
           path: tests/scenarios/junit-phase2.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Test Report - Phase 3
+        uses: dorny/test-reporter@v1
+        if: always() && github.event_name == 'pull_request'
+        with:
+          name: Phase 3 - Task Lifecycle & Status Tests
+          path: tests/scenarios/junit-phase3.xml
           reporter: java-junit
           fail-on-error: false
 
@@ -143,9 +169,10 @@ jobs:
             // Parse outputs from all phases
             const phase1 = parseTestOutput('tests/scenarios/test-output-phase1.log', 'Phase 1: Foundation');
             const phase2 = parseTestOutput('tests/scenarios/test-output-phase2.log', 'Phase 2: Core Operations');
+            const phase3 = parseTestOutput('tests/scenarios/test-output-phase3.log', 'Phase 3: Task Lifecycle & Status');
             
             // Combine results
-            const phases = [phase1, phase2].filter(p => p !== null);
+            const phases = [phase1, phase2, phase3].filter(p => p !== null);
             
             let summary = '## 🧪 Scenario Test Results\n\n';
             
