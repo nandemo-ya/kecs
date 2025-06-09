@@ -7,7 +7,7 @@ import (
 	"log"
 	"path/filepath"
 
-	_ "github.com/marcboeker/go-duckdb" // DuckDB driver
+	_ "github.com/marcboeker/go-duckdb/v2" // DuckDB driver
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
