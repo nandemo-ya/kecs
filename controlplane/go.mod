@@ -5,7 +5,7 @@ go 1.24.3
 require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
-	github.com/marcboeker/go-duckdb v1.8.5
+	github.com/marcboeker/go-duckdb/v2 v2.1.0
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/spf13/cobra v1.9.1
@@ -23,6 +23,12 @@ require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/apache/arrow-go/v18 v18.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/duckdb/duckdb-go-bindings v0.1.13 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.8 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.8 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.8 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.8 // indirect
+	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.8 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
@@ -44,6 +50,8 @@ require (
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
+	github.com/marcboeker/go-duckdb/arrowmapping v0.0.6 // indirect
+	github.com/marcboeker/go-duckdb/mapping v0.0.6 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect

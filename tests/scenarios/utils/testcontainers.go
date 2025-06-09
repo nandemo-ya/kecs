@@ -24,7 +24,7 @@ func StartKECS(t TestingT) *KECSContainer {
 
 	// Container request configuration
 	req := testcontainers.ContainerRequest{
-		Image:        "kecs:test",
+		Image:        getEnvOrDefault("KECS_IMAGE", "kecs:test"),
 		ExposedPorts: []string{"8080/tcp", "8081/tcp"},
 		Env: map[string]string{
 			"LOG_LEVEL":                 getEnvOrDefault("KECS_LOG_LEVEL", "info"),
