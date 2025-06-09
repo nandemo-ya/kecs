@@ -259,7 +259,12 @@ func (s *Server) handleRunTaskECS(w http.ResponseWriter, body []byte) {
 	taskDef, err := s.storage.TaskDefinitionStore().GetByARN(context.Background(), taskDefArn)
 	if err != nil || taskDef == nil {
 		log.Printf("Task definition not found. Error: %v, TaskDef: %v", err, taskDef)
-		http.Error(w, fmt.Sprintf("Task definition not found: %s (searched ARN: %s)", req.TaskDefinition, taskDefArn), http.StatusBadRequest)
+		errorResponse := map[string]interface{}{
+			"__type": "ClientException",
+			"message": fmt.Sprintf("Task definition not found: %s", req.TaskDefinition),
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 

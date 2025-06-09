@@ -1,0 +1,14 @@
+{
+  "family": "busybox-sleep",
+  "networkMode": "bridge",
+  "containerDefinitions": [
+    {
+      "name": "busybox",
+      "image": "busybox:latest",
+      "memory": 128,
+      "cpu": 256,
+      "essential": true,
+      "command": ["sh", "-c", "echo 'Starting sleep task' && sleep 300"]
+    }
+  ]
+}

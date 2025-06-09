@@ -1,0 +1,27 @@
+{
+  "family": "multi-container-app",
+  "networkMode": "bridge",
+  "containerDefinitions": [
+    {
+      "name": "web",
+      "image": "nginx:alpine",
+      "memory": 256,
+      "cpu": 128,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    {
+      "name": "sidecar",
+      "image": "busybox:latest",
+      "memory": 128,
+      "cpu": 64,
+      "essential": false,
+      "command": ["sh", "-c", "while true; do echo 'Sidecar running'; sleep 30; done"]
+    }
+  ]
+}

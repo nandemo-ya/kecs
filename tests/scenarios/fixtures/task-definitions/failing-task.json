@@ -1,0 +1,14 @@
+{
+  "family": "failing-task",
+  "networkMode": "bridge",
+  "containerDefinitions": [
+    {
+      "name": "failing-container",
+      "image": "busybox:latest",
+      "memory": 128,
+      "cpu": 256,
+      "essential": true,
+      "command": ["sh", "-c", "echo 'This task will fail' && exit 1"]
+    }
+  ]
+}

@@ -107,3 +107,26 @@ func (l *TestLogger) Debug(format string, args ...interface{}) {
 func (l *TestLogger) Error(format string, args ...interface{}) {
 	l.t.Logf("[ERROR] "+format, args...)
 }
+
+// InterfaceSliceToStringSlice converts []interface{} to []string
+func InterfaceSliceToStringSlice(slice []interface{}) []string {
+	result := make([]string, len(slice))
+	for i, v := range slice {
+		if str, ok := v.(string); ok {
+			result[i] = str
+		}
+	}
+	return result
+}
+
+// GenerateRandomString generates a random string of specified length
+func GenerateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	result := make([]byte, length)
+	for i := range result {
+		result[i] = charset[time.Now().UnixNano()%int64(len(charset))]
+		// Add some entropy by sleeping a tiny bit
+		time.Sleep(time.Nanosecond)
+	}
+	return string(result)
+}
