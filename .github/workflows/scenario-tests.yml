@@ -8,6 +8,11 @@ on:
       - '.github/workflows/scenario-tests.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
 jobs:
   phase1-foundation:
     runs-on: ubuntu-latest
@@ -38,9 +43,18 @@ jobs:
           docker build -t kecs:test .
 
       - name: Run Phase 1 tests
+        id: test
         run: |
           cd tests/scenarios
-          make test-cluster
+          # Run tests with JUnit output for reporting (no color output for cleaner logs)
+          go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout 30m \
+            --no-color \
+            --junit-report=junit.xml \
+            --output-dir=. \
+            ./cluster/... | tee test-output.log
+          
+          # Capture exit code
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
         env:
           KECS_LOG_LEVEL: info
 
@@ -49,4 +63,85 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results-phase1
-          path: tests/scenarios/results/
+          path: |
+            tests/scenarios/junit.xml
+            tests/scenarios/test-output.log
+
+      - name: Test Report
+        uses: dorny/test-reporter@v1
+        if: always() && github.event_name == 'pull_request'
+        with:
+          name: Scenario Tests Report
+          path: tests/scenarios/junit.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Comment PR with test results
+        uses: actions/github-script@v7
+        if: always() && github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Read test output
+            let testOutput = '';
+            try {
+              testOutput = fs.readFileSync('tests/scenarios/test-output.log', 'utf8');
+              // Remove ANSI escape codes for cleaner output
+              testOutput = testOutput.replace(/\x1b\[[0-9;]*m/g, '');
+            } catch (e) {
+              testOutput = 'Failed to read test output';
+            }
+            
+            // Extract test summary from output
+            const summaryMatch = testOutput.match(/Ran (\d+) of (\d+) Specs in .*/);
+            const passedMatch = testOutput.match(/(\d+) Passed/);
+            const failedMatch = testOutput.match(/(\d+) Failed/);
+            const pendingMatch = testOutput.match(/(\d+) Pending/);
+            const skippedMatch = testOutput.match(/(\d+) Skipped/);
+            
+            let summary = '## 🧪 Scenario Test Results\n\n';
+            
+            if (summaryMatch) {
+              summary += `**Test Summary:**\n`;
+              summary += `- Total Specs: ${summaryMatch[2]}\n`;
+              summary += `- Ran: ${summaryMatch[1]}\n`;
+              if (passedMatch) summary += `- ✅ Passed: ${passedMatch[1]}\n`;
+              if (failedMatch) summary += `- ❌ Failed: ${failedMatch[1]}\n`;
+              if (pendingMatch) summary += `- ⏸️ Pending: ${pendingMatch[1]}\n`;
+              if (skippedMatch) summary += `- ⏭️ Skipped: ${skippedMatch[1]}\n`;
+              
+              summary += '\n';
+              
+              // Add success/failure badge
+              if (failedMatch && failedMatch[1] === '0') {
+                summary += '### ✅ All tests passed!\n\n';
+              } else if (failedMatch && failedMatch[1] !== '0') {
+                summary += '### ❌ Some tests failed\n\n';
+              }
+            }
+            
+            // Add test details section
+            summary += '<details>\n<summary>Test Output Details</summary>\n\n';
+            summary += '```\n';
+            // Get last 50 lines of output for brevity
+            const lines = testOutput.split('\n');
+            const lastLines = lines.slice(-50).join('\n');
+            summary += lastLines;
+            summary += '\n```\n</details>';
+            
+            // Comment on PR
+            try {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: summary
+              });
+              console.log('Successfully posted test results to PR');
+            } catch (error) {
+              console.error('Failed to post comment:', error);
+              // Don't fail the workflow if commenting fails
+            }
