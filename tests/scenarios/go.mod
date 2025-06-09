@@ -1,8 +1,6 @@
 module github.com/nandemo-ya/kecs/tests/scenarios
 
-go 1.23.0
-
-toolchain go1.24.3
+go 1.24.3
 
 tool github.com/onsi/ginkgo/v2/ginkgo
 
