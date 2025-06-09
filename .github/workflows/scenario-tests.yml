@@ -46,8 +46,9 @@ jobs:
         id: test
         run: |
           cd tests/scenarios
-          # Run tests with JUnit output for reporting
+          # Run tests with JUnit output for reporting (no color output for cleaner logs)
           go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout 30m \
+            --no-color \
             --junit-report=junit.xml \
             --output-dir=. \
             ./cluster/... | tee test-output.log
@@ -88,6 +89,8 @@ jobs:
             let testOutput = '';
             try {
               testOutput = fs.readFileSync('tests/scenarios/test-output.log', 'utf8');
+              // Remove ANSI escape codes for cleaner output
+              testOutput = testOutput.replace(/\x1b\[[0-9;]*m/g, '');
             } catch (e) {
               testOutput = 'Failed to read test output';
             }
