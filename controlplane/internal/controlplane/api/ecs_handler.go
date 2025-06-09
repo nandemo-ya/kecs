@@ -117,6 +117,8 @@ func (s *Server) handleECSRequest(w http.ResponseWriter, r *http.Request) {
 		s.handleECSUntagResource(w, body)
 	case "ListTagsForResource":
 		s.handleECSListTagsForResource(w, body)
+	case "ListTaskDefinitionFamilies":
+		s.handleECSListTaskDefinitionFamilies(w, body)
 	default:
 		// Return a basic empty response for unsupported operations
 		s.handleUnsupportedOperation(w, operation)

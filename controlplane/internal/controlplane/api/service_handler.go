@@ -20,7 +20,12 @@ import (
 func (s *Server) handleECSCreateService(w http.ResponseWriter, body []byte) {
 	var req CreateServiceRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": "Invalid request body",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -28,7 +33,12 @@ func (s *Server) handleECSCreateService(w http.ResponseWriter, body []byte) {
 	resp, err := s.CreateServiceWithStorage(ctx, req)
 	if err != nil {
 		log.Printf("Error creating service: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorResponse := map[string]interface{}{
+			"__type": "ServiceException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -41,7 +51,12 @@ func (s *Server) handleECSCreateService(w http.ResponseWriter, body []byte) {
 func (s *Server) handleECSDescribeServices(w http.ResponseWriter, body []byte) {
 	var req DescribeServicesRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": "Invalid request body",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -49,7 +64,12 @@ func (s *Server) handleECSDescribeServices(w http.ResponseWriter, body []byte) {
 	resp, err := s.DescribeServicesWithStorage(ctx, req)
 	if err != nil {
 		log.Printf("Error describing services: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorResponse := map[string]interface{}{
+			"__type": "ServiceException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -62,7 +82,12 @@ func (s *Server) handleECSDescribeServices(w http.ResponseWriter, body []byte) {
 func (s *Server) handleECSListServices(w http.ResponseWriter, body []byte) {
 	var req ListServicesRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": "Invalid request body",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -70,7 +95,12 @@ func (s *Server) handleECSListServices(w http.ResponseWriter, body []byte) {
 	resp, err := s.ListServicesWithStorage(ctx, req)
 	if err != nil {
 		log.Printf("Error listing services: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorResponse := map[string]interface{}{
+			"__type": "ServiceException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -83,7 +113,12 @@ func (s *Server) handleECSListServices(w http.ResponseWriter, body []byte) {
 func (s *Server) handleECSUpdateService(w http.ResponseWriter, body []byte) {
 	var req UpdateServiceRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": "Invalid request body",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -91,7 +126,12 @@ func (s *Server) handleECSUpdateService(w http.ResponseWriter, body []byte) {
 	resp, err := s.UpdateServiceWithStorage(ctx, req)
 	if err != nil {
 		log.Printf("Error updating service: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorResponse := map[string]interface{}{
+			"__type": "ServiceException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -104,7 +144,12 @@ func (s *Server) handleECSUpdateService(w http.ResponseWriter, body []byte) {
 func (s *Server) handleECSDeleteService(w http.ResponseWriter, body []byte) {
 	var req DeleteServiceRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		errorResponse := map[string]interface{}{
+			"__type": "InvalidParameterException",
+			"message": "Invalid request body",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
@@ -112,7 +157,12 @@ func (s *Server) handleECSDeleteService(w http.ResponseWriter, body []byte) {
 	resp, err := s.DeleteServiceWithStorage(ctx, req)
 	if err != nil {
 		log.Printf("Error deleting service: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errorResponse := map[string]interface{}{
+			"__type": "ServiceException",
+			"message": err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
 
