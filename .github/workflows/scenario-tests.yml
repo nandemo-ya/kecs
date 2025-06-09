@@ -1,4 +1,4 @@
-name: Scenario Tests - Phase 1
+name: Scenario Tests
 
 on:
   pull_request:
@@ -14,7 +14,7 @@ permissions:
   checks: write
 
 jobs:
-  phase1-foundation:
+  test-phases:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,16 +42,33 @@ jobs:
           cd controlplane
           docker build -t kecs:test .
 
-      - name: Run Phase 1 tests
-        id: test
+      - name: Run Phase 1 tests (Foundation)
+        id: test-phase1
         run: |
           cd tests/scenarios
-          # Run tests with JUnit output for reporting (no color output for cleaner logs)
+          echo "## Running Phase 1: Foundation tests ##"
           go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout 30m \
             --no-color \
-            --junit-report=junit.xml \
+            --junit-report=junit-phase1.xml \
             --output-dir=. \
-            ./cluster/... | tee test-output.log
+            ./cluster/... | tee test-output-phase1.log
+          
+          # Capture exit code
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        env:
+          KECS_LOG_LEVEL: info
+
+      - name: Run Phase 2 tests (Core Operations)
+        id: test-phase2
+        if: success() || failure()
+        run: |
+          cd tests/scenarios
+          echo "## Running Phase 2: Core Operations tests ##"
+          go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout 30m \
+            --no-color \
+            --junit-report=junit-phase2.xml \
+            --output-dir=. \
+            ./task_definition/... ./service/... | tee test-output-phase2.log
           
           # Capture exit code
           echo "exit_code=$?" >> $GITHUB_OUTPUT
@@ -62,17 +79,26 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-phase1
+          name: test-results-all-phases
           path: |
-            tests/scenarios/junit.xml
-            tests/scenarios/test-output.log
+            tests/scenarios/junit-*.xml
+            tests/scenarios/test-output-*.log
 
-      - name: Test Report
+      - name: Test Report - Phase 1
         uses: dorny/test-reporter@v1
         if: always() && github.event_name == 'pull_request'
         with:
-          name: Scenario Tests Report
-          path: tests/scenarios/junit.xml
+          name: Phase 1 - Foundation Tests
+          path: tests/scenarios/junit-phase1.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Test Report - Phase 2
+        uses: dorny/test-reporter@v1
+        if: always() && github.event_name == 'pull_request'
+        with:
+          name: Phase 2 - Core Operations Tests
+          path: tests/scenarios/junit-phase2.xml
           reporter: java-junit
           fail-on-error: false
 
@@ -85,52 +111,83 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             
-            // Read test output
-            let testOutput = '';
-            try {
-              testOutput = fs.readFileSync('tests/scenarios/test-output.log', 'utf8');
-              // Remove ANSI escape codes for cleaner output
-              testOutput = testOutput.replace(/\x1b\[[0-9;]*m/g, '');
-            } catch (e) {
-              testOutput = 'Failed to read test output';
+            // Function to parse test output
+            function parseTestOutput(filename, phaseName) {
+              let testOutput = '';
+              try {
+                testOutput = fs.readFileSync(filename, 'utf8');
+                // Remove ANSI escape codes for cleaner output
+                testOutput = testOutput.replace(/\x1b\[[0-9;]*m/g, '');
+              } catch (e) {
+                return null;
+              }
+              
+              const summaryMatch = testOutput.match(/Ran (\d+) of (\d+) Specs in .*/);
+              const passedMatch = testOutput.match(/(\d+) Passed/);
+              const failedMatch = testOutput.match(/(\d+) Failed/);
+              const pendingMatch = testOutput.match(/(\d+) Pending/);
+              const skippedMatch = testOutput.match(/(\d+) Skipped/);
+              
+              return {
+                phase: phaseName,
+                total: summaryMatch ? parseInt(summaryMatch[2]) : 0,
+                ran: summaryMatch ? parseInt(summaryMatch[1]) : 0,
+                passed: passedMatch ? parseInt(passedMatch[1]) : 0,
+                failed: failedMatch ? parseInt(failedMatch[1]) : 0,
+                pending: pendingMatch ? parseInt(pendingMatch[1]) : 0,
+                skipped: skippedMatch ? parseInt(skippedMatch[1]) : 0,
+                output: testOutput
+              };
             }
             
-            // Extract test summary from output
-            const summaryMatch = testOutput.match(/Ran (\d+) of (\d+) Specs in .*/);
-            const passedMatch = testOutput.match(/(\d+) Passed/);
-            const failedMatch = testOutput.match(/(\d+) Failed/);
-            const pendingMatch = testOutput.match(/(\d+) Pending/);
-            const skippedMatch = testOutput.match(/(\d+) Skipped/);
+            // Parse outputs from all phases
+            const phase1 = parseTestOutput('tests/scenarios/test-output-phase1.log', 'Phase 1: Foundation');
+            const phase2 = parseTestOutput('tests/scenarios/test-output-phase2.log', 'Phase 2: Core Operations');
+            
+            // Combine results
+            const phases = [phase1, phase2].filter(p => p !== null);
             
             let summary = '## 🧪 Scenario Test Results\n\n';
             
-            if (summaryMatch) {
-              summary += `**Test Summary:**\n`;
-              summary += `- Total Specs: ${summaryMatch[2]}\n`;
-              summary += `- Ran: ${summaryMatch[1]}\n`;
-              if (passedMatch) summary += `- ✅ Passed: ${passedMatch[1]}\n`;
-              if (failedMatch) summary += `- ❌ Failed: ${failedMatch[1]}\n`;
-              if (pendingMatch) summary += `- ⏸️ Pending: ${pendingMatch[1]}\n`;
-              if (skippedMatch) summary += `- ⏭️ Skipped: ${skippedMatch[1]}\n`;
-              
-              summary += '\n';
-              
-              // Add success/failure badge
-              if (failedMatch && failedMatch[1] === '0') {
-                summary += '### ✅ All tests passed!\n\n';
-              } else if (failedMatch && failedMatch[1] !== '0') {
-                summary += '### ❌ Some tests failed\n\n';
-              }
+            // Overall summary
+            let totalPassed = 0, totalFailed = 0, totalRan = 0, totalSpecs = 0;
+            phases.forEach(phase => {
+              totalPassed += phase.passed;
+              totalFailed += phase.failed;
+              totalRan += phase.ran;
+              totalSpecs += phase.total;
+            });
+            
+            summary += `### Overall Summary\n`;
+            summary += `- Total Specs: ${totalSpecs}\n`;
+            summary += `- Total Ran: ${totalRan}\n`;
+            summary += `- ✅ Total Passed: ${totalPassed}\n`;
+            summary += `- ❌ Total Failed: ${totalFailed}\n\n`;
+            
+            if (totalFailed === 0 && totalRan > 0) {
+              summary += '### ✅ All tests passed!\n\n';
+            } else if (totalFailed > 0) {
+              summary += '### ❌ Some tests failed\n\n';
             }
             
-            // Add test details section
-            summary += '<details>\n<summary>Test Output Details</summary>\n\n';
-            summary += '```\n';
-            // Get last 50 lines of output for brevity
-            const lines = testOutput.split('\n');
-            const lastLines = lines.slice(-50).join('\n');
-            summary += lastLines;
-            summary += '\n```\n</details>';
+            // Phase-by-phase breakdown
+            summary += '### Phase Results\n\n';
+            phases.forEach(phase => {
+              const status = phase.failed === 0 ? '✅' : '❌';
+              summary += `**${phase.phase}** ${status}\n`;
+              summary += `- Specs: ${phase.total} | Ran: ${phase.ran} | Passed: ${phase.passed} | Failed: ${phase.failed}\n\n`;
+            });
+            
+            // Add test details sections for each phase
+            phases.forEach(phase => {
+              summary += `<details>\n<summary>${phase.phase} - Output Details</summary>\n\n`;
+              summary += '```\n';
+              // Get last 30 lines of output for each phase
+              const lines = phase.output.split('\n');
+              const lastLines = lines.slice(-30).join('\n');
+              summary += lastLines;
+              summary += '\n```\n</details>\n\n';
+            });
             
             // Comment on PR
             try {
