@@ -172,6 +172,14 @@ cd docs-site && npm run docs:build
    - Both controlplane and web-ui unit tests must pass
    - Fix any failing tests before proceeding with PR
 
+4. **Test CI/CD changes locally with act before committing**
+   ```bash
+   # Test GitHub Actions workflow locally
+   act -W .github/workflows/workflow-name.yml -j job-name --container-architecture linux/amd64
+   ```
+   - ALWAYS verify CI changes work locally before pushing
+   - This prevents breaking the CI pipeline for other developers
+
 ### When implementing new ECS API endpoints:
 1. Add type definitions to the appropriate file in `internal/controlplane/api/`
 2. Implement the handler function following existing patterns
