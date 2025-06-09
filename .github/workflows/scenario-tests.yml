@@ -1,0 +1,52 @@
+name: Scenario Tests - Phase 1
+
+on:
+  pull_request:
+    paths:
+      - 'tests/scenarios/**'
+      - 'controlplane/**'
+      - '.github/workflows/scenario-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  phase1-foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: tests/scenarios/go.mod
+
+      - name: Download dependencies
+        run: |
+          cd tests/scenarios
+          go mod download
+          go mod tidy
+
+      - name: Install AWS CLI v2
+        uses: unfor19/install-aws-cli-action@v1
+        with:
+          version: 2
+          verbose: false
+          arch: amd64
+
+      - name: Build KECS Docker image
+        run: |
+          cd controlplane
+          docker build -t kecs:test .
+
+      - name: Run Phase 1 tests
+        run: |
+          cd tests/scenarios
+          make test-cluster
+        env:
+          KECS_LOG_LEVEL: info
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-phase1
+          path: tests/scenarios/results/
