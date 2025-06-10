@@ -210,12 +210,12 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 					"runningTasksCount":                 existingCluster.RunningTasksCount,
 					"pendingTasksCount":                 existingCluster.PendingTasksCount,
 					"activeServicesCount":               existingCluster.ActiveServicesCount,
-					// Add statistics sub-object
-					"statistics": map[string]interface{}{
-						"registeredContainerInstancesCount": existingCluster.RegisteredContainerInstancesCount,
-						"runningTasksCount":                 existingCluster.RunningTasksCount,
-						"pendingTasksCount":                 existingCluster.PendingTasksCount,
-						"activeServicesCount":               existingCluster.ActiveServicesCount,
+					// Add statistics as array of key-value pairs
+					"statistics": []map[string]interface{}{
+						{"name": "registeredContainerInstancesCount", "value": fmt.Sprintf("%d", existingCluster.RegisteredContainerInstancesCount)},
+						{"name": "runningTasksCount", "value": fmt.Sprintf("%d", existingCluster.RunningTasksCount)},
+						{"name": "pendingTasksCount", "value": fmt.Sprintf("%d", existingCluster.PendingTasksCount)},
+						{"name": "activeServicesCount", "value": fmt.Sprintf("%d", existingCluster.ActiveServicesCount)},
 					},
 				},
 			}
@@ -305,12 +305,12 @@ func (s *Server) CreateClusterWithStorage(ctx context.Context, req *generated.Cr
 			"runningTasksCount":                 cluster.RunningTasksCount,
 			"pendingTasksCount":                 cluster.PendingTasksCount,
 			"activeServicesCount":               cluster.ActiveServicesCount,
-			// Add statistics sub-object
-			"statistics": map[string]interface{}{
-				"registeredContainerInstancesCount": cluster.RegisteredContainerInstancesCount,
-				"runningTasksCount":                 cluster.RunningTasksCount,
-				"pendingTasksCount":                 cluster.PendingTasksCount,
-				"activeServicesCount":               cluster.ActiveServicesCount,
+			// Add statistics as array of key-value pairs
+			"statistics": []map[string]interface{}{
+				{"name": "registeredContainerInstancesCount", "value": fmt.Sprintf("%d", cluster.RegisteredContainerInstancesCount)},
+				{"name": "runningTasksCount", "value": fmt.Sprintf("%d", cluster.RunningTasksCount)},
+				{"name": "pendingTasksCount", "value": fmt.Sprintf("%d", cluster.PendingTasksCount)},
+				{"name": "activeServicesCount", "value": fmt.Sprintf("%d", cluster.ActiveServicesCount)},
 			},
 		},
 	}
@@ -547,12 +547,12 @@ func buildDescribeClustersResponse(clusters []*storage.Cluster, failures []map[s
 			"runningTasksCount":                 cluster.RunningTasksCount,
 			"pendingTasksCount":                 cluster.PendingTasksCount,
 			"activeServicesCount":               cluster.ActiveServicesCount,
-			// Add statistics sub-object
-			"statistics": map[string]interface{}{
-				"registeredContainerInstancesCount": cluster.RegisteredContainerInstancesCount,
-				"runningTasksCount":                 cluster.RunningTasksCount,
-				"pendingTasksCount":                 cluster.PendingTasksCount,
-				"activeServicesCount":               cluster.ActiveServicesCount,
+			// Add statistics as array of key-value pairs
+			"statistics": []map[string]interface{}{
+				{"name": "registeredContainerInstancesCount", "value": fmt.Sprintf("%d", cluster.RegisteredContainerInstancesCount)},
+				{"name": "runningTasksCount", "value": fmt.Sprintf("%d", cluster.RunningTasksCount)},
+				{"name": "pendingTasksCount", "value": fmt.Sprintf("%d", cluster.PendingTasksCount)},
+				{"name": "activeServicesCount", "value": fmt.Sprintf("%d", cluster.ActiveServicesCount)},
 			},
 		}
 
