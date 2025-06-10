@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -23,12 +23,9 @@ type KECSContainer struct {
 func StartKECS(t TestingT) *KECSContainer {
 	ctx := context.Background()
 
-	// Check if running in test mode
-	testMode := getEnvOrDefault("KECS_TEST_MODE", "false")
-	disableKind := "false"
-	if testMode == "true" {
-		disableKind = "true" // Disable Kind cluster in test mode
-	}
+	// Check if running in test mode (default to true for tests)
+	testMode := getEnvOrDefault("KECS_TEST_MODE", "true")
+	disableKind := "true" // Always disable Kind cluster in test containers
 	
 	// Debug: Print environment variable
 	fmt.Printf("DEBUG: KECS_TEST_MODE from environment: %s\n", testMode)
@@ -38,7 +35,7 @@ func StartKECS(t TestingT) *KECSContainer {
 		Image:        getEnvOrDefault("KECS_IMAGE", "kecs:test"),
 		ExposedPorts: []string{"8080/tcp", "8081/tcp"},
 		Env: map[string]string{
-			"LOG_LEVEL":                 getEnvOrDefault("KECS_LOG_LEVEL", "info"),
+			"LOG_LEVEL":                 getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
 			"KECS_DISABLE_KIND_CLUSTER": disableKind,
 			"KECS_TEST_MODE":            testMode,
 		},
@@ -49,14 +46,6 @@ func StartKECS(t TestingT) *KECSContainer {
 	
 	// Debug: Print environment being set
 	fmt.Printf("DEBUG: Setting container env KECS_TEST_MODE=%s\n", testMode)
-	
-	// Only bind Docker socket if not in test mode
-	if testMode != "true" {
-		req.HostConfigModifier = func(hc *container.HostConfig) {
-			hc.Binds = []string{"/var/run/docker.sock:/var/run/docker.sock"}
-		}
-		req.User = "root" // Run as root to access Docker socket
-	}
 
 	// Start container
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -118,15 +107,23 @@ func (k *KECSContainer) AdminEndpoint() string {
 
 // GetLogs returns the container logs
 func (k *KECSContainer) GetLogs() (string, error) {
-	logs, err := k.container.Logs(k.ctx)
+	// Use docker logs directly to get all logs
+	containerID := k.container.GetContainerID()
+	cmd := exec.Command("docker", "logs", containerID)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("failed to get logs: %w", err)
+		// Fallback to original method
+		logs, err := k.container.Logs(k.ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to get logs: %w", err)
+		}
+		
+		// Read all available logs
+		buf := make([]byte, 100000)
+		n, _ := logs.Read(buf)
+		return string(buf[:n]), nil
 	}
-	
-	// Read all available logs
-	buf := make([]byte, 100000)
-	n, _ := logs.Read(buf)
-	return string(buf[:n]), nil
+	return string(output), nil
 }
 
 // Cleanup terminates the container and cleans up resources

@@ -518,6 +518,9 @@ func (c *ECSClient) RunTask(runTaskConfig map[string]interface{}) (map[string]in
 		return nil, fmt.Errorf("failed to marshal run task config: %w", err)
 	}
 
+	// Debug: log the request payload
+	fmt.Printf("[DEBUG] RunTask request payload: %s\n", string(data))
+
 	cmd := exec.Command("curl", "-s", "-X", "POST",
 		fmt.Sprintf("%s/v1/RunTask", c.endpoint),
 		"-H", "Content-Type: application/x-amz-json-1.1",

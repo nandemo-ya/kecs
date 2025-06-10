@@ -133,10 +133,20 @@ var _ = Describe("RunTask Operations", func() {
 			}
 
 			result, err := client.RunTask(runTaskConfig)
+			if err != nil {
+				// Get container logs for debugging
+				logs, _ := kecs.GetLogs()
+				GinkgoWriter.Printf("KECS Container Logs:\n%s\n", logs)
+			}
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify 3 tasks were created
 			tasks := result["tasks"].([]interface{})
+			if len(tasks) != 3 {
+				// Get container logs for debugging
+				logs, _ := kecs.GetLogs()
+				GinkgoWriter.Printf("Expected 3 tasks but got %d. KECS Container Logs:\n%s\n", len(tasks), logs)
+			}
 			Expect(tasks).To(HaveLen(3))
 
 			// Collect task ARNs
