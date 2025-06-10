@@ -274,16 +274,12 @@ func (s *Server) handleListTasksECS(w http.ResponseWriter, body []byte) {
 		return
 	}
 
-	// TODO: Implement actual task listing logic
-
-	// For now, return a mock response
-	cluster := "default"
-	if req.Cluster != "" {
-		cluster = req.Cluster
-	}
-
-	resp := ListTasksResponse{
-		TaskArns: []string{"arn:aws:ecs:region:account:task/" + cluster + "/task-id"},
+	ctx := context.Background()
+	resp, err := s.ListTasksWithStorage(ctx, req)
+	if err != nil {
+		log.Printf("Error listing tasks: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -622,6 +618,61 @@ func (s *Server) RunTaskWithStorage(ctx context.Context, req RunTaskRequest) (*R
 	}
 
 	return resp, nil
+}
+
+// ListTasksWithStorage lists tasks using storage
+func (s *Server) ListTasksWithStorage(ctx context.Context, req ListTasksRequest) (*ListTasksResponse, error) {
+	// Default cluster if not specified
+	clusterName := "default"
+	if req.Cluster != "" {
+		clusterName = req.Cluster
+	}
+
+	// Get cluster from storage
+	cluster, err := s.storage.ClusterStore().Get(ctx, clusterName)
+	if err != nil || cluster == nil {
+		return nil, fmt.Errorf("cluster not found: %s", clusterName)
+	}
+
+	// Build filters
+	filters := storage.TaskFilters{
+		MaxResults: 100, // Default limit
+	}
+
+	if req.ServiceName != "" {
+		filters.ServiceName = req.ServiceName
+	}
+	if req.StartedBy != "" {
+		filters.StartedBy = req.StartedBy
+	}
+	if req.DesiredStatus != "" {
+		filters.DesiredStatus = req.DesiredStatus
+	}
+	if req.LaunchType != "" {
+		filters.LaunchType = req.LaunchType
+	}
+	if req.ContainerInstance != "" {
+		filters.ContainerInstance = req.ContainerInstance
+	}
+	if req.MaxResults > 0 {
+		filters.MaxResults = req.MaxResults
+	}
+
+	// Get tasks from storage
+	tasks, err := s.storage.TaskStore().List(ctx, cluster.ARN, filters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tasks: %w", err)
+	}
+
+	// Extract ARNs
+	var taskArns []string
+	for _, task := range tasks {
+		taskArns = append(taskArns, task.ARN)
+	}
+
+	return &ListTasksResponse{
+		TaskArns: taskArns,
+	}, nil
 }
 
 // DescribeTasksWithStorage describes tasks using storage and Kubernetes status

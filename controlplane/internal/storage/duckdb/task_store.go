@@ -158,7 +158,7 @@ func (s *taskStore) List(ctx context.Context, cluster string, filters storage.Ta
 	
 	if filters.ServiceName != "" {
 		conditions = append(conditions, "started_by = ?")
-		args = append(args, filters.ServiceName)
+		args = append(args, fmt.Sprintf("ecs-svc/%s", filters.ServiceName))
 	}
 	
 	if filters.Family != "" {

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -469,6 +470,9 @@ func (s *Server) handleECSRegisterTaskDefinition(w http.ResponseWriter, body []b
 		json.NewEncoder(w).Encode(errorResponse)
 		return
 	}
+	
+	log.Printf("DEBUG: Registered task definition: family=%s, revision=%d, ARN=%s", 
+		registered.Family, registered.Revision, registered.ARN)
 
 	// Convert back to API format
 	apiTaskDef, err := s.convertFromStorageTaskDefinitionToMap(registered)

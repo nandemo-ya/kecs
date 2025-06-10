@@ -186,14 +186,40 @@ func (s *Server) CreateServiceWithStorage(ctx context.Context, req CreateService
 	}
 
 	// Get task definition
+	var taskDef *storage.TaskDefinition
 	taskDefArn := req.TaskDefinition
+	
+	log.Printf("DEBUG: Looking for task definition: %s", req.TaskDefinition)
+	
 	if !strings.HasPrefix(taskDefArn, "arn:aws:ecs:") {
-		// Convert family:revision to ARN
-		taskDefArn = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", s.region, s.accountID, req.TaskDefinition)
+		// Check if it's family:revision or just family
+		if strings.Contains(req.TaskDefinition, ":") {
+			// family:revision format
+			taskDefArn = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", s.region, s.accountID, req.TaskDefinition)
+			log.Printf("DEBUG: Trying to get task definition by ARN: %s", taskDefArn)
+			taskDef, err = s.storage.TaskDefinitionStore().GetByARN(context.Background(), taskDefArn)
+		} else {
+			// Just family - get latest
+			log.Printf("DEBUG: Trying to get latest task definition for family: %s", req.TaskDefinition)
+			taskDef, err = s.storage.TaskDefinitionStore().GetLatest(context.Background(), req.TaskDefinition)
+			if taskDef != nil {
+				taskDefArn = taskDef.ARN
+				log.Printf("DEBUG: Found latest task definition: %s", taskDefArn)
+			}
+		}
+	} else {
+		// Full ARN provided
+		log.Printf("DEBUG: Full ARN provided: %s", taskDefArn)
+		taskDef, err = s.storage.TaskDefinitionStore().GetByARN(context.Background(), taskDefArn)
 	}
-
-	taskDef, err := s.storage.TaskDefinitionStore().GetByARN(context.Background(), taskDefArn)
-	if err != nil || taskDef == nil {
+	
+	if err != nil {
+		log.Printf("DEBUG: Error getting task definition: %v", err)
+		return nil, fmt.Errorf("task definition not found: %s", req.TaskDefinition)
+	}
+	
+	if taskDef == nil {
+		log.Printf("DEBUG: Task definition is nil")
 		return nil, fmt.Errorf("task definition not found: %s", req.TaskDefinition)
 	}
 
@@ -320,16 +346,33 @@ func (s *Server) UpdateServiceWithStorage(ctx context.Context, req UpdateService
 	oldTaskDefinitionARN := existingService.TaskDefinitionARN
 
 	// Update fields
-	if req.DesiredCount > 0 && req.DesiredCount != existingService.DesiredCount {
+	// Note: DesiredCount can be 0 (to scale down to 0 tasks)
+	if req.DesiredCount >= 0 && req.DesiredCount != existingService.DesiredCount {
+		log.Printf("DEBUG: Updating desired count from %d to %d", existingService.DesiredCount, req.DesiredCount)
 		existingService.DesiredCount = req.DesiredCount
 		needsKubernetesUpdate = true
 	}
 	if req.TaskDefinition != "" && req.TaskDefinition != existingService.TaskDefinitionARN {
-		// Convert short format to full ARN if necessary
+		// Convert to ARN if necessary
+		var newTaskDefArn string
 		if !strings.HasPrefix(req.TaskDefinition, "arn:aws:ecs:") {
-			req.TaskDefinition = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", s.region, s.accountID, req.TaskDefinition)
+			// Check if it's family:revision or just family
+			if strings.Contains(req.TaskDefinition, ":") {
+				// family:revision format
+				newTaskDefArn = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", s.region, s.accountID, req.TaskDefinition)
+			} else {
+				// Just family - get latest
+				latestTaskDef, err := s.storage.TaskDefinitionStore().GetLatest(context.Background(), req.TaskDefinition)
+				if err != nil || latestTaskDef == nil {
+					return nil, fmt.Errorf("task definition not found: %s", req.TaskDefinition)
+				}
+				newTaskDefArn = latestTaskDef.ARN
+			}
+		} else {
+			newTaskDefArn = req.TaskDefinition
 		}
-		existingService.TaskDefinitionARN = req.TaskDefinition
+		
+		existingService.TaskDefinitionARN = newTaskDefArn
 		needsKubernetesUpdate = true
 	}
 	if req.PlatformVersion != "" {
@@ -599,6 +642,28 @@ func storageServiceToAPIService(storageService *storage.Service) Service {
 	if storageService.Tags != "" && storageService.Tags != "null" {
 		json.Unmarshal([]byte(storageService.Tags), &service.Tags)
 	}
+
+	// Add deployment information
+	// In AWS ECS, there's always at least one deployment representing the current state
+	deployment := Deployment{
+		Id:                       fmt.Sprintf("ecs-svc/%s", storageService.ServiceName),
+		Status:                   "PRIMARY",
+		TaskDefinition:           storageService.TaskDefinitionARN,
+		DesiredCount:             storageService.DesiredCount,
+		RunningCount:             storageService.RunningCount,
+		PendingCount:             storageService.PendingCount,
+		LaunchType:               storageService.LaunchType,
+		PlatformVersion:          storageService.PlatformVersion,
+		CreatedAt:                storageService.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:                storageService.UpdatedAt.Format(time.RFC3339),
+	}
+	
+	// Copy deployment configuration if it exists
+	if service.DeploymentConfiguration != nil {
+		// The deployment inherits the service's deployment configuration
+	}
+	
+	service.Deployments = []Deployment{deployment}
 
 	return service
 }
