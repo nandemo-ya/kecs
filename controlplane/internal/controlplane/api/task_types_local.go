@@ -50,7 +50,7 @@ type Container struct {
 	ImageDigest       string             `json:"imageDigest,omitempty"`
 	RuntimeId         string             `json:"runtimeId,omitempty"`
 	LastStatus        string             `json:"lastStatus,omitempty"`
-	ExitCode          int                `json:"exitCode,omitempty"`
+	ExitCode          *int               `json:"exitCode,omitempty"`
 	Reason            string             `json:"reason,omitempty"`
 	NetworkBindings   []NetworkBinding   `json:"networkBindings,omitempty"`
 	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
@@ -59,6 +59,7 @@ type Container struct {
 	Memory            string             `json:"memory,omitempty"`
 	MemoryReservation string             `json:"memoryReservation,omitempty"`
 	GpuIds            []string           `json:"gpuIds,omitempty"`
+	Essential         *bool              `json:"essential,omitempty"`
 }
 
 // NetworkBinding represents a network binding for a container

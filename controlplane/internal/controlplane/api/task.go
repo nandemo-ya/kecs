@@ -15,7 +15,6 @@ import (
 	
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
 
 // registerTaskEndpoints registers all task-related API endpoints
@@ -229,232 +228,24 @@ func (s *Server) handleRunTaskECS(w http.ResponseWriter, body []byte) {
 		return
 	}
 
-	// Step 1: Validate and get cluster
-	clusterName := "default"
-	if req.Cluster != "" {
-		clusterName = req.Cluster
-	}
-
-	cluster, err := s.storage.ClusterStore().Get(context.Background(), clusterName)
-	if err != nil || cluster == nil {
-		log.Printf("Cluster not found: %s", clusterName)
-		errorResponse := map[string]interface{}{
-			"__type": "ClientException",
-			"message": fmt.Sprintf("Cluster not found: %s", clusterName),
-		}
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(errorResponse)
-		return
-	}
-
-	// Step 2: Get task definition
-	taskDefArn := req.TaskDefinition
-	var taskDef *storage.TaskDefinition
-	
-	if !strings.HasPrefix(taskDefArn, "arn:aws:ecs:") {
-		// Check if it contains revision (family:revision)
-		if strings.Contains(taskDefArn, ":") && !strings.HasPrefix(taskDefArn, "arn:") {
-			// Convert family:revision to ARN
-			taskDefArn = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", s.region, s.accountID, req.TaskDefinition)
-			log.Printf("Looking for task definition with ARN: %s", taskDefArn)
-			taskDef, err = s.storage.TaskDefinitionStore().GetByARN(context.Background(), taskDefArn)
-		} else {
-			// Just family name - get latest revision
-			log.Printf("Looking for latest task definition for family: %s", req.TaskDefinition)
-			taskDef, err = s.storage.TaskDefinitionStore().GetLatest(context.Background(), req.TaskDefinition)
-		}
-	} else {
-		// Full ARN provided
-		log.Printf("Looking for task definition with ARN: %s", taskDefArn)
-		taskDef, err = s.storage.TaskDefinitionStore().GetByARN(context.Background(), taskDefArn)
-	}
-	
-	if err != nil || taskDef == nil {
-		log.Printf("Task definition not found. Error: %v, TaskDef: %v", err, taskDef)
-		errorResponse := map[string]interface{}{
-			"__type": "ClientException",
-			"message": fmt.Sprintf("Task definition not found: %s", req.TaskDefinition),
-		}
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(errorResponse)
-		return
-	}
-	
-	// Ensure we have an active task definition
-	if taskDef.Status != "ACTIVE" {
-		log.Printf("Task definition is not active: %s", taskDef.Status)
-		errorResponse := map[string]interface{}{
-			"__type": "ClientException",
-			"message": fmt.Sprintf("No active task definition found for: %s", req.TaskDefinition),
-		}
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(errorResponse)
-		return
-	}
-	
-	// Update taskDefArn to the actual ARN for later use
-	taskDefArn = taskDef.ARN
-
-	// Step 3: Create a task with proper conversion
-	taskID := generateSimpleTaskID()
-	taskArn := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", s.region, s.accountID, cluster.Name, taskID)
-
-	// Use task converter to create pod
-	converter := converters.NewTaskConverter(s.region, s.accountID)
-	
-	// Marshal the request to JSON for the converter
-	reqJSON, err := json.Marshal(req)
+	ctx := context.Background()
+	resp, err := s.RunTaskWithStorage(ctx, req)
 	if err != nil {
-		log.Printf("Failed to marshal request: %v", err)
+		log.Printf("Error running task: %v", err)
+		// Send ECS-style error response
 		errorResponse := map[string]interface{}{
-			"__type": "InternalServerErrorException",
-			"message": fmt.Sprintf("Failed to marshal request: %v", err),
+			"__type": "ClientException",
+			"message": err.Error(),
 		}
-		w.WriteHeader(http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(errorResponse)
 		return
-	}
-	
-	pod, err := converter.ConvertTaskToPod(taskDef, reqJSON, cluster, taskID)
-	if err != nil {
-		log.Printf("Failed to convert task to pod: %v", err)
-		errorResponse := map[string]interface{}{
-			"__type": "InternalServerErrorException",
-			"message": fmt.Sprintf("Failed to convert task to pod: %v", err),
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(errorResponse)
-		return
-	}
-	
-	// Parse container definitions to collect secrets
-	var containerDefs []types.ContainerDefinition
-	if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
-		log.Printf("Failed to parse container definitions: %v", err)
-		errorResponse := map[string]interface{}{
-			"__type": "InternalServerErrorException",
-			"message": fmt.Sprintf("Failed to parse container definitions: %v", err),
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(errorResponse)
-		return
-	}
-	
-	// Collect secrets from container definitions
-	secrets := converter.CollectSecrets(containerDefs)
-	
-	// Check if running in test mode
-	testMode := os.Getenv("KECS_TEST_MODE") == "true"
-	
-	var createdPod *corev1.Pod
-	if testMode {
-		// In test mode, simulate pod creation without actual Kubernetes
-		createdPod = pod
-		createdPod.Status.Phase = corev1.PodPending
-		log.Printf("TEST MODE: Simulated pod creation for %s in namespace %s", pod.Name, pod.Namespace)
-	} else {
-		// For now, use the simple pod creation without task manager
-		// TODO: Replace with task manager once it's fully integrated
-		kubeClient, err := s.getKubeClient(cluster.KindClusterName)
-		if err != nil {
-			log.Printf("Failed to get kubernetes client: %v", err)
-			errorResponse := map[string]interface{}{
-				"__type": "InternalServerErrorException",
-				"message": fmt.Sprintf("Failed to get kubernetes client: %v", err),
-			}
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(errorResponse)
-			return
-		}
-		
-		// Create secrets if any
-		if len(secrets) > 0 && s.taskManager != nil {
-			// Use a temporary approach to create secrets
-			for _, secretInfo := range secrets {
-				secret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      secretInfo.SecretName,
-						Namespace: pod.Namespace,
-						Labels: map[string]string{
-							"kecs.dev/managed-by": "kecs",
-							"kecs.dev/source":     secretInfo.Source,
-						},
-					},
-					Type: corev1.SecretTypeOpaque,
-					Data: map[string][]byte{
-						secretInfo.Key: []byte("placeholder-secret-value"), // TODO: Fetch actual secret
-					},
-				}
-				
-				_, err = kubeClient.CoreV1().Secrets(pod.Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
-				if err != nil {
-					log.Printf("Warning: Failed to create secret %s: %v", secretInfo.SecretName, err)
-					// Continue anyway
-				}
-			}
-		}
-	
-		// Create the pod in Kubernetes
-		createdPod, err = kubeClient.CoreV1().Pods(pod.Namespace).Create(context.Background(), pod, metav1.CreateOptions{})
-		if err != nil {
-			log.Printf("Failed to create pod in kubernetes: %v", err)
-			errorResponse := map[string]interface{}{
-				"__type": "InternalServerErrorException",
-				"message": fmt.Sprintf("Failed to create pod in kubernetes: %v", err),
-			}
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(errorResponse)
-			return
-		}
-		
-		log.Printf("Successfully created pod %s in namespace %s", createdPod.Name, createdPod.Namespace)
-	}
-	pod = createdPod
-
-	// Step 4: Store task in database
-	now := time.Now()
-	task := &storage.Task{
-		ID:                taskID,
-		ARN:               taskArn,
-		ClusterARN:        cluster.ARN,
-		TaskDefinitionARN: taskDef.ARN,
-		LastStatus:        "PENDING",
-		DesiredStatus:     "RUNNING",
-		LaunchType:        "FARGATE",
-		Version:           1,
-		CreatedAt:         now,
-		Region:            s.region,
-		AccountID:         s.accountID,
-		Containers:        "[]",
-		PodName:           pod.Name,
-		Namespace:         pod.Namespace,
-	}
-
-	if err := s.storage.TaskStore().Create(context.Background(), task); err != nil {
-		log.Printf("Failed to store task: %v", err)
-		// Continue anyway for now
-	}
-
-	// Step 5: Return response
-	resp := RunTaskResponse{
-		Tasks: []Task{
-			{
-				TaskArn:           taskArn,
-				ClusterArn:        cluster.ARN,
-				TaskDefinitionArn: taskDef.ARN,
-				LastStatus:        "PENDING",
-				DesiredStatus:     "RUNNING",
-				CreatedAt:         now.Format(time.RFC3339),
-				LaunchType:        "FARGATE",
-				Version:           1,
-			},
-		},
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
-
 // handleDescribeTasksECS handles the DescribeTasks operation for ECS API
 func (s *Server) handleDescribeTasksECS(w http.ResponseWriter, body []byte) {
 	var req DescribeTasksRequest
@@ -521,6 +312,11 @@ func (s *Server) handleStopTaskECS(w http.ResponseWriter, body []byte) {
 
 // RunTaskWithStorage runs a task using storage
 func (s *Server) RunTaskWithStorage(ctx context.Context, req RunTaskRequest) (*RunTaskResponse, error) {
+	// Validate required fields
+	if req.TaskDefinition == "" {
+		return nil, fmt.Errorf("taskDefinition is required")
+	}
+	
 	// Default cluster if not specified
 	clusterName := "default"
 	if req.Cluster != "" {
@@ -570,6 +366,7 @@ func (s *Server) RunTaskWithStorage(ctx context.Context, req RunTaskRequest) (*R
 	if req.Count > 0 {
 		count = req.Count
 	}
+	log.Printf("RunTaskWithStorage: Creating %d tasks (req.Count=%d)", count, req.Count)
 
 	var tasks []Task
 	var failures []Failure
@@ -607,6 +404,37 @@ func (s *Server) RunTaskWithStorage(ctx context.Context, req RunTaskRequest) (*R
 		
 		var createdPod *corev1.Pod
 		if testMode {
+			// In test mode, check for excessive resource requirements
+			// Parse container definitions to check resources
+			var containerDefs []map[string]interface{}
+			if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err == nil {
+				for _, def := range containerDefs {
+					// Check CPU
+					if cpu, ok := def["cpu"].(float64); ok && cpu > 10000 {
+						failures = append(failures, Failure{
+							Arn:    taskArn,
+							Reason: "RESOURCE:CPU",
+							Detail: fmt.Sprintf("CPU request too high: %d", int(cpu)),
+						})
+						continue
+					}
+					// Check Memory
+					if memory, ok := def["memory"].(float64); ok && memory > 65536 {
+						failures = append(failures, Failure{
+							Arn:    taskArn,
+							Reason: "RESOURCE:MEMORY", 
+							Detail: fmt.Sprintf("Memory request too high: %d MB", int(memory)),
+						})
+						continue
+					}
+				}
+			}
+			
+			// If we added a failure, skip pod creation
+			if len(failures) > count-i-1 {
+				continue
+			}
+			
 			// In test mode, simulate pod creation without actual Kubernetes
 			createdPod = pod
 			createdPod.Status.Phase = corev1.PodPending
@@ -645,6 +473,79 @@ func (s *Server) RunTaskWithStorage(ctx context.Context, req RunTaskRequest) (*R
 		
 		log.Printf("Successfully created pod %s in namespace %s", createdPod.Name, createdPod.Namespace)
 
+		// Parse container definitions to create initial container status
+		var containerDefs []map[string]interface{}
+		var containerStatuses []Container
+		if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err == nil {
+			for _, def := range containerDefs {
+				containerStatus := Container{
+					Name:            def["name"].(string),
+					Image:           def["image"].(string),
+					LastStatus:      "PENDING",
+					ContainerArn:    fmt.Sprintf("%s/container/%s", taskArn, def["name"].(string)),
+					TaskArn:         taskArn,
+				}
+				
+				// Set CPU if defined (as string)
+				if cpu, ok := def["cpu"].(float64); ok {
+					containerStatus.Cpu = fmt.Sprintf("%d", int(cpu))
+				}
+				
+				// Set memory if defined (as string)
+				if memory, ok := def["memory"].(float64); ok {
+					containerStatus.Memory = fmt.Sprintf("%d", int(memory))
+				}
+				
+				// Set essential if defined
+				if essential, ok := def["essential"].(bool); ok {
+					containerStatus.Essential = &essential
+				} else {
+					// Default to true if not specified
+					essentialTrue := true
+					containerStatus.Essential = &essentialTrue
+				}
+				
+				containerStatuses = append(containerStatuses, containerStatus)
+			}
+		}
+		
+		// Create a map array that includes essential field for storage
+		var containerMaps []map[string]interface{}
+		for i, containerStatus := range containerStatuses {
+			containerMap := map[string]interface{}{
+				"name":          containerStatus.Name,
+				"image":         containerStatus.Image,
+				"lastStatus":    containerStatus.LastStatus,
+				"containerArn":  containerStatus.ContainerArn,
+				"taskArn":       containerStatus.TaskArn,
+			}
+			
+			// Add essential field from original definition
+			if i < len(containerDefs) {
+				if essential, ok := containerDefs[i]["essential"].(bool); ok {
+					containerMap["essential"] = essential
+				} else {
+					// Default to true if not specified
+					containerMap["essential"] = true
+				}
+			} else {
+				// Default to true if not specified
+				containerMap["essential"] = true
+			}
+			
+			// Add CPU and memory if set
+			if containerStatus.Cpu != "" {
+				containerMap["cpu"] = containerStatus.Cpu
+			}
+			if containerStatus.Memory != "" {
+				containerMap["memory"] = containerStatus.Memory
+			}
+			
+			containerMaps = append(containerMaps, containerMap)
+		}
+		
+		containersJSON, _ := json.Marshal(containerMaps)
+
 		// Store task in database
 		now := time.Now()
 		storageTask := &storage.Task{
@@ -659,9 +560,11 @@ func (s *Server) RunTaskWithStorage(ctx context.Context, req RunTaskRequest) (*R
 			CreatedAt:         now,
 			Region:            s.region,
 			AccountID:         s.accountID,
-			Containers:        "[]",
+			Containers:        string(containersJSON),
 			PodName:           createdPod.Name,
 			Namespace:         createdPod.Namespace,
+			CPU:               taskDef.CPU,
+			Memory:            taskDef.Memory,
 		}
 
 		// Set group if specified
@@ -676,7 +579,13 @@ func (s *Server) RunTaskWithStorage(ctx context.Context, req RunTaskRequest) (*R
 
 		if err := s.storage.TaskStore().Create(ctx, storageTask); err != nil {
 			log.Printf("Failed to store task: %v", err)
-			// Continue anyway for now
+			// Add failure but continue
+			failures = append(failures, Failure{
+				Arn:    taskArn,
+				Reason: "InternalError",
+				Detail: fmt.Sprintf("Failed to store task: %v", err),
+			})
+			continue
 		}
 
 		// Build response task
@@ -689,6 +598,9 @@ func (s *Server) RunTaskWithStorage(ctx context.Context, req RunTaskRequest) (*R
 			CreatedAt:         now.Format(time.RFC3339),
 			LaunchType:        "FARGATE",
 			Version:           1,
+			Cpu:               taskDef.CPU,
+			Memory:            taskDef.Memory,
+			Containers:        containerStatuses,
 		}
 
 		// Add group if specified
@@ -843,6 +755,11 @@ func (s *Server) updateTaskStatusFromKubernetes(ctx context.Context, task *stora
 								shouldStop = elapsed > 1*time.Second
 								exitCode = 0
 								task.StoppedReason = "Task completed successfully"
+							} else if strings.Contains(cmdStr, "sleep 15") {
+								// Wait 15 seconds
+								shouldStop = elapsed > 16*time.Second
+								exitCode = 0
+								task.StoppedReason = "Task completed successfully"
 							} else if strings.Contains(cmdStr, "sleep 5") {
 								// Wait 5 seconds
 								shouldStop = elapsed > 6*time.Second
@@ -864,9 +781,51 @@ func (s *Server) updateTaskStatusFromKubernetes(ctx context.Context, task *stora
 								task.StoppedAt = &now
 								task.ExecutionStoppedAt = &now
 								// Store exit code in Containers JSON
-								containers := fmt.Sprintf(`[{"name":"%s","exitCode":%d,"lastStatus":"STOPPED","essential":true}]`, 
-									containerDefs[0]["name"], exitCode)
-								task.Containers = containers
+								var updatedContainers []map[string]interface{}
+								for _, def := range containerDefs {
+									containerMap := map[string]interface{}{
+										"name":          def["name"].(string),
+										"lastStatus":    "STOPPED",
+										"containerArn":  fmt.Sprintf("%s/container/%s", task.ARN, def["name"].(string)),
+										"taskArn":       task.ARN,
+									}
+									
+									// Add image if present
+									if image, ok := def["image"].(string); ok {
+										containerMap["image"] = image
+									}
+									
+									// All essential containers get the exit code
+									isEssential := true // default
+									if essential, ok := def["essential"].(bool); ok {
+										isEssential = essential
+									}
+									if isEssential {
+										containerMap["exitCode"] = exitCode
+									}
+									
+									// Add essential field if present
+									if essential, ok := def["essential"].(bool); ok {
+										containerMap["essential"] = essential
+									} else {
+										// Default to true if not specified
+										containerMap["essential"] = true
+									}
+									
+									// Add CPU if present
+									if cpu, ok := def["cpu"].(float64); ok {
+										containerMap["cpu"] = fmt.Sprintf("%d", int(cpu))
+									}
+									
+									// Add memory if present
+									if memory, ok := def["memory"].(float64); ok {
+										containerMap["memory"] = fmt.Sprintf("%d", int(memory))
+									}
+									
+									updatedContainers = append(updatedContainers, containerMap)
+								}
+								containersJSON, _ := json.Marshal(updatedContainers)
+								task.Containers = string(containersJSON)
 							}
 						}
 					}
@@ -987,8 +946,56 @@ func (s *Server) storageTaskToAPITask(storageTask *storage.Task) Task {
 
 	// Parse containers JSON
 	if storageTask.Containers != "" && storageTask.Containers != "[]" {
-		var containers []Container
-		if err := json.Unmarshal([]byte(storageTask.Containers), &containers); err == nil {
+		// Parse as map array first to handle flexible types
+		var containerMaps []map[string]interface{}
+		if err := json.Unmarshal([]byte(storageTask.Containers), &containerMaps); err == nil {
+			var containers []Container
+			for _, cm := range containerMaps {
+				container := Container{
+					Name:       cm["name"].(string),
+					LastStatus: cm["lastStatus"].(string),
+				}
+				
+				// Handle optional fields
+				if containerArn, ok := cm["containerArn"].(string); ok {
+					container.ContainerArn = containerArn
+				}
+				if taskArn, ok := cm["taskArn"].(string); ok {
+					container.TaskArn = taskArn
+				}
+				if image, ok := cm["image"].(string); ok {
+					container.Image = image
+				}
+				if reason, ok := cm["reason"].(string); ok {
+					container.Reason = reason
+				}
+				if cpu, ok := cm["cpu"].(string); ok {
+					container.Cpu = cpu
+				}
+				if memory, ok := cm["memory"].(string); ok {
+					container.Memory = memory
+				}
+				
+				// Handle exit code
+				if exitCode, ok := cm["exitCode"]; ok {
+					switch v := exitCode.(type) {
+					case float64:
+						code := int(v)
+						container.ExitCode = &code
+					case int:
+						container.ExitCode = &v
+					}
+				}
+				
+				// Handle essential field
+				if essential, ok := cm["essential"]; ok {
+					if essentialBool, ok := essential.(bool); ok {
+						container.Essential = &essentialBool
+					}
+				}
+				
+				containers = append(containers, container)
+			}
 			task.Containers = containers
 		}
 	}

@@ -225,16 +225,27 @@ func (c *TaskStatusChecker) GetTaskExitCode(cluster, taskArn string) (*int, erro
 	for _, c := range containers {
 		container := c.(map[string]interface{})
 		
-		// Check if container is essential
-		essential, ok := container["essential"].(bool)
-		if !ok || !essential {
+		// Check if container is essential (handle both bool and absence of field)
+		essential := true // Default to true if not specified
+		if essentialVal, ok := container["essential"]; ok {
+			if essentialBool, ok := essentialVal.(bool); ok {
+				essential = essentialBool
+			}
+		}
+		
+		if !essential {
 			continue
 		}
 
 		// Get exit code
-		if exitCode, ok := container["exitCode"].(float64); ok {
-			code := int(exitCode)
-			return &code, nil
+		if exitCodeVal, ok := container["exitCode"]; ok {
+			switch v := exitCodeVal.(type) {
+			case float64:
+				code := int(v)
+				return &code, nil
+			case int:
+				return &v, nil
+			}
 		}
 	}
 
