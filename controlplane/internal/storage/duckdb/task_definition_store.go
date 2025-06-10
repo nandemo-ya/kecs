@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -103,6 +104,8 @@ func (s *taskDefinitionStore) Get(ctx context.Context, family string, revision i
 
 // GetLatest retrieves the latest revision of a task definition family
 func (s *taskDefinitionStore) GetLatest(ctx context.Context, family string) (*storage.TaskDefinition, error) {
+	log.Printf("DEBUG: GetLatest called for family: %s", family)
+	
 	var revision sql.NullInt64
 	err := s.db.QueryRowContext(ctx, `
 		SELECT MAX(revision) 
@@ -110,14 +113,17 @@ func (s *taskDefinitionStore) GetLatest(ctx context.Context, family string) (*st
 		WHERE family = ? AND status = 'ACTIVE'
 	`, family).Scan(&revision)
 	if err != nil {
+		log.Printf("DEBUG: GetLatest query error: %v", err)
 		return nil, fmt.Errorf("failed to get latest revision: %w", err)
 	}
 	
 	// Check if we got a NULL (no active revisions found)
 	if !revision.Valid {
+		log.Printf("DEBUG: No active revisions found for family: %s", family)
 		return nil, fmt.Errorf("task definition family not found: %s", family)
 	}
 
+	log.Printf("DEBUG: Found latest revision %d for family %s", revision.Int64, family)
 	return s.Get(ctx, family, int(revision.Int64))
 }
 
