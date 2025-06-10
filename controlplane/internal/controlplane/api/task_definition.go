@@ -365,6 +365,7 @@ type DeleteTaskDefinitionsResponse struct {
 
 // handleECSRegisterTaskDefinition handles the RegisterTaskDefinition operation
 func (s *Server) handleECSRegisterTaskDefinition(w http.ResponseWriter, body []byte) {
+	fmt.Printf("DEBUG: handleECSRegisterTaskDefinition called with server region=%s, accountID=%s\n", s.region, s.accountID)
 	// Parse body as a generic map to handle generated type limitations
 	var requestData map[string]interface{}
 	if len(body) > 0 {
@@ -1016,8 +1017,8 @@ func (s *Server) convertMapToStorageTaskDefinition(requestData map[string]interf
 		ProxyConfiguration:       proxyConfigJSON,
 		InferenceAccelerators:    inferenceAcceleratorsJSON,
 		RuntimePlatform:          runtimePlatformJSON,
-		Region:                   "us-east-1",
-		AccountID:                "123456789012",
+		Region:                   s.region,
+		AccountID:                s.accountID,
 	}, nil
 }
 

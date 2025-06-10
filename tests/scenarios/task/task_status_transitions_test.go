@@ -66,6 +66,11 @@ var _ = Describe("Task Status Transitions", func() {
 			}
 
 			result, err := client.RunTask(runTaskConfig)
+			if err != nil {
+				// Get container logs for debugging
+				logs, _ := kecs.GetLogs()
+				GinkgoWriter.Printf("KECS Container Logs:\n%s\n", logs)
+			}
 			Expect(err).NotTo(HaveOccurred())
 
 			tasks := result["tasks"].([]interface{})
@@ -78,6 +83,11 @@ var _ = Describe("Task Status Transitions", func() {
 
 			// Wait for task to complete
 			err = checker.WaitForStatus(clusterName, taskArn, "STOPPED", 60*time.Second)
+			if err != nil {
+				// Get container logs for debugging
+				logs, _ := kecs.GetLogs()
+				GinkgoWriter.Printf("KECS Container Logs:\n%s\n", logs)
+			}
 			Expect(err).NotTo(HaveOccurred())
 
 			// Validate transitions

@@ -48,6 +48,11 @@ func init() {
 }
 
 func runServer() {
+	// Log test mode status for debugging
+	if os.Getenv("KECS_TEST_MODE") == "true" {
+		fmt.Println("KECS_TEST_MODE is enabled - running in test mode")
+	}
+	
 	fmt.Printf("Starting KECS Control Plane server on port %d with log level %s\n", port, logLevel)
 	fmt.Printf("Starting KECS Admin server on port %d\n", adminPort)
 	if kubeconfig != "" {
