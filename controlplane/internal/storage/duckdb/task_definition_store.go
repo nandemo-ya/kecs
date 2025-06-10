@@ -103,20 +103,22 @@ func (s *taskDefinitionStore) Get(ctx context.Context, family string, revision i
 
 // GetLatest retrieves the latest revision of a task definition family
 func (s *taskDefinitionStore) GetLatest(ctx context.Context, family string) (*storage.TaskDefinition, error) {
-	var revision int
+	var revision sql.NullInt64
 	err := s.db.QueryRowContext(ctx, `
 		SELECT MAX(revision) 
 		FROM task_definitions 
 		WHERE family = ? AND status = 'ACTIVE'
 	`, family).Scan(&revision)
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("task definition family not found: %s", family)
-	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest revision: %w", err)
 	}
+	
+	// Check if we got a NULL (no active revisions found)
+	if !revision.Valid {
+		return nil, fmt.Errorf("task definition family not found: %s", family)
+	}
 
-	return s.Get(ctx, family, revision)
+	return s.Get(ctx, family, int(revision.Int64))
 }
 
 // ListFamilies lists task definition families with pagination

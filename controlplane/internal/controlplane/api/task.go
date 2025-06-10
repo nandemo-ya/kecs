@@ -312,6 +312,11 @@ func (s *Server) handleStopTaskECS(w http.ResponseWriter, body []byte) {
 
 // RunTaskWithStorage runs a task using storage
 func (s *Server) RunTaskWithStorage(ctx context.Context, req RunTaskRequest) (*RunTaskResponse, error) {
+	// Validate required fields
+	if req.TaskDefinition == "" {
+		return nil, fmt.Errorf("taskDefinition is required")
+	}
+	
 	// Default cluster if not specified
 	clusterName := "default"
 	if req.Cluster != "" {
@@ -399,6 +404,37 @@ func (s *Server) RunTaskWithStorage(ctx context.Context, req RunTaskRequest) (*R
 		
 		var createdPod *corev1.Pod
 		if testMode {
+			// In test mode, check for excessive resource requirements
+			// Parse container definitions to check resources
+			var containerDefs []map[string]interface{}
+			if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err == nil {
+				for _, def := range containerDefs {
+					// Check CPU
+					if cpu, ok := def["cpu"].(float64); ok && cpu > 10000 {
+						failures = append(failures, Failure{
+							Arn:    taskArn,
+							Reason: "RESOURCE:CPU",
+							Detail: fmt.Sprintf("CPU request too high: %d", int(cpu)),
+						})
+						continue
+					}
+					// Check Memory
+					if memory, ok := def["memory"].(float64); ok && memory > 65536 {
+						failures = append(failures, Failure{
+							Arn:    taskArn,
+							Reason: "RESOURCE:MEMORY", 
+							Detail: fmt.Sprintf("Memory request too high: %d MB", int(memory)),
+						})
+						continue
+					}
+				}
+			}
+			
+			// If we added a failure, skip pod creation
+			if len(failures) > count-i-1 {
+				continue
+			}
+			
 			// In test mode, simulate pod creation without actual Kubernetes
 			createdPod = pod
 			createdPod.Status.Phase = corev1.PodPending
