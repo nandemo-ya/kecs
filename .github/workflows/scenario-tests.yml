@@ -30,6 +30,11 @@ jobs:
           go mod download
           go mod tidy
 
+      - name: Install ginkgo
+        run: |
+          cd tests/scenarios
+          go install github.com/onsi/ginkgo/v2/ginkgo@latest
+
       - name: Install AWS CLI v2
         uses: unfor19/install-aws-cli-action@v1
         with:
@@ -37,17 +42,24 @@ jobs:
           verbose: false
           arch: amd64
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build KECS Docker image
-        run: |
-          cd controlplane
-          docker build -t kecs:test .
+        uses: docker/build-push-action@v5
+        with:
+          context: ./controlplane
+          tags: kecs:test
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Run Phase 1 tests (Foundation)
         id: test-phase1
         run: |
           cd tests/scenarios
           echo "## Running Phase 1: Foundation tests ##"
-          go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout 30m \
+          ginkgo -v -timeout 30m \
             --no-color \
             --junit-report=junit-phase1.xml \
             --output-dir=. \
@@ -64,7 +76,7 @@ jobs:
         run: |
           cd tests/scenarios
           echo "## Running Phase 2: Core Operations tests ##"
-          go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout 30m \
+          ginkgo -v -timeout 30m \
             --no-color \
             --junit-report=junit-phase2.xml \
             --output-dir=. \
@@ -81,7 +93,7 @@ jobs:
         run: |
           cd tests/scenarios
           echo "## Running Phase 3: Task Lifecycle & Status tests ##"
-          go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout 30m \
+          ginkgo -v -timeout 30m \
             --no-color \
             --junit-report=junit-phase3.xml \
             --output-dir=. \
@@ -98,7 +110,7 @@ jobs:
         run: |
           cd tests/scenarios
           echo "## Running Phase 4: Advanced Service Operations tests ##"
-          go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout 30m \
+          ginkgo -v -timeout 30m \
             --no-color \
             --junit-report=junit-phase4.xml \
             --output-dir=. \
