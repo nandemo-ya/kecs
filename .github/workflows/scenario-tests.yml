@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   test-phases:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-m
     steps:
       - uses: actions/checkout@v4
 
