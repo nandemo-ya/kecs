@@ -1,8 +1,8 @@
 package utils
 
-// NewECSClient creates a new ECS client with optional mode
-// Default is curl mode for backward compatibility
-func NewECSClient(endpoint string, mode ...ClientMode) ECSClientInterface {
+// NewECSClientInterface creates a new ECS client interface with optional mode
+// Use this for new tests that support multiple client modes
+func NewECSClientInterface(endpoint string, mode ...ClientMode) ECSClientInterface {
 	if len(mode) > 0 {
 		switch mode[0] {
 		case AWSCLIMode:
@@ -15,6 +15,3 @@ func NewECSClient(endpoint string, mode ...ClientMode) ECSClientInterface {
 	return NewCurlClient(endpoint)
 }
 
-// ECSClient is a type alias for backward compatibility
-// Deprecated: Use NewECSClient with ClientMode instead
-type ECSClient = CurlClient

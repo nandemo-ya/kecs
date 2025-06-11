@@ -132,17 +132,17 @@ func TestServiceCompatibility(t *testing.T) {
 // TestClientModeSelection tests that the correct client is selected based on mode
 func TestClientModeSelection(t *testing.T) {
 	// Test default mode (curl)
-	client := utils.NewECSClient("http://localhost:8080")
+	client := utils.NewECSClientInterface("http://localhost:8080")
 	_, isCurl := client.(*utils.CurlClient)
 	assert.True(t, isCurl, "Default client should be CurlClient")
 	
 	// Test explicit curl mode
-	curlClient := utils.NewECSClient("http://localhost:8080", utils.CurlMode)
+	curlClient := utils.NewECSClientInterface("http://localhost:8080", utils.CurlMode)
 	_, isCurl = curlClient.(*utils.CurlClient)
 	assert.True(t, isCurl, "Explicit curl mode should return CurlClient")
 	
 	// Test AWS CLI mode
-	awsClient := utils.NewECSClient("http://localhost:8080", utils.AWSCLIMode)
+	awsClient := utils.NewECSClientInterface("http://localhost:8080", utils.AWSCLIMode)
 	_, isAWSCLI := awsClient.(*utils.AWSCLIClient)
 	assert.True(t, isAWSCLI, "AWS CLI mode should return AWSCLIClient")
 }

@@ -14,7 +14,7 @@ func TestWithBothClients(t *testing.T, testName string, testFunc func(t *testing
 		defer kecs.Cleanup()
 		
 		// Create curl client
-		client := NewECSClient(kecs.Endpoint(), CurlMode)
+		client := NewECSClientInterface(kecs.Endpoint(), CurlMode)
 		testFunc(t, client, CurlMode)
 	})
 	
@@ -31,7 +31,7 @@ func TestWithBothClients(t *testing.T, testName string, testFunc func(t *testing
 			defer kecs.Cleanup()
 			
 			// Create AWS CLI client
-			client := NewECSClient(kecs.Endpoint(), AWSCLIMode)
+			client := NewECSClientInterface(kecs.Endpoint(), AWSCLIMode)
 			testFunc(t, client, AWSCLIMode)
 		})
 	}
@@ -46,7 +46,7 @@ func IsAWSCLIInstalled() bool {
 // GetTestClient returns an ECS client based on environment variable
 func GetTestClient(endpoint string) ECSClientInterface {
 	if os.Getenv("USE_AWS_CLI") == "true" && IsAWSCLIInstalled() {
-		return NewECSClient(endpoint, AWSCLIMode)
+		return NewECSClientInterface(endpoint, AWSCLIMode)
 	}
-	return NewECSClient(endpoint, CurlMode)
+	return NewECSClientInterface(endpoint, CurlMode)
 }
