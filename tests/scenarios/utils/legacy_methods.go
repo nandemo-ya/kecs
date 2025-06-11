@@ -2,7 +2,6 @@ package utils
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 // Legacy service methods for backward compatibility
@@ -88,9 +87,34 @@ func (c *ECSClient) UpdateService(config map[string]interface{}) (map[string]int
 	}, nil
 }
 
-// DeleteServiceForce deletes a service forcefully
-func (c *ECSClient) DeleteServiceForce(cluster, service string) error {
-	return c.CurlClient.DeleteService(cluster, service)
+// DeleteServiceForce (legacy) deletes a service forcefully and returns result
+func (c *ECSClient) DeleteServiceForce(cluster, service string) (map[string]interface{}, error) {
+	err := c.CurlClient.DeleteService(cluster, service)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"service": map[string]interface{}{
+			"serviceName": service,
+			"status":      "DRAINING",
+		},
+	}, nil
+}
+
+// DeleteService (legacy) deletes a service and returns result
+func (c *ECSClient) DeleteService(cluster, service string) (map[string]interface{}, error) {
+	err := c.CurlClient.DeleteService(cluster, service)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"service": map[string]interface{}{
+			"serviceName": service,
+			"status":      "DRAINING",
+		},
+	}, nil
 }
 
 // Legacy task methods
@@ -196,4 +220,54 @@ func (c *ECSClient) StopTask(cluster, task, reason string) (map[string]interface
 	}
 
 	return map[string]interface{}{}, nil
+}
+
+// DescribeServices (legacy) describes multiple services
+func (c *ECSClient) DescribeServices(cluster string, services []string) (map[string]interface{}, error) {
+	var serviceResults []map[string]interface{}
+	
+	for _, serviceName := range services {
+		svc, err := c.CurlClient.DescribeService(cluster, serviceName)
+		if err != nil {
+			// Add failure instead of erroring out
+			continue
+		}
+		
+		svcJSON, _ := json.Marshal(svc)
+		var svcMap map[string]interface{}
+		json.Unmarshal(svcJSON, &svcMap)
+		serviceResults = append(serviceResults, svcMap)
+	}
+	
+	return map[string]interface{}{
+		"services": serviceResults,
+	}, nil
+}
+
+// ListServices (legacy) lists services with map result
+func (c *ECSClient) ListServices(cluster string) (map[string]interface{}, error) {
+	arns, err := c.CurlClient.ListServices(cluster)
+	if err != nil {
+		return nil, err
+	}
+	
+	return map[string]interface{}{
+		"serviceArns": arns,
+	}, nil
+}
+
+// DescribeService (legacy) describes a single service with map result
+func (c *ECSClient) DescribeService(cluster, service string) (map[string]interface{}, error) {
+	svc, err := c.CurlClient.DescribeService(cluster, service)
+	if err != nil {
+		return nil, err
+	}
+	
+	svcJSON, _ := json.Marshal(svc)
+	var svcMap map[string]interface{}
+	json.Unmarshal(svcJSON, &svcMap)
+	
+	return map[string]interface{}{
+		"service": svcMap,
+	}, nil
 }

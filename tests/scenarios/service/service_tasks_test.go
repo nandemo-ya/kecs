@@ -24,7 +24,7 @@ var _ = Describe("Service Tasks", func() {
 		// Start KECS container
 		kecs = utils.StartKECS(GinkgoT())
 		client = utils.NewECSClient(kecs.Endpoint())
-		checker = utils.NewTaskStatusChecker(client)
+		checker = utils.NewTaskStatusChecker(client.CurlClient)
 		
 		// Create a test cluster
 		clusterName = "test-cluster-" + utils.GenerateRandomString(8)

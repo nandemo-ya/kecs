@@ -89,6 +89,11 @@ func (c *TaskStatusChecker) WaitForTaskStopped(cluster, taskArn string) error {
 	return c.WaitForTaskStatus(cluster, taskArn, "STOPPED", 2*time.Minute)
 }
 
+// WaitForStatus is an alias for WaitForTaskStatus for backward compatibility
+func (c *TaskStatusChecker) WaitForStatus(cluster, taskArn, expectedStatus string, timeout time.Duration) error {
+	return c.WaitForTaskStatus(cluster, taskArn, expectedStatus, timeout)
+}
+
 // ValidateTaskTransition validates that task status transitions are valid
 func (c *TaskStatusChecker) ValidateTaskTransition(taskArn, fromStatus, toStatus string) error {
 	// Valid transitions based on ECS task lifecycle
@@ -273,6 +278,24 @@ func (c *TaskStatusChecker) CheckMultipleTasksStatus(cluster string, taskArns []
 		if task.LastStatus != expectedStatus {
 			return fmt.Errorf("task %s has status %s, expected %s", 
 				task.TaskArn, task.LastStatus, expectedStatus)
+		}
+	}
+
+	return nil
+}
+
+// ValidateTransitions validates all recorded transitions for a task
+func (c *TaskStatusChecker) ValidateTransitions(taskArn string) error {
+	history := c.statusHistory[taskArn]
+	if len(history) < 2 {
+		return nil // No transitions to validate
+	}
+
+	for i := 1; i < len(history); i++ {
+		fromStatus := history[i-1].Status
+		toStatus := history[i].Status
+		if err := c.ValidateTaskTransition(taskArn, fromStatus, toStatus); err != nil {
+			return fmt.Errorf("invalid transition at step %d: %w", i, err)
 		}
 	}
 

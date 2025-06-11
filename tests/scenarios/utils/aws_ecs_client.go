@@ -79,7 +79,7 @@ func (c *ECSClient) DescribeTaskDefinition(taskDefID string) (map[string]interfa
 }
 
 // ListTaskDefinitionFamilies lists task definition families
-func (c *ECSClient) ListTaskDefinitionFamilies(params map[string]interface{}) (map[string]interface{}, error) {
+func (c *ECSClient) ListTaskDefinitionFamilies() (map[string]interface{}, error) {
 	// For now, just return empty list as this is not implemented in the interface
 	return map[string]interface{}{
 		"families": []string{},
@@ -95,5 +95,20 @@ func (c *ECSClient) ListTaskDefinitionsWithOptions(params map[string]interface{}
 
 	return map[string]interface{}{
 		"taskDefinitionArns": arns,
+	}, nil
+}
+
+// DeregisterTaskDefinition (legacy) deregisters a task definition
+func (c *ECSClient) DeregisterTaskDefinition(taskDefArn string) (map[string]interface{}, error) {
+	err := c.CurlClient.DeregisterTaskDefinition(taskDefArn)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"taskDefinition": map[string]interface{}{
+			"taskDefinitionArn": taskDefArn,
+			"status":            "INACTIVE",
+		},
 	}, nil
 }

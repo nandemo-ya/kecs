@@ -21,7 +21,7 @@ var _ = Describe("StopTask Operations", func() {
 	BeforeEach(func() {
 		kecs = utils.StartKECS(GinkgoT())
 		client = utils.NewECSClient(kecs.Endpoint())
-		checker = utils.NewTaskStatusChecker(client)
+		checker = utils.NewTaskStatusChecker(client.CurlClient)
 
 		// Create a test cluster
 		clusterName = fmt.Sprintf("test-cluster-%d", time.Now().Unix())
