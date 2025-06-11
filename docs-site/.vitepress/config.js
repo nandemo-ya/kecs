@@ -37,6 +37,13 @@ export default defineConfig({
             { text: 'Tasks', link: '/guides/tasks' },
             { text: 'Task Definitions', link: '/guides/task-definitions' }
           ]
+        },
+        {
+          text: 'Testing',
+          items: [
+            { text: 'Integration Testing', link: '/guides/integration-testing' },
+            { text: 'Using Testcontainers', link: '/guides/testcontainers' }
+          ]
         }
       ],
       '/api/': [
@@ -70,6 +77,7 @@ export default defineConfig({
             { text: 'Contributing', link: '/development/contributing' },
             { text: 'Architecture', link: '/development/architecture' },
             { text: 'Testing', link: '/development/testing' },
+            { text: 'Testcontainers Integration', link: '/development/testcontainers' },
             { text: 'Building', link: '/development/building' }
           ]
         }
