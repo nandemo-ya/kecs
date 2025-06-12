@@ -26,6 +26,9 @@ type SmithyShape struct {
 	Output     *SmithyTarget              `json:"output,omitempty"`
 	Errors     []SmithyTarget             `json:"errors,omitempty"`
 	Members    map[string]SmithyMember    `json:"members,omitempty"`
+	Member     *SmithyMember              `json:"member,omitempty"` // For list types
+	Key        *SmithyMember              `json:"key,omitempty"`    // For map types
+	Value      *SmithyMember              `json:"value,omitempty"`  // For map types
 	Traits     map[string]interface{}     `json:"traits,omitempty"`
 }
 
@@ -92,7 +95,19 @@ func main() {
 func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 	var operations []Operation
 	var types []TypeDef
+	typeSet := make(map[string]bool)
 
+	// First pass: collect all type names
+	for shapeID, shape := range model.Shapes {
+		if shape.Type == "structure" || shape.Type == "list" || shape.Type == "map" || shape.Type == "enum" || 
+		   shape.Type == "integer" || shape.Type == "long" || shape.Type == "boolean" || 
+		   shape.Type == "string" || shape.Type == "double" || shape.Type == "timestamp" {
+			typeName := extractTypeName(shapeID)
+			typeSet[typeName] = true
+		}
+	}
+
+	// Second pass: extract operations and types
 	for shapeID, shape := range model.Shapes {
 		switch shape.Type {
 		case "service":
@@ -119,17 +134,15 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 				}
 			}
 		case "structure":
-			// Extract type definitions
+			// Extract all structure type definitions
 			typeName := extractTypeName(shapeID)
-			if !strings.HasSuffix(typeName, "Request") && !strings.HasSuffix(typeName, "Response") {
-				continue // Skip request/response types for now
-			}
 			
 			var members []Member
 			for memberName, member := range shape.Members {
+				memberType := mapTypeWithContext(member.Target, typeSet)
 				members = append(members, Member{
 					Name:         memberName,
-					Type:         extractTypeName(member.Target),
+					Type:         memberType,
 					Required:     isRequired(member.Traits),
 					Documentation: extractDocumentation(member.Traits),
 				})
@@ -141,6 +154,31 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 				Members:      members,
 				Documentation: extractDocumentation(shape.Traits),
 			})
+		case "list":
+			// Extract list type definitions
+			typeName := extractTypeName(shapeID)
+			if shape.Member != nil {
+				memberType := mapTypeWithContext(shape.Member.Target, typeSet)
+				types = append(types, TypeDef{
+					Name:         typeName,
+					Type:         "list",
+					Members:      []Member{{Name: "Item", Type: memberType}},
+					Documentation: extractDocumentation(shape.Traits),
+				})
+			}
+		case "map":
+			// Extract map type definitions
+			typeName := extractTypeName(shapeID)
+			if shape.Key != nil && shape.Value != nil {
+				keyType := mapTypeWithContext(shape.Key.Target, typeSet)
+				valueType := mapTypeWithContext(shape.Value.Target, typeSet)
+				types = append(types, TypeDef{
+					Name:         typeName,
+					Type:         "map",
+					Members:      []Member{{Name: "Key", Type: keyType}, {Name: "Value", Type: valueType}},
+					Documentation: extractDocumentation(shape.Traits),
+				})
+			}
 		}
 	}
 
@@ -267,13 +305,23 @@ package generated
 import "time"
 
 {{- range .Types }}
+{{- if eq .Type "structure" }}
 
 // {{ .Name }} represents the {{ .Name }} structure
 type {{ .Name }} struct {
 {{- range .Members }}
-	{{ .Name }} {{ mapType .Type }} ` + "`json:\"{{ toLowerCamel .Name }}{{ if not .Required }},omitempty{{ end }}\"`" + `
+	{{ .Name }} {{ .Type }} ` + "`json:\"{{ toLowerCamel .Name }}{{ if not .Required }},omitempty{{ end }}\"`" + `
 {{- end }}
 }
+{{- else if eq .Type "list" }}
+
+// {{ .Name }} represents a list type
+type {{ .Name }} []{{ (index .Members 0).Type }}
+{{- else if eq .Type "map" }}
+
+// {{ .Name }} represents a map type  
+type {{ .Name }} map[{{ (index .Members 0).Type }}]{{ (index .Members 1).Type }}
+{{- end }}
 {{- end }}
 `
 
@@ -317,28 +365,65 @@ func generateTypes(filename string, types []TypeDef) error {
 }
 
 func mapType(smithyType string) string {
-	switch smithyType {
-	case "smithy.api#String", "String":
+	return mapTypeWithContext(smithyType, nil)
+}
+
+func mapTypeWithContext(smithyType string, typeSet map[string]bool) string {
+	// Extract the type name without namespace
+	typeName := extractTypeName(smithyType)
+	
+	// Check basic types first (with or without namespace)
+	switch typeName {
+	case "String":
 		return "*string"
-	case "smithy.api#Integer", "Integer":
+	case "Integer":
 		return "*int32"
-	case "smithy.api#Long", "Long":
+	case "Long":
 		return "*int64"
-	case "smithy.api#Boolean", "Boolean":
+	case "Boolean":
 		return "*bool"
-	case "smithy.api#Double", "Double":
+	case "Double":
 		return "*float64"
-	case "smithy.api#Timestamp", "Timestamp":
+	case "Timestamp":
 		return "*time.Time"
 	case "BoxedInteger":
 		return "*int32"
 	case "BoxedBoolean":
 		return "*bool"
+	}
+	
+	// Also check with full namespace
+	switch smithyType {
+	case "smithy.api#String", "com.amazonaws.ecs#String":
+		return "*string"
+	case "smithy.api#Integer", "com.amazonaws.ecs#Integer":
+		return "*int32"
+	case "smithy.api#Long", "com.amazonaws.ecs#Long":
+		return "*int64"
+	case "smithy.api#Boolean", "com.amazonaws.ecs#Boolean":
+		return "*bool"
+	case "smithy.api#Double", "com.amazonaws.ecs#Double":
+		return "*float64"
+	case "smithy.api#Timestamp", "com.amazonaws.ecs#Timestamp":
+		return "*time.Time"
 	default:
 		if strings.HasPrefix(smithyType, "smithy.api#") {
 			return "*string" // Default to string for unknown smithy types
 		}
-		// For custom types that might not be defined, use interface{}
+		
+		// Check if this is a known custom type
+		if typeSet != nil && typeSet[typeName] {
+			// Check if it's a list or map type by looking at the suffix
+			if strings.HasSuffix(typeName, "List") || strings.HasSuffix(typeName, "Array") {
+				return typeName // Return as-is for type alias
+			}
+			if strings.HasSuffix(typeName, "Map") {
+				return typeName // Return as-is for type alias
+			}
+			return "*" + typeName
+		}
+		
+		// For unknown types, use interface{}
 		return "interface{}"
 	}
 }
