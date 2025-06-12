@@ -96,14 +96,19 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 	var operations []Operation
 	var types []TypeDef
 	typeSet := make(map[string]bool)
+	listTypes := make(map[string]string) // Maps list type name to its element type
 
-	// First pass: collect all type names
+	// First pass: collect all type names and list mappings
 	for shapeID, shape := range model.Shapes {
-		if shape.Type == "structure" || shape.Type == "list" || shape.Type == "map" || shape.Type == "enum" || 
+		typeName := extractTypeName(shapeID)
+		if shape.Type == "structure" || shape.Type == "map" || shape.Type == "enum" || 
 		   shape.Type == "integer" || shape.Type == "long" || shape.Type == "boolean" || 
 		   shape.Type == "string" || shape.Type == "double" || shape.Type == "timestamp" {
-			typeName := extractTypeName(shapeID)
 			typeSet[typeName] = true
+		} else if shape.Type == "list" && shape.Member != nil {
+			// Store list type mapping for later use
+			elementType := extractTypeName(shape.Member.Target)
+			listTypes[typeName] = elementType
 		}
 	}
 
@@ -139,7 +144,7 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 			
 			var members []Member
 			for memberName, member := range shape.Members {
-				memberType := mapTypeWithContext(member.Target, typeSet)
+				memberType := mapTypeWithContext(member.Target, typeSet, listTypes)
 				members = append(members, Member{
 					Name:         memberName,
 					Type:         memberType,
@@ -159,23 +164,14 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 				Documentation: extractDocumentation(shape.Traits),
 			})
 		case "list":
-			// Extract list type definitions
-			typeName := extractTypeName(shapeID)
-			if shape.Member != nil {
-				memberType := mapTypeWithContext(shape.Member.Target, typeSet)
-				types = append(types, TypeDef{
-					Name:         typeName,
-					Type:         "list",
-					Members:      []Member{{Name: "Item", Type: memberType}},
-					Documentation: extractDocumentation(shape.Traits),
-				})
-			}
+			// Skip list type definitions - they will be inlined as slices
+			continue
 		case "map":
 			// Extract map type definitions
 			typeName := extractTypeName(shapeID)
 			if shape.Key != nil && shape.Value != nil {
-				keyType := mapTypeWithContext(shape.Key.Target, typeSet)
-				valueType := mapTypeWithContext(shape.Value.Target, typeSet)
+				keyType := mapTypeWithContext(shape.Key.Target, typeSet, listTypes)
+				valueType := mapTypeWithContext(shape.Value.Target, typeSet, listTypes)
 				types = append(types, TypeDef{
 					Name:         typeName,
 					Type:         "map",
@@ -337,10 +333,6 @@ type {{ .Name }} struct {
 	{{ toCamelCase .Name }} {{ .Type }} ` + "`json:\"{{ toLowerCamel .Name }}{{ if not .Required }},omitempty{{ end }}\"`" + `
 {{- end }}
 }
-{{- else if eq .Type "list" }}
-
-// {{ .Name }} represents a list type
-type {{ .Name }} []{{ (index .Members 0).Type }}
 {{- else if eq .Type "map" }}
 
 // {{ .Name }} represents a map type  
@@ -418,10 +410,10 @@ func generateTypes(filename string, types []TypeDef) error {
 }
 
 func mapType(smithyType string) string {
-	return mapTypeWithContext(smithyType, nil)
+	return mapTypeWithContext(smithyType, nil, nil)
 }
 
-func mapTypeWithContext(smithyType string, typeSet map[string]bool) string {
+func mapTypeWithContext(smithyType string, typeSet map[string]bool, listTypes map[string]string) string {
 	// Extract the type name without namespace
 	typeName := extractTypeName(smithyType)
 	
@@ -464,12 +456,26 @@ func mapTypeWithContext(smithyType string, typeSet map[string]bool) string {
 			return "*string" // Default to string for unknown smithy types
 		}
 		
+		// Check if this is a list type
+		if listTypes != nil {
+			if elementType, ok := listTypes[typeName]; ok {
+				// Special case for StringList
+				if typeName == "StringList" {
+					return "[]string"
+				}
+				// Convert list type to slice
+				elemType := mapTypeWithContext("com.amazonaws.ecs#" + elementType, typeSet, listTypes)
+				// Remove pointer from element type if present
+				if strings.HasPrefix(elemType, "*") {
+					elemType = elemType[1:]
+				}
+				return "[]" + elemType
+			}
+		}
+		
 		// Check if this is a known custom type
 		if typeSet != nil && typeSet[typeName] {
-			// Check if it's a list or map type by looking at the suffix
-			if strings.HasSuffix(typeName, "List") || strings.HasSuffix(typeName, "Array") {
-				return typeName // Return as-is for type alias
-			}
+			// Map types remain as type aliases
 			if strings.HasSuffix(typeName, "Map") {
 				return typeName // Return as-is for type alias
 			}
