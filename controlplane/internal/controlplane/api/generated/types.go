@@ -9,15 +9,6 @@ type AccessDeniedException struct {
 	Message *string `json:"message,omitempty"`
 }
 
-// AgentUpdateStatus represents an enum type
-type AgentUpdateStatus string
-
-// ApplicationProtocol represents an enum type
-type ApplicationProtocol string
-
-// AssignPublicIp represents an enum type
-type AssignPublicIp string
-
 // Attachment represents the Attachment structure
 type Attachment struct {
 	Details []KeyValuePair `json:"details,omitempty"`
@@ -60,9 +51,6 @@ type AutoScalingGroupProviderUpdate struct {
 	ManagedTerminationProtection *ManagedTerminationProtection `json:"managedTerminationProtection,omitempty"`
 }
 
-// AvailabilityZoneRebalancing represents an enum type
-type AvailabilityZoneRebalancing string
-
 // AwsVpcConfiguration represents the AwsVpcConfiguration structure
 type AwsVpcConfiguration struct {
 	AssignPublicIp *AssignPublicIp `json:"assignPublicIp,omitempty"`
@@ -84,9 +72,6 @@ type BoxedBoolean bool
 // BoxedInteger represents an integer type alias
 type BoxedInteger int32
 
-// CPUArchitecture represents an enum type
-type CPUArchitecture string
-
 // CapacityProvider represents the CapacityProvider structure
 type CapacityProvider struct {
 	AutoScalingGroupProvider *AutoScalingGroupProvider `json:"autoScalingGroupProvider,omitempty"`
@@ -97,12 +82,6 @@ type CapacityProvider struct {
 	UpdateStatus *CapacityProviderUpdateStatus `json:"updateStatus,omitempty"`
 	UpdateStatusReason *string `json:"updateStatusReason,omitempty"`
 }
-
-// CapacityProviderField represents an enum type
-type CapacityProviderField string
-
-// CapacityProviderStatus represents an enum type
-type CapacityProviderStatus string
 
 // CapacityProviderStrategyItem represents the CapacityProviderStrategyItem structure
 type CapacityProviderStrategyItem struct {
@@ -116,9 +95,6 @@ type CapacityProviderStrategyItemBase int32
 
 // CapacityProviderStrategyItemWeight represents an integer type alias
 type CapacityProviderStrategyItemWeight int32
-
-// CapacityProviderUpdateStatus represents an enum type
-type CapacityProviderUpdateStatus string
 
 // ClientException represents the ClientException structure
 type ClientException struct {
@@ -166,9 +142,6 @@ type ClusterContainsTasksException struct {
 	Message *string `json:"message,omitempty"`
 }
 
-// ClusterField represents an enum type
-type ClusterField string
-
 // ClusterNotFoundException represents the ClusterNotFoundException structure
 type ClusterNotFoundException struct {
 	Message *string `json:"message,omitempty"`
@@ -190,20 +163,11 @@ type ClusterSetting struct {
 	Value *string `json:"value,omitempty"`
 }
 
-// ClusterSettingName represents an enum type
-type ClusterSettingName string
-
-// Compatibility represents an enum type
-type Compatibility string
-
 // ConflictException represents the ConflictException structure
 type ConflictException struct {
 	Message *string `json:"message,omitempty"`
 	ResourceIds []string `json:"resourceIds,omitempty"`
 }
-
-// Connectivity represents an enum type
-type Connectivity string
 
 // Container represents the Container structure
 type Container struct {
@@ -225,9 +189,6 @@ type Container struct {
 	RuntimeId *string `json:"runtimeId,omitempty"`
 	TaskArn *string `json:"taskArn,omitempty"`
 }
-
-// ContainerCondition represents an enum type
-type ContainerCondition string
 
 // ContainerDefinition represents the ContainerDefinition structure
 type ContainerDefinition struct {
@@ -310,17 +271,11 @@ type ContainerInstance struct {
 	VersionInfo *VersionInfo `json:"versionInfo,omitempty"`
 }
 
-// ContainerInstanceField represents an enum type
-type ContainerInstanceField string
-
 // ContainerInstanceHealthStatus represents the ContainerInstanceHealthStatus structure
 type ContainerInstanceHealthStatus struct {
 	Details []InstanceHealthCheckResult `json:"details,omitempty"`
 	OverallStatus *InstanceHealthCheckState `json:"overallStatus,omitempty"`
 }
-
-// ContainerInstanceStatus represents an enum type
-type ContainerInstanceStatus string
 
 // ContainerOverride represents the ContainerOverride structure
 type ContainerOverride struct {
@@ -572,16 +527,10 @@ type DeploymentController struct {
 	Type *DeploymentControllerType `json:"type"`
 }
 
-// DeploymentControllerType represents an enum type
-type DeploymentControllerType string
-
 // DeploymentEphemeralStorage represents the DeploymentEphemeralStorage structure
 type DeploymentEphemeralStorage struct {
 	KmsKeyId *string `json:"kmsKeyId,omitempty"`
 }
-
-// DeploymentRolloutState represents an enum type
-type DeploymentRolloutState string
 
 // DeregisterContainerInstanceRequest represents the DeregisterContainerInstanceRequest structure
 type DeregisterContainerInstanceRequest struct {
@@ -719,18 +668,12 @@ type DescribeTasksResponse struct {
 	Tasks []Task `json:"tasks,omitempty"`
 }
 
-// DesiredStatus represents an enum type
-type DesiredStatus string
-
 // Device represents the Device structure
 type Device struct {
 	ContainerPath *string `json:"containerPath,omitempty"`
 	HostPath *string `json:"hostPath"`
 	Permissions []DeviceCgroupPermission `json:"permissions,omitempty"`
 }
-
-// DeviceCgroupPermission represents an enum type
-type DeviceCgroupPermission string
 
 // DiscoverPollEndpointRequest represents the DiscoverPollEndpointRequest structure
 type DiscoverPollEndpointRequest struct {
@@ -766,9 +709,6 @@ type Duration int32
 // EBSKMSKeyId represents a string type alias
 type EBSKMSKeyId string
 
-// EBSResourceType represents an enum type
-type EBSResourceType string
-
 // EBSSnapshotId represents a string type alias
 type EBSSnapshotId string
 
@@ -791,12 +731,6 @@ type EFSAuthorizationConfig struct {
 	Iam *EFSAuthorizationConfigIAM `json:"iam,omitempty"`
 }
 
-// EFSAuthorizationConfigIAM represents an enum type
-type EFSAuthorizationConfigIAM string
-
-// EFSTransitEncryption represents an enum type
-type EFSTransitEncryption string
-
 // EFSVolumeConfiguration represents the EFSVolumeConfiguration structure
 type EFSVolumeConfiguration struct {
 	AuthorizationConfig *EFSAuthorizationConfig `json:"authorizationConfig,omitempty"`
@@ -811,9 +745,6 @@ type EnvironmentFile struct {
 	Type *EnvironmentFileType `json:"type"`
 	Value *string `json:"value"`
 }
-
-// EnvironmentFileType represents an enum type
-type EnvironmentFileType string
 
 // EphemeralStorage represents the EphemeralStorage structure
 type EphemeralStorage struct {
@@ -835,9 +766,6 @@ type ExecuteCommandLogConfiguration struct {
 	S3EncryptionEnabled *bool `json:"s3EncryptionEnabled,omitempty"`
 	S3KeyPrefix *string `json:"s3KeyPrefix,omitempty"`
 }
-
-// ExecuteCommandLogging represents an enum type
-type ExecuteCommandLogging string
 
 // ExecuteCommandRequest represents the ExecuteCommandRequest structure
 type ExecuteCommandRequest struct {
@@ -887,9 +815,6 @@ type FirelensConfiguration struct {
 // FirelensConfigurationOptionsMap represents a map type  
 type FirelensConfigurationOptionsMap map[*string]*string
 
-// FirelensConfigurationType represents an enum type
-type FirelensConfigurationType string
-
 // GetTaskProtectionRequest represents the GetTaskProtectionRequest structure
 type GetTaskProtectionRequest struct {
 	Cluster *string `json:"cluster"`
@@ -910,9 +835,6 @@ type HealthCheck struct {
 	StartPeriod *int32 `json:"startPeriod,omitempty"`
 	Timeout *int32 `json:"timeout,omitempty"`
 }
-
-// HealthStatus represents an enum type
-type HealthStatus string
 
 // HostEntry represents the HostEntry structure
 type HostEntry struct {
@@ -948,12 +870,6 @@ type InstanceHealthCheckResult struct {
 	Type *InstanceHealthCheckType `json:"type,omitempty"`
 }
 
-// InstanceHealthCheckState represents an enum type
-type InstanceHealthCheckState string
-
-// InstanceHealthCheckType represents an enum type
-type InstanceHealthCheckType string
-
 // Integer represents an integer type alias
 type Integer int32
 
@@ -961,9 +877,6 @@ type Integer int32
 type InvalidParameterException struct {
 	Message *string `json:"message,omitempty"`
 }
-
-// IpcMode represents an enum type
-type IpcMode string
 
 // KernelCapabilities represents the KernelCapabilities structure
 type KernelCapabilities struct {
@@ -976,9 +889,6 @@ type KeyValuePair struct {
 	Name *string `json:"name,omitempty"`
 	Value *string `json:"value,omitempty"`
 }
-
-// LaunchType represents an enum type
-type LaunchType string
 
 // LimitExceededException represents the LimitExceededException structure
 type LimitExceededException struct {
@@ -1175,9 +1085,6 @@ type LogConfiguration struct {
 // LogConfigurationOptionsMap represents a map type  
 type LogConfigurationOptionsMap map[*string]*string
 
-// LogDriver represents an enum type
-type LogDriver string
-
 // Long represents a long type alias
 type Long int64
 
@@ -1189,9 +1096,6 @@ type ManagedAgent struct {
 	Reason *string `json:"reason,omitempty"`
 }
 
-// ManagedAgentName represents an enum type
-type ManagedAgentName string
-
 // ManagedAgentStateChange represents the ManagedAgentStateChange structure
 type ManagedAgentStateChange struct {
 	ContainerName *string `json:"containerName"`
@@ -1199,9 +1103,6 @@ type ManagedAgentStateChange struct {
 	Reason *string `json:"reason,omitempty"`
 	Status *string `json:"status"`
 }
-
-// ManagedDraining represents an enum type
-type ManagedDraining string
 
 // ManagedScaling represents the ManagedScaling structure
 type ManagedScaling struct {
@@ -1215,9 +1116,6 @@ type ManagedScaling struct {
 // ManagedScalingInstanceWarmupPeriod represents an integer type alias
 type ManagedScalingInstanceWarmupPeriod int32
 
-// ManagedScalingStatus represents an enum type
-type ManagedScalingStatus string
-
 // ManagedScalingStepSize represents an integer type alias
 type ManagedScalingStepSize int32
 
@@ -1229,9 +1127,6 @@ type ManagedStorageConfiguration struct {
 	FargateEphemeralStorageKmsKeyId *string `json:"fargateEphemeralStorageKmsKeyId,omitempty"`
 	KmsKeyId *string `json:"kmsKeyId,omitempty"`
 }
-
-// ManagedTerminationProtection represents an enum type
-type ManagedTerminationProtection string
 
 // MissingVersionException represents the MissingVersionException structure
 type MissingVersionException struct {
@@ -1272,19 +1167,10 @@ type NetworkInterface struct {
 	PrivateIpv4Address *string `json:"privateIpv4Address,omitempty"`
 }
 
-// NetworkMode represents an enum type
-type NetworkMode string
-
 // NoUpdateAvailableException represents the NoUpdateAvailableException structure
 type NoUpdateAvailableException struct {
 	Message *string `json:"message,omitempty"`
 }
-
-// OSFamily represents an enum type
-type OSFamily string
-
-// PidMode represents an enum type
-type PidMode string
 
 // PlacementConstraint represents the PlacementConstraint structure
 type PlacementConstraint struct {
@@ -1292,26 +1178,17 @@ type PlacementConstraint struct {
 	Type *PlacementConstraintType `json:"type,omitempty"`
 }
 
-// PlacementConstraintType represents an enum type
-type PlacementConstraintType string
-
 // PlacementStrategy represents the PlacementStrategy structure
 type PlacementStrategy struct {
 	Field *string `json:"field,omitempty"`
 	Type *PlacementStrategyType `json:"type,omitempty"`
 }
 
-// PlacementStrategyType represents an enum type
-type PlacementStrategyType string
-
 // PlatformDevice represents the PlatformDevice structure
 type PlatformDevice struct {
 	Id *string `json:"id"`
 	Type *PlatformDeviceType `json:"type"`
 }
-
-// PlatformDeviceType represents an enum type
-type PlatformDeviceType string
 
 // PlatformTaskDefinitionIncompatibilityException represents the PlatformTaskDefinitionIncompatibilityException structure
 type PlatformTaskDefinitionIncompatibilityException struct {
@@ -1336,9 +1213,6 @@ type PortMapping struct {
 // PortNumber represents an integer type alias
 type PortNumber int32
 
-// PropagateTags represents an enum type
-type PropagateTags string
-
 // ProtectedTask represents the ProtectedTask structure
 type ProtectedTask struct {
 	ExpirationDate *time.Time `json:"expirationDate,omitempty"`
@@ -1352,9 +1226,6 @@ type ProxyConfiguration struct {
 	Properties []KeyValuePair `json:"properties,omitempty"`
 	Type *ProxyConfigurationType `json:"type,omitempty"`
 }
-
-// ProxyConfigurationType represents an enum type
-type ProxyConfigurationType string
 
 // PutAccountSettingDefaultRequest represents the PutAccountSettingDefaultRequest structure
 type PutAccountSettingDefaultRequest struct {
@@ -1479,9 +1350,6 @@ type ResourceRequirement struct {
 	Value *string `json:"value"`
 }
 
-// ResourceType represents an enum type
-type ResourceType string
-
 // Rollback represents the Rollback structure
 type Rollback struct {
 	Reason *string `json:"reason,omitempty"`
@@ -1529,15 +1397,6 @@ type Scale struct {
 	Unit *ScaleUnit `json:"unit,omitempty"`
 	Value *float64 `json:"value,omitempty"`
 }
-
-// ScaleUnit represents an enum type
-type ScaleUnit string
-
-// SchedulingStrategy represents an enum type
-type SchedulingStrategy string
-
-// Scope represents an enum type
-type Scope string
 
 // Secret represents the Secret structure
 type Secret struct {
@@ -1683,21 +1542,12 @@ type ServiceDeploymentNotFoundException struct {
 	Message *string `json:"message,omitempty"`
 }
 
-// ServiceDeploymentRollbackMonitorsStatus represents an enum type
-type ServiceDeploymentRollbackMonitorsStatus string
-
-// ServiceDeploymentStatus represents an enum type
-type ServiceDeploymentStatus string
-
 // ServiceEvent represents the ServiceEvent structure
 type ServiceEvent struct {
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	Id *string `json:"id,omitempty"`
 	Message *string `json:"message,omitempty"`
 }
-
-// ServiceField represents an enum type
-type ServiceField string
 
 // ServiceManagedEBSVolumeConfiguration represents the ServiceManagedEBSVolumeConfiguration structure
 type ServiceManagedEBSVolumeConfiguration struct {
@@ -1783,18 +1633,6 @@ type Setting struct {
 	Value *string `json:"value,omitempty"`
 }
 
-// SettingName represents an enum type
-type SettingName string
-
-// SettingType represents an enum type
-type SettingType string
-
-// SortOrder represents an enum type
-type SortOrder string
-
-// StabilityStatus represents an enum type
-type StabilityStatus string
-
 // StartTaskRequest represents the StartTaskRequest structure
 type StartTaskRequest struct {
 	Cluster *string `json:"cluster,omitempty"`
@@ -1828,9 +1666,6 @@ type StopServiceDeploymentRequest struct {
 type StopServiceDeploymentResponse struct {
 	ServiceDeploymentArn *string `json:"serviceDeploymentArn,omitempty"`
 }
-
-// StopServiceDeploymentStopType represents an enum type
-type StopServiceDeploymentStopType string
 
 // StopTaskRequest represents the StopTaskRequest structure
 type StopTaskRequest struct {
@@ -1935,9 +1770,6 @@ type TargetNotFoundException struct {
 	Message *string `json:"message,omitempty"`
 }
 
-// TargetType represents an enum type
-type TargetType string
-
 // Task represents the Task structure
 type Task struct {
 	Attachments []Attachment `json:"attachments,omitempty"`
@@ -2008,35 +1840,17 @@ type TaskDefinition struct {
 	Volumes []Volume `json:"volumes,omitempty"`
 }
 
-// TaskDefinitionFamilyStatus represents an enum type
-type TaskDefinitionFamilyStatus string
-
-// TaskDefinitionField represents an enum type
-type TaskDefinitionField string
-
 // TaskDefinitionPlacementConstraint represents the TaskDefinitionPlacementConstraint structure
 type TaskDefinitionPlacementConstraint struct {
 	Expression *string `json:"expression,omitempty"`
 	Type *TaskDefinitionPlacementConstraintType `json:"type,omitempty"`
 }
 
-// TaskDefinitionPlacementConstraintType represents an enum type
-type TaskDefinitionPlacementConstraintType string
-
-// TaskDefinitionStatus represents an enum type
-type TaskDefinitionStatus string
-
 // TaskEphemeralStorage represents the TaskEphemeralStorage structure
 type TaskEphemeralStorage struct {
 	KmsKeyId *string `json:"kmsKeyId,omitempty"`
 	SizeInGiB *int32 `json:"sizeInGiB,omitempty"`
 }
-
-// TaskField represents an enum type
-type TaskField string
-
-// TaskFilesystemType represents an enum type
-type TaskFilesystemType string
 
 // TaskManagedEBSVolumeConfiguration represents the TaskManagedEBSVolumeConfiguration structure
 type TaskManagedEBSVolumeConfiguration struct {
@@ -2099,16 +1913,10 @@ type TaskSet struct {
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 }
 
-// TaskSetField represents an enum type
-type TaskSetField string
-
 // TaskSetNotFoundException represents the TaskSetNotFoundException structure
 type TaskSetNotFoundException struct {
 	Message *string `json:"message,omitempty"`
 }
-
-// TaskStopCode represents an enum type
-type TaskStopCode string
 
 // TaskVolumeConfiguration represents the TaskVolumeConfiguration structure
 type TaskVolumeConfiguration struct {
@@ -2132,18 +1940,12 @@ type Tmpfs struct {
 	Size *int32 `json:"size"`
 }
 
-// TransportProtocol represents an enum type
-type TransportProtocol string
-
 // Ulimit represents the Ulimit structure
 type Ulimit struct {
 	HardLimit *int32 `json:"hardLimit"`
 	Name *UlimitName `json:"name"`
 	SoftLimit *int32 `json:"softLimit"`
 }
-
-// UlimitName represents an enum type
-type UlimitName string
 
 // UnsupportedFeatureException represents the UnsupportedFeatureException structure
 type UnsupportedFeatureException struct {
@@ -2292,9 +2094,6 @@ type UpdateTaskSetRequest struct {
 type UpdateTaskSetResponse struct {
 	TaskSet *TaskSet `json:"taskSet,omitempty"`
 }
-
-// VersionConsistency represents an enum type
-type VersionConsistency string
 
 // VersionInfo represents the VersionInfo structure
 type VersionInfo struct {
