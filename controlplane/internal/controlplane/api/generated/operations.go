@@ -79,12 +79,6 @@ func NewECSService() *ECSService {
 	return &ECSService{}
 }
 
-// NewECSServiceWithStorage creates a new ECS service instance with storage
-// Note: Storage is handled in ecs_handler.go, not in generated code
-func NewECSServiceWithStorage(storage interface{}) *ECSService {
-	return &ECSService{}
-}
-
 // CreateCapacityProvider implements the CreateCapacityProvider operation
 func (s *ECSService) CreateCapacityProvider(ctx context.Context, req *CreateCapacityProviderRequest) (*CreateCapacityProviderResponse, error) {
 	// TODO: Implement CreateCapacityProvider operation
@@ -1166,4 +1160,3 @@ func HandleUpdateTaskSet(service ECSServiceInterface) http.HandlerFunc {
 		w.Write([]byte("{}"))
 	}
 }
-
