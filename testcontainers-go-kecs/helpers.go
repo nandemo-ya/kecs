@@ -86,7 +86,7 @@ func WaitForTask(ctx context.Context, client *ecs.Client, clusterName, taskArn s
 				return fmt.Errorf("failed to describe task: %w", err)
 			}
 
-			if len(output.Tasks) > 0 && string(output.Tasks[0].LastStatus) == desiredStatus {
+			if len(output.Tasks) > 0 && aws.ToString(output.Tasks[0].LastStatus) == desiredStatus {
 				return nil
 			}
 		}

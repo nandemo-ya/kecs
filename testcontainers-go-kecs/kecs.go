@@ -18,7 +18,7 @@ import (
 
 const (
 	// DefaultImage is the default KECS Docker image
-	DefaultImage = "ghcr.io/nandemo-ya/kecs:latest"
+	DefaultImage = "kecs:test"
 	
 	// DefaultAPIPort is the default port for the ECS API
 	DefaultAPIPort = "8080"
