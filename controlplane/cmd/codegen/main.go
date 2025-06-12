@@ -147,6 +147,10 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 					Documentation: extractDocumentation(member.Traits),
 				})
 			}
+			// Sort members for consistent output
+			sort.Slice(members, func(i, j int) bool {
+				return members[i].Name < members[j].Name
+			})
 			
 			types = append(types, TypeDef{
 				Name:         typeName,
@@ -310,7 +314,7 @@ import "time"
 // {{ .Name }} represents the {{ .Name }} structure
 type {{ .Name }} struct {
 {{- range .Members }}
-	{{ .Name }} {{ .Type }} ` + "`json:\"{{ toLowerCamel .Name }}{{ if not .Required }},omitempty{{ end }}\"`" + `
+	{{ toCamelCase .Name }} {{ .Type }} ` + "`json:\"{{ toLowerCamel .Name }}{{ if not .Required }},omitempty{{ end }}\"`" + `
 {{- end }}
 }
 {{- else if eq .Type "list" }}
@@ -346,6 +350,7 @@ func generateTypes(filename string, types []TypeDef) error {
 	funcMap := template.FuncMap{
 		"mapType": mapType,
 		"toLowerCamel": toLowerCamel,
+		"toCamelCase": toCamelCase,
 	}
 
 	tmpl, err := template.New("types").Funcs(funcMap).Parse(typesTemplate)
@@ -433,4 +438,11 @@ func toLowerCamel(s string) string {
 		return s
 	}
 	return strings.ToLower(s[:1]) + s[1:]
+}
+
+func toCamelCase(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
