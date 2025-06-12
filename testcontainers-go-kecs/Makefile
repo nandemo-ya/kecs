@@ -5,11 +5,11 @@ default: test
 
 # Run all tests
 test:
-	go test -v -race ./...
+	ginkgo -v -race ./...
 
 # Run example tests
 test-examples:
-	cd examples && go test -v -race ./...
+	cd examples && ginkgo -v -race ./...
 
 # Run tests with coverage
 test-coverage:
