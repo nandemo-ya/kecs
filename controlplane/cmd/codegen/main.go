@@ -183,6 +183,26 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 					Documentation: extractDocumentation(shape.Traits),
 				})
 			}
+		case "enum":
+			// Extract enum type definitions
+			typeName := extractTypeName(shapeID)
+			types = append(types, TypeDef{
+				Name:         typeName,
+				Type:         "enum",
+				Documentation: extractDocumentation(shape.Traits),
+			})
+		case "integer", "long", "boolean", "string", "double", "timestamp":
+			// Extract primitive type aliases
+			typeName := extractTypeName(shapeID)
+			// Skip built-in Smithy types
+			if strings.HasPrefix(shapeID, "smithy.api#") {
+				continue
+			}
+			types = append(types, TypeDef{
+				Name:         typeName,
+				Type:         shape.Type,
+				Documentation: extractDocumentation(shape.Traits),
+			})
 		}
 	}
 
@@ -325,6 +345,34 @@ type {{ .Name }} []{{ (index .Members 0).Type }}
 
 // {{ .Name }} represents a map type  
 type {{ .Name }} map[{{ (index .Members 0).Type }}]{{ (index .Members 1).Type }}
+{{- else if eq .Type "enum" }}
+
+// {{ .Name }} represents an enum type
+type {{ .Name }} string
+{{- else if eq .Type "integer" }}
+
+// {{ .Name }} represents an integer type alias
+type {{ .Name }} int32
+{{- else if eq .Type "long" }}
+
+// {{ .Name }} represents a long type alias
+type {{ .Name }} int64
+{{- else if eq .Type "boolean" }}
+
+// {{ .Name }} represents a boolean type alias
+type {{ .Name }} bool
+{{- else if eq .Type "string" }}
+
+// {{ .Name }} represents a string type alias
+type {{ .Name }} string
+{{- else if eq .Type "double" }}
+
+// {{ .Name }} represents a double type alias
+type {{ .Name }} float64
+{{- else if eq .Type "timestamp" }}
+
+// {{ .Name }} represents a timestamp type alias
+type {{ .Name }} time.Time
 {{- end }}
 {{- end }}
 `
