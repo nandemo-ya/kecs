@@ -107,7 +107,7 @@ type RunTaskRequest struct {
 	Group                    string                    `json:"group,omitempty"`
 	StartedBy                string                    `json:"startedBy,omitempty"`
 	LaunchType               string                    `json:"launchType,omitempty"`
-	CapacityProviderStrategy []CapacityStrategy        `json:"capacityProviderStrategy,omitempty"`
+	CapacityProviderStrategy []*CapacityStrategy        `json:"capacityProviderStrategy,omitempty"`
 	PlacementConstraints     []TaskPlacementConstraint `json:"placementConstraints,omitempty"`
 	PlacementStrategy        []PlacementStrategy       `json:"placementStrategy,omitempty"`
 	PlatformVersion          string                    `json:"platformVersion,omitempty"`

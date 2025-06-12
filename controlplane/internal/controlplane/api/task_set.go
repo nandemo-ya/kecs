@@ -15,7 +15,7 @@ type CreateTaskSetRequest struct {
 	LoadBalancers     []LoadBalancer        `json:"loadBalancers,omitempty"`
 	ServiceRegistries []ServiceRegistry     `json:"serviceRegistries,omitempty"`
 	LaunchType        string                `json:"launchType,omitempty"`
-	CapacityProviderStrategy []CapacityStrategy `json:"capacityProviderStrategy,omitempty"`
+	CapacityProviderStrategy []*CapacityStrategy `json:"capacityProviderStrategy,omitempty"`
 	PlatformVersion   string                `json:"platformVersion,omitempty"`
 	Scale             *Scale                `json:"scale,omitempty"`
 	ClientToken       string                `json:"clientToken,omitempty"`

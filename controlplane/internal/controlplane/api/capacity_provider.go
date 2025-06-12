@@ -82,7 +82,7 @@ type DescribeCapacityProvidersResponse struct {
 type PutClusterCapacityProvidersRequest struct {
 	Cluster                       string             `json:"cluster"`
 	CapacityProviders             []string           `json:"capacityProviders"`
-	DefaultCapacityProviderStrategy []CapacityStrategy `json:"defaultCapacityProviderStrategy"`
+	DefaultCapacityProviderStrategy []*CapacityStrategy `json:"defaultCapacityProviderStrategy"`
 }
 
 // PutClusterCapacityProvidersResponse represents the response from putting cluster capacity providers
