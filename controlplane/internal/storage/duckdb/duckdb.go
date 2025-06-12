@@ -61,6 +61,11 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 	log.Println("Initializing DuckDB storage...")
 
+	// Migrate existing tables if needed
+	if err := s.migrateSchema(ctx); err != nil {
+		return fmt.Errorf("failed to migrate schema: %w", err)
+	}
+
 	// Create clusters table
 	if err := s.createClustersTable(ctx); err != nil {
 		return fmt.Errorf("failed to create clusters table: %w", err)
@@ -142,16 +147,16 @@ func (s *DuckDBStorage) createClustersTable(ctx context.Context) error {
 		status VARCHAR NOT NULL,
 		region VARCHAR NOT NULL,
 		account_id VARCHAR NOT NULL,
-		configuration JSON,
-		settings JSON,
-		tags JSON,
+		configuration VARCHAR,
+		settings VARCHAR,
+		tags VARCHAR,
 		kind_cluster_name VARCHAR,
 		registered_container_instances_count INTEGER DEFAULT 0,
 		running_tasks_count INTEGER DEFAULT 0,
 		pending_tasks_count INTEGER DEFAULT 0,
 		active_services_count INTEGER DEFAULT 0,
-		capacity_providers JSON,
-		default_capacity_provider_strategy JSON,
+		capacity_providers VARCHAR,
+		default_capacity_provider_strategy VARCHAR,
 		created_at TIMESTAMP NOT NULL,
 		updated_at TIMESTAMP NOT NULL
 	)`
@@ -322,4 +327,129 @@ func (t *duckDBTransaction) Commit() error {
 
 func (t *duckDBTransaction) Rollback() error {
 	return t.tx.Rollback()
+}
+
+// migrateSchema migrates existing database schema to new format
+func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
+	// Check if clusters table exists
+	var tableExists bool
+	err := s.db.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.tables 
+			WHERE table_name = 'clusters'
+		)
+	`).Scan(&tableExists)
+	if err != nil || !tableExists {
+		// Table doesn't exist, no migration needed
+		return nil
+	}
+
+	// Check if tags column is JSON type (old schema)
+	var dataType string
+	err = s.db.QueryRowContext(ctx, `
+		SELECT data_type 
+		FROM information_schema.columns 
+		WHERE table_name = 'clusters' AND column_name = 'tags'
+	`).Scan(&dataType)
+	if err != nil {
+		// Column doesn't exist or error checking, skip migration
+		return nil
+	}
+
+	if dataType != "JSON" {
+		// Already migrated
+		return nil
+	}
+
+	log.Println("Migrating clusters table from JSON to VARCHAR columns...")
+
+	// Create a transaction for the migration
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Create temporary table with new schema
+	_, err = tx.ExecContext(ctx, `
+		CREATE TABLE clusters_new (
+			id VARCHAR PRIMARY KEY,
+			arn VARCHAR NOT NULL UNIQUE,
+			name VARCHAR NOT NULL UNIQUE,
+			status VARCHAR NOT NULL,
+			region VARCHAR NOT NULL,
+			account_id VARCHAR NOT NULL,
+			configuration VARCHAR,
+			settings VARCHAR,
+			tags VARCHAR,
+			kind_cluster_name VARCHAR,
+			registered_container_instances_count INTEGER DEFAULT 0,
+			running_tasks_count INTEGER DEFAULT 0,
+			pending_tasks_count INTEGER DEFAULT 0,
+			active_services_count INTEGER DEFAULT 0,
+			capacity_providers VARCHAR,
+			default_capacity_provider_strategy VARCHAR,
+			created_at TIMESTAMP NOT NULL,
+			updated_at TIMESTAMP NOT NULL
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create new table: %w", err)
+	}
+
+	// Copy data with JSON to VARCHAR conversion
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO clusters_new
+		SELECT 
+			id, arn, name, status, region, account_id,
+			CAST(configuration AS VARCHAR),
+			CAST(settings AS VARCHAR),
+			CAST(tags AS VARCHAR),
+			kind_cluster_name,
+			registered_container_instances_count,
+			running_tasks_count,
+			pending_tasks_count,
+			active_services_count,
+			CAST(capacity_providers AS VARCHAR),
+			CAST(default_capacity_provider_strategy AS VARCHAR),
+			created_at, updated_at
+		FROM clusters
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy data: %w", err)
+	}
+
+	// Drop old table
+	_, err = tx.ExecContext(ctx, "DROP TABLE clusters")
+	if err != nil {
+		return fmt.Errorf("failed to drop old table: %w", err)
+	}
+
+	// Rename new table
+	_, err = tx.ExecContext(ctx, "ALTER TABLE clusters_new RENAME TO clusters")
+	if err != nil {
+		return fmt.Errorf("failed to rename table: %w", err)
+	}
+
+	// Recreate indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_clusters_name ON clusters(name)",
+		"CREATE INDEX IF NOT EXISTS idx_clusters_status ON clusters(status)",
+		"CREATE INDEX IF NOT EXISTS idx_clusters_region ON clusters(region)",
+		"CREATE INDEX IF NOT EXISTS idx_clusters_account_id ON clusters(account_id)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := tx.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit migration: %w", err)
+	}
+
+	log.Println("Successfully migrated clusters table")
+	return nil
 }
