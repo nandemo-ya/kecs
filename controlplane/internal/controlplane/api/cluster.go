@@ -18,7 +18,7 @@ type Cluster struct {
 	Tags                              []Tag             `json:"tags,omitempty"`
 	Settings                          []ClusterSetting  `json:"settings,omitempty"`
 	CapacityProviders                 []string          `json:"capacityProviders,omitempty"`
-	DefaultCapacityProviderStrategy   []CapacityStrategy `json:"defaultCapacityProviderStrategy,omitempty"`
+	DefaultCapacityProviderStrategy   []*CapacityStrategy `json:"defaultCapacityProviderStrategy,omitempty"`
 	Attachments                       []Attachment      `json:"attachments,omitempty"`
 	AttachmentsStatus                 string            `json:"attachmentsStatus,omitempty"`
 }
@@ -62,7 +62,7 @@ type CreateClusterRequest struct {
 	Tags                            []Tag             `json:"tags,omitempty"`
 	Settings                        []ClusterSetting  `json:"settings,omitempty"`
 	CapacityProviders               []string          `json:"capacityProviders,omitempty"`
-	DefaultCapacityProviderStrategy []CapacityStrategy `json:"defaultCapacityProviderStrategy,omitempty"`
+	DefaultCapacityProviderStrategy []*CapacityStrategy `json:"defaultCapacityProviderStrategy,omitempty"`
 }
 
 // CreateClusterResponse represents the response from creating a cluster
@@ -116,7 +116,7 @@ type UpdateClusterRequest struct {
 	Cluster                         string            `json:"cluster"`
 	Settings                        []ClusterSetting  `json:"settings,omitempty"`
 	CapacityProviders               []string          `json:"capacityProviders,omitempty"`
-	DefaultCapacityProviderStrategy []CapacityStrategy `json:"defaultCapacityProviderStrategy,omitempty"`
+	DefaultCapacityProviderStrategy []*CapacityStrategy `json:"defaultCapacityProviderStrategy,omitempty"`
 }
 
 // UpdateClusterResponse represents the response from updating a cluster

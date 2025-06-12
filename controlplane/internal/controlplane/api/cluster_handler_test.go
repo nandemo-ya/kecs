@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -106,9 +105,11 @@ var _ = Describe("ClusterHandler", func() {
 	)
 
 	BeforeEach(func() {
+		mockStorage := NewMockStorage()
 		server = &Server{
-			storage:     NewMockStorage(),
+			storage:     mockStorage,
 			kindManager: nil, // Skip actual kind cluster creation in tests
+			ecsAPI:      NewDefaultECSAPI(mockStorage, nil),
 		}
 		ctx = context.Background()
 	})
@@ -116,19 +117,19 @@ var _ = Describe("ClusterHandler", func() {
 	Describe("CreateClusterWithStorage", func() {
 		Context("when creating a cluster with random name", func() {
 			It("should create cluster with a specific name", func() {
+				clusterName := "test-cluster"
 				req := &generated.CreateClusterRequest{
-					"clusterName": "test-cluster",
+					ClusterName: &clusterName,
 				}
 
 				resp, err := server.CreateClusterWithStorage(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify response
-				clusterData, ok := (*resp)["cluster"].(map[string]interface{})
-				Expect(ok).To(BeTrue())
-
-				clusterName, _ := clusterData["clusterName"].(string)
-				Expect(clusterName).To(Equal("test-cluster"))
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Cluster).NotTo(BeNil())
+				Expect(resp.Cluster.ClusterName).NotTo(BeNil())
+				Expect(*resp.Cluster.ClusterName).To(Equal("test-cluster"))
 
 				// Get the cluster from storage to check the kind cluster name
 				cluster, err := server.storage.ClusterStore().Get(ctx, "test-cluster")
@@ -136,16 +137,16 @@ var _ = Describe("ClusterHandler", func() {
 
 				// Verify that the kind cluster name follows the expected pattern
 				Expect(cluster.KindClusterName).To(HavePrefix("kecs-"))
-
-				// The name should have 3 parts: kecs-adjective-noun
-				parts := strings.Split(cluster.KindClusterName, "-")
-				Expect(parts).To(HaveLen(3))
+				
+				// Should be kecs-<cluster-name>
+				Expect(cluster.KindClusterName).To(Equal("kecs-test-cluster"))
 			})
 
 			It("should create different random names for different clusters", func() {
 				// Create first cluster
+				clusterName1 := "test-cluster-1"
 				req1 := &generated.CreateClusterRequest{
-					"clusterName": "test-cluster-1",
+					ClusterName: &clusterName1,
 				}
 				_, err := server.CreateClusterWithStorage(ctx, req1)
 				Expect(err).NotTo(HaveOccurred())
@@ -154,8 +155,9 @@ var _ = Describe("ClusterHandler", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// Create second cluster
+				clusterName2 := "test-cluster-2"
 				req2 := &generated.CreateClusterRequest{
-					"clusterName": "test-cluster-2",
+					ClusterName: &clusterName2,
 				}
 				_, err = server.CreateClusterWithStorage(ctx, req2)
 				Expect(err).NotTo(HaveOccurred())
@@ -170,8 +172,9 @@ var _ = Describe("ClusterHandler", func() {
 
 		Context("when creating a cluster with idempotency", func() {
 			It("should return existing cluster when name already exists", func() {
+				clusterName := "idempotent-test"
 				req := &generated.CreateClusterRequest{
-					"clusterName": "idempotent-test",
+					ClusterName: &clusterName,
 				}
 
 				// First call - should create the cluster
@@ -179,12 +182,15 @@ var _ = Describe("ClusterHandler", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify first response
-				clusterData1, ok := (*resp1)["cluster"].(map[string]interface{})
-				Expect(ok).To(BeTrue())
+				Expect(resp1).NotTo(BeNil())
+				Expect(resp1.Cluster).NotTo(BeNil())
+				Expect(resp1.Cluster.ClusterArn).NotTo(BeNil())
+				Expect(resp1.Cluster.ClusterName).NotTo(BeNil())
+				Expect(resp1.Cluster.Status).NotTo(BeNil())
 
-				clusterArn1, _ := clusterData1["clusterArn"].(string)
-				clusterName1, _ := clusterData1["clusterName"].(string)
-				status1, _ := clusterData1["status"].(string)
+				clusterArn1 := *resp1.Cluster.ClusterArn
+				clusterName1 := *resp1.Cluster.ClusterName
+				status1 := *resp1.Cluster.Status
 
 				Expect(clusterName1).To(Equal("idempotent-test"))
 				Expect(status1).To(Equal("ACTIVE"))
@@ -194,12 +200,15 @@ var _ = Describe("ClusterHandler", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify second response
-				clusterData2, ok := (*resp2)["cluster"].(map[string]interface{})
-				Expect(ok).To(BeTrue())
+				Expect(resp2).NotTo(BeNil())
+				Expect(resp2.Cluster).NotTo(BeNil())
+				Expect(resp2.Cluster.ClusterArn).NotTo(BeNil())
+				Expect(resp2.Cluster.ClusterName).NotTo(BeNil())
+				Expect(resp2.Cluster.Status).NotTo(BeNil())
 
-				clusterArn2, _ := clusterData2["clusterArn"].(string)
-				clusterName2, _ := clusterData2["clusterName"].(string)
-				status2, _ := clusterData2["status"].(string)
+				clusterArn2 := *resp2.Cluster.ClusterArn
+				clusterName2 := *resp2.Cluster.ClusterName
+				status2 := *resp2.Cluster.Status
 
 				// Verify both responses are identical
 				Expect(clusterArn1).To(Equal(clusterArn2))

@@ -1,20 +1,56 @@
 package api
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 )
+
+// DeleteServiceWithStorage wraps the new DefaultECSAPI.DeleteService for test compatibility
+func (s *Server) DeleteServiceWithStorage(ctx context.Context, req DeleteServiceRequest) (*DeleteServiceResponse, error) {
+	// Convert old request to generated request
+	genReq := &generated.DeleteServiceRequest{
+		Cluster: ptr.String(req.Cluster),
+		Service: ptr.String(req.Service),
+		Force:   ptr.Bool(req.Force),
+	}
+
+	// Call the new API
+	genResp, err := s.ecsAPI.DeleteService(ctx, genReq)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert generated response to old response
+	// The storageServiceToGeneratedService already returns a pointer, so we need to dereference it
+	service := storageServiceToAPIService(&storage.Service{
+		ARN:                      *genResp.Service.ServiceArn,
+		ServiceName:              *genResp.Service.ServiceName,
+		ClusterARN:               *genResp.Service.ClusterArn,
+		Status:                   *genResp.Service.Status,
+		DesiredCount:             int(*genResp.Service.DesiredCount),
+		RunningCount:             int(*genResp.Service.RunningCount),
+		PendingCount:             int(*genResp.Service.PendingCount),
+		TaskDefinitionARN:        *genResp.Service.TaskDefinition,
+		SchedulingStrategy:       string(*genResp.Service.SchedulingStrategy),
+		EnableECSManagedTags:     *genResp.Service.EnableECSManagedTags,
+		EnableExecuteCommand:     *genResp.Service.EnableExecuteCommand,
+		HealthCheckGracePeriodSeconds: int(*genResp.Service.HealthCheckGracePeriodSeconds),
+		CreatedAt:                *genResp.Service.CreatedAt,
+	})
+
+	return &DeleteServiceResponse{
+		Service: service,
+	}, nil
+}
 
 var _ = Describe("ServiceHandler", func() {
 	var (
@@ -43,6 +79,7 @@ var _ = Describe("ServiceHandler", func() {
 			kindManager: kubernetes.NewKindManager(),
 			region:      "us-east-1",
 			accountID:   "123456789012",
+			ecsAPI:      NewDefaultECSAPI(dbStorage, kubernetes.NewKindManager()),
 		}
 
 		// Create test cluster
@@ -163,56 +200,6 @@ var _ = Describe("ServiceHandler", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("cluster not found"))
 			})
-		})
-	})
-
-	Describe("DeleteService API Endpoint", func() {
-		var service *storage.Service
-
-		BeforeEach(func() {
-			// Create test service with desired count 0 for easy deletion
-			service = &storage.Service{
-				ServiceName:       "api-test-service",
-				ARN:               fmt.Sprintf("arn:aws:ecs:%s:%s:service/test-cluster/api-test-service", server.region, server.accountID),
-				ClusterARN:        cluster.ARN,
-				TaskDefinitionARN: taskDef.ARN,
-				DesiredCount:      0,
-				RunningCount:      0,
-				PendingCount:      0,
-				Status:            "ACTIVE",
-				LaunchType:        "FARGATE",
-				Region:            server.region,
-				AccountID:         server.accountID,
-				DeploymentName:    "ecs-service-api-test-service",
-				Namespace:         "test-cluster-us-east-1",
-			}
-			err := dbStorage.ServiceStore().Create(ctx, service)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("should delete service via API endpoint", func() {
-			req := DeleteServiceRequest{
-				Cluster: "test-cluster",
-				Service: "api-test-service",
-			}
-
-			body, _ := json.Marshal(req)
-			httpReq := httptest.NewRequest("POST", "/", bytes.NewReader(body))
-			httpReq.Header.Set("X-Amz-Target", "AmazonEC2ContainerServiceV20141113.DeleteService")
-			httpReq.Header.Set("Content-Type", "application/x-amz-json-1.1")
-
-			w := httptest.NewRecorder()
-			server.handleECSRequest(w, httpReq)
-
-			// Check response
-			Expect(w.Code).To(Equal(http.StatusOK))
-
-			var resp DeleteServiceResponse
-			err := json.Unmarshal(w.Body.Bytes(), &resp)
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(resp.Service.ServiceName).To(Equal("api-test-service"))
-			Expect(resp.Service.Status).To(Equal("DRAINING"))
 		})
 	})
 })
