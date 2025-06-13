@@ -98,7 +98,7 @@ func (m *MockClusterStore) Delete(ctx context.Context, clusterName string) error
 	return nil
 }
 
-var _ = Describe("ClusterHandler", func() {
+var _ = Describe("Cluster ECS API", func() {
 	var (
 		server *Server
 		ctx    context.Context
@@ -114,7 +114,7 @@ var _ = Describe("ClusterHandler", func() {
 		ctx = context.Background()
 	})
 
-	Describe("CreateClusterWithStorage", func() {
+	Describe("CreateCluster", func() {
 		Context("when creating a cluster with random name", func() {
 			It("should create cluster with a specific name", func() {
 				clusterName := "test-cluster"
@@ -122,7 +122,7 @@ var _ = Describe("ClusterHandler", func() {
 					ClusterName: &clusterName,
 				}
 
-				resp, err := server.CreateClusterWithStorage(ctx, req)
+				resp, err := server.ecsAPI.CreateCluster(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify response
@@ -148,7 +148,7 @@ var _ = Describe("ClusterHandler", func() {
 				req1 := &generated.CreateClusterRequest{
 					ClusterName: &clusterName1,
 				}
-				_, err := server.CreateClusterWithStorage(ctx, req1)
+				_, err := server.ecsAPI.CreateCluster(ctx, req1)
 				Expect(err).NotTo(HaveOccurred())
 
 				cluster1, err := server.storage.ClusterStore().Get(ctx, "test-cluster-1")
@@ -159,7 +159,7 @@ var _ = Describe("ClusterHandler", func() {
 				req2 := &generated.CreateClusterRequest{
 					ClusterName: &clusterName2,
 				}
-				_, err = server.CreateClusterWithStorage(ctx, req2)
+				_, err = server.ecsAPI.CreateCluster(ctx, req2)
 				Expect(err).NotTo(HaveOccurred())
 
 				cluster2, err := server.storage.ClusterStore().Get(ctx, "test-cluster-2")
@@ -178,7 +178,7 @@ var _ = Describe("ClusterHandler", func() {
 				}
 
 				// First call - should create the cluster
-				resp1, err := server.CreateClusterWithStorage(ctx, req)
+				resp1, err := server.ecsAPI.CreateCluster(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify first response
@@ -196,7 +196,7 @@ var _ = Describe("ClusterHandler", func() {
 				Expect(status1).To(Equal("ACTIVE"))
 
 				// Second call - should return the existing cluster (idempotent)
-				resp2, err := server.CreateClusterWithStorage(ctx, req)
+				resp2, err := server.ecsAPI.CreateCluster(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify second response
@@ -227,6 +227,172 @@ var _ = Describe("ClusterHandler", func() {
 				}
 
 				Expect(clusterCount).To(Equal(1))
+			})
+		})
+	})
+
+	Describe("ListClusters", func() {
+		Context("when listing clusters", func() {
+			It("should return empty list when no clusters exist", func() {
+				req := &generated.ListClustersRequest{}
+				
+				resp, err := server.ecsAPI.ListClusters(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.ClusterArns).To(BeEmpty())
+			})
+
+			It("should return all cluster ARNs", func() {
+				// Create test clusters
+				clusterNames := []string{"cluster-1", "cluster-2", "cluster-3"}
+				for _, name := range clusterNames {
+					clusterName := name
+					_, err := server.ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{
+						ClusterName: &clusterName,
+					})
+					Expect(err).NotTo(HaveOccurred())
+				}
+
+				// List clusters
+				req := &generated.ListClustersRequest{}
+				resp, err := server.ecsAPI.ListClusters(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.ClusterArns).To(HaveLen(3))
+				
+				// Verify all ARNs are present
+				arnMap := make(map[string]bool)
+				for _, arn := range resp.ClusterArns {
+					arnMap[arn] = true
+				}
+				
+				for _, name := range clusterNames {
+					expectedArn := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/" + name
+					Expect(arnMap).To(HaveKey(expectedArn))
+				}
+			})
+		})
+	})
+
+	Describe("DescribeClusters", func() {
+		Context("when describing clusters", func() {
+			BeforeEach(func() {
+				// Create test clusters
+				clusterNames := []string{"describe-test-1", "describe-test-2"}
+				for _, name := range clusterNames {
+					clusterName := name
+					_, err := server.ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{
+						ClusterName: &clusterName,
+					})
+					Expect(err).NotTo(HaveOccurred())
+				}
+			})
+
+			It("should describe all clusters when no specific clusters requested", func() {
+				req := &generated.DescribeClustersRequest{}
+				
+				resp, err := server.ecsAPI.DescribeClusters(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Clusters).To(HaveLen(2))
+				Expect(resp.Failures).To(BeEmpty())
+			})
+
+			It("should describe specific clusters by name", func() {
+				req := &generated.DescribeClustersRequest{
+					Clusters: []string{"describe-test-1"},
+				}
+				
+				resp, err := server.ecsAPI.DescribeClusters(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Clusters).To(HaveLen(1))
+				Expect(*resp.Clusters[0].ClusterName).To(Equal("describe-test-1"))
+				Expect(resp.Failures).To(BeEmpty())
+			})
+
+			It("should return failure for non-existent cluster", func() {
+				req := &generated.DescribeClustersRequest{
+					Clusters: []string{"non-existent-cluster"},
+				}
+				
+				resp, err := server.ecsAPI.DescribeClusters(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Clusters).To(BeEmpty())
+				Expect(resp.Failures).To(HaveLen(1))
+				Expect(*resp.Failures[0].Reason).To(Equal("MISSING"))
+			})
+		})
+	})
+
+	Describe("DeleteCluster", func() {
+		Context("when deleting a cluster", func() {
+			It("should delete an existing cluster", func() {
+				// Create a cluster first
+				clusterName := "delete-test"
+				_, err := server.ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{
+					ClusterName: &clusterName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				// Delete the cluster
+				req := &generated.DeleteClusterRequest{
+					Cluster: &clusterName,
+				}
+				
+				resp, err := server.ecsAPI.DeleteCluster(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Cluster).NotTo(BeNil())
+				Expect(*resp.Cluster.ClusterName).To(Equal("delete-test"))
+				Expect(*resp.Cluster.Status).To(Equal("INACTIVE"))
+
+				// Verify cluster is deleted from storage
+				_, err = server.storage.ClusterStore().Get(ctx, "delete-test")
+				Expect(err).To(HaveOccurred())
+			})
+
+			It("should fail when cluster has active services", func() {
+				// Create a cluster with active services count
+				clusterName := "cluster-with-services"
+				_, err := server.ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{
+					ClusterName: &clusterName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				// Simulate active services by updating the cluster
+				cluster, err := server.storage.ClusterStore().Get(ctx, clusterName)
+				Expect(err).NotTo(HaveOccurred())
+				cluster.ActiveServicesCount = 1
+				err = server.storage.ClusterStore().Update(ctx, cluster)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Try to delete the cluster
+				req := &generated.DeleteClusterRequest{
+					Cluster: &clusterName,
+				}
+				
+				_, err = server.ecsAPI.DeleteCluster(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("active services"))
+			})
+
+			It("should fail when cluster does not exist", func() {
+				clusterName := "non-existent"
+				req := &generated.DeleteClusterRequest{
+					Cluster: &clusterName,
+				}
+				
+				_, err := server.ecsAPI.DeleteCluster(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("not found"))
 			})
 		})
 	})
