@@ -269,7 +269,7 @@ var _ = Describe("Cluster ECS API", func() {
 				}
 				
 				for _, name := range clusterNames {
-					expectedArn := "arn:aws:ecs:us-east-1:123456789012:cluster/" + name
+					expectedArn := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/" + name
 					Expect(arnMap).To(HaveKey(expectedArn))
 				}
 			})
