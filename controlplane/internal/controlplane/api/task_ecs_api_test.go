@@ -2,152 +2,34 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
-	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/mocks"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
-// MockTaskStore for task operations
-type MockTaskStore struct {
-	storage *MockStorage
-}
-
-func (m *MockTaskStore) Create(ctx context.Context, task *storage.Task) error {
-	if m.storage.tasks == nil {
-		m.storage.tasks = make(map[string]*storage.Task)
-	}
-	m.storage.tasks[task.ID] = task
-	return nil
-}
-
-func (m *MockTaskStore) Get(ctx context.Context, cluster, taskID string) (*storage.Task, error) {
-	// Try by ID first
-	if task, exists := m.storage.tasks[taskID]; exists {
-		return task, nil
-	}
-	// Try by ARN
-	for _, task := range m.storage.tasks {
-		if task.ARN == taskID {
-			return task, nil
-		}
-	}
-	return nil, errors.New("task not found")
-}
-
-func (m *MockTaskStore) List(ctx context.Context, cluster string, filters storage.TaskFilters) ([]*storage.Task, error) {
-	var tasks []*storage.Task
-	for _, task := range m.storage.tasks {
-		if task.ClusterARN != cluster {
-			continue
-		}
-		
-		// Apply filters
-		if filters.ServiceName != "" && task.StartedBy != fmt.Sprintf("ecs-svc/%s", filters.ServiceName) {
-			continue
-		}
-		if filters.Family != "" && !hasTaskFamily(task.TaskDefinitionARN, filters.Family) {
-			continue
-		}
-		if filters.LaunchType != "" && task.LaunchType != filters.LaunchType {
-			continue
-		}
-		if filters.DesiredStatus != "" && task.DesiredStatus != filters.DesiredStatus {
-			continue
-		}
-		if filters.StartedBy != "" && task.StartedBy != filters.StartedBy {
-			continue
-		}
-		
-		tasks = append(tasks, task)
-	}
-	
-	// Apply limit
-	if filters.MaxResults > 0 && len(tasks) > filters.MaxResults {
-		tasks = tasks[:filters.MaxResults]
-	}
-	
-	return tasks, nil
-}
-
-func (m *MockTaskStore) Update(ctx context.Context, task *storage.Task) error {
-	if _, exists := m.storage.tasks[task.ID]; !exists {
-		return errors.New("task not found")
-	}
-	m.storage.tasks[task.ID] = task
-	return nil
-}
-
-func (m *MockTaskStore) Delete(ctx context.Context, cluster, taskID string) error {
-	delete(m.storage.tasks, taskID)
-	return nil
-}
-
-func (m *MockTaskStore) GetByARNs(ctx context.Context, arns []string) ([]*storage.Task, error) {
-	var tasks []*storage.Task
-	for _, arn := range arns {
-		for _, task := range m.storage.tasks {
-			if task.ARN == arn {
-				tasks = append(tasks, task)
-				break
-			}
-		}
-	}
-	return tasks, nil
-}
-
-func hasTaskFamily(taskDefArn, family string) bool {
-	// Check if task definition ARN contains the family name
-	if taskDefArn == "" || family == "" {
-		return false
-	}
-	// Check various formats
-	return taskDefArn == family || // exact match
-		fmt.Sprintf("task-definition/%s:", family) == taskDefArn || // partial ARN
-		strings.Contains(taskDefArn, fmt.Sprintf(":%s:", family)) || // contains family with colons
-		strings.Contains(taskDefArn, fmt.Sprintf("/%s:", family)) // ARN format
-}
-
-// MockTaskManager for Kubernetes operations
-type MockTaskManager struct {
-	tasks map[string]*storage.Task
-}
-
-func (m *MockTaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *storage.Task, secrets map[string]*converters.SecretInfo) error {
-	if m.tasks == nil {
-		m.tasks = make(map[string]*storage.Task)
-	}
-	m.tasks[task.ID] = task
-	return nil
-}
-
-func (m *MockTaskManager) StopTask(ctx context.Context, cluster, taskID, reason string) error {
-	if task, exists := m.tasks[taskID]; exists {
-		now := time.Now()
-		task.DesiredStatus = "STOPPED"
-		task.StoppedReason = reason
-		task.StoppingAt = &now
-	}
-	return nil
-}
 
 var _ = Describe("Task ECS API", func() {
 	var (
 		server *Server
 		ctx    context.Context
+		mockStorage *mocks.MockStorage
+		mockTaskStore *mocks.MockTaskStore
+		mockClusterStore *mocks.MockClusterStore
 	)
 
 	BeforeEach(func() {
-		mockStorage := NewMockStorage()
-		mockStorage.tasks = make(map[string]*storage.Task)
+		mockStorage = mocks.NewMockStorage()
+		mockTaskStore = mocks.NewMockTaskStore()
+		mockClusterStore = mocks.NewMockClusterStore()
+		
+		mockStorage.SetTaskStore(mockTaskStore)
+		mockStorage.SetClusterStore(mockClusterStore)
 		
 		server = &Server{
 			storage:     mockStorage,
@@ -165,23 +47,32 @@ var _ = Describe("Task ECS API", func() {
 			Region:     "ap-northeast-1",
 			AccountID:  "123456789012",
 		}
-		mockStorage.clusters["default"] = cluster
-		
-		// Add a test task definition
-		taskDef := &storage.TaskDefinition{
-			ID:       "test-taskdef-1",
-			ARN:      "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/nginx:1",
-			Family:   "nginx",
-			Revision: 1,
-			Status:   "ACTIVE",
-			ContainerDefinitions: `[{"name":"nginx","image":"nginx:latest","memory":512}]`,
-			Region:    "ap-northeast-1",
-			AccountID: "123456789012",
-		}
-		mockStorage.taskDefinitions["nginx:1"] = taskDef
+		err := mockClusterStore.Create(ctx, cluster)
+		Expect(err).To(BeNil())
 	})
 
 	Describe("RunTask", func() {
+		var mockTaskDefStore *mocks.MockTaskDefinitionStore
+		
+		BeforeEach(func() {
+			
+			mockTaskDefStore = mocks.NewMockTaskDefinitionStore()
+			mockStorage.SetTaskDefinitionStore(mockTaskDefStore)
+			
+			// Add a task definition
+			taskDef := &storage.TaskDefinition{
+				ARN:      "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/nginx:1",
+				Family:   "nginx",
+				Revision: 1,
+				Status:   "ACTIVE",
+				ContainerDefinitions: `[{"name":"nginx","image":"nginx:latest","memory":512}]`,
+				Region:    "ap-northeast-1",
+				AccountID: "123456789012",
+			}
+			_, err := mockTaskDefStore.Register(ctx, taskDef)
+			Expect(err).To(BeNil())
+		})
+		
 		Context("when running a task", func() {
 			It("should create a new task successfully", func() {
 				taskDef := "nginx:1"
@@ -256,7 +147,8 @@ var _ = Describe("Task ECS API", func() {
 					Region:            "ap-northeast-1",
 					AccountID:         "123456789012",
 				}
-				server.storage.(*MockStorage).tasks["task-123"] = task
+				err := mockTaskStore.Create(ctx, task)
+				Expect(err).To(BeNil())
 			})
 			
 			It("should stop a running task", func() {
@@ -276,9 +168,12 @@ var _ = Describe("Task ECS API", func() {
 			})
 			
 			It("should be idempotent when task already stopped", func() {
-				// Set task as already stopped
-				task := server.storage.(*MockStorage).tasks["task-123"]
+				// Get and update task to stopped
+				task, err := mockTaskStore.Get(ctx, "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default", "task-123")
+				Expect(err).To(BeNil())
 				task.DesiredStatus = "STOPPED"
+				err = mockTaskStore.Update(ctx, task)
+				Expect(err).To(BeNil())
 				
 				taskID := "task-123"
 				req := &generated.StopTaskRequest{
@@ -322,7 +217,8 @@ var _ = Describe("Task ECS API", func() {
 						AccountID:         "123456789012",
 						Tags:              `[{"key":"env","value":"test"}]`,
 					}
-					server.storage.(*MockStorage).tasks[task.ID] = task
+					err := mockTaskStore.Create(ctx, task)
+					Expect(err).To(BeNil())
 				}
 			})
 			
@@ -413,7 +309,8 @@ var _ = Describe("Task ECS API", func() {
 					if t.serviceName != "" {
 						task.StartedBy = fmt.Sprintf("ecs-svc/%s", t.serviceName)
 					}
-					server.storage.(*MockStorage).tasks[t.id] = task
+					err := mockTaskStore.Create(ctx, task)
+					Expect(err).To(BeNil())
 				}
 			})
 			

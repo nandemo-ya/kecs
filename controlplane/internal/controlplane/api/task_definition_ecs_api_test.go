@@ -8,16 +8,22 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/mocks"
 )
 
 var _ = Describe("Task Definition ECS API", func() {
 	var (
 		server *Server
 		ctx    context.Context
+		mockStorage *mocks.MockStorage
+		mockTaskDefStore *mocks.MockTaskDefinitionStore
 	)
 
 	BeforeEach(func() {
-		mockStorage := NewMockStorage()
+		mockStorage = mocks.NewMockStorage()
+		mockTaskDefStore = mocks.NewMockTaskDefinitionStore()
+		mockStorage.SetTaskDefinitionStore(mockTaskDefStore)
+		
 		server = &Server{
 			storage:     mockStorage,
 			kindManager: nil, // Skip actual kind cluster creation in tests
