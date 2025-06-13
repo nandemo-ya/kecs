@@ -169,7 +169,7 @@ var _ = Describe("Task ECS API", func() {
 			
 			It("should be idempotent when task already stopped", func() {
 				// Get and update task to stopped
-				task, err := mockTaskStore.Get(ctx, "default", "task-123")
+				task, err := mockTaskStore.Get(ctx, "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default", "task-123")
 				Expect(err).To(BeNil())
 				task.DesiredStatus = "STOPPED"
 				err = mockTaskStore.Update(ctx, task)

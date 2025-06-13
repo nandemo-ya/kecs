@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
@@ -166,6 +167,16 @@ func (m *MockTaskDefinitionStore) Register(ctx context.Context, taskDef *storage
 	revisions := m.taskDefsByFamily[taskDef.Family]
 	taskDef.Revision = len(revisions) + 1
 	
+	// Set status to ACTIVE if not set
+	if taskDef.Status == "" {
+		taskDef.Status = "ACTIVE"
+	}
+	
+	// Set ARN if not set
+	if taskDef.ARN == "" {
+		taskDef.ARN = fmt.Sprintf("arn:aws:ecs:ap-northeast-1:123456789012:task-definition/%s:%d", taskDef.Family, taskDef.Revision)
+	}
+	
 	key := fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision)
 	m.taskDefs[key] = taskDef
 	m.taskDefsByFamily[taskDef.Family] = append(revisions, taskDef)
@@ -193,14 +204,23 @@ func (m *MockTaskDefinitionStore) GetLatest(ctx context.Context, family string) 
 func (m *MockTaskDefinitionStore) ListFamilies(ctx context.Context, familyPrefix string, status string, limit int, nextToken string) ([]*storage.TaskDefinitionFamily, string, error) {
 	var families []*storage.TaskDefinitionFamily
 	for family, revisions := range m.taskDefsByFamily {
-		if familyPrefix == "" || family == familyPrefix {
+		// Filter by family prefix
+		if familyPrefix == "" || strings.HasPrefix(family, familyPrefix) {
 			families = append(families, &storage.TaskDefinitionFamily{
 				Family:         family,
 				LatestRevision: len(revisions),
 			})
 		}
 	}
-	return families, "", nil
+	
+	// Apply limit if specified
+	var newNextToken string
+	if limit > 0 && len(families) > limit {
+		families = families[:limit]
+		newNextToken = "next-token"
+	}
+	
+	return families, newNextToken, nil
 }
 
 func (m *MockTaskDefinitionStore) ListRevisions(ctx context.Context, family string, status string, limit int, nextToken string) ([]*storage.TaskDefinitionRevision, string, error) {
@@ -353,7 +373,7 @@ func (m *MockTaskStore) List(ctx context.Context, cluster string, filters storag
 			continue
 		}
 		// Apply filters
-		if filters.ServiceName != "" && task.StartedBy != filters.ServiceName {
+		if filters.ServiceName != "" && task.StartedBy != fmt.Sprintf("ecs-svc/%s", filters.ServiceName) {
 			continue
 		}
 		if filters.DesiredStatus != "" && task.DesiredStatus != filters.DesiredStatus {
@@ -362,8 +382,17 @@ func (m *MockTaskStore) List(ctx context.Context, cluster string, filters storag
 		if filters.LaunchType != "" && task.LaunchType != filters.LaunchType {
 			continue
 		}
+		if filters.Family != "" && !hasTaskFamily(task.TaskDefinitionARN, filters.Family) {
+			continue
+		}
 		results = append(results, task)
 	}
+	
+	// Apply MaxResults limit
+	if filters.MaxResults > 0 && len(results) > filters.MaxResults {
+		results = results[:filters.MaxResults]
+	}
+	
 	return results, nil
 }
 
@@ -489,4 +518,17 @@ func (m *MockTaskSetStore) UpdatePrimary(ctx context.Context, serviceARN, taskSe
 // GetTaskSets returns the internal task sets map for testing
 func (m *MockTaskSetStore) GetTaskSets() map[string]*storage.TaskSet {
 	return m.taskSets
+}
+
+// hasTaskFamily checks if task definition ARN contains the family name
+func hasTaskFamily(taskDefArn, family string) bool {
+	// Check if task definition ARN contains the family name
+	if taskDefArn == "" || family == "" {
+		return false
+	}
+	// Check various formats
+	return taskDefArn == family || // exact match
+		strings.Contains(taskDefArn, fmt.Sprintf("task-definition/%s:", family)) || // ARN format
+		strings.Contains(taskDefArn, fmt.Sprintf(":%s:", family)) || // contains family with colons
+		strings.Contains(taskDefArn, fmt.Sprintf("/%s:", family)) // ARN format
 }
