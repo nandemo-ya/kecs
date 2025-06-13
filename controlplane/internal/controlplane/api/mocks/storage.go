@@ -271,13 +271,17 @@ func (m *MockServiceStore) Get(ctx context.Context, cluster, serviceName string)
 func (m *MockServiceStore) List(ctx context.Context, cluster string, serviceName string, launchType string, limit int, nextToken string) ([]*storage.Service, string, error) {
 	var results []*storage.Service
 	for _, svc := range m.services {
-		if svc.ClusterARN == cluster {
-			if serviceName == "" || svc.ServiceName == serviceName {
-				if launchType == "" || svc.LaunchType == launchType {
-					results = append(results, svc)
-				}
-			}
+		// Apply filters
+		if cluster != "" && svc.ClusterARN != cluster {
+			continue
 		}
+		if serviceName != "" && svc.ServiceName != serviceName {
+			continue
+		}
+		if launchType != "" && svc.LaunchType != launchType {
+			continue
+		}
+		results = append(results, svc)
 	}
 	return results, "", nil
 }

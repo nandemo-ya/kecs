@@ -140,6 +140,33 @@ var _ = Describe("Service ECS API", func() {
 	})
 
 	Describe("UpdateServicePrimaryTaskSet", func() {
+		var mockTaskSetStore *mocks.MockTaskSetStore
+		
+		BeforeEach(func() {
+			mockTaskSetStore = mocks.NewMockTaskSetStore()
+			mockStorage.SetTaskSetStore(mockTaskSetStore)
+			
+			// Create a task set for testing
+			taskSet := &storage.TaskSet{
+				ID:         "new-task-set",
+				ARN:        "arn:aws:ecs:ap-northeast-1:123456789012:task-set/default/test-service/new-task-set",
+				ServiceARN: "arn:aws:ecs:ap-northeast-1:123456789012:service/default/test-service",
+				ClusterARN: "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
+				Status:     "ACTIVE",
+				TaskDefinition: "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/nginx:1",
+				LaunchType:     "FARGATE",
+				Scale:          `{"value":100.0,"unit":"PERCENT"}`,
+				StabilityStatus: "STEADY_STATE",
+				ComputedDesiredCount: 2,
+				RunningCount:   2,
+				PendingCount:   0,
+				CreatedAt:     time.Now(),
+				UpdatedAt:     time.Now(),
+			}
+			err := mockTaskSetStore.Create(ctx, taskSet)
+			Expect(err).To(BeNil())
+		})
+		
 		Context("when updating primary task set", func() {
 			It("should update primary task set successfully", func() {
 				serviceName := "test-service"
@@ -155,7 +182,7 @@ var _ = Describe("Service ECS API", func() {
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.TaskSet).NotTo(BeNil())
 				Expect(*resp.TaskSet.Id).To(Equal(taskSetId))
-				Expect(*resp.TaskSet.Status).To(Equal("PRIMARY"))
+				Expect(*resp.TaskSet.Status).To(Equal("ACTIVE"))
 			})
 
 			It("should fail without service name", func() {
