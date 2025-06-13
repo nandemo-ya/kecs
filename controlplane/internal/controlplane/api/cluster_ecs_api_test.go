@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -14,12 +16,14 @@ import (
 
 // MockStorage implements a simple in-memory storage for testing
 type MockStorage struct {
-	clusters map[string]*storage.Cluster
+	clusters        map[string]*storage.Cluster
+	taskDefinitions map[string]*storage.TaskDefinition
 }
 
 func NewMockStorage() *MockStorage {
 	return &MockStorage{
-		clusters: make(map[string]*storage.Cluster),
+		clusters:        make(map[string]*storage.Cluster),
+		taskDefinitions: make(map[string]*storage.TaskDefinition),
 	}
 }
 
@@ -32,7 +36,7 @@ func (m *MockStorage) ServiceStore() storage.ServiceStore {
 }
 
 func (m *MockStorage) TaskDefinitionStore() storage.TaskDefinitionStore {
-	return nil // Not needed for this test
+	return &MockTaskDefinitionStore{storage: m}
 }
 
 func (m *MockStorage) TaskStore() storage.TaskStore {
@@ -671,3 +675,146 @@ var _ = Describe("Cluster ECS API", func() {
 		})
 	})
 })
+
+// MockTaskDefinitionStore for task definition operations
+type MockTaskDefinitionStore struct {
+	storage *MockStorage
+}
+
+func (m *MockTaskDefinitionStore) Register(ctx context.Context, taskDef *storage.TaskDefinition) (*storage.TaskDefinition, error) {
+	if m.storage.taskDefinitions == nil {
+		m.storage.taskDefinitions = make(map[string]*storage.TaskDefinition)
+	}
+
+	// Get next revision
+	maxRevision := 0
+	for _, td := range m.storage.taskDefinitions {
+		if td.Family == taskDef.Family && td.Revision > maxRevision {
+			maxRevision = td.Revision
+		}
+	}
+	taskDef.Revision = maxRevision + 1
+	taskDef.ARN = fmt.Sprintf("arn:aws:ecs:ap-northeast-1:123456789012:task-definition/%s:%d", taskDef.Family, taskDef.Revision)
+	taskDef.Status = "ACTIVE"
+	taskDef.RegisteredAt = time.Now()
+
+	key := fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision)
+	m.storage.taskDefinitions[key] = taskDef
+	return taskDef, nil
+}
+
+func (m *MockTaskDefinitionStore) Get(ctx context.Context, family string, revision int) (*storage.TaskDefinition, error) {
+	key := fmt.Sprintf("%s:%d", family, revision)
+	td, exists := m.storage.taskDefinitions[key]
+	if !exists {
+		return nil, errors.New("task definition not found")
+	}
+	return td, nil
+}
+
+func (m *MockTaskDefinitionStore) GetLatest(ctx context.Context, family string) (*storage.TaskDefinition, error) {
+	var latest *storage.TaskDefinition
+	maxRevision := 0
+	for _, td := range m.storage.taskDefinitions {
+		if td.Family == family && td.Status == "ACTIVE" && td.Revision > maxRevision {
+			maxRevision = td.Revision
+			latest = td
+		}
+	}
+	if latest == nil {
+		return nil, errors.New("task definition family not found")
+	}
+	return latest, nil
+}
+
+func (m *MockTaskDefinitionStore) ListFamilies(ctx context.Context, familyPrefix string, status string, limit int, nextToken string) ([]*storage.TaskDefinitionFamily, string, error) {
+	familyMap := make(map[string]*storage.TaskDefinitionFamily)
+	
+	for _, td := range m.storage.taskDefinitions {
+		if familyPrefix != "" && !hasPrefix(td.Family, familyPrefix) {
+			continue
+		}
+		if status != "" && td.Status != status {
+			continue
+		}
+		
+		if family, exists := familyMap[td.Family]; exists {
+			if td.Revision > family.LatestRevision {
+				family.LatestRevision = td.Revision
+			}
+			if td.Status == "ACTIVE" {
+				family.ActiveRevisions++
+			}
+		} else {
+			familyMap[td.Family] = &storage.TaskDefinitionFamily{
+				Family:          td.Family,
+				LatestRevision:  td.Revision,
+				ActiveRevisions: 0,
+			}
+			if td.Status == "ACTIVE" {
+				familyMap[td.Family].ActiveRevisions = 1
+			}
+		}
+	}
+	
+	families := make([]*storage.TaskDefinitionFamily, 0, len(familyMap))
+	for _, family := range familyMap {
+		families = append(families, family)
+	}
+	
+	// Simple pagination
+	if limit > 0 && len(families) > limit {
+		return families[:limit], families[limit-1].Family, nil
+	}
+	
+	return families, "", nil
+}
+
+func (m *MockTaskDefinitionStore) ListRevisions(ctx context.Context, family string, status string, limit int, nextToken string) ([]*storage.TaskDefinitionRevision, string, error) {
+	revisions := make([]*storage.TaskDefinitionRevision, 0)
+	
+	for _, td := range m.storage.taskDefinitions {
+		if td.Family != family {
+			continue
+		}
+		if status != "" && td.Status != status {
+			continue
+		}
+		
+		rev := &storage.TaskDefinitionRevision{
+			ARN:      td.ARN,
+			Family:   td.Family,
+			Revision: td.Revision,
+			Status:   td.Status,
+		}
+		revisions = append(revisions, rev)
+	}
+	
+	return revisions, "", nil
+}
+
+func (m *MockTaskDefinitionStore) Deregister(ctx context.Context, family string, revision int) error {
+	key := fmt.Sprintf("%s:%d", family, revision)
+	td, exists := m.storage.taskDefinitions[key]
+	if !exists {
+		return errors.New("task definition not found")
+	}
+	if td.Status == "INACTIVE" {
+		return nil // Already inactive (idempotent)
+	}
+	td.Status = "INACTIVE"
+	return nil
+}
+
+func (m *MockTaskDefinitionStore) GetByARN(ctx context.Context, arn string) (*storage.TaskDefinition, error) {
+	for _, td := range m.storage.taskDefinitions {
+		if td.ARN == arn {
+			return td, nil
+		}
+	}
+	return nil, errors.New("task definition not found")
+}
+
+func hasPrefix(s, prefix string) bool {
+	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
