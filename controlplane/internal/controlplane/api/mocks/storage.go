@@ -461,6 +461,7 @@ func (m *MockTaskSetStore) Get(ctx context.Context, serviceARN, taskSetID string
 
 func (m *MockTaskSetStore) List(ctx context.Context, serviceARN string, taskSetIDs []string) ([]*storage.TaskSet, error) {
 	var results []*storage.TaskSet
+	// First collect all matching task sets
 	for _, ts := range m.taskSets {
 		if ts.ServiceARN == serviceARN {
 			if len(taskSetIDs) == 0 {
@@ -475,6 +476,18 @@ func (m *MockTaskSetStore) List(ctx context.Context, serviceARN string, taskSetI
 			}
 		}
 	}
+	
+	// Sort by ID to ensure consistent ordering
+	if len(results) > 1 {
+		for i := 0; i < len(results)-1; i++ {
+			for j := i + 1; j < len(results); j++ {
+				if results[i].ID > results[j].ID {
+					results[i], results[j] = results[j], results[i]
+				}
+			}
+		}
+	}
+	
 	return results, nil
 }
 

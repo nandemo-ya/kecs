@@ -240,9 +240,15 @@ var _ = Describe("TaskSetEcsApi", func() {
 			Expect(resp.TaskSets).To(HaveLen(2))
 			Expect(resp.Failures).To(BeEmpty())
 
-			// Verify first task set
-			ts1 := resp.TaskSets[0]
-			Expect(*ts1.Id).To(Equal("ts-12345678"))
+			// Create a map for easier lookup
+			taskSetMap := make(map[string]generated.TaskSet)
+			for _, ts := range resp.TaskSets {
+				taskSetMap[*ts.Id] = ts
+			}
+
+			// Verify task set "ts-12345678"
+			ts1, exists := taskSetMap["ts-12345678"]
+			Expect(exists).To(BeTrue())
 			Expect(*ts1.Status).To(Equal("ACTIVE"))
 			Expect(*ts1.StabilityStatus).To(Equal(generated.StabilityStatus("STEADY_STATE")))
 			Expect(*ts1.ComputedDesiredCount).To(Equal(int32(3)))
@@ -250,9 +256,9 @@ var _ = Describe("TaskSetEcsApi", func() {
 			Expect(*ts1.Scale.Value).To(Equal(100.0))
 			Expect(ts1.Tags).To(HaveLen(1))
 
-			// Verify second task set
-			ts2 := resp.TaskSets[1]
-			Expect(*ts2.Id).To(Equal("ts-87654321"))
+			// Verify task set "ts-87654321"
+			ts2, exists := taskSetMap["ts-87654321"]
+			Expect(exists).To(BeTrue())
 			Expect(*ts2.Status).To(Equal("DRAINING"))
 			Expect(*ts2.StabilityStatus).To(Equal(generated.StabilityStatus("STABILIZING")))
 			Expect(*ts2.ComputedDesiredCount).To(Equal(int32(0)))
