@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -446,6 +447,195 @@ var _ = Describe("Cluster ECS API", func() {
 		})
 	})
 	
+	Describe("UpdateCluster", func() {
+		Context("when updating a cluster", func() {
+			BeforeEach(func() {
+				// Create a test cluster
+				clusterName := "update-test"
+				_, err := server.ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{
+					ClusterName: &clusterName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should update cluster settings", func() {
+				clusterName := "update-test"
+				settingName := generated.ClusterSettingNameContainerInsights
+				settingValue := "enabled"
+				settings := []generated.ClusterSetting{
+					{
+						Name:  &settingName,
+						Value: &settingValue,
+					},
+				}
+
+				req := &generated.UpdateClusterRequest{
+					Cluster:  &clusterName,
+					Settings: settings,
+				}
+
+				resp, err := server.ecsAPI.UpdateCluster(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Cluster).NotTo(BeNil())
+				Expect(resp.Cluster.Settings).To(HaveLen(1))
+				Expect(*resp.Cluster.Settings[0].Name).To(Equal(settingName))
+				Expect(*resp.Cluster.Settings[0].Value).To(Equal("enabled"))
+			})
+
+			It("should update cluster configuration", func() {
+				clusterName := "update-test"
+				loggingValue := generated.ExecuteCommandLoggingDefault
+				config := &generated.ClusterConfiguration{
+					ExecuteCommandConfiguration: &generated.ExecuteCommandConfiguration{
+						Logging: &loggingValue,
+					},
+				}
+
+				req := &generated.UpdateClusterRequest{
+					Cluster:       &clusterName,
+					Configuration: config,
+				}
+
+				resp, err := server.ecsAPI.UpdateCluster(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Cluster).NotTo(BeNil())
+				Expect(resp.Cluster.Configuration).NotTo(BeNil())
+				Expect(resp.Cluster.Configuration.ExecuteCommandConfiguration).NotTo(BeNil())
+				Expect(*resp.Cluster.Configuration.ExecuteCommandConfiguration.Logging).To(Equal(generated.ExecuteCommandLoggingDefault))
+			})
+
+			It("should fail when cluster does not exist", func() {
+				clusterName := "non-existent"
+				req := &generated.UpdateClusterRequest{
+					Cluster: &clusterName,
+				}
+
+				_, err := server.ecsAPI.UpdateCluster(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("not found"))
+			})
+		})
+	})
+
+	Describe("UpdateClusterSettings", func() {
+		Context("when updating cluster settings", func() {
+			BeforeEach(func() {
+				// Create a test cluster with initial settings
+				clusterName := "settings-test"
+				settingName := generated.ClusterSettingNameContainerInsights
+				settingValue := "disabled"
+				_, err := server.ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{
+					ClusterName: &clusterName,
+					Settings: []generated.ClusterSetting{
+						{
+							Name:  &settingName,
+							Value: &settingValue,
+						},
+					},
+				})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should update existing cluster settings", func() {
+				clusterName := "settings-test"
+				settingName := generated.ClusterSettingNameContainerInsights
+				settingValue := "enabled"
+				settings := []generated.ClusterSetting{
+					{
+						Name:  &settingName,
+						Value: &settingValue,
+					},
+				}
+
+				req := &generated.UpdateClusterSettingsRequest{
+					Cluster:  &clusterName,
+					Settings: settings,
+				}
+
+				resp, err := server.ecsAPI.UpdateClusterSettings(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Cluster).NotTo(BeNil())
+				Expect(resp.Cluster.Settings).To(HaveLen(1))
+				Expect(*resp.Cluster.Settings[0].Name).To(Equal(settingName))
+				Expect(*resp.Cluster.Settings[0].Value).To(Equal("enabled"))
+			})
+
+			It("should fail when settings are not provided", func() {
+				clusterName := "settings-test"
+				req := &generated.UpdateClusterSettingsRequest{
+					Cluster: &clusterName,
+				}
+
+				_, err := server.ecsAPI.UpdateClusterSettings(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("settings are required"))
+			})
+		})
+	})
+
+	Describe("PutClusterCapacityProviders", func() {
+		Context("when updating cluster capacity providers", func() {
+			BeforeEach(func() {
+				// Create a test cluster
+				clusterName := "capacity-test"
+				_, err := server.ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{
+					ClusterName: &clusterName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should update capacity providers and strategy", func() {
+				clusterName := "capacity-test"
+				capacityProviders := []string{"FARGATE", "FARGATE_SPOT"}
+				weightOne := generated.CapacityProviderStrategyItemWeight(1)
+				baseOne := generated.CapacityProviderStrategyItemBase(1)
+				weightFour := generated.CapacityProviderStrategyItemWeight(4)
+				strategy := []generated.CapacityProviderStrategyItem{
+					{
+						CapacityProvider: ptr.String("FARGATE"),
+						Weight:           &weightOne,
+						Base:             &baseOne,
+					},
+					{
+						CapacityProvider: ptr.String("FARGATE_SPOT"),
+						Weight:           &weightFour,
+					},
+				}
+
+				req := &generated.PutClusterCapacityProvidersRequest{
+					Cluster:                         &clusterName,
+					CapacityProviders:               capacityProviders,
+					DefaultCapacityProviderStrategy: strategy,
+				}
+
+				resp, err := server.ecsAPI.PutClusterCapacityProviders(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Cluster).NotTo(BeNil())
+				Expect(resp.Cluster.CapacityProviders).To(Equal(capacityProviders))
+				Expect(resp.Cluster.DefaultCapacityProviderStrategy).To(HaveLen(2))
+			})
+
+			It("should fail when required fields are missing", func() {
+				clusterName := "capacity-test"
+				req := &generated.PutClusterCapacityProvidersRequest{
+					Cluster: &clusterName,
+				}
+
+				_, err := server.ecsAPI.PutClusterCapacityProviders(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("capacityProviders is required"))
+			})
+		})
+	})
+
 	Describe("extractClusterNameFromARN", func() {
 		It("should extract cluster name from valid ARN", func() {
 			arn := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/my-cluster"
