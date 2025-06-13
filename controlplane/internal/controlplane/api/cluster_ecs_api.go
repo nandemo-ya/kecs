@@ -84,15 +84,24 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 
 	// Extract settings and configuration from request
 	if req.Settings != nil && len(req.Settings) > 0 {
-		settingsJSON, _ := json.Marshal(req.Settings)
+		settingsJSON, err := json.Marshal(req.Settings)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal cluster settings: %w", err)
+		}
 		cluster.Settings = string(settingsJSON)
 	}
 	if req.Configuration != nil {
-		configJSON, _ := json.Marshal(req.Configuration)
+		configJSON, err := json.Marshal(req.Configuration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal cluster configuration: %w", err)
+		}
 		cluster.Configuration = string(configJSON)
 	}
 	if req.Tags != nil && len(req.Tags) > 0 {
-		tagsJSON, _ := json.Marshal(req.Tags)
+		tagsJSON, err := json.Marshal(req.Tags)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal cluster tags: %w", err)
+		}
 		cluster.Tags = string(tagsJSON)
 	}
 

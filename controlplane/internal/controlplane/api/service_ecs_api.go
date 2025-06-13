@@ -96,15 +96,50 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	}
 
 	// Convert complex objects to JSON for storage
-	loadBalancersJSON, _ := json.Marshal(req.LoadBalancers)
-	serviceRegistriesJSON, _ := json.Marshal(req.ServiceRegistries)
-	networkConfigJSON, _ := json.Marshal(req.NetworkConfiguration)
-	deploymentConfigJSON, _ := json.Marshal(req.DeploymentConfiguration)
-	placementConstraintsJSON, _ := json.Marshal(req.PlacementConstraints)
-	placementStrategyJSON, _ := json.Marshal(req.PlacementStrategy)
-	capacityProviderStrategyJSON, _ := json.Marshal(req.CapacityProviderStrategy)
-	tagsJSON, _ := json.Marshal(req.Tags)
-	serviceConnectConfigJSON, _ := json.Marshal(req.ServiceConnectConfiguration)
+	loadBalancersJSON, err := json.Marshal(req.LoadBalancers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal load balancers: %w", err)
+	}
+	
+	serviceRegistriesJSON, err := json.Marshal(req.ServiceRegistries)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal service registries: %w", err)
+	}
+	
+	networkConfigJSON, err := json.Marshal(req.NetworkConfiguration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal network configuration: %w", err)
+	}
+	
+	deploymentConfigJSON, err := json.Marshal(req.DeploymentConfiguration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal deployment configuration: %w", err)
+	}
+	
+	placementConstraintsJSON, err := json.Marshal(req.PlacementConstraints)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal placement constraints: %w", err)
+	}
+	
+	placementStrategyJSON, err := json.Marshal(req.PlacementStrategy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal placement strategy: %w", err)
+	}
+	
+	capacityProviderStrategyJSON, err := json.Marshal(req.CapacityProviderStrategy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal capacity provider strategy: %w", err)
+	}
+	
+	tagsJSON, err := json.Marshal(req.Tags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal tags: %w", err)
+	}
+	
+	serviceConnectConfigJSON, err := json.Marshal(req.ServiceConnectConfiguration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal service connect configuration: %w", err)
+	}
 
 	// Create service converter and manager
 	serviceConverter := converters.NewServiceConverter(api.region, api.accountID)
@@ -453,37 +488,61 @@ func (api *DefaultECSAPI) UpdateService(ctx context.Context, req *generated.Upda
 
 	// Update complex objects if provided
 	if req.NetworkConfiguration != nil {
-		networkConfigJSON, _ := json.Marshal(req.NetworkConfiguration)
+		networkConfigJSON, err := json.Marshal(req.NetworkConfiguration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal network configuration: %w", err)
+		}
 		existingService.NetworkConfiguration = string(networkConfigJSON)
 		needsKubernetesUpdate = true
 	}
 	if req.DeploymentConfiguration != nil {
-		deploymentConfigJSON, _ := json.Marshal(req.DeploymentConfiguration)
+		deploymentConfigJSON, err := json.Marshal(req.DeploymentConfiguration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal deployment configuration: %w", err)
+		}
 		existingService.DeploymentConfiguration = string(deploymentConfigJSON)
 	}
 	if req.PlacementConstraints != nil {
-		placementConstraintsJSON, _ := json.Marshal(req.PlacementConstraints)
+		placementConstraintsJSON, err := json.Marshal(req.PlacementConstraints)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal placement constraints: %w", err)
+		}
 		existingService.PlacementConstraints = string(placementConstraintsJSON)
 	}
 	if req.PlacementStrategy != nil {
-		placementStrategyJSON, _ := json.Marshal(req.PlacementStrategy)
+		placementStrategyJSON, err := json.Marshal(req.PlacementStrategy)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal placement strategy: %w", err)
+		}
 		existingService.PlacementStrategy = string(placementStrategyJSON)
 	}
 	if req.CapacityProviderStrategy != nil {
-		capacityProviderStrategyJSON, _ := json.Marshal(req.CapacityProviderStrategy)
+		capacityProviderStrategyJSON, err := json.Marshal(req.CapacityProviderStrategy)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal capacity provider strategy: %w", err)
+		}
 		existingService.CapacityProviderStrategy = string(capacityProviderStrategyJSON)
 	}
 	if req.LoadBalancers != nil {
-		loadBalancersJSON, _ := json.Marshal(req.LoadBalancers)
+		loadBalancersJSON, err := json.Marshal(req.LoadBalancers)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal load balancers: %w", err)
+		}
 		existingService.LoadBalancers = string(loadBalancersJSON)
 		needsKubernetesUpdate = true
 	}
 	if req.ServiceRegistries != nil {
-		serviceRegistriesJSON, _ := json.Marshal(req.ServiceRegistries)
+		serviceRegistriesJSON, err := json.Marshal(req.ServiceRegistries)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal service registries: %w", err)
+		}
 		existingService.ServiceRegistries = string(serviceRegistriesJSON)
 	}
 	if req.ServiceConnectConfiguration != nil {
-		serviceConnectConfigJSON, _ := json.Marshal(req.ServiceConnectConfiguration)
+		serviceConnectConfigJSON, err := json.Marshal(req.ServiceConnectConfiguration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal service connect configuration: %w", err)
+		}
 		existingService.ServiceConnectConfiguration = string(serviceConnectConfigJSON)
 	}
 
