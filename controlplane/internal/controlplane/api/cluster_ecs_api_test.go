@@ -19,6 +19,7 @@ type MockStorage struct {
 	clusters        map[string]*storage.Cluster
 	taskDefinitions map[string]*storage.TaskDefinition
 	tasks           map[string]*storage.Task
+	services        map[string]*storage.Service
 }
 
 func NewMockStorage() *MockStorage {
@@ -26,6 +27,7 @@ func NewMockStorage() *MockStorage {
 		clusters:        make(map[string]*storage.Cluster),
 		taskDefinitions: make(map[string]*storage.TaskDefinition),
 		tasks:           make(map[string]*storage.Task),
+		services:        make(map[string]*storage.Service),
 	}
 }
 
@@ -34,7 +36,13 @@ func (m *MockStorage) ClusterStore() storage.ClusterStore {
 }
 
 func (m *MockStorage) ServiceStore() storage.ServiceStore {
-	return nil // Not needed for this test
+	if m.services == nil {
+		m.services = make(map[string]*storage.Service)
+	}
+	return &MockServiceStore{
+		storage: m,
+		services: m.services,
+	}
 }
 
 func (m *MockStorage) TaskDefinitionStore() storage.TaskDefinitionStore {
