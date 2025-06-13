@@ -18,12 +18,14 @@ import (
 type MockStorage struct {
 	clusters        map[string]*storage.Cluster
 	taskDefinitions map[string]*storage.TaskDefinition
+	tasks           map[string]*storage.Task
 }
 
 func NewMockStorage() *MockStorage {
 	return &MockStorage{
 		clusters:        make(map[string]*storage.Cluster),
 		taskDefinitions: make(map[string]*storage.TaskDefinition),
+		tasks:           make(map[string]*storage.Task),
 	}
 }
 
@@ -40,7 +42,7 @@ func (m *MockStorage) TaskDefinitionStore() storage.TaskDefinitionStore {
 }
 
 func (m *MockStorage) TaskStore() storage.TaskStore {
-	return nil // Not needed for this test
+	return &MockTaskStore{storage: m}
 }
 
 func (m *MockStorage) AccountSettingStore() storage.AccountSettingStore {
