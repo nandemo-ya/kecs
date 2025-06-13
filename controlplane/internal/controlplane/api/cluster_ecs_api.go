@@ -284,20 +284,267 @@ func (api *DefaultECSAPI) DeleteCluster(ctx context.Context, req *generated.Dele
 
 // UpdateCluster implements the UpdateCluster operation
 func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.UpdateClusterRequest) (*generated.UpdateClusterResponse, error) {
-	// TODO: Implement UpdateCluster
-	return nil, fmt.Errorf("UpdateCluster not implemented")
+	if req.Cluster == nil {
+		return nil, fmt.Errorf("cluster identifier is required")
+	}
+
+	// Extract cluster name from ARN if necessary
+	clusterName := extractClusterNameFromARN(*req.Cluster)
+	
+	// Look up cluster
+	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
+	if err != nil {
+		return nil, fmt.Errorf("cluster not found: %s", *req.Cluster)
+	}
+
+	// Update settings if provided
+	if req.Settings != nil && len(req.Settings) > 0 {
+		settingsJSON, err := json.Marshal(req.Settings)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal cluster settings: %w", err)
+		}
+		cluster.Settings = string(settingsJSON)
+	}
+
+	// Update configuration if provided
+	if req.Configuration != nil {
+		configJSON, err := json.Marshal(req.Configuration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal cluster configuration: %w", err)
+		}
+		cluster.Configuration = string(configJSON)
+	}
+
+	// Update service connect defaults if provided
+	if req.ServiceConnectDefaults != nil {
+		// For now, we'll store this in the Configuration field
+		// In a real implementation, this might need a separate field
+		log.Printf("ServiceConnectDefaults update requested but not fully implemented yet")
+	}
+
+	// Update the cluster
+	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
+		return nil, fmt.Errorf("failed to update cluster: %w", err)
+	}
+
+	// Build response
+	responseCluster := &generated.Cluster{
+		ClusterArn:  ptr.String(cluster.ARN),
+		ClusterName: ptr.String(cluster.Name),
+		Status:      ptr.String(cluster.Status),
+		RegisteredContainerInstancesCount: ptr.Int32(int32(cluster.RegisteredContainerInstancesCount)),
+		RunningTasksCount:                ptr.Int32(int32(cluster.RunningTasksCount)),
+		PendingTasksCount:                ptr.Int32(int32(cluster.PendingTasksCount)),
+		ActiveServicesCount:              ptr.Int32(int32(cluster.ActiveServicesCount)),
+	}
+
+	// Add settings if present
+	if cluster.Settings != "" {
+		var settings []generated.ClusterSetting
+		if err := json.Unmarshal([]byte(cluster.Settings), &settings); err == nil {
+			responseCluster.Settings = settings
+		}
+	}
+
+	// Add configuration if present
+	if cluster.Configuration != "" {
+		var config generated.ClusterConfiguration
+		if err := json.Unmarshal([]byte(cluster.Configuration), &config); err == nil {
+			responseCluster.Configuration = &config
+		}
+	}
+
+	// Add tags if present
+	if cluster.Tags != "" {
+		var tags []generated.Tag
+		if err := json.Unmarshal([]byte(cluster.Tags), &tags); err == nil {
+			responseCluster.Tags = tags
+		}
+	}
+
+	return &generated.UpdateClusterResponse{
+		Cluster: responseCluster,
+	}, nil
 }
 
 // UpdateClusterSettings implements the UpdateClusterSettings operation
 func (api *DefaultECSAPI) UpdateClusterSettings(ctx context.Context, req *generated.UpdateClusterSettingsRequest) (*generated.UpdateClusterSettingsResponse, error) {
-	// TODO: Implement UpdateClusterSettings
-	return nil, fmt.Errorf("UpdateClusterSettings not implemented")
+	if req.Cluster == nil {
+		return nil, fmt.Errorf("cluster identifier is required")
+	}
+	if req.Settings == nil || len(req.Settings) == 0 {
+		return nil, fmt.Errorf("settings are required")
+	}
+
+	// Extract cluster name from ARN if necessary
+	clusterName := extractClusterNameFromARN(*req.Cluster)
+	
+	// Look up cluster
+	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
+	if err != nil {
+		return nil, fmt.Errorf("cluster not found: %s", *req.Cluster)
+	}
+
+	// Parse existing settings
+	var existingSettings []generated.ClusterSetting
+	if cluster.Settings != "" {
+		if err := json.Unmarshal([]byte(cluster.Settings), &existingSettings); err != nil {
+			log.Printf("Failed to unmarshal existing settings: %v", err)
+			existingSettings = []generated.ClusterSetting{}
+		}
+	}
+
+	// Create a map for easier updates
+	settingsMap := make(map[generated.ClusterSettingName]string)
+	for _, setting := range existingSettings {
+		if setting.Name != nil && setting.Value != nil {
+			settingsMap[*setting.Name] = *setting.Value
+		}
+	}
+
+	// Update with new settings
+	for _, setting := range req.Settings {
+		if setting.Name != nil && setting.Value != nil {
+			settingsMap[*setting.Name] = *setting.Value
+		}
+	}
+
+	// Convert back to array
+	var updatedSettings []generated.ClusterSetting
+	for name, value := range settingsMap {
+		settingName := name
+		settingValue := value
+		updatedSettings = append(updatedSettings, generated.ClusterSetting{
+			Name:  &settingName,
+			Value: &settingValue,
+		})
+	}
+
+	// Marshal and store updated settings
+	settingsJSON, err := json.Marshal(updatedSettings)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal cluster settings: %w", err)
+	}
+	cluster.Settings = string(settingsJSON)
+
+	// Update the cluster
+	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
+		return nil, fmt.Errorf("failed to update cluster: %w", err)
+	}
+
+	// Build response
+	responseCluster := &generated.Cluster{
+		ClusterArn:  ptr.String(cluster.ARN),
+		ClusterName: ptr.String(cluster.Name),
+		Status:      ptr.String(cluster.Status),
+		Settings:    updatedSettings,
+		RegisteredContainerInstancesCount: ptr.Int32(int32(cluster.RegisteredContainerInstancesCount)),
+		RunningTasksCount:                ptr.Int32(int32(cluster.RunningTasksCount)),
+		PendingTasksCount:                ptr.Int32(int32(cluster.PendingTasksCount)),
+		ActiveServicesCount:              ptr.Int32(int32(cluster.ActiveServicesCount)),
+	}
+
+	// Add configuration if present
+	if cluster.Configuration != "" {
+		var config generated.ClusterConfiguration
+		if err := json.Unmarshal([]byte(cluster.Configuration), &config); err == nil {
+			responseCluster.Configuration = &config
+		}
+	}
+
+	// Add tags if present
+	if cluster.Tags != "" {
+		var tags []generated.Tag
+		if err := json.Unmarshal([]byte(cluster.Tags), &tags); err == nil {
+			responseCluster.Tags = tags
+		}
+	}
+
+	return &generated.UpdateClusterSettingsResponse{
+		Cluster: responseCluster,
+	}, nil
 }
 
 // PutClusterCapacityProviders implements the PutClusterCapacityProviders operation
 func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *generated.PutClusterCapacityProvidersRequest) (*generated.PutClusterCapacityProvidersResponse, error) {
-	// TODO: Implement PutClusterCapacityProviders
-	return nil, fmt.Errorf("PutClusterCapacityProviders not implemented")
+	if req.Cluster == nil {
+		return nil, fmt.Errorf("cluster identifier is required")
+	}
+	if req.CapacityProviders == nil {
+		return nil, fmt.Errorf("capacityProviders is required")
+	}
+	if req.DefaultCapacityProviderStrategy == nil {
+		return nil, fmt.Errorf("defaultCapacityProviderStrategy is required")
+	}
+
+	// Extract cluster name from ARN if necessary
+	clusterName := extractClusterNameFromARN(*req.Cluster)
+	
+	// Look up cluster
+	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
+	if err != nil {
+		return nil, fmt.Errorf("cluster not found: %s", *req.Cluster)
+	}
+
+	// Marshal capacity providers
+	capacityProvidersJSON, err := json.Marshal(req.CapacityProviders)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal capacity providers: %w", err)
+	}
+	cluster.CapacityProviders = string(capacityProvidersJSON)
+
+	// Marshal default capacity provider strategy
+	strategyJSON, err := json.Marshal(req.DefaultCapacityProviderStrategy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal default capacity provider strategy: %w", err)
+	}
+	cluster.DefaultCapacityProviderStrategy = string(strategyJSON)
+
+	// Update the cluster
+	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
+		return nil, fmt.Errorf("failed to update cluster: %w", err)
+	}
+
+	// Build response
+	responseCluster := &generated.Cluster{
+		ClusterArn:                       ptr.String(cluster.ARN),
+		ClusterName:                      ptr.String(cluster.Name),
+		Status:                           ptr.String(cluster.Status),
+		CapacityProviders:                req.CapacityProviders,
+		DefaultCapacityProviderStrategy:  req.DefaultCapacityProviderStrategy,
+		RegisteredContainerInstancesCount: ptr.Int32(int32(cluster.RegisteredContainerInstancesCount)),
+		RunningTasksCount:                ptr.Int32(int32(cluster.RunningTasksCount)),
+		PendingTasksCount:                ptr.Int32(int32(cluster.PendingTasksCount)),
+		ActiveServicesCount:              ptr.Int32(int32(cluster.ActiveServicesCount)),
+	}
+
+	// Add settings if present
+	if cluster.Settings != "" {
+		var settings []generated.ClusterSetting
+		if err := json.Unmarshal([]byte(cluster.Settings), &settings); err == nil {
+			responseCluster.Settings = settings
+		}
+	}
+
+	// Add configuration if present
+	if cluster.Configuration != "" {
+		var config generated.ClusterConfiguration
+		if err := json.Unmarshal([]byte(cluster.Configuration), &config); err == nil {
+			responseCluster.Configuration = &config
+		}
+	}
+
+	// Add tags if present
+	if cluster.Tags != "" {
+		var tags []generated.Tag
+		if err := json.Unmarshal([]byte(cluster.Tags), &tags); err == nil {
+			responseCluster.Tags = tags
+		}
+	}
+
+	return &generated.PutClusterCapacityProvidersResponse{
+		Cluster: responseCluster,
+	}, nil
 }
 
 // createKindClusterAndNamespace creates a Kind cluster and namespace for the ECS cluster
