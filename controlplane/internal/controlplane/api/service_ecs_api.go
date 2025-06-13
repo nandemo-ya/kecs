@@ -674,34 +674,55 @@ func (api *DefaultECSAPI) UpdateServicePrimaryTaskSet(ctx context.Context, req *
 		return nil, fmt.Errorf("service not found: %w", err)
 	}
 
-	// For now, we'll store the primary task set in the DeploymentName field
-	// In a real implementation, we'd have proper task set management
-	service.DeploymentName = *req.PrimaryTaskSet
-	service.UpdatedAt = time.Now()
-
-	// Update service
-	if err := api.storage.ServiceStore().Update(ctx, service); err != nil {
-		return nil, fmt.Errorf("failed to update service: %w", err)
+	// Update primary task set
+	err = api.storage.TaskSetStore().UpdatePrimary(ctx, service.ARN, *req.PrimaryTaskSet)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update primary task set: %w", err)
 	}
 
-	// Create response with task set information
-	taskSet := &generated.TaskSet{
-		TaskSetArn:      ptr.String(fmt.Sprintf("arn:aws:ecs:%s:%s:task-set/%s/%s/%s", api.region, api.accountID, clusterName, *req.Service, *req.PrimaryTaskSet)),
-		ServiceArn:      ptr.String(service.ARN),
-		ClusterArn:      ptr.String(cluster.ARN),
-		Status:          ptr.String("PRIMARY"),
-		TaskDefinition:  ptr.String(service.TaskDefinitionARN),
-		ComputedDesiredCount: ptr.Int32(int32(service.DesiredCount)),
-		RunningCount:    ptr.Int32(int32(service.RunningCount)),
-		PendingCount:    ptr.Int32(int32(service.PendingCount)),
-		LaunchType:      (*generated.LaunchType)(ptr.String(service.LaunchType)),
-		CreatedAt:       ptr.Time(service.UpdatedAt),
-		UpdatedAt:       ptr.Time(service.UpdatedAt),
-		Id:              ptr.String(*req.PrimaryTaskSet),
+	// Get the updated task set
+	taskSet, err := api.storage.TaskSetStore().Get(ctx, service.ARN, *req.PrimaryTaskSet)
+	if err != nil {
+		return nil, fmt.Errorf("task set not found: %s", *req.PrimaryTaskSet)
+	}
+
+	// Build response
+	apiTaskSet := &generated.TaskSet{
+		Id:             ptr.String(taskSet.ID),
+		TaskSetArn:     ptr.String(taskSet.ARN),
+		ServiceArn:     ptr.String(taskSet.ServiceARN),
+		ClusterArn:     ptr.String(taskSet.ClusterARN),
+		Status:         ptr.String(taskSet.Status),
+		TaskDefinition: ptr.String(taskSet.TaskDefinition),
+		StabilityStatus: (*generated.StabilityStatus)(ptr.String(taskSet.StabilityStatus)),
+		ComputedDesiredCount: ptr.Int32(taskSet.ComputedDesiredCount),
+		PendingCount:   ptr.Int32(taskSet.PendingCount),
+		RunningCount:   ptr.Int32(taskSet.RunningCount),
+		CreatedAt:      ptr.Time(taskSet.CreatedAt),
+		UpdatedAt:      ptr.Time(taskSet.UpdatedAt),
+	}
+
+	// Set optional fields
+	if taskSet.LaunchType != "" {
+		apiTaskSet.LaunchType = (*generated.LaunchType)(ptr.String(taskSet.LaunchType))
+	}
+	if taskSet.PlatformVersion != "" {
+		apiTaskSet.PlatformVersion = ptr.String(taskSet.PlatformVersion)
+	}
+	if taskSet.ExternalID != "" {
+		apiTaskSet.ExternalId = ptr.String(taskSet.ExternalID)
+	}
+
+	// Unmarshal scale if present
+	if taskSet.Scale != "" {
+		var scale generated.Scale
+		if err := json.Unmarshal([]byte(taskSet.Scale), &scale); err == nil {
+			apiTaskSet.Scale = &scale
+		}
 	}
 
 	return &generated.UpdateServicePrimaryTaskSetResponse{
-		TaskSet: taskSet,
+		TaskSet: apiTaskSet,
 	}, nil
 }
 

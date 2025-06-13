@@ -28,6 +28,9 @@ type Storage interface {
 	// Account setting operations
 	AccountSettingStore() AccountSettingStore
 	
+	// TaskSet operations
+	TaskSetStore() TaskSetStore
+	
 	// Transaction support
 	BeginTx(ctx context.Context) (Transaction, error)
 }
@@ -570,4 +573,110 @@ type AccountSettingFilters struct {
 	
 	// Next token for pagination
 	NextToken string
+}
+
+// TaskSetStore defines task set-specific storage operations
+type TaskSetStore interface {
+	// Create a new task set
+	Create(ctx context.Context, taskSet *TaskSet) error
+	
+	// Get a task set by service ARN and task set ID
+	Get(ctx context.Context, serviceARN, taskSetID string) (*TaskSet, error)
+	
+	// List task sets for a service
+	List(ctx context.Context, serviceARN string, taskSetIDs []string) ([]*TaskSet, error)
+	
+	// Update a task set
+	Update(ctx context.Context, taskSet *TaskSet) error
+	
+	// Delete a task set
+	Delete(ctx context.Context, serviceARN, taskSetID string) error
+	
+	// Get task set by ARN
+	GetByARN(ctx context.Context, arn string) (*TaskSet, error)
+	
+	// Update primary task set
+	UpdatePrimary(ctx context.Context, serviceARN, taskSetID string) error
+}
+
+// TaskSet represents an ECS task set in storage
+type TaskSet struct {
+	// Unique identifier
+	ID string `json:"id"`
+	
+	// Task set ARN
+	ARN string `json:"arn"`
+	
+	// Service ARN
+	ServiceARN string `json:"serviceArn"`
+	
+	// Cluster ARN
+	ClusterARN string `json:"clusterArn"`
+	
+	// External ID
+	ExternalID string `json:"externalId,omitempty"`
+	
+	// Task definition ARN
+	TaskDefinition string `json:"taskDefinition"`
+	
+	// Launch type
+	LaunchType string `json:"launchType,omitempty"`
+	
+	// Platform version
+	PlatformVersion string `json:"platformVersion,omitempty"`
+	
+	// Platform family
+	PlatformFamily string `json:"platformFamily,omitempty"`
+	
+	// Network configuration as JSON
+	NetworkConfiguration string `json:"networkConfiguration,omitempty"`
+	
+	// Load balancers as JSON
+	LoadBalancers string `json:"loadBalancers,omitempty"`
+	
+	// Service registries as JSON
+	ServiceRegistries string `json:"serviceRegistries,omitempty"`
+	
+	// Capacity provider strategy as JSON
+	CapacityProviderStrategy string `json:"capacityProviderStrategy,omitempty"`
+	
+	// Scale as JSON
+	Scale string `json:"scale,omitempty"`
+	
+	// Computed desired count
+	ComputedDesiredCount int32 `json:"computedDesiredCount"`
+	
+	// Pending count
+	PendingCount int32 `json:"pendingCount"`
+	
+	// Running count
+	RunningCount int32 `json:"runningCount"`
+	
+	// Status
+	Status string `json:"status"`
+	
+	// Stability status
+	StabilityStatus string `json:"stabilityStatus"`
+	
+	// Stability status at
+	StabilityStatusAt *time.Time `json:"stabilityStatusAt,omitempty"`
+	
+	// Started by
+	StartedBy string `json:"startedBy,omitempty"`
+	
+	// Tags as JSON
+	Tags string `json:"tags,omitempty"`
+	
+	// Fargate ephemeral storage as JSON
+	FargateEphemeralStorage string `json:"fargateEphemeralStorage,omitempty"`
+	
+	// Region
+	Region string `json:"region"`
+	
+	// Account ID
+	AccountID string `json:"accountId"`
+	
+	// Timestamps
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }

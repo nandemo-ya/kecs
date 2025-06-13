@@ -20,6 +20,7 @@ type DuckDBStorage struct {
 	serviceStore        *serviceStore
 	taskStore           *taskStore
 	accountSettingStore *accountSettingStore
+	taskSetStore        *taskSetStore
 }
 
 // NewDuckDBStorage creates a new DuckDB storage instance
@@ -53,6 +54,7 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 	s.serviceStore = &serviceStore{db: db}
 	s.taskStore = &taskStore{db: db}
 	s.accountSettingStore = &accountSettingStore{db: db}
+	s.taskSetStore = &taskSetStore{db: db}
 
 	return s, nil
 }
@@ -91,6 +93,11 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 		return fmt.Errorf("failed to create account settings table: %w", err)
 	}
 
+	// Create task sets table
+	if err := s.createTaskSetsTable(ctx); err != nil {
+		return fmt.Errorf("failed to create task sets table: %w", err)
+	}
+
 	log.Println("DuckDB storage initialized successfully")
 	return nil
 }
@@ -126,6 +133,11 @@ func (s *DuckDBStorage) TaskStore() storage.TaskStore {
 // AccountSettingStore returns the account setting store
 func (s *DuckDBStorage) AccountSettingStore() storage.AccountSettingStore {
 	return s.accountSettingStore
+}
+
+// TaskSetStore returns the task set store
+func (s *DuckDBStorage) TaskSetStore() storage.TaskSetStore {
+	return s.taskSetStore
 }
 
 // BeginTx starts a new transaction
@@ -451,5 +463,61 @@ func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 	}
 
 	log.Println("Successfully migrated clusters table")
+	return nil
+}
+
+// createTaskSetsTable creates the task_sets table
+func (s *DuckDBStorage) createTaskSetsTable(ctx context.Context) error {
+	query := `
+	CREATE TABLE IF NOT EXISTS task_sets (
+		id VARCHAR PRIMARY KEY,
+		arn VARCHAR NOT NULL UNIQUE,
+		service_arn VARCHAR NOT NULL,
+		cluster_arn VARCHAR NOT NULL,
+		external_id VARCHAR,
+		task_definition VARCHAR NOT NULL,
+		launch_type VARCHAR,
+		platform_version VARCHAR,
+		platform_family VARCHAR,
+		network_configuration VARCHAR,
+		load_balancers VARCHAR,
+		service_registries VARCHAR,
+		capacity_provider_strategy VARCHAR,
+		scale VARCHAR,
+		computed_desired_count INTEGER NOT NULL DEFAULT 0,
+		pending_count INTEGER NOT NULL DEFAULT 0,
+		running_count INTEGER NOT NULL DEFAULT 0,
+		status VARCHAR NOT NULL,
+		stability_status VARCHAR NOT NULL,
+		stability_status_at TIMESTAMP,
+		started_by VARCHAR,
+		tags VARCHAR,
+		fargate_ephemeral_storage VARCHAR,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		created_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL,
+		UNIQUE(service_arn, id)
+	)`
+
+	if _, err := s.db.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("failed to create task_sets table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_task_sets_service ON task_sets(service_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_task_sets_cluster ON task_sets(cluster_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_task_sets_status ON task_sets(status)",
+		"CREATE INDEX IF NOT EXISTS idx_task_sets_region ON task_sets(region)",
+		"CREATE INDEX IF NOT EXISTS idx_task_sets_account_id ON task_sets(account_id)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
 	return nil
 }

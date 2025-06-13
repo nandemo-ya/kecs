@@ -2,125 +2,27 @@ package api
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/mocks"
 )
-
-// MockStorage implements a simple in-memory storage for testing
-type MockStorage struct {
-	clusters        map[string]*storage.Cluster
-	taskDefinitions map[string]*storage.TaskDefinition
-	tasks           map[string]*storage.Task
-	services        map[string]*storage.Service
-}
-
-func NewMockStorage() *MockStorage {
-	return &MockStorage{
-		clusters:        make(map[string]*storage.Cluster),
-		taskDefinitions: make(map[string]*storage.TaskDefinition),
-		tasks:           make(map[string]*storage.Task),
-		services:        make(map[string]*storage.Service),
-	}
-}
-
-func (m *MockStorage) ClusterStore() storage.ClusterStore {
-	return &MockClusterStore{storage: m}
-}
-
-func (m *MockStorage) ServiceStore() storage.ServiceStore {
-	if m.services == nil {
-		m.services = make(map[string]*storage.Service)
-	}
-	return &MockServiceStore{
-		storage: m,
-		services: m.services,
-	}
-}
-
-func (m *MockStorage) TaskDefinitionStore() storage.TaskDefinitionStore {
-	return &MockTaskDefinitionStore{storage: m}
-}
-
-func (m *MockStorage) TaskStore() storage.TaskStore {
-	return &MockTaskStore{storage: m}
-}
-
-func (m *MockStorage) AccountSettingStore() storage.AccountSettingStore {
-	return nil // Not needed for this test
-}
-
-func (m *MockStorage) Initialize(ctx context.Context) error {
-	return nil
-}
-
-func (m *MockStorage) Close() error {
-	return nil
-}
-
-func (m *MockStorage) BeginTx(ctx context.Context) (storage.Transaction, error) {
-	return &MockTransaction{}, nil
-}
-
-// MockTransaction implements storage.Transaction
-type MockTransaction struct{}
-
-func (t *MockTransaction) Commit() error   { return nil }
-func (t *MockTransaction) Rollback() error { return nil }
-
-type MockClusterStore struct {
-	storage *MockStorage
-}
-
-func (m *MockClusterStore) Create(ctx context.Context, cluster *storage.Cluster) error {
-	if _, exists := m.storage.clusters[cluster.Name]; exists {
-		return errors.New("cluster already exists")
-	}
-	m.storage.clusters[cluster.Name] = cluster
-	return nil
-}
-
-func (m *MockClusterStore) Get(ctx context.Context, clusterName string) (*storage.Cluster, error) {
-	cluster, exists := m.storage.clusters[clusterName]
-	if !exists {
-		return nil, errors.New("cluster not found")
-	}
-	return cluster, nil
-}
-
-func (m *MockClusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
-	clusters := make([]*storage.Cluster, 0, len(m.storage.clusters))
-	for _, cluster := range m.storage.clusters {
-		clusters = append(clusters, cluster)
-	}
-	return clusters, nil
-}
-
-func (m *MockClusterStore) Update(ctx context.Context, cluster *storage.Cluster) error {
-	m.storage.clusters[cluster.Name] = cluster
-	return nil
-}
-
-func (m *MockClusterStore) Delete(ctx context.Context, clusterName string) error {
-	delete(m.storage.clusters, clusterName)
-	return nil
-}
 
 var _ = Describe("Cluster ECS API", func() {
 	var (
 		server *Server
 		ctx    context.Context
+		mockStorage *mocks.MockStorage
+		mockClusterStore *mocks.MockClusterStore
 	)
 
 	BeforeEach(func() {
-		mockStorage := NewMockStorage()
+		mockStorage = mocks.NewMockStorage()
+		mockClusterStore = mocks.NewMockClusterStore()
+		mockStorage.SetClusterStore(mockClusterStore)
 		server = &Server{
 			storage:     mockStorage,
 			kindManager: nil, // Skip actual kind cluster creation in tests
@@ -147,7 +49,7 @@ var _ = Describe("Cluster ECS API", func() {
 				Expect(*resp.Cluster.ClusterName).To(Equal("test-cluster"))
 
 				// Get the cluster from storage to check the kind cluster name
-				cluster, err := server.storage.ClusterStore().Get(ctx, "test-cluster")
+				cluster, err := mockClusterStore.Get(ctx, "test-cluster")
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify that the kind cluster name follows the expected pattern
@@ -166,7 +68,7 @@ var _ = Describe("Cluster ECS API", func() {
 				_, err := server.ecsAPI.CreateCluster(ctx, req1)
 				Expect(err).NotTo(HaveOccurred())
 
-				cluster1, err := server.storage.ClusterStore().Get(ctx, "test-cluster-1")
+				cluster1, err := mockClusterStore.Get(ctx, "test-cluster-1")
 				Expect(err).NotTo(HaveOccurred())
 
 				// Create second cluster
@@ -177,7 +79,7 @@ var _ = Describe("Cluster ECS API", func() {
 				_, err = server.ecsAPI.CreateCluster(ctx, req2)
 				Expect(err).NotTo(HaveOccurred())
 
-				cluster2, err := server.storage.ClusterStore().Get(ctx, "test-cluster-2")
+				cluster2, err := mockClusterStore.Get(ctx, "test-cluster-2")
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify the two clusters have different kind cluster names
@@ -231,7 +133,7 @@ var _ = Describe("Cluster ECS API", func() {
 				Expect(status1).To(Equal(status2))
 
 				// Verify only one cluster exists in storage
-				clusters, err := server.storage.ClusterStore().List(ctx)
+				clusters, err := mockClusterStore.List(ctx)
 				Expect(err).NotTo(HaveOccurred())
 
 				clusterCount := 0
@@ -346,7 +248,7 @@ var _ = Describe("Cluster ECS API", func() {
 			
 			It("should describe clusters by ARN", func() {
 				// First create the cluster
-				cluster, err := server.storage.ClusterStore().Get(ctx, "describe-test-1")
+				cluster, err := mockClusterStore.Get(ctx, "describe-test-1")
 				Expect(err).NotTo(HaveOccurred())
 				
 				// Use ARN to describe
@@ -390,7 +292,7 @@ var _ = Describe("Cluster ECS API", func() {
 				Expect(*resp.Cluster.Status).To(Equal("INACTIVE"))
 
 				// Verify cluster is deleted from storage
-				_, err = server.storage.ClusterStore().Get(ctx, "delete-test")
+				_, err = mockClusterStore.Get(ctx, "delete-test")
 				Expect(err).To(HaveOccurred())
 			})
 
@@ -403,10 +305,10 @@ var _ = Describe("Cluster ECS API", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// Simulate active services by updating the cluster
-				cluster, err := server.storage.ClusterStore().Get(ctx, clusterName)
+				cluster, err := mockClusterStore.Get(ctx, clusterName)
 				Expect(err).NotTo(HaveOccurred())
 				cluster.ActiveServicesCount = 1
-				err = server.storage.ClusterStore().Update(ctx, cluster)
+				err = mockClusterStore.Update(ctx, cluster)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Try to delete the cluster
@@ -455,7 +357,7 @@ var _ = Describe("Cluster ECS API", func() {
 				Expect(*resp.Cluster.Status).To(Equal("INACTIVE"))
 				
 				// Verify cluster is deleted from storage
-				_, err = server.storage.ClusterStore().Get(ctx, "delete-by-arn-test")
+				_, err = mockClusterStore.Get(ctx, "delete-by-arn-test")
 				Expect(err).To(HaveOccurred())
 			})
 		})
@@ -685,146 +587,3 @@ var _ = Describe("Cluster ECS API", func() {
 		})
 	})
 })
-
-// MockTaskDefinitionStore for task definition operations
-type MockTaskDefinitionStore struct {
-	storage *MockStorage
-}
-
-func (m *MockTaskDefinitionStore) Register(ctx context.Context, taskDef *storage.TaskDefinition) (*storage.TaskDefinition, error) {
-	if m.storage.taskDefinitions == nil {
-		m.storage.taskDefinitions = make(map[string]*storage.TaskDefinition)
-	}
-
-	// Get next revision
-	maxRevision := 0
-	for _, td := range m.storage.taskDefinitions {
-		if td.Family == taskDef.Family && td.Revision > maxRevision {
-			maxRevision = td.Revision
-		}
-	}
-	taskDef.Revision = maxRevision + 1
-	taskDef.ARN = fmt.Sprintf("arn:aws:ecs:ap-northeast-1:123456789012:task-definition/%s:%d", taskDef.Family, taskDef.Revision)
-	taskDef.Status = "ACTIVE"
-	taskDef.RegisteredAt = time.Now()
-
-	key := fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision)
-	m.storage.taskDefinitions[key] = taskDef
-	return taskDef, nil
-}
-
-func (m *MockTaskDefinitionStore) Get(ctx context.Context, family string, revision int) (*storage.TaskDefinition, error) {
-	key := fmt.Sprintf("%s:%d", family, revision)
-	td, exists := m.storage.taskDefinitions[key]
-	if !exists {
-		return nil, errors.New("task definition not found")
-	}
-	return td, nil
-}
-
-func (m *MockTaskDefinitionStore) GetLatest(ctx context.Context, family string) (*storage.TaskDefinition, error) {
-	var latest *storage.TaskDefinition
-	maxRevision := 0
-	for _, td := range m.storage.taskDefinitions {
-		if td.Family == family && td.Status == "ACTIVE" && td.Revision > maxRevision {
-			maxRevision = td.Revision
-			latest = td
-		}
-	}
-	if latest == nil {
-		return nil, errors.New("task definition family not found")
-	}
-	return latest, nil
-}
-
-func (m *MockTaskDefinitionStore) ListFamilies(ctx context.Context, familyPrefix string, status string, limit int, nextToken string) ([]*storage.TaskDefinitionFamily, string, error) {
-	familyMap := make(map[string]*storage.TaskDefinitionFamily)
-	
-	for _, td := range m.storage.taskDefinitions {
-		if familyPrefix != "" && !hasPrefix(td.Family, familyPrefix) {
-			continue
-		}
-		if status != "" && td.Status != status {
-			continue
-		}
-		
-		if family, exists := familyMap[td.Family]; exists {
-			if td.Revision > family.LatestRevision {
-				family.LatestRevision = td.Revision
-			}
-			if td.Status == "ACTIVE" {
-				family.ActiveRevisions++
-			}
-		} else {
-			familyMap[td.Family] = &storage.TaskDefinitionFamily{
-				Family:          td.Family,
-				LatestRevision:  td.Revision,
-				ActiveRevisions: 0,
-			}
-			if td.Status == "ACTIVE" {
-				familyMap[td.Family].ActiveRevisions = 1
-			}
-		}
-	}
-	
-	families := make([]*storage.TaskDefinitionFamily, 0, len(familyMap))
-	for _, family := range familyMap {
-		families = append(families, family)
-	}
-	
-	// Simple pagination
-	if limit > 0 && len(families) > limit {
-		return families[:limit], families[limit-1].Family, nil
-	}
-	
-	return families, "", nil
-}
-
-func (m *MockTaskDefinitionStore) ListRevisions(ctx context.Context, family string, status string, limit int, nextToken string) ([]*storage.TaskDefinitionRevision, string, error) {
-	revisions := make([]*storage.TaskDefinitionRevision, 0)
-	
-	for _, td := range m.storage.taskDefinitions {
-		if td.Family != family {
-			continue
-		}
-		if status != "" && td.Status != status {
-			continue
-		}
-		
-		rev := &storage.TaskDefinitionRevision{
-			ARN:      td.ARN,
-			Family:   td.Family,
-			Revision: td.Revision,
-			Status:   td.Status,
-		}
-		revisions = append(revisions, rev)
-	}
-	
-	return revisions, "", nil
-}
-
-func (m *MockTaskDefinitionStore) Deregister(ctx context.Context, family string, revision int) error {
-	key := fmt.Sprintf("%s:%d", family, revision)
-	td, exists := m.storage.taskDefinitions[key]
-	if !exists {
-		return errors.New("task definition not found")
-	}
-	if td.Status == "INACTIVE" {
-		return nil // Already inactive (idempotent)
-	}
-	td.Status = "INACTIVE"
-	return nil
-}
-
-func (m *MockTaskDefinitionStore) GetByARN(ctx context.Context, arn string) (*storage.TaskDefinition, error) {
-	for _, td := range m.storage.taskDefinitions {
-		if td.ARN == arn {
-			return td, nil
-		}
-	}
-	return nil, errors.New("task definition not found")
-}
-
-func hasPrefix(s, prefix string) bool {
-	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
-}

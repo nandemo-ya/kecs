@@ -2,110 +2,33 @@ package api
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/mocks"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
-
-// MockServiceStore for service operations
-type MockServiceStore struct {
-	storage *MockStorage
-	services map[string]*storage.Service
-}
-
-func NewMockServiceStore(mockStorage *MockStorage) *MockServiceStore {
-	return &MockServiceStore{
-		storage: mockStorage,
-		services: make(map[string]*storage.Service),
-	}
-}
-
-func (m *MockServiceStore) Create(ctx context.Context, service *storage.Service) error {
-	if m.services == nil {
-		m.services = make(map[string]*storage.Service)
-	}
-	key := fmt.Sprintf("%s:%s", service.ClusterARN, service.ServiceName)
-	if _, exists := m.services[key]; exists {
-		return errors.New("service already exists")
-	}
-	m.services[key] = service
-	return nil
-}
-
-func (m *MockServiceStore) Get(ctx context.Context, cluster, serviceName string) (*storage.Service, error) {
-	key := fmt.Sprintf("%s:%s", cluster, serviceName)
-	service, exists := m.services[key]
-	if !exists {
-		return nil, errors.New("service not found")
-	}
-	return service, nil
-}
-
-func (m *MockServiceStore) List(ctx context.Context, cluster string, serviceName string, launchType string, limit int, nextToken string) ([]*storage.Service, string, error) {
-	var services []*storage.Service
-	for _, service := range m.services {
-		// Apply filters
-		if cluster != "" && service.ClusterARN != cluster {
-			continue
-		}
-		if serviceName != "" && service.ServiceName != serviceName {
-			continue
-		}
-		if launchType != "" && service.LaunchType != launchType {
-			continue
-		}
-		services = append(services, service)
-		// Simple pagination for testing
-		if limit > 0 && len(services) >= limit {
-			break
-		}
-	}
-	return services, "", nil
-}
-
-func (m *MockServiceStore) Update(ctx context.Context, service *storage.Service) error {
-	key := fmt.Sprintf("%s:%s", service.ClusterARN, service.ServiceName)
-	if _, exists := m.services[key]; !exists {
-		return errors.New("service not found")
-	}
-	m.services[key] = service
-	return nil
-}
-
-func (m *MockServiceStore) Delete(ctx context.Context, cluster, serviceName string) error {
-	key := fmt.Sprintf("%s:%s", cluster, serviceName)
-	delete(m.services, key)
-	return nil
-}
-
-func (m *MockServiceStore) GetByARN(ctx context.Context, arn string) (*storage.Service, error) {
-	for _, service := range m.services {
-		if service.ARN == arn {
-			return service, nil
-		}
-	}
-	return nil, errors.New("service not found")
-}
 
 var _ = Describe("Service ECS API", func() {
 	var (
 		server *Server
 		ctx    context.Context
-		mockServiceStore *MockServiceStore
+		mockStorage *mocks.MockStorage
+		mockServiceStore *mocks.MockServiceStore
+		mockClusterStore *mocks.MockClusterStore
 	)
 
 	BeforeEach(func() {
-		mockStorage := NewMockStorage()
-		mockServiceStore = NewMockServiceStore(mockStorage)
+		mockStorage = mocks.NewMockStorage()
+		mockServiceStore = mocks.NewMockServiceStore()
+		mockClusterStore = mocks.NewMockClusterStore()
 		
-		// Add mock service store to storage
-		mockStorage.services = mockServiceStore.services
+		// Set stores on mock storage
+		mockStorage.SetServiceStore(mockServiceStore)
+		mockStorage.SetClusterStore(mockClusterStore)
 		
 		server = &Server{
 			storage:     mockStorage,
@@ -123,7 +46,8 @@ var _ = Describe("Service ECS API", func() {
 			Region:     "ap-northeast-1",
 			AccountID:  "123456789012",
 		}
-		mockStorage.clusters["default"] = cluster
+		err := mockClusterStore.Create(ctx, cluster)
+		Expect(err).To(BeNil())
 		
 		// Add test services
 		testService := &storage.Service{
@@ -143,7 +67,8 @@ var _ = Describe("Service ECS API", func() {
 			CreatedAt:         time.Now().Add(-1 * time.Hour),
 			UpdatedAt:         time.Now().Add(-30 * time.Minute),
 		}
-		mockServiceStore.services["arn:aws:ecs:ap-northeast-1:123456789012:cluster/default:test-service"] = testService
+		err = mockServiceStore.Create(ctx, testService)
+		Expect(err).To(BeNil())
 	})
 
 	Describe("ListServicesByNamespace", func() {
@@ -159,7 +84,8 @@ var _ = Describe("Service ECS API", func() {
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
 				}
-				mockServiceStore.services["arn:aws:ecs:ap-northeast-1:123456789012:cluster/default:test-service-2"] = service2
+				err := mockServiceStore.Create(ctx, service2)
+				Expect(err).To(BeNil())
 				
 				service3 := &storage.Service{
 					ID:          "service-3",
@@ -170,7 +96,8 @@ var _ = Describe("Service ECS API", func() {
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
 				}
-				mockServiceStore.services["arn:aws:ecs:ap-northeast-1:123456789012:cluster/default:other-service"] = service3
+				err = mockServiceStore.Create(ctx, service3)
+				Expect(err).To(BeNil())
 			})
 
 			It("should list services in specified namespace", func() {
