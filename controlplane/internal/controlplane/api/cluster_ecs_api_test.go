@@ -328,6 +328,26 @@ var _ = Describe("Cluster ECS API", func() {
 				Expect(resp.Failures).To(HaveLen(1))
 				Expect(*resp.Failures[0].Reason).To(Equal("MISSING"))
 			})
+			
+			It("should describe clusters by ARN", func() {
+				// First create the cluster
+				cluster, err := server.storage.ClusterStore().Get(ctx, "describe-test-1")
+				Expect(err).NotTo(HaveOccurred())
+				
+				// Use ARN to describe
+				req := &generated.DescribeClustersRequest{
+					Clusters: []string{cluster.ARN},
+				}
+				
+				resp, err := server.ecsAPI.DescribeClusters(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Clusters).To(HaveLen(1))
+				Expect(*resp.Clusters[0].ClusterName).To(Equal("describe-test-1"))
+				Expect(*resp.Clusters[0].ClusterArn).To(Equal(cluster.ARN))
+				Expect(resp.Failures).To(BeEmpty())
+			})
 		})
 	})
 
@@ -394,6 +414,70 @@ var _ = Describe("Cluster ECS API", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("not found"))
 			})
+			
+			It("should delete a cluster by ARN", func() {
+				// Create a cluster first
+				clusterName := "delete-by-arn-test"
+				createResp, err := server.ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{
+					ClusterName: &clusterName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+				
+				// Get the ARN
+				clusterArn := *createResp.Cluster.ClusterArn
+				
+				// Delete the cluster using ARN
+				req := &generated.DeleteClusterRequest{
+					Cluster: &clusterArn,
+				}
+				
+				resp, err := server.ecsAPI.DeleteCluster(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Cluster).NotTo(BeNil())
+				Expect(*resp.Cluster.ClusterName).To(Equal("delete-by-arn-test"))
+				Expect(*resp.Cluster.Status).To(Equal("INACTIVE"))
+				
+				// Verify cluster is deleted from storage
+				_, err = server.storage.ClusterStore().Get(ctx, "delete-by-arn-test")
+				Expect(err).To(HaveOccurred())
+			})
+		})
+	})
+	
+	Describe("extractClusterNameFromARN", func() {
+		It("should extract cluster name from valid ARN", func() {
+			arn := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/my-cluster"
+			name := extractClusterNameFromARN(arn)
+			Expect(name).To(Equal("my-cluster"))
+		})
+		
+		It("should return input for non-ARN strings", func() {
+			name := extractClusterNameFromARN("my-cluster")
+			Expect(name).To(Equal("my-cluster"))
+		})
+		
+		It("should return input for invalid ARN format", func() {
+			// Missing cluster name after slash
+			arn := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/"
+			name := extractClusterNameFromARN(arn)
+			Expect(name).To(Equal(arn))
+			
+			// No slash
+			arn2 := "arn:aws:ecs:ap-northeast-1:123456789012:cluster"
+			name2 := extractClusterNameFromARN(arn2)
+			Expect(name2).To(Equal(arn2))
+			
+			// Multiple slashes
+			arn3 := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/my/cluster"
+			name3 := extractClusterNameFromARN(arn3)
+			Expect(name3).To(Equal(arn3))
+		})
+		
+		It("should handle empty string", func() {
+			name := extractClusterNameFromARN("")
+			Expect(name).To(Equal(""))
 		})
 	})
 })

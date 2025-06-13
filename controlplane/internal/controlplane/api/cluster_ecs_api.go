@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
@@ -171,9 +172,10 @@ func (api *DefaultECSAPI) DescribeClusters(ctx context.Context, req *generated.D
 	var failures []generated.Failure
 
 	for _, identifier := range clusterIdentifiers {
-		cluster, err := api.storage.ClusterStore().Get(ctx, identifier)
-		// Storage only supports lookup by name currently
-		// TODO: Add ARN lookup support
+		// Extract cluster name from ARN if necessary
+		clusterName := extractClusterNameFromARN(identifier)
+		
+		cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
 		
 		if err != nil {
 			failures = append(failures, generated.Failure{
@@ -239,9 +241,11 @@ func (api *DefaultECSAPI) DeleteCluster(ctx context.Context, req *generated.Dele
 		return nil, fmt.Errorf("cluster identifier is required")
 	}
 
+	// Extract cluster name from ARN if necessary
+	clusterName := extractClusterNameFromARN(*req.Cluster)
+	
 	// Look up cluster
-	cluster, err := api.storage.ClusterStore().Get(ctx, *req.Cluster)
-	// TODO: Add ARN lookup support
+	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
 	
 	if err != nil {
 		return nil, fmt.Errorf("cluster not found: %s", *req.Cluster)
@@ -395,4 +399,16 @@ func (api *DefaultECSAPI) deleteKindClusterAndNamespace(cluster *storage.Cluster
 	}
 	
 	log.Printf("Successfully deleted kind cluster %s and namespace for ECS cluster %s", cluster.KindClusterName, cluster.Name)
+}
+
+// extractClusterNameFromARN extracts cluster name from ARN or returns the input if it's not an ARN
+// ARN format: arn:aws:ecs:region:account-id:cluster/cluster-name
+func extractClusterNameFromARN(identifier string) string {
+	if strings.HasPrefix(identifier, "arn:aws:ecs:") {
+		parts := strings.Split(identifier, "/")
+		if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+			return parts[1]
+		}
+	}
+	return identifier
 }
