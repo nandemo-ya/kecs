@@ -30,8 +30,9 @@ Git worktrees allow you to have multiple branches checked out simultaneously in 
 This will:
 1. Create worktrees for specified branches
 2. Set up .env files for each worktree
-3. Install dependencies (Go modules, npm packages) unless --skip-deps is used
-4. Create VS Code workspace files
+3. Copy and update Claude settings (.claude/settings.local.json) with corrected paths
+4. Install dependencies (Go modules, npm packages) unless --skip-deps is used
+5. Create VS Code workspace files
 
 ## Workflow Structure
 
@@ -39,6 +40,7 @@ This will:
 kecs/                          # Main repository
 kecs-worktrees/               # Worktree directory
 ├── feat/localstack-integration/
+│   ├── .claude/settings.local.json  # Claude settings with updated paths
 │   ├── controlplane/.env
 │   ├── web-ui/.env
 │   ├── mcp-server/.env
@@ -156,12 +158,17 @@ When using AI agents (like Claude) for development:
    cd ../kecs-worktrees/feat/proxy-modes
    ```
 
-2. **Provide context** to each agent:
+2. **Claude settings are automatically configured**:
+   - `.claude/settings.local.json` is copied from the main repository
+   - All paths in the settings are automatically updated to the worktree path
+   - Permissions and configurations remain consistent across worktrees
+
+3. **Provide context** to each agent:
    - Current branch and feature being worked on
    - Relevant ADRs and documentation
    - Any dependencies on other features
 
-3. **Coordinate between agents** when needed:
+4. **Coordinate between agents** when needed:
    - Share common interfaces
    - Avoid conflicting changes
    - Merge regularly with main branch
@@ -295,11 +302,15 @@ KECS_ADMIN_PORT=8081
 KECS_STORAGE_PATH=/tmp/kecs-my-feature.db
 EOF
 
-# 4. Install dependencies
+# 4. Copy and update Claude settings
+mkdir -p .claude
+sed "s|/path/to/main/repo|$(pwd)|g" /path/to/main/repo/.claude/settings.local.json > .claude/settings.local.json
+
+# 5. Install dependencies
 cd controlplane && go mod download
 cd ../web-ui && npm install
 
-# 5. Start development
+# 6. Start development
 make run
 ```
 

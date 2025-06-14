@@ -129,6 +129,33 @@ setup_dependencies() {
     print_success "Dependencies installed for ${branch_name}"
 }
 
+# Function to setup Claude settings
+setup_claude_settings() {
+    local worktree_path=$1
+    local branch_name=$2
+    local main_repo_path="${PROJECT_ROOT}"
+    local claude_dir="${worktree_path}/.claude"
+    
+    print_info "Setting up Claude settings for ${branch_name}"
+    
+    # Create .claude directory if it doesn't exist
+    mkdir -p "$claude_dir"
+    
+    # Copy settings.local.json from main repo if it exists
+    if [ -f "${main_repo_path}/.claude/settings.local.json" ]; then
+        # Read the original file and update paths
+        local old_path=$(echo "$main_repo_path" | sed 's/[[\.*^$()+?{|]/\\&/g')
+        local new_path=$(echo "$worktree_path" | sed 's/[[\.*^$()+?{|]/\\&/g')
+        
+        # Copy and update paths in settings.local.json
+        sed "s|$old_path|$new_path|g" "${main_repo_path}/.claude/settings.local.json" > "${claude_dir}/settings.local.json"
+        
+        print_success "Claude settings copied and paths updated"
+    else
+        print_warning "No .claude/settings.local.json found in main repository"
+    fi
+}
+
 # Function to create VS Code workspace file
 create_vscode_workspace() {
     local branch_name=$1
@@ -304,6 +331,7 @@ main() {
         print_info "Processing branch: ${branch}"
         create_worktree "$branch"
         setup_env_files "${WORKTREE_DIR}/${branch}" "$branch"
+        setup_claude_settings "${WORKTREE_DIR}/${branch}" "$branch"
         
         if [ "$SKIP_DEPS" = false ]; then
             setup_dependencies "${WORKTREE_DIR}/${branch}" "$branch"
