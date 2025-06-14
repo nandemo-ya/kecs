@@ -125,7 +125,7 @@ func (k *KindManager) GetClusterNodes(clusterName string) ([]nodes.Node, error) 
 
 func (k *KindManager) getKubeconfigPath(kecsClusterName string) string {
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".kube", fmt.Sprintf("kecs-%s.config", kecsClusterName))
+	return filepath.Join(homeDir, ".kube", fmt.Sprintf("%s.config", kecsClusterName))
 }
 
 // GetKubeConfig returns a kubernetes config for the current context
