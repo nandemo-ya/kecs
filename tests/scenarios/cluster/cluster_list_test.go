@@ -72,9 +72,12 @@ var _ = Describe("Cluster List Operations", func() {
 				Expect(err).NotTo(HaveOccurred(), "Failed to list clusters")
 
 				// Verify all created clusters are in the list
+				// ListClusters returns ARNs, so we need to check for ARN format
 				for _, expectedName := range clusterNames {
-					Expect(clusters).To(ContainElement(expectedName),
-						"Cluster %s not found in list", expectedName)
+					// Convert cluster name to expected ARN format
+					expectedArn := fmt.Sprintf("arn:aws:ecs:ap-northeast-1:123456789012:cluster/%s", expectedName)
+					Expect(clusters).To(ContainElement(expectedArn),
+						"Cluster ARN for %s not found in list", expectedName)
 				}
 
 				logger.Info("Successfully listed %d clusters", len(clusters))
@@ -92,13 +95,15 @@ var _ = Describe("Cluster List Operations", func() {
 				Expect(err).NotTo(HaveOccurred(), "Failed to list clusters")
 
 				// Verify deleted cluster is not in the list
-				Expect(clusters).NotTo(ContainElement(deletedCluster),
-					"Deleted cluster should not appear in list")
+				deletedArn := fmt.Sprintf("arn:aws:ecs:ap-northeast-1:123456789012:cluster/%s", deletedCluster)
+				Expect(clusters).NotTo(ContainElement(deletedArn),
+					"Deleted cluster ARN should not appear in list")
 
 				// Verify remaining clusters are still in the list
 				for i := 1; i < len(clusterNames); i++ {
-					Expect(clusters).To(ContainElement(clusterNames[i]),
-						"Cluster %s not found in list", clusterNames[i])
+					expectedArn := fmt.Sprintf("arn:aws:ecs:ap-northeast-1:123456789012:cluster/%s", clusterNames[i])
+					Expect(clusters).To(ContainElement(expectedArn),
+						"Cluster ARN for %s not found in list", clusterNames[i])
 				}
 			})
 		})
@@ -145,9 +150,10 @@ var _ = Describe("Cluster List Operations", func() {
 
 					// Count our test clusters
 					foundCount := 0
-					for _, cluster := range clusters {
-						for _, expected := range clusterNames {
-							if cluster == expected {
+					for _, clusterArn := range clusters {
+						for _, expectedName := range clusterNames {
+							expectedArn := fmt.Sprintf("arn:aws:ecs:ap-northeast-1:123456789012:cluster/%s", expectedName)
+							if clusterArn == expectedArn {
 								foundCount++
 								break
 							}
