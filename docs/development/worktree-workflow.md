@@ -141,6 +141,8 @@ Open a workspace:
 code ../kecs-worktrees/feat/proxy-modes/kecs-feat-proxy-modes.code-workspace
 ```
 
+Note: For branch names with slashes (e.g., `feat/proxy-modes`), the workspace filename will have dashes instead (e.g., `kecs-feat-proxy-modes.code-workspace`).
+
 ## AI Agent Development
 
 When using AI agents (like Claude) for development:
