@@ -93,8 +93,14 @@ func (c *ECSClient) ListTaskDefinitionsWithOptions(params map[string]interface{}
 		return nil, err
 	}
 
+	// Convert []string to []interface{} for test compatibility
+	interfaceArns := make([]interface{}, len(arns))
+	for i, arn := range arns {
+		interfaceArns[i] = arn
+	}
+
 	return map[string]interface{}{
-		"taskDefinitionArns": arns,
+		"taskDefinitionArns": interfaceArns,
 	}, nil
 }
 
