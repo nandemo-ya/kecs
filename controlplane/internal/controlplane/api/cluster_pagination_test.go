@@ -3,217 +3,196 @@ package api_test
 import (
 	"context"
 	"fmt"
-	"testing"
+	"time"
 
-	"github.com/google/uuid"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/mocks"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestListClustersPagination(t *testing.T) {
-	// Create test storage
-	testStorage, err := duckdb.NewDuckDBStorage(":memory:")
-	require.NoError(t, err)
-	defer testStorage.Close()
+var _ = Describe("Cluster Pagination", func() {
+	var (
+		ctx          context.Context
+		mockStorage  *mocks.MockStorage
+		clusterStore *mocks.MockClusterStore
+		ecsAPI       generated.ECSAPIInterface
+	)
 
-	// Initialize storage
-	ctx := context.Background()
-	require.NoError(t, testStorage.Initialize(ctx))
+	BeforeEach(func() {
+		ctx = context.Background()
 
-	// Create API instance
-	apiInstance := api.NewDefaultECSAPIWithConfig(testStorage, nil, "us-east-1", "123456789012")
+		// Setup mock storage
+		mockStorage = mocks.NewMockStorage()
+		clusterStore = mocks.NewMockClusterStore()
+		mockStorage.SetClusterStore(clusterStore)
 
-	// Create multiple clusters for testing pagination
-	clusterNames := []string{}
-	for i := 0; i < 15; i++ {
-		clusterName := fmt.Sprintf("test-cluster-%02d", i)
-		clusterNames = append(clusterNames, clusterName)
-		
-		req := &generated.CreateClusterRequest{
-			ClusterName: ptr.String(clusterName),
-			Tags: []generated.Tag{
-				{
-					Key:   (*generated.TagKey)(ptr.String("Environment")),
-					Value: (*generated.TagValue)(ptr.String("test")),
-				},
-			},
-		}
-		
-		_, err := apiInstance.CreateCluster(ctx, req)
-		require.NoError(t, err)
-	}
-
-	// Test 1: List clusters without pagination (should return all)
-	t.Run("list all clusters", func(t *testing.T) {
-		req := &generated.ListClustersRequest{}
-		resp, err := apiInstance.ListClusters(ctx, req)
-		require.NoError(t, err)
-		assert.Equal(t, 15, len(resp.ClusterArns))
-		assert.Nil(t, resp.NextToken)
-	})
-
-	// Test 2: List clusters with maxResults = 5
-	t.Run("list with maxResults=5", func(t *testing.T) {
-		req := &generated.ListClustersRequest{
-			MaxResults: ptr.Int32(5),
-		}
-		resp, err := apiInstance.ListClusters(ctx, req)
-		require.NoError(t, err)
-		assert.Equal(t, 5, len(resp.ClusterArns))
-		assert.NotNil(t, resp.NextToken)
-		
-		// Verify the clusters are in the expected order
-		for i := 0; i < 5; i++ {
-			assert.Contains(t, resp.ClusterArns[i], "test-cluster")
-		}
-	})
-
-	// Test 3: List next page using NextToken
-	t.Run("list next page", func(t *testing.T) {
-		// First page
-		req1 := &generated.ListClustersRequest{
-			MaxResults: ptr.Int32(5),
-		}
-		resp1, err := apiInstance.ListClusters(ctx, req1)
-		require.NoError(t, err)
-		require.NotNil(t, resp1.NextToken)
-
-		// Second page
-		req2 := &generated.ListClustersRequest{
-			MaxResults: ptr.Int32(5),
-			NextToken:  resp1.NextToken,
-		}
-		resp2, err := apiInstance.ListClusters(ctx, req2)
-		require.NoError(t, err)
-		assert.Equal(t, 5, len(resp2.ClusterArns))
-		assert.NotNil(t, resp2.NextToken)
-
-		// Verify no overlap between pages
-		for _, arn1 := range resp1.ClusterArns {
-			for _, arn2 := range resp2.ClusterArns {
-				assert.NotEqual(t, arn1, arn2, "Found duplicate ARN across pages")
+		// Create test clusters
+		for i := 0; i < 250; i++ {
+			cluster := &storage.Cluster{
+				ID:        fmt.Sprintf("cluster-id-%03d", i), // Use predictable IDs for consistent sorting
+				ARN:       fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-%03d", i),
+				Name:      fmt.Sprintf("test-cluster-%03d", i),
+				Status:    "ACTIVE",
+				Region:    "us-east-1",
+				AccountID: "123456789012",
+				CreatedAt: time.Now().Add(time.Duration(-i) * time.Hour),
+				UpdatedAt: time.Now(),
 			}
+			err := clusterStore.Create(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
 		}
+
+		// Create ECS API instance
+		ecsAPI = api.NewDefaultECSAPIWithConfig(mockStorage, nil, "us-east-1", "123456789012")
 	})
 
-	// Test 4: List last page
-	t.Run("list last page", func(t *testing.T) {
-		var allArns []string
-		var nextToken *string
-		pageSize := int32(6)
+	Describe("ListClusters", func() {
+		Context("with pagination", func() {
+			It("should list all clusters without pagination", func() {
+				req := &generated.ListClustersRequest{}
 
-		// Collect all pages
-		for i := 0; i < 3; i++ {
-			req := &generated.ListClustersRequest{
-				MaxResults: ptr.Int32(pageSize),
-				NextToken:  nextToken,
-			}
-			resp, err := apiInstance.ListClusters(ctx, req)
-			require.NoError(t, err)
-			
-			allArns = append(allArns, resp.ClusterArns...)
-			nextToken = resp.NextToken
-			
-			if nextToken == nil {
-				// Last page should have 3 items (15 total, 6+6+3)
-				assert.Equal(t, 3, len(resp.ClusterArns))
-				break
-			}
-		}
-		
-		assert.Equal(t, 15, len(allArns))
+				resp, err := ecsAPI.ListClusters(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.ClusterArns).To(HaveLen(100)) // Default limit
+				Expect(resp.NextToken).NotTo(BeNil())
+			})
+
+			It("should list clusters with maxResults=5", func() {
+				req := &generated.ListClustersRequest{
+					MaxResults: ptr.Int32(5),
+				}
+
+				resp, err := ecsAPI.ListClusters(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.ClusterArns).To(HaveLen(5))
+				Expect(resp.NextToken).NotTo(BeNil())
+
+				// Verify ARNs are in expected order
+				for i := 0; i < 5; i++ {
+					expectedARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-%03d", i)
+					Expect(resp.ClusterArns[i]).To(Equal(expectedARN))
+				}
+			})
+
+			It("should list next page", func() {
+				// First page
+				req1 := &generated.ListClustersRequest{
+					MaxResults: ptr.Int32(10),
+				}
+				resp1, err := ecsAPI.ListClusters(ctx, req1)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp1.ClusterArns).To(HaveLen(10))
+				Expect(resp1.NextToken).NotTo(BeNil())
+
+				// Second page
+				req2 := &generated.ListClustersRequest{
+					MaxResults: ptr.Int32(10),
+					NextToken:  resp1.NextToken,
+				}
+				resp2, err := ecsAPI.ListClusters(ctx, req2)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp2).NotTo(BeNil())
+				Expect(resp2.ClusterArns).To(HaveLen(10))
+				Expect(resp2.NextToken).NotTo(BeNil())
+
+				// Verify different results
+				Expect(resp2.ClusterArns[0]).NotTo(Equal(resp1.ClusterArns[0]))
+				expectedARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-%03d", 10)
+				Expect(resp2.ClusterArns[0]).To(Equal(expectedARN))
+			})
+
+			It("should handle last page", func() {
+				// Navigate to near the end
+				req := &generated.ListClustersRequest{
+					MaxResults: ptr.Int32(100),
+				}
+
+				var nextToken *string
+				for i := 0; i < 2; i++ {
+					req.NextToken = nextToken
+					resp, err := ecsAPI.ListClusters(ctx, req)
+					Expect(err).NotTo(HaveOccurred())
+					nextToken = resp.NextToken
+				}
+
+				// Last page
+				req.NextToken = nextToken
+				resp, err := ecsAPI.ListClusters(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.ClusterArns).To(HaveLen(50)) // 250 total - 200 = 50
+				Expect(resp.NextToken).To(BeNil())
+			})
+
+			It("should return error for invalid next token", func() {
+				req := &generated.ListClustersRequest{
+					NextToken: ptr.String("invalid-token"),
+				}
+
+				resp, err := ecsAPI.ListClusters(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(resp).To(BeNil())
+				Expect(err.Error()).To(ContainSubstring("invalid pagination token"))
+			})
+
+			It("should cap maxResults at 100", func() {
+				req := &generated.ListClustersRequest{
+					MaxResults: ptr.Int32(200),
+				}
+
+				resp, err := ecsAPI.ListClusters(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.ClusterArns).To(HaveLen(100)) // Capped at 100
+			})
+		})
+
+		Context("pagination consistency", func() {
+			It("should return consistent results across pages", func() {
+				// Collect all clusters using pagination
+				var allClusters []string
+				var nextToken *string
+
+				for {
+					req := &generated.ListClustersRequest{
+						MaxResults: ptr.Int32(50),
+						NextToken:  nextToken,
+					}
+
+					resp, err := ecsAPI.ListClusters(ctx, req)
+					Expect(err).NotTo(HaveOccurred())
+					
+					allClusters = append(allClusters, resp.ClusterArns...)
+					
+					if resp.NextToken == nil {
+						break
+					}
+					nextToken = resp.NextToken
+				}
+
+				// Verify we got all clusters
+				Expect(allClusters).To(HaveLen(250))
+
+				// Verify order is consistent
+				for i := 0; i < 250; i++ {
+					expectedARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-%03d", i)
+					Expect(allClusters[i]).To(Equal(expectedARN))
+				}
+
+				// Verify no duplicates
+				seen := make(map[string]bool)
+				for _, arn := range allClusters {
+					Expect(seen[arn]).To(BeFalse(), "Found duplicate ARN: %s", arn)
+					seen[arn] = true
+				}
+			})
+		})
 	})
-
-	// Test 5: Invalid next token
-	t.Run("invalid next token", func(t *testing.T) {
-		req := &generated.ListClustersRequest{
-			MaxResults: ptr.Int32(5),
-			NextToken:  ptr.String("invalid-token"),
-		}
-		resp, err := apiInstance.ListClusters(ctx, req)
-		require.NoError(t, err)
-		// Should return results starting from the beginning when token is invalid
-		assert.GreaterOrEqual(t, len(resp.ClusterArns), 5)
-	})
-
-	// Test 6: MaxResults > 100 (should be capped at 100)
-	t.Run("maxResults capped at 100", func(t *testing.T) {
-		req := &generated.ListClustersRequest{
-			MaxResults: ptr.Int32(200),
-		}
-		resp, err := apiInstance.ListClusters(ctx, req)
-		require.NoError(t, err)
-		// Should return all 15 clusters since we have less than 100
-		assert.Equal(t, 15, len(resp.ClusterArns))
-		assert.Nil(t, resp.NextToken)
-	})
-}
-
-// TestListClustersPaginationConsistency verifies that pagination returns consistent results
-func TestListClustersPaginationConsistency(t *testing.T) {
-	// Create test storage
-	testStorage, err := duckdb.NewDuckDBStorage(":memory:")
-	require.NoError(t, err)
-	defer testStorage.Close()
-
-	// Initialize storage
-	ctx := context.Background()
-	require.NoError(t, testStorage.Initialize(ctx))
-
-	// Create API instance
-	apiInstance := api.NewDefaultECSAPIWithConfig(testStorage, nil, "us-east-1", "123456789012")
-
-	// Create clusters with known IDs for predictable ordering
-	clusterIDs := []string{}
-	for i := 0; i < 10; i++ {
-		// Create cluster with specific ID to control ordering
-		cluster := &storage.Cluster{
-			ID:        fmt.Sprintf("%02d-%s", i, uuid.New().String()),
-			ARN:       fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-%02d", i),
-			Name:      fmt.Sprintf("test-cluster-%02d", i),
-			Status:    "ACTIVE",
-			Region:    "us-east-1",
-			AccountID: "123456789012",
-		}
-		
-		err := testStorage.ClusterStore().Create(ctx, cluster)
-		require.NoError(t, err)
-		clusterIDs = append(clusterIDs, cluster.ID)
-	}
-
-	// Paginate through all results and collect them
-	var allArns []string
-	var nextToken *string
-	pageSize := int32(3)
-
-	for {
-		req := &generated.ListClustersRequest{
-			MaxResults: ptr.Int32(pageSize),
-			NextToken:  nextToken,
-		}
-		resp, err := apiInstance.ListClusters(ctx, req)
-		require.NoError(t, err)
-		
-		allArns = append(allArns, resp.ClusterArns...)
-		
-		if resp.NextToken == nil {
-			break
-		}
-		nextToken = resp.NextToken
-	}
-
-	// Verify we got all clusters
-	assert.Equal(t, 10, len(allArns))
-	
-	// Verify no duplicates
-	seen := make(map[string]bool)
-	for _, arn := range allArns {
-		assert.False(t, seen[arn], "Found duplicate ARN: %s", arn)
-		seen[arn] = true
-	}
-}
+})

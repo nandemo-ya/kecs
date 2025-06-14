@@ -172,7 +172,7 @@ func (m *MockClusterStore) ListWithPagination(ctx context.Context, limit int, ne
 		allClusters = append(allClusters, cluster)
 	}
 	
-	// Sort by ID for consistent ordering
+	// Sort by ID for consistent ordering (matches DuckDB implementation)
 	sort.Slice(allClusters, func(i, j int) bool {
 		return allClusters[i].ID < allClusters[j].ID
 	})
@@ -180,6 +180,20 @@ func (m *MockClusterStore) ListWithPagination(ctx context.Context, limit int, ne
 	// Find starting position based on nextToken
 	start := 0
 	if nextToken != "" {
+		// Validate token exists
+		tokenExists := false
+		for _, cluster := range allClusters {
+			if cluster.ID == nextToken {
+				tokenExists = true
+				break
+			}
+		}
+		
+		// If token doesn't exist, return error (like DuckDB implementation)
+		if !tokenExists {
+			return nil, "", fmt.Errorf("invalid pagination token")
+		}
+		
 		for i, cluster := range allClusters {
 			if cluster.ID > nextToken {
 				start = i
