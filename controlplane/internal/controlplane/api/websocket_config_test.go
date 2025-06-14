@@ -4,239 +4,181 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"testing"
 
-	"github.com/stretchr/testify/assert"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestWebSocketConfig_CheckOrigin(t *testing.T) {
-	tests := []struct {
-		name           string
-		config         *WebSocketConfig
-		origin         string
-		referer        string
-		host           string
-		expectedResult bool
-	}{
-		{
-			name: "empty allowed origins allows all",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{},
-			},
-			origin:         "http://example.com",
-			expectedResult: true,
-		},
-		{
-			name: "wildcard allows all origins",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{"*"},
-			},
-			origin:         "http://malicious.com",
-			expectedResult: true,
-		},
-		{
-			name: "exact match allowed",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{"http://localhost:3000", "https://app.example.com"},
-			},
-			origin:         "http://localhost:3000",
-			expectedResult: true,
-		},
-		{
-			name: "exact match denied",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{"http://localhost:3000"},
-			},
-			origin:         "http://localhost:3001",
-			expectedResult: false,
-		},
-		{
-			name: "scheme mismatch denied",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{"https://example.com"},
-			},
-			origin:         "http://example.com",
-			expectedResult: false,
-		},
-		{
-			name: "wildcard subdomain match",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{"*.example.com"},
-			},
-			origin:         "https://app.example.com",
-			expectedResult: true,
-		},
-		{
-			name: "wildcard subdomain with nested subdomain",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{"*.example.com"},
-			},
-			origin:         "https://api.app.example.com",
-			expectedResult: true,
-		},
-		{
-			name: "wildcard subdomain root domain denied",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{"*.example.com"},
-			},
-			origin:         "https://example.com",
-			expectedResult: false,
-		},
-		{
-			name: "scheme-less match",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{"localhost:3000"},
-			},
-			origin:         "http://localhost:3000",
-			expectedResult: true,
-		},
-		{
-			name: "same origin with no origin header",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{"http://example.com"},
-			},
-			origin:         "",
-			referer:        "http://localhost:8080/page",
-			host:           "localhost:8080",
-			expectedResult: true,
-		},
-		{
-			name: "different origin with no origin header",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{"http://example.com"},
-			},
-			origin:         "",
-			referer:        "http://example.com/page",
-			host:           "localhost:8080",
-			expectedResult: false,
-		},
-		{
-			name: "custom check function overrides",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{"http://denied.com"},
-				CheckOriginFunc: func(r *http.Request) bool {
-					// Custom function that always allows
-					return true
-				},
-			},
-			origin:         "http://custom.com",
-			expectedResult: true,
-		},
-		{
-			name: "multiple allowed origins",
-			config: &WebSocketConfig{
-				AllowedOrigins: []string{
-					"http://localhost:3000",
-					"http://localhost:8080",
-					"https://production.app.com",
-					"*.staging.app.com",
-				},
-			},
-			origin:         "https://api.staging.app.com",
-			expectedResult: true,
-		},
-	}
+var _ = Describe("WebSocketConfig", func() {
+	Context("when checking origin", func() {
+		DescribeTable("origin validation scenarios",
+			func(config *WebSocketConfig, origin, referer, host string, expectedResult bool) {
+				// Create a test request
+				req := httptest.NewRequest("GET", "/ws", nil)
+				
+				// Set headers
+				if origin != "" {
+					req.Header.Set("Origin", origin)
+				}
+				if referer != "" {
+					req.Header.Set("Referer", referer)
+				}
+				if host != "" {
+					req.Host = host
+				}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a test request
-			req := httptest.NewRequest("GET", "/ws", nil)
+				// Check origin
+				result := config.CheckOrigin(req)
+				Expect(result).To(Equal(expectedResult))
+			},
+			Entry("empty allowed origins allows all",
+				&WebSocketConfig{
+					AllowedOrigins: []string{},
+				},
+				"http://example.com", "", "",
+				true,
+			),
+			Entry("wildcard allows all origins",
+				&WebSocketConfig{
+					AllowedOrigins: []string{"*"},
+				},
+				"http://malicious.com", "", "",
+				true,
+			),
+			Entry("exact match allowed",
+				&WebSocketConfig{
+					AllowedOrigins: []string{"http://localhost:3000", "https://app.example.com"},
+				},
+				"http://localhost:3000", "", "",
+				true,
+			),
+			Entry("exact match denied",
+				&WebSocketConfig{
+					AllowedOrigins: []string{"http://localhost:3000"},
+				},
+				"http://localhost:3001", "", "",
+				false,
+			),
+			Entry("scheme mismatch denied",
+				&WebSocketConfig{
+					AllowedOrigins: []string{"https://example.com"},
+				},
+				"http://example.com", "", "",
+				false,
+			),
+			Entry("wildcard subdomain match",
+				&WebSocketConfig{
+					AllowedOrigins: []string{"*.example.com"},
+				},
+				"https://app.example.com", "", "",
+				true,
+			),
+			Entry("wildcard subdomain with nested subdomain",
+				&WebSocketConfig{
+					AllowedOrigins: []string{"*.example.com"},
+				},
+				"https://api.app.example.com", "", "",
+				true,
+			),
+			Entry("wildcard subdomain root domain denied",
+				&WebSocketConfig{
+					AllowedOrigins: []string{"*.example.com"},
+				},
+				"https://example.com", "", "",
+				false,
+			),
+			Entry("scheme-less match",
+				&WebSocketConfig{
+					AllowedOrigins: []string{"localhost:3000"},
+				},
+				"http://localhost:3000", "", "",
+				true,
+			),
+			Entry("same origin with no origin header",
+				&WebSocketConfig{
+					AllowedOrigins: []string{"http://example.com"},
+				},
+				"", "http://localhost:8080/page", "localhost:8080",
+				true,
+			),
+			Entry("different origin with no origin header",
+				&WebSocketConfig{
+					AllowedOrigins: []string{"http://example.com"},
+				},
+				"", "http://example.com/page", "localhost:8080",
+				false,
+			),
+			Entry("custom check function overrides",
+				&WebSocketConfig{
+					AllowedOrigins: []string{"http://denied.com"},
+					CheckOriginFunc: func(r *http.Request) bool {
+						// Custom function that always allows
+						return true
+					},
+				},
+				"http://custom.com", "", "",
+				true,
+			),
+			Entry("multiple allowed origins",
+				&WebSocketConfig{
+					AllowedOrigins: []string{
+						"http://localhost:3000",
+						"http://localhost:8080",
+						"https://production.app.com",
+						"*.staging.app.com",
+					},
+				},
+				"https://api.staging.app.com", "", "",
+				true,
+			),
+		)
+	})
+
+	Context("when matching origin patterns", func() {
+		var config *WebSocketConfig
+
+		BeforeEach(func() {
+			config = &WebSocketConfig{}
+		})
+
+		DescribeTable("origin matching scenarios",
+			func(origin, allowed string, expected bool) {
+				originURL, err := parseURL(origin)
+				Expect(err).NotTo(HaveOccurred())
+
+				result := config.matchOrigin(originURL, allowed)
+				Expect(result).To(Equal(expected))
+			},
+			Entry("wildcard matches anything", "http://example.com", "*", true),
+			Entry("exact match", "http://example.com", "http://example.com", true),
+			Entry("port mismatch", "http://example.com:8080", "http://example.com", false),
+			Entry("subdomain wildcard match", "https://app.example.com", "*.example.com", true),
+			Entry("subdomain wildcard no match on root", "https://example.com", "*.example.com", false),
+			Entry("scheme-less match with http", "http://localhost:3000", "localhost:3000", true),
+			Entry("scheme-less match with https", "https://localhost:3000", "localhost:3000", true),
+		)
+	})
+
+	Context("when using default configuration", func() {
+		It("should have expected default values", func() {
+			config := DefaultWebSocketConfig()
 			
-			// Set headers
-			if tt.origin != "" {
-				req.Header.Set("Origin", tt.origin)
-			}
-			if tt.referer != "" {
-				req.Header.Set("Referer", tt.referer)
-			}
-			if tt.host != "" {
-				req.Host = tt.host
-			}
-
-			// Check origin
-			result := tt.config.CheckOrigin(req)
-			assert.Equal(t, tt.expectedResult, result)
+			Expect(config).NotTo(BeNil())
+			Expect(config.AllowedOrigins).To(BeEmpty())
+			Expect(config.AllowCredentials).To(BeTrue())
+			Expect(config.CheckOriginFunc).To(BeNil())
 		})
-	}
-}
 
-func TestWebSocketConfig_matchOrigin(t *testing.T) {
-	config := &WebSocketConfig{}
-
-	tests := []struct {
-		name     string
-		origin   string
-		allowed  string
-		expected bool
-	}{
-		{
-			name:     "wildcard matches anything",
-			origin:   "http://example.com",
-			allowed:  "*",
-			expected: true,
-		},
-		{
-			name:     "exact match",
-			origin:   "http://example.com",
-			allowed:  "http://example.com",
-			expected: true,
-		},
-		{
-			name:     "port mismatch",
-			origin:   "http://example.com:8080",
-			allowed:  "http://example.com",
-			expected: false,
-		},
-		{
-			name:     "subdomain wildcard match",
-			origin:   "https://app.example.com",
-			allowed:  "*.example.com",
-			expected: true,
-		},
-		{
-			name:     "subdomain wildcard no match on root",
-			origin:   "https://example.com",
-			allowed:  "*.example.com",
-			expected: false,
-		},
-		{
-			name:     "scheme-less match with http",
-			origin:   "http://localhost:3000",
-			allowed:  "localhost:3000",
-			expected: true,
-		},
-		{
-			name:     "scheme-less match with https",
-			origin:   "https://localhost:3000",
-			allowed:  "localhost:3000",
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			originURL, err := parseURL(tt.origin)
-			assert.NoError(t, err)
-
-			result := config.matchOrigin(originURL, tt.allowed)
-			assert.Equal(t, tt.expected, result)
+		It("should allow all origins by default", func() {
+			config := DefaultWebSocketConfig()
+			
+			req := httptest.NewRequest("GET", "/ws", nil)
+			req.Header.Set("Origin", "http://any-origin.com")
+			
+			Expect(config.CheckOrigin(req)).To(BeTrue())
 		})
-	}
-}
-
-func TestDefaultWebSocketConfig(t *testing.T) {
-	config := DefaultWebSocketConfig()
-	
-	assert.NotNil(t, config)
-	assert.Empty(t, config.AllowedOrigins)
-	assert.True(t, config.AllowCredentials)
-	assert.Nil(t, config.CheckOriginFunc)
-	
-	// Default config should allow all origins
-	req := httptest.NewRequest("GET", "/ws", nil)
-	req.Header.Set("Origin", "http://any-origin.com")
-	assert.True(t, config.CheckOrigin(req))
-}
+	})
+})
 
 // Helper function to parse URL for tests
 func parseURL(urlStr string) (*url.URL, error) {
