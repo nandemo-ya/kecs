@@ -131,8 +131,31 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 
 // ListClusters implements the ListClusters operation
 func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListClustersRequest) (*generated.ListClustersResponse, error) {
-	// Get all clusters from storage
-	clusters, err := api.storage.ClusterStore().List(ctx)
+	// Debug log the request
+	reqJSON, _ := json.Marshal(req)
+	log.Printf("ListClusters request: %s", string(reqJSON))
+	
+	// Set default limit if not specified
+	limit := 100
+	if req.MaxResults != nil && *req.MaxResults > 0 {
+		limit = int(*req.MaxResults)
+		// AWS ECS has a maximum of 100 results per page
+		if limit > 100 {
+			limit = 100
+		}
+		log.Printf("ListClusters: MaxResults=%d, effective limit=%d", *req.MaxResults, limit)
+	} else {
+		log.Printf("ListClusters: No MaxResults specified, using default limit=%d", limit)
+	}
+
+	// Extract next token
+	var nextToken string
+	if req.NextToken != nil {
+		nextToken = *req.NextToken
+	}
+
+	// Get clusters with pagination
+	clusters, newNextToken, err := api.storage.ClusterStore().ListWithPagination(ctx, limit, nextToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list clusters: %w", err)
 	}
@@ -147,8 +170,13 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 		ClusterArns: clusterArns,
 	}
 
-	// Handle pagination if requested
-	// TODO: Implement proper pagination
+	// Set next token if there are more results
+	if newNextToken != "" {
+		response.NextToken = ptr.String(newNextToken)
+		log.Printf("ListClusters: Returning %d clusters with nextToken=%s", len(clusterArns), newNextToken)
+	} else {
+		log.Printf("ListClusters: Returning %d clusters with no nextToken", len(clusterArns))
+	}
 
 	return response, nil
 }

@@ -341,7 +341,7 @@ import "time"
 // {{ .Name }} represents the {{ .Name }} structure
 type {{ .Name }} struct {
 {{- range .Members }}
-	{{ toCamelCase .Name }} {{ .Type }} ` + "`json:\"{{ toLowerCamel .Name }}{{ if not .Required }},omitempty{{ end }}\"`" + `
+	{{ toCamelCase .Name }} {{ .Type }} ` + "`json:\"{{ toLowerCamel .Name }}{{ if and (not .Required) (not (hasPrefix .Type \"[]\")) }},omitempty{{ end }}\"`" + `
 {{- end }}
 }
 {{- else if eq .Type "map" }}
@@ -398,6 +398,7 @@ func generateTypes(filename string, types []TypeDef) error {
 		"mapType": mapType,
 		"toLowerCamel": toLowerCamel,
 		"toCamelCase": toCamelCase,
+		"hasPrefix": strings.HasPrefix,
 	}
 
 	tmpl, err := template.New("types").Funcs(funcMap).Parse(typesTemplate)

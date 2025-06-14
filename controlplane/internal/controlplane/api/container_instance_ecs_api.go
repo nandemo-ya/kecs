@@ -7,6 +7,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // RegisterContainerInstance implements the RegisterContainerInstance operation
@@ -164,31 +165,58 @@ func (api *DefaultECSAPI) DescribeContainerInstances(ctx context.Context, req *g
 
 // ListContainerInstances implements the ListContainerInstances operation
 func (api *DefaultECSAPI) ListContainerInstances(ctx context.Context, req *generated.ListContainerInstancesRequest) (*generated.ListContainerInstancesResponse, error) {
-	// TODO: Implement actual container instance listing logic
-	// For now, return a mock response
+	// Get cluster name
 	cluster := "default"
 	if req.Cluster != nil {
 		cluster = *req.Cluster
 	}
 
-	// Mock response with sample container instance ARNs
-	containerInstanceArns := []string{
-		"arn:aws:ecs:" + api.region + ":" + api.accountID + ":container-instance/" + cluster + "/i-1234567890abcdef0",
-		"arn:aws:ecs:" + api.region + ":" + api.accountID + ":container-instance/" + cluster + "/i-1234567890abcdef1",
-		"arn:aws:ecs:" + api.region + ":" + api.accountID + ":container-instance/" + cluster + "/i-1234567890abcdef2",
+	// Get cluster to validate it exists and get its ARN
+	clusterObj, err := api.storage.ClusterStore().Get(ctx, cluster)
+	if err != nil {
+		// If cluster not found, return empty result
+		return &generated.ListContainerInstancesResponse{
+			ContainerInstanceArns: []string{},
+		}, nil
+	}
+	clusterARN := clusterObj.ARN
+
+	// Set default limit if not specified
+	limit := 100
+	if req.MaxResults != nil && *req.MaxResults > 0 {
+		limit = int(*req.MaxResults)
+		// AWS ECS has a maximum of 100 results per page
+		if limit > 100 {
+			limit = 100
+		}
 	}
 
-	// Apply filtering if status is specified
-	if req.Status != nil && *req.Status != "ACTIVE" {
-		// If filtering for non-ACTIVE status, return empty list
-		containerInstanceArns = []string{}
+	// Extract next token
+	var nextToken string
+	if req.NextToken != nil {
+		nextToken = *req.NextToken
 	}
 
-	// Apply pagination if requested
-	maxResults := 100
-	if req.MaxResults != nil && *req.MaxResults < int32(len(containerInstanceArns)) {
-		maxResults = int(*req.MaxResults)
-		containerInstanceArns = containerInstanceArns[:maxResults]
+	// Build filters
+	filters := storage.ContainerInstanceFilters{}
+	if req.Status != nil {
+		filters.Status = string(*req.Status)
+	}
+	if req.Filter != nil {
+		filters.Filter = *req.Filter
+	}
+
+	// Get container instances with pagination
+	instances, newNextToken, err := api.storage.ContainerInstanceStore().ListWithPagination(ctx, clusterARN, filters, limit, nextToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list container instances: %w", err)
+	}
+
+	// Convert to ARNs
+	// Initialize with empty slice to ensure it's not nil when marshaling to JSON
+	containerInstanceArns := make([]string, 0, len(instances))
+	for _, instance := range instances {
+		containerInstanceArns = append(containerInstanceArns, instance.ARN)
 	}
 
 	resp := &generated.ListContainerInstancesResponse{
@@ -196,10 +224,10 @@ func (api *DefaultECSAPI) ListContainerInstances(ctx context.Context, req *gener
 	}
 
 	// Add next token if there are more results
-	if req.MaxResults != nil && *req.MaxResults < 3 {
-		resp.NextToken = ptr.String("next-page-token")
+	if newNextToken != "" {
+		resp.NextToken = ptr.String(newNextToken)
 	}
-
+	
 	return resp, nil
 }
 

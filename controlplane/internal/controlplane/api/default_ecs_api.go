@@ -23,3 +23,13 @@ func NewDefaultECSAPI(storage storage.Storage, kindManager *kubernetes.KindManag
 		accountID:   "123456789012",   // Default account ID
 	}
 }
+
+// NewDefaultECSAPIWithConfig creates a new default ECS API implementation with custom region and accountID
+func NewDefaultECSAPIWithConfig(storage storage.Storage, kindManager *kubernetes.KindManager, region, accountID string) generated.ECSAPIInterface {
+	return &DefaultECSAPI{
+		storage:     storage,
+		kindManager: kindManager,
+		region:      region,
+		accountID:   accountID,
+	}
+}

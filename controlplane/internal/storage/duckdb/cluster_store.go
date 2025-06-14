@@ -196,6 +196,106 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 	return clusters, nil
 }
 
+// ListWithPagination retrieves clusters with pagination support
+func (s *clusterStore) ListWithPagination(ctx context.Context, limit int, nextToken string) ([]*storage.Cluster, string, error) {
+	var args []interface{}
+	
+	baseQuery := `
+		SELECT 
+			id, arn, name, status, region, account_id,
+			configuration, settings, tags, kind_cluster_name,
+			registered_container_instances_count, running_tasks_count,
+			pending_tasks_count, active_services_count,
+			capacity_providers, default_capacity_provider_strategy,
+			created_at, updated_at
+		FROM clusters`
+
+	// Add token-based pagination
+	if nextToken != "" {
+		// Validate that the token exists
+		var exists bool
+		err := s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM clusters WHERE id = ?)", nextToken).Scan(&exists)
+		if err != nil || !exists {
+			// Invalid token, start from beginning
+			nextToken = ""
+		} else {
+			baseQuery += " WHERE id > ?"
+			args = append(args, nextToken)
+		}
+	}
+
+	// Add ordering and limit
+	baseQuery += " ORDER BY id"
+	if limit > 0 {
+		baseQuery += " LIMIT ?"
+		args = append(args, limit+1) // Get one extra to determine if there are more results
+	}
+
+	rows, err := s.db.QueryContext(ctx, baseQuery, args...)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to list clusters: %w", err)
+	}
+	defer rows.Close()
+
+	var clusters []*storage.Cluster
+	
+	for rows.Next() {
+		cluster := &storage.Cluster{}
+		var configuration, settings, tags, kindClusterName, capacityProviders, defaultCapacityProviderStrategy sql.NullString
+
+		err := rows.Scan(
+			&cluster.ID,
+			&cluster.ARN,
+			&cluster.Name,
+			&cluster.Status,
+			&cluster.Region,
+			&cluster.AccountID,
+			&configuration,
+			&settings,
+			&tags,
+			&kindClusterName,
+			&cluster.RegisteredContainerInstancesCount,
+			&cluster.RunningTasksCount,
+			&cluster.PendingTasksCount,
+			&cluster.ActiveServicesCount,
+			&capacityProviders,
+			&defaultCapacityProviderStrategy,
+			&cluster.CreatedAt,
+			&cluster.UpdatedAt,
+		)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to scan cluster row: %w", err)
+		}
+
+		// Handle nullable fields
+		cluster.Configuration = configuration.String
+		cluster.Settings = settings.String
+		cluster.Tags = tags.String
+		cluster.KindClusterName = kindClusterName.String
+		cluster.CapacityProviders = capacityProviders.String
+		cluster.DefaultCapacityProviderStrategy = defaultCapacityProviderStrategy.String
+
+		clusters = append(clusters, cluster)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("error iterating clusters: %w", err)
+	}
+
+	// Determine next token
+	var newNextToken string
+	if limit > 0 && len(clusters) > limit {
+		// Remove the extra item
+		clusters = clusters[:limit]
+		// Use the last item's ID as the next token
+		if len(clusters) > 0 {
+			newNextToken = clusters[len(clusters)-1].ID
+		}
+	}
+
+	return clusters, newNextToken, nil
+}
+
 // Update updates an existing cluster
 func (s *clusterStore) Update(ctx context.Context, cluster *storage.Cluster) error {
 	// Update timestamp

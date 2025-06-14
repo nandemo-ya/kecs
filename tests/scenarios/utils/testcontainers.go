@@ -134,6 +134,18 @@ func (k *KECSContainer) Cleanup() error {
 	return nil
 }
 
+// RunCommand executes a command in the container
+func (k *KECSContainer) RunCommand(command ...string) (string, error) {
+	cmd := exec.Command(command[0], command[1:]...)
+	output, err := cmd.CombinedOutput()
+	return string(output), err
+}
+
+// APIEndpoint returns the KECS API endpoint URL (same as Endpoint)
+func (k *KECSContainer) APIEndpoint() string {
+	return k.endpoint
+}
+
 
 // getEnvOrDefault returns environment variable value or default
 func getEnvOrDefault(key, defaultValue string) string {
