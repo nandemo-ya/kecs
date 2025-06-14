@@ -31,6 +31,12 @@ type Storage interface {
 	// TaskSet operations
 	TaskSetStore() TaskSetStore
 	
+	// Container Instance operations
+	ContainerInstanceStore() ContainerInstanceStore
+	
+	// Attribute operations
+	AttributeStore() AttributeStore
+	
 	// Transaction support
 	BeginTx(ctx context.Context) (Transaction, error)
 }
@@ -51,6 +57,9 @@ type ClusterStore interface {
 	
 	// List all clusters
 	List(ctx context.Context) ([]*Cluster, error)
+	
+	// ListWithPagination retrieves clusters with pagination support
+	ListWithPagination(ctx context.Context, limit int, nextToken string) ([]*Cluster, string, error)
 	
 	// Update a cluster
 	Update(ctx context.Context, cluster *Cluster) error
@@ -669,6 +678,150 @@ type TaskSet struct {
 	
 	// Fargate ephemeral storage as JSON
 	FargateEphemeralStorage string `json:"fargateEphemeralStorage,omitempty"`
+	
+	// Region
+	Region string `json:"region"`
+	
+	// Account ID
+	AccountID string `json:"accountId"`
+	
+	// Timestamps
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// ContainerInstanceStore defines container instance-specific storage operations
+type ContainerInstanceStore interface {
+	// Register a new container instance
+	Register(ctx context.Context, instance *ContainerInstance) error
+	
+	// Get a container instance by ARN
+	Get(ctx context.Context, arn string) (*ContainerInstance, error)
+	
+	// List container instances with filtering and pagination
+	ListWithPagination(ctx context.Context, cluster string, filters ContainerInstanceFilters, limit int, nextToken string) ([]*ContainerInstance, string, error)
+	
+	// Update a container instance
+	Update(ctx context.Context, instance *ContainerInstance) error
+	
+	// Deregister a container instance
+	Deregister(ctx context.Context, arn string) error
+	
+	// Get container instances by ARNs
+	GetByARNs(ctx context.Context, arns []string) ([]*ContainerInstance, error)
+}
+
+// ContainerInstance represents an ECS container instance in storage
+type ContainerInstance struct {
+	// Unique identifier
+	ID string `json:"id"`
+	
+	// Container instance ARN
+	ARN string `json:"arn"`
+	
+	// Cluster ARN
+	ClusterARN string `json:"clusterArn"`
+	
+	// EC2 instance ID
+	EC2InstanceID string `json:"ec2InstanceId"`
+	
+	// Status (ACTIVE, DRAINING, REGISTERING, DEREGISTERING, REGISTRATION_FAILED)
+	Status string `json:"status"`
+	
+	// Status reason
+	StatusReason string `json:"statusReason,omitempty"`
+	
+	// Agent connected
+	AgentConnected bool `json:"agentConnected"`
+	
+	// Agent update status
+	AgentUpdateStatus string `json:"agentUpdateStatus,omitempty"`
+	
+	// Running tasks count
+	RunningTasksCount int32 `json:"runningTasksCount"`
+	
+	// Pending tasks count
+	PendingTasksCount int32 `json:"pendingTasksCount"`
+	
+	// Version
+	Version int64 `json:"version"`
+	
+	// Version info as JSON
+	VersionInfo string `json:"versionInfo,omitempty"`
+	
+	// Registered resources as JSON
+	RegisteredResources string `json:"registeredResources,omitempty"`
+	
+	// Remaining resources as JSON
+	RemainingResources string `json:"remainingResources,omitempty"`
+	
+	// Attributes as JSON
+	Attributes string `json:"attributes,omitempty"`
+	
+	// Attachments as JSON
+	Attachments string `json:"attachments,omitempty"`
+	
+	// Tags as JSON
+	Tags string `json:"tags,omitempty"`
+	
+	// Capacity provider name
+	CapacityProviderName string `json:"capacityProviderName,omitempty"`
+	
+	// Health status
+	HealthStatus string `json:"healthStatus,omitempty"`
+	
+	// Region
+	Region string `json:"region"`
+	
+	// Account ID
+	AccountID string `json:"accountId"`
+	
+	// Timestamps
+	RegisteredAt   time.Time  `json:"registeredAt"`
+	UpdatedAt      time.Time  `json:"updatedAt"`
+	DeregisteredAt *time.Time `json:"deregisteredAt,omitempty"`
+}
+
+// ContainerInstanceFilters defines filters for listing container instances
+type ContainerInstanceFilters struct {
+	// Filter by status
+	Status string
+	
+	// Filter by instance
+	Filter string
+}
+
+// AttributeStore defines attribute-specific storage operations
+type AttributeStore interface {
+	// Put attributes
+	Put(ctx context.Context, attributes []*Attribute) error
+	
+	// Delete attributes
+	Delete(ctx context.Context, cluster string, attributes []*Attribute) error
+	
+	// List attributes with pagination
+	ListWithPagination(ctx context.Context, targetType, cluster string, limit int, nextToken string) ([]*Attribute, string, error)
+}
+
+// Attribute represents an ECS attribute in storage
+type Attribute struct {
+	// Unique identifier
+	ID string `json:"id"`
+	
+	// Attribute name
+	Name string `json:"name"`
+	
+	// Attribute value
+	Value string `json:"value,omitempty"`
+	
+	// Target type (container-instance)
+	TargetType string `json:"targetType"`
+	
+	// Target ID (container instance ARN)
+	TargetID string `json:"targetId"`
+	
+	// Cluster name
+	Cluster string `json:"cluster"`
 	
 	// Region
 	Region string `json:"region"`

@@ -13,14 +13,16 @@ import (
 
 // DuckDBStorage implements storage.Storage using DuckDB
 type DuckDBStorage struct {
-	db                  *sql.DB
-	dbPath              string
-	clusterStore        *clusterStore
-	taskDefinitionStore *taskDefinitionStore
-	serviceStore        *serviceStore
-	taskStore           *taskStore
-	accountSettingStore *accountSettingStore
-	taskSetStore        *taskSetStore
+	db                      *sql.DB
+	dbPath                  string
+	clusterStore            *clusterStore
+	taskDefinitionStore     *taskDefinitionStore
+	serviceStore            *serviceStore
+	taskStore               *taskStore
+	accountSettingStore     *accountSettingStore
+	taskSetStore            *taskSetStore
+	containerInstanceStore  *containerInstanceStore
+	attributeStore          *attributeStore
 }
 
 // NewDuckDBStorage creates a new DuckDB storage instance
@@ -55,6 +57,8 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 	s.taskStore = &taskStore{db: db}
 	s.accountSettingStore = &accountSettingStore{db: db}
 	s.taskSetStore = &taskSetStore{db: db}
+	s.containerInstanceStore = &containerInstanceStore{db: db}
+	s.attributeStore = &attributeStore{db: db}
 
 	return s, nil
 }
@@ -98,6 +102,16 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 		return fmt.Errorf("failed to create task sets table: %w", err)
 	}
 
+	// Create container instances table
+	if err := s.createContainerInstancesTable(ctx); err != nil {
+		return fmt.Errorf("failed to create container instances table: %w", err)
+	}
+
+	// Create attributes table
+	if err := s.createAttributesTable(ctx); err != nil {
+		return fmt.Errorf("failed to create attributes table: %w", err)
+	}
+
 	log.Println("DuckDB storage initialized successfully")
 	return nil
 }
@@ -138,6 +152,16 @@ func (s *DuckDBStorage) AccountSettingStore() storage.AccountSettingStore {
 // TaskSetStore returns the task set store
 func (s *DuckDBStorage) TaskSetStore() storage.TaskSetStore {
 	return s.taskSetStore
+}
+
+// ContainerInstanceStore returns the container instance store
+func (s *DuckDBStorage) ContainerInstanceStore() storage.ContainerInstanceStore {
+	return s.containerInstanceStore
+}
+
+// AttributeStore returns the attribute store
+func (s *DuckDBStorage) AttributeStore() storage.AttributeStore {
+	return s.attributeStore
 }
 
 // BeginTx starts a new transaction
@@ -511,6 +535,100 @@ func (s *DuckDBStorage) createTaskSetsTable(ctx context.Context) error {
 		"CREATE INDEX IF NOT EXISTS idx_task_sets_status ON task_sets(status)",
 		"CREATE INDEX IF NOT EXISTS idx_task_sets_region ON task_sets(region)",
 		"CREATE INDEX IF NOT EXISTS idx_task_sets_account_id ON task_sets(account_id)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// createContainerInstancesTable creates the container_instances table
+func (s *DuckDBStorage) createContainerInstancesTable(ctx context.Context) error {
+	query := `
+	CREATE TABLE IF NOT EXISTS container_instances (
+		id VARCHAR PRIMARY KEY,
+		arn VARCHAR NOT NULL UNIQUE,
+		cluster_arn VARCHAR NOT NULL,
+		ec2_instance_id VARCHAR NOT NULL,
+		status VARCHAR NOT NULL,
+		status_reason VARCHAR,
+		agent_connected BOOLEAN NOT NULL DEFAULT false,
+		agent_update_status VARCHAR,
+		running_tasks_count INTEGER NOT NULL DEFAULT 0,
+		pending_tasks_count INTEGER NOT NULL DEFAULT 0,
+		version BIGINT NOT NULL DEFAULT 1,
+		version_info VARCHAR,
+		registered_resources VARCHAR,
+		remaining_resources VARCHAR,
+		attributes VARCHAR,
+		attachments VARCHAR,
+		tags VARCHAR,
+		capacity_provider_name VARCHAR,
+		health_status VARCHAR,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		registered_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL,
+		deregistered_at TIMESTAMP
+	)`
+
+	if _, err := s.db.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("failed to create container_instances table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_container_instances_cluster ON container_instances(cluster_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_container_instances_status ON container_instances(status)",
+		"CREATE INDEX IF NOT EXISTS idx_container_instances_ec2_instance ON container_instances(ec2_instance_id)",
+		"CREATE INDEX IF NOT EXISTS idx_container_instances_region ON container_instances(region)",
+		"CREATE INDEX IF NOT EXISTS idx_container_instances_account_id ON container_instances(account_id)",
+		"CREATE INDEX IF NOT EXISTS idx_container_instances_capacity_provider ON container_instances(capacity_provider_name)",
+		"CREATE INDEX IF NOT EXISTS idx_container_instances_registered_at ON container_instances(registered_at)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// createAttributesTable creates the attributes table
+func (s *DuckDBStorage) createAttributesTable(ctx context.Context) error {
+	query := `
+	CREATE TABLE IF NOT EXISTS attributes (
+		id VARCHAR PRIMARY KEY,
+		name VARCHAR NOT NULL,
+		value VARCHAR,
+		target_type VARCHAR NOT NULL,
+		target_id VARCHAR NOT NULL,
+		cluster VARCHAR NOT NULL,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		created_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL,
+		UNIQUE(name, target_type, target_id, cluster)
+	)`
+
+	if _, err := s.db.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("failed to create attributes table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_attributes_name ON attributes(name)",
+		"CREATE INDEX IF NOT EXISTS idx_attributes_target ON attributes(target_type, target_id)",
+		"CREATE INDEX IF NOT EXISTS idx_attributes_cluster ON attributes(cluster)",
+		"CREATE INDEX IF NOT EXISTS idx_attributes_region ON attributes(region)",
+		"CREATE INDEX IF NOT EXISTS idx_attributes_account_id ON attributes(account_id)",
+		"CREATE INDEX IF NOT EXISTS idx_attributes_created_at ON attributes(created_at)",
 	}
 
 	for _, idx := range indexes {

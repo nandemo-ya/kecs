@@ -11,7 +11,7 @@ type AccessDeniedException struct {
 
 // Attachment represents the Attachment structure
 type Attachment struct {
-	Details []KeyValuePair `json:"details,omitempty"`
+	Details []KeyValuePair `json:"details"`
 	Id *string `json:"id,omitempty"`
 	Status *string `json:"status,omitempty"`
 	Type *string `json:"type,omitempty"`
@@ -54,7 +54,7 @@ type AutoScalingGroupProviderUpdate struct {
 // AwsVpcConfiguration represents the AwsVpcConfiguration structure
 type AwsVpcConfiguration struct {
 	AssignPublicIp *AssignPublicIp `json:"assignPublicIp,omitempty"`
-	SecurityGroups []string `json:"securityGroups,omitempty"`
+	SecurityGroups []string `json:"securityGroups"`
 	Subnets []string `json:"subnets"`
 }
 
@@ -78,7 +78,7 @@ type CapacityProvider struct {
 	CapacityProviderArn *string `json:"capacityProviderArn,omitempty"`
 	Name *string `json:"name,omitempty"`
 	Status *CapacityProviderStatus `json:"status,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 	UpdateStatus *CapacityProviderUpdateStatus `json:"updateStatus,omitempty"`
 	UpdateStatusReason *string `json:"updateStatusReason,omitempty"`
 }
@@ -104,21 +104,21 @@ type ClientException struct {
 // Cluster represents the Cluster structure
 type Cluster struct {
 	ActiveServicesCount *int32 `json:"activeServicesCount,omitempty"`
-	Attachments []Attachment `json:"attachments,omitempty"`
+	Attachments []Attachment `json:"attachments"`
 	AttachmentsStatus *string `json:"attachmentsStatus,omitempty"`
-	CapacityProviders []string `json:"capacityProviders,omitempty"`
+	CapacityProviders []string `json:"capacityProviders"`
 	ClusterArn *string `json:"clusterArn,omitempty"`
 	ClusterName *string `json:"clusterName,omitempty"`
 	Configuration *ClusterConfiguration `json:"configuration,omitempty"`
-	DefaultCapacityProviderStrategy []CapacityProviderStrategyItem `json:"defaultCapacityProviderStrategy,omitempty"`
+	DefaultCapacityProviderStrategy []CapacityProviderStrategyItem `json:"defaultCapacityProviderStrategy"`
 	PendingTasksCount *int32 `json:"pendingTasksCount,omitempty"`
 	RegisteredContainerInstancesCount *int32 `json:"registeredContainerInstancesCount,omitempty"`
 	RunningTasksCount *int32 `json:"runningTasksCount,omitempty"`
 	ServiceConnectDefaults *ClusterServiceConnectDefaults `json:"serviceConnectDefaults,omitempty"`
-	Settings []ClusterSetting `json:"settings,omitempty"`
-	Statistics []KeyValuePair `json:"statistics,omitempty"`
+	Settings []ClusterSetting `json:"settings"`
+	Statistics []KeyValuePair `json:"statistics"`
 	Status *string `json:"status,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 }
 
 // ClusterConfiguration represents the ClusterConfiguration structure
@@ -166,7 +166,7 @@ type ClusterSetting struct {
 // ConflictException represents the ConflictException structure
 type ConflictException struct {
 	Message *string `json:"message,omitempty"`
-	ResourceIds []string `json:"resourceIds,omitempty"`
+	ResourceIds []string `json:"resourceIds"`
 }
 
 // Container represents the Container structure
@@ -174,17 +174,17 @@ type Container struct {
 	ContainerArn *string `json:"containerArn,omitempty"`
 	Cpu *string `json:"cpu,omitempty"`
 	ExitCode *int32 `json:"exitCode,omitempty"`
-	GpuIds []string `json:"gpuIds,omitempty"`
+	GpuIds []string `json:"gpuIds"`
 	HealthStatus *HealthStatus `json:"healthStatus,omitempty"`
 	Image *string `json:"image,omitempty"`
 	ImageDigest *string `json:"imageDigest,omitempty"`
 	LastStatus *string `json:"lastStatus,omitempty"`
-	ManagedAgents []ManagedAgent `json:"managedAgents,omitempty"`
+	ManagedAgents []ManagedAgent `json:"managedAgents"`
 	Memory *string `json:"memory,omitempty"`
 	MemoryReservation *string `json:"memoryReservation,omitempty"`
 	Name *string `json:"name,omitempty"`
-	NetworkBindings []NetworkBinding `json:"networkBindings,omitempty"`
-	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
+	NetworkBindings []NetworkBinding `json:"networkBindings"`
+	NetworkInterfaces []NetworkInterface `json:"networkInterfaces"`
 	Reason *string `json:"reason,omitempty"`
 	RuntimeId *string `json:"runtimeId,omitempty"`
 	TaskArn *string `json:"taskArn,omitempty"`
@@ -192,47 +192,47 @@ type Container struct {
 
 // ContainerDefinition represents the ContainerDefinition structure
 type ContainerDefinition struct {
-	Command []string `json:"command,omitempty"`
+	Command []string `json:"command"`
 	Cpu *int32 `json:"cpu,omitempty"`
-	CredentialSpecs []string `json:"credentialSpecs,omitempty"`
-	DependsOn []ContainerDependency `json:"dependsOn,omitempty"`
+	CredentialSpecs []string `json:"credentialSpecs"`
+	DependsOn []ContainerDependency `json:"dependsOn"`
 	DisableNetworking *bool `json:"disableNetworking,omitempty"`
-	DnsSearchDomains []string `json:"dnsSearchDomains,omitempty"`
-	DnsServers []string `json:"dnsServers,omitempty"`
+	DnsSearchDomains []string `json:"dnsSearchDomains"`
+	DnsServers []string `json:"dnsServers"`
 	DockerLabels DockerLabelsMap `json:"dockerLabels,omitempty"`
-	DockerSecurityOptions []string `json:"dockerSecurityOptions,omitempty"`
-	EntryPoint []string `json:"entryPoint,omitempty"`
-	Environment []KeyValuePair `json:"environment,omitempty"`
-	EnvironmentFiles []EnvironmentFile `json:"environmentFiles,omitempty"`
+	DockerSecurityOptions []string `json:"dockerSecurityOptions"`
+	EntryPoint []string `json:"entryPoint"`
+	Environment []KeyValuePair `json:"environment"`
+	EnvironmentFiles []EnvironmentFile `json:"environmentFiles"`
 	Essential *bool `json:"essential,omitempty"`
-	ExtraHosts []HostEntry `json:"extraHosts,omitempty"`
+	ExtraHosts []HostEntry `json:"extraHosts"`
 	FirelensConfiguration *FirelensConfiguration `json:"firelensConfiguration,omitempty"`
 	HealthCheck *HealthCheck `json:"healthCheck,omitempty"`
 	Hostname *string `json:"hostname,omitempty"`
 	Image *string `json:"image,omitempty"`
 	Interactive *bool `json:"interactive,omitempty"`
-	Links []string `json:"links,omitempty"`
+	Links []string `json:"links"`
 	LinuxParameters *LinuxParameters `json:"linuxParameters,omitempty"`
 	LogConfiguration *LogConfiguration `json:"logConfiguration,omitempty"`
 	Memory *int32 `json:"memory,omitempty"`
 	MemoryReservation *int32 `json:"memoryReservation,omitempty"`
-	MountPoints []MountPoint `json:"mountPoints,omitempty"`
+	MountPoints []MountPoint `json:"mountPoints"`
 	Name *string `json:"name,omitempty"`
-	PortMappings []PortMapping `json:"portMappings,omitempty"`
+	PortMappings []PortMapping `json:"portMappings"`
 	Privileged *bool `json:"privileged,omitempty"`
 	PseudoTerminal *bool `json:"pseudoTerminal,omitempty"`
 	ReadonlyRootFilesystem *bool `json:"readonlyRootFilesystem,omitempty"`
 	RepositoryCredentials *RepositoryCredentials `json:"repositoryCredentials,omitempty"`
-	ResourceRequirements []ResourceRequirement `json:"resourceRequirements,omitempty"`
+	ResourceRequirements []ResourceRequirement `json:"resourceRequirements"`
 	RestartPolicy *ContainerRestartPolicy `json:"restartPolicy,omitempty"`
-	Secrets []Secret `json:"secrets,omitempty"`
+	Secrets []Secret `json:"secrets"`
 	StartTimeout *int32 `json:"startTimeout,omitempty"`
 	StopTimeout *int32 `json:"stopTimeout,omitempty"`
-	SystemControls []SystemControl `json:"systemControls,omitempty"`
-	Ulimits []Ulimit `json:"ulimits,omitempty"`
+	SystemControls []SystemControl `json:"systemControls"`
+	Ulimits []Ulimit `json:"ulimits"`
 	User *string `json:"user,omitempty"`
 	VersionConsistency *VersionConsistency `json:"versionConsistency,omitempty"`
-	VolumesFrom []VolumeFrom `json:"volumesFrom,omitempty"`
+	VolumesFrom []VolumeFrom `json:"volumesFrom"`
 	WorkingDirectory *string `json:"workingDirectory,omitempty"`
 }
 
@@ -253,46 +253,46 @@ type ContainerImage struct {
 type ContainerInstance struct {
 	AgentConnected *bool `json:"agentConnected,omitempty"`
 	AgentUpdateStatus *AgentUpdateStatus `json:"agentUpdateStatus,omitempty"`
-	Attachments []Attachment `json:"attachments,omitempty"`
-	Attributes []Attribute `json:"attributes,omitempty"`
+	Attachments []Attachment `json:"attachments"`
+	Attributes []Attribute `json:"attributes"`
 	CapacityProviderName *string `json:"capacityProviderName,omitempty"`
 	ContainerInstanceArn *string `json:"containerInstanceArn,omitempty"`
 	Ec2InstanceId *string `json:"ec2InstanceId,omitempty"`
 	HealthStatus *ContainerInstanceHealthStatus `json:"healthStatus,omitempty"`
 	PendingTasksCount *int32 `json:"pendingTasksCount,omitempty"`
 	RegisteredAt *time.Time `json:"registeredAt,omitempty"`
-	RegisteredResources []Resource `json:"registeredResources,omitempty"`
-	RemainingResources []Resource `json:"remainingResources,omitempty"`
+	RegisteredResources []Resource `json:"registeredResources"`
+	RemainingResources []Resource `json:"remainingResources"`
 	RunningTasksCount *int32 `json:"runningTasksCount,omitempty"`
 	Status *string `json:"status,omitempty"`
 	StatusReason *string `json:"statusReason,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 	Version *int64 `json:"version,omitempty"`
 	VersionInfo *VersionInfo `json:"versionInfo,omitempty"`
 }
 
 // ContainerInstanceHealthStatus represents the ContainerInstanceHealthStatus structure
 type ContainerInstanceHealthStatus struct {
-	Details []InstanceHealthCheckResult `json:"details,omitempty"`
+	Details []InstanceHealthCheckResult `json:"details"`
 	OverallStatus *InstanceHealthCheckState `json:"overallStatus,omitempty"`
 }
 
 // ContainerOverride represents the ContainerOverride structure
 type ContainerOverride struct {
-	Command []string `json:"command,omitempty"`
+	Command []string `json:"command"`
 	Cpu *int32 `json:"cpu,omitempty"`
-	Environment []KeyValuePair `json:"environment,omitempty"`
-	EnvironmentFiles []EnvironmentFile `json:"environmentFiles,omitempty"`
+	Environment []KeyValuePair `json:"environment"`
+	EnvironmentFiles []EnvironmentFile `json:"environmentFiles"`
 	Memory *int32 `json:"memory,omitempty"`
 	MemoryReservation *int32 `json:"memoryReservation,omitempty"`
 	Name *string `json:"name,omitempty"`
-	ResourceRequirements []ResourceRequirement `json:"resourceRequirements,omitempty"`
+	ResourceRequirements []ResourceRequirement `json:"resourceRequirements"`
 }
 
 // ContainerRestartPolicy represents the ContainerRestartPolicy structure
 type ContainerRestartPolicy struct {
 	Enabled *bool `json:"enabled"`
-	IgnoredExitCodes []int32 `json:"ignoredExitCodes,omitempty"`
+	IgnoredExitCodes []int32 `json:"ignoredExitCodes"`
 	RestartAttemptPeriod *int32 `json:"restartAttemptPeriod,omitempty"`
 }
 
@@ -301,7 +301,7 @@ type ContainerStateChange struct {
 	ContainerName *string `json:"containerName,omitempty"`
 	ExitCode *int32 `json:"exitCode,omitempty"`
 	ImageDigest *string `json:"imageDigest,omitempty"`
-	NetworkBindings []NetworkBinding `json:"networkBindings,omitempty"`
+	NetworkBindings []NetworkBinding `json:"networkBindings"`
 	Reason *string `json:"reason,omitempty"`
 	RuntimeId *string `json:"runtimeId,omitempty"`
 	Status *string `json:"status,omitempty"`
@@ -311,7 +311,7 @@ type ContainerStateChange struct {
 type CreateCapacityProviderRequest struct {
 	AutoScalingGroupProvider *AutoScalingGroupProvider `json:"autoScalingGroupProvider"`
 	Name *string `json:"name"`
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 }
 
 // CreateCapacityProviderResponse represents the CreateCapacityProviderResponse structure
@@ -321,13 +321,13 @@ type CreateCapacityProviderResponse struct {
 
 // CreateClusterRequest represents the CreateClusterRequest structure
 type CreateClusterRequest struct {
-	CapacityProviders []string `json:"capacityProviders,omitempty"`
+	CapacityProviders []string `json:"capacityProviders"`
 	ClusterName *string `json:"clusterName,omitempty"`
 	Configuration *ClusterConfiguration `json:"configuration,omitempty"`
-	DefaultCapacityProviderStrategy []CapacityProviderStrategyItem `json:"defaultCapacityProviderStrategy,omitempty"`
+	DefaultCapacityProviderStrategy []CapacityProviderStrategyItem `json:"defaultCapacityProviderStrategy"`
 	ServiceConnectDefaults *ClusterServiceConnectDefaultsRequest `json:"serviceConnectDefaults,omitempty"`
-	Settings []ClusterSetting `json:"settings,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
+	Settings []ClusterSetting `json:"settings"`
+	Tags []Tag `json:"tags"`
 }
 
 // CreateClusterResponse represents the CreateClusterResponse structure
@@ -338,7 +338,7 @@ type CreateClusterResponse struct {
 // CreateServiceRequest represents the CreateServiceRequest structure
 type CreateServiceRequest struct {
 	AvailabilityZoneRebalancing *AvailabilityZoneRebalancing `json:"availabilityZoneRebalancing,omitempty"`
-	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy,omitempty"`
+	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy"`
 	ClientToken *string `json:"clientToken,omitempty"`
 	Cluster *string `json:"cluster,omitempty"`
 	DeploymentConfiguration *DeploymentConfiguration `json:"deploymentConfiguration,omitempty"`
@@ -348,21 +348,21 @@ type CreateServiceRequest struct {
 	EnableExecuteCommand *bool `json:"enableExecuteCommand,omitempty"`
 	HealthCheckGracePeriodSeconds *int32 `json:"healthCheckGracePeriodSeconds,omitempty"`
 	LaunchType *LaunchType `json:"launchType,omitempty"`
-	LoadBalancers []LoadBalancer `json:"loadBalancers,omitempty"`
+	LoadBalancers []LoadBalancer `json:"loadBalancers"`
 	NetworkConfiguration *NetworkConfiguration `json:"networkConfiguration,omitempty"`
-	PlacementConstraints []PlacementConstraint `json:"placementConstraints,omitempty"`
-	PlacementStrategy []PlacementStrategy `json:"placementStrategy,omitempty"`
+	PlacementConstraints []PlacementConstraint `json:"placementConstraints"`
+	PlacementStrategy []PlacementStrategy `json:"placementStrategy"`
 	PlatformVersion *string `json:"platformVersion,omitempty"`
 	PropagateTags *PropagateTags `json:"propagateTags,omitempty"`
 	Role *string `json:"role,omitempty"`
 	SchedulingStrategy *SchedulingStrategy `json:"schedulingStrategy,omitempty"`
 	ServiceConnectConfiguration *ServiceConnectConfiguration `json:"serviceConnectConfiguration,omitempty"`
 	ServiceName *string `json:"serviceName"`
-	ServiceRegistries []ServiceRegistry `json:"serviceRegistries,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
+	ServiceRegistries []ServiceRegistry `json:"serviceRegistries"`
+	Tags []Tag `json:"tags"`
 	TaskDefinition *string `json:"taskDefinition,omitempty"`
-	VolumeConfigurations []ServiceVolumeConfiguration `json:"volumeConfigurations,omitempty"`
-	VpcLatticeConfigurations []VpcLatticeConfiguration `json:"vpcLatticeConfigurations,omitempty"`
+	VolumeConfigurations []ServiceVolumeConfiguration `json:"volumeConfigurations"`
+	VpcLatticeConfigurations []VpcLatticeConfiguration `json:"vpcLatticeConfigurations"`
 }
 
 // CreateServiceResponse represents the CreateServiceResponse structure
@@ -372,18 +372,18 @@ type CreateServiceResponse struct {
 
 // CreateTaskSetRequest represents the CreateTaskSetRequest structure
 type CreateTaskSetRequest struct {
-	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy,omitempty"`
+	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy"`
 	ClientToken *string `json:"clientToken,omitempty"`
 	Cluster *string `json:"cluster"`
 	ExternalId *string `json:"externalId,omitempty"`
 	LaunchType *LaunchType `json:"launchType,omitempty"`
-	LoadBalancers []LoadBalancer `json:"loadBalancers,omitempty"`
+	LoadBalancers []LoadBalancer `json:"loadBalancers"`
 	NetworkConfiguration *NetworkConfiguration `json:"networkConfiguration,omitempty"`
 	PlatformVersion *string `json:"platformVersion,omitempty"`
 	Scale *Scale `json:"scale,omitempty"`
 	Service *string `json:"service"`
-	ServiceRegistries []ServiceRegistry `json:"serviceRegistries,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
+	ServiceRegistries []ServiceRegistry `json:"serviceRegistries"`
+	Tags []Tag `json:"tags"`
 	TaskDefinition *string `json:"taskDefinition"`
 }
 
@@ -417,7 +417,7 @@ type DeleteAttributesRequest struct {
 
 // DeleteAttributesResponse represents the DeleteAttributesResponse structure
 type DeleteAttributesResponse struct {
-	Attributes []Attribute `json:"attributes,omitempty"`
+	Attributes []Attribute `json:"attributes"`
 }
 
 // DeleteCapacityProviderRequest represents the DeleteCapacityProviderRequest structure
@@ -459,8 +459,8 @@ type DeleteTaskDefinitionsRequest struct {
 
 // DeleteTaskDefinitionsResponse represents the DeleteTaskDefinitionsResponse structure
 type DeleteTaskDefinitionsResponse struct {
-	Failures []Failure `json:"failures,omitempty"`
-	TaskDefinitions []TaskDefinition `json:"taskDefinitions,omitempty"`
+	Failures []Failure `json:"failures"`
+	TaskDefinitions []TaskDefinition `json:"taskDefinitions"`
 }
 
 // DeleteTaskSetRequest represents the DeleteTaskSetRequest structure
@@ -478,7 +478,7 @@ type DeleteTaskSetResponse struct {
 
 // Deployment represents the Deployment structure
 type Deployment struct {
-	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy,omitempty"`
+	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	DesiredCount *int32 `json:"desiredCount,omitempty"`
 	FailedTasks *int32 `json:"failedTasks,omitempty"`
@@ -493,12 +493,12 @@ type Deployment struct {
 	RolloutStateReason *string `json:"rolloutStateReason,omitempty"`
 	RunningCount *int32 `json:"runningCount,omitempty"`
 	ServiceConnectConfiguration *ServiceConnectConfiguration `json:"serviceConnectConfiguration,omitempty"`
-	ServiceConnectResources []ServiceConnectServiceResource `json:"serviceConnectResources,omitempty"`
+	ServiceConnectResources []ServiceConnectServiceResource `json:"serviceConnectResources"`
 	Status *string `json:"status,omitempty"`
 	TaskDefinition *string `json:"taskDefinition,omitempty"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
-	VolumeConfigurations []ServiceVolumeConfiguration `json:"volumeConfigurations,omitempty"`
-	VpcLatticeConfigurations []VpcLatticeConfiguration `json:"vpcLatticeConfigurations,omitempty"`
+	VolumeConfigurations []ServiceVolumeConfiguration `json:"volumeConfigurations"`
+	VpcLatticeConfigurations []VpcLatticeConfiguration `json:"vpcLatticeConfigurations"`
 }
 
 // DeploymentAlarms represents the DeploymentAlarms structure
@@ -556,42 +556,42 @@ type DeregisterTaskDefinitionResponse struct {
 
 // DescribeCapacityProvidersRequest represents the DescribeCapacityProvidersRequest structure
 type DescribeCapacityProvidersRequest struct {
-	CapacityProviders []string `json:"capacityProviders,omitempty"`
-	Include []CapacityProviderField `json:"include,omitempty"`
+	CapacityProviders []string `json:"capacityProviders"`
+	Include []CapacityProviderField `json:"include"`
 	MaxResults *int32 `json:"maxResults,omitempty"`
 	NextToken *string `json:"nextToken,omitempty"`
 }
 
 // DescribeCapacityProvidersResponse represents the DescribeCapacityProvidersResponse structure
 type DescribeCapacityProvidersResponse struct {
-	CapacityProviders []CapacityProvider `json:"capacityProviders,omitempty"`
-	Failures []Failure `json:"failures,omitempty"`
+	CapacityProviders []CapacityProvider `json:"capacityProviders"`
+	Failures []Failure `json:"failures"`
 	NextToken *string `json:"nextToken,omitempty"`
 }
 
 // DescribeClustersRequest represents the DescribeClustersRequest structure
 type DescribeClustersRequest struct {
-	Clusters []string `json:"clusters,omitempty"`
-	Include []ClusterField `json:"include,omitempty"`
+	Clusters []string `json:"clusters"`
+	Include []ClusterField `json:"include"`
 }
 
 // DescribeClustersResponse represents the DescribeClustersResponse structure
 type DescribeClustersResponse struct {
-	Clusters []Cluster `json:"clusters,omitempty"`
-	Failures []Failure `json:"failures,omitempty"`
+	Clusters []Cluster `json:"clusters"`
+	Failures []Failure `json:"failures"`
 }
 
 // DescribeContainerInstancesRequest represents the DescribeContainerInstancesRequest structure
 type DescribeContainerInstancesRequest struct {
 	Cluster *string `json:"cluster,omitempty"`
 	ContainerInstances []string `json:"containerInstances"`
-	Include []ContainerInstanceField `json:"include,omitempty"`
+	Include []ContainerInstanceField `json:"include"`
 }
 
 // DescribeContainerInstancesResponse represents the DescribeContainerInstancesResponse structure
 type DescribeContainerInstancesResponse struct {
-	ContainerInstances []ContainerInstance `json:"containerInstances,omitempty"`
-	Failures []Failure `json:"failures,omitempty"`
+	ContainerInstances []ContainerInstance `json:"containerInstances"`
+	Failures []Failure `json:"failures"`
 }
 
 // DescribeServiceDeploymentsRequest represents the DescribeServiceDeploymentsRequest structure
@@ -601,8 +601,8 @@ type DescribeServiceDeploymentsRequest struct {
 
 // DescribeServiceDeploymentsResponse represents the DescribeServiceDeploymentsResponse structure
 type DescribeServiceDeploymentsResponse struct {
-	Failures []Failure `json:"failures,omitempty"`
-	ServiceDeployments []ServiceDeployment `json:"serviceDeployments,omitempty"`
+	Failures []Failure `json:"failures"`
+	ServiceDeployments []ServiceDeployment `json:"serviceDeployments"`
 }
 
 // DescribeServiceRevisionsRequest represents the DescribeServiceRevisionsRequest structure
@@ -612,67 +612,67 @@ type DescribeServiceRevisionsRequest struct {
 
 // DescribeServiceRevisionsResponse represents the DescribeServiceRevisionsResponse structure
 type DescribeServiceRevisionsResponse struct {
-	Failures []Failure `json:"failures,omitempty"`
-	ServiceRevisions []ServiceRevision `json:"serviceRevisions,omitempty"`
+	Failures []Failure `json:"failures"`
+	ServiceRevisions []ServiceRevision `json:"serviceRevisions"`
 }
 
 // DescribeServicesRequest represents the DescribeServicesRequest structure
 type DescribeServicesRequest struct {
 	Cluster *string `json:"cluster,omitempty"`
-	Include []ServiceField `json:"include,omitempty"`
+	Include []ServiceField `json:"include"`
 	Services []string `json:"services"`
 }
 
 // DescribeServicesResponse represents the DescribeServicesResponse structure
 type DescribeServicesResponse struct {
-	Failures []Failure `json:"failures,omitempty"`
-	Services []Service `json:"services,omitempty"`
+	Failures []Failure `json:"failures"`
+	Services []Service `json:"services"`
 }
 
 // DescribeTaskDefinitionRequest represents the DescribeTaskDefinitionRequest structure
 type DescribeTaskDefinitionRequest struct {
-	Include []TaskDefinitionField `json:"include,omitempty"`
+	Include []TaskDefinitionField `json:"include"`
 	TaskDefinition *string `json:"taskDefinition"`
 }
 
 // DescribeTaskDefinitionResponse represents the DescribeTaskDefinitionResponse structure
 type DescribeTaskDefinitionResponse struct {
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 	TaskDefinition *TaskDefinition `json:"taskDefinition,omitempty"`
 }
 
 // DescribeTaskSetsRequest represents the DescribeTaskSetsRequest structure
 type DescribeTaskSetsRequest struct {
 	Cluster *string `json:"cluster"`
-	Include []TaskSetField `json:"include,omitempty"`
+	Include []TaskSetField `json:"include"`
 	Service *string `json:"service"`
-	TaskSets []string `json:"taskSets,omitempty"`
+	TaskSets []string `json:"taskSets"`
 }
 
 // DescribeTaskSetsResponse represents the DescribeTaskSetsResponse structure
 type DescribeTaskSetsResponse struct {
-	Failures []Failure `json:"failures,omitempty"`
-	TaskSets []TaskSet `json:"taskSets,omitempty"`
+	Failures []Failure `json:"failures"`
+	TaskSets []TaskSet `json:"taskSets"`
 }
 
 // DescribeTasksRequest represents the DescribeTasksRequest structure
 type DescribeTasksRequest struct {
 	Cluster *string `json:"cluster,omitempty"`
-	Include []TaskField `json:"include,omitempty"`
+	Include []TaskField `json:"include"`
 	Tasks []string `json:"tasks"`
 }
 
 // DescribeTasksResponse represents the DescribeTasksResponse structure
 type DescribeTasksResponse struct {
-	Failures []Failure `json:"failures,omitempty"`
-	Tasks []Task `json:"tasks,omitempty"`
+	Failures []Failure `json:"failures"`
+	Tasks []Task `json:"tasks"`
 }
 
 // Device represents the Device structure
 type Device struct {
 	ContainerPath *string `json:"containerPath,omitempty"`
 	HostPath *string `json:"hostPath"`
-	Permissions []DeviceCgroupPermission `json:"permissions,omitempty"`
+	Permissions []DeviceCgroupPermission `json:"permissions"`
 }
 
 // DiscoverPollEndpointRequest represents the DiscoverPollEndpointRequest structure
@@ -716,7 +716,7 @@ type EBSSnapshotId string
 type EBSTagSpecification struct {
 	PropagateTags *PropagateTags `json:"propagateTags,omitempty"`
 	ResourceType *EBSResourceType `json:"resourceType"`
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 }
 
 // EBSVolumeType represents a string type alias
@@ -818,13 +818,13 @@ type FirelensConfigurationOptionsMap map[*string]*string
 // GetTaskProtectionRequest represents the GetTaskProtectionRequest structure
 type GetTaskProtectionRequest struct {
 	Cluster *string `json:"cluster"`
-	Tasks []string `json:"tasks,omitempty"`
+	Tasks []string `json:"tasks"`
 }
 
 // GetTaskProtectionResponse represents the GetTaskProtectionResponse structure
 type GetTaskProtectionResponse struct {
-	Failures []Failure `json:"failures,omitempty"`
-	ProtectedTasks []ProtectedTask `json:"protectedTasks,omitempty"`
+	Failures []Failure `json:"failures"`
+	ProtectedTasks []ProtectedTask `json:"protectedTasks"`
 }
 
 // HealthCheck represents the HealthCheck structure
@@ -880,8 +880,8 @@ type InvalidParameterException struct {
 
 // KernelCapabilities represents the KernelCapabilities structure
 type KernelCapabilities struct {
-	Add []string `json:"add,omitempty"`
-	Drop []string `json:"drop,omitempty"`
+	Add []string `json:"add"`
+	Drop []string `json:"drop"`
 }
 
 // KeyValuePair represents the KeyValuePair structure
@@ -898,12 +898,12 @@ type LimitExceededException struct {
 // LinuxParameters represents the LinuxParameters structure
 type LinuxParameters struct {
 	Capabilities *KernelCapabilities `json:"capabilities,omitempty"`
-	Devices []Device `json:"devices,omitempty"`
+	Devices []Device `json:"devices"`
 	InitProcessEnabled *bool `json:"initProcessEnabled,omitempty"`
 	MaxSwap *int32 `json:"maxSwap,omitempty"`
 	SharedMemorySize *int32 `json:"sharedMemorySize,omitempty"`
 	Swappiness *int32 `json:"swappiness,omitempty"`
-	Tmpfs []Tmpfs `json:"tmpfs,omitempty"`
+	Tmpfs []Tmpfs `json:"tmpfs"`
 }
 
 // ListAccountSettingsRequest represents the ListAccountSettingsRequest structure
@@ -919,7 +919,7 @@ type ListAccountSettingsRequest struct {
 // ListAccountSettingsResponse represents the ListAccountSettingsResponse structure
 type ListAccountSettingsResponse struct {
 	NextToken *string `json:"nextToken,omitempty"`
-	Settings []Setting `json:"settings,omitempty"`
+	Settings []Setting `json:"settings"`
 }
 
 // ListAttributesRequest represents the ListAttributesRequest structure
@@ -934,7 +934,7 @@ type ListAttributesRequest struct {
 
 // ListAttributesResponse represents the ListAttributesResponse structure
 type ListAttributesResponse struct {
-	Attributes []Attribute `json:"attributes,omitempty"`
+	Attributes []Attribute `json:"attributes"`
 	NextToken *string `json:"nextToken,omitempty"`
 }
 
@@ -946,7 +946,7 @@ type ListClustersRequest struct {
 
 // ListClustersResponse represents the ListClustersResponse structure
 type ListClustersResponse struct {
-	ClusterArns []string `json:"clusterArns,omitempty"`
+	ClusterArns []string `json:"clusterArns"`
 	NextToken *string `json:"nextToken,omitempty"`
 }
 
@@ -961,7 +961,7 @@ type ListContainerInstancesRequest struct {
 
 // ListContainerInstancesResponse represents the ListContainerInstancesResponse structure
 type ListContainerInstancesResponse struct {
-	ContainerInstanceArns []string `json:"containerInstanceArns,omitempty"`
+	ContainerInstanceArns []string `json:"containerInstanceArns"`
 	NextToken *string `json:"nextToken,omitempty"`
 }
 
@@ -972,13 +972,13 @@ type ListServiceDeploymentsRequest struct {
 	MaxResults *int32 `json:"maxResults,omitempty"`
 	NextToken *string `json:"nextToken,omitempty"`
 	Service *string `json:"service"`
-	Status []ServiceDeploymentStatus `json:"status,omitempty"`
+	Status []ServiceDeploymentStatus `json:"status"`
 }
 
 // ListServiceDeploymentsResponse represents the ListServiceDeploymentsResponse structure
 type ListServiceDeploymentsResponse struct {
 	NextToken *string `json:"nextToken,omitempty"`
-	ServiceDeployments []ServiceDeploymentBrief `json:"serviceDeployments,omitempty"`
+	ServiceDeployments []ServiceDeploymentBrief `json:"serviceDeployments"`
 }
 
 // ListServicesByNamespaceRequest represents the ListServicesByNamespaceRequest structure
@@ -991,7 +991,7 @@ type ListServicesByNamespaceRequest struct {
 // ListServicesByNamespaceResponse represents the ListServicesByNamespaceResponse structure
 type ListServicesByNamespaceResponse struct {
 	NextToken *string `json:"nextToken,omitempty"`
-	ServiceArns []string `json:"serviceArns,omitempty"`
+	ServiceArns []string `json:"serviceArns"`
 }
 
 // ListServicesRequest represents the ListServicesRequest structure
@@ -1006,7 +1006,7 @@ type ListServicesRequest struct {
 // ListServicesResponse represents the ListServicesResponse structure
 type ListServicesResponse struct {
 	NextToken *string `json:"nextToken,omitempty"`
-	ServiceArns []string `json:"serviceArns,omitempty"`
+	ServiceArns []string `json:"serviceArns"`
 }
 
 // ListTagsForResourceRequest represents the ListTagsForResourceRequest structure
@@ -1016,7 +1016,7 @@ type ListTagsForResourceRequest struct {
 
 // ListTagsForResourceResponse represents the ListTagsForResourceResponse structure
 type ListTagsForResourceResponse struct {
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 }
 
 // ListTaskDefinitionFamiliesRequest represents the ListTaskDefinitionFamiliesRequest structure
@@ -1029,7 +1029,7 @@ type ListTaskDefinitionFamiliesRequest struct {
 
 // ListTaskDefinitionFamiliesResponse represents the ListTaskDefinitionFamiliesResponse structure
 type ListTaskDefinitionFamiliesResponse struct {
-	Families []string `json:"families,omitempty"`
+	Families []string `json:"families"`
 	NextToken *string `json:"nextToken,omitempty"`
 }
 
@@ -1045,7 +1045,7 @@ type ListTaskDefinitionsRequest struct {
 // ListTaskDefinitionsResponse represents the ListTaskDefinitionsResponse structure
 type ListTaskDefinitionsResponse struct {
 	NextToken *string `json:"nextToken,omitempty"`
-	TaskDefinitionArns []string `json:"taskDefinitionArns,omitempty"`
+	TaskDefinitionArns []string `json:"taskDefinitionArns"`
 }
 
 // ListTasksRequest represents the ListTasksRequest structure
@@ -1064,7 +1064,7 @@ type ListTasksRequest struct {
 // ListTasksResponse represents the ListTasksResponse structure
 type ListTasksResponse struct {
 	NextToken *string `json:"nextToken,omitempty"`
-	TaskArns []string `json:"taskArns,omitempty"`
+	TaskArns []string `json:"taskArns"`
 }
 
 // LoadBalancer represents the LoadBalancer structure
@@ -1079,7 +1079,7 @@ type LoadBalancer struct {
 type LogConfiguration struct {
 	LogDriver *LogDriver `json:"logDriver"`
 	Options LogConfigurationOptionsMap `json:"options,omitempty"`
-	SecretOptions []Secret `json:"secretOptions,omitempty"`
+	SecretOptions []Secret `json:"secretOptions"`
 }
 
 // LogConfigurationOptionsMap represents a map type  
@@ -1223,7 +1223,7 @@ type ProtectedTask struct {
 // ProxyConfiguration represents the ProxyConfiguration structure
 type ProxyConfiguration struct {
 	ContainerName *string `json:"containerName"`
-	Properties []KeyValuePair `json:"properties,omitempty"`
+	Properties []KeyValuePair `json:"properties"`
 	Type *ProxyConfigurationType `json:"type,omitempty"`
 }
 
@@ -1258,7 +1258,7 @@ type PutAttributesRequest struct {
 
 // PutAttributesResponse represents the PutAttributesResponse structure
 type PutAttributesResponse struct {
-	Attributes []Attribute `json:"attributes,omitempty"`
+	Attributes []Attribute `json:"attributes"`
 }
 
 // PutClusterCapacityProvidersRequest represents the PutClusterCapacityProvidersRequest structure
@@ -1275,14 +1275,14 @@ type PutClusterCapacityProvidersResponse struct {
 
 // RegisterContainerInstanceRequest represents the RegisterContainerInstanceRequest structure
 type RegisterContainerInstanceRequest struct {
-	Attributes []Attribute `json:"attributes,omitempty"`
+	Attributes []Attribute `json:"attributes"`
 	Cluster *string `json:"cluster,omitempty"`
 	ContainerInstanceArn *string `json:"containerInstanceArn,omitempty"`
 	InstanceIdentityDocument *string `json:"instanceIdentityDocument,omitempty"`
 	InstanceIdentityDocumentSignature *string `json:"instanceIdentityDocumentSignature,omitempty"`
-	PlatformDevices []PlatformDevice `json:"platformDevices,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-	TotalResources []Resource `json:"totalResources,omitempty"`
+	PlatformDevices []PlatformDevice `json:"platformDevices"`
+	Tags []Tag `json:"tags"`
+	TotalResources []Resource `json:"totalResources"`
 	VersionInfo *VersionInfo `json:"versionInfo,omitempty"`
 }
 
@@ -1299,23 +1299,23 @@ type RegisterTaskDefinitionRequest struct {
 	EphemeralStorage *EphemeralStorage `json:"ephemeralStorage,omitempty"`
 	ExecutionRoleArn *string `json:"executionRoleArn,omitempty"`
 	Family *string `json:"family"`
-	InferenceAccelerators []InferenceAccelerator `json:"inferenceAccelerators,omitempty"`
+	InferenceAccelerators []InferenceAccelerator `json:"inferenceAccelerators"`
 	IpcMode *IpcMode `json:"ipcMode,omitempty"`
 	Memory *string `json:"memory,omitempty"`
 	NetworkMode *NetworkMode `json:"networkMode,omitempty"`
 	PidMode *PidMode `json:"pidMode,omitempty"`
-	PlacementConstraints []TaskDefinitionPlacementConstraint `json:"placementConstraints,omitempty"`
+	PlacementConstraints []TaskDefinitionPlacementConstraint `json:"placementConstraints"`
 	ProxyConfiguration *ProxyConfiguration `json:"proxyConfiguration,omitempty"`
-	RequiresCompatibilities []Compatibility `json:"requiresCompatibilities,omitempty"`
+	RequiresCompatibilities []Compatibility `json:"requiresCompatibilities"`
 	RuntimePlatform *RuntimePlatform `json:"runtimePlatform,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 	TaskRoleArn *string `json:"taskRoleArn,omitempty"`
-	Volumes []Volume `json:"volumes,omitempty"`
+	Volumes []Volume `json:"volumes"`
 }
 
 // RegisterTaskDefinitionResponse represents the RegisterTaskDefinitionResponse structure
 type RegisterTaskDefinitionResponse struct {
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 	TaskDefinition *TaskDefinition `json:"taskDefinition,omitempty"`
 }
 
@@ -1330,7 +1330,7 @@ type Resource struct {
 	IntegerValue *int32 `json:"integerValue,omitempty"`
 	LongValue *int64 `json:"longValue,omitempty"`
 	Name *string `json:"name,omitempty"`
-	StringSetValue []string `json:"stringSetValue,omitempty"`
+	StringSetValue []string `json:"stringSetValue"`
 	Type *string `json:"type,omitempty"`
 }
 
@@ -1359,7 +1359,7 @@ type Rollback struct {
 
 // RunTaskRequest represents the RunTaskRequest structure
 type RunTaskRequest struct {
-	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy,omitempty"`
+	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy"`
 	ClientToken *string `json:"clientToken,omitempty"`
 	Cluster *string `json:"cluster,omitempty"`
 	Count *int32 `json:"count,omitempty"`
@@ -1369,21 +1369,21 @@ type RunTaskRequest struct {
 	LaunchType *LaunchType `json:"launchType,omitempty"`
 	NetworkConfiguration *NetworkConfiguration `json:"networkConfiguration,omitempty"`
 	Overrides *TaskOverride `json:"overrides,omitempty"`
-	PlacementConstraints []PlacementConstraint `json:"placementConstraints,omitempty"`
-	PlacementStrategy []PlacementStrategy `json:"placementStrategy,omitempty"`
+	PlacementConstraints []PlacementConstraint `json:"placementConstraints"`
+	PlacementStrategy []PlacementStrategy `json:"placementStrategy"`
 	PlatformVersion *string `json:"platformVersion,omitempty"`
 	PropagateTags *PropagateTags `json:"propagateTags,omitempty"`
 	ReferenceId *string `json:"referenceId,omitempty"`
 	StartedBy *string `json:"startedBy,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 	TaskDefinition *string `json:"taskDefinition"`
-	VolumeConfigurations []TaskVolumeConfiguration `json:"volumeConfigurations,omitempty"`
+	VolumeConfigurations []TaskVolumeConfiguration `json:"volumeConfigurations"`
 }
 
 // RunTaskResponse represents the RunTaskResponse structure
 type RunTaskResponse struct {
-	Failures []Failure `json:"failures,omitempty"`
-	Tasks []Task `json:"tasks,omitempty"`
+	Failures []Failure `json:"failures"`
+	Tasks []Task `json:"tasks"`
 }
 
 // RuntimePlatform represents the RuntimePlatform structure
@@ -1415,24 +1415,24 @@ type ServerException struct {
 // Service represents the Service structure
 type Service struct {
 	AvailabilityZoneRebalancing *AvailabilityZoneRebalancing `json:"availabilityZoneRebalancing,omitempty"`
-	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy,omitempty"`
+	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy"`
 	ClusterArn *string `json:"clusterArn,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	CreatedBy *string `json:"createdBy,omitempty"`
 	DeploymentConfiguration *DeploymentConfiguration `json:"deploymentConfiguration,omitempty"`
 	DeploymentController *DeploymentController `json:"deploymentController,omitempty"`
-	Deployments []Deployment `json:"deployments,omitempty"`
+	Deployments []Deployment `json:"deployments"`
 	DesiredCount *int32 `json:"desiredCount,omitempty"`
 	EnableECSManagedTags *bool `json:"enableECSManagedTags,omitempty"`
 	EnableExecuteCommand *bool `json:"enableExecuteCommand,omitempty"`
-	Events []ServiceEvent `json:"events,omitempty"`
+	Events []ServiceEvent `json:"events"`
 	HealthCheckGracePeriodSeconds *int32 `json:"healthCheckGracePeriodSeconds,omitempty"`
 	LaunchType *LaunchType `json:"launchType,omitempty"`
-	LoadBalancers []LoadBalancer `json:"loadBalancers,omitempty"`
+	LoadBalancers []LoadBalancer `json:"loadBalancers"`
 	NetworkConfiguration *NetworkConfiguration `json:"networkConfiguration,omitempty"`
 	PendingCount *int32 `json:"pendingCount,omitempty"`
-	PlacementConstraints []PlacementConstraint `json:"placementConstraints,omitempty"`
-	PlacementStrategy []PlacementStrategy `json:"placementStrategy,omitempty"`
+	PlacementConstraints []PlacementConstraint `json:"placementConstraints"`
+	PlacementStrategy []PlacementStrategy `json:"placementStrategy"`
 	PlatformFamily *string `json:"platformFamily,omitempty"`
 	PlatformVersion *string `json:"platformVersion,omitempty"`
 	PropagateTags *PropagateTags `json:"propagateTags,omitempty"`
@@ -1441,11 +1441,11 @@ type Service struct {
 	SchedulingStrategy *SchedulingStrategy `json:"schedulingStrategy,omitempty"`
 	ServiceArn *string `json:"serviceArn,omitempty"`
 	ServiceName *string `json:"serviceName,omitempty"`
-	ServiceRegistries []ServiceRegistry `json:"serviceRegistries,omitempty"`
+	ServiceRegistries []ServiceRegistry `json:"serviceRegistries"`
 	Status *string `json:"status,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 	TaskDefinition *string `json:"taskDefinition,omitempty"`
-	TaskSets []TaskSet `json:"taskSets,omitempty"`
+	TaskSets []TaskSet `json:"taskSets"`
 }
 
 // ServiceConnectClientAlias represents the ServiceConnectClientAlias structure
@@ -1459,12 +1459,12 @@ type ServiceConnectConfiguration struct {
 	Enabled *bool `json:"enabled"`
 	LogConfiguration *LogConfiguration `json:"logConfiguration,omitempty"`
 	Namespace *string `json:"namespace,omitempty"`
-	Services []ServiceConnectService `json:"services,omitempty"`
+	Services []ServiceConnectService `json:"services"`
 }
 
 // ServiceConnectService represents the ServiceConnectService structure
 type ServiceConnectService struct {
-	ClientAliases []ServiceConnectClientAlias `json:"clientAliases,omitempty"`
+	ClientAliases []ServiceConnectClientAlias `json:"clientAliases"`
 	DiscoveryName *string `json:"discoveryName,omitempty"`
 	IngressPortOverride *PortNumber `json:"ingressPortOverride,omitempty"`
 	PortName *string `json:"portName"`
@@ -1501,7 +1501,7 @@ type ServiceDeployment struct {
 	Rollback *Rollback `json:"rollback,omitempty"`
 	ServiceArn *string `json:"serviceArn,omitempty"`
 	ServiceDeploymentArn *string `json:"serviceDeploymentArn,omitempty"`
-	SourceServiceRevisions []ServiceRevisionSummary `json:"sourceServiceRevisions,omitempty"`
+	SourceServiceRevisions []ServiceRevisionSummary `json:"sourceServiceRevisions"`
 	StartedAt *time.Time `json:"startedAt,omitempty"`
 	Status *ServiceDeploymentStatus `json:"status,omitempty"`
 	StatusReason *string `json:"statusReason,omitempty"`
@@ -1512,9 +1512,9 @@ type ServiceDeployment struct {
 
 // ServiceDeploymentAlarms represents the ServiceDeploymentAlarms structure
 type ServiceDeploymentAlarms struct {
-	AlarmNames []string `json:"alarmNames,omitempty"`
+	AlarmNames []string `json:"alarmNames"`
 	Status *ServiceDeploymentRollbackMonitorsStatus `json:"status,omitempty"`
-	TriggeredAlarmNames []string `json:"triggeredAlarmNames,omitempty"`
+	TriggeredAlarmNames []string `json:"triggeredAlarmNames"`
 }
 
 // ServiceDeploymentBrief represents the ServiceDeploymentBrief structure
@@ -1558,7 +1558,7 @@ type ServiceManagedEBSVolumeConfiguration struct {
 	RoleArn *IAMRoleArn `json:"roleArn"`
 	SizeInGiB *int32 `json:"sizeInGiB,omitempty"`
 	SnapshotId *EBSSnapshotId `json:"snapshotId,omitempty"`
-	TagSpecifications []EBSTagSpecification `json:"tagSpecifications,omitempty"`
+	TagSpecifications []EBSTagSpecification `json:"tagSpecifications"`
 	Throughput *int32 `json:"throughput,omitempty"`
 	VolumeInitializationRate *int32 `json:"volumeInitializationRate,omitempty"`
 	VolumeType *EBSVolumeType `json:"volumeType,omitempty"`
@@ -1584,24 +1584,24 @@ type ServiceRegistry struct {
 
 // ServiceRevision represents the ServiceRevision structure
 type ServiceRevision struct {
-	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy,omitempty"`
+	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy"`
 	ClusterArn *string `json:"clusterArn,omitempty"`
-	ContainerImages []ContainerImage `json:"containerImages,omitempty"`
+	ContainerImages []ContainerImage `json:"containerImages"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	FargateEphemeralStorage *DeploymentEphemeralStorage `json:"fargateEphemeralStorage,omitempty"`
 	GuardDutyEnabled *bool `json:"guardDutyEnabled,omitempty"`
 	LaunchType *LaunchType `json:"launchType,omitempty"`
-	LoadBalancers []LoadBalancer `json:"loadBalancers,omitempty"`
+	LoadBalancers []LoadBalancer `json:"loadBalancers"`
 	NetworkConfiguration *NetworkConfiguration `json:"networkConfiguration,omitempty"`
 	PlatformFamily *string `json:"platformFamily,omitempty"`
 	PlatformVersion *string `json:"platformVersion,omitempty"`
 	ServiceArn *string `json:"serviceArn,omitempty"`
 	ServiceConnectConfiguration *ServiceConnectConfiguration `json:"serviceConnectConfiguration,omitempty"`
-	ServiceRegistries []ServiceRegistry `json:"serviceRegistries,omitempty"`
+	ServiceRegistries []ServiceRegistry `json:"serviceRegistries"`
 	ServiceRevisionArn *string `json:"serviceRevisionArn,omitempty"`
 	TaskDefinition *string `json:"taskDefinition,omitempty"`
-	VolumeConfigurations []ServiceVolumeConfiguration `json:"volumeConfigurations,omitempty"`
-	VpcLatticeConfigurations []VpcLatticeConfiguration `json:"vpcLatticeConfigurations,omitempty"`
+	VolumeConfigurations []ServiceVolumeConfiguration `json:"volumeConfigurations"`
+	VpcLatticeConfigurations []VpcLatticeConfiguration `json:"vpcLatticeConfigurations"`
 }
 
 // ServiceRevisionSummary represents the ServiceRevisionSummary structure
@@ -1645,15 +1645,15 @@ type StartTaskRequest struct {
 	PropagateTags *PropagateTags `json:"propagateTags,omitempty"`
 	ReferenceId *string `json:"referenceId,omitempty"`
 	StartedBy *string `json:"startedBy,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 	TaskDefinition *string `json:"taskDefinition"`
-	VolumeConfigurations []TaskVolumeConfiguration `json:"volumeConfigurations,omitempty"`
+	VolumeConfigurations []TaskVolumeConfiguration `json:"volumeConfigurations"`
 }
 
 // StartTaskResponse represents the StartTaskResponse structure
 type StartTaskResponse struct {
-	Failures []Failure `json:"failures,omitempty"`
-	Tasks []Task `json:"tasks,omitempty"`
+	Failures []Failure `json:"failures"`
+	Tasks []Task `json:"tasks"`
 }
 
 // StopServiceDeploymentRequest represents the StopServiceDeploymentRequest structure
@@ -1701,7 +1701,7 @@ type SubmitContainerStateChangeRequest struct {
 	Cluster *string `json:"cluster,omitempty"`
 	ContainerName *string `json:"containerName,omitempty"`
 	ExitCode *int32 `json:"exitCode,omitempty"`
-	NetworkBindings []NetworkBinding `json:"networkBindings,omitempty"`
+	NetworkBindings []NetworkBinding `json:"networkBindings"`
 	Reason *string `json:"reason,omitempty"`
 	RuntimeId *string `json:"runtimeId,omitempty"`
 	Status *string `json:"status,omitempty"`
@@ -1715,11 +1715,11 @@ type SubmitContainerStateChangeResponse struct {
 
 // SubmitTaskStateChangeRequest represents the SubmitTaskStateChangeRequest structure
 type SubmitTaskStateChangeRequest struct {
-	Attachments []AttachmentStateChange `json:"attachments,omitempty"`
+	Attachments []AttachmentStateChange `json:"attachments"`
 	Cluster *string `json:"cluster,omitempty"`
-	Containers []ContainerStateChange `json:"containers,omitempty"`
+	Containers []ContainerStateChange `json:"containers"`
 	ExecutionStoppedAt *time.Time `json:"executionStoppedAt,omitempty"`
-	ManagedAgents []ManagedAgentStateChange `json:"managedAgents,omitempty"`
+	ManagedAgents []ManagedAgentStateChange `json:"managedAgents"`
 	PullStartedAt *time.Time `json:"pullStartedAt,omitempty"`
 	PullStoppedAt *time.Time `json:"pullStoppedAt,omitempty"`
 	Reason *string `json:"reason,omitempty"`
@@ -1772,15 +1772,15 @@ type TargetNotFoundException struct {
 
 // Task represents the Task structure
 type Task struct {
-	Attachments []Attachment `json:"attachments,omitempty"`
-	Attributes []Attribute `json:"attributes,omitempty"`
+	Attachments []Attachment `json:"attachments"`
+	Attributes []Attribute `json:"attributes"`
 	AvailabilityZone *string `json:"availabilityZone,omitempty"`
 	CapacityProviderName *string `json:"capacityProviderName,omitempty"`
 	ClusterArn *string `json:"clusterArn,omitempty"`
 	Connectivity *Connectivity `json:"connectivity,omitempty"`
 	ConnectivityAt *time.Time `json:"connectivityAt,omitempty"`
 	ContainerInstanceArn *string `json:"containerInstanceArn,omitempty"`
-	Containers []Container `json:"containers,omitempty"`
+	Containers []Container `json:"containers"`
 	Cpu *string `json:"cpu,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	DesiredStatus *string `json:"desiredStatus,omitempty"`
@@ -1790,7 +1790,7 @@ type Task struct {
 	FargateEphemeralStorage *TaskEphemeralStorage `json:"fargateEphemeralStorage,omitempty"`
 	Group *string `json:"group,omitempty"`
 	HealthStatus *HealthStatus `json:"healthStatus,omitempty"`
-	InferenceAccelerators []InferenceAccelerator `json:"inferenceAccelerators,omitempty"`
+	InferenceAccelerators []InferenceAccelerator `json:"inferenceAccelerators"`
 	LastStatus *string `json:"lastStatus,omitempty"`
 	LaunchType *LaunchType `json:"launchType,omitempty"`
 	Memory *string `json:"memory,omitempty"`
@@ -1805,7 +1805,7 @@ type Task struct {
 	StoppedAt *time.Time `json:"stoppedAt,omitempty"`
 	StoppedReason *string `json:"stoppedReason,omitempty"`
 	StoppingAt *time.Time `json:"stoppingAt,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 	TaskArn *string `json:"taskArn,omitempty"`
 	TaskDefinitionArn *string `json:"taskDefinitionArn,omitempty"`
 	Version *int64 `json:"version,omitempty"`
@@ -1813,31 +1813,31 @@ type Task struct {
 
 // TaskDefinition represents the TaskDefinition structure
 type TaskDefinition struct {
-	Compatibilities []Compatibility `json:"compatibilities,omitempty"`
-	ContainerDefinitions []ContainerDefinition `json:"containerDefinitions,omitempty"`
+	Compatibilities []Compatibility `json:"compatibilities"`
+	ContainerDefinitions []ContainerDefinition `json:"containerDefinitions"`
 	Cpu *string `json:"cpu,omitempty"`
 	DeregisteredAt *time.Time `json:"deregisteredAt,omitempty"`
 	EnableFaultInjection *bool `json:"enableFaultInjection,omitempty"`
 	EphemeralStorage *EphemeralStorage `json:"ephemeralStorage,omitempty"`
 	ExecutionRoleArn *string `json:"executionRoleArn,omitempty"`
 	Family *string `json:"family,omitempty"`
-	InferenceAccelerators []InferenceAccelerator `json:"inferenceAccelerators,omitempty"`
+	InferenceAccelerators []InferenceAccelerator `json:"inferenceAccelerators"`
 	IpcMode *IpcMode `json:"ipcMode,omitempty"`
 	Memory *string `json:"memory,omitempty"`
 	NetworkMode *NetworkMode `json:"networkMode,omitempty"`
 	PidMode *PidMode `json:"pidMode,omitempty"`
-	PlacementConstraints []TaskDefinitionPlacementConstraint `json:"placementConstraints,omitempty"`
+	PlacementConstraints []TaskDefinitionPlacementConstraint `json:"placementConstraints"`
 	ProxyConfiguration *ProxyConfiguration `json:"proxyConfiguration,omitempty"`
 	RegisteredAt *time.Time `json:"registeredAt,omitempty"`
 	RegisteredBy *string `json:"registeredBy,omitempty"`
-	RequiresAttributes []Attribute `json:"requiresAttributes,omitempty"`
-	RequiresCompatibilities []Compatibility `json:"requiresCompatibilities,omitempty"`
+	RequiresAttributes []Attribute `json:"requiresAttributes"`
+	RequiresCompatibilities []Compatibility `json:"requiresCompatibilities"`
 	Revision *int32 `json:"revision,omitempty"`
 	RuntimePlatform *RuntimePlatform `json:"runtimePlatform,omitempty"`
 	Status *TaskDefinitionStatus `json:"status,omitempty"`
 	TaskDefinitionArn *string `json:"taskDefinitionArn,omitempty"`
 	TaskRoleArn *string `json:"taskRoleArn,omitempty"`
-	Volumes []Volume `json:"volumes,omitempty"`
+	Volumes []Volume `json:"volumes"`
 }
 
 // TaskDefinitionPlacementConstraint represents the TaskDefinitionPlacementConstraint structure
@@ -1861,7 +1861,7 @@ type TaskManagedEBSVolumeConfiguration struct {
 	RoleArn *IAMRoleArn `json:"roleArn"`
 	SizeInGiB *int32 `json:"sizeInGiB,omitempty"`
 	SnapshotId *EBSSnapshotId `json:"snapshotId,omitempty"`
-	TagSpecifications []EBSTagSpecification `json:"tagSpecifications,omitempty"`
+	TagSpecifications []EBSTagSpecification `json:"tagSpecifications"`
 	TerminationPolicy *TaskManagedEBSVolumeTerminationPolicy `json:"terminationPolicy,omitempty"`
 	Throughput *int32 `json:"throughput,omitempty"`
 	VolumeInitializationRate *int32 `json:"volumeInitializationRate,omitempty"`
@@ -1875,18 +1875,18 @@ type TaskManagedEBSVolumeTerminationPolicy struct {
 
 // TaskOverride represents the TaskOverride structure
 type TaskOverride struct {
-	ContainerOverrides []ContainerOverride `json:"containerOverrides,omitempty"`
+	ContainerOverrides []ContainerOverride `json:"containerOverrides"`
 	Cpu *string `json:"cpu,omitempty"`
 	EphemeralStorage *EphemeralStorage `json:"ephemeralStorage,omitempty"`
 	ExecutionRoleArn *string `json:"executionRoleArn,omitempty"`
-	InferenceAcceleratorOverrides []InferenceAcceleratorOverride `json:"inferenceAcceleratorOverrides,omitempty"`
+	InferenceAcceleratorOverrides []InferenceAcceleratorOverride `json:"inferenceAcceleratorOverrides"`
 	Memory *string `json:"memory,omitempty"`
 	TaskRoleArn *string `json:"taskRoleArn,omitempty"`
 }
 
 // TaskSet represents the TaskSet structure
 type TaskSet struct {
-	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy,omitempty"`
+	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy"`
 	ClusterArn *string `json:"clusterArn,omitempty"`
 	ComputedDesiredCount *int32 `json:"computedDesiredCount,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
@@ -1894,7 +1894,7 @@ type TaskSet struct {
 	FargateEphemeralStorage *DeploymentEphemeralStorage `json:"fargateEphemeralStorage,omitempty"`
 	Id *string `json:"id,omitempty"`
 	LaunchType *LaunchType `json:"launchType,omitempty"`
-	LoadBalancers []LoadBalancer `json:"loadBalancers,omitempty"`
+	LoadBalancers []LoadBalancer `json:"loadBalancers"`
 	NetworkConfiguration *NetworkConfiguration `json:"networkConfiguration,omitempty"`
 	PendingCount *int32 `json:"pendingCount,omitempty"`
 	PlatformFamily *string `json:"platformFamily,omitempty"`
@@ -1902,12 +1902,12 @@ type TaskSet struct {
 	RunningCount *int32 `json:"runningCount,omitempty"`
 	Scale *Scale `json:"scale,omitempty"`
 	ServiceArn *string `json:"serviceArn,omitempty"`
-	ServiceRegistries []ServiceRegistry `json:"serviceRegistries,omitempty"`
+	ServiceRegistries []ServiceRegistry `json:"serviceRegistries"`
 	StabilityStatus *StabilityStatus `json:"stabilityStatus,omitempty"`
 	StabilityStatusAt *time.Time `json:"stabilityStatusAt,omitempty"`
 	StartedBy *string `json:"startedBy,omitempty"`
 	Status *string `json:"status,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
+	Tags []Tag `json:"tags"`
 	TaskDefinition *string `json:"taskDefinition,omitempty"`
 	TaskSetArn *string `json:"taskSetArn,omitempty"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
@@ -1936,7 +1936,7 @@ type Timestamp time.Time
 // Tmpfs represents the Tmpfs structure
 type Tmpfs struct {
 	ContainerPath *string `json:"containerPath"`
-	MountOptions []string `json:"mountOptions,omitempty"`
+	MountOptions []string `json:"mountOptions"`
 	Size *int32 `json:"size"`
 }
 
@@ -1978,7 +1978,7 @@ type UpdateClusterRequest struct {
 	Cluster *string `json:"cluster"`
 	Configuration *ClusterConfiguration `json:"configuration,omitempty"`
 	ServiceConnectDefaults *ClusterServiceConnectDefaultsRequest `json:"serviceConnectDefaults,omitempty"`
-	Settings []ClusterSetting `json:"settings,omitempty"`
+	Settings []ClusterSetting `json:"settings"`
 }
 
 // UpdateClusterResponse represents the UpdateClusterResponse structure
@@ -2017,8 +2017,8 @@ type UpdateContainerInstancesStateRequest struct {
 
 // UpdateContainerInstancesStateResponse represents the UpdateContainerInstancesStateResponse structure
 type UpdateContainerInstancesStateResponse struct {
-	ContainerInstances []ContainerInstance `json:"containerInstances,omitempty"`
-	Failures []Failure `json:"failures,omitempty"`
+	ContainerInstances []ContainerInstance `json:"containerInstances"`
+	Failures []Failure `json:"failures"`
 }
 
 // UpdateInProgressException represents the UpdateInProgressException structure
@@ -2041,7 +2041,7 @@ type UpdateServicePrimaryTaskSetResponse struct {
 // UpdateServiceRequest represents the UpdateServiceRequest structure
 type UpdateServiceRequest struct {
 	AvailabilityZoneRebalancing *AvailabilityZoneRebalancing `json:"availabilityZoneRebalancing,omitempty"`
-	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy,omitempty"`
+	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy"`
 	Cluster *string `json:"cluster,omitempty"`
 	DeploymentConfiguration *DeploymentConfiguration `json:"deploymentConfiguration,omitempty"`
 	DesiredCount *int32 `json:"desiredCount,omitempty"`
@@ -2049,18 +2049,18 @@ type UpdateServiceRequest struct {
 	EnableExecuteCommand *bool `json:"enableExecuteCommand,omitempty"`
 	ForceNewDeployment *bool `json:"forceNewDeployment,omitempty"`
 	HealthCheckGracePeriodSeconds *int32 `json:"healthCheckGracePeriodSeconds,omitempty"`
-	LoadBalancers []LoadBalancer `json:"loadBalancers,omitempty"`
+	LoadBalancers []LoadBalancer `json:"loadBalancers"`
 	NetworkConfiguration *NetworkConfiguration `json:"networkConfiguration,omitempty"`
-	PlacementConstraints []PlacementConstraint `json:"placementConstraints,omitempty"`
-	PlacementStrategy []PlacementStrategy `json:"placementStrategy,omitempty"`
+	PlacementConstraints []PlacementConstraint `json:"placementConstraints"`
+	PlacementStrategy []PlacementStrategy `json:"placementStrategy"`
 	PlatformVersion *string `json:"platformVersion,omitempty"`
 	PropagateTags *PropagateTags `json:"propagateTags,omitempty"`
 	Service *string `json:"service"`
 	ServiceConnectConfiguration *ServiceConnectConfiguration `json:"serviceConnectConfiguration,omitempty"`
-	ServiceRegistries []ServiceRegistry `json:"serviceRegistries,omitempty"`
+	ServiceRegistries []ServiceRegistry `json:"serviceRegistries"`
 	TaskDefinition *string `json:"taskDefinition,omitempty"`
-	VolumeConfigurations []ServiceVolumeConfiguration `json:"volumeConfigurations,omitempty"`
-	VpcLatticeConfigurations []VpcLatticeConfiguration `json:"vpcLatticeConfigurations,omitempty"`
+	VolumeConfigurations []ServiceVolumeConfiguration `json:"volumeConfigurations"`
+	VpcLatticeConfigurations []VpcLatticeConfiguration `json:"vpcLatticeConfigurations"`
 }
 
 // UpdateServiceResponse represents the UpdateServiceResponse structure
@@ -2078,8 +2078,8 @@ type UpdateTaskProtectionRequest struct {
 
 // UpdateTaskProtectionResponse represents the UpdateTaskProtectionResponse structure
 type UpdateTaskProtectionResponse struct {
-	Failures []Failure `json:"failures,omitempty"`
-	ProtectedTasks []ProtectedTask `json:"protectedTasks,omitempty"`
+	Failures []Failure `json:"failures"`
+	ProtectedTasks []ProtectedTask `json:"protectedTasks"`
 }
 
 // UpdateTaskSetRequest represents the UpdateTaskSetRequest structure

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -12,12 +13,14 @@ import (
 
 // MockStorage implements storage.Storage interface for testing
 type MockStorage struct {
-	clusterStore        storage.ClusterStore
-	taskDefinitionStore storage.TaskDefinitionStore
-	serviceStore        storage.ServiceStore
-	taskStore           storage.TaskStore
-	accountSettingStore storage.AccountSettingStore
-	taskSetStore        storage.TaskSetStore
+	clusterStore            storage.ClusterStore
+	taskDefinitionStore     storage.TaskDefinitionStore
+	serviceStore            storage.ServiceStore
+	taskStore               storage.TaskStore
+	accountSettingStore     storage.AccountSettingStore
+	taskSetStore            storage.TaskSetStore
+	containerInstanceStore  storage.ContainerInstanceStore
+	attributeStore          storage.AttributeStore
 }
 
 func NewMockStorage() *MockStorage {
@@ -56,6 +59,14 @@ func (m *MockStorage) TaskSetStore() storage.TaskSetStore {
 	return m.taskSetStore
 }
 
+func (m *MockStorage) ContainerInstanceStore() storage.ContainerInstanceStore {
+	return m.containerInstanceStore
+}
+
+func (m *MockStorage) AttributeStore() storage.AttributeStore {
+	return m.attributeStore
+}
+
 func (m *MockStorage) BeginTx(ctx context.Context) (storage.Transaction, error) {
 	return nil, nil
 }
@@ -88,6 +99,16 @@ func (m *MockStorage) SetAccountSettingStore(store storage.AccountSettingStore) 
 // SetTaskSetStore sets the task set store
 func (m *MockStorage) SetTaskSetStore(store storage.TaskSetStore) {
 	m.taskSetStore = store
+}
+
+// SetContainerInstanceStore sets the container instance store
+func (m *MockStorage) SetContainerInstanceStore(store storage.ContainerInstanceStore) {
+	m.containerInstanceStore = store
+}
+
+// SetAttributeStore sets the attribute store
+func (m *MockStorage) SetAttributeStore(store storage.AttributeStore) {
+	m.attributeStore = store
 }
 
 // MockClusterStore implements storage.ClusterStore for testing
@@ -142,6 +163,63 @@ func (m *MockClusterStore) Delete(ctx context.Context, name string) error {
 	}
 	delete(m.clusters, name)
 	return nil
+}
+
+func (m *MockClusterStore) ListWithPagination(ctx context.Context, limit int, nextToken string) ([]*storage.Cluster, string, error) {
+	// Convert map to slice
+	var allClusters []*storage.Cluster
+	for _, cluster := range m.clusters {
+		allClusters = append(allClusters, cluster)
+	}
+	
+	// Sort by ID for consistent ordering (matches DuckDB implementation)
+	sort.Slice(allClusters, func(i, j int) bool {
+		return allClusters[i].ID < allClusters[j].ID
+	})
+	
+	// Find starting position based on nextToken
+	start := 0
+	if nextToken != "" {
+		// Validate token exists
+		tokenExists := false
+		for _, cluster := range allClusters {
+			if cluster.ID == nextToken {
+				tokenExists = true
+				break
+			}
+		}
+		
+		// If token doesn't exist, return error (like DuckDB implementation)
+		if !tokenExists {
+			return nil, "", fmt.Errorf("invalid pagination token")
+		}
+		
+		for i, cluster := range allClusters {
+			if cluster.ID > nextToken {
+				start = i
+				break
+			}
+		}
+	}
+	
+	// Get the requested page
+	end := start + limit
+	if end > len(allClusters) {
+		end = len(allClusters)
+	}
+	
+	result := allClusters[start:end]
+	
+	// Determine next token
+	var newNextToken string
+	if limit > 0 && end < len(allClusters) {
+		// Use the last item's ID as the next token
+		if len(result) > 0 {
+			newNextToken = result[len(result)-1].ID
+		}
+	}
+	
+	return result, newNextToken, nil
 }
 
 // MockTaskDefinitionStore implements storage.TaskDefinitionStore for testing
@@ -544,4 +622,194 @@ func hasTaskFamily(taskDefArn, family string) bool {
 		strings.Contains(taskDefArn, fmt.Sprintf("task-definition/%s:", family)) || // ARN format
 		strings.Contains(taskDefArn, fmt.Sprintf(":%s:", family)) || // contains family with colons
 		strings.Contains(taskDefArn, fmt.Sprintf("/%s:", family)) // ARN format
+}
+
+// MockContainerInstanceStore implements storage.ContainerInstanceStore for testing
+type MockContainerInstanceStore struct {
+	instances map[string]*storage.ContainerInstance
+}
+
+func NewMockContainerInstanceStore() *MockContainerInstanceStore {
+	return &MockContainerInstanceStore{
+		instances: make(map[string]*storage.ContainerInstance),
+	}
+}
+
+func (m *MockContainerInstanceStore) Register(ctx context.Context, instance *storage.ContainerInstance) error {
+	if m.instances == nil {
+		m.instances = make(map[string]*storage.ContainerInstance)
+	}
+	if _, exists := m.instances[instance.ARN]; exists {
+		return errors.New("container instance already exists")
+	}
+	m.instances[instance.ARN] = instance
+	return nil
+}
+
+func (m *MockContainerInstanceStore) Get(ctx context.Context, arn string) (*storage.ContainerInstance, error) {
+	instance, exists := m.instances[arn]
+	if !exists {
+		return nil, errors.New("container instance not found")
+	}
+	return instance, nil
+}
+
+func (m *MockContainerInstanceStore) ListWithPagination(ctx context.Context, cluster string, filters storage.ContainerInstanceFilters, limit int, nextToken string) ([]*storage.ContainerInstance, string, error) {
+	// Convert map to slice
+	var allInstances []*storage.ContainerInstance
+	for _, instance := range m.instances {
+		if instance.ClusterARN == cluster {
+			// Apply status filter
+			if filters.Status != "" && instance.Status != filters.Status {
+				continue
+			}
+			allInstances = append(allInstances, instance)
+		}
+	}
+	
+	// Sort by ID for consistent ordering
+	sort.Slice(allInstances, func(i, j int) bool {
+		return allInstances[i].ID < allInstances[j].ID
+	})
+	
+	// Find starting position based on nextToken
+	start := 0
+	if nextToken != "" {
+		for i, instance := range allInstances {
+			if instance.ID > nextToken {
+				start = i
+				break
+			}
+		}
+	}
+	
+	// Get the requested page
+	end := start + limit
+	if end > len(allInstances) {
+		end = len(allInstances)
+	}
+	
+	result := allInstances[start:end]
+	
+	// Determine next token
+	var newNextToken string
+	if limit > 0 && end < len(allInstances) {
+		// Use the last item's ID as the next token
+		if len(result) > 0 {
+			newNextToken = result[len(result)-1].ID
+		}
+	}
+	
+	return result, newNextToken, nil
+}
+
+func (m *MockContainerInstanceStore) Update(ctx context.Context, instance *storage.ContainerInstance) error {
+	if _, exists := m.instances[instance.ARN]; !exists {
+		return errors.New("container instance not found")
+	}
+	instance.UpdatedAt = time.Now()
+	m.instances[instance.ARN] = instance
+	return nil
+}
+
+func (m *MockContainerInstanceStore) Deregister(ctx context.Context, arn string) error {
+	instance, exists := m.instances[arn]
+	if !exists {
+		return errors.New("container instance not found")
+	}
+	instance.Status = "INACTIVE"
+	now := time.Now()
+	instance.DeregisteredAt = &now
+	instance.UpdatedAt = now
+	return nil
+}
+
+func (m *MockContainerInstanceStore) GetByARNs(ctx context.Context, arns []string) ([]*storage.ContainerInstance, error) {
+	var results []*storage.ContainerInstance
+	for _, arn := range arns {
+		if instance, exists := m.instances[arn]; exists {
+			results = append(results, instance)
+		}
+	}
+	return results, nil
+}
+
+// MockAttributeStore implements storage.AttributeStore for testing
+type MockAttributeStore struct {
+	attributes map[string]*storage.Attribute
+}
+
+func NewMockAttributeStore() *MockAttributeStore {
+	return &MockAttributeStore{
+		attributes: make(map[string]*storage.Attribute),
+	}
+}
+
+func (m *MockAttributeStore) Put(ctx context.Context, attributes []*storage.Attribute) error {
+	if m.attributes == nil {
+		m.attributes = make(map[string]*storage.Attribute)
+	}
+	for _, attr := range attributes {
+		key := fmt.Sprintf("%s:%s:%s:%s", attr.Cluster, attr.TargetType, attr.TargetID, attr.Name)
+		m.attributes[key] = attr
+	}
+	return nil
+}
+
+func (m *MockAttributeStore) Delete(ctx context.Context, cluster string, attributes []*storage.Attribute) error {
+	for _, attr := range attributes {
+		key := fmt.Sprintf("%s:%s:%s:%s", cluster, attr.TargetType, attr.TargetID, attr.Name)
+		delete(m.attributes, key)
+	}
+	return nil
+}
+
+func (m *MockAttributeStore) ListWithPagination(ctx context.Context, targetType, cluster string, limit int, nextToken string) ([]*storage.Attribute, string, error) {
+	// Convert map to slice
+	var allAttributes []*storage.Attribute
+	for _, attr := range m.attributes {
+		// Apply filters
+		if targetType != "" && attr.TargetType != targetType {
+			continue
+		}
+		if cluster != "" && attr.Cluster != cluster {
+			continue
+		}
+		allAttributes = append(allAttributes, attr)
+	}
+	
+	// Sort by ID for consistent ordering
+	sort.Slice(allAttributes, func(i, j int) bool {
+		return allAttributes[i].ID < allAttributes[j].ID
+	})
+	
+	// Find starting position based on nextToken
+	start := 0
+	if nextToken != "" {
+		for i, attr := range allAttributes {
+			if attr.ID > nextToken {
+				start = i
+				break
+			}
+		}
+	}
+	
+	// Get the requested page
+	end := start + limit
+	if end > len(allAttributes) {
+		end = len(allAttributes)
+	}
+	
+	result := allAttributes[start:end]
+	
+	// Determine next token
+	var newNextToken string
+	if limit > 0 && end < len(allAttributes) {
+		// Use the last item's ID as the next token
+		if len(result) > 0 {
+			newNextToken = result[len(result)-1].ID
+		}
+	}
+	
+	return result, newNextToken, nil
 }
