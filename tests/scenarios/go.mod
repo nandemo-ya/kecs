@@ -7,7 +7,7 @@ tool github.com/onsi/ginkgo/v2/ginkgo
 require (
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.27.0
 )
 
@@ -32,8 +32,8 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
-	github.com/google/uuid v1.5.0 // indirect
-	github.com/klauspost/compress v1.16.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
@@ -53,9 +53,9 @@ require (
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
-	golang.org/x/exp v0.0.0-20230510235704-dd950f8aeaea // indirect
+	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c // indirect
 	golang.org/x/mod v0.24.0 // indirect
-	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
