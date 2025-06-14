@@ -226,6 +226,7 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 	}
 
 	taskDefIdentifier := *req.TaskDefinition
+	log.Printf("DEBUG: DescribeTaskDefinition called for: %s", taskDefIdentifier)
 	var taskDef *storage.TaskDefinition
 	var err error
 
@@ -251,6 +252,9 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 		return nil, fmt.Errorf("task definition not found: %s", taskDefIdentifier)
 	}
 
+	log.Printf("DEBUG: Found task definition: family=%s, revision=%d, containerDefs=%s", 
+		taskDef.Family, taskDef.Revision, taskDef.ContainerDefinitions)
+
 	// Convert to generated response
 	responseTaskDef := storageTaskDefinitionToGenerated(taskDef)
 
@@ -259,6 +263,9 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 
 	// Note: generated.TaskDefinition doesn't have a Tags field
 	// Tags are handled separately in the API response
+
+	log.Printf("DEBUG: Response task def has %d container definitions", 
+		len(responseTaskDef.ContainerDefinitions))
 
 	return &generated.DescribeTaskDefinitionResponse{
 		TaskDefinition: responseTaskDef,
@@ -482,6 +489,9 @@ func storageTaskDefinitionToGenerated(taskDef *storage.TaskDefinition) *generate
 		Revision:          ptr.Int32(int32(taskDef.Revision)),
 		Status:            (*generated.TaskDefinitionStatus)(ptr.String(taskDef.Status)),
 		RegisteredAt:      ptr.Time(taskDef.RegisteredAt),
+		// Initialize with empty slices to ensure they're always included in JSON
+		ContainerDefinitions: []generated.ContainerDefinition{},
+		Volumes: []generated.Volume{},
 	}
 
 	// Set optional string fields
@@ -515,13 +525,27 @@ func storageTaskDefinitionToGenerated(taskDef *storage.TaskDefinition) *generate
 		var containerDefs []generated.ContainerDefinition
 		if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err == nil {
 			response.ContainerDefinitions = containerDefs
+		} else {
+			log.Printf("Failed to unmarshal container definitions for task definition %s:%d: %v", taskDef.Family, taskDef.Revision, err)
+			// Return empty slice instead of nil to prevent nil pointer dereference
+			response.ContainerDefinitions = []generated.ContainerDefinition{}
 		}
+	} else {
+		// Always set an empty slice if no container definitions to ensure it's not nil
+		response.ContainerDefinitions = []generated.ContainerDefinition{}
 	}
 	if taskDef.Volumes != "" && taskDef.Volumes != "[]" {
 		var volumes []generated.Volume
 		if err := json.Unmarshal([]byte(taskDef.Volumes), &volumes); err == nil {
 			response.Volumes = volumes
+		} else {
+			log.Printf("Failed to unmarshal volumes for task definition %s:%d: %v", taskDef.Family, taskDef.Revision, err)
+			// Return empty slice instead of nil to prevent nil pointer dereference
+			response.Volumes = []generated.Volume{}
 		}
+	} else {
+		// Always set an empty slice if no volumes to ensure it's not nil
+		response.Volumes = []generated.Volume{}
 	}
 	if taskDef.PlacementConstraints != "" && taskDef.PlacementConstraints != "[]" {
 		var constraints []generated.TaskDefinitionPlacementConstraint
