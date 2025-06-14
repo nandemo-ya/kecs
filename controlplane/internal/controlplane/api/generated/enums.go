@@ -7,11 +7,11 @@ type AgentUpdateStatus string
 
 // Enum values for AgentUpdateStatus
 const (
-	AgentUpdateStatusFailed AgentUpdateStatus = "FAILED"
-	AgentUpdateStatusPending AgentUpdateStatus = "PENDING"
-	AgentUpdateStatusStaged AgentUpdateStatus = "STAGED"
-	AgentUpdateStatusStaging AgentUpdateStatus = "STAGING"
-	AgentUpdateStatusUpdated AgentUpdateStatus = "UPDATED"
+	AgentUpdateStatusFailed   AgentUpdateStatus = "FAILED"
+	AgentUpdateStatusPending  AgentUpdateStatus = "PENDING"
+	AgentUpdateStatusStaged   AgentUpdateStatus = "STAGED"
+	AgentUpdateStatusStaging  AgentUpdateStatus = "STAGING"
+	AgentUpdateStatusUpdated  AgentUpdateStatus = "UPDATED"
 	AgentUpdateStatusUpdating AgentUpdateStatus = "UPDATING"
 )
 
@@ -33,8 +33,8 @@ type ApplicationProtocol string
 
 // Enum values for ApplicationProtocol
 const (
-	ApplicationProtocolGrpc ApplicationProtocol = "grpc"
-	ApplicationProtocolHttp ApplicationProtocol = "http"
+	ApplicationProtocolGrpc  ApplicationProtocol = "grpc"
+	ApplicationProtocolHttp  ApplicationProtocol = "http"
 	ApplicationProtocolHttp2 ApplicationProtocol = "http2"
 )
 
@@ -54,7 +54,7 @@ type AssignPublicIp string
 // Enum values for AssignPublicIp
 const (
 	AssignPublicIpDisabled AssignPublicIp = "DISABLED"
-	AssignPublicIpEnabled AssignPublicIp = "ENABLED"
+	AssignPublicIpEnabled  AssignPublicIp = "ENABLED"
 )
 
 // Values returns all known values for AssignPublicIp. Note that this can be
@@ -72,7 +72,7 @@ type AvailabilityZoneRebalancing string
 // Enum values for AvailabilityZoneRebalancing
 const (
 	AvailabilityZoneRebalancingDisabled AvailabilityZoneRebalancing = "DISABLED"
-	AvailabilityZoneRebalancingEnabled AvailabilityZoneRebalancing = "ENABLED"
+	AvailabilityZoneRebalancingEnabled  AvailabilityZoneRebalancing = "ENABLED"
 )
 
 // Values returns all known values for AvailabilityZoneRebalancing. Note that this can be
@@ -123,7 +123,7 @@ type CapacityProviderStatus string
 
 // Enum values for CapacityProviderStatus
 const (
-	CapacityProviderStatusActive CapacityProviderStatus = "ACTIVE"
+	CapacityProviderStatusActive   CapacityProviderStatus = "ACTIVE"
 	CapacityProviderStatusInactive CapacityProviderStatus = "INACTIVE"
 )
 
@@ -141,11 +141,11 @@ type CapacityProviderUpdateStatus string
 
 // Enum values for CapacityProviderUpdateStatus
 const (
-	CapacityProviderUpdateStatusDeleteComplete CapacityProviderUpdateStatus = "DELETE_COMPLETE"
-	CapacityProviderUpdateStatusDeleteFailed CapacityProviderUpdateStatus = "DELETE_FAILED"
+	CapacityProviderUpdateStatusDeleteComplete   CapacityProviderUpdateStatus = "DELETE_COMPLETE"
+	CapacityProviderUpdateStatusDeleteFailed     CapacityProviderUpdateStatus = "DELETE_FAILED"
 	CapacityProviderUpdateStatusDeleteInProgress CapacityProviderUpdateStatus = "DELETE_IN_PROGRESS"
-	CapacityProviderUpdateStatusUpdateComplete CapacityProviderUpdateStatus = "UPDATE_COMPLETE"
-	CapacityProviderUpdateStatusUpdateFailed CapacityProviderUpdateStatus = "UPDATE_FAILED"
+	CapacityProviderUpdateStatusUpdateComplete   CapacityProviderUpdateStatus = "UPDATE_COMPLETE"
+	CapacityProviderUpdateStatusUpdateFailed     CapacityProviderUpdateStatus = "UPDATE_FAILED"
 	CapacityProviderUpdateStatusUpdateInProgress CapacityProviderUpdateStatus = "UPDATE_IN_PROGRESS"
 )
 
@@ -167,11 +167,11 @@ type ClusterField string
 
 // Enum values for ClusterField
 const (
-	ClusterFieldAttachments ClusterField = "ATTACHMENTS"
+	ClusterFieldAttachments    ClusterField = "ATTACHMENTS"
 	ClusterFieldConfigurations ClusterField = "CONFIGURATIONS"
-	ClusterFieldSettings ClusterField = "SETTINGS"
-	ClusterFieldStatistics ClusterField = "STATISTICS"
-	ClusterFieldTags ClusterField = "TAGS"
+	ClusterFieldSettings       ClusterField = "SETTINGS"
+	ClusterFieldStatistics     ClusterField = "STATISTICS"
+	ClusterFieldTags           ClusterField = "TAGS"
 )
 
 // Values returns all known values for ClusterField. Note that this can be
@@ -207,9 +207,9 @@ type Compatibility string
 
 // Enum values for Compatibility
 const (
-	CompatibilityEc2 Compatibility = "EC2"
+	CompatibilityEc2      Compatibility = "EC2"
 	CompatibilityExternal Compatibility = "EXTERNAL"
-	CompatibilityFargate Compatibility = "FARGATE"
+	CompatibilityFargate  Compatibility = "FARGATE"
 )
 
 // Values returns all known values for Compatibility. Note that this can be
@@ -227,7 +227,7 @@ type Connectivity string
 
 // Enum values for Connectivity
 const (
-	ConnectivityConnected Connectivity = "CONNECTED"
+	ConnectivityConnected    Connectivity = "CONNECTED"
 	ConnectivityDisconnected Connectivity = "DISCONNECTED"
 )
 
@@ -246,9 +246,9 @@ type ContainerCondition string
 // Enum values for ContainerCondition
 const (
 	ContainerConditionComplete ContainerCondition = "COMPLETE"
-	ContainerConditionHealthy ContainerCondition = "HEALTHY"
-	ContainerConditionStart ContainerCondition = "START"
-	ContainerConditionSuccess ContainerCondition = "SUCCESS"
+	ContainerConditionHealthy  ContainerCondition = "HEALTHY"
+	ContainerConditionStart    ContainerCondition = "START"
+	ContainerConditionSuccess  ContainerCondition = "SUCCESS"
 )
 
 // Values returns all known values for ContainerCondition. Note that this can be
@@ -268,7 +268,7 @@ type ContainerInstanceField string
 // Enum values for ContainerInstanceField
 const (
 	ContainerInstanceFieldContainerInstanceHealth ContainerInstanceField = "CONTAINER_INSTANCE_HEALTH"
-	ContainerInstanceFieldTags ContainerInstanceField = "TAGS"
+	ContainerInstanceFieldTags                    ContainerInstanceField = "TAGS"
 )
 
 // Values returns all known values for ContainerInstanceField. Note that this can be
@@ -285,10 +285,10 @@ type ContainerInstanceStatus string
 
 // Enum values for ContainerInstanceStatus
 const (
-	ContainerInstanceStatusActive ContainerInstanceStatus = "ACTIVE"
-	ContainerInstanceStatusDeregistering ContainerInstanceStatus = "DEREGISTERING"
-	ContainerInstanceStatusDraining ContainerInstanceStatus = "DRAINING"
-	ContainerInstanceStatusRegistering ContainerInstanceStatus = "REGISTERING"
+	ContainerInstanceStatusActive             ContainerInstanceStatus = "ACTIVE"
+	ContainerInstanceStatusDeregistering      ContainerInstanceStatus = "DEREGISTERING"
+	ContainerInstanceStatusDraining           ContainerInstanceStatus = "DRAINING"
+	ContainerInstanceStatusRegistering        ContainerInstanceStatus = "REGISTERING"
 	ContainerInstanceStatusRegistrationFailed ContainerInstanceStatus = "REGISTRATION_FAILED"
 )
 
@@ -310,8 +310,8 @@ type DeploymentControllerType string
 // Enum values for DeploymentControllerType
 const (
 	DeploymentControllerTypeCodeDeploy DeploymentControllerType = "CODE_DEPLOY"
-	DeploymentControllerTypeEcs DeploymentControllerType = "ECS"
-	DeploymentControllerTypeExternal DeploymentControllerType = "EXTERNAL"
+	DeploymentControllerTypeEcs        DeploymentControllerType = "ECS"
+	DeploymentControllerTypeExternal   DeploymentControllerType = "EXTERNAL"
 )
 
 // Values returns all known values for DeploymentControllerType. Note that this can be
@@ -329,8 +329,8 @@ type DeploymentRolloutState string
 
 // Enum values for DeploymentRolloutState
 const (
-	DeploymentRolloutStateCompleted DeploymentRolloutState = "COMPLETED"
-	DeploymentRolloutStateFailed DeploymentRolloutState = "FAILED"
+	DeploymentRolloutStateCompleted  DeploymentRolloutState = "COMPLETED"
+	DeploymentRolloutStateFailed     DeploymentRolloutState = "FAILED"
 	DeploymentRolloutStateInProgress DeploymentRolloutState = "IN_PROGRESS"
 )
 
@@ -370,7 +370,7 @@ type DeviceCgroupPermission string
 // Enum values for DeviceCgroupPermission
 const (
 	DeviceCgroupPermissionMknod DeviceCgroupPermission = "mknod"
-	DeviceCgroupPermissionRead DeviceCgroupPermission = "read"
+	DeviceCgroupPermissionRead  DeviceCgroupPermission = "read"
 	DeviceCgroupPermissionWrite DeviceCgroupPermission = "write"
 )
 
@@ -406,7 +406,7 @@ type EFSAuthorizationConfigIAM string
 // Enum values for EFSAuthorizationConfigIAM
 const (
 	EFSAuthorizationConfigIAMDisabled EFSAuthorizationConfigIAM = "DISABLED"
-	EFSAuthorizationConfigIAMEnabled EFSAuthorizationConfigIAM = "ENABLED"
+	EFSAuthorizationConfigIAMEnabled  EFSAuthorizationConfigIAM = "ENABLED"
 )
 
 // Values returns all known values for EFSAuthorizationConfigIAM. Note that this can be
@@ -424,7 +424,7 @@ type EFSTransitEncryption string
 // Enum values for EFSTransitEncryption
 const (
 	EFSTransitEncryptionDisabled EFSTransitEncryption = "DISABLED"
-	EFSTransitEncryptionEnabled EFSTransitEncryption = "ENABLED"
+	EFSTransitEncryptionEnabled  EFSTransitEncryption = "ENABLED"
 )
 
 // Values returns all known values for EFSTransitEncryption. Note that this can be
@@ -457,8 +457,8 @@ type ExecuteCommandLogging string
 
 // Enum values for ExecuteCommandLogging
 const (
-	ExecuteCommandLoggingDefault ExecuteCommandLogging = "DEFAULT"
-	ExecuteCommandLoggingNone ExecuteCommandLogging = "NONE"
+	ExecuteCommandLoggingDefault  ExecuteCommandLogging = "DEFAULT"
+	ExecuteCommandLoggingNone     ExecuteCommandLogging = "NONE"
 	ExecuteCommandLoggingOverride ExecuteCommandLogging = "OVERRIDE"
 )
 
@@ -478,7 +478,7 @@ type FirelensConfigurationType string
 // Enum values for FirelensConfigurationType
 const (
 	FirelensConfigurationTypeFluentbit FirelensConfigurationType = "fluentbit"
-	FirelensConfigurationTypeFluentd FirelensConfigurationType = "fluentd"
+	FirelensConfigurationTypeFluentd   FirelensConfigurationType = "fluentd"
 )
 
 // Values returns all known values for FirelensConfigurationType. Note that this can be
@@ -495,9 +495,9 @@ type HealthStatus string
 
 // Enum values for HealthStatus
 const (
-	HealthStatusHealthy HealthStatus = "HEALTHY"
+	HealthStatusHealthy   HealthStatus = "HEALTHY"
 	HealthStatusUnhealthy HealthStatus = "UNHEALTHY"
-	HealthStatusUnknown HealthStatus = "UNKNOWN"
+	HealthStatusUnknown   HealthStatus = "UNKNOWN"
 )
 
 // Values returns all known values for HealthStatus. Note that this can be
@@ -515,10 +515,10 @@ type InstanceHealthCheckState string
 
 // Enum values for InstanceHealthCheckState
 const (
-	InstanceHealthCheckStateImpaired InstanceHealthCheckState = "IMPAIRED"
-	InstanceHealthCheckStateInitializing InstanceHealthCheckState = "INITIALIZING"
+	InstanceHealthCheckStateImpaired         InstanceHealthCheckState = "IMPAIRED"
+	InstanceHealthCheckStateInitializing     InstanceHealthCheckState = "INITIALIZING"
 	InstanceHealthCheckStateInsufficientData InstanceHealthCheckState = "INSUFFICIENT_DATA"
-	InstanceHealthCheckStateOk InstanceHealthCheckState = "OK"
+	InstanceHealthCheckStateOk               InstanceHealthCheckState = "OK"
 )
 
 // Values returns all known values for InstanceHealthCheckState. Note that this can be
@@ -573,9 +573,9 @@ type LaunchType string
 
 // Enum values for LaunchType
 const (
-	LaunchTypeEc2 LaunchType = "EC2"
+	LaunchTypeEc2      LaunchType = "EC2"
 	LaunchTypeExternal LaunchType = "EXTERNAL"
-	LaunchTypeFargate LaunchType = "FARGATE"
+	LaunchTypeFargate  LaunchType = "FARGATE"
 )
 
 // Values returns all known values for LaunchType. Note that this can be
@@ -594,13 +594,13 @@ type LogDriver string
 // Enum values for LogDriver
 const (
 	LogDriverAwsfirelens LogDriver = "awsfirelens"
-	LogDriverAwslogs LogDriver = "awslogs"
-	LogDriverFluentd LogDriver = "fluentd"
-	LogDriverGelf LogDriver = "gelf"
-	LogDriverJournald LogDriver = "journald"
-	LogDriverJsonFile LogDriver = "json-file"
-	LogDriverSplunk LogDriver = "splunk"
-	LogDriverSyslog LogDriver = "syslog"
+	LogDriverAwslogs     LogDriver = "awslogs"
+	LogDriverFluentd     LogDriver = "fluentd"
+	LogDriverGelf        LogDriver = "gelf"
+	LogDriverJournald    LogDriver = "journald"
+	LogDriverJsonFile    LogDriver = "json-file"
+	LogDriverSplunk      LogDriver = "splunk"
+	LogDriverSyslog      LogDriver = "syslog"
 )
 
 // Values returns all known values for LogDriver. Note that this can be
@@ -640,7 +640,7 @@ type ManagedDraining string
 // Enum values for ManagedDraining
 const (
 	ManagedDrainingDisabled ManagedDraining = "DISABLED"
-	ManagedDrainingEnabled ManagedDraining = "ENABLED"
+	ManagedDrainingEnabled  ManagedDraining = "ENABLED"
 )
 
 // Values returns all known values for ManagedDraining. Note that this can be
@@ -658,7 +658,7 @@ type ManagedScalingStatus string
 // Enum values for ManagedScalingStatus
 const (
 	ManagedScalingStatusDisabled ManagedScalingStatus = "DISABLED"
-	ManagedScalingStatusEnabled ManagedScalingStatus = "ENABLED"
+	ManagedScalingStatusEnabled  ManagedScalingStatus = "ENABLED"
 )
 
 // Values returns all known values for ManagedScalingStatus. Note that this can be
@@ -676,7 +676,7 @@ type ManagedTerminationProtection string
 // Enum values for ManagedTerminationProtection
 const (
 	ManagedTerminationProtectionDisabled ManagedTerminationProtection = "DISABLED"
-	ManagedTerminationProtectionEnabled ManagedTerminationProtection = "ENABLED"
+	ManagedTerminationProtectionEnabled  ManagedTerminationProtection = "ENABLED"
 )
 
 // Values returns all known values for ManagedTerminationProtection. Note that this can be
@@ -695,8 +695,8 @@ type NetworkMode string
 const (
 	NetworkModeAwsvpc NetworkMode = "awsvpc"
 	NetworkModeBridge NetworkMode = "bridge"
-	NetworkModeHost NetworkMode = "host"
-	NetworkModeNone NetworkMode = "none"
+	NetworkModeHost   NetworkMode = "host"
+	NetworkModeNone   NetworkMode = "none"
 )
 
 // Values returns all known values for NetworkMode. Note that this can be
@@ -715,7 +715,7 @@ type OSFamily string
 
 // Enum values for OSFamily
 const (
-	OSFamilyLinux OSFamily = "LINUX"
+	OSFamilyLinux                 OSFamily = "LINUX"
 	OSFamilyWindowsServer2004Core OSFamily = "WINDOWS_SERVER_2004_CORE"
 	OSFamilyWindowsServer2016Full OSFamily = "WINDOWS_SERVER_2016_FULL"
 	OSFamilyWindowsServer2019Core OSFamily = "WINDOWS_SERVER_2019_CORE"
@@ -764,7 +764,7 @@ type PlacementConstraintType string
 // Enum values for PlacementConstraintType
 const (
 	PlacementConstraintTypeDistinctInstance PlacementConstraintType = "distinctInstance"
-	PlacementConstraintTypeMemberOf PlacementConstraintType = "memberOf"
+	PlacementConstraintTypeMemberOf         PlacementConstraintType = "memberOf"
 )
 
 // Values returns all known values for PlacementConstraintType. Note that this can be
@@ -782,8 +782,8 @@ type PlacementStrategyType string
 // Enum values for PlacementStrategyType
 const (
 	PlacementStrategyTypeBinpack PlacementStrategyType = "binpack"
-	PlacementStrategyTypeRandom PlacementStrategyType = "random"
-	PlacementStrategyTypeSpread PlacementStrategyType = "spread"
+	PlacementStrategyTypeRandom  PlacementStrategyType = "random"
+	PlacementStrategyTypeSpread  PlacementStrategyType = "spread"
 )
 
 // Values returns all known values for PlacementStrategyType. Note that this can be
@@ -817,8 +817,8 @@ type PropagateTags string
 
 // Enum values for PropagateTags
 const (
-	PropagateTagsNone PropagateTags = "NONE"
-	PropagateTagsService PropagateTags = "SERVICE"
+	PropagateTagsNone           PropagateTags = "NONE"
+	PropagateTagsService        PropagateTags = "SERVICE"
 	PropagateTagsTaskDefinition PropagateTags = "TASK_DEFINITION"
 )
 
@@ -853,7 +853,7 @@ type ResourceType string
 
 // Enum values for ResourceType
 const (
-	ResourceTypeGpu ResourceType = "GPU"
+	ResourceTypeGpu                  ResourceType = "GPU"
 	ResourceTypeInferenceAccelerator ResourceType = "InferenceAccelerator"
 )
 
@@ -887,7 +887,7 @@ type SchedulingStrategy string
 
 // Enum values for SchedulingStrategy
 const (
-	SchedulingStrategyDaemon SchedulingStrategy = "DAEMON"
+	SchedulingStrategyDaemon  SchedulingStrategy = "DAEMON"
 	SchedulingStrategyReplica SchedulingStrategy = "REPLICA"
 )
 
@@ -906,7 +906,7 @@ type Scope string
 // Enum values for Scope
 const (
 	ScopeShared Scope = "shared"
-	ScopeTask Scope = "task"
+	ScopeTask   Scope = "task"
 )
 
 // Values returns all known values for Scope. Note that this can be
@@ -923,10 +923,10 @@ type ServiceDeploymentRollbackMonitorsStatus string
 
 // Enum values for ServiceDeploymentRollbackMonitorsStatus
 const (
-	ServiceDeploymentRollbackMonitorsStatusDisabled ServiceDeploymentRollbackMonitorsStatus = "DISABLED"
-	ServiceDeploymentRollbackMonitorsStatusMonitoring ServiceDeploymentRollbackMonitorsStatus = "MONITORING"
+	ServiceDeploymentRollbackMonitorsStatusDisabled           ServiceDeploymentRollbackMonitorsStatus = "DISABLED"
+	ServiceDeploymentRollbackMonitorsStatusMonitoring         ServiceDeploymentRollbackMonitorsStatus = "MONITORING"
 	ServiceDeploymentRollbackMonitorsStatusMonitoringComplete ServiceDeploymentRollbackMonitorsStatus = "MONITORING_COMPLETE"
-	ServiceDeploymentRollbackMonitorsStatusTriggered ServiceDeploymentRollbackMonitorsStatus = "TRIGGERED"
+	ServiceDeploymentRollbackMonitorsStatusTriggered          ServiceDeploymentRollbackMonitorsStatus = "TRIGGERED"
 )
 
 // Values returns all known values for ServiceDeploymentRollbackMonitorsStatus. Note that this can be
@@ -945,15 +945,15 @@ type ServiceDeploymentStatus string
 
 // Enum values for ServiceDeploymentStatus
 const (
-	ServiceDeploymentStatusInProgress ServiceDeploymentStatus = "IN_PROGRESS"
-	ServiceDeploymentStatusPending ServiceDeploymentStatus = "PENDING"
-	ServiceDeploymentStatusRollbackFailed ServiceDeploymentStatus = "ROLLBACK_FAILED"
+	ServiceDeploymentStatusInProgress         ServiceDeploymentStatus = "IN_PROGRESS"
+	ServiceDeploymentStatusPending            ServiceDeploymentStatus = "PENDING"
+	ServiceDeploymentStatusRollbackFailed     ServiceDeploymentStatus = "ROLLBACK_FAILED"
 	ServiceDeploymentStatusRollbackInProgress ServiceDeploymentStatus = "ROLLBACK_IN_PROGRESS"
-	ServiceDeploymentStatusRollbackRequested ServiceDeploymentStatus = "ROLLBACK_REQUESTED"
+	ServiceDeploymentStatusRollbackRequested  ServiceDeploymentStatus = "ROLLBACK_REQUESTED"
 	ServiceDeploymentStatusRollbackSuccessful ServiceDeploymentStatus = "ROLLBACK_SUCCESSFUL"
-	ServiceDeploymentStatusStopped ServiceDeploymentStatus = "STOPPED"
-	ServiceDeploymentStatusStopRequested ServiceDeploymentStatus = "STOP_REQUESTED"
-	ServiceDeploymentStatusSuccessful ServiceDeploymentStatus = "SUCCESSFUL"
+	ServiceDeploymentStatusStopped            ServiceDeploymentStatus = "STOPPED"
+	ServiceDeploymentStatusStopRequested      ServiceDeploymentStatus = "STOP_REQUESTED"
+	ServiceDeploymentStatusSuccessful         ServiceDeploymentStatus = "SUCCESSFUL"
 )
 
 // Values returns all known values for ServiceDeploymentStatus. Note that this can be
@@ -993,16 +993,16 @@ type SettingName string
 
 // Enum values for SettingName
 const (
-	SettingNameAwsvpcTrunking SettingName = "awsvpcTrunking"
-	SettingNameContainerInsights SettingName = "containerInsights"
-	SettingNameContainerInstanceLongArnFormat SettingName = "containerInstanceLongArnFormat"
-	SettingNameDefaultLogDriverMode SettingName = "defaultLogDriverMode"
-	SettingNameFargateFipsMode SettingName = "fargateFIPSMode"
+	SettingNameAwsvpcTrunking                  SettingName = "awsvpcTrunking"
+	SettingNameContainerInsights               SettingName = "containerInsights"
+	SettingNameContainerInstanceLongArnFormat  SettingName = "containerInstanceLongArnFormat"
+	SettingNameDefaultLogDriverMode            SettingName = "defaultLogDriverMode"
+	SettingNameFargateFipsMode                 SettingName = "fargateFIPSMode"
 	SettingNameFargateTaskRetirementWaitPeriod SettingName = "fargateTaskRetirementWaitPeriod"
-	SettingNameGuardDutyActivate SettingName = "guardDutyActivate"
-	SettingNameServiceLongArnFormat SettingName = "serviceLongArnFormat"
-	SettingNameTagResourceAuthorization SettingName = "tagResourceAuthorization"
-	SettingNameTaskLongArnFormat SettingName = "taskLongArnFormat"
+	SettingNameGuardDutyActivate               SettingName = "guardDutyActivate"
+	SettingNameServiceLongArnFormat            SettingName = "serviceLongArnFormat"
+	SettingNameTagResourceAuthorization        SettingName = "tagResourceAuthorization"
+	SettingNameTaskLongArnFormat               SettingName = "taskLongArnFormat"
 )
 
 // Values returns all known values for SettingName. Note that this can be
@@ -1028,7 +1028,7 @@ type SettingType string
 // Enum values for SettingType
 const (
 	SettingTypeAwsManaged SettingType = "aws_managed"
-	SettingTypeUser SettingType = "user"
+	SettingTypeUser       SettingType = "user"
 )
 
 // Values returns all known values for SettingType. Note that this can be
@@ -1045,7 +1045,7 @@ type SortOrder string
 
 // Enum values for SortOrder
 const (
-	SortOrderAsc SortOrder = "ASC"
+	SortOrderAsc  SortOrder = "ASC"
 	SortOrderDesc SortOrder = "DESC"
 )
 
@@ -1081,7 +1081,7 @@ type StopServiceDeploymentStopType string
 
 // Enum values for StopServiceDeploymentStopType
 const (
-	StopServiceDeploymentStopTypeAbort StopServiceDeploymentStopType = "ABORT"
+	StopServiceDeploymentStopTypeAbort    StopServiceDeploymentStopType = "ABORT"
 	StopServiceDeploymentStopTypeRollback StopServiceDeploymentStopType = "ROLLBACK"
 )
 
@@ -1115,8 +1115,8 @@ type TaskDefinitionFamilyStatus string
 
 // Enum values for TaskDefinitionFamilyStatus
 const (
-	TaskDefinitionFamilyStatusActive TaskDefinitionFamilyStatus = "ACTIVE"
-	TaskDefinitionFamilyStatusAll TaskDefinitionFamilyStatus = "ALL"
+	TaskDefinitionFamilyStatusActive   TaskDefinitionFamilyStatus = "ACTIVE"
+	TaskDefinitionFamilyStatusAll      TaskDefinitionFamilyStatus = "ALL"
 	TaskDefinitionFamilyStatusInactive TaskDefinitionFamilyStatus = "INACTIVE"
 )
 
@@ -1167,9 +1167,9 @@ type TaskDefinitionStatus string
 
 // Enum values for TaskDefinitionStatus
 const (
-	TaskDefinitionStatusActive TaskDefinitionStatus = "ACTIVE"
+	TaskDefinitionStatusActive           TaskDefinitionStatus = "ACTIVE"
 	TaskDefinitionStatusDeleteInProgress TaskDefinitionStatus = "DELETE_IN_PROGRESS"
-	TaskDefinitionStatusInactive TaskDefinitionStatus = "INACTIVE"
+	TaskDefinitionStatusInactive         TaskDefinitionStatus = "INACTIVE"
 )
 
 // Values returns all known values for TaskDefinitionStatus. Note that this can be
@@ -1206,7 +1206,7 @@ const (
 	TaskFilesystemTypeExt3 TaskFilesystemType = "ext3"
 	TaskFilesystemTypeExt4 TaskFilesystemType = "ext4"
 	TaskFilesystemTypeNtfs TaskFilesystemType = "ntfs"
-	TaskFilesystemTypeXfs TaskFilesystemType = "xfs"
+	TaskFilesystemTypeXfs  TaskFilesystemType = "xfs"
 )
 
 // Values returns all known values for TaskFilesystemType. Note that this can be
@@ -1241,12 +1241,12 @@ type TaskStopCode string
 
 // Enum values for TaskStopCode
 const (
-	TaskStopCodeEssentialContainerExited TaskStopCode = "EssentialContainerExited"
+	TaskStopCodeEssentialContainerExited  TaskStopCode = "EssentialContainerExited"
 	TaskStopCodeServiceSchedulerInitiated TaskStopCode = "ServiceSchedulerInitiated"
-	TaskStopCodeSpotInterruption TaskStopCode = "SpotInterruption"
-	TaskStopCodeTaskFailedToStart TaskStopCode = "TaskFailedToStart"
-	TaskStopCodeTerminationNotice TaskStopCode = "TerminationNotice"
-	TaskStopCodeUserInitiated TaskStopCode = "UserInitiated"
+	TaskStopCodeSpotInterruption          TaskStopCode = "SpotInterruption"
+	TaskStopCodeTaskFailedToStart         TaskStopCode = "TaskFailedToStart"
+	TaskStopCodeTerminationNotice         TaskStopCode = "TerminationNotice"
+	TaskStopCodeUserInitiated             TaskStopCode = "UserInitiated"
 )
 
 // Values returns all known values for TaskStopCode. Note that this can be
@@ -1285,21 +1285,21 @@ type UlimitName string
 
 // Enum values for UlimitName
 const (
-	UlimitNameCore UlimitName = "core"
-	UlimitNameCpu UlimitName = "cpu"
-	UlimitNameData UlimitName = "data"
-	UlimitNameFsize UlimitName = "fsize"
-	UlimitNameLocks UlimitName = "locks"
-	UlimitNameMemlock UlimitName = "memlock"
-	UlimitNameMsgqueue UlimitName = "msgqueue"
-	UlimitNameNice UlimitName = "nice"
-	UlimitNameNofile UlimitName = "nofile"
-	UlimitNameNproc UlimitName = "nproc"
-	UlimitNameRss UlimitName = "rss"
-	UlimitNameRtprio UlimitName = "rtprio"
-	UlimitNameRttime UlimitName = "rttime"
+	UlimitNameCore       UlimitName = "core"
+	UlimitNameCpu        UlimitName = "cpu"
+	UlimitNameData       UlimitName = "data"
+	UlimitNameFsize      UlimitName = "fsize"
+	UlimitNameLocks      UlimitName = "locks"
+	UlimitNameMemlock    UlimitName = "memlock"
+	UlimitNameMsgqueue   UlimitName = "msgqueue"
+	UlimitNameNice       UlimitName = "nice"
+	UlimitNameNofile     UlimitName = "nofile"
+	UlimitNameNproc      UlimitName = "nproc"
+	UlimitNameRss        UlimitName = "rss"
+	UlimitNameRtprio     UlimitName = "rtprio"
+	UlimitNameRttime     UlimitName = "rttime"
 	UlimitNameSigpending UlimitName = "sigpending"
-	UlimitNameStack UlimitName = "stack"
+	UlimitNameStack      UlimitName = "stack"
 )
 
 // Values returns all known values for UlimitName. Note that this can be
@@ -1330,7 +1330,7 @@ type VersionConsistency string
 // Enum values for VersionConsistency
 const (
 	VersionConsistencyDisabled VersionConsistency = "disabled"
-	VersionConsistencyEnabled VersionConsistency = "enabled"
+	VersionConsistencyEnabled  VersionConsistency = "enabled"
 )
 
 // Values returns all known values for VersionConsistency. Note that this can be

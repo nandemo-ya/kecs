@@ -87,11 +87,11 @@ func TestStringSlice(t *testing.T) {
 	// Test StringSlice function
 	v := []string{"a", "b", "c"}
 	p := ptr.StringSlice(v)
-	
+
 	if len(p) != len(v) {
 		t.Errorf("Expected length %d, got %d", len(v), len(p))
 	}
-	
+
 	for i := range v {
 		if p[i] == nil || *p[i] != v[i] {
 			t.Errorf("Expected %s at index %d, got %v", v[i], i, p[i])
@@ -103,7 +103,7 @@ func TestStringSlice(t *testing.T) {
 	if len(result) != len(v) {
 		t.Errorf("Expected length %d, got %d", len(v), len(result))
 	}
-	
+
 	for i := range v {
 		if result[i] != v[i] {
 			t.Errorf("Expected %s at index %d, got %s", v[i], i, result[i])
@@ -122,11 +122,11 @@ func TestStringMap(t *testing.T) {
 	// Test StringMap function
 	v := map[string]string{"key1": "value1", "key2": "value2"}
 	p := ptr.StringMap(v)
-	
+
 	if len(p) != len(v) {
 		t.Errorf("Expected length %d, got %d", len(v), len(p))
 	}
-	
+
 	for k, val := range v {
 		if p[k] == nil || *p[k] != val {
 			t.Errorf("Expected %s for key %s, got %v", val, k, p[k])
@@ -138,7 +138,7 @@ func TestStringMap(t *testing.T) {
 	if len(result) != len(v) {
 		t.Errorf("Expected length %d, got %d", len(v), len(result))
 	}
-	
+
 	for k, val := range v {
 		if result[k] != val {
 			t.Errorf("Expected %s for key %s, got %s", val, k, result[k])

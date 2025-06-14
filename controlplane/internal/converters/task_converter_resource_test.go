@@ -202,13 +202,13 @@ func TestApplyContainerOverride(t *testing.T) {
 	converter := NewTaskConverter("us-east-1", "123456789012")
 
 	tests := []struct {
-		name              string
-		container         *corev1.Container
-		override          *types.ContainerOverride
-		expectedCommand   []string
-		expectedEnv       map[string]string
-		expectedCPU       int64 // millis
-		expectedMemory    int64 // MiB
+		name            string
+		container       *corev1.Container
+		override        *types.ContainerOverride
+		expectedCommand []string
+		expectedEnv     map[string]string
+		expectedCPU     int64 // millis
+		expectedMemory  int64 // MiB
 	}{
 		{
 			name: "override command",
@@ -565,13 +565,13 @@ func TestExpandRegexPattern(t *testing.T) {
 		expected []string
 	}{
 		{
-			name:    "t2 instance types",
-			pattern: "t2.*",
+			name:     "t2 instance types",
+			pattern:  "t2.*",
 			expected: []string{"t2.micro", "t2.small", "t2.medium", "t2.large", "t2.xlarge", "t2.2xlarge"},
 		},
 		{
-			name:    "m5 instance types",
-			pattern: "m5.*",
+			name:     "m5 instance types",
+			pattern:  "m5.*",
 			expected: []string{"m5.large", "m5.xlarge", "m5.2xlarge", "m5.4xlarge", "m5.8xlarge", "m5.12xlarge", "m5.16xlarge", "m5.24xlarge"},
 		},
 		{

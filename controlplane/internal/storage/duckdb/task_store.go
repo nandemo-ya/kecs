@@ -155,32 +155,32 @@ func (s *taskStore) List(ctx context.Context, cluster string, filters storage.Ta
 
 	// Build dynamic WHERE clauses based on filters
 	var conditions []string
-	
+
 	if filters.ServiceName != "" {
 		conditions = append(conditions, "started_by = ?")
 		args = append(args, fmt.Sprintf("ecs-svc/%s", filters.ServiceName))
 	}
-	
+
 	if filters.Family != "" {
 		conditions = append(conditions, "task_definition_arn LIKE ?")
 		args = append(args, fmt.Sprintf("%%:%s:%%", filters.Family))
 	}
-	
+
 	if filters.ContainerInstance != "" {
 		conditions = append(conditions, "container_instance_arn = ?")
 		args = append(args, filters.ContainerInstance)
 	}
-	
+
 	if filters.LaunchType != "" {
 		conditions = append(conditions, "launch_type = ?")
 		args = append(args, filters.LaunchType)
 	}
-	
+
 	if filters.DesiredStatus != "" {
 		conditions = append(conditions, "desired_status = ?")
 		args = append(args, filters.DesiredStatus)
 	}
-	
+
 	if filters.StartedBy != "" {
 		conditions = append(conditions, "started_by = ?")
 		args = append(args, filters.StartedBy)

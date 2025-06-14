@@ -42,21 +42,21 @@ func (sm *ServiceManager) CreateService(
 	if os.Getenv("KECS_TEST_MODE") == "true" {
 		// In test mode, simulate service creation
 		log.Printf("TEST MODE: Simulated service creation for %s in namespace %s", storageService.ServiceName, deployment.Namespace)
-		
+
 		// Update service status to ACTIVE
 		storageService.Status = "ACTIVE"
 		storageService.RunningCount = storageService.DesiredCount
 		storageService.PendingCount = 0
-		
+
 		// Simulate creating initial tasks for the service
 		if sm.storage != nil && storageService.DesiredCount > 0 {
 			taskStore := sm.storage.TaskStore()
 			for i := 0; i < storageService.DesiredCount; i++ {
 				// Generate task ID and ARN
-				taskID := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s-%d", 
-					storageService.Region, storageService.AccountID, cluster.Name, 
+				taskID := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s-%d",
+					storageService.Region, storageService.AccountID, cluster.Name,
 					storageService.ServiceName, i)
-				
+
 				task := &storage.Task{
 					ARN:               taskID,
 					ClusterARN:        cluster.ARN,
@@ -68,7 +68,7 @@ func (sm *ServiceManager) CreateService(
 					Region:            storageService.Region,
 					AccountID:         storageService.AccountID,
 				}
-				
+
 				if err := taskStore.Create(ctx, task); err != nil {
 					log.Printf("TEST MODE: Failed to create task for service %s: %v", storageService.ServiceName, err)
 				} else {
@@ -76,10 +76,10 @@ func (sm *ServiceManager) CreateService(
 				}
 			}
 		}
-		
+
 		return nil
 	}
-	
+
 	// Get Kubernetes client for the cluster
 	kubeClient, err := sm.kindManager.GetKubeClient(cluster.KindClusterName)
 	if err != nil {
@@ -109,7 +109,7 @@ func (sm *ServiceManager) CreateService(
 		log.Printf("Warning: failed to update service status to ACTIVE: %v", err)
 		// Don't fail the entire operation for status update issues
 	} else {
-		log.Printf("Updated service status to ACTIVE for service %s (ID: %s)", 
+		log.Printf("Updated service status to ACTIVE for service %s (ID: %s)",
 			storageService.ServiceName, storageService.ID)
 	}
 
@@ -131,25 +131,25 @@ func (sm *ServiceManager) UpdateService(
 	if os.Getenv("KECS_TEST_MODE") == "true" {
 		// In test mode, simulate service update
 		log.Printf("TEST MODE: Simulated service update for %s in namespace %s", storageService.ServiceName, deployment.Namespace)
-		
+
 		// Update service counts based on replica changes
 		if deployment.Spec.Replicas != nil {
 			newDesiredCount := int(*deployment.Spec.Replicas)
 			if newDesiredCount != storageService.DesiredCount {
 				oldDesiredCount := storageService.DesiredCount
 				storageService.DesiredCount = newDesiredCount
-				
+
 				// Simulate task scaling
 				if sm.storage != nil {
 					taskStore := sm.storage.TaskStore()
-					
+
 					if newDesiredCount > oldDesiredCount {
 						// Scale up - create new tasks
 						for i := oldDesiredCount; i < newDesiredCount; i++ {
-							taskID := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s-%d-%d", 
-								storageService.Region, storageService.AccountID, cluster.Name, 
+							taskID := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s-%d-%d",
+								storageService.Region, storageService.AccountID, cluster.Name,
 								storageService.ServiceName, time.Now().Unix(), i)
-							
+
 							task := &storage.Task{
 								ARN:               taskID,
 								ClusterARN:        cluster.ARN,
@@ -161,7 +161,7 @@ func (sm *ServiceManager) UpdateService(
 								Region:            storageService.Region,
 								AccountID:         storageService.AccountID,
 							}
-							
+
 							if err := taskStore.Create(ctx, task); err != nil {
 								log.Printf("TEST MODE: Failed to create task during scale-up: %v", err)
 							}
@@ -169,7 +169,7 @@ func (sm *ServiceManager) UpdateService(
 					} else if newDesiredCount < oldDesiredCount {
 						// Scale down - stop excess tasks
 						tasks, err := taskStore.List(ctx, cluster.ARN, storage.TaskFilters{
-							ServiceName: storageService.ServiceName,
+							ServiceName:   storageService.ServiceName,
 							DesiredStatus: "RUNNING",
 						})
 						if err == nil {
@@ -191,21 +191,21 @@ func (sm *ServiceManager) UpdateService(
 						}
 					}
 				}
-				
+
 				// Update running count to match desired count
 				storageService.RunningCount = newDesiredCount
 				storageService.PendingCount = 0
-				log.Printf("TEST MODE: Service %s scaled from %d to %d replicas", 
+				log.Printf("TEST MODE: Service %s scaled from %d to %d replicas",
 					storageService.ServiceName, oldDesiredCount, newDesiredCount)
 			}
 		}
-		
+
 		// Ensure status remains ACTIVE in test mode
 		storageService.Status = "ACTIVE"
-		
+
 		return nil
 	}
-	
+
 	// Get Kubernetes client for the cluster
 	kubeClient, err := sm.kindManager.GetKubeClient(cluster.KindClusterName)
 	if err != nil {
@@ -255,16 +255,16 @@ func (sm *ServiceManager) DeleteService(
 	if os.Getenv("KECS_TEST_MODE") == "true" {
 		// In test mode, simulate service deletion
 		log.Printf("TEST MODE: Simulated service deletion for %s", storageService.ServiceName)
-		
+
 		// Update service status to INACTIVE
 		storageService.Status = "INACTIVE"
 		storageService.RunningCount = 0
 		storageService.PendingCount = 0
-		
+
 		// Simulate deleting tasks for the service
 		if sm.storage != nil {
 			taskStore := sm.storage.TaskStore()
-			
+
 			// Get all tasks for the service
 			tasks, err := taskStore.List(ctx, cluster.ARN, storage.TaskFilters{
 				ServiceName: storageService.ServiceName,
@@ -283,10 +283,10 @@ func (sm *ServiceManager) DeleteService(
 				}
 			}
 		}
-		
+
 		return nil
 	}
-	
+
 	// Get Kubernetes client for the cluster
 	kubeClient, err := sm.kindManager.GetKubeClient(cluster.KindClusterName)
 	if err != nil {
@@ -334,7 +334,7 @@ func (sm *ServiceManager) GetServiceStatus(
 	if os.Getenv("KECS_TEST_MODE") == "true" {
 		// In test mode, return simulated status based on stored service data
 		log.Printf("TEST MODE: Returning simulated status for service %s", storageService.ServiceName)
-		
+
 		return &ServiceStatus{
 			Status:       storageService.Status,
 			DesiredCount: storageService.DesiredCount,
@@ -342,7 +342,7 @@ func (sm *ServiceManager) GetServiceStatus(
 			PendingCount: storageService.PendingCount,
 		}, nil
 	}
-	
+
 	// Get Kubernetes client for the cluster
 	kubeClient, err := sm.kindManager.GetKubeClient(cluster.KindClusterName)
 	if err != nil {
@@ -467,20 +467,20 @@ func (sm *ServiceManager) createKubernetesService(ctx context.Context, kubeClien
 // updateServiceStatusSafely updates service status with safe error handling
 func (sm *ServiceManager) updateServiceStatusSafely(ctx context.Context, cluster *storage.Cluster, storageService *storage.Service) error {
 	log.Printf("DEBUG: Starting status update for service %s (ID: %s)", storageService.ServiceName, storageService.ID)
-	
+
 	// Get fresh service data from storage to avoid conflicts
 	freshService, err := sm.storage.ServiceStore().Get(ctx, cluster.ARN, storageService.ServiceName)
 	if err != nil {
 		return fmt.Errorf("failed to get fresh service for status update: %w", err)
 	}
-	
+
 	log.Printf("DEBUG: Retrieved fresh service ID: %s, current status: %s", freshService.ID, freshService.Status)
-	
+
 	// Update only the status field
 	freshService.Status = "ACTIVE"
-	
+
 	log.Printf("DEBUG: About to update service ID: %s to status: ACTIVE", freshService.ID)
-	
+
 	// Use a simple approach: since we have the fresh service, just update it
 	return sm.storage.ServiceStore().Update(ctx, freshService)
 }

@@ -99,10 +99,10 @@ type MountPoint struct {
 
 // Volume represents a volume in a task definition
 type Volume struct {
-	Name                        *string                      `json:"name,omitempty"`
-	Host                        *HostVolumeProperties        `json:"host,omitempty"`
-	DockerVolumeConfiguration   *DockerVolumeConfiguration   `json:"dockerVolumeConfiguration,omitempty"`
-	EfsVolumeConfiguration      *EFSVolumeConfiguration      `json:"efsVolumeConfiguration,omitempty"`
+	Name                                    *string                                  `json:"name,omitempty"`
+	Host                                    *HostVolumeProperties                    `json:"host,omitempty"`
+	DockerVolumeConfiguration               *DockerVolumeConfiguration               `json:"dockerVolumeConfiguration,omitempty"`
+	EfsVolumeConfiguration                  *EFSVolumeConfiguration                  `json:"efsVolumeConfiguration,omitempty"`
 	FsxWindowsFileServerVolumeConfiguration *FSxWindowsFileServerVolumeConfiguration `json:"fsxWindowsFileServerVolumeConfiguration,omitempty"`
 }
 
@@ -122,11 +122,11 @@ type DockerVolumeConfiguration struct {
 
 // EFSVolumeConfiguration represents EFS volume configuration
 type EFSVolumeConfiguration struct {
-	FileSystemId          *string                       `json:"fileSystemId"`
-	RootDirectory         *string                       `json:"rootDirectory,omitempty"`
-	TransitEncryption     *string                       `json:"transitEncryption,omitempty"`
-	TransitEncryptionPort *int                          `json:"transitEncryptionPort,omitempty"`
-	AuthorizationConfig   *EFSAuthorizationConfig       `json:"authorizationConfig,omitempty"`
+	FileSystemId          *string                 `json:"fileSystemId"`
+	RootDirectory         *string                 `json:"rootDirectory,omitempty"`
+	TransitEncryption     *string                 `json:"transitEncryption,omitempty"`
+	TransitEncryptionPort *int                    `json:"transitEncryptionPort,omitempty"`
+	AuthorizationConfig   *EFSAuthorizationConfig `json:"authorizationConfig,omitempty"`
 }
 
 // EFSAuthorizationConfig represents EFS authorization configuration
@@ -137,9 +137,9 @@ type EFSAuthorizationConfig struct {
 
 // FSxWindowsFileServerVolumeConfiguration represents FSx Windows File Server volume configuration
 type FSxWindowsFileServerVolumeConfiguration struct {
-	FileSystemId        *string                                      `json:"fileSystemId"`
-	RootDirectory       *string                                      `json:"rootDirectory"`
-	AuthorizationConfig *FSxWindowsFileServerAuthorizationConfig    `json:"authorizationConfig"`
+	FileSystemId        *string                                  `json:"fileSystemId"`
+	RootDirectory       *string                                  `json:"rootDirectory"`
+	AuthorizationConfig *FSxWindowsFileServerAuthorizationConfig `json:"authorizationConfig"`
 }
 
 // FSxWindowsFileServerAuthorizationConfig represents FSx Windows File Server authorization configuration
@@ -156,13 +156,13 @@ type VolumeFrom struct {
 
 // LinuxParameters represents Linux-specific parameters
 type LinuxParameters struct {
-	Capabilities       *KernelCapabilities    `json:"capabilities,omitempty"`
-	Devices            []Device               `json:"devices,omitempty"`
-	InitProcessEnabled *bool                  `json:"initProcessEnabled,omitempty"`
-	SharedMemorySize   *int                   `json:"sharedMemorySize,omitempty"`
-	Tmpfs              []Tmpfs                `json:"tmpfs,omitempty"`
-	MaxSwap            *int                   `json:"maxSwap,omitempty"`
-	Swappiness         *int                   `json:"swappiness,omitempty"`
+	Capabilities       *KernelCapabilities `json:"capabilities,omitempty"`
+	Devices            []Device            `json:"devices,omitempty"`
+	InitProcessEnabled *bool               `json:"initProcessEnabled,omitempty"`
+	SharedMemorySize   *int                `json:"sharedMemorySize,omitempty"`
+	Tmpfs              []Tmpfs             `json:"tmpfs,omitempty"`
+	MaxSwap            *int                `json:"maxSwap,omitempty"`
+	Swappiness         *int                `json:"swappiness,omitempty"`
 }
 
 // KernelCapabilities represents kernel capabilities
@@ -212,9 +212,9 @@ type Ulimit struct {
 
 // LogConfiguration represents log configuration
 type LogConfiguration struct {
-	LogDriver *string                   `json:"logDriver"`
-	Options   map[string]string         `json:"options,omitempty"`
-	SecretOptions []Secret              `json:"secretOptions,omitempty"`
+	LogDriver     *string           `json:"logDriver"`
+	Options       map[string]string `json:"options,omitempty"`
+	SecretOptions []Secret          `json:"secretOptions,omitempty"`
 }
 
 // HealthCheck represents a health check
@@ -258,9 +258,9 @@ type InferenceAccelerator struct {
 
 // ProxyConfiguration represents proxy configuration
 type ProxyConfiguration struct {
-	Type           *string        `json:"type,omitempty"`
-	ContainerName  *string        `json:"containerName"`
-	Properties     []KeyValuePair `json:"properties,omitempty"`
+	Type          *string        `json:"type,omitempty"`
+	ContainerName *string        `json:"containerName"`
+	Properties    []KeyValuePair `json:"properties,omitempty"`
 }
 
 // EphemeralStorage represents ephemeral storage configuration

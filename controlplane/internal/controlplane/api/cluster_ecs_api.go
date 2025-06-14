@@ -29,14 +29,14 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 	if err == nil && existing != nil {
 		// Ensure the kind cluster exists (it might have been deleted manually)
 		go api.ensureKindClusterExists(existing)
-		
+
 		// Return existing cluster
 		cluster := &generated.Cluster{
 			ClusterArn:  ptr.String(existing.ARN),
 			ClusterName: ptr.String(existing.Name),
 			Status:      ptr.String(existing.Status),
 		}
-		
+
 		// Parse settings, configuration, and tags
 		if existing.Settings != "" {
 			var settings []generated.ClusterSetting
@@ -70,13 +70,13 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 
 	// Create cluster object
 	cluster := &storage.Cluster{
-		ID:              uuid.New().String(),
-		ARN:             arn,
-		Name:            clusterName,
-		Status:          "ACTIVE",
-		Region:          api.region,
-		AccountID:       api.accountID,
-		KindClusterName: kindClusterName,
+		ID:                                uuid.New().String(),
+		ARN:                               arn,
+		Name:                              clusterName,
+		Status:                            "ACTIVE",
+		Region:                            api.region,
+		AccountID:                         api.accountID,
+		KindClusterName:                   kindClusterName,
 		RegisteredContainerInstancesCount: 0,
 		RunningTasksCount:                 0,
 		PendingTasksCount:                 0,
@@ -117,12 +117,12 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 	// Build response
 	response := &generated.CreateClusterResponse{
 		Cluster: &generated.Cluster{
-			ClusterArn:  ptr.String(cluster.ARN),
-			ClusterName: ptr.String(cluster.Name),
-			Status:      ptr.String(cluster.Status),
-			Settings:    req.Settings,
+			ClusterArn:    ptr.String(cluster.ARN),
+			ClusterName:   ptr.String(cluster.Name),
+			Status:        ptr.String(cluster.Status),
+			Settings:      req.Settings,
 			Configuration: req.Configuration,
-			Tags:        req.Tags,
+			Tags:          req.Tags,
 		},
 	}
 
@@ -134,7 +134,7 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 	// Debug log the request
 	reqJSON, _ := json.Marshal(req)
 	log.Printf("ListClusters request: %s", string(reqJSON))
-	
+
 	// Set default limit if not specified
 	limit := 100
 	if req.MaxResults != nil && *req.MaxResults > 0 {
@@ -202,9 +202,9 @@ func (api *DefaultECSAPI) DescribeClusters(ctx context.Context, req *generated.D
 	for _, identifier := range clusterIdentifiers {
 		// Extract cluster name from ARN if necessary
 		clusterName := extractClusterNameFromARN(identifier)
-		
+
 		cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
-		
+
 		if err != nil {
 			failures = append(failures, generated.Failure{
 				Arn:    ptr.String(identifier),
@@ -218,11 +218,11 @@ func (api *DefaultECSAPI) DescribeClusters(ctx context.Context, req *generated.D
 		clusterResp := generated.Cluster{
 			ClusterArn:                        ptr.String(cluster.ARN),
 			ClusterName:                       ptr.String(cluster.Name),
-			Status:                           ptr.String(cluster.Status),
+			Status:                            ptr.String(cluster.Status),
 			RegisteredContainerInstancesCount: ptr.Int32(int32(cluster.RegisteredContainerInstancesCount)),
-			RunningTasksCount:                ptr.Int32(int32(cluster.RunningTasksCount)),
-			PendingTasksCount:                ptr.Int32(int32(cluster.PendingTasksCount)),
-			ActiveServicesCount:              ptr.Int32(int32(cluster.ActiveServicesCount)),
+			RunningTasksCount:                 ptr.Int32(int32(cluster.RunningTasksCount)),
+			PendingTasksCount:                 ptr.Int32(int32(cluster.PendingTasksCount)),
+			ActiveServicesCount:               ptr.Int32(int32(cluster.ActiveServicesCount)),
 		}
 
 		// Add settings if requested
@@ -271,10 +271,10 @@ func (api *DefaultECSAPI) DeleteCluster(ctx context.Context, req *generated.Dele
 
 	// Extract cluster name from ARN if necessary
 	clusterName := extractClusterNameFromARN(*req.Cluster)
-	
+
 	// Look up cluster
 	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("cluster not found: %s", *req.Cluster)
 	}
@@ -318,7 +318,7 @@ func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.Upda
 
 	// Extract cluster name from ARN if necessary
 	clusterName := extractClusterNameFromARN(*req.Cluster)
-	
+
 	// Look up cluster
 	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
 	if err != nil {
@@ -357,13 +357,13 @@ func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.Upda
 
 	// Build response
 	responseCluster := &generated.Cluster{
-		ClusterArn:  ptr.String(cluster.ARN),
-		ClusterName: ptr.String(cluster.Name),
-		Status:      ptr.String(cluster.Status),
+		ClusterArn:                        ptr.String(cluster.ARN),
+		ClusterName:                       ptr.String(cluster.Name),
+		Status:                            ptr.String(cluster.Status),
 		RegisteredContainerInstancesCount: ptr.Int32(int32(cluster.RegisteredContainerInstancesCount)),
-		RunningTasksCount:                ptr.Int32(int32(cluster.RunningTasksCount)),
-		PendingTasksCount:                ptr.Int32(int32(cluster.PendingTasksCount)),
-		ActiveServicesCount:              ptr.Int32(int32(cluster.ActiveServicesCount)),
+		RunningTasksCount:                 ptr.Int32(int32(cluster.RunningTasksCount)),
+		PendingTasksCount:                 ptr.Int32(int32(cluster.PendingTasksCount)),
+		ActiveServicesCount:               ptr.Int32(int32(cluster.ActiveServicesCount)),
 	}
 
 	// Add settings if present
@@ -406,7 +406,7 @@ func (api *DefaultECSAPI) UpdateClusterSettings(ctx context.Context, req *genera
 
 	// Extract cluster name from ARN if necessary
 	clusterName := extractClusterNameFromARN(*req.Cluster)
-	
+
 	// Look up cluster
 	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
 	if err != nil {
@@ -462,14 +462,14 @@ func (api *DefaultECSAPI) UpdateClusterSettings(ctx context.Context, req *genera
 
 	// Build response
 	responseCluster := &generated.Cluster{
-		ClusterArn:  ptr.String(cluster.ARN),
-		ClusterName: ptr.String(cluster.Name),
-		Status:      ptr.String(cluster.Status),
-		Settings:    updatedSettings,
+		ClusterArn:                        ptr.String(cluster.ARN),
+		ClusterName:                       ptr.String(cluster.Name),
+		Status:                            ptr.String(cluster.Status),
+		Settings:                          updatedSettings,
 		RegisteredContainerInstancesCount: ptr.Int32(int32(cluster.RegisteredContainerInstancesCount)),
-		RunningTasksCount:                ptr.Int32(int32(cluster.RunningTasksCount)),
-		PendingTasksCount:                ptr.Int32(int32(cluster.PendingTasksCount)),
-		ActiveServicesCount:              ptr.Int32(int32(cluster.ActiveServicesCount)),
+		RunningTasksCount:                 ptr.Int32(int32(cluster.RunningTasksCount)),
+		PendingTasksCount:                 ptr.Int32(int32(cluster.PendingTasksCount)),
+		ActiveServicesCount:               ptr.Int32(int32(cluster.ActiveServicesCount)),
 	}
 
 	// Add configuration if present
@@ -507,7 +507,7 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 
 	// Extract cluster name from ARN if necessary
 	clusterName := extractClusterNameFromARN(*req.Cluster)
-	
+
 	// Look up cluster
 	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
 	if err != nil {
@@ -535,15 +535,15 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 
 	// Build response
 	responseCluster := &generated.Cluster{
-		ClusterArn:                       ptr.String(cluster.ARN),
-		ClusterName:                      ptr.String(cluster.Name),
-		Status:                           ptr.String(cluster.Status),
-		CapacityProviders:                req.CapacityProviders,
-		DefaultCapacityProviderStrategy:  req.DefaultCapacityProviderStrategy,
+		ClusterArn:                        ptr.String(cluster.ARN),
+		ClusterName:                       ptr.String(cluster.Name),
+		Status:                            ptr.String(cluster.Status),
+		CapacityProviders:                 req.CapacityProviders,
+		DefaultCapacityProviderStrategy:   req.DefaultCapacityProviderStrategy,
 		RegisteredContainerInstancesCount: ptr.Int32(int32(cluster.RegisteredContainerInstancesCount)),
-		RunningTasksCount:                ptr.Int32(int32(cluster.RunningTasksCount)),
-		PendingTasksCount:                ptr.Int32(int32(cluster.PendingTasksCount)),
-		ActiveServicesCount:              ptr.Int32(int32(cluster.ActiveServicesCount)),
+		RunningTasksCount:                 ptr.Int32(int32(cluster.RunningTasksCount)),
+		PendingTasksCount:                 ptr.Int32(int32(cluster.PendingTasksCount)),
+		ActiveServicesCount:               ptr.Int32(int32(cluster.ActiveServicesCount)),
 	}
 
 	// Add settings if present
@@ -578,13 +578,13 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 // createKindClusterAndNamespace creates a Kind cluster and namespace for the ECS cluster
 func (api *DefaultECSAPI) createKindClusterAndNamespace(cluster *storage.Cluster) {
 	ctx := context.Background()
-	
+
 	// Skip kind cluster creation if kindManager is nil (test mode)
 	if api.kindManager == nil {
 		log.Printf("Skipping kind cluster creation for %s (kindManager is nil)", cluster.Name)
 		return
 	}
-	
+
 	// Check if kind cluster already exists
 	if _, err := api.kindManager.GetKubeClient(cluster.KindClusterName); err != nil {
 		// Cluster doesn't exist, create it
@@ -596,33 +596,33 @@ func (api *DefaultECSAPI) createKindClusterAndNamespace(cluster *storage.Cluster
 	} else {
 		log.Printf("Reusing existing kind cluster %s for ECS cluster %s", cluster.KindClusterName, cluster.Name)
 	}
-	
+
 	// Get Kubernetes client
 	kubeClient, err := api.kindManager.GetKubeClient(cluster.KindClusterName)
 	if err != nil {
 		log.Printf("Failed to get kubernetes client for %s: %v", cluster.KindClusterName, err)
 		return
 	}
-	
+
 	// Create namespace
 	namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
 	if err := namespaceManager.CreateNamespace(ctx, cluster.Name, cluster.Region); err != nil {
 		log.Printf("Failed to create namespace for %s: %v", cluster.Name, err)
 		return
 	}
-	
+
 	log.Printf("Successfully created kind cluster %s and namespace for ECS cluster %s", cluster.KindClusterName, cluster.Name)
 }
 
 // ensureKindClusterExists ensures that a Kind cluster exists for an existing ECS cluster
 func (api *DefaultECSAPI) ensureKindClusterExists(cluster *storage.Cluster) {
 	ctx := context.Background()
-	
+
 	// Skip kind cluster creation if kindManager is nil (test mode)
 	if api.kindManager == nil {
 		return
 	}
-	
+
 	// Check if kind cluster exists, create if it doesn't
 	if _, err := api.kindManager.GetKubeClient(cluster.KindClusterName); err != nil {
 		log.Printf("Kind cluster %s for existing ECS cluster %s is missing, recreating...", cluster.KindClusterName, cluster.Name)
@@ -630,14 +630,14 @@ func (api *DefaultECSAPI) ensureKindClusterExists(cluster *storage.Cluster) {
 			log.Printf("Failed to recreate kind cluster %s: %v", cluster.KindClusterName, err)
 			return
 		}
-		
+
 		// Get Kubernetes client and create namespace
 		kubeClient, err := api.kindManager.GetKubeClient(cluster.KindClusterName)
 		if err != nil {
 			log.Printf("Failed to get kubernetes client for %s: %v", cluster.KindClusterName, err)
 			return
 		}
-		
+
 		namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
 		if err := namespaceManager.CreateNamespace(ctx, cluster.Name, cluster.Region); err != nil {
 			log.Printf("Failed to create namespace for %s: %v", cluster.Name, err)
@@ -650,13 +650,13 @@ func (api *DefaultECSAPI) ensureKindClusterExists(cluster *storage.Cluster) {
 // deleteKindClusterAndNamespace deletes the Kind cluster and namespace for an ECS cluster
 func (api *DefaultECSAPI) deleteKindClusterAndNamespace(cluster *storage.Cluster) {
 	ctx := context.Background()
-	
+
 	// Skip kind cluster deletion if kindManager is nil (test mode)
 	if api.kindManager == nil {
 		log.Printf("Skipping kind cluster deletion for %s (kindManager is nil)", cluster.Name)
 		return
 	}
-	
+
 	// Get Kubernetes client before deleting cluster
 	kubeClient, err := api.kindManager.GetKubeClient(cluster.KindClusterName)
 	if err == nil {
@@ -666,13 +666,13 @@ func (api *DefaultECSAPI) deleteKindClusterAndNamespace(cluster *storage.Cluster
 			log.Printf("Failed to delete namespace for %s: %v", cluster.Name, err)
 		}
 	}
-	
+
 	// Delete kind cluster
 	if err := api.kindManager.DeleteCluster(ctx, cluster.KindClusterName); err != nil {
 		log.Printf("Failed to delete kind cluster %s for ECS cluster %s: %v", cluster.KindClusterName, cluster.Name, err)
 		return
 	}
-	
+
 	log.Printf("Successfully deleted kind cluster %s and namespace for ECS cluster %s", cluster.KindClusterName, cluster.Name)
 }
 

@@ -13,23 +13,23 @@ import (
 )
 
 type SmithyModel struct {
-	Smithy   string                       `json:"smithy"`
-	Metadata map[string]interface{}       `json:"metadata"`
-	Shapes   map[string]SmithyShape       `json:"shapes"`
+	Smithy   string                 `json:"smithy"`
+	Metadata map[string]interface{} `json:"metadata"`
+	Shapes   map[string]SmithyShape `json:"shapes"`
 }
 
 type SmithyShape struct {
-	Type       string                     `json:"type"`
-	Version    string                     `json:"version,omitempty"`
-	Operations []SmithyTarget             `json:"operations,omitempty"`
-	Input      *SmithyTarget              `json:"input,omitempty"`
-	Output     *SmithyTarget              `json:"output,omitempty"`
-	Errors     []SmithyTarget             `json:"errors,omitempty"`
-	Members    map[string]SmithyMember    `json:"members,omitempty"`
-	Member     *SmithyMember              `json:"member,omitempty"` // For list types
-	Key        *SmithyMember              `json:"key,omitempty"`    // For map types
-	Value      *SmithyMember              `json:"value,omitempty"`  // For map types
-	Traits     map[string]interface{}     `json:"traits,omitempty"`
+	Type       string                  `json:"type"`
+	Version    string                  `json:"version,omitempty"`
+	Operations []SmithyTarget          `json:"operations,omitempty"`
+	Input      *SmithyTarget           `json:"input,omitempty"`
+	Output     *SmithyTarget           `json:"output,omitempty"`
+	Errors     []SmithyTarget          `json:"errors,omitempty"`
+	Members    map[string]SmithyMember `json:"members,omitempty"`
+	Member     *SmithyMember           `json:"member,omitempty"` // For list types
+	Key        *SmithyMember           `json:"key,omitempty"`    // For map types
+	Value      *SmithyMember           `json:"value,omitempty"`  // For map types
+	Traits     map[string]interface{}  `json:"traits,omitempty"`
 }
 
 type SmithyTarget struct {
@@ -42,18 +42,18 @@ type SmithyMember struct {
 }
 
 type Operation struct {
-	Name         string
-	InputType    string
-	OutputType   string
+	Name          string
+	InputType     string
+	OutputType    string
 	Documentation string
-	Errors       []string
+	Errors        []string
 }
 
 type TypeDef struct {
-	Name         string
-	Type         string
-	Members      []Member
-	EnumValues   []EnumValue // For enum types
+	Name          string
+	Type          string
+	Members       []Member
+	EnumValues    []EnumValue // For enum types
 	Documentation string
 }
 
@@ -63,16 +63,16 @@ type EnumValue struct {
 }
 
 type Member struct {
-	Name         string
-	Type         string
-	Required     bool
+	Name          string
+	Type          string
+	Required      bool
 	Documentation string
 }
 
 func main() {
 	var (
-		modelPath  = flag.String("model", "api-models/ecs.json", "Path to Smithy model JSON file")
-		outputDir  = flag.String("output", "internal/controlplane/api/generated", "Output directory for generated code")
+		modelPath = flag.String("model", "api-models/ecs.json", "Path to Smithy model JSON file")
+		outputDir = flag.String("output", "internal/controlplane/api/generated", "Output directory for generated code")
 	)
 	flag.Parse()
 
@@ -107,9 +107,9 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 	// First pass: collect all type names and list mappings
 	for shapeID, shape := range model.Shapes {
 		typeName := extractTypeName(shapeID)
-		if shape.Type == "structure" || shape.Type == "map" || shape.Type == "enum" || 
-		   shape.Type == "integer" || shape.Type == "long" || shape.Type == "boolean" || 
-		   shape.Type == "string" || shape.Type == "double" || shape.Type == "timestamp" {
+		if shape.Type == "structure" || shape.Type == "map" || shape.Type == "enum" ||
+			shape.Type == "integer" || shape.Type == "long" || shape.Type == "boolean" ||
+			shape.Type == "string" || shape.Type == "double" || shape.Type == "timestamp" {
 			typeSet[typeName] = true
 		} else if shape.Type == "list" && shape.Member != nil {
 			// Store list type mapping for later use
@@ -126,35 +126,35 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 			for _, opTarget := range shape.Operations {
 				if opShape, exists := model.Shapes[opTarget.Target]; exists {
 					op := Operation{
-						Name:         extractOperationName(opTarget.Target),
+						Name:          extractOperationName(opTarget.Target),
 						Documentation: extractDocumentation(opShape.Traits),
 					}
-					
+
 					if opShape.Input != nil {
 						op.InputType = extractTypeName(opShape.Input.Target)
 					}
 					if opShape.Output != nil {
 						op.OutputType = extractTypeName(opShape.Output.Target)
 					}
-					
+
 					for _, errorTarget := range opShape.Errors {
 						op.Errors = append(op.Errors, extractTypeName(errorTarget.Target))
 					}
-					
+
 					operations = append(operations, op)
 				}
 			}
 		case "structure":
 			// Extract all structure type definitions
 			typeName := extractTypeName(shapeID)
-			
+
 			var members []Member
 			for memberName, member := range shape.Members {
 				memberType := mapTypeWithContext(member.Target, typeSet, listTypes)
 				members = append(members, Member{
-					Name:         memberName,
-					Type:         memberType,
-					Required:     isRequired(member.Traits),
+					Name:          memberName,
+					Type:          memberType,
+					Required:      isRequired(member.Traits),
 					Documentation: extractDocumentation(member.Traits),
 				})
 			}
@@ -162,11 +162,11 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 			sort.Slice(members, func(i, j int) bool {
 				return members[i].Name < members[j].Name
 			})
-			
+
 			types = append(types, TypeDef{
-				Name:         typeName,
-				Type:         "structure",
-				Members:      members,
+				Name:          typeName,
+				Type:          "structure",
+				Members:       members,
 				Documentation: extractDocumentation(shape.Traits),
 			})
 		case "list":
@@ -179,9 +179,9 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 				keyType := mapTypeWithContext(shape.Key.Target, typeSet, listTypes)
 				valueType := mapTypeWithContext(shape.Value.Target, typeSet, listTypes)
 				types = append(types, TypeDef{
-					Name:         typeName,
-					Type:         "map",
-					Members:      []Member{{Name: "Key", Type: keyType}, {Name: "Value", Type: valueType}},
+					Name:          typeName,
+					Type:          "map",
+					Members:       []Member{{Name: "Key", Type: keyType}, {Name: "Value", Type: valueType}},
 					Documentation: extractDocumentation(shape.Traits),
 				})
 			}
@@ -206,9 +206,9 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 				return enumValues[i].Name < enumValues[j].Name
 			})
 			types = append(types, TypeDef{
-				Name:         typeName,
-				Type:         "enum",
-				EnumValues:   enumValues,
+				Name:          typeName,
+				Type:          "enum",
+				EnumValues:    enumValues,
 				Documentation: extractDocumentation(shape.Traits),
 			})
 		case "integer", "long", "boolean", "string", "double", "timestamp":
@@ -219,8 +219,8 @@ func extractOperationsAndTypes(model SmithyModel) ([]Operation, []TypeDef) {
 				continue
 			}
 			types = append(types, TypeDef{
-				Name:         typeName,
-				Type:         shape.Type,
+				Name:          typeName,
+				Type:          shape.Type,
 				Documentation: extractDocumentation(shape.Traits),
 			})
 		}
@@ -395,10 +395,10 @@ func generateOperations(filename string, operations []Operation) error {
 
 func generateTypes(filename string, types []TypeDef) error {
 	funcMap := template.FuncMap{
-		"mapType": mapType,
+		"mapType":      mapType,
 		"toLowerCamel": toLowerCamel,
-		"toCamelCase": toCamelCase,
-		"hasPrefix": strings.HasPrefix,
+		"toCamelCase":  toCamelCase,
+		"hasPrefix":    strings.HasPrefix,
 	}
 
 	tmpl, err := template.New("types").Funcs(funcMap).Parse(typesTemplate)
@@ -424,7 +424,7 @@ func mapType(smithyType string) string {
 func mapTypeWithContext(smithyType string, typeSet map[string]bool, listTypes map[string]string) string {
 	// Extract the type name without namespace
 	typeName := extractTypeName(smithyType)
-	
+
 	// Check basic types first (with or without namespace)
 	switch typeName {
 	case "String":
@@ -444,7 +444,7 @@ func mapTypeWithContext(smithyType string, typeSet map[string]bool, listTypes ma
 	case "BoxedBoolean":
 		return "*bool"
 	}
-	
+
 	// Also check with full namespace
 	switch smithyType {
 	case "smithy.api#String", "com.amazonaws.ecs#String":
@@ -463,7 +463,7 @@ func mapTypeWithContext(smithyType string, typeSet map[string]bool, listTypes ma
 		if strings.HasPrefix(smithyType, "smithy.api#") {
 			return "*string" // Default to string for unknown smithy types
 		}
-		
+
 		// Check if this is a list type
 		if listTypes != nil {
 			if elementType, ok := listTypes[typeName]; ok {
@@ -472,7 +472,7 @@ func mapTypeWithContext(smithyType string, typeSet map[string]bool, listTypes ma
 					return "[]string"
 				}
 				// Convert list type to slice
-				elemType := mapTypeWithContext("com.amazonaws.ecs#" + elementType, typeSet, listTypes)
+				elemType := mapTypeWithContext("com.amazonaws.ecs#"+elementType, typeSet, listTypes)
 				// Remove pointer from element type if present
 				if strings.HasPrefix(elemType, "*") {
 					elemType = elemType[1:]
@@ -480,7 +480,7 @@ func mapTypeWithContext(smithyType string, typeSet map[string]bool, listTypes ma
 				return "[]" + elemType
 			}
 		}
-		
+
 		// Check if this is a known custom type
 		if typeSet != nil && typeSet[typeName] {
 			// Map types remain as type aliases
@@ -489,7 +489,7 @@ func mapTypeWithContext(smithyType string, typeSet map[string]bool, listTypes ma
 			}
 			return "*" + typeName
 		}
-		
+
 		// For unknown types, use interface{}
 		return "interface{}"
 	}
@@ -516,7 +516,7 @@ func toConstantName(s string) string {
 	s = strings.ReplaceAll(s, "HTTP", "Http")
 	s = strings.ReplaceAll(s, "ARM64", "Arm64")
 	s = strings.ReplaceAll(s, "X86_64", "X8664")
-	
+
 	// Convert snake_case to CamelCase
 	parts := strings.Split(s, "_")
 	for i, part := range parts {
@@ -561,7 +561,7 @@ func ({{ $enumName }}) Values() []{{ $enumName }} {
 
 func generateEnums(filename string, enums []TypeDef) error {
 	funcMap := template.FuncMap{
-		"toCamelCase": toCamelCase,
+		"toCamelCase":    toCamelCase,
 		"toConstantName": toConstantName,
 	}
 

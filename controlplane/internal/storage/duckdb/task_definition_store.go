@@ -105,7 +105,7 @@ func (s *taskDefinitionStore) Get(ctx context.Context, family string, revision i
 // GetLatest retrieves the latest revision of a task definition family
 func (s *taskDefinitionStore) GetLatest(ctx context.Context, family string) (*storage.TaskDefinition, error) {
 	log.Printf("DEBUG: GetLatest called for family: %s", family)
-	
+
 	var revision sql.NullInt64
 	err := s.db.QueryRowContext(ctx, `
 		SELECT MAX(revision) 
@@ -116,7 +116,7 @@ func (s *taskDefinitionStore) GetLatest(ctx context.Context, family string) (*st
 		log.Printf("DEBUG: GetLatest query error: %v", err)
 		return nil, fmt.Errorf("failed to get latest revision: %w", err)
 	}
-	
+
 	// Check if we got a NULL (no active revisions found)
 	if !revision.Valid {
 		log.Printf("DEBUG: No active revisions found for family: %s", family)
@@ -248,33 +248,33 @@ func (s *taskDefinitionStore) Deregister(ctx context.Context, family string, rev
 	// DuckDB has a known issue with UPDATE on tables with primary key constraints
 	// See: https://github.com/duckdb/duckdb/issues/8764
 	// The error happens even when not updating the primary key column
-	
+
 	// First check if it exists and is active
 	var currentStatus string
 	err := s.db.QueryRowContext(ctx, `
 		SELECT status FROM task_definitions 
 		WHERE family = ? AND revision = ?
 	`, family, revision).Scan(&currentStatus)
-	
+
 	if err == sql.ErrNoRows {
 		return fmt.Errorf("task definition not found: %s:%d", family, revision)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to check task definition status: %w", err)
 	}
-	
+
 	if currentStatus == "INACTIVE" {
 		// Already inactive, return success (idempotent)
 		return nil
 	}
-	
+
 	// Try the UPDATE
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE task_definitions 
 		SET status = 'INACTIVE', deregistered_at = ?
 		WHERE family = ? AND revision = ? AND status = 'ACTIVE'
 	`, time.Now(), family, revision)
-	
+
 	if err != nil {
 		// Check if this is the known DuckDB constraint error
 		if strings.Contains(err.Error(), "Duplicate key") && strings.Contains(err.Error(), "violates primary key constraint") {
@@ -286,7 +286,7 @@ func (s *taskDefinitionStore) Deregister(ctx context.Context, family string, rev
 				SELECT status FROM task_definitions 
 				WHERE family = ? AND revision = ?
 			`, family, revision).Scan(&updatedStatus)
-			
+
 			if err2 == nil && updatedStatus == "INACTIVE" {
 				// The update actually worked despite the error
 				return nil

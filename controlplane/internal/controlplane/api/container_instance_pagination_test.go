@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/google/uuid"
-	
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
@@ -208,7 +208,7 @@ var _ = Describe("ContainerInstance Pagination", func() {
 
 			It("should return second page using next token", func() {
 				targetType := generated.TargetTypeContainerInstance
-				
+
 				// First page
 				req1 := &generated.ListAttributesRequest{
 					Cluster:    ptr.String("test-cluster"),

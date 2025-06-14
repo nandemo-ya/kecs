@@ -15,7 +15,7 @@ var _ = Describe("WebSocketConfig", func() {
 			func(config *WebSocketConfig, origin, referer, host string, expectedResult bool) {
 				// Create a test request
 				req := httptest.NewRequest("GET", "/ws", nil)
-				
+
 				// Set headers
 				if origin != "" {
 					req.Header.Set("Origin", origin)
@@ -162,7 +162,7 @@ var _ = Describe("WebSocketConfig", func() {
 	Context("when using default configuration", func() {
 		It("should have expected default values", func() {
 			config := DefaultWebSocketConfig()
-			
+
 			Expect(config).NotTo(BeNil())
 			Expect(config.AllowedOrigins).To(BeEmpty())
 			Expect(config.AllowCredentials).To(BeTrue())
@@ -171,10 +171,10 @@ var _ = Describe("WebSocketConfig", func() {
 
 		It("should allow all origins by default", func() {
 			config := DefaultWebSocketConfig()
-			
+
 			req := httptest.NewRequest("GET", "/ws", nil)
 			req.Header.Set("Origin", "http://any-origin.com")
-			
+
 			Expect(config.CheckOrigin(req)).To(BeTrue())
 		})
 	})

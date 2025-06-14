@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 
 	_ "github.com/marcboeker/go-duckdb/v2" // DuckDB driver
@@ -13,16 +14,16 @@ import (
 
 // DuckDBStorage implements storage.Storage using DuckDB
 type DuckDBStorage struct {
-	db                      *sql.DB
-	dbPath                  string
-	clusterStore            *clusterStore
-	taskDefinitionStore     *taskDefinitionStore
-	serviceStore            *serviceStore
-	taskStore               *taskStore
-	accountSettingStore     *accountSettingStore
-	taskSetStore            *taskSetStore
-	containerInstanceStore  *containerInstanceStore
-	attributeStore          *attributeStore
+	db                     *sql.DB
+	dbPath                 string
+	clusterStore           *clusterStore
+	taskDefinitionStore    *taskDefinitionStore
+	serviceStore           *serviceStore
+	taskStore              *taskStore
+	accountSettingStore    *accountSettingStore
+	taskSetStore           *taskSetStore
+	containerInstanceStore *containerInstanceStore
+	attributeStore         *attributeStore
 }
 
 // NewDuckDBStorage creates a new DuckDB storage instance
@@ -30,8 +31,9 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(dbPath)
 	if dir != "" && dir != "." {
-		// Note: In production, handle this error properly
-		_ = filepath.Dir(dbPath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create database directory %s: %w", dir, err)
+		}
 	}
 
 	// Open DuckDB connection

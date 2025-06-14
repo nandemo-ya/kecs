@@ -13,14 +13,14 @@ import (
 
 // MockStorage implements storage.Storage interface for testing
 type MockStorage struct {
-	clusterStore            storage.ClusterStore
-	taskDefinitionStore     storage.TaskDefinitionStore
-	serviceStore            storage.ServiceStore
-	taskStore               storage.TaskStore
-	accountSettingStore     storage.AccountSettingStore
-	taskSetStore            storage.TaskSetStore
-	containerInstanceStore  storage.ContainerInstanceStore
-	attributeStore          storage.AttributeStore
+	clusterStore           storage.ClusterStore
+	taskDefinitionStore    storage.TaskDefinitionStore
+	serviceStore           storage.ServiceStore
+	taskStore              storage.TaskStore
+	accountSettingStore    storage.AccountSettingStore
+	taskSetStore           storage.TaskSetStore
+	containerInstanceStore storage.ContainerInstanceStore
+	attributeStore         storage.AttributeStore
 }
 
 func NewMockStorage() *MockStorage {
@@ -171,12 +171,12 @@ func (m *MockClusterStore) ListWithPagination(ctx context.Context, limit int, ne
 	for _, cluster := range m.clusters {
 		allClusters = append(allClusters, cluster)
 	}
-	
+
 	// Sort by ID for consistent ordering (matches DuckDB implementation)
 	sort.Slice(allClusters, func(i, j int) bool {
 		return allClusters[i].ID < allClusters[j].ID
 	})
-	
+
 	// Find starting position based on nextToken
 	start := 0
 	if nextToken != "" {
@@ -188,12 +188,12 @@ func (m *MockClusterStore) ListWithPagination(ctx context.Context, limit int, ne
 				break
 			}
 		}
-		
+
 		// If token doesn't exist, return error (like DuckDB implementation)
 		if !tokenExists {
 			return nil, "", fmt.Errorf("invalid pagination token")
 		}
-		
+
 		for i, cluster := range allClusters {
 			if cluster.ID > nextToken {
 				start = i
@@ -201,15 +201,15 @@ func (m *MockClusterStore) ListWithPagination(ctx context.Context, limit int, ne
 			}
 		}
 	}
-	
+
 	// Get the requested page
 	end := start + limit
 	if end > len(allClusters) {
 		end = len(allClusters)
 	}
-	
+
 	result := allClusters[start:end]
-	
+
 	// Determine next token
 	var newNextToken string
 	if limit > 0 && end < len(allClusters) {
@@ -218,7 +218,7 @@ func (m *MockClusterStore) ListWithPagination(ctx context.Context, limit int, ne
 			newNextToken = result[len(result)-1].ID
 		}
 	}
-	
+
 	return result, newNextToken, nil
 }
 
@@ -240,25 +240,25 @@ func (m *MockTaskDefinitionStore) Register(ctx context.Context, taskDef *storage
 		m.taskDefs = make(map[string]*storage.TaskDefinition)
 		m.taskDefsByFamily = make(map[string][]*storage.TaskDefinition)
 	}
-	
+
 	// Assign revision number
 	revisions := m.taskDefsByFamily[taskDef.Family]
 	taskDef.Revision = len(revisions) + 1
-	
+
 	// Set status to ACTIVE if not set
 	if taskDef.Status == "" {
 		taskDef.Status = "ACTIVE"
 	}
-	
+
 	// Set ARN if not set
 	if taskDef.ARN == "" {
 		taskDef.ARN = fmt.Sprintf("arn:aws:ecs:ap-northeast-1:123456789012:task-definition/%s:%d", taskDef.Family, taskDef.Revision)
 	}
-	
+
 	key := fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision)
 	m.taskDefs[key] = taskDef
 	m.taskDefsByFamily[taskDef.Family] = append(revisions, taskDef)
-	
+
 	return taskDef, nil
 }
 
@@ -290,14 +290,14 @@ func (m *MockTaskDefinitionStore) ListFamilies(ctx context.Context, familyPrefix
 			})
 		}
 	}
-	
+
 	// Apply limit if specified
 	var newNextToken string
 	if limit > 0 && len(families) > limit {
 		families = families[:limit]
 		newNextToken = "next-token"
 	}
-	
+
 	return families, newNextToken, nil
 }
 
@@ -465,12 +465,12 @@ func (m *MockTaskStore) List(ctx context.Context, cluster string, filters storag
 		}
 		results = append(results, task)
 	}
-	
+
 	// Apply MaxResults limit
 	if filters.MaxResults > 0 && len(results) > filters.MaxResults {
 		results = results[:filters.MaxResults]
 	}
-	
+
 	return results, nil
 }
 
@@ -554,7 +554,7 @@ func (m *MockTaskSetStore) List(ctx context.Context, serviceARN string, taskSetI
 			}
 		}
 	}
-	
+
 	// Sort by ID to ensure consistent ordering
 	if len(results) > 1 {
 		for i := 0; i < len(results)-1; i++ {
@@ -565,7 +565,7 @@ func (m *MockTaskSetStore) List(ctx context.Context, serviceARN string, taskSetI
 			}
 		}
 	}
-	
+
 	return results, nil
 }
 
@@ -666,12 +666,12 @@ func (m *MockContainerInstanceStore) ListWithPagination(ctx context.Context, clu
 			allInstances = append(allInstances, instance)
 		}
 	}
-	
+
 	// Sort by ID for consistent ordering
 	sort.Slice(allInstances, func(i, j int) bool {
 		return allInstances[i].ID < allInstances[j].ID
 	})
-	
+
 	// Find starting position based on nextToken
 	start := 0
 	if nextToken != "" {
@@ -682,15 +682,15 @@ func (m *MockContainerInstanceStore) ListWithPagination(ctx context.Context, clu
 			}
 		}
 	}
-	
+
 	// Get the requested page
 	end := start + limit
 	if end > len(allInstances) {
 		end = len(allInstances)
 	}
-	
+
 	result := allInstances[start:end]
-	
+
 	// Determine next token
 	var newNextToken string
 	if limit > 0 && end < len(allInstances) {
@@ -699,7 +699,7 @@ func (m *MockContainerInstanceStore) ListWithPagination(ctx context.Context, clu
 			newNextToken = result[len(result)-1].ID
 		}
 	}
-	
+
 	return result, newNextToken, nil
 }
 
@@ -777,12 +777,12 @@ func (m *MockAttributeStore) ListWithPagination(ctx context.Context, targetType,
 		}
 		allAttributes = append(allAttributes, attr)
 	}
-	
+
 	// Sort by ID for consistent ordering
 	sort.Slice(allAttributes, func(i, j int) bool {
 		return allAttributes[i].ID < allAttributes[j].ID
 	})
-	
+
 	// Find starting position based on nextToken
 	start := 0
 	if nextToken != "" {
@@ -793,15 +793,15 @@ func (m *MockAttributeStore) ListWithPagination(ctx context.Context, targetType,
 			}
 		}
 	}
-	
+
 	// Get the requested page
 	end := start + limit
 	if end > len(allAttributes) {
 		end = len(allAttributes)
 	}
-	
+
 	result := allAttributes[start:end]
-	
+
 	// Determine next token
 	var newNextToken string
 	if limit > 0 && end < len(allAttributes) {
@@ -810,6 +810,6 @@ func (m *MockAttributeStore) ListWithPagination(ctx context.Context, targetType,
 			newNextToken = result[len(result)-1].ID
 		}
 	}
-	
+
 	return result, newNextToken, nil
 }

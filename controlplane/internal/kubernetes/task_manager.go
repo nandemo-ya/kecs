@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -140,7 +141,7 @@ func (tm *TaskManager) UpdateTaskStatus(ctx context.Context, taskARN string, pod
 
 	// Update timestamps based on pod status
 	now := time.Now()
-	
+
 	// Set pull timestamps
 	if previousStatus == "PENDING" && task.LastStatus == "PROVISIONING" {
 		task.PullStartedAt = &now
@@ -159,7 +160,7 @@ func (tm *TaskManager) UpdateTaskStatus(ctx context.Context, taskARN string, pod
 	if task.LastStatus == "STOPPED" {
 		task.StoppedAt = &now
 		task.ExecutionStoppedAt = &now
-		
+
 		// Determine stop reason
 		if pod.Status.Reason != "" {
 			task.StopCode = pod.Status.Reason
@@ -167,7 +168,7 @@ func (tm *TaskManager) UpdateTaskStatus(ctx context.Context, taskARN string, pod
 		if pod.Status.Message != "" {
 			task.StoppedReason = pod.Status.Message
 		}
-		
+
 		// Check container statuses for more details
 		for _, cs := range pod.Status.ContainerStatuses {
 			if cs.State.Terminated != nil {
@@ -193,13 +194,13 @@ func (tm *TaskManager) UpdateTaskStatus(ctx context.Context, taskARN string, pod
 func (tm *TaskManager) watchPodStatus(ctx context.Context, taskARN, namespace, podName string) {
 	// Use a field selector to watch only this specific pod
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", podName).String()
-	
+
 	watcher, err := tm.clientset.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
 		FieldSelector: fieldSelector,
 	})
 	if err != nil {
-		// Log error but don't crash
-		fmt.Printf("Failed to watch pod %s: %v\n", podName, err)
+		// Log error with more context and don't crash
+		log.Printf("Failed to watch pod %s in namespace %s for task %s: %v", podName, namespace, taskARN, err)
 		return
 	}
 	defer watcher.Stop()
@@ -212,7 +213,8 @@ func (tm *TaskManager) watchPodStatus(ctx context.Context, taskARN, namespace, p
 
 		// Update task status
 		if err := tm.UpdateTaskStatus(ctx, taskARN, pod); err != nil {
-			fmt.Printf("Failed to update task status: %v\n", err)
+			log.Printf("Failed to update task status for task %s (pod %s/%s): %v", taskARN, pod.Namespace, pod.Name, err)
+			// Continue processing other events despite this error
 		}
 
 		// Stop watching if pod is terminated
@@ -225,7 +227,7 @@ func (tm *TaskManager) watchPodStatus(ctx context.Context, taskARN, namespace, p
 // getContainerStatuses extracts container status information
 func (tm *TaskManager) getContainerStatuses(pod *corev1.Pod) []types.Container {
 	containers := make([]types.Container, 0, len(pod.Status.ContainerStatuses))
-	
+
 	for _, cs := range pod.Status.ContainerStatuses {
 		container := types.Container{
 			Name:         cs.Name,
@@ -234,7 +236,7 @@ func (tm *TaskManager) getContainerStatuses(pod *corev1.Pod) []types.Container {
 			Image:        cs.Image,
 			ImageDigest:  cs.ImageID,
 		}
-		
+
 		// Set last status based on container state
 		if cs.State.Running != nil {
 			container.LastStatus = "RUNNING"
@@ -246,17 +248,17 @@ func (tm *TaskManager) getContainerStatuses(pod *corev1.Pod) []types.Container {
 			container.LastStatus = "PENDING"
 			container.Reason = cs.State.Waiting.Reason
 		}
-		
+
 		// Health status
 		if cs.Ready {
 			container.HealthStatus = "HEALTHY"
 		} else {
 			container.HealthStatus = "UNHEALTHY"
 		}
-		
+
 		containers = append(containers, container)
 	}
-	
+
 	return containers
 }
 
@@ -264,7 +266,7 @@ func (tm *TaskManager) getContainerStatuses(pod *corev1.Pod) []types.Container {
 func (tm *TaskManager) getHealthStatus(pod *corev1.Pod) string {
 	allHealthy := true
 	hasUnhealthy := false
-	
+
 	for _, cs := range pod.Status.ContainerStatuses {
 		if !cs.Ready {
 			allHealthy = false
@@ -274,7 +276,7 @@ func (tm *TaskManager) getHealthStatus(pod *corev1.Pod) string {
 			}
 		}
 	}
-	
+
 	if allHealthy {
 		return "HEALTHY"
 	} else if hasUnhealthy {
@@ -310,7 +312,7 @@ func (tm *TaskManager) createSecrets(ctx context.Context, namespace string, secr
 			// Secret already exists, skip creation
 			continue
 		}
-		
+
 		// Create the secret with placeholder data
 		// In a real implementation, this would fetch the actual secret value from AWS
 		secret := &corev1.Secret{
@@ -330,12 +332,12 @@ func (tm *TaskManager) createSecrets(ctx context.Context, namespace string, secr
 				info.Key: []byte("placeholder-secret-value"), // TODO: Fetch actual secret from AWS
 			},
 		}
-		
+
 		_, err = tm.clientset.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			return fmt.Errorf("failed to create secret %s: %w", info.SecretName, err)
 		}
 	}
-	
+
 	return nil
 }

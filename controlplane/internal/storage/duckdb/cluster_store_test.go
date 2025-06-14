@@ -87,7 +87,7 @@ func TestClusterStore_ListWithPagination(t *testing.T) {
 	t.Run("large page size", func(t *testing.T) {
 		result, nextToken, err := store.ClusterStore().ListWithPagination(ctx, 100, "")
 		require.NoError(t, err)
-		assert.Len(t, result, 10) // Should return all 10 items
+		assert.Len(t, result, 10)  // Should return all 10 items
 		assert.Empty(t, nextToken) // No more pages
 	})
 
@@ -120,11 +120,11 @@ func TestClusterStore_ListWithPagination(t *testing.T) {
 func setupTestDB(t *testing.T) storage.Storage {
 	store, err := NewDuckDBStorage(":memory:")
 	require.NoError(t, err)
-	
+
 	// Initialize the database schema
 	ctx := context.Background()
 	err = store.Initialize(ctx)
 	require.NoError(t, err)
-	
+
 	return store
 }

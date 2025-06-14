@@ -85,34 +85,34 @@ type TaskOverride struct {
 
 // ContainerOverride represents an override for a container
 type ContainerOverride struct {
-	Name                 *string                `json:"name"`
-	Command              []string               `json:"command,omitempty"`
-	Environment          []KeyValuePair         `json:"environment,omitempty"`
-	EnvironmentFiles     []EnvironmentFile      `json:"environmentFiles,omitempty"`
-	Cpu                  *int                   `json:"cpu,omitempty"`
-	Memory               *int                   `json:"memory,omitempty"`
-	MemoryReservation    *int                   `json:"memoryReservation,omitempty"`
-	ResourceRequirements []ResourceRequirement  `json:"resourceRequirements,omitempty"`
+	Name                 *string               `json:"name"`
+	Command              []string              `json:"command,omitempty"`
+	Environment          []KeyValuePair        `json:"environment,omitempty"`
+	EnvironmentFiles     []EnvironmentFile     `json:"environmentFiles,omitempty"`
+	Cpu                  *int                  `json:"cpu,omitempty"`
+	Memory               *int                  `json:"memory,omitempty"`
+	MemoryReservation    *int                  `json:"memoryReservation,omitempty"`
+	ResourceRequirements []ResourceRequirement `json:"resourceRequirements,omitempty"`
 }
 
 // RunTaskRequest represents the request to run a task
 type RunTaskRequest struct {
-	Cluster                  *string                   `json:"cluster,omitempty"`
-	TaskDefinition           *string                   `json:"taskDefinition"`
-	Count                    *int                      `json:"count,omitempty"`
-	Group                    *string                   `json:"group,omitempty"`
-	StartedBy                *string                   `json:"startedBy,omitempty"`
-	LaunchType               *string                   `json:"launchType,omitempty"`
-	CapacityProviderStrategy []CapacityStrategy        `json:"capacityProviderStrategy,omitempty"`
-	PlacementConstraints     []PlacementConstraint     `json:"placementConstraints,omitempty"`
-	PlacementStrategy        []PlacementStrategy       `json:"placementStrategy,omitempty"`
-	PlatformVersion          *string                   `json:"platformVersion,omitempty"`
-	EnableECSManagedTags     *bool                     `json:"enableECSManagedTags,omitempty"`
-	PropagateTags            *string                   `json:"propagateTags,omitempty"`
-	ReferenceId              *string                   `json:"referenceId,omitempty"`
-	Tags                     []Tag                     `json:"tags,omitempty"`
-	EnableExecuteCommand     *bool                     `json:"enableExecuteCommand,omitempty"`
-	Overrides                *TaskOverride             `json:"overrides,omitempty"`
+	Cluster                  *string               `json:"cluster,omitempty"`
+	TaskDefinition           *string               `json:"taskDefinition"`
+	Count                    *int                  `json:"count,omitempty"`
+	Group                    *string               `json:"group,omitempty"`
+	StartedBy                *string               `json:"startedBy,omitempty"`
+	LaunchType               *string               `json:"launchType,omitempty"`
+	CapacityProviderStrategy []CapacityStrategy    `json:"capacityProviderStrategy,omitempty"`
+	PlacementConstraints     []PlacementConstraint `json:"placementConstraints,omitempty"`
+	PlacementStrategy        []PlacementStrategy   `json:"placementStrategy,omitempty"`
+	PlatformVersion          *string               `json:"platformVersion,omitempty"`
+	EnableECSManagedTags     *bool                 `json:"enableECSManagedTags,omitempty"`
+	PropagateTags            *string               `json:"propagateTags,omitempty"`
+	ReferenceId              *string               `json:"referenceId,omitempty"`
+	Tags                     []Tag                 `json:"tags,omitempty"`
+	EnableExecuteCommand     *bool                 `json:"enableExecuteCommand,omitempty"`
+	Overrides                *TaskOverride         `json:"overrides,omitempty"`
 }
 
 // PlacementStrategy represents a placement strategy for a task

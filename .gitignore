@@ -36,6 +36,7 @@ coverage.txt
 # IDE files
 .idea/
 .vscode/
+*.code-workspace
 *.swp
 *.swo
 *~

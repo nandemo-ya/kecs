@@ -40,9 +40,9 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	// Get task definition
 	var taskDef *storage.TaskDefinition
 	taskDefArn := *req.TaskDefinition
-	
+
 	log.Printf("DEBUG: Looking for task definition: %s", taskDefArn)
-	
+
 	if !strings.HasPrefix(taskDefArn, "arn:aws:ecs:") {
 		// Check if it's family:revision or just family
 		if strings.Contains(taskDefArn, ":") {
@@ -64,12 +64,12 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		log.Printf("DEBUG: Full ARN provided: %s", taskDefArn)
 		taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefArn)
 	}
-	
+
 	if err != nil {
 		log.Printf("DEBUG: Error getting task definition: %v", err)
 		return nil, fmt.Errorf("task definition not found: %s", *req.TaskDefinition)
 	}
-	
+
 	if taskDef == nil {
 		log.Printf("DEBUG: Task definition is nil")
 		return nil, fmt.Errorf("task definition not found: %s", *req.TaskDefinition)
@@ -84,7 +84,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	if req.LaunchType != nil {
 		launchType = *req.LaunchType
 	}
-	
+
 	schedulingStrategy := generated.SchedulingStrategyReplica
 	if req.SchedulingStrategy != nil {
 		schedulingStrategy = *req.SchedulingStrategy
@@ -100,42 +100,42 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal load balancers: %w", err)
 	}
-	
+
 	serviceRegistriesJSON, err := json.Marshal(req.ServiceRegistries)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal service registries: %w", err)
 	}
-	
+
 	networkConfigJSON, err := json.Marshal(req.NetworkConfiguration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal network configuration: %w", err)
 	}
-	
+
 	deploymentConfigJSON, err := json.Marshal(req.DeploymentConfiguration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal deployment configuration: %w", err)
 	}
-	
+
 	placementConstraintsJSON, err := json.Marshal(req.PlacementConstraints)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal placement constraints: %w", err)
 	}
-	
+
 	placementStrategyJSON, err := json.Marshal(req.PlacementStrategy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal placement strategy: %w", err)
 	}
-	
+
 	capacityProviderStrategyJSON, err := json.Marshal(req.CapacityProviderStrategy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal capacity provider strategy: %w", err)
 	}
-	
+
 	tagsJSON, err := json.Marshal(req.Tags)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal tags: %w", err)
 	}
-	
+
 	serviceConnectConfigJSON, err := json.Marshal(req.ServiceConnectConfiguration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal service connect configuration: %w", err)
@@ -163,7 +163,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	// Create storage service with deployment information
 	namespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
 	deploymentName := fmt.Sprintf("ecs-service-%s", *req.ServiceName)
-	
+
 	// Extract optional string values
 	var platformVersion, roleARN, propagateTags string
 	if req.PlatformVersion != nil {
@@ -188,7 +188,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	if req.EnableExecuteCommand != nil {
 		enableExecuteCommand = *req.EnableExecuteCommand
 	}
-	
+
 	storageService := &storage.Service{
 		ARN:                           serviceARN,
 		ServiceName:                   *req.ServiceName,
@@ -294,7 +294,7 @@ func (api *DefaultECSAPI) DeleteService(ctx context.Context, req *generated.Dele
 	// Delete Kubernetes resources
 	serviceManager := kubernetes.NewServiceManager(api.storage, api.kindManager)
 	if err := serviceManager.DeleteService(ctx, cluster, existingService); err != nil {
-		log.Printf("Warning: failed to delete Kubernetes resources for service %s: %v", 
+		log.Printf("Warning: failed to delete Kubernetes resources for service %s: %v",
 			existingService.ServiceName, err)
 		// Continue with deletion even if Kubernetes deletion fails
 		// This matches AWS ECS behavior where the service is marked for deletion
@@ -306,7 +306,7 @@ func (api *DefaultECSAPI) DeleteService(ctx context.Context, req *generated.Dele
 		return nil, fmt.Errorf("failed to delete service: %w", err)
 	}
 
-	log.Printf("Successfully deleted service %s from cluster %s", 
+	log.Printf("Successfully deleted service %s from cluster %s",
 		existingService.ServiceName, clusterName)
 
 	// Convert back to API response
@@ -496,7 +496,7 @@ func (api *DefaultECSAPI) UpdateService(ctx context.Context, req *generated.Upda
 		existingService.DesiredCount = int(*req.DesiredCount)
 		needsKubernetesUpdate = true
 	}
-	
+
 	if req.TaskDefinition != nil && *req.TaskDefinition != "" && *req.TaskDefinition != existingService.TaskDefinitionARN {
 		// Convert to ARN if necessary
 		var newTaskDefArn string
@@ -516,11 +516,11 @@ func (api *DefaultECSAPI) UpdateService(ctx context.Context, req *generated.Upda
 		} else {
 			newTaskDefArn = *req.TaskDefinition
 		}
-		
+
 		existingService.TaskDefinitionARN = newTaskDefArn
 		needsKubernetesUpdate = true
 	}
-	
+
 	if req.PlatformVersion != nil && *req.PlatformVersion != "" {
 		existingService.PlatformVersion = *req.PlatformVersion
 	}
@@ -602,7 +602,7 @@ func (api *DefaultECSAPI) UpdateService(ctx context.Context, req *generated.Upda
 	if needsKubernetesUpdate {
 		// Update status to show update in progress
 		existingService.Status = "PENDING"
-		
+
 		// Get the task definition
 		taskDef := existingService.TaskDefinitionARN
 		taskDefinition, err := api.storage.TaskDefinitionStore().GetByARN(ctx, taskDef)
@@ -632,7 +632,7 @@ func (api *DefaultECSAPI) UpdateService(ctx context.Context, req *generated.Upda
 		// Update status to ACTIVE after successful update
 		existingService.Status = "ACTIVE"
 	}
-	
+
 	// Single update at the end
 	if err := api.storage.ServiceStore().Update(ctx, existingService); err != nil {
 		return nil, fmt.Errorf("failed to update service: %w", err)
@@ -688,18 +688,18 @@ func (api *DefaultECSAPI) UpdateServicePrimaryTaskSet(ctx context.Context, req *
 
 	// Build response
 	apiTaskSet := &generated.TaskSet{
-		Id:             ptr.String(taskSet.ID),
-		TaskSetArn:     ptr.String(taskSet.ARN),
-		ServiceArn:     ptr.String(taskSet.ServiceARN),
-		ClusterArn:     ptr.String(taskSet.ClusterARN),
-		Status:         ptr.String(taskSet.Status),
-		TaskDefinition: ptr.String(taskSet.TaskDefinition),
-		StabilityStatus: (*generated.StabilityStatus)(ptr.String(taskSet.StabilityStatus)),
+		Id:                   ptr.String(taskSet.ID),
+		TaskSetArn:           ptr.String(taskSet.ARN),
+		ServiceArn:           ptr.String(taskSet.ServiceARN),
+		ClusterArn:           ptr.String(taskSet.ClusterARN),
+		Status:               ptr.String(taskSet.Status),
+		TaskDefinition:       ptr.String(taskSet.TaskDefinition),
+		StabilityStatus:      (*generated.StabilityStatus)(ptr.String(taskSet.StabilityStatus)),
 		ComputedDesiredCount: ptr.Int32(taskSet.ComputedDesiredCount),
-		PendingCount:   ptr.Int32(taskSet.PendingCount),
-		RunningCount:   ptr.Int32(taskSet.RunningCount),
-		CreatedAt:      ptr.Time(taskSet.CreatedAt),
-		UpdatedAt:      ptr.Time(taskSet.UpdatedAt),
+		PendingCount:         ptr.Int32(taskSet.PendingCount),
+		RunningCount:         ptr.Int32(taskSet.RunningCount),
+		CreatedAt:            ptr.Time(taskSet.CreatedAt),
+		UpdatedAt:            ptr.Time(taskSet.UpdatedAt),
 	}
 
 	// Set optional fields
@@ -781,11 +781,11 @@ func (api *DefaultECSAPI) DescribeServiceDeployments(ctx context.Context, req *g
 		status := generated.ServiceDeploymentStatusSuccessful
 		deployment := generated.ServiceDeployment{
 			ServiceDeploymentArn: ptr.String(deploymentArn),
-			ServiceArn:          ptr.String(service.ARN),
-			ClusterArn:          ptr.String(cluster.ARN),
-			Status:              &status,
-			CreatedAt:           ptr.Time(service.CreatedAt),
-			UpdatedAt:           ptr.Time(service.UpdatedAt),
+			ServiceArn:           ptr.String(service.ARN),
+			ClusterArn:           ptr.String(cluster.ARN),
+			Status:               &status,
+			CreatedAt:            ptr.Time(service.CreatedAt),
+			UpdatedAt:            ptr.Time(service.UpdatedAt),
 		}
 
 		// Set deployment configuration if available
@@ -799,15 +799,15 @@ func (api *DefaultECSAPI) DescribeServiceDeployments(ctx context.Context, req *g
 		// Set deployment circuit breaker if available
 		circuitBreakerStatus := generated.ServiceDeploymentRollbackMonitorsStatusDisabled
 		deployment.DeploymentCircuitBreaker = &generated.ServiceDeploymentCircuitBreaker{
-			Status:  &circuitBreakerStatus,
+			Status:       &circuitBreakerStatus,
 			FailureCount: ptr.Int32(0),
-			Threshold: ptr.Int32(50),
+			Threshold:    ptr.Int32(50),
 		}
 
 		// Add deployment ID to deployment
 		deployment.SourceServiceRevisions = []generated.ServiceRevisionSummary{
 			{
-				Arn:           ptr.String(fmt.Sprintf("arn:aws:ecs:%s:%s:service-revision/%s/%s/%s", api.region, api.accountID, clusterName, serviceName, deploymentID)),
+				Arn:                ptr.String(fmt.Sprintf("arn:aws:ecs:%s:%s:service-revision/%s/%s/%s", api.region, api.accountID, clusterName, serviceName, deploymentID)),
 				RequestedTaskCount: ptr.Int32(int32(service.DesiredCount)),
 				RunningTaskCount:   ptr.Int32(int32(service.RunningCount)),
 				PendingTaskCount:   ptr.Int32(int32(service.PendingCount)),
@@ -822,7 +822,7 @@ func (api *DefaultECSAPI) DescribeServiceDeployments(ctx context.Context, req *g
 
 	return &generated.DescribeServiceDeploymentsResponse{
 		ServiceDeployments: deployments,
-		Failures:          failures,
+		Failures:           failures,
 	}, nil
 }
 
@@ -880,10 +880,10 @@ func (api *DefaultECSAPI) DescribeServiceRevisions(ctx context.Context, req *gen
 		// In a real implementation, we'd track revision history
 		revision := generated.ServiceRevision{
 			ServiceRevisionArn: ptr.String(revisionArn),
-			ServiceArn:        ptr.String(service.ARN),
-			ClusterArn:        ptr.String(cluster.ARN),
-			TaskDefinition:    ptr.String(service.TaskDefinitionARN),
-			CreatedAt:         ptr.Time(service.CreatedAt),
+			ServiceArn:         ptr.String(service.ARN),
+			ClusterArn:         ptr.String(cluster.ARN),
+			TaskDefinition:     ptr.String(service.TaskDefinitionARN),
+			CreatedAt:          ptr.Time(service.CreatedAt),
 		}
 
 		// Set capacity provider strategy if available
@@ -954,11 +954,11 @@ func (api *DefaultECSAPI) DescribeServiceRevisions(ctx context.Context, req *gen
 
 	return &generated.DescribeServiceRevisionsResponse{
 		ServiceRevisions: revisions,
-		Failures:        failures,
+		Failures:         failures,
 	}, nil
 }
 
-// ListServiceDeployments implements the ListServiceDeployments operation  
+// ListServiceDeployments implements the ListServiceDeployments operation
 func (api *DefaultECSAPI) ListServiceDeployments(ctx context.Context, req *generated.ListServiceDeploymentsRequest) (*generated.ListServiceDeploymentsResponse, error) {
 	// Validate required fields
 	if req.Service == nil || *req.Service == "" {
@@ -990,12 +990,12 @@ func (api *DefaultECSAPI) ListServiceDeployments(ctx context.Context, req *gener
 	// Current deployment
 	currentStatus := generated.ServiceDeploymentStatusSuccessful
 	currentDeployment := generated.ServiceDeploymentBrief{
-		ServiceDeploymentArn: ptr.String(fmt.Sprintf("arn:aws:ecs:%s:%s:service-deployment/%s/%s/current", api.region, api.accountID, clusterName, service.ServiceName)),
-		ServiceArn:          ptr.String(service.ARN),
-		ClusterArn:          ptr.String(cluster.ARN),
-		Status:              &currentStatus,
-		CreatedAt:           ptr.Time(service.UpdatedAt),
-		StartedAt:           ptr.Time(service.UpdatedAt),
+		ServiceDeploymentArn:     ptr.String(fmt.Sprintf("arn:aws:ecs:%s:%s:service-deployment/%s/%s/current", api.region, api.accountID, clusterName, service.ServiceName)),
+		ServiceArn:               ptr.String(service.ARN),
+		ClusterArn:               ptr.String(cluster.ARN),
+		Status:                   &currentStatus,
+		CreatedAt:                ptr.Time(service.UpdatedAt),
+		StartedAt:                ptr.Time(service.UpdatedAt),
 		TargetServiceRevisionArn: ptr.String(fmt.Sprintf("arn:aws:ecs:%s:%s:service-revision/%s/%s/current", api.region, api.accountID, clusterName, service.ServiceName)),
 	}
 	deployments = append(deployments, currentDeployment)
@@ -1005,13 +1005,13 @@ func (api *DefaultECSAPI) ListServiceDeployments(ctx context.Context, req *gener
 	if service.UpdatedAt.After(service.CreatedAt) {
 		prevStatus := generated.ServiceDeploymentStatusSuccessful
 		prevDeployment := generated.ServiceDeploymentBrief{
-			ServiceDeploymentArn: ptr.String(fmt.Sprintf("arn:aws:ecs:%s:%s:service-deployment/%s/%s/previous-1", api.region, api.accountID, clusterName, service.ServiceName)),
-			ServiceArn:          ptr.String(service.ARN),
-			ClusterArn:          ptr.String(cluster.ARN),
-			Status:              &prevStatus,
-			CreatedAt:           ptr.Time(service.CreatedAt),
-			StartedAt:           ptr.Time(service.CreatedAt),
-			FinishedAt:          ptr.Time(service.UpdatedAt.Add(-1 * time.Hour)), // Simulate finished 1 hour before update
+			ServiceDeploymentArn:     ptr.String(fmt.Sprintf("arn:aws:ecs:%s:%s:service-deployment/%s/%s/previous-1", api.region, api.accountID, clusterName, service.ServiceName)),
+			ServiceArn:               ptr.String(service.ARN),
+			ClusterArn:               ptr.String(cluster.ARN),
+			Status:                   &prevStatus,
+			CreatedAt:                ptr.Time(service.CreatedAt),
+			StartedAt:                ptr.Time(service.CreatedAt),
+			FinishedAt:               ptr.Time(service.UpdatedAt.Add(-1 * time.Hour)), // Simulate finished 1 hour before update
 			TargetServiceRevisionArn: ptr.String(fmt.Sprintf("arn:aws:ecs:%s:%s:service-revision/%s/%s/previous-1", api.region, api.accountID, clusterName, service.ServiceName)),
 		}
 		deployments = append(deployments, prevDeployment)
@@ -1100,19 +1100,19 @@ func storageServiceToGeneratedService(storageService *storage.Service) *generate
 	}
 
 	service := &generated.Service{
-		ServiceArn:                   ptr.String(storageService.ARN),
-		ServiceName:                  ptr.String(storageService.ServiceName),
-		ClusterArn:                   ptr.String(storageService.ClusterARN),
-		Status:                       ptr.String(storageService.Status),
-		DesiredCount:                 ptr.Int32(int32(storageService.DesiredCount)),
-		RunningCount:                 ptr.Int32(int32(storageService.RunningCount)),
-		PendingCount:                 ptr.Int32(int32(storageService.PendingCount)),
-		TaskDefinition:               ptr.String(storageService.TaskDefinitionARN),
-		SchedulingStrategy:           (*generated.SchedulingStrategy)(ptr.String(storageService.SchedulingStrategy)),
-		EnableECSManagedTags:         ptr.Bool(storageService.EnableECSManagedTags),
-		EnableExecuteCommand:         ptr.Bool(storageService.EnableExecuteCommand),
+		ServiceArn:                    ptr.String(storageService.ARN),
+		ServiceName:                   ptr.String(storageService.ServiceName),
+		ClusterArn:                    ptr.String(storageService.ClusterARN),
+		Status:                        ptr.String(storageService.Status),
+		DesiredCount:                  ptr.Int32(int32(storageService.DesiredCount)),
+		RunningCount:                  ptr.Int32(int32(storageService.RunningCount)),
+		PendingCount:                  ptr.Int32(int32(storageService.PendingCount)),
+		TaskDefinition:                ptr.String(storageService.TaskDefinitionARN),
+		SchedulingStrategy:            (*generated.SchedulingStrategy)(ptr.String(storageService.SchedulingStrategy)),
+		EnableECSManagedTags:          ptr.Bool(storageService.EnableECSManagedTags),
+		EnableExecuteCommand:          ptr.Bool(storageService.EnableExecuteCommand),
 		HealthCheckGracePeriodSeconds: ptr.Int32(int32(storageService.HealthCheckGracePeriodSeconds)),
-		CreatedAt:                    ptr.Time(storageService.CreatedAt),
+		CreatedAt:                     ptr.Time(storageService.CreatedAt),
 	}
 
 	// Set optional fields
@@ -1184,16 +1184,16 @@ func storageServiceToGeneratedService(storageService *storage.Service) *generate
 	// Add deployment information
 	// In AWS ECS, there's always at least one deployment representing the current state
 	deployment := generated.Deployment{
-		Id:              ptr.String(fmt.Sprintf("ecs-svc/%s", storageService.ServiceName)),
-		Status:          ptr.String("PRIMARY"),
-		TaskDefinition:  ptr.String(storageService.TaskDefinitionARN),
-		DesiredCount:    ptr.Int32(int32(storageService.DesiredCount)),
-		RunningCount:    ptr.Int32(int32(storageService.RunningCount)),
-		PendingCount:    ptr.Int32(int32(storageService.PendingCount)),
-		CreatedAt:       ptr.Time(storageService.CreatedAt),
-		UpdatedAt:       ptr.Time(storageService.UpdatedAt),
+		Id:             ptr.String(fmt.Sprintf("ecs-svc/%s", storageService.ServiceName)),
+		Status:         ptr.String("PRIMARY"),
+		TaskDefinition: ptr.String(storageService.TaskDefinitionARN),
+		DesiredCount:   ptr.Int32(int32(storageService.DesiredCount)),
+		RunningCount:   ptr.Int32(int32(storageService.RunningCount)),
+		PendingCount:   ptr.Int32(int32(storageService.PendingCount)),
+		CreatedAt:      ptr.Time(storageService.CreatedAt),
+		UpdatedAt:      ptr.Time(storageService.UpdatedAt),
 	}
-	
+
 	if storageService.LaunchType != "" {
 		launchType := generated.LaunchType(storageService.LaunchType)
 		deployment.LaunchType = &launchType
@@ -1201,7 +1201,7 @@ func storageServiceToGeneratedService(storageService *storage.Service) *generate
 	if storageService.PlatformVersion != "" {
 		deployment.PlatformVersion = ptr.String(storageService.PlatformVersion)
 	}
-	
+
 	service.Deployments = []generated.Deployment{deployment}
 
 	return service

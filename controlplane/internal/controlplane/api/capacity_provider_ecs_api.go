@@ -16,7 +16,7 @@ func (api *DefaultECSAPI) CreateCapacityProvider(ctx context.Context, req *gener
 		name = *req.Name
 	}
 	arn := "arn:aws:ecs:" + api.region + ":" + api.accountID + ":capacity-provider/" + name
-	
+
 	resp := &generated.CreateCapacityProviderResponse{
 		CapacityProvider: &generated.CapacityProvider{
 			CapacityProviderArn:      ptr.String(arn),
@@ -39,12 +39,12 @@ func (api *DefaultECSAPI) DeleteCapacityProvider(ctx context.Context, req *gener
 		name = *req.CapacityProvider
 	}
 	arn := "arn:aws:ecs:" + api.region + ":" + api.accountID + ":capacity-provider/" + name
-	
+
 	resp := &generated.DeleteCapacityProviderResponse{
 		CapacityProvider: &generated.CapacityProvider{
 			CapacityProviderArn: ptr.String(arn),
-			Name:               req.CapacityProvider,
-			Status:             (*generated.CapacityProviderStatus)(ptr.String("INACTIVE")),
+			Name:                req.CapacityProvider,
+			Status:              (*generated.CapacityProviderStatus)(ptr.String("INACTIVE")),
 		},
 	}
 
@@ -56,27 +56,27 @@ func (api *DefaultECSAPI) DescribeCapacityProviders(ctx context.Context, req *ge
 	// TODO: Implement actual capacity provider description logic
 	// For now, return a mock response
 	capacityProviders := []generated.CapacityProvider{}
-	
+
 	if len(req.CapacityProviders) > 0 {
 		for _, name := range req.CapacityProviders {
 			arn := "arn:aws:ecs:" + api.region + ":" + api.accountID + ":capacity-provider/" + name
 			capacityProviders = append(capacityProviders, generated.CapacityProvider{
 				CapacityProviderArn: ptr.String(arn),
-				Name:               ptr.String(name),
-				Status:             (*generated.CapacityProviderStatus)(ptr.String("ACTIVE")),
+				Name:                ptr.String(name),
+				Status:              (*generated.CapacityProviderStatus)(ptr.String("ACTIVE")),
 			})
 		}
 	} else {
 		// Return default capacity providers if none specified
 		capacityProviders = append(capacityProviders, generated.CapacityProvider{
 			CapacityProviderArn: ptr.String("arn:aws:ecs:" + api.region + ":" + api.accountID + ":capacity-provider/FARGATE"),
-			Name:               ptr.String("FARGATE"),
-			Status:             (*generated.CapacityProviderStatus)(ptr.String("ACTIVE")),
+			Name:                ptr.String("FARGATE"),
+			Status:              (*generated.CapacityProviderStatus)(ptr.String("ACTIVE")),
 		})
 		capacityProviders = append(capacityProviders, generated.CapacityProvider{
 			CapacityProviderArn: ptr.String("arn:aws:ecs:" + api.region + ":" + api.accountID + ":capacity-provider/FARGATE_SPOT"),
-			Name:               ptr.String("FARGATE_SPOT"),
-			Status:             (*generated.CapacityProviderStatus)(ptr.String("ACTIVE")),
+			Name:                ptr.String("FARGATE_SPOT"),
+			Status:              (*generated.CapacityProviderStatus)(ptr.String("ACTIVE")),
 		})
 	}
 
@@ -96,16 +96,16 @@ func (api *DefaultECSAPI) UpdateCapacityProvider(ctx context.Context, req *gener
 		name = *req.Name
 	}
 	arn := "arn:aws:ecs:" + api.region + ":" + api.accountID + ":capacity-provider/" + name
-	
+
 	// Convert AutoScalingGroupProviderUpdate to AutoScalingGroupProvider
 	var autoScalingGroupProvider *generated.AutoScalingGroupProvider
 	if req.AutoScalingGroupProvider != nil {
 		autoScalingGroupProvider = &generated.AutoScalingGroupProvider{
-			ManagedScaling:                   req.AutoScalingGroupProvider.ManagedScaling,
-			ManagedTerminationProtection:     req.AutoScalingGroupProvider.ManagedTerminationProtection,
+			ManagedScaling:               req.AutoScalingGroupProvider.ManagedScaling,
+			ManagedTerminationProtection: req.AutoScalingGroupProvider.ManagedTerminationProtection,
 		}
 	}
-	
+
 	resp := &generated.UpdateCapacityProviderResponse{
 		CapacityProvider: &generated.CapacityProvider{
 			CapacityProviderArn:      ptr.String(arn),

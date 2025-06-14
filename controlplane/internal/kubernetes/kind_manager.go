@@ -33,16 +33,16 @@ func (k *KindManager) CreateCluster(ctx context.Context, clusterName string) err
 	if !strings.HasPrefix(clusterName, "kecs-") {
 		kecsClusterName = fmt.Sprintf("kecs-%s", clusterName)
 	}
-	
+
 	exists, err := k.ClusterExists(kecsClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to check if cluster exists: %w", err)
 	}
-	
+
 	if exists {
 		return nil
 	}
-	
+
 	err = k.provider.Create(
 		kecsClusterName,
 		cluster.CreateWithNodeImage("kindest/node:v1.31.4"),
@@ -51,11 +51,11 @@ func (k *KindManager) CreateCluster(ctx context.Context, clusterName string) err
 		cluster.CreateWithDisplayUsage(false),
 		cluster.CreateWithDisplaySalutation(false),
 	)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to create kind cluster: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -65,16 +65,16 @@ func (k *KindManager) DeleteCluster(ctx context.Context, clusterName string) err
 	if !strings.HasPrefix(clusterName, "kecs-") {
 		kecsClusterName = fmt.Sprintf("kecs-%s", clusterName)
 	}
-	
+
 	exists, err := k.ClusterExists(kecsClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to check if cluster exists: %w", err)
 	}
-	
+
 	if !exists {
 		return nil
 	}
-	
+
 	return k.provider.Delete(kecsClusterName, k.getKubeconfigPath(kecsClusterName))
 }
 
@@ -83,13 +83,13 @@ func (k *KindManager) ClusterExists(kecsClusterName string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	
+
 	for _, c := range clusters {
 		if c == kecsClusterName {
 			return true, nil
 		}
 	}
-	
+
 	return false, nil
 }
 
@@ -100,17 +100,17 @@ func (k *KindManager) GetKubeClient(clusterName string) (*kubernetes.Clientset, 
 		kecsClusterName = fmt.Sprintf("kecs-%s", clusterName)
 	}
 	kubeconfigPath := k.getKubeconfigPath(kecsClusterName)
-	
+
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build kubeconfig: %w", err)
 	}
-	
+
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
-	
+
 	return clientset, nil
 }
 

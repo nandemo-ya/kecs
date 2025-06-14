@@ -35,11 +35,11 @@ func (s *Server) createBasicPod(taskDef *storage.TaskDefinition, cluster *storag
 
 	// Get the first container definition
 	firstContainer := containerDefs[0]
-	
+
 	// Extract basic container info
 	name, _ := firstContainer["name"].(string)
 	image, _ := firstContainer["image"].(string)
-	
+
 	if name == "" || image == "" {
 		return nil, fmt.Errorf("missing required container name or image")
 	}
@@ -90,6 +90,6 @@ func (s *Server) getKubeClient(kindClusterName string) (kubernetes.Interface, er
 	if s.kindManager == nil {
 		return nil, fmt.Errorf("kind manager not available")
 	}
-	
+
 	return s.kindManager.GetKubeClient(kindClusterName)
 }

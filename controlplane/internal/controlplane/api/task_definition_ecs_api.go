@@ -122,25 +122,25 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 
 	// Create storage task definition
 	storageTaskDef := &storage.TaskDefinition{
-		ID:                       uuid.New().String(),
-		Family:                   *req.Family,
-		TaskRoleARN:              taskRoleARN,
-		ExecutionRoleARN:         executionRoleARN,
-		NetworkMode:              string(networkMode),
-		ContainerDefinitions:     string(containerDefsJSON),
-		Volumes:                  volumesJSON,
-		PlacementConstraints:     placementConstraintsJSON,
-		RequiresCompatibilities:  requiresCompatibilitiesJSON,
-		CPU:                      cpu,
-		Memory:                   memory,
-		Tags:                     tagsJSON,
-		PidMode:                  pidMode,
-		IpcMode:                  ipcMode,
-		ProxyConfiguration:       proxyConfigJSON,
-		InferenceAccelerators:    inferenceAcceleratorsJSON,
-		RuntimePlatform:          runtimePlatformJSON,
-		Region:                   api.region,
-		AccountID:                api.accountID,
+		ID:                      uuid.New().String(),
+		Family:                  *req.Family,
+		TaskRoleARN:             taskRoleARN,
+		ExecutionRoleARN:        executionRoleARN,
+		NetworkMode:             string(networkMode),
+		ContainerDefinitions:    string(containerDefsJSON),
+		Volumes:                 volumesJSON,
+		PlacementConstraints:    placementConstraintsJSON,
+		RequiresCompatibilities: requiresCompatibilitiesJSON,
+		CPU:                     cpu,
+		Memory:                  memory,
+		Tags:                    tagsJSON,
+		PidMode:                 pidMode,
+		IpcMode:                 ipcMode,
+		ProxyConfiguration:      proxyConfigJSON,
+		InferenceAccelerators:   inferenceAcceleratorsJSON,
+		RuntimePlatform:         runtimePlatformJSON,
+		Region:                  api.region,
+		AccountID:               api.accountID,
 	}
 
 	// Register the task definition
@@ -252,7 +252,7 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 		return nil, fmt.Errorf("task definition not found: %s", taskDefIdentifier)
 	}
 
-	log.Printf("DEBUG: Found task definition: family=%s, revision=%d, containerDefs=%s", 
+	log.Printf("DEBUG: Found task definition: family=%s, revision=%d, containerDefs=%s",
 		taskDef.Family, taskDef.Revision, taskDef.ContainerDefinitions)
 
 	// Convert to generated response
@@ -264,7 +264,7 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 	// Note: generated.TaskDefinition doesn't have a Tags field
 	// Tags are handled separately in the API response
 
-	log.Printf("DEBUG: Response task def has %d container definitions", 
+	log.Printf("DEBUG: Response task def has %d container definitions",
 		len(responseTaskDef.ContainerDefinitions))
 
 	return &generated.DescribeTaskDefinitionResponse{
@@ -491,7 +491,7 @@ func storageTaskDefinitionToGenerated(taskDef *storage.TaskDefinition) *generate
 		RegisteredAt:      ptr.Time(taskDef.RegisteredAt),
 		// Initialize with empty slices to ensure they're always included in JSON
 		ContainerDefinitions: []generated.ContainerDefinition{},
-		Volumes: []generated.Volume{},
+		Volumes:              []generated.Volume{},
 	}
 
 	// Set optional string fields

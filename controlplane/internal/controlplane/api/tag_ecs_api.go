@@ -75,7 +75,7 @@ func (api *DefaultECSAPI) ListTagsForResource(ctx context.Context, req *generate
 
 	// For now, return mock tags based on resource type
 	tags := []generated.Tag{}
-	
+
 	// Determine resource type from ARN
 	resourceArn := *req.ResourceArn
 	if strings.Contains(resourceArn, ":cluster/") {

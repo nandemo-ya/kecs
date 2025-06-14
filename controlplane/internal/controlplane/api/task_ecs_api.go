@@ -37,7 +37,7 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 	// Get task definition
 	taskDefIdentifier := *req.TaskDefinition
 	var taskDef *storage.TaskDefinition
-	
+
 	if strings.Contains(taskDefIdentifier, ":") {
 		// family:revision format or ARN
 		if strings.HasPrefix(taskDefIdentifier, "arn:aws:ecs:") {
@@ -65,7 +65,7 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 
 	// Create task manager (skip if kindManager is nil - for tests)
 	var taskManager *mockTaskManager
-	
+
 	if api.kindManager != nil {
 		// For production, we would use the real task manager
 		// but for now we'll use the mock since the real one expects *corev1.Pod
@@ -86,12 +86,12 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 
 	var tasks []generated.Task
 	var failures []generated.Failure
-	
+
 	// Create requested number of tasks
 	for i := 0; i < count; i++ {
 		// Generate task ID
 		taskID := uuid.New().String()
-		
+
 		// Create storage task
 		now := time.Now()
 		task := &storage.Task{
@@ -227,7 +227,7 @@ func (api *DefaultECSAPI) StopTask(ctx context.Context, req *generated.StopTaskR
 
 	// Create task manager (skip if kindManager is nil - for tests)
 	var taskManager *mockTaskManager
-	
+
 	if api.kindManager != nil {
 		// For production, we would use the real task manager
 		// but for now we'll use the mock

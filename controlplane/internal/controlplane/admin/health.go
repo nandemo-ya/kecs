@@ -32,19 +32,19 @@ type CheckResult struct {
 
 // DetailedHealthResponse represents a detailed health check response
 type DetailedHealthResponse struct {
-	Status     string                  `json:"status"`
-	Timestamp  time.Time               `json:"timestamp"`
-	Version    string                  `json:"version"`
-	Uptime     string                  `json:"uptime"`
-	Checks     map[string]CheckResult  `json:"checks"`
-	System     SystemInfo              `json:"system"`
+	Status    string                 `json:"status"`
+	Timestamp time.Time              `json:"timestamp"`
+	Version   string                 `json:"version"`
+	Uptime    string                 `json:"uptime"`
+	Checks    map[string]CheckResult `json:"checks"`
+	System    SystemInfo             `json:"system"`
 }
 
 // SystemInfo contains system information
 type SystemInfo struct {
-	GoVersion    string `json:"go_version"`
-	NumCPU       int    `json:"num_cpu"`
-	NumGoroutine int    `json:"num_goroutine"`
+	GoVersion    string      `json:"go_version"`
+	NumCPU       int         `json:"num_cpu"`
+	NumGoroutine int         `json:"num_goroutine"`
 	MemoryUsage  MemoryStats `json:"memory_usage"`
 }
 
@@ -95,7 +95,7 @@ func (hc *HealthChecker) RunChecks(ctx context.Context) map[string]CheckResult {
 		wg.Add(1)
 		go func(n string, c CheckFunc) {
 			defer wg.Done()
-			
+
 			// Create a timeout context for each check
 			checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
@@ -113,7 +113,7 @@ func (hc *HealthChecker) RunChecks(ctx context.Context) map[string]CheckResult {
 			hc.mu.Lock()
 			hc.lastResults[n] = result
 			hc.mu.Unlock()
-			
+
 			results[n] = result
 		}(name, check)
 	}
@@ -125,7 +125,7 @@ func (hc *HealthChecker) RunChecks(ctx context.Context) map[string]CheckResult {
 // GetDetailedHealth returns detailed health information
 func (hc *HealthChecker) GetDetailedHealth(ctx context.Context) DetailedHealthResponse {
 	checks := hc.RunChecks(ctx)
-	
+
 	// Determine overall status
 	status := "healthy"
 	for _, check := range checks {
@@ -194,14 +194,14 @@ func (s *Server) handleHealthDetailed(checker *HealthChecker) http.HandlerFunc {
 		health := checker.GetDetailedHealth(ctx)
 
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		// Set appropriate status code
 		if health.Status != "healthy" {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		} else {
 			w.WriteHeader(http.StatusOK)
 		}
-		
+
 		json.NewEncoder(w).Encode(health)
 	}
 }
@@ -210,12 +210,12 @@ func (s *Server) handleHealthDetailed(checker *HealthChecker) http.HandlerFunc {
 func (s *Server) handleReadiness(checker *HealthChecker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		
+
 		// Run critical checks only
 		checker.mu.RLock()
 		storageCheck := checker.checks["storage"]
 		checker.mu.RUnlock()
-		
+
 		if storageCheck != nil {
 			if err := storageCheck(ctx); err != nil {
 				w.WriteHeader(http.StatusServiceUnavailable)
@@ -226,7 +226,7 @@ func (s *Server) handleReadiness(checker *HealthChecker) http.HandlerFunc {
 				return
 			}
 		}
-		
+
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{
 			"status": "ready",

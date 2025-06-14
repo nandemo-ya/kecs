@@ -47,7 +47,7 @@ func (s *accountSettingStore) Upsert(ctx context.Context, setting *storage.Accou
 	if setting.ID == "" {
 		setting.ID = uuid.New().String()
 	}
-	
+
 	now := time.Now()
 	if setting.CreatedAt.IsZero() {
 		setting.CreatedAt = now
@@ -173,12 +173,12 @@ func (s *accountSettingStore) List(ctx context.Context, filters storage.AccountS
 
 	// Add ordering and pagination
 	query += " ORDER BY name, principal_arn"
-	
+
 	limit := filters.MaxResults
 	if limit <= 0 || limit > 100 {
 		limit = 100
 	}
-	
+
 	offset := 0
 	if filters.NextToken != "" {
 		// Decode the next token (base64 encoded offset)
@@ -261,7 +261,7 @@ func (s *accountSettingStore) SetDefault(ctx context.Context, name, value string
 		Value:        value,
 		PrincipalARN: "default",
 		IsDefault:    true,
-		Region:       "us-east-1", // Default region
+		Region:       "us-east-1",    // Default region
 		AccountID:    "000000000000", // Default account ID
 	}
 	return s.Upsert(ctx, setting)

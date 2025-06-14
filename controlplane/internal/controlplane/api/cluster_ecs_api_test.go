@@ -13,9 +13,9 @@ import (
 
 var _ = Describe("Cluster ECS API", func() {
 	var (
-		server *Server
-		ctx    context.Context
-		mockStorage *mocks.MockStorage
+		server           *Server
+		ctx              context.Context
+		mockStorage      *mocks.MockStorage
 		mockClusterStore *mocks.MockClusterStore
 	)
 
@@ -54,7 +54,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 				// Verify that the kind cluster name follows the expected pattern
 				Expect(cluster.KindClusterName).To(HavePrefix("kecs-"))
-				
+
 				// Should be kecs-<cluster-name>
 				Expect(cluster.KindClusterName).To(Equal("kecs-test-cluster"))
 			})
@@ -152,10 +152,10 @@ var _ = Describe("Cluster ECS API", func() {
 		Context("when listing clusters", func() {
 			It("should return empty list when no clusters exist", func() {
 				req := &generated.ListClustersRequest{}
-				
+
 				resp, err := server.ecsAPI.ListClusters(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.ClusterArns).To(BeEmpty())
 			})
@@ -175,16 +175,16 @@ var _ = Describe("Cluster ECS API", func() {
 				req := &generated.ListClustersRequest{}
 				resp, err := server.ecsAPI.ListClusters(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.ClusterArns).To(HaveLen(3))
-				
+
 				// Verify all ARNs are present
 				arnMap := make(map[string]bool)
 				for _, arn := range resp.ClusterArns {
 					arnMap[arn] = true
 				}
-				
+
 				for _, name := range clusterNames {
 					expectedArn := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/" + name
 					Expect(arnMap).To(HaveKey(expectedArn))
@@ -209,10 +209,10 @@ var _ = Describe("Cluster ECS API", func() {
 
 			It("should describe all clusters when no specific clusters requested", func() {
 				req := &generated.DescribeClustersRequest{}
-				
+
 				resp, err := server.ecsAPI.DescribeClusters(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.Clusters).To(HaveLen(2))
 				Expect(resp.Failures).To(BeEmpty())
@@ -222,10 +222,10 @@ var _ = Describe("Cluster ECS API", func() {
 				req := &generated.DescribeClustersRequest{
 					Clusters: []string{"describe-test-1"},
 				}
-				
+
 				resp, err := server.ecsAPI.DescribeClusters(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.Clusters).To(HaveLen(1))
 				Expect(*resp.Clusters[0].ClusterName).To(Equal("describe-test-1"))
@@ -236,29 +236,29 @@ var _ = Describe("Cluster ECS API", func() {
 				req := &generated.DescribeClustersRequest{
 					Clusters: []string{"non-existent-cluster"},
 				}
-				
+
 				resp, err := server.ecsAPI.DescribeClusters(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.Clusters).To(BeEmpty())
 				Expect(resp.Failures).To(HaveLen(1))
 				Expect(*resp.Failures[0].Reason).To(Equal("MISSING"))
 			})
-			
+
 			It("should describe clusters by ARN", func() {
 				// First create the cluster
 				cluster, err := mockClusterStore.Get(ctx, "describe-test-1")
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				// Use ARN to describe
 				req := &generated.DescribeClustersRequest{
 					Clusters: []string{cluster.ARN},
 				}
-				
+
 				resp, err := server.ecsAPI.DescribeClusters(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.Clusters).To(HaveLen(1))
 				Expect(*resp.Clusters[0].ClusterName).To(Equal("describe-test-1"))
@@ -282,10 +282,10 @@ var _ = Describe("Cluster ECS API", func() {
 				req := &generated.DeleteClusterRequest{
 					Cluster: &clusterName,
 				}
-				
+
 				resp, err := server.ecsAPI.DeleteCluster(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.Cluster).NotTo(BeNil())
 				Expect(*resp.Cluster.ClusterName).To(Equal("delete-test"))
@@ -315,7 +315,7 @@ var _ = Describe("Cluster ECS API", func() {
 				req := &generated.DeleteClusterRequest{
 					Cluster: &clusterName,
 				}
-				
+
 				_, err = server.ecsAPI.DeleteCluster(ctx, req)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("active services"))
@@ -326,12 +326,12 @@ var _ = Describe("Cluster ECS API", func() {
 				req := &generated.DeleteClusterRequest{
 					Cluster: &clusterName,
 				}
-				
+
 				_, err := server.ecsAPI.DeleteCluster(ctx, req)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("not found"))
 			})
-			
+
 			It("should delete a cluster by ARN", func() {
 				// Create a cluster first
 				clusterName := "delete-by-arn-test"
@@ -339,30 +339,30 @@ var _ = Describe("Cluster ECS API", func() {
 					ClusterName: &clusterName,
 				})
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				// Get the ARN
 				clusterArn := *createResp.Cluster.ClusterArn
-				
+
 				// Delete the cluster using ARN
 				req := &generated.DeleteClusterRequest{
 					Cluster: &clusterArn,
 				}
-				
+
 				resp, err := server.ecsAPI.DeleteCluster(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.Cluster).NotTo(BeNil())
 				Expect(*resp.Cluster.ClusterName).To(Equal("delete-by-arn-test"))
 				Expect(*resp.Cluster.Status).To(Equal("INACTIVE"))
-				
+
 				// Verify cluster is deleted from storage
 				_, err = mockClusterStore.Get(ctx, "delete-by-arn-test")
 				Expect(err).To(HaveOccurred())
 			})
 		})
 	})
-	
+
 	Describe("UpdateCluster", func() {
 		Context("when updating a cluster", func() {
 			BeforeEach(func() {
@@ -392,7 +392,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 				resp, err := server.ecsAPI.UpdateCluster(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.Cluster).NotTo(BeNil())
 				Expect(resp.Cluster.Settings).To(HaveLen(1))
@@ -416,7 +416,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 				resp, err := server.ecsAPI.UpdateCluster(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.Cluster).NotTo(BeNil())
 				Expect(resp.Cluster.Configuration).NotTo(BeNil())
@@ -474,7 +474,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 				resp, err := server.ecsAPI.UpdateClusterSettings(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.Cluster).NotTo(BeNil())
 				Expect(resp.Cluster.Settings).To(HaveLen(1))
@@ -532,7 +532,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 				resp, err := server.ecsAPI.PutClusterCapacityProviders(ctx, req)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.Cluster).NotTo(BeNil())
 				Expect(resp.Cluster.CapacityProviders).To(Equal(capacityProviders))
@@ -558,29 +558,29 @@ var _ = Describe("Cluster ECS API", func() {
 			name := extractClusterNameFromARN(arn)
 			Expect(name).To(Equal("my-cluster"))
 		})
-		
+
 		It("should return input for non-ARN strings", func() {
 			name := extractClusterNameFromARN("my-cluster")
 			Expect(name).To(Equal("my-cluster"))
 		})
-		
+
 		It("should return input for invalid ARN format", func() {
 			// Missing cluster name after slash
 			arn := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/"
 			name := extractClusterNameFromARN(arn)
 			Expect(name).To(Equal(arn))
-			
+
 			// No slash
 			arn2 := "arn:aws:ecs:ap-northeast-1:123456789012:cluster"
 			name2 := extractClusterNameFromARN(arn2)
 			Expect(name2).To(Equal(arn2))
-			
+
 			// Multiple slashes
 			arn3 := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/my/cluster"
 			name3 := extractClusterNameFromARN(arn3)
 			Expect(name3).To(Equal(arn3))
 		})
-		
+
 		It("should handle empty string", func() {
 			name := extractClusterNameFromARN("")
 			Expect(name).To(Equal(""))

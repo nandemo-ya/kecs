@@ -7,7 +7,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
@@ -168,9 +168,9 @@ var _ = Describe("Cluster Pagination", func() {
 
 					resp, err := ecsAPI.ListClusters(ctx, req)
 					Expect(err).NotTo(HaveOccurred())
-					
+
 					allClusters = append(allClusters, resp.ClusterArns...)
-					
+
 					if resp.NextToken == nil {
 						break
 					}
