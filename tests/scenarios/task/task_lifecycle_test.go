@@ -83,16 +83,27 @@ var _ = Describe("Task Lifecycle", func() {
 			descResult, err := client.DescribeTasks(clusterName, []string{taskArn})
 			Expect(err).NotTo(HaveOccurred())
 
-			describedTasks := descResult["tasks"].([]interface{})
-			runningTask := describedTasks[0].(map[string]interface{})
+			// Use helper to extract tasks
+			describedTasks, err := utils.GetTasksFromResult(descResult)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(describedTasks).To(HaveLen(1))
+			runningTask := describedTasks[0]
 
 			// Check allocated resources
 			Expect(runningTask["cpu"]).To(Equal("256"))
 			Expect(runningTask["memory"]).To(Equal("512"))
 
 			// Check container resources
-			containers := runningTask["containers"].([]interface{})
-			container := containers[0].(map[string]interface{})
+			containersValue := runningTask["containers"]
+			var container map[string]interface{}
+			switch containers := containersValue.(type) {
+			case []interface{}:
+				container = containers[0].(map[string]interface{})
+			case []map[string]interface{}:
+				container = containers[0]
+			default:
+				Fail(fmt.Sprintf("Unexpected type for containers: %T", containers))
+			}
 			Expect(container["cpu"]).To(Equal("256"))
 			Expect(container["memory"]).To(Equal("512"))
 		})

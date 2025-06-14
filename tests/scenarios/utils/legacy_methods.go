@@ -2,89 +2,53 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 // Legacy service methods for backward compatibility
 
 // CreateService (legacy) creates a service using map format
 func (c *ECSClient) CreateService(config map[string]interface{}) (map[string]interface{}, error) {
-	cluster, _ := config["cluster"].(string)
-	serviceName, _ := config["serviceName"].(string)
-	taskDef, _ := config["taskDefinition"].(string)
-	desiredCount := 1
-	if dc, ok := config["desiredCount"].(float64); ok {
-		desiredCount = int(dc)
-	} else if dc, ok := config["desiredCount"].(int); ok {
-		desiredCount = dc
-	}
-
-	err := c.CurlClient.CreateService(cluster, serviceName, taskDef, desiredCount)
+	// Convert config to JSON and use executeCurl directly to pass all parameters
+	jsonData, err := json.Marshal(config)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get service details
-	service, err := c.CurlClient.DescribeService(cluster, serviceName)
+	output, err := c.CurlClient.executeCurl("CreateService", string(jsonData))
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert to map
-	serviceJSON, err := json.Marshal(service)
-	if err != nil {
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
 		return nil, err
 	}
 
-	var serviceMap map[string]interface{}
-	if err := json.Unmarshal(serviceJSON, &serviceMap); err != nil {
-		return nil, err
-	}
-
-	return map[string]interface{}{
-		"service": serviceMap,
-	}, nil
+	return result, nil
 }
 
 // UpdateService (legacy) updates a service using map format
 func (c *ECSClient) UpdateService(config map[string]interface{}) (map[string]interface{}, error) {
-	cluster, _ := config["cluster"].(string)
-	service, _ := config["service"].(string)
-	
-	var desiredCount *int
-	if dc, ok := config["desiredCount"].(float64); ok {
-		count := int(dc)
-		desiredCount = &count
-	} else if dc, ok := config["desiredCount"].(int); ok {
-		desiredCount = &dc
-	}
-	
-	taskDef, _ := config["taskDefinition"].(string)
-
-	err := c.CurlClient.UpdateService(cluster, service, desiredCount, taskDef)
+	// Convert config to JSON and use executeCurl directly to pass all parameters
+	jsonData, err := json.Marshal(config)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get updated service details
-	svc, err := c.CurlClient.DescribeService(cluster, service)
+	output, err := c.CurlClient.executeCurl("UpdateService", string(jsonData))
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert to map
-	serviceJSON, err := json.Marshal(svc)
-	if err != nil {
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
 		return nil, err
 	}
 
-	var serviceMap map[string]interface{}
-	if err := json.Unmarshal(serviceJSON, &serviceMap); err != nil {
-		return nil, err
-	}
-
-	return map[string]interface{}{
-		"service": serviceMap,
-	}, nil
+	return result, nil
 }
 
 // DeleteServiceForce (legacy) deletes a service forcefully and returns result
@@ -149,6 +113,37 @@ func (c *ECSClient) RunTask(config map[string]interface{}) (map[string]interface
 	return resultMap, nil
 }
 
+// DescribeService (legacy) describes a service using map format
+func (c *ECSClient) DescribeService(cluster, service string) (map[string]interface{}, error) {
+	// Use executeCurl directly to get full response
+	payload := fmt.Sprintf(`{
+		"cluster": "%s",
+		"services": ["%s"]
+	}`, cluster, service)
+	
+	output, err := c.CurlClient.executeCurl("DescribeServices", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, err
+	}
+
+	// Extract the first service from the services array
+	if services, ok := result["services"].([]interface{}); ok && len(services) > 0 {
+		if serviceMap, ok := services[0].(map[string]interface{}); ok {
+			return map[string]interface{}{
+				"service": serviceMap,
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("service not found")
+}
+
 // DescribeTasks (legacy) with map interface support
 func (c *ECSClient) DescribeTasks(cluster string, taskArns []string) (map[string]interface{}, error) {
 	tasks, err := c.CurlClient.DescribeTasks(cluster, taskArns)
@@ -179,15 +174,43 @@ func (c *ECSClient) DescribeTasks(cluster string, taskArns []string) (map[string
 // ListTasks (legacy) with map interface support
 func (c *ECSClient) ListTasks(cluster string, params map[string]interface{}) (map[string]interface{}, error) {
 	serviceName, _ := params["serviceName"].(string)
+	desiredStatus, _ := params["desiredStatus"].(string)
 	
-	taskArns, err := c.CurlClient.ListTasks(cluster, serviceName)
+	// Use executeCurl directly to pass all parameters
+	payload := fmt.Sprintf(`{"cluster": "%s"`, cluster)
+	if serviceName != "" {
+		payload += fmt.Sprintf(`, "serviceName": "%s"`, serviceName)
+	}
+	if desiredStatus != "" {
+		payload += fmt.Sprintf(`, "desiredStatus": "%s"`, desiredStatus)
+	}
+	payload += "}"
+	
+	output, err := c.CurlClient.executeCurl("ListTasks", payload)
 	if err != nil {
 		return nil, err
 	}
 
-	return map[string]interface{}{
-		"taskArns": taskArns,
-	}, nil
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, err
+	}
+
+	// Convert taskArns from []string to []interface{} for backward compatibility
+	if _, ok := result["taskArns"].([]interface{}); ok {
+		// Already in the expected format
+		return result, nil
+	} else if taskArnsStr, ok := result["taskArns"].([]string); ok {
+		// Convert []string to []interface{}
+		taskArnsInterface := make([]interface{}, len(taskArnsStr))
+		for i, arn := range taskArnsStr {
+			taskArnsInterface[i] = arn
+		}
+		result["taskArns"] = taskArnsInterface
+	}
+
+	return result, nil
 }
 
 // StopTask (legacy) stops a task
@@ -253,21 +276,5 @@ func (c *ECSClient) ListServices(cluster string) (map[string]interface{}, error)
 	
 	return map[string]interface{}{
 		"serviceArns": arns,
-	}, nil
-}
-
-// DescribeService (legacy) describes a single service with map result
-func (c *ECSClient) DescribeService(cluster, service string) (map[string]interface{}, error) {
-	svc, err := c.CurlClient.DescribeService(cluster, service)
-	if err != nil {
-		return nil, err
-	}
-	
-	svcJSON, _ := json.Marshal(svc)
-	var svcMap map[string]interface{}
-	json.Unmarshal(svcJSON, &svcMap)
-	
-	return map[string]interface{}{
-		"service": svcMap,
 	}, nil
 }

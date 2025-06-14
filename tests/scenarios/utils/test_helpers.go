@@ -130,3 +130,30 @@ func GenerateRandomString(length int) string {
 	}
 	return string(result)
 }
+
+// GetTasksFromResult extracts tasks array from a result map, handling different type formats
+func GetTasksFromResult(result map[string]interface{}) ([]map[string]interface{}, error) {
+	tasksValue, ok := result["tasks"]
+	if !ok {
+		return nil, fmt.Errorf("no tasks field in result")
+	}
+
+	switch tasks := tasksValue.(type) {
+	case []interface{}:
+		// Convert []interface{} to []map[string]interface{}
+		taskMaps := make([]map[string]interface{}, len(tasks))
+		for i, task := range tasks {
+			taskMap, ok := task.(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf("task at index %d is not a map", i)
+			}
+			taskMaps[i] = taskMap
+		}
+		return taskMaps, nil
+	case []map[string]interface{}:
+		// Already in the correct format
+		return tasks, nil
+	default:
+		return nil, fmt.Errorf("unexpected type for tasks: %T", tasks)
+	}
+}

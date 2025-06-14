@@ -106,6 +106,8 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 			CreatedAt:         now,
 			Region:            api.region,
 			AccountID:         api.accountID,
+			CPU:               taskDef.CPU,       // Set from task definition
+			Memory:            taskDef.Memory,    // Set from task definition
 		}
 
 		// Apply overrides if any
