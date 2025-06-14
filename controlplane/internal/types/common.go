@@ -16,10 +16,10 @@ type Attribute struct {
 
 // Attachment represents an attachment
 type Attachment struct {
-	Id        *string           `json:"id,omitempty"`
-	Type      *string           `json:"type,omitempty"`
-	Status    *string           `json:"status,omitempty"`
-	Details   []KeyValuePair    `json:"details,omitempty"`
+	Id      *string        `json:"id,omitempty"`
+	Type    *string        `json:"type,omitempty"`
+	Status  *string        `json:"status,omitempty"`
+	Details []KeyValuePair `json:"details,omitempty"`
 }
 
 // Failure represents a failure response

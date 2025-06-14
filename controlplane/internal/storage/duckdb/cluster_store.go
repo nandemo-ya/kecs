@@ -199,7 +199,7 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 // ListWithPagination retrieves clusters with pagination support
 func (s *clusterStore) ListWithPagination(ctx context.Context, limit int, nextToken string) ([]*storage.Cluster, string, error) {
 	var args []interface{}
-	
+
 	baseQuery := `
 		SELECT 
 			id, arn, name, status, region, account_id,
@@ -238,7 +238,7 @@ func (s *clusterStore) ListWithPagination(ctx context.Context, limit int, nextTo
 	defer rows.Close()
 
 	var clusters []*storage.Cluster
-	
+
 	for rows.Next() {
 		cluster := &storage.Cluster{}
 		var configuration, settings, tags, kindClusterName, capacityProviders, defaultCapacityProviderStrategy sql.NullString

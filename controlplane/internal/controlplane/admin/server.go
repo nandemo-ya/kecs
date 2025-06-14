@@ -13,9 +13,9 @@ import (
 
 // Server represents the HTTP admin server for KECS Control Plane
 type Server struct {
-	httpServer      *http.Server
-	port            int
-	healthChecker   *HealthChecker
+	httpServer       *http.Server
+	port             int
+	healthChecker    *HealthChecker
 	metricsCollector *MetricsCollector
 }
 
@@ -25,7 +25,7 @@ func NewServer(port int, storage storage.Storage) *Server {
 		port:             port,
 		metricsCollector: NewMetricsCollector(),
 	}
-	
+
 	// Initialize health checker if storage is provided
 	if storage != nil {
 		s.healthChecker = NewHealthChecker(storage)
@@ -33,7 +33,7 @@ func NewServer(port int, storage storage.Storage) *Server {
 		// Create health checker without storage
 		s.healthChecker = NewHealthChecker(nil)
 	}
-	
+
 	return s
 }
 
@@ -69,7 +69,7 @@ func (s *Server) setupRoutes() http.Handler {
 	mux.HandleFunc("/live", s.handleLiveness)
 	mux.HandleFunc("/ready", s.handleReadiness(s.healthChecker))
 	mux.HandleFunc("/health/detailed", s.handleHealthDetailed(s.healthChecker))
-	
+
 	// Metrics endpoints
 	mux.HandleFunc("/metrics", s.handleMetrics(s.metricsCollector))
 	mux.HandleFunc("/metrics/prometheus", s.handlePrometheusMetrics(s.metricsCollector))

@@ -7,8 +7,8 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
@@ -67,7 +67,7 @@ func (c *ServiceConverter) createDeployment(
 ) (*appsv1.Deployment, error) {
 	// Create namespace name
 	namespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
-	
+
 	// Create deployment name (ECS service name with prefix)
 	deploymentName := fmt.Sprintf("ecs-service-%s", service.ServiceName)
 
@@ -96,8 +96,8 @@ func (c *ServiceConverter) createDeployment(
 			Namespace: namespace,
 			Labels:    labels,
 			Annotations: map[string]string{
-				"kecs.dev/service-arn":        service.ARN,
-				"kecs.dev/task-definition":    service.TaskDefinitionARN,
+				"kecs.dev/service-arn":         service.ARN,
+				"kecs.dev/task-definition":     service.TaskDefinitionARN,
 				"kecs.dev/scheduling-strategy": service.SchedulingStrategy,
 			},
 		},
@@ -105,7 +105,7 @@ func (c *ServiceConverter) createDeployment(
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": service.ServiceName,
+					"app":              service.ServiceName,
 					"kecs.dev/service": service.ServiceName,
 				},
 			},
@@ -283,7 +283,7 @@ func (c *ServiceConverter) createKubernetesService(
 
 	// Create namespace name
 	namespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
-	
+
 	// Create service name
 	serviceName := fmt.Sprintf("ecs-service-%s", service.ServiceName)
 
@@ -335,7 +335,7 @@ func (c *ServiceConverter) createKubernetesService(
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{
-				"app": service.ServiceName,
+				"app":              service.ServiceName,
 				"kecs.dev/service": service.ServiceName,
 			},
 			Ports: servicePorts,

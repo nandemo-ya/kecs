@@ -40,40 +40,40 @@ var _ = Describe("WebSocketAuthentication", func() {
 			func(config *WebSocketConfig, authHeader string, expectConnect bool) {
 				// Create hub with config
 				hub = NewWebSocketHubWithConfig(config)
-				
+
 				// Start hub in background
 				go hub.Run(ctx)
-				
+
 				// Give hub time to start
 				time.Sleep(10 * time.Millisecond)
-				
+
 				// Create server
 				server = &Server{
 					webSocketHub: hub,
 				}
-				
+
 				// Create test server
 				handler := server.HandleWebSocket(hub)
 				ts = httptest.NewServer(handler)
-				
+
 				// Convert http to ws
 				wsURL = "ws" + strings.TrimPrefix(ts.URL, "http")
-				
+
 				// Create WebSocket connection request
 				dialer := websocket.DefaultDialer
 				header := http.Header{}
 				if authHeader != "" {
 					header.Set("Authorization", authHeader)
 				}
-				
+
 				// Attempt connection
 				conn, resp, err := dialer.Dial(wsURL, header)
-				
+
 				if expectConnect {
 					Expect(err).NotTo(HaveOccurred())
 					Expect(conn).NotTo(BeNil())
 					defer conn.Close()
-					
+
 					// Connection was successful - authentication passed
 					// Give time for the client to be registered
 					time.Sleep(50 * time.Millisecond)
@@ -157,9 +157,9 @@ var _ = Describe("WebSocketAuthentication", func() {
 						token := strings.TrimPrefix(auth, "Bearer ")
 						if token == "admin-token" {
 							return &AuthInfo{
-								UserID:   "admin-123",
-								Username: "admin",
-								Roles:    []string{"admin"},
+								UserID:      "admin-123",
+								Username:    "admin",
+								Roles:       []string{"admin"},
 								Permissions: []string{"*:*"},
 							}, true
 						} else if token == "user-token" {
@@ -180,28 +180,28 @@ var _ = Describe("WebSocketAuthentication", func() {
 				AuthorizeFunc: func(authInfo *AuthInfo, operation string, resource string) bool {
 					// Check permissions
 					requiredPermission := fmt.Sprintf("%s:%s", getResourceType(resource), operation)
-					
+
 					for _, perm := range authInfo.Permissions {
 						if perm == requiredPermission || perm == "*:*" {
 							return true
 						}
 					}
-					
+
 					return false
 				},
 			}
-			
+
 			hub = NewWebSocketHubWithConfig(config)
 			go hub.Run(ctx)
-			
+
 			// Give hub time to start
 			time.Sleep(50 * time.Millisecond)
-			
+
 			// Create server
 			server = &Server{
 				webSocketHub: hub,
 			}
-			
+
 			// Create test server
 			handler := server.HandleWebSocket(hub)
 			ts = httptest.NewServer(handler)
@@ -211,14 +211,14 @@ var _ = Describe("WebSocketAuthentication", func() {
 		It("should allow admin user to do everything", func() {
 			header := http.Header{}
 			header.Set("Authorization", "Bearer admin-token")
-			
+
 			conn, _, err := websocket.DefaultDialer.Dial(wsURL, header)
 			Expect(err).NotTo(HaveOccurred())
 			defer conn.Close()
-			
+
 			// Give time for connection to be established
 			time.Sleep(50 * time.Millisecond)
-			
+
 			// Test subscribing to a task
 			subscribeMsg := WebSocketMessage{
 				Type:    "subscribe",
@@ -227,7 +227,7 @@ var _ = Describe("WebSocketAuthentication", func() {
 			}
 			err = conn.WriteJSON(subscribeMsg)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Read response
 			var response WebSocketMessage
 			conn.SetReadDeadline(time.Now().Add(2 * time.Second))
@@ -239,17 +239,17 @@ var _ = Describe("WebSocketAuthentication", func() {
 		It("should enforce permissions for regular user", func() {
 			header := http.Header{}
 			header.Set("Authorization", "Bearer user-token")
-			
+
 			conn, _, err := websocket.DefaultDialer.Dial(wsURL, header)
 			Expect(err).NotTo(HaveOccurred())
 			defer conn.Close()
-			
+
 			// Give time for connection to be established
 			time.Sleep(50 * time.Millisecond)
-			
+
 			// Set read deadline to avoid hanging
 			conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-			
+
 			// Test subscribing to a task (allowed)
 			subscribeMsg := WebSocketMessage{
 				Type:    "subscribe",
@@ -258,13 +258,13 @@ var _ = Describe("WebSocketAuthentication", func() {
 			}
 			err = conn.WriteJSON(subscribeMsg)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Should receive confirmation
 			var response WebSocketMessage
 			err = conn.ReadJSON(&response)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Type).To(Equal("subscribed"))
-			
+
 			// Test subscribing to a cluster (not allowed)
 			subscribeMsg = WebSocketMessage{
 				Type:    "subscribe",
@@ -273,17 +273,17 @@ var _ = Describe("WebSocketAuthentication", func() {
 			}
 			err = conn.WriteJSON(subscribeMsg)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Should receive error
 			err = conn.ReadJSON(&response)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Type).To(Equal("error"))
-			
+
 			var errorPayload map[string]string
 			err = json.Unmarshal(response.Payload, &errorPayload)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(errorPayload["error"]).To(Equal("unauthorized"))
-			
+
 			// Test setting filters (not allowed)
 			setFiltersMsg := WebSocketMessage{
 				Type:    "setFilters",
@@ -292,7 +292,7 @@ var _ = Describe("WebSocketAuthentication", func() {
 			}
 			err = conn.WriteJSON(setFiltersMsg)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Should receive error
 			err = conn.ReadJSON(&response)
 			Expect(err).NotTo(HaveOccurred())
@@ -309,7 +309,7 @@ var _ = Describe("WebSocketAuthentication", func() {
 				"initial-token": true,
 				"refresh-token": true,
 			}
-			
+
 			config := &WebSocketConfig{
 				AuthEnabled: true,
 				AuthFunc: func(r *http.Request) (*AuthInfo, bool) {
@@ -318,9 +318,9 @@ var _ = Describe("WebSocketAuthentication", func() {
 						token := strings.TrimPrefix(auth, "Bearer ")
 						if valid, ok := validTokens[token]; ok && valid {
 							return &AuthInfo{
-								UserID:   "user-123",
-								Username: "testuser",
-								Roles:    []string{"user"},
+								UserID:      "user-123",
+								Username:    "testuser",
+								Roles:       []string{"user"},
 								Permissions: []string{"task:subscribe"},
 							}, true
 						}
@@ -328,18 +328,18 @@ var _ = Describe("WebSocketAuthentication", func() {
 					return nil, false
 				},
 			}
-			
+
 			hub = NewWebSocketHubWithConfig(config)
 			go hub.Run(ctx)
-			
+
 			// Give hub time to start
 			time.Sleep(50 * time.Millisecond)
-			
+
 			// Create server
 			server = &Server{
 				webSocketHub: hub,
 			}
-			
+
 			// Create test server
 			handler := server.HandleWebSocket(hub)
 			ts = httptest.NewServer(handler)
@@ -350,14 +350,14 @@ var _ = Describe("WebSocketAuthentication", func() {
 			// Connect with initial token
 			header := http.Header{}
 			header.Set("Authorization", "Bearer initial-token")
-			
+
 			conn, _, err := websocket.DefaultDialer.Dial(wsURL, header)
 			Expect(err).NotTo(HaveOccurred())
 			defer conn.Close()
-			
+
 			// Invalidate initial token
 			validTokens["initial-token"] = false
-			
+
 			// Try to authenticate with new token
 			authMsg := WebSocketMessage{
 				Type:    "authenticate",
@@ -366,18 +366,18 @@ var _ = Describe("WebSocketAuthentication", func() {
 			}
 			err = conn.WriteJSON(authMsg)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Should receive success response
 			var response WebSocketMessage
 			err = conn.ReadJSON(&response)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Type).To(Equal("authenticated"))
-			
+
 			var authPayload map[string]interface{}
 			err = json.Unmarshal(response.Payload, &authPayload)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(authPayload["username"]).To(Equal("testuser"))
-			
+
 			// Try to authenticate with invalid token
 			authMsg = WebSocketMessage{
 				Type:    "authenticate",
@@ -386,12 +386,12 @@ var _ = Describe("WebSocketAuthentication", func() {
 			}
 			err = conn.WriteJSON(authMsg)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Should receive error response
 			err = conn.ReadJSON(&response)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Type).To(Equal("error"))
-			
+
 			var errorPayload map[string]string
 			err = json.Unmarshal(response.Payload, &errorPayload)
 			Expect(err).NotTo(HaveOccurred())
@@ -406,11 +406,11 @@ var _ = Describe("WebSocketAuthentication", func() {
 				if authHeader != "" {
 					req.Header.Set("Authorization", authHeader)
 				}
-				
+
 				authInfo, authenticated := defaultAuthFunc(req)
-				
+
 				Expect(authenticated).To(Equal(expectAuth))
-				
+
 				if expectAuth {
 					Expect(authInfo).NotTo(BeNil())
 					Expect(authInfo.Username).To(Equal(expectUser))
@@ -445,16 +445,16 @@ var _ = Describe("WebSocketAuthentication", func() {
 					hub:      hub,
 					authInfo: authInfo,
 				}
-				
+
 				// Test with auth enabled
 				result := client.IsAuthorized(operation, resource)
 				Expect(result).To(Equal(expected))
-				
+
 				// Test with auth disabled
 				hub.config.AuthEnabled = false
 				result = client.IsAuthorized(operation, resource)
 				Expect(result).To(BeTrue()) // Always true when auth is disabled
-				
+
 				hub.config.AuthEnabled = true
 			},
 			Entry("admin can do everything",

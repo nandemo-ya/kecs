@@ -13,7 +13,7 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		if origin == "" {
 			origin = "*"
 		}
-		
+
 		// In production, you should validate the origin against a whitelist
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -38,7 +38,7 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
-		
+
 		// For API endpoints, set strict CSP
 		if !strings.HasPrefix(r.URL.Path, "/ui") && !strings.HasPrefix(r.URL.Path, "/ws") {
 			w.Header().Set("Content-Security-Policy", "default-src 'none'")

@@ -81,9 +81,9 @@ func (api *DefaultECSAPI) RegisterContainerInstance(ctx context.Context, req *ge
 					StringSetValue: []string{},
 				},
 			},
-			VersionInfo:     req.VersionInfo,
-			Attributes:      req.Attributes,
-			Tags:            req.Tags,
+			VersionInfo: req.VersionInfo,
+			Attributes:  req.Attributes,
+			Tags:        req.Tags,
 		},
 	}
 
@@ -227,7 +227,7 @@ func (api *DefaultECSAPI) ListContainerInstances(ctx context.Context, req *gener
 	if newNextToken != "" {
 		resp.NextToken = ptr.String(newNextToken)
 	}
-	
+
 	return resp, nil
 }
 

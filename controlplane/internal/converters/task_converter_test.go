@@ -95,10 +95,10 @@ var _ = Describe("TaskConverter", func() {
 
 	Describe("ConvertTaskToPod", func() {
 		var (
-			taskDef *storage.TaskDefinition
+			taskDef     *storage.TaskDefinition
 			runTaskJSON []byte
-			cluster *storage.Cluster
-			taskID string
+			cluster     *storage.Cluster
+			taskID      string
 		)
 
 		BeforeEach(func() {

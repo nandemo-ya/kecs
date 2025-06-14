@@ -218,7 +218,7 @@ func TestConvertVolumes(t *testing.T) {
 			expectedVolumes: 3,
 			validate: func(t *testing.T, volumes []corev1.Volume) {
 				require.Len(t, volumes, 3)
-				
+
 				// Find each volume by name
 				var hostVol, efsVol, dockerVol *corev1.Volume
 				for i := range volumes {
@@ -231,15 +231,15 @@ func TestConvertVolumes(t *testing.T) {
 						dockerVol = &volumes[i]
 					}
 				}
-				
+
 				require.NotNil(t, hostVol)
 				require.NotNil(t, hostVol.HostPath)
 				assert.Equal(t, "/host/path", hostVol.HostPath.Path)
-				
+
 				require.NotNil(t, efsVol)
 				require.NotNil(t, efsVol.NFS)
 				assert.Equal(t, "fs-multi123.efs.us-east-1.amazonaws.com", efsVol.NFS.Server)
-				
+
 				require.NotNil(t, dockerVol)
 				require.NotNil(t, dockerVol.EmptyDir)
 			},
@@ -261,9 +261,9 @@ func TestConvertEFSVolume(t *testing.T) {
 	converter := NewTaskConverter("ap-northeast-1", "123456789012")
 
 	tests := []struct {
-		name     string
+		name      string
 		efsConfig *types.EFSVolumeConfiguration
-		validate func(t *testing.T, volumeSource corev1.VolumeSource)
+		validate  func(t *testing.T, volumeSource corev1.VolumeSource)
 	}{
 		{
 			name: "basic EFS configuration",
@@ -532,12 +532,12 @@ func TestAddVolumeAnnotations(t *testing.T) {
 				assert.Equal(t, "shared", pod.Annotations["kecs.dev/volume-docker-vol-docker-scope"])
 				assert.Equal(t, "rexray/ebs", pod.Annotations["kecs.dev/volume-docker-vol-docker-driver"])
 				assert.Equal(t, "true", pod.Annotations["kecs.dev/volume-docker-vol-docker-autoprovision"])
-				
+
 				// Check JSON encoded driver opts
 				driverOpts := pod.Annotations["kecs.dev/volume-docker-vol-docker-driver-opts"]
 				assert.Contains(t, driverOpts, `"volumeID":"vol-12345"`)
 				assert.Contains(t, driverOpts, `"size":"100"`)
-				
+
 				// Check JSON encoded labels
 				labels := pod.Annotations["kecs.dev/volume-docker-vol-docker-labels"]
 				assert.Contains(t, labels, `"env":"prod"`)
@@ -596,9 +596,9 @@ func TestAddVolumeAnnotations(t *testing.T) {
 					Annotations: make(map[string]string),
 				},
 			}
-			
+
 			converter.addVolumeAnnotations(pod, tt.volumes)
-			
+
 			if tt.validatePod != nil {
 				tt.validatePod(t, pod)
 			}

@@ -22,7 +22,7 @@ func (s *serviceStore) Create(ctx context.Context, service *storage.Service) err
 	if service.ID == "" {
 		service.ID = uuid.New().String()
 	}
-	
+
 	now := time.Now()
 	if service.CreatedAt.IsZero() {
 		service.CreatedAt = now
@@ -161,7 +161,7 @@ func (s *serviceStore) Get(ctx context.Context, cluster, serviceName string) (*s
 func (s *serviceStore) List(ctx context.Context, cluster string, serviceName string, launchType string, limit int, nextToken string) ([]*storage.Service, string, error) {
 	var args []interface{}
 	var conditions []string
-	
+
 	baseQuery := `
 	SELECT 
 		id, arn, service_name, cluster_arn, task_definition_arn,
@@ -296,10 +296,10 @@ func (s *serviceStore) Update(ctx context.Context, service *storage.Service) err
 	service.UpdatedAt = time.Now()
 
 	log.Printf("DEBUG: Updating service ID: %s, ARN: %s, status: %s, desiredCount: %d", service.ID, service.ARN, service.Status, service.DesiredCount)
-	
+
 	// Small delay to avoid DuckDB concurrency issues
 	time.Sleep(50 * time.Millisecond)
-	
+
 	// First, let's check if the record exists
 	var count int
 	checkQuery := `SELECT COUNT(*) FROM services WHERE id = ?`

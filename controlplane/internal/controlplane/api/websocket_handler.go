@@ -93,7 +93,7 @@ func (h *WebSocketHub) Run(ctx context.Context) {
 	if h.config.ConnectionLimitConfig != nil && h.config.ConnectionLimitConfig.ConnectionTimeout > 0 {
 		go h.cleanupInactiveConnections(ctx)
 	}
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -110,17 +110,17 @@ func (h *WebSocketHub) Run(ctx context.Context) {
 				delete(h.clients, client)
 				close(client.send)
 				h.mu.Unlock()
-				
+
 				// Clean up rate limiter
 				if h.rateLimiter != nil {
 					h.rateLimiter.Remove(client.id)
 				}
-				
+
 				// Remove from connection limiter
 				if h.connectionLimiter != nil && client.request != nil {
 					h.connectionLimiter.RemoveConnection(client.request, client.authInfo)
 				}
-				
+
 				log.Printf("WebSocket client unregistered: %s", client.id)
 			} else {
 				h.mu.Unlock()
@@ -140,7 +140,7 @@ func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
 		WriteBufferSize: 1024,
 		CheckOrigin:     hub.config.CheckOrigin,
 	}
-	
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Log origin for debugging
 		origin := r.Header.Get("Origin")
@@ -158,7 +158,7 @@ func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
 				// Default authentication using Authorization header
 				authInfo, authenticated = defaultAuthFunc(r)
 			}
-			
+
 			if !authenticated {
 				log.Printf("WebSocket authentication failed from origin %s", origin)
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -166,25 +166,25 @@ func (s *Server) HandleWebSocket(hub *WebSocketHub) http.HandlerFunc {
 			}
 			log.Printf("WebSocket authenticated user: %s", authInfo.Username)
 		}
-		
+
 		// Check connection limits
 		if hub.connectionLimiter != nil && !hub.connectionLimiter.CanConnect(r, authInfo) {
 			username := "anonymous"
 			if authInfo != nil {
 				username = authInfo.Username
 			}
-			log.Printf("WebSocket connection limit exceeded for user %s from %s", 
+			log.Printf("WebSocket connection limit exceeded for user %s from %s",
 				username, getClientIP(r))
 			http.Error(w, "Connection limit exceeded", http.StatusTooManyRequests)
 			return
 		}
-		
+
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Printf("WebSocket upgrade error from origin %s: %v", origin, err)
 			return
 		}
-		
+
 		// Add to connection limiter after successful upgrade
 		if hub.connectionLimiter != nil && r != nil {
 			hub.connectionLimiter.AddConnection(r, authInfo)
@@ -218,7 +218,9 @@ func (c *WebSocketClient) readPump() {
 	defer func() {
 		c.cancel()
 		c.hub.unregister <- c
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			log.Printf("Error closing WebSocket connection in readPump for client %s: %v", c.id, err)
+		}
 	}()
 
 	// Set initial read deadline
@@ -227,7 +229,7 @@ func (c *WebSocketClient) readPump() {
 		readTimeout = 60 * time.Second
 	}
 	c.conn.SetReadDeadline(time.Now().Add(readTimeout))
-	
+
 	c.conn.SetPongHandler(func(string) error {
 		c.conn.SetReadDeadline(time.Now().Add(readTimeout))
 		c.updateLastActivity()
@@ -271,16 +273,18 @@ func (c *WebSocketClient) writePump() {
 		pingInterval = 54 * time.Second
 	}
 	ticker := time.NewTicker(pingInterval)
-	
+
 	// Use configured write timeout
 	writeTimeout := c.hub.config.WriteTimeout
 	if writeTimeout == 0 {
 		writeTimeout = 10 * time.Second
 	}
-	
+
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			log.Printf("Error closing WebSocket connection in writePump for client %s: %v", c.id, err)
+		}
 	}()
 
 	for {
@@ -343,7 +347,7 @@ func (c *WebSocketClient) handleMessage(message WebSocketMessage) {
 				}
 				return
 			}
-			
+
 			c.Subscribe(payload.ResourceType, payload.ResourceID)
 			// Send confirmation
 			c.send <- WebSocketMessage{
@@ -373,7 +377,7 @@ func (c *WebSocketClient) handleMessage(message WebSocketMessage) {
 				}
 				return
 			}
-			
+
 			c.Unsubscribe(payload.ResourceType, payload.ResourceID)
 			// Send confirmation
 			c.send <- WebSocketMessage{
@@ -399,7 +403,7 @@ func (c *WebSocketClient) handleMessage(message WebSocketMessage) {
 				}
 				return
 			}
-			
+
 			c.SetFilters(filters)
 			// Send confirmation
 			c.send <- WebSocketMessage{
@@ -419,14 +423,25 @@ func (c *WebSocketClient) handleMessage(message WebSocketMessage) {
 			// Validate the token and update auth info
 			if c.hub.config.AuthEnabled && c.hub.config.AuthFunc != nil {
 				// Create a mock request with the token
-				req, _ := http.NewRequest("GET", "/", nil)
+				req, err := http.NewRequest("GET", "/", nil)
+				if err != nil {
+					log.Printf("Failed to create mock request for WebSocket authentication: %v", err)
+					// Send error response
+					c.send <- WebSocketMessage{
+						Type:      "error",
+						ID:        message.ID,
+						Timestamp: time.Now(),
+						Payload:   []byte(`{"error":"Authentication failed due to internal error"}`),
+					}
+					return
+				}
 				req.Header.Set("Authorization", "Bearer "+payload.Token)
-				
+
 				if authInfo, authenticated := c.hub.config.AuthFunc(req); authenticated {
 					c.mu.Lock()
 					c.authInfo = authInfo
 					c.mu.Unlock()
-					
+
 					// Send success response
 					c.send <- WebSocketMessage{
 						Type:      "authenticated",
@@ -516,7 +531,7 @@ func (h *WebSocketHub) BroadcastMetricUpdate(metrics interface{}) {
 func (c *WebSocketClient) Subscribe(resourceType, resourceID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.subscriptions == nil {
 		c.subscriptions = make(map[string]map[string]bool)
 	}
@@ -524,7 +539,7 @@ func (c *WebSocketClient) Subscribe(resourceType, resourceID string) {
 		c.subscriptions[resourceType] = make(map[string]bool)
 	}
 	c.subscriptions[resourceType][resourceID] = true
-	
+
 	log.Printf("Client %s subscribed to %s:%s", c.id, resourceType, resourceID)
 }
 
@@ -532,14 +547,14 @@ func (c *WebSocketClient) Subscribe(resourceType, resourceID string) {
 func (c *WebSocketClient) Unsubscribe(resourceType, resourceID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.subscriptions[resourceType] != nil {
 		delete(c.subscriptions[resourceType], resourceID)
 		if len(c.subscriptions[resourceType]) == 0 {
 			delete(c.subscriptions, resourceType)
 		}
 	}
-	
+
 	log.Printf("Client %s unsubscribed from %s:%s", c.id, resourceType, resourceID)
 }
 
@@ -547,7 +562,7 @@ func (c *WebSocketClient) Unsubscribe(resourceType, resourceID string) {
 func (c *WebSocketClient) IsSubscribed(resourceType, resourceID string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	if resources, ok := c.subscriptions[resourceType]; ok {
 		// Check specific resource or wildcard subscription
 		return resources[resourceID] || resources["*"]
@@ -559,7 +574,7 @@ func (c *WebSocketClient) IsSubscribed(resourceType, resourceID string) bool {
 func (h *WebSocketHub) BroadcastToSubscribed(resourceType, resourceID string, message WebSocketMessage) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	for client := range h.clients {
 		if client.IsSubscribed(resourceType, resourceID) {
 			select {
@@ -596,24 +611,24 @@ func defaultAuthFunc(r *http.Request) (*AuthInfo, bool) {
 	if authHeader == "" {
 		return nil, false
 	}
-	
+
 	// Extract token (Bearer token format)
 	const bearerPrefix = "Bearer "
 	if !strings.HasPrefix(authHeader, bearerPrefix) {
 		return nil, false
 	}
-	
+
 	token := strings.TrimPrefix(authHeader, bearerPrefix)
-	
+
 	// In a real implementation, validate the token
 	// For now, we'll create a simple auth info based on the token
 	// TODO: Implement proper token validation (JWT, API key, etc.)
-	
+
 	// Mock implementation - DO NOT USE IN PRODUCTION
 	if token == "" {
 		return nil, false
 	}
-	
+
 	return &AuthInfo{
 		UserID:   "user-" + token[:8], // Use first 8 chars as user ID
 		Username: "user-" + token[:8],
@@ -635,16 +650,16 @@ func (c *WebSocketClient) IsAuthorized(operation string, resource string) bool {
 	if c.hub.config.AuthEnabled == false {
 		return true
 	}
-	
+
 	if c.authInfo == nil {
 		return false
 	}
-	
+
 	// Use custom authorize function if provided
 	if c.hub.config.AuthorizeFunc != nil {
 		return c.hub.config.AuthorizeFunc(c.authInfo, operation, resource)
 	}
-	
+
 	// Default authorization logic
 	return c.defaultAuthorize(operation, resource)
 }
@@ -653,29 +668,29 @@ func (c *WebSocketClient) IsAuthorized(operation string, resource string) bool {
 func (c *WebSocketClient) defaultAuthorize(operation string, resource string) bool {
 	// Check permissions
 	requiredPermission := fmt.Sprintf("%s:%s", getResourceType(resource), operation)
-	
+
 	for _, perm := range c.authInfo.Permissions {
 		if perm == requiredPermission || perm == "*:*" {
 			return true
 		}
-		
+
 		// Check wildcard permissions
 		parts := strings.Split(perm, ":")
 		if len(parts) == 2 {
 			if (parts[0] == "*" || parts[0] == getResourceType(resource)) &&
-			   (parts[1] == "*" || parts[1] == operation) {
+				(parts[1] == "*" || parts[1] == operation) {
 				return true
 			}
 		}
 	}
-	
+
 	// Check role-based permissions
 	for _, role := range c.authInfo.Roles {
 		if role == "admin" {
 			return true // Admins can do everything
 		}
 	}
-	
+
 	return false
 }
 
@@ -693,7 +708,7 @@ func getResourceType(resource string) string {
 func (c *WebSocketClient) SetFilters(filters []EventFilter) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.filters = filters
 	log.Printf("Client %s updated filters: %d filters set", c.id, len(filters))
 }
@@ -702,19 +717,19 @@ func (c *WebSocketClient) SetFilters(filters []EventFilter) {
 func (c *WebSocketClient) MatchesFilter(message WebSocketMessage) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	// If no filters are set, accept all messages
 	if len(c.filters) == 0 {
 		return true
 	}
-	
+
 	// Check each filter - if any filter matches, accept the message
 	for _, filter := range c.filters {
 		if c.matchesSingleFilter(message, filter) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -733,7 +748,7 @@ func (c *WebSocketClient) matchesSingleFilter(message WebSocketMessage, filter E
 			return false
 		}
 	}
-	
+
 	// Check resource type
 	if len(filter.ResourceTypes) > 0 {
 		found := false
@@ -747,7 +762,7 @@ func (c *WebSocketClient) matchesSingleFilter(message WebSocketMessage, filter E
 			return false
 		}
 	}
-	
+
 	// Check resource ID
 	if len(filter.ResourceIDs) > 0 {
 		found := false
@@ -761,7 +776,7 @@ func (c *WebSocketClient) matchesSingleFilter(message WebSocketMessage, filter E
 			return false
 		}
 	}
-	
+
 	// Check metadata if present
 	if len(filter.Metadata) > 0 {
 		// For now, we'll need to parse the payload to check metadata
@@ -769,7 +784,7 @@ func (c *WebSocketClient) matchesSingleFilter(message WebSocketMessage, filter E
 		// In a real implementation, you might want to add metadata fields to WebSocketMessage
 		return true // Simplified for now
 	}
-	
+
 	return true
 }
 
@@ -777,7 +792,7 @@ func (c *WebSocketClient) matchesSingleFilter(message WebSocketMessage, filter E
 func (h *WebSocketHub) BroadcastWithFiltering(message WebSocketMessage) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	for client := range h.clients {
 		// Check if the message passes the filter
 		if client.MatchesFilter(message) {
@@ -819,12 +834,12 @@ func (c *WebSocketClient) IsActive() bool {
 	if c.hub.config.ConnectionLimitConfig == nil {
 		return true // No connection limit configured
 	}
-	
+
 	timeout := c.hub.config.ConnectionLimitConfig.ConnectionTimeout
 	if timeout == 0 {
 		return true // No timeout configured
 	}
-	
+
 	return time.Since(c.GetLastActivity()) < timeout
 }
 
@@ -832,18 +847,18 @@ func (c *WebSocketClient) IsActive() bool {
 func (h *WebSocketHub) ConnectionStats() map[string]interface{} {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	stats := map[string]interface{}{
 		"total_clients": len(h.clients),
 	}
-	
+
 	if h.connectionLimiter != nil {
 		connectionStats := h.connectionLimiter.GetConnectionStats()
 		for k, v := range connectionStats {
 			stats[k] = v
 		}
 	}
-	
+
 	return stats
 }
 
@@ -851,7 +866,7 @@ func (h *WebSocketHub) ConnectionStats() map[string]interface{} {
 func (h *WebSocketHub) cleanupInactiveConnections(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -859,18 +874,20 @@ func (h *WebSocketHub) cleanupInactiveConnections(ctx context.Context) {
 		case <-ticker.C:
 			h.mu.RLock()
 			inactiveClients := make([]*WebSocketClient, 0)
-			
+
 			for client := range h.clients {
 				if !client.IsActive() {
 					inactiveClients = append(inactiveClients, client)
 				}
 			}
 			h.mu.RUnlock()
-			
+
 			// Close inactive connections
 			for _, client := range inactiveClients {
 				log.Printf("Closing inactive connection: %s", client.id)
-				client.conn.Close() // This will trigger cleanup via readPump
+				if err := client.conn.Close(); err != nil {
+					log.Printf("Error closing inactive WebSocket connection %s: %v", client.id, err)
+				}
 			}
 		}
 	}

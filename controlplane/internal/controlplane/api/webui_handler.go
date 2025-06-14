@@ -63,7 +63,10 @@ func (h *WebUIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.ServeContent(w, r, stat.Name(), stat.ModTime(), seeker)
 	} else {
 		// If not seekable, just copy the content
-		io.Copy(w, file)
+		if _, err := io.Copy(w, file); err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
@@ -87,13 +90,16 @@ func (h *WebUIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 		http.ServeContent(w, r, h.indexPath, stat.ModTime(), seeker)
 	} else {
 		// If not seekable, just copy the content
-		io.Copy(w, index)
+		if _, err := io.Copy(w, index); err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
 // setContentType sets the appropriate content type based on file extension
 func (h *WebUIHandler) setContentType(w http.ResponseWriter, path string) {
-	ext := strings.ToLower(path[strings.LastIndex(path, ".")	:])
+	ext := strings.ToLower(path[strings.LastIndex(path, "."):])
 	switch ext {
 	case ".html":
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

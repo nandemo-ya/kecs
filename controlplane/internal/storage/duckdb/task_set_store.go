@@ -294,4 +294,3 @@ func (s *taskSetStore) UpdatePrimary(ctx context.Context, serviceARN, taskSetID 
 	// and potentially adjust the scale of other task sets
 	return nil
 }
-

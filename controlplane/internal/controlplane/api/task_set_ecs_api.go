@@ -53,21 +53,21 @@ func (api *DefaultECSAPI) CreateTaskSet(ctx context.Context, req *generated.Crea
 
 	// Create storage object
 	storageTaskSet := &storage.TaskSet{
-		ID:               taskSetId,
-		ARN:              taskSetARN,
-		ServiceARN:       serviceARN,
-		ClusterARN:       clusterARN,
-		ExternalID:       ptr.ToString(req.ExternalId),
-		TaskDefinition:   ptr.ToString(req.TaskDefinition),
-		LaunchType:       ptr.ToString((*string)(req.LaunchType)),
-		PlatformVersion:  ptr.ToString(req.PlatformVersion),
-		Status:           "ACTIVE",
-		StabilityStatus:  "STEADY_STATE",
+		ID:                   taskSetId,
+		ARN:                  taskSetARN,
+		ServiceARN:           serviceARN,
+		ClusterARN:           clusterARN,
+		ExternalID:           ptr.ToString(req.ExternalId),
+		TaskDefinition:       ptr.ToString(req.TaskDefinition),
+		LaunchType:           ptr.ToString((*string)(req.LaunchType)),
+		PlatformVersion:      ptr.ToString(req.PlatformVersion),
+		Status:               "ACTIVE",
+		StabilityStatus:      "STEADY_STATE",
 		ComputedDesiredCount: 0, // Will be computed based on service desired count and scale
-		PendingCount:     0,
-		RunningCount:     0,
-		Region:          api.region,
-		AccountID:       api.accountID,
+		PendingCount:         0,
+		RunningCount:         0,
+		Region:               api.region,
+		AccountID:            api.accountID,
 	}
 
 	// Marshal complex fields to JSON
@@ -110,26 +110,26 @@ func (api *DefaultECSAPI) CreateTaskSet(ctx context.Context, req *generated.Crea
 	// Build response
 	resp := &generated.CreateTaskSetResponse{
 		TaskSet: &generated.TaskSet{
-			Id:               ptr.String(taskSetId),
-			TaskSetArn:       ptr.String(taskSetARN),
-			ServiceArn:       ptr.String(serviceARN),
-			ClusterArn:       ptr.String(clusterARN),
-			ExternalId:       req.ExternalId,
-			Status:           ptr.String("ACTIVE"),
-			TaskDefinition:   req.TaskDefinition,
-			LaunchType:       req.LaunchType,
-			Scale:            scale,
-			StabilityStatus:  (*generated.StabilityStatus)(ptr.String("STEADY_STATE")),
-			CreatedAt:        ptr.Time(storageTaskSet.CreatedAt),
-			LoadBalancers:    req.LoadBalancers,
-			ServiceRegistries: req.ServiceRegistries,
-			NetworkConfiguration: req.NetworkConfiguration,
+			Id:                       ptr.String(taskSetId),
+			TaskSetArn:               ptr.String(taskSetARN),
+			ServiceArn:               ptr.String(serviceARN),
+			ClusterArn:               ptr.String(clusterARN),
+			ExternalId:               req.ExternalId,
+			Status:                   ptr.String("ACTIVE"),
+			TaskDefinition:           req.TaskDefinition,
+			LaunchType:               req.LaunchType,
+			Scale:                    scale,
+			StabilityStatus:          (*generated.StabilityStatus)(ptr.String("STEADY_STATE")),
+			CreatedAt:                ptr.Time(storageTaskSet.CreatedAt),
+			LoadBalancers:            req.LoadBalancers,
+			ServiceRegistries:        req.ServiceRegistries,
+			NetworkConfiguration:     req.NetworkConfiguration,
 			CapacityProviderStrategy: req.CapacityProviderStrategy,
-			PlatformVersion:  req.PlatformVersion,
-			Tags:             req.Tags,
-			ComputedDesiredCount: ptr.Int32(0),
-			PendingCount:     ptr.Int32(0),
-			RunningCount:     ptr.Int32(0),
+			PlatformVersion:          req.PlatformVersion,
+			Tags:                     req.Tags,
+			ComputedDesiredCount:     ptr.Int32(0),
+			PendingCount:             ptr.Int32(0),
+			RunningCount:             ptr.Int32(0),
 		},
 	}
 
@@ -176,12 +176,12 @@ func (api *DefaultECSAPI) DeleteTaskSet(ctx context.Context, req *generated.Dele
 	// Build response
 	resp := &generated.DeleteTaskSetResponse{
 		TaskSet: &generated.TaskSet{
-			Id:             ptr.String(storageTaskSet.ID),
-			TaskSetArn:     ptr.String(storageTaskSet.ARN),
-			ServiceArn:     ptr.String(storageTaskSet.ServiceARN),
-			ClusterArn:     ptr.String(storageTaskSet.ClusterARN),
-			Status:         ptr.String("DRAINING"),
-			UpdatedAt:      ptr.Time(storageTaskSet.UpdatedAt),
+			Id:         ptr.String(storageTaskSet.ID),
+			TaskSetArn: ptr.String(storageTaskSet.ARN),
+			ServiceArn: ptr.String(storageTaskSet.ServiceARN),
+			ClusterArn: ptr.String(storageTaskSet.ClusterARN),
+			Status:     ptr.String("DRAINING"),
+			UpdatedAt:  ptr.Time(storageTaskSet.UpdatedAt),
 		},
 	}
 
@@ -220,18 +220,18 @@ func (api *DefaultECSAPI) DescribeTaskSets(ctx context.Context, req *generated.D
 
 	for _, ts := range storageTaskSets {
 		apiTaskSet := generated.TaskSet{
-			Id:             ptr.String(ts.ID),
-			TaskSetArn:     ptr.String(ts.ARN),
-			ServiceArn:     ptr.String(ts.ServiceARN),
-			ClusterArn:     ptr.String(ts.ClusterARN),
-			Status:         ptr.String(ts.Status),
-			TaskDefinition: ptr.String(ts.TaskDefinition),
+			Id:                   ptr.String(ts.ID),
+			TaskSetArn:           ptr.String(ts.ARN),
+			ServiceArn:           ptr.String(ts.ServiceARN),
+			ClusterArn:           ptr.String(ts.ClusterARN),
+			Status:               ptr.String(ts.Status),
+			TaskDefinition:       ptr.String(ts.TaskDefinition),
 			ComputedDesiredCount: ptr.Int32(ts.ComputedDesiredCount),
-			PendingCount:   ptr.Int32(ts.PendingCount),
-			RunningCount:   ptr.Int32(ts.RunningCount),
-			StabilityStatus: (*generated.StabilityStatus)(ptr.String(ts.StabilityStatus)),
-			CreatedAt:       ptr.Time(ts.CreatedAt),
-			UpdatedAt:       ptr.Time(ts.UpdatedAt),
+			PendingCount:         ptr.Int32(ts.PendingCount),
+			RunningCount:         ptr.Int32(ts.RunningCount),
+			StabilityStatus:      (*generated.StabilityStatus)(ptr.String(ts.StabilityStatus)),
+			CreatedAt:            ptr.Time(ts.CreatedAt),
+			UpdatedAt:            ptr.Time(ts.UpdatedAt),
 		}
 
 		// Set launch type if specified
@@ -362,18 +362,18 @@ func (api *DefaultECSAPI) UpdateTaskSet(ctx context.Context, req *generated.Upda
 
 	// Build response
 	apiTaskSet := &generated.TaskSet{
-		Id:             ptr.String(storageTaskSet.ID),
-		TaskSetArn:     ptr.String(storageTaskSet.ARN),
-		ServiceArn:     ptr.String(storageTaskSet.ServiceARN),
-		ClusterArn:     ptr.String(storageTaskSet.ClusterARN),
-		Status:         ptr.String(storageTaskSet.Status),
-		TaskDefinition: ptr.String(storageTaskSet.TaskDefinition),
-		Scale:          req.Scale,
-		StabilityStatus: (*generated.StabilityStatus)(ptr.String("STABILIZING")),
-		UpdatedAt:       ptr.Time(storageTaskSet.UpdatedAt),
+		Id:                   ptr.String(storageTaskSet.ID),
+		TaskSetArn:           ptr.String(storageTaskSet.ARN),
+		ServiceArn:           ptr.String(storageTaskSet.ServiceARN),
+		ClusterArn:           ptr.String(storageTaskSet.ClusterARN),
+		Status:               ptr.String(storageTaskSet.Status),
+		TaskDefinition:       ptr.String(storageTaskSet.TaskDefinition),
+		Scale:                req.Scale,
+		StabilityStatus:      (*generated.StabilityStatus)(ptr.String("STABILIZING")),
+		UpdatedAt:            ptr.Time(storageTaskSet.UpdatedAt),
 		ComputedDesiredCount: ptr.Int32(storageTaskSet.ComputedDesiredCount),
-		PendingCount:   ptr.Int32(storageTaskSet.PendingCount),
-		RunningCount:   ptr.Int32(storageTaskSet.RunningCount),
+		PendingCount:         ptr.Int32(storageTaskSet.PendingCount),
+		RunningCount:         ptr.Int32(storageTaskSet.RunningCount),
 	}
 
 	// Set launch type if specified

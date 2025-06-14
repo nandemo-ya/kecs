@@ -16,31 +16,31 @@ import (
 
 // Server represents the HTTP API server for KECS Control Plane
 type Server struct {
-	httpServer    *http.Server
-	port          int
-	kubeconfig    string
-	ecsAPI        generated.ECSAPIInterface
-	storage       storage.Storage
-	kindManager   *kubernetes.KindManager
-	taskManager   *kubernetes.TaskManager
-	region        string
-	accountID     string
-	webSocketHub  *WebSocketHub
-	webUIHandler  *WebUIHandler
+	httpServer   *http.Server
+	port         int
+	kubeconfig   string
+	ecsAPI       generated.ECSAPIInterface
+	storage      storage.Storage
+	kindManager  *kubernetes.KindManager
+	taskManager  *kubernetes.TaskManager
+	region       string
+	accountID    string
+	webSocketHub *WebSocketHub
+	webUIHandler *WebUIHandler
 }
 
 // NewServer creates a new API server instance
-func NewServer(port int, kubeconfig string, storage storage.Storage) *Server {
+func NewServer(port int, kubeconfig string, storage storage.Storage) (*Server, error) {
 	// Create WebSocket configuration
 	wsConfig := &WebSocketConfig{
 		AllowedOrigins: []string{
-			"http://localhost:3000",      // React development server
-			"http://localhost:8080",      // API server
+			"http://localhost:3000",                  // React development server
+			"http://localhost:8080",                  // API server
 			fmt.Sprintf("http://localhost:%d", port), // Dynamic port
 		},
 		AllowCredentials: true,
 	}
-	
+
 	// Add environment-specific origins
 	if envOrigins := os.Getenv("KECS_ALLOWED_ORIGINS"); envOrigins != "" {
 		additionalOrigins := strings.Split(envOrigins, ",")
@@ -51,7 +51,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage) *Server {
 			}
 		}
 	}
-	
+
 	// Initialize kindManager first
 	var kindManager *kubernetes.KindManager
 	if os.Getenv("KECS_TEST_MODE") != "true" {
@@ -74,8 +74,14 @@ func NewServer(port int, kubeconfig string, storage storage.Storage) *Server {
 	// Initialize task manager
 	taskManager, err := kubernetes.NewTaskManager(storage)
 	if err != nil {
-		log.Printf("Warning: Failed to initialize task manager: %v", err)
-		// Continue without task manager - some features may not work
+		if os.Getenv("KECS_TEST_MODE") == "true" {
+			log.Printf("Warning: Failed to initialize task manager in test mode: %v", err)
+			// Continue without task manager in test mode - some features may not work
+		} else {
+			log.Printf("Error: Failed to initialize task manager: %v", err)
+			// TaskManager is critical for normal operation, return error
+			return nil, fmt.Errorf("failed to initialize task manager: %w", err)
+		}
 	} else {
 		s.taskManager = taskManager
 	}
@@ -87,7 +93,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage) *Server {
 		}
 	}
 
-	return s
+	return s, nil
 }
 
 // Start starts the HTTP server
@@ -153,10 +159,10 @@ func (s *Server) setupRoutes() http.Handler {
 		}
 		// Remove trailing slash
 		uiBasePath = strings.TrimSuffix(uiBasePath, "/")
-		
+
 		// Handle UI routes - this will match /ui/* paths
 		mux.Handle(uiBasePath+"/", http.StripPrefix(uiBasePath, s.webUIHandler))
-		
+
 		// Redirect /ui to /ui/
 		mux.HandleFunc(uiBasePath, func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, uiBasePath+"/", http.StatusMovedPermanently)
@@ -172,7 +178,6 @@ func (s *Server) setupRoutes() http.Handler {
 
 	return handler
 }
-
 
 // handleHealthCheck handles the health check endpoint
 func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {

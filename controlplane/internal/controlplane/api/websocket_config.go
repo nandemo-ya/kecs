@@ -199,7 +199,7 @@ func (c *WebSocketConfig) matchOrigin(originURL *url.URL, allowed string) bool {
 func (c *WebSocketConfig) isSameOrigin(r *http.Request) bool {
 	// Get the host from the request
 	host := r.Host
-	
+
 	// Get the referer
 	referer := r.Header.Get("Referer")
 	if referer == "" {
@@ -219,9 +219,9 @@ func (c *WebSocketConfig) isSameOrigin(r *http.Request) bool {
 // BuildWebSocketUpgrader creates a WebSocket upgrader with the configured origin check
 func (c *WebSocketConfig) BuildWebSocketUpgrader() *Upgrader {
 	return &Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-		CheckOrigin:     c.CheckOrigin,
+		ReadBufferSize:    1024,
+		WriteBufferSize:   1024,
+		CheckOrigin:       c.CheckOrigin,
 		EnableCompression: true,
 	}
 }

@@ -57,14 +57,14 @@ var _ = Describe("WebSocketRateLimit", func() {
 		It("should reset rate limit after cleanup", func() {
 			// Create a new limiter for this test to avoid global rate limit issues
 			cleanupConfig := &RateLimitConfig{
-				MessagesPerMinute:       60,  // 1 per second
+				MessagesPerMinute:       60, // 1 per second
 				BurstSize:               5,
 				GlobalMessagesPerMinute: 600, // 10 per second globally
 				GlobalBurstSize:         50,  // Large global burst
 				BypassRoles:             []string{"admin"},
 			}
 			cleanupLimiter := NewRateLimiter(cleanupConfig)
-			
+
 			clientID := "cleanup-client"
 			authInfo := &AuthInfo{UserID: "user2", Roles: []string{"user"}}
 
@@ -105,10 +105,10 @@ var _ = Describe("WebSocketRateLimit", func() {
 		It("should enforce per-user connection limit", func() {
 			req1 := httptest.NewRequest("GET", "/ws", nil)
 			req1.RemoteAddr = "192.168.1.1:1234"
-			
+
 			req2 := httptest.NewRequest("GET", "/ws", nil)
 			req2.RemoteAddr = "192.168.1.2:1234"
-			
+
 			req3 := httptest.NewRequest("GET", "/ws", nil)
 			req3.RemoteAddr = "192.168.1.3:1234"
 
@@ -165,7 +165,7 @@ var _ = Describe("WebSocketRateLimit", func() {
 		It("should track connection statistics", func() {
 			req1 := httptest.NewRequest("GET", "/ws", nil)
 			req1.RemoteAddr = "192.168.1.1:1234"
-			
+
 			req2 := httptest.NewRequest("GET", "/ws", nil)
 			req2.RemoteAddr = "192.168.1.2:1234"
 
@@ -317,7 +317,7 @@ var _ = Describe("WebSocketRateLimit", func() {
 			// Create test server
 			handler := server.HandleWebSocket(hub)
 			ts = httptest.NewServer(handler)
-			
+
 			connections = make([]*websocket.Conn, 0)
 		})
 
@@ -379,7 +379,7 @@ var _ = Describe("WebSocketRateLimit", func() {
 			// Fourth total connection should fail (we have 3 connections already)
 			header3 := http.Header{}
 			header3.Set("X-User-ID", "user3")
-			
+
 			_, resp, err := websocket.DefaultDialer.Dial(wsURL, header3)
 			Expect(err).To(HaveOccurred())
 			if resp != nil {
@@ -399,16 +399,16 @@ var _ = Describe("WebSocketRateLimit", func() {
 			}
 
 			hub := NewWebSocketHubWithConfig(config)
-			
+
 			// Create a mock client
 			client := &WebSocketClient{
 				hub:          hub,
 				lastActivity: time.Now().Add(-200 * time.Millisecond), // 200ms ago
 			}
-			
+
 			// Test IsActive method
 			Expect(client.IsActive()).To(BeFalse(), "Client should be inactive after timeout")
-			
+
 			// Update activity
 			client.updateLastActivity()
 			Expect(client.IsActive()).To(BeTrue(), "Client should be active after update")
@@ -420,11 +420,11 @@ var _ = Describe("WebSocketRateLimit", func() {
 			func(headers map[string]string, remoteAddr, expectedIP string) {
 				req := httptest.NewRequest("GET", "/ws", nil)
 				req.RemoteAddr = remoteAddr
-				
+
 				for k, v := range headers {
 					req.Header.Set(k, v)
 				}
-				
+
 				ip := getClientIP(req)
 				Expect(ip).To(Equal(expectedIP))
 			},

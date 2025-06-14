@@ -214,12 +214,12 @@ func (c *ConnectionLimiter) GetConnectionStats() map[string]interface{} {
 	defer c.mu.RUnlock()
 
 	return map[string]interface{}{
-		"total_connections":  c.totalConnections,
-		"users_connected":    len(c.connectionsPerUser),
-		"unique_ips":         len(c.connectionsPerIP),
-		"max_total":          c.config.MaxTotalConnections,
-		"max_per_user":       c.config.MaxConnectionsPerUser,
-		"max_per_ip":         c.config.MaxConnectionsPerIP,
+		"total_connections": c.totalConnections,
+		"users_connected":   len(c.connectionsPerUser),
+		"unique_ips":        len(c.connectionsPerIP),
+		"max_total":         c.config.MaxTotalConnections,
+		"max_per_user":      c.config.MaxConnectionsPerUser,
+		"max_per_ip":        c.config.MaxConnectionsPerIP,
 	}
 }
 
@@ -258,7 +258,7 @@ func getClientIP(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
-	
+
 	// Check X-Forwarded-For header first (for proxied connections)
 	forwarded := r.Header.Get("X-Forwarded-For")
 	if forwarded != "" {

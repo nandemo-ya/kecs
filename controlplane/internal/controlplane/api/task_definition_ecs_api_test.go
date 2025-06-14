@@ -13,9 +13,9 @@ import (
 
 var _ = Describe("Task Definition ECS API", func() {
 	var (
-		server *Server
-		ctx    context.Context
-		mockStorage *mocks.MockStorage
+		server           *Server
+		ctx              context.Context
+		mockStorage      *mocks.MockStorage
 		mockTaskDefStore *mocks.MockTaskDefinitionStore
 	)
 
@@ -23,7 +23,7 @@ var _ = Describe("Task Definition ECS API", func() {
 		mockStorage = mocks.NewMockStorage()
 		mockTaskDefStore = mocks.NewMockTaskDefinitionStore()
 		mockStorage.SetTaskDefinitionStore(mockTaskDefStore)
-		
+
 		server = &Server{
 			storage:     mockStorage,
 			kindManager: nil, // Skip actual kind cluster creation in tests

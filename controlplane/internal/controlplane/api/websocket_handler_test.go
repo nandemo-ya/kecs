@@ -32,13 +32,13 @@ var _ = Describe("WebSocketHandler", func() {
 	Context("when running the WebSocket hub", func() {
 		It("should handle client registration and unregistration", func() {
 			hub = NewWebSocketHub()
-			
+
 			// Run hub in background
 			go hub.Run(ctx)
-			
+
 			// Give it time to start
 			time.Sleep(10 * time.Millisecond)
-			
+
 			// Test client registration
 			client := &WebSocketClient{
 				hub:           hub,
@@ -47,22 +47,22 @@ var _ = Describe("WebSocketHandler", func() {
 				subscriptions: make(map[string]map[string]bool),
 				filters:       []EventFilter{},
 			}
-			
+
 			hub.register <- client
 			time.Sleep(10 * time.Millisecond)
-			
+
 			// Check client is registered
 			hub.mu.RLock()
 			Expect(hub.clients[client]).To(BeTrue())
 			hub.mu.RUnlock()
-			
+
 			// Test broadcast
 			testMsg := WebSocketMessage{
 				Type:      "test",
 				Timestamp: time.Now(),
 			}
 			hub.broadcast <- testMsg
-			
+
 			// Client should receive the message
 			Eventually(func() WebSocketMessage {
 				select {
@@ -72,11 +72,11 @@ var _ = Describe("WebSocketHandler", func() {
 					return WebSocketMessage{}
 				}
 			}, 100*time.Millisecond).Should(Equal(testMsg))
-			
+
 			// Test client unregistration
 			hub.unregister <- client
 			time.Sleep(10 * time.Millisecond)
-			
+
 			// Check client is unregistered
 			hub.mu.RLock()
 			Expect(hub.clients[client]).To(BeFalse())
@@ -89,41 +89,41 @@ var _ = Describe("WebSocketHandler", func() {
 			func(config *WebSocketConfig, origin string, expectUpgrade bool) {
 				// Create hub with config
 				hub = NewWebSocketHubWithConfig(config)
-				
+
 				// Start hub in background
 				go hub.Run(ctx)
-				
+
 				// Give hub time to start
 				time.Sleep(10 * time.Millisecond)
-				
+
 				// Create server
 				server := &Server{
 					webSocketHub: hub,
 				}
-				
+
 				// Create test server
 				handler := server.HandleWebSocket(hub)
 				ts := httptest.NewServer(handler)
 				defer ts.Close()
-				
+
 				// Convert http to ws
 				wsURL := "ws" + strings.TrimPrefix(ts.URL, "http")
-				
+
 				// Create WebSocket connection request
 				dialer := websocket.DefaultDialer
 				header := http.Header{}
 				if origin != "" {
 					header.Set("Origin", origin)
 				}
-				
+
 				// Attempt connection
 				conn, resp, err := dialer.Dial(wsURL, header)
-				
+
 				if expectUpgrade {
 					Expect(err).NotTo(HaveOccurred())
 					Expect(conn).NotTo(BeNil())
 					defer conn.Close()
-					
+
 					// Connection was successful - origin check passed
 					// Give time for the client to be registered
 					time.Sleep(50 * time.Millisecond)
@@ -174,7 +174,7 @@ var _ = Describe("WebSocketHandler", func() {
 					AuthEnabled: false,
 				},
 			}
-			
+
 			client = &WebSocketClient{
 				hub:           hub,
 				send:          make(chan WebSocketMessage, 10),
@@ -189,9 +189,9 @@ var _ = Describe("WebSocketHandler", func() {
 				Type: "ping",
 				ID:   "123",
 			}
-			
+
 			client.handleMessage(message)
-			
+
 			var response WebSocketMessage
 			Eventually(func() WebSocketMessage {
 				select {
@@ -202,7 +202,7 @@ var _ = Describe("WebSocketHandler", func() {
 					return WebSocketMessage{}
 				}
 			}, 100*time.Millisecond).ShouldNot(Equal(WebSocketMessage{}))
-			
+
 			Expect(response.Type).To(Equal("pong"))
 			Expect(response.ID).To(Equal("123"))
 		})
@@ -212,7 +212,7 @@ var _ = Describe("WebSocketHandler", func() {
 				Type:    "subscribe",
 				Payload: []byte(`{"resourceType":"task","resourceId":"task-123"}`),
 			}
-			
+
 			client.handleMessage(message)
 			// For now, just ensure no panic
 			// In real implementation, would check subscription state
@@ -223,7 +223,7 @@ var _ = Describe("WebSocketHandler", func() {
 				Type:    "unsubscribe",
 				Payload: []byte(`{"resourceType":"task","resourceId":"task-123"}`),
 			}
-			
+
 			client.handleMessage(message)
 			// For now, just ensure no panic
 			// In real implementation, would check subscription state
@@ -233,7 +233,7 @@ var _ = Describe("WebSocketHandler", func() {
 			message := WebSocketMessage{
 				Type: "unknown",
 			}
-			
+
 			// Should not crash
 			client.handleMessage(message)
 		})
@@ -245,7 +245,7 @@ var _ = Describe("WebSocketHandler", func() {
 		BeforeEach(func() {
 			hub = NewWebSocketHub()
 			go hub.Run(ctx)
-			
+
 			// Create and register multiple clients
 			clients = make([]*WebSocketClient, 3)
 			for i := 0; i < 3; i++ {
@@ -258,7 +258,7 @@ var _ = Describe("WebSocketHandler", func() {
 				}
 				hub.register <- clients[i]
 			}
-			
+
 			// Give time for registration
 			time.Sleep(10 * time.Millisecond)
 		})
@@ -268,7 +268,7 @@ var _ = Describe("WebSocketHandler", func() {
 				"status": "RUNNING",
 				"cpu":    "50%",
 			})
-			
+
 			// All clients should receive the update
 			for i, client := range clients {
 				var msg WebSocketMessage
@@ -281,7 +281,7 @@ var _ = Describe("WebSocketHandler", func() {
 						return WebSocketMessage{}
 					}
 				}, 100*time.Millisecond, 10*time.Millisecond).ShouldNot(Equal(WebSocketMessage{}), "Client %d did not receive task update", i)
-				
+
 				Expect(msg.Type).To(Equal("task_update"))
 				Expect(msg.Payload).NotTo(BeNil())
 			}
@@ -293,7 +293,7 @@ var _ = Describe("WebSocketHandler", func() {
 				"level":     "info",
 				"timestamp": time.Now(),
 			})
-			
+
 			// All clients should receive the log
 			for i, client := range clients {
 				var msg WebSocketMessage
@@ -306,7 +306,7 @@ var _ = Describe("WebSocketHandler", func() {
 						return WebSocketMessage{}
 					}
 				}, 100*time.Millisecond, 10*time.Millisecond).ShouldNot(Equal(WebSocketMessage{}), "Client %d did not receive log entry", i)
-				
+
 				Expect(msg.Type).To(Equal("log_entry"))
 				Expect(msg.Payload).NotTo(BeNil())
 			}
@@ -317,7 +317,7 @@ var _ = Describe("WebSocketHandler", func() {
 				"cpu_usage":    75.5,
 				"memory_usage": 1024,
 			})
-			
+
 			// All clients should receive the metrics
 			for i, client := range clients {
 				var msg WebSocketMessage
@@ -330,7 +330,7 @@ var _ = Describe("WebSocketHandler", func() {
 						return WebSocketMessage{}
 					}
 				}, 100*time.Millisecond, 10*time.Millisecond).ShouldNot(Equal(WebSocketMessage{}), "Client %d did not receive metric update", i)
-				
+
 				Expect(msg.Type).To(Equal("metric_update"))
 				Expect(msg.Payload).NotTo(BeNil())
 			}
@@ -347,7 +347,7 @@ var _ = Describe("WebSocketHandler", func() {
 					AuthEnabled: false,
 				},
 			}
-			
+
 			client = &WebSocketClient{
 				hub:     hub,
 				id:      "test-client",
@@ -368,14 +368,14 @@ var _ = Describe("WebSocketHandler", func() {
 			client.SetFilters([]EventFilter{
 				{EventTypes: []string{"task_update", "service_update"}},
 			})
-			
+
 			msg := WebSocketMessage{
 				Type:         "task_update",
 				ResourceType: "task",
 				ResourceID:   "task-123",
 			}
 			Expect(client.MatchesFilter(msg)).To(BeTrue())
-			
+
 			msg.Type = "log_entry"
 			Expect(client.MatchesFilter(msg)).To(BeFalse())
 		})
@@ -384,14 +384,14 @@ var _ = Describe("WebSocketHandler", func() {
 			client.SetFilters([]EventFilter{
 				{ResourceTypes: []string{"task", "service"}},
 			})
-			
+
 			msg := WebSocketMessage{
 				Type:         "task_update",
 				ResourceType: "task",
 				ResourceID:   "task-123",
 			}
 			Expect(client.MatchesFilter(msg)).To(BeTrue())
-			
+
 			msg.ResourceType = "cluster"
 			Expect(client.MatchesFilter(msg)).To(BeFalse())
 		})
@@ -400,14 +400,14 @@ var _ = Describe("WebSocketHandler", func() {
 			client.SetFilters([]EventFilter{
 				{ResourceIDs: []string{"task-123", "task-456"}},
 			})
-			
+
 			msg := WebSocketMessage{
 				Type:         "task_update",
 				ResourceType: "task",
 				ResourceID:   "task-123",
 			}
 			Expect(client.MatchesFilter(msg)).To(BeTrue())
-			
+
 			msg.ResourceID = "task-789"
 			Expect(client.MatchesFilter(msg)).To(BeFalse())
 		})
@@ -416,7 +416,7 @@ var _ = Describe("WebSocketHandler", func() {
 			client.SetFilters([]EventFilter{
 				{ResourceIDs: []string{"*"}},
 			})
-			
+
 			msg := WebSocketMessage{
 				Type:         "task_update",
 				ResourceType: "task",
@@ -433,14 +433,14 @@ var _ = Describe("WebSocketHandler", func() {
 					ResourceIDs:   []string{"task-123"},
 				},
 			})
-			
+
 			msg := WebSocketMessage{
 				Type:         "task_update",
 				ResourceType: "task",
 				ResourceID:   "task-123",
 			}
 			Expect(client.MatchesFilter(msg)).To(BeTrue())
-			
+
 			msg.ResourceID = "task-456"
 			Expect(client.MatchesFilter(msg)).To(BeFalse())
 		})
@@ -450,19 +450,19 @@ var _ = Describe("WebSocketHandler", func() {
 				{EventTypes: []string{"task_update"}},
 				{ResourceTypes: []string{"service"}},
 			})
-			
+
 			msg := WebSocketMessage{
 				Type:         "task_update",
 				ResourceType: "cluster",
 			}
 			Expect(client.MatchesFilter(msg)).To(BeTrue()) // Matches first filter
-			
+
 			msg = WebSocketMessage{
 				Type:         "cluster_update",
 				ResourceType: "service",
 			}
 			Expect(client.MatchesFilter(msg)).To(BeTrue()) // Matches second filter
-			
+
 			msg = WebSocketMessage{
 				Type:         "cluster_update",
 				ResourceType: "cluster",
@@ -481,7 +481,7 @@ var _ = Describe("WebSocketHandler", func() {
 					AuthEnabled: false,
 				},
 			}
-			
+
 			client = &WebSocketClient{
 				hub:     hub,
 				send:    make(chan WebSocketMessage, 10),
@@ -497,21 +497,21 @@ var _ = Describe("WebSocketHandler", func() {
 					ResourceTypes: []string{"task", "service"},
 				},
 			}
-			
+
 			filtersJSON, _ := json.Marshal(filters)
 			setFiltersMsg := WebSocketMessage{
 				Type:    "setFilters",
 				ID:      "msg-789",
 				Payload: filtersJSON,
 			}
-			
+
 			client.handleMessage(setFiltersMsg)
-			
+
 			// Check filters were set
 			Expect(client.filters).To(HaveLen(1))
 			Expect(client.filters[0].EventTypes).To(Equal(filters[0].EventTypes))
 			Expect(client.filters[0].ResourceTypes).To(Equal(filters[0].ResourceTypes))
-			
+
 			// Check confirmation was sent
 			var msg WebSocketMessage
 			Eventually(func() WebSocketMessage {
@@ -523,7 +523,7 @@ var _ = Describe("WebSocketHandler", func() {
 					return WebSocketMessage{}
 				}
 			}, 100*time.Millisecond).ShouldNot(Equal(WebSocketMessage{}))
-			
+
 			Expect(msg.Type).To(Equal("filtersSet"))
 			Expect(msg.ID).To(Equal("msg-789"))
 			Expect(msg.Payload).To(Equal(setFiltersMsg.Payload))
@@ -551,7 +551,7 @@ var _ = Describe("WebSocketHandler", func() {
 					{EventTypes: []string{"task_update"}},
 				},
 			}
-			
+
 			clientWithServiceFilter = &WebSocketClient{
 				hub:           hub,
 				send:          make(chan WebSocketMessage, 10),
@@ -561,7 +561,7 @@ var _ = Describe("WebSocketHandler", func() {
 					{EventTypes: []string{"service_update"}},
 				},
 			}
-			
+
 			clientWithNoFilter = &WebSocketClient{
 				hub:           hub,
 				send:          make(chan WebSocketMessage, 10),
@@ -637,7 +637,7 @@ var _ = Describe("WebSocketHandler", func() {
 				subscriptions: make(map[string]map[string]bool),
 				filters:       []EventFilter{},
 			}
-			
+
 			unsubscribedClient = &WebSocketClient{
 				hub:           hub,
 				send:          make(chan WebSocketMessage, 10),
@@ -693,7 +693,7 @@ var _ = Describe("WebSocketHandler", func() {
 					AuthEnabled: false,
 				},
 			}
-			
+
 			client = &WebSocketClient{
 				hub:           hub,
 				id:            "test-client",
@@ -717,7 +717,7 @@ var _ = Describe("WebSocketHandler", func() {
 		It("should handle unsubscription", func() {
 			client.Subscribe("task", "task-123")
 			Expect(client.IsSubscribed("task", "task-123")).To(BeTrue())
-			
+
 			client.Unsubscribe("task", "task-123")
 			Expect(client.IsSubscribed("task", "task-123")).To(BeFalse())
 		})
@@ -725,11 +725,11 @@ var _ = Describe("WebSocketHandler", func() {
 		It("should handle multiple subscriptions", func() {
 			client.Subscribe("cluster", "cluster-1")
 			client.Subscribe("cluster", "cluster-2")
-			
+
 			client.Unsubscribe("cluster", "cluster-1")
 			Expect(client.IsSubscribed("cluster", "cluster-1")).To(BeFalse())
 			Expect(client.IsSubscribed("cluster", "cluster-2")).To(BeTrue())
-			
+
 			client.Unsubscribe("cluster", "cluster-2")
 			Expect(client.IsSubscribed("cluster", "cluster-2")).To(BeFalse())
 		})
@@ -745,7 +745,7 @@ var _ = Describe("WebSocketHandler", func() {
 					AuthEnabled: false,
 				},
 			}
-			
+
 			client = &WebSocketClient{
 				hub:           hub,
 				send:          make(chan WebSocketMessage, 10),
@@ -761,12 +761,12 @@ var _ = Describe("WebSocketHandler", func() {
 				ID:      "msg-123",
 				Payload: []byte(`{"resourceType":"task","resourceId":"task-123"}`),
 			}
-			
+
 			client.handleMessage(subscribeMsg)
-			
+
 			// Check subscription was added
 			Expect(client.IsSubscribed("task", "task-123")).To(BeTrue())
-			
+
 			// Check confirmation was sent
 			var msg WebSocketMessage
 			Eventually(func() WebSocketMessage {
@@ -778,7 +778,7 @@ var _ = Describe("WebSocketHandler", func() {
 					return WebSocketMessage{}
 				}
 			}, 100*time.Millisecond).ShouldNot(Equal(WebSocketMessage{}))
-			
+
 			Expect(msg.Type).To(Equal("subscribed"))
 			Expect(msg.ID).To(Equal("msg-123"))
 			Expect(msg.Payload).To(Equal(subscribeMsg.Payload))
@@ -787,18 +787,18 @@ var _ = Describe("WebSocketHandler", func() {
 		It("should handle unsubscribe message", func() {
 			// First subscribe
 			client.Subscribe("task", "task-123")
-			
+
 			unsubscribeMsg := WebSocketMessage{
 				Type:    "unsubscribe",
 				ID:      "msg-456",
 				Payload: []byte(`{"resourceType":"task","resourceId":"task-123"}`),
 			}
-			
+
 			client.handleMessage(unsubscribeMsg)
-			
+
 			// Check subscription was removed
 			Expect(client.IsSubscribed("task", "task-123")).To(BeFalse())
-			
+
 			// Check confirmation was sent
 			var msg WebSocketMessage
 			Eventually(func() WebSocketMessage {
@@ -810,7 +810,7 @@ var _ = Describe("WebSocketHandler", func() {
 					return WebSocketMessage{}
 				}
 			}, 100*time.Millisecond).ShouldNot(Equal(WebSocketMessage{}))
-			
+
 			Expect(msg.Type).To(Equal("unsubscribed"))
 			Expect(msg.ID).To(Equal("msg-456"))
 			Expect(msg.Payload).To(Equal(unsubscribeMsg.Payload))

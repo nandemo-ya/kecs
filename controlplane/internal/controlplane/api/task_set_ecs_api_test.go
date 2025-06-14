@@ -16,17 +16,17 @@ import (
 
 var _ = Describe("TaskSetEcsApi", func() {
 	var (
-		ctx            context.Context
-		ecsAPI         generated.ECSAPIInterface
-		mockStorage    *mocks.MockStorage
+		ctx              context.Context
+		ecsAPI           generated.ECSAPIInterface
+		mockStorage      *mocks.MockStorage
 		mockTaskSetStore *mocks.MockTaskSetStore
 		mockServiceStore *mocks.MockServiceStore
-		region         string
-		accountID      string
-		clusterName    string
-		serviceName    string
-		serviceARN     string
-		clusterARN     string
+		region           string
+		accountID        string
+		clusterName      string
+		serviceName      string
+		serviceARN       string
+		clusterARN       string
 	)
 
 	BeforeEach(func() {
@@ -41,7 +41,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 		mockStorage = mocks.NewMockStorage()
 		mockTaskSetStore = mocks.NewMockTaskSetStore()
 		mockServiceStore = mocks.NewMockServiceStore()
-		
+
 		mockStorage.SetTaskSetStore(mockTaskSetStore)
 		mockStorage.SetServiceStore(mockServiceStore)
 
@@ -215,7 +215,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 				Tags:                 `[{"key":"Environment","value":"test"}]`,
 			})
 			Expect(err).To(BeNil())
-			
+
 			err = mockTaskSetStore.Create(ctx, &storage.TaskSet{
 				ID:                   "ts-87654321",
 				ARN:                  fmt.Sprintf("arn:aws:ecs:%s:%s:task-set/%s/%s/ts-87654321", region, accountID, clusterName, serviceName),

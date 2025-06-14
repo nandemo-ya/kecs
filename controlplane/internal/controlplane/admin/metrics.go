@@ -28,26 +28,26 @@ type Metrics struct {
 
 // ApplicationMetrics contains application-level metrics
 type ApplicationMetrics struct {
-	Version        string    `json:"version"`
-	StartTime      time.Time `json:"start_time"`
-	Uptime         string    `json:"uptime"`
-	UptimeSeconds  float64   `json:"uptime_seconds"`
+	Version       string    `json:"version"`
+	StartTime     time.Time `json:"start_time"`
+	Uptime        string    `json:"uptime"`
+	UptimeSeconds float64   `json:"uptime_seconds"`
 }
 
 // RuntimeMetrics contains Go runtime metrics
 type RuntimeMetrics struct {
-	GoVersion       string      `json:"go_version"`
-	NumCPU          int         `json:"num_cpu"`
-	NumGoroutine    int         `json:"num_goroutine"`
-	MemoryStats     MemoryStats `json:"memory"`
+	GoVersion    string      `json:"go_version"`
+	NumCPU       int         `json:"num_cpu"`
+	NumGoroutine int         `json:"num_goroutine"`
+	MemoryStats  MemoryStats `json:"memory"`
 }
 
 // APIMetrics contains API-related metrics
 type APIMetrics struct {
-	TotalRequests   int64   `json:"total_requests"`
-	ErrorCount      int64   `json:"error_count"`
-	AverageLatency  float64 `json:"average_latency_ms"`
-	ActiveRequests  int64   `json:"active_requests"`
+	TotalRequests  int64   `json:"total_requests"`
+	ErrorCount     int64   `json:"error_count"`
+	AverageLatency float64 `json:"average_latency_ms"`
+	ActiveRequests int64   `json:"active_requests"`
 }
 
 // StorageMetrics contains storage-related metrics
@@ -140,7 +140,7 @@ func (mc *MetricsCollector) GetMetrics() Metrics {
 func (s *Server) handleMetrics(collector *MetricsCollector) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		metrics := collector.GetMetrics()
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(metrics)
@@ -151,38 +151,38 @@ func (s *Server) handleMetrics(collector *MetricsCollector) http.HandlerFunc {
 func (s *Server) handlePrometheusMetrics(collector *MetricsCollector) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		metrics := collector.GetMetrics()
-		
+
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 		w.WriteHeader(http.StatusOK)
-		
+
 		// Write metrics in Prometheus format
 		// Application metrics
 		fmt.Fprintf(w, "# HELP kecs_up Whether the KECS server is up\n")
 		fmt.Fprintf(w, "# TYPE kecs_up gauge\n")
 		fmt.Fprintf(w, "kecs_up 1\n")
-		
+
 		fmt.Fprintf(w, "# HELP kecs_uptime_seconds Time since KECS server started in seconds\n")
 		fmt.Fprintf(w, "# TYPE kecs_uptime_seconds counter\n")
 		fmt.Fprintf(w, "kecs_uptime_seconds %f\n", metrics.Application.UptimeSeconds)
-		
+
 		// Runtime metrics
 		fmt.Fprintf(w, "# HELP kecs_goroutines Number of goroutines\n")
 		fmt.Fprintf(w, "# TYPE kecs_goroutines gauge\n")
 		fmt.Fprintf(w, "kecs_goroutines %d\n", metrics.Runtime.NumGoroutine)
-		
+
 		fmt.Fprintf(w, "# HELP kecs_memory_alloc_bytes Current memory allocation in bytes\n")
 		fmt.Fprintf(w, "# TYPE kecs_memory_alloc_bytes gauge\n")
 		fmt.Fprintf(w, "kecs_memory_alloc_bytes %d\n", metrics.Runtime.MemoryStats.Alloc)
-		
+
 		// API metrics
 		fmt.Fprintf(w, "# HELP kecs_api_requests_total Total number of API requests\n")
 		fmt.Fprintf(w, "# TYPE kecs_api_requests_total counter\n")
 		fmt.Fprintf(w, "kecs_api_requests_total %d\n", metrics.API.TotalRequests)
-		
+
 		fmt.Fprintf(w, "# HELP kecs_api_errors_total Total number of API errors\n")
 		fmt.Fprintf(w, "# TYPE kecs_api_errors_total counter\n")
 		fmt.Fprintf(w, "kecs_api_errors_total %d\n", metrics.API.ErrorCount)
-		
+
 		// WebSocket metrics
 		fmt.Fprintf(w, "# HELP kecs_websocket_connections_active Number of active WebSocket connections\n")
 		fmt.Fprintf(w, "# TYPE kecs_websocket_connections_active gauge\n")
