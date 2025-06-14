@@ -133,7 +133,9 @@ setup_dependencies() {
 create_vscode_workspace() {
     local branch_name=$1
     local worktree_path="${WORKTREE_DIR}/${branch_name}"
-    local workspace_file="${worktree_path}/kecs-${branch_name}.code-workspace"
+    # Replace slashes with dashes for filename
+    local safe_branch_name=$(echo "$branch_name" | tr '/' '-')
+    local workspace_file="${worktree_path}/kecs-${safe_branch_name}.code-workspace"
     
     print_info "Creating VS Code workspace file for ${branch_name}"
     
@@ -320,7 +322,7 @@ main() {
     echo ""
     echo "To work on a feature:"
     echo "  cd ${WORKTREE_DIR}/<branch-name>"
-    echo "  code kecs-<branch-name>.code-workspace"
+    echo "  code kecs-<branch-name>.code-workspace  # Note: slashes in branch names are replaced with dashes"
     echo ""
     echo "To run tests in a worktree:"
     echo "  cd ${WORKTREE_DIR}/<branch-name>/controlplane"
