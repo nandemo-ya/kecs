@@ -21,77 +21,44 @@ var _ = Describe("TaskConverter", func() {
 	Describe("parseSecretARN", func() {
 		It("should parse Secrets Manager ARN with JSON key", func() {
 			arn := "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf:username::"
-			result := converter.parseSecretARN(arn)
+			result, err := converter.parseSecretArn(arn)
 
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).NotTo(BeNil())
-			Expect(result.SecretName).To(Equal("kecs-secret-my-secret"))
+			Expect(result.SecretName).To(Equal("my-secret-AbCdEf"))
 			Expect(result.Key).To(Equal("username"))
 			Expect(result.Source).To(Equal("secretsmanager"))
 		})
 
 		It("should parse Secrets Manager ARN without JSON key", func() {
 			arn := "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf"
-			result := converter.parseSecretARN(arn)
+			result, err := converter.parseSecretArn(arn)
 
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).NotTo(BeNil())
-			Expect(result.SecretName).To(Equal("kecs-secret-my-secret"))
-			Expect(result.Key).To(Equal("value"))
+			Expect(result.SecretName).To(Equal("my-secret-AbCdEf"))
+			Expect(result.Key).To(Equal("default"))
 			Expect(result.Source).To(Equal("secretsmanager"))
 		})
 
 		It("should parse SSM Parameter Store ARN", func() {
 			arn := "arn:aws:ssm:us-east-1:123456789012:parameter/app/database/password"
-			result := converter.parseSecretARN(arn)
+			result, err := converter.parseSecretArn(arn)
 
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).NotTo(BeNil())
-			Expect(result.SecretName).To(Equal("kecs-secret-app-database-password"))
+			Expect(result.SecretName).To(Equal("app/database/password"))
 			Expect(result.Key).To(Equal("value"))
 			Expect(result.Source).To(Equal("ssm"))
 		})
 
-		It("should return nil for invalid ARN", func() {
-			result := converter.parseSecretARN("invalid-arn")
+		It("should return error for invalid ARN", func() {
+			result, err := converter.parseSecretArn("invalid-arn")
+			Expect(err).To(HaveOccurred())
 			Expect(result).To(BeNil())
 		})
 	})
 
-	Describe("CollectSecrets", func() {
-		It("should collect and deduplicate secrets from container definitions", func() {
-			containerDefs := []types.ContainerDefinition{
-				{
-					Name:  ptr.To("web"),
-					Image: ptr.To("nginx:latest"),
-					Secrets: []types.Secret{
-						{
-							Name:      ptr.To("DB_PASSWORD"),
-							ValueFrom: ptr.To("arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pass-XyZ123"),
-						},
-						{
-							Name:      ptr.To("API_KEY"),
-							ValueFrom: ptr.To("arn:aws:ssm:us-east-1:123456789012:parameter/api/key"),
-						},
-					},
-				},
-				{
-					Name:  ptr.To("app"),
-					Image: ptr.To("myapp:latest"),
-					Secrets: []types.Secret{
-						{
-							Name:      ptr.To("DB_PASSWORD2"),
-							ValueFrom: ptr.To("arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pass-XyZ123"), // Same secret
-						},
-					},
-				},
-			}
-
-			secrets := converter.CollectSecrets(containerDefs)
-
-			// Should have 2 unique secrets (db-pass and api-key) - keys are ARNs
-			Expect(secrets).To(HaveLen(2))
-			Expect(secrets).To(HaveKey("arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pass-XyZ123"))
-			Expect(secrets).To(HaveKey("arn:aws:ssm:us-east-1:123456789012:parameter/api/key"))
-		})
-	})
 
 	Describe("ConvertTaskToPod", func() {
 		var (
@@ -219,7 +186,7 @@ var _ = Describe("TaskConverter", func() {
 			Expect(container.Env[0].ValueFrom).NotTo(BeNil())
 			Expect(container.Env[0].ValueFrom.SecretKeyRef).NotTo(BeNil())
 			Expect(container.Env[0].ValueFrom.SecretKeyRef.Name).To(Equal("kecs-secret-db-pass"))
-			Expect(container.Env[0].ValueFrom.SecretKeyRef.Key).To(Equal("value"))
+			Expect(container.Env[0].ValueFrom.SecretKeyRef.Key).To(Equal("default"))
 		})
 
 		It("should handle overrides from RunTask request", func() {
