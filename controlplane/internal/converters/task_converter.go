@@ -24,7 +24,7 @@ type TaskConverter struct {
 	region                string
 	accountID             string
 	cloudWatchIntegration cloudwatch.Integration
-	artifactManager       artifacts.Manager
+	artifactManager       *artifacts.Manager
 }
 
 // SecretInfo holds parsed information from a secret ARN
@@ -52,7 +52,7 @@ func NewTaskConverterWithCloudWatch(region, accountID string, cwIntegration clou
 }
 
 // SetArtifactManager sets the artifact manager for the task converter
-func (c *TaskConverter) SetArtifactManager(am artifacts.Manager) {
+func (c *TaskConverter) SetArtifactManager(am *artifacts.Manager) {
 	c.artifactManager = am
 }
 

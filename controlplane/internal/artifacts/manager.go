@@ -8,176 +8,147 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/s3"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 	"k8s.io/klog/v2"
 )
 
-// Manager handles artifact downloads for containers
-type Manager interface {
-	// DownloadArtifacts downloads all artifacts for a container
-	DownloadArtifacts(ctx context.Context, artifacts []types.Artifact, workDir string) error
-	// CleanupArtifacts removes downloaded artifacts
-	CleanupArtifacts(workDir string) error
-	// SetS3Endpoint sets custom S3 endpoint for LocalStack integration
-	SetS3Endpoint(endpoint string)
+// Manager handles artifact downloads and management
+type Manager struct {
+	s3Integration s3.Integration
+	httpClient    *http.Client
 }
 
-// ArtifactManager implements the Manager interface
-type ArtifactManager struct {
-	httpClient      *http.Client
-	s3Client        *s3.Client
-	s3Endpoint      string
-	cacheDir        string
-	downloadTimeout time.Duration
+// NewManager creates a new artifact manager
+func NewManager(s3Integration s3.Integration) *Manager {
+	return &Manager{
+		s3Integration: s3Integration,
+		httpClient: &http.Client{
+			Timeout: 0, // No timeout for large downloads
+		},
+	}
 }
 
-// NewArtifactManager creates a new artifact manager
-func NewArtifactManager(cacheDir string) (*ArtifactManager, error) {
-	// Create cache directory if it doesn't exist
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create cache directory: %w", err)
-	}
-
-	// Create HTTP client with timeout
-	httpClient := &http.Client{
-		Timeout: 5 * time.Minute,
-	}
-
-	return &ArtifactManager{
-		httpClient:      httpClient,
-		cacheDir:        cacheDir,
-		downloadTimeout: 5 * time.Minute,
-	}, nil
-}
-
-// SetS3Endpoint sets custom S3 endpoint for LocalStack integration
-func (am *ArtifactManager) SetS3Endpoint(endpoint string) {
-	am.s3Endpoint = endpoint
-	// Reinitialize S3 client with new endpoint
-	am.s3Client = nil
-}
-
-// initS3Client initializes the S3 client with custom endpoint if set
-func (am *ArtifactManager) initS3Client(ctx context.Context) error {
-	if am.s3Client != nil {
-		return nil
-	}
-
-	// Load AWS configuration
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to load AWS config: %w", err)
-	}
-
-	// Override endpoint if set (for LocalStack)
-	if am.s3Endpoint != "" {
-		cfg.BaseEndpoint = aws.String(am.s3Endpoint)
-		klog.V(3).Infof("Using custom S3 endpoint: %s", am.s3Endpoint)
-	}
-
-	// Create S3 client
-	am.s3Client = s3.NewFromConfig(cfg)
-	return nil
-}
-
-// DownloadArtifacts downloads all artifacts for a container
-func (am *ArtifactManager) DownloadArtifacts(ctx context.Context, artifacts []types.Artifact, workDir string) error {
-	if len(artifacts) == 0 {
-		return nil
-	}
-
-	klog.V(2).Infof("Downloading %d artifacts to %s", len(artifacts), workDir)
-
-	// Create work directory
-	if err := os.MkdirAll(workDir, 0755); err != nil {
-		return fmt.Errorf("failed to create work directory: %w", err)
-	}
-
-	// Download each artifact
-	for _, artifact := range artifacts {
-		if err := am.downloadArtifact(ctx, artifact, workDir); err != nil {
-			return fmt.Errorf("failed to download artifact %s: %w", *artifact.Name, err)
-		}
-	}
-
-	return nil
-}
-
-// downloadArtifact downloads a single artifact
-func (am *ArtifactManager) downloadArtifact(ctx context.Context, artifact types.Artifact, workDir string) error {
+// DownloadArtifact downloads an artifact based on its type
+func (m *Manager) DownloadArtifact(ctx context.Context, artifact *types.Artifact) (err error) {
 	if artifact.ArtifactUrl == nil || artifact.TargetPath == nil {
 		return fmt.Errorf("artifact URL and target path are required")
 	}
 
 	artifactURL := *artifact.ArtifactUrl
-	targetPath := filepath.Join(workDir, *artifact.TargetPath)
+	targetPath := *artifact.TargetPath
 
-	klog.V(3).Infof("Downloading artifact from %s to %s", artifactURL, targetPath)
-
-	// Create target directory
+	// Ensure target directory exists
 	targetDir := filepath.Dir(targetPath)
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
 
-	// Determine artifact type
-	artifactType := am.determineArtifactType(artifactURL, artifact.Type)
-
 	// Download based on type
-	var err error
+	var reader io.ReadCloser
+
+	artifactType := m.detectArtifactType(artifactURL, artifact.Type)
+	
 	switch artifactType {
 	case "s3":
-		err = am.downloadS3Artifact(ctx, artifactURL, targetPath)
+		reader, err = m.downloadFromS3(ctx, artifactURL)
 	case "http", "https":
-		err = am.downloadHTTPArtifact(ctx, artifactURL, targetPath)
+		reader, err = m.downloadFromHTTP(ctx, artifactURL)
 	default:
 		return fmt.Errorf("unsupported artifact type: %s", artifactType)
 	}
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to download artifact: %w", err)
 	}
+	defer reader.Close()
 
-	// Validate checksum if provided
+	// Create temporary file
+	tempFile, tempErr := os.CreateTemp(targetDir, ".download-*")
+	if tempErr != nil {
+		return fmt.Errorf("failed to create temp file: %w", tempErr)
+	}
+	tempPath := tempFile.Name()
+	defer os.Remove(tempPath) // Clean up temp file on error
+
+	// Download to temp file with optional checksum validation
+	var hasher io.Writer
 	if artifact.Checksum != nil && artifact.ChecksumType != nil {
-		if err := am.validateChecksum(targetPath, *artifact.Checksum, *artifact.ChecksumType); err != nil {
-			// Remove invalid file
-			os.Remove(targetPath)
-			return fmt.Errorf("checksum validation failed: %w", err)
+		switch strings.ToLower(*artifact.ChecksumType) {
+		case "sha256":
+			h := sha256.New()
+			hasher = h
+			defer func() {
+				if err == nil {
+					checksum := hex.EncodeToString(h.Sum(nil))
+					if checksum != *artifact.Checksum {
+						err = fmt.Errorf("checksum mismatch: expected %s, got %s", *artifact.Checksum, checksum)
+					}
+				}
+			}()
+		case "md5":
+			h := md5.New()
+			hasher = h
+			defer func() {
+				if err == nil {
+					checksum := hex.EncodeToString(h.Sum(nil))
+					if checksum != *artifact.Checksum {
+						err = fmt.Errorf("checksum mismatch: expected %s, got %s", *artifact.Checksum, checksum)
+					}
+				}
+			}()
+		default:
+			return fmt.Errorf("unsupported checksum type: %s", *artifact.ChecksumType)
 		}
 	}
+
+	// Copy data
+	var writer io.Writer = tempFile
+	if hasher != nil {
+		writer = io.MultiWriter(tempFile, hasher)
+	}
+
+	if _, copyErr := io.Copy(writer, reader); copyErr != nil {
+		tempFile.Close()
+		return fmt.Errorf("failed to write artifact: %w", copyErr)
+	}
+	tempFile.Close()
 
 	// Set permissions if specified
 	if artifact.Permissions != nil {
-		mode, err := parseFileMode(*artifact.Permissions)
-		if err != nil {
-			return fmt.Errorf("invalid permissions: %w", err)
+		mode, parseErr := parseFileMode(*artifact.Permissions)
+		if parseErr != nil {
+			return fmt.Errorf("invalid permissions: %w", parseErr)
 		}
-		if err := os.Chmod(targetPath, mode); err != nil {
-			return fmt.Errorf("failed to set permissions: %w", err)
+		if chmodErr := os.Chmod(tempPath, mode); chmodErr != nil {
+			return fmt.Errorf("failed to set permissions: %w", chmodErr)
 		}
 	}
 
-	klog.V(3).Infof("Successfully downloaded artifact to %s", targetPath)
+	// Move temp file to final location
+	if renameErr := os.Rename(tempPath, targetPath); renameErr != nil {
+		// If rename fails (e.g., across filesystems), try copy
+		if copyErr := copyFile(tempPath, targetPath); copyErr != nil {
+			return fmt.Errorf("failed to move artifact to target: %w", copyErr)
+		}
+		os.Remove(tempPath)
+	}
+
+	klog.Infof("Successfully downloaded artifact to: %s", targetPath)
 	return nil
 }
 
-// determineArtifactType determines the type of artifact from URL
-func (am *ArtifactManager) determineArtifactType(artifactURL string, explicitType *string) string {
+// detectArtifactType detects the artifact type from URL or explicit type
+func (m *Manager) detectArtifactType(artifactURL string, explicitType *string) string {
 	if explicitType != nil {
-		return *explicitType
+		return strings.ToLower(*explicitType)
 	}
 
-	// Parse URL to determine type
+	// Auto-detect from URL
 	if strings.HasPrefix(artifactURL, "s3://") {
 		return "s3"
 	} else if strings.HasPrefix(artifactURL, "http://") {
@@ -186,153 +157,106 @@ func (am *ArtifactManager) determineArtifactType(artifactURL string, explicitTyp
 		return "https"
 	}
 
-	return "unknown"
+	// Default to https for URLs without scheme
+	return "https"
 }
 
-// downloadS3Artifact downloads an artifact from S3
-func (am *ArtifactManager) downloadS3Artifact(ctx context.Context, s3URL, targetPath string) error {
-	// Initialize S3 client if needed
-	if err := am.initS3Client(ctx); err != nil {
+// downloadFromS3 downloads an artifact from S3
+func (m *Manager) downloadFromS3(ctx context.Context, s3URL string) (io.ReadCloser, error) {
+	// Parse S3 URL: s3://bucket/key
+	if !strings.HasPrefix(s3URL, "s3://") {
+		return nil, fmt.Errorf("invalid S3 URL format: %s", s3URL)
+	}
+
+	s3Path := strings.TrimPrefix(s3URL, "s3://")
+	parts := strings.SplitN(s3Path, "/", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid S3 URL format: %s", s3URL)
+	}
+
+	bucket := parts[0]
+	key := parts[1]
+
+	return m.s3Integration.DownloadFile(ctx, bucket, key)
+}
+
+// downloadFromHTTP downloads an artifact from HTTP/HTTPS
+func (m *Manager) downloadFromHTTP(ctx context.Context, artifactURL string) (io.ReadCloser, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", artifactURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := m.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("HTTP error: %s", resp.Status)
+	}
+
+	return resp.Body, nil
+}
+
+// parseFileMode parses file permissions string (e.g., "0644") to os.FileMode
+func parseFileMode(permissions string) (os.FileMode, error) {
+	// Parse as octal
+	mode, err := parseOctal(permissions)
+	if err != nil {
+		return 0, err
+	}
+	return os.FileMode(mode), nil
+}
+
+// parseOctal parses an octal string to uint32
+func parseOctal(s string) (uint32, error) {
+	// Remove leading zeros
+	s = strings.TrimLeft(s, "0")
+	if s == "" {
+		return 0, nil
+	}
+
+	var result uint32
+	for _, c := range s {
+		if c < '0' || c > '7' {
+			return 0, fmt.Errorf("invalid octal digit: %c", c)
+		}
+		result = result*8 + uint32(c-'0')
+	}
+	return result, nil
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
 		return err
 	}
 
-	// Parse S3 URL
-	u, err := url.Parse(s3URL)
-	if err != nil {
-		return fmt.Errorf("invalid S3 URL: %w", err)
-	}
-
-	bucket := u.Host
-	key := strings.TrimPrefix(u.Path, "/")
-
-	klog.V(4).Infof("Downloading from S3 bucket=%s key=%s", bucket, key)
-
-	// Download from S3
-	result, err := am.s3Client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to download from S3: %w", err)
-	}
-	defer result.Body.Close()
-
-	// Create target file
-	file, err := os.Create(targetPath)
-	if err != nil {
-		return fmt.Errorf("failed to create target file: %w", err)
-	}
-	defer file.Close()
-
-	// Copy content
-	_, err = io.Copy(file, result.Body)
-	if err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
-	}
-
-	return nil
-}
-
-// downloadHTTPArtifact downloads an artifact via HTTP/HTTPS
-func (am *ArtifactManager) downloadHTTPArtifact(ctx context.Context, artifactURL, targetPath string) error {
-	// Create request with context
-	req, err := http.NewRequestWithContext(ctx, "GET", artifactURL, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Download file
-	resp, err := am.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to download: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check status code
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download failed with status: %s", resp.Status)
-	}
-
-	// Create target file
-	file, err := os.Create(targetPath)
-	if err != nil {
-		return fmt.Errorf("failed to create target file: %w", err)
-	}
-	defer file.Close()
-
-	// Copy content
-	_, err = io.Copy(file, resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
-	}
-
-	return nil
-}
-
-// validateChecksum validates file checksum
-func (am *ArtifactManager) validateChecksum(filePath, expectedChecksum, checksumType string) error {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
-
-	var actualChecksum string
-
-	switch strings.ToLower(checksumType) {
-	case "sha256":
-		h := sha256.New()
-		if _, err := io.Copy(h, file); err != nil {
-			return fmt.Errorf("failed to calculate checksum: %w", err)
-		}
-		actualChecksum = hex.EncodeToString(h.Sum(nil))
-
-	case "md5":
-		h := md5.New()
-		if _, err := io.Copy(h, file); err != nil {
-			return fmt.Errorf("failed to calculate checksum: %w", err)
-		}
-		actualChecksum = hex.EncodeToString(h.Sum(nil))
-
-	default:
-		return fmt.Errorf("unsupported checksum type: %s", checksumType)
-	}
-
-	if actualChecksum != expectedChecksum {
-		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actualChecksum)
-	}
-
-	return nil
+	return out.Sync()
 }
 
 // CleanupArtifacts removes downloaded artifacts
-func (am *ArtifactManager) CleanupArtifacts(workDir string) error {
-	if workDir == "" || workDir == "/" {
-		return fmt.Errorf("invalid work directory")
+func (m *Manager) CleanupArtifacts(artifacts []types.Artifact) {
+	for _, artifact := range artifacts {
+		if artifact.TargetPath != nil {
+			if err := os.Remove(*artifact.TargetPath); err != nil && !os.IsNotExist(err) {
+				klog.Warningf("Failed to cleanup artifact %s: %v", *artifact.TargetPath, err)
+			}
+		}
 	}
-
-	klog.V(3).Infof("Cleaning up artifacts in %s", workDir)
-
-	// Remove work directory
-	if err := os.RemoveAll(workDir); err != nil {
-		return fmt.Errorf("failed to cleanup artifacts: %w", err)
-	}
-
-	return nil
-}
-
-// parseFileMode parses file mode string (e.g., "0644") to os.FileMode
-func parseFileMode(mode string) (os.FileMode, error) {
-	// Remove leading zero if present
-	mode = strings.TrimPrefix(mode, "0")
-
-	// Parse as octal
-	parsed, err := fmt.Sscanf(mode, "%o", new(int))
-	if err != nil || parsed != 1 {
-		return 0, fmt.Errorf("invalid file mode: %s", mode)
-	}
-
-	var fileMode os.FileMode
-	fmt.Sscanf(mode, "%o", &fileMode)
-	return fileMode, nil
 }

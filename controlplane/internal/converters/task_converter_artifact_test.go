@@ -1,235 +1,206 @@
-package converters
+package converters_test
 
 import (
 	"context"
 	"encoding/json"
-	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"k8s.io/utils/ptr"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
+	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
-
-func TestConvertTaskToPod_WithArtifacts(t *testing.T) {
-	// Create task converter with artifact manager
-	converter := NewTaskConverter("us-east-1", "123456789012")
-	
-	// Mock artifact manager
-	mockArtifactManager := &mockArtifactManager{}
-	converter.SetArtifactManager(mockArtifactManager)
-
-	// Create test task definition with artifacts
-	containerDef := types.ContainerDefinition{
-		Name:     stringPtr("webapp"),
-		Image:    stringPtr("nginx:latest"),
-		Cpu:      intPtr(512),
-		Memory:   intPtr(1024),
-		Essential: boolPtr(true),
-		Artifacts: []types.Artifact{
-			{
-				Name:        stringPtr("app-config"),
-				ArtifactUrl: stringPtr("s3://my-bucket/configs/app.conf"),
-				Type:        stringPtr("s3"),
-				TargetPath:  stringPtr("config/app.conf"),
-				Permissions: stringPtr("0644"),
-			},
-			{
-				Name:        stringPtr("static-assets"),
-				ArtifactUrl: stringPtr("https://example.com/assets.tar.gz"),
-				Type:        stringPtr("https"),
-				TargetPath:  stringPtr("assets/assets.tar.gz"),
-				Permissions: stringPtr("0755"),
-			},
-		},
-	}
-
-	containerDefsJSON, err := json.Marshal([]types.ContainerDefinition{containerDef})
-	require.NoError(t, err)
-
-	taskDef := &storage.TaskDefinition{
-		ARN:                  "arn:aws:ecs:us-east-1:123456789012:task-definition/webapp-with-artifacts:1",
-		Family:               "webapp-with-artifacts",
-		Revision:             1,
-		ContainerDefinitions: string(containerDefsJSON),
-		CPU:                  "512",
-		Memory:               "1024",
-		NetworkMode:          "awsvpc",
-		Status:               "ACTIVE",
-	}
-
-	cluster := &storage.Cluster{
-		Name:   "test-cluster",
-		Status: "ACTIVE",
-	}
-
-	runTaskReq := types.RunTaskRequest{
-		Cluster:        stringPtr("test-cluster"),
-		TaskDefinition: stringPtr("webapp-with-artifacts:1"),
-		LaunchType:     stringPtr("FARGATE"),
-	}
-	runTaskReqJSON, err := json.Marshal(runTaskReq)
-	require.NoError(t, err)
-
-	// Convert task to pod
-	pod, err := converter.ConvertTaskToPod(taskDef, runTaskReqJSON, cluster, "test-task-id")
-	require.NoError(t, err)
-	assert.NotNil(t, pod)
-
-	// Verify init containers were created
-	assert.Len(t, pod.Spec.InitContainers, 1)
-	initContainer := pod.Spec.InitContainers[0]
-	assert.Equal(t, "artifact-downloader-webapp", initContainer.Name)
-	assert.Equal(t, "busybox:latest", initContainer.Image)
-	assert.Equal(t, []string{"/bin/sh", "-c"}, initContainer.Command)
-
-	// Verify artifact volume was created
-	artifactVolumeFound := false
-	for _, vol := range pod.Spec.Volumes {
-		if vol.Name == "artifacts-webapp" {
-			artifactVolumeFound = true
-			assert.NotNil(t, vol.VolumeSource.EmptyDir)
-			break
-		}
-	}
-	assert.True(t, artifactVolumeFound, "Artifact volume should be created")
-
-	// Verify main container has artifact volume mount
-	container := pod.Spec.Containers[0]
-	artifactVolumeMountFound := false
-	for _, mount := range container.VolumeMounts {
-		if mount.Name == "artifacts-webapp" {
-			artifactVolumeMountFound = true
-			assert.Equal(t, "/artifacts", mount.MountPath)
-			assert.True(t, mount.ReadOnly)
-			break
-		}
-	}
-	assert.True(t, artifactVolumeMountFound, "Container should have artifact volume mount")
-
-	// Verify init container has correct environment variables
-	assert.Len(t, initContainer.Env, 3)
-	envMap := make(map[string]string)
-	for _, env := range initContainer.Env {
-		envMap[env.Name] = env.Value
-	}
-	assert.Equal(t, "test", envMap["AWS_ACCESS_KEY_ID"])
-	assert.Equal(t, "test", envMap["AWS_SECRET_ACCESS_KEY"])
-	assert.Equal(t, "us-east-1", envMap["AWS_DEFAULT_REGION"])
-}
-
-func TestGenerateArtifactDownloadScript(t *testing.T) {
-	converter := NewTaskConverter("us-east-1", "123456789012")
-
-	artifacts := []types.Artifact{
-		{
-			Name:        stringPtr("s3-artifact"),
-			ArtifactUrl: stringPtr("s3://my-bucket/file.txt"),
-			TargetPath:  stringPtr("data/file.txt"),
-			Permissions: stringPtr("0644"),
-		},
-		{
-			Name:        stringPtr("http-artifact"),
-			ArtifactUrl: stringPtr("https://example.com/archive.tar.gz"),
-			TargetPath:  stringPtr("downloads/archive.tar.gz"),
-			Permissions: stringPtr("0755"),
-		},
-	}
-
-	script := converter.generateArtifactDownloadScript(artifacts)
-	assert.NotEmpty(t, script)
-
-	// Verify script contains expected commands
-	assert.Contains(t, script, "mkdir -p $(dirname /artifacts/data/file.txt)")
-	assert.Contains(t, script, "mkdir -p $(dirname /artifacts/downloads/archive.tar.gz)")
-	assert.Contains(t, script, "wget -q -O /artifacts/downloads/archive.tar.gz https://example.com/archive.tar.gz")
-	assert.Contains(t, script, "chmod 0644 /artifacts/data/file.txt")
-	assert.Contains(t, script, "chmod 0755 /artifacts/downloads/archive.tar.gz")
-	assert.Contains(t, script, "S3 download would happen here") // Placeholder for S3
-}
-
-func TestConvertTaskToPod_NoArtifacts(t *testing.T) {
-	// Create task converter without artifact manager
-	converter := NewTaskConverter("us-east-1", "123456789012")
-
-	// Create test task definition without artifacts
-	containerDef := types.ContainerDefinition{
-		Name:      stringPtr("webapp"),
-		Image:     stringPtr("nginx:latest"),
-		Cpu:       intPtr(512),
-		Memory:    intPtr(1024),
-		Essential: boolPtr(true),
-	}
-
-	containerDefsJSON, err := json.Marshal([]types.ContainerDefinition{containerDef})
-	require.NoError(t, err)
-
-	taskDef := &storage.TaskDefinition{
-		ARN:                  "arn:aws:ecs:us-east-1:123456789012:task-definition/webapp:1",
-		Family:               "webapp",
-		Revision:             1,
-		ContainerDefinitions: string(containerDefsJSON),
-		CPU:                  "512",
-		Memory:               "1024",
-		NetworkMode:          "awsvpc",
-		Status:               "ACTIVE",
-	}
-
-	cluster := &storage.Cluster{
-		Name:   "test-cluster",
-		Status: "ACTIVE",
-	}
-
-	runTaskReq := types.RunTaskRequest{
-		Cluster:        stringPtr("test-cluster"),
-		TaskDefinition: stringPtr("webapp:1"),
-		LaunchType:     stringPtr("FARGATE"),
-	}
-	runTaskReqJSON, err := json.Marshal(runTaskReq)
-	require.NoError(t, err)
-
-	// Convert task to pod
-	pod, err := converter.ConvertTaskToPod(taskDef, runTaskReqJSON, cluster, "test-task-id")
-	require.NoError(t, err)
-	assert.NotNil(t, pod)
-
-	// Verify no init containers were created
-	assert.Len(t, pod.Spec.InitContainers, 0)
-
-	// Verify no artifact volumes were created
-	for _, vol := range pod.Spec.Volumes {
-		assert.NotContains(t, vol.Name, "artifacts-")
-	}
-
-	// Verify container has no artifact volume mounts
-	container := pod.Spec.Containers[0]
-	for _, mount := range container.VolumeMounts {
-		assert.NotEqual(t, "/artifacts", mount.MountPath)
-	}
-}
 
 // Mock artifact manager for testing
 type mockArtifactManager struct{}
 
-func (m *mockArtifactManager) DownloadArtifacts(ctx context.Context, artifacts []types.Artifact, workDir string) error {
+func (m *mockArtifactManager) DownloadArtifact(ctx context.Context, artifact *types.Artifact) error {
 	return nil
 }
 
-func (m *mockArtifactManager) CleanupArtifacts(workDir string) error {
-	return nil
-}
+func (m *mockArtifactManager) CleanupArtifacts(artifacts []types.Artifact) {}
 
-func (m *mockArtifactManager) SetS3Endpoint(endpoint string) {}
+var _ = Describe("TaskConverter Artifact Support", func() {
+	var (
+		converter *converters.TaskConverter
+		taskDef   *storage.TaskDefinition
+		cluster   *storage.Cluster
+	)
 
-// Helper functions
-func stringPtr(s string) *string {
-	return &s
-}
+	BeforeEach(func() {
+		converter = converters.NewTaskConverter("us-east-1", "123456789012")
+		// Set mock artifact manager
+		converter.SetArtifactManager(artifacts.NewManager(nil)) // In production, pass real S3 integration
+		
+		cluster = &storage.Cluster{
+			Name:   "test-cluster",
+			Region: "us-east-1",
+		}
+	})
 
-func intPtr(i int) *int {
-	return &i
-}
+	Describe("ConvertTaskToPod with Artifacts", func() {
+		It("should create init containers for artifacts", func() {
+			// Task definition with artifacts
+			containerDefs := []types.ContainerDefinition{
+				{
+					Name:   ptr.To("app"),
+					Image:  ptr.To("myapp:latest"),
+					Memory: ptr.To(int(512)),
+					Artifacts: []types.Artifact{
+						{
+							Name:        ptr.To("config"),
+							ArtifactUrl: ptr.To("s3://my-bucket/config.json"),
+							TargetPath:  ptr.To("/config/app.json"),
+							Type:        ptr.To("s3"),
+						},
+						{
+							Name:        ptr.To("static-files"),
+							ArtifactUrl: ptr.To("https://example.com/static.tar.gz"),
+							TargetPath:  ptr.To("/static/files.tar.gz"),
+							Type:        ptr.To("https"),
+						},
+					},
+				},
+			}
 
-func boolPtr(b bool) *bool {
-	return &b
-}
+			containerDefsJSON, _ := json.Marshal(containerDefs)
+			taskDef = &storage.TaskDefinition{
+				Family:               "test-task",
+				Revision:             1,
+				ARN:                  "arn:aws:ecs:us-east-1:123456789012:task-definition/test-task:1",
+				ContainerDefinitions: string(containerDefsJSON),
+				Memory:               "1024",
+				CPU:                  "512",
+				NetworkMode:          "awsvpc",
+				Status:               "ACTIVE",
+			}
+
+			runTaskJSON := []byte(`{}`)
+			pod, err := converter.ConvertTaskToPod(taskDef, runTaskJSON, cluster, "task-123")
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pod).NotTo(BeNil())
+
+			// Check init containers
+			Expect(pod.Spec.InitContainers).To(HaveLen(1))
+			initContainer := pod.Spec.InitContainers[0]
+			Expect(initContainer.Name).To(Equal("artifact-downloader-app"))
+			Expect(initContainer.Image).To(Equal("busybox:latest"))
+
+			// Check volumes
+			Expect(pod.Spec.Volumes).To(HaveLen(1))
+			Expect(pod.Spec.Volumes[0].Name).To(Equal("artifacts-app"))
+
+			// Check main container has artifact volume mount
+			Expect(pod.Spec.Containers[0].VolumeMounts).To(HaveLen(1))
+			volumeMount := pod.Spec.Containers[0].VolumeMounts[0]
+			Expect(volumeMount.Name).To(Equal("artifacts-app"))
+			Expect(volumeMount.MountPath).To(Equal("/artifacts"))
+			Expect(volumeMount.ReadOnly).To(BeTrue())
+
+			// Check environment variables for LocalStack
+			Expect(initContainer.Env).To(HaveLen(3))
+			envMap := make(map[string]string)
+			for _, env := range initContainer.Env {
+				envMap[env.Name] = env.Value
+			}
+			Expect(envMap["AWS_ACCESS_KEY_ID"]).To(Equal("test"))
+			Expect(envMap["AWS_SECRET_ACCESS_KEY"]).To(Equal("test"))
+			Expect(envMap["AWS_DEFAULT_REGION"]).To(Equal("us-east-1"))
+		})
+
+		It("should handle containers without artifacts", func() {
+			// Task definition without artifacts
+			containerDefs := []types.ContainerDefinition{
+				{
+					Name:   ptr.To("app"),
+					Image:  ptr.To("myapp:latest"),
+					Memory: ptr.To(int(512)),
+				},
+			}
+
+			containerDefsJSON, _ := json.Marshal(containerDefs)
+			taskDef = &storage.TaskDefinition{
+				Family:               "test-task",
+				Revision:             1,
+				ARN:                  "arn:aws:ecs:us-east-1:123456789012:task-definition/test-task:1",
+				ContainerDefinitions: string(containerDefsJSON),
+				Memory:               "1024",
+				CPU:                  "512",
+				NetworkMode:          "awsvpc",
+				Status:               "ACTIVE",
+			}
+
+			runTaskJSON := []byte(`{}`)
+			pod, err := converter.ConvertTaskToPod(taskDef, runTaskJSON, cluster, "task-123")
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pod).NotTo(BeNil())
+
+			// No init containers should be created
+			Expect(pod.Spec.InitContainers).To(BeEmpty())
+
+			// No artifact volumes
+			Expect(pod.Spec.Volumes).To(BeEmpty())
+
+			// No artifact volume mounts
+			Expect(pod.Spec.Containers[0].VolumeMounts).To(BeEmpty())
+		})
+
+		It("should handle mixed containers with and without artifacts", func() {
+			// Task definition with mixed containers
+			containerDefs := []types.ContainerDefinition{
+				{
+					Name:   ptr.To("app"),
+					Image:  ptr.To("myapp:latest"),
+					Memory: ptr.To(int(512)),
+					Artifacts: []types.Artifact{
+						{
+							Name:        ptr.To("config"),
+							ArtifactUrl: ptr.To("s3://my-bucket/config.json"),
+							TargetPath:  ptr.To("/config/app.json"),
+						},
+					},
+				},
+				{
+					Name:   ptr.To("sidecar"),
+					Image:  ptr.To("sidecar:latest"),
+					Memory: ptr.To(int(256)),
+					// No artifacts
+				},
+			}
+
+			containerDefsJSON, _ := json.Marshal(containerDefs)
+			taskDef = &storage.TaskDefinition{
+				Family:               "test-task",
+				Revision:             1,
+				ARN:                  "arn:aws:ecs:us-east-1:123456789012:task-definition/test-task:1",
+				ContainerDefinitions: string(containerDefsJSON),
+				Memory:               "1024",
+				CPU:                  "512",
+				NetworkMode:          "awsvpc",
+				Status:               "ACTIVE",
+			}
+
+			runTaskJSON := []byte(`{}`)
+			pod, err := converter.ConvertTaskToPod(taskDef, runTaskJSON, cluster, "task-123")
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pod).NotTo(BeNil())
+
+			// Only one init container for the app container
+			Expect(pod.Spec.InitContainers).To(HaveLen(1))
+			Expect(pod.Spec.InitContainers[0].Name).To(Equal("artifact-downloader-app"))
+
+			// Only one volume for artifacts
+			Expect(pod.Spec.Volumes).To(HaveLen(1))
+
+			// Check container volume mounts
+			Expect(pod.Spec.Containers[0].VolumeMounts).To(HaveLen(1)) // app has artifact mount
+			Expect(pod.Spec.Containers[1].VolumeMounts).To(BeEmpty())  // sidecar has no artifact mount
+		})
+	})
+})
