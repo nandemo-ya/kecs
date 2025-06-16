@@ -35,5 +35,6 @@ type ECSClientInterface interface {
 	PutAttributes(clusterName string, attributes []Attribute) error
 	ListAttributes(clusterName, targetType string) ([]Attribute, error)
 	DeleteAttributes(clusterName string, attributes []Attribute) error
+	GetLocalStackStatus(clusterName string) (string, error)
 }
 

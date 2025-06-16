@@ -467,3 +467,29 @@ func (c *CurlClient) DeleteAttributes(clusterName string, attributes []Attribute
 	_, err := c.executeCurl("DeleteAttributes", payload)
 	return err
 }
+
+// GetLocalStackStatus gets the LocalStack status (KECS-specific)
+func (c *CurlClient) GetLocalStackStatus(clusterName string) (string, error) {
+	// This would be a custom KECS endpoint
+	url := fmt.Sprintf("%s/localstack/status?cluster=%s", c.endpoint, clusterName)
+	
+	args := []string{
+		"-s", "-X", "GET",
+		url,
+	}
+
+	output, err := c.runCommand(args...)
+	if err != nil {
+		return "", err
+	}
+
+	var result struct {
+		Status string `json:"status"`
+	}
+
+	if err := json.Unmarshal(output, &result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return result.Status, nil
+}
