@@ -16,17 +16,18 @@ import (
 
 // Server represents the HTTP API server for KECS Control Plane
 type Server struct {
-	httpServer   *http.Server
-	port         int
-	kubeconfig   string
-	ecsAPI       generated.ECSAPIInterface
-	storage      storage.Storage
-	kindManager  *kubernetes.KindManager
-	taskManager  *kubernetes.TaskManager
-	region       string
-	accountID    string
-	webSocketHub *WebSocketHub
-	webUIHandler *WebUIHandler
+	httpServer        *http.Server
+	port              int
+	kubeconfig        string
+	ecsAPI            generated.ECSAPIInterface
+	storage           storage.Storage
+	kindManager       *kubernetes.KindManager
+	taskManager       *kubernetes.TaskManager
+	region            string
+	accountID         string
+	webSocketHub      *WebSocketHub
+	webUIHandler      *WebUIHandler
+	testModeWorker    *TestModeTaskWorker
 }
 
 // NewServer creates a new API server instance
@@ -93,6 +94,11 @@ func NewServer(port int, kubeconfig string, storage storage.Storage) (*Server, e
 		}
 	}
 
+	// Initialize test mode worker if in test mode
+	if os.Getenv("KECS_TEST_MODE") == "true" {
+		s.testModeWorker = NewTestModeTaskWorker(storage)
+	}
+
 	return s, nil
 }
 
@@ -101,6 +107,11 @@ func (s *Server) Start() error {
 	// Start WebSocket hub
 	ctx := context.Background()
 	go s.webSocketHub.Run(ctx)
+
+	// Start test mode worker if available
+	if s.testModeWorker != nil {
+		s.testModeWorker.Start(ctx)
+	}
 
 	router := s.setupRoutes()
 
@@ -126,6 +137,12 @@ func (s *Server) Start() error {
 // Stop gracefully stops the HTTP server
 func (s *Server) Stop(ctx context.Context) error {
 	log.Println("Shutting down API server...")
+	
+	// Stop test mode worker if running
+	if s.testModeWorker != nil {
+		s.testModeWorker.Stop()
+	}
+	
 	return s.httpServer.Shutdown(ctx)
 }
 

@@ -1150,11 +1150,23 @@ func storageServiceToGeneratedService(storageService *storage.Service) *generate
 			service.NetworkConfiguration = &networkConfig
 		}
 	}
+	// Always set deployment configuration with defaults if not provided
+	deploymentConfig := &generated.DeploymentConfiguration{
+		MaximumPercent:        ptr.Int32(200),
+		MinimumHealthyPercent: ptr.Int32(100),
+	}
+	
 	if storageService.DeploymentConfiguration != "" && storageService.DeploymentConfiguration != "null" {
-		var deploymentConfig generated.DeploymentConfiguration
-		if err := json.Unmarshal([]byte(storageService.DeploymentConfiguration), &deploymentConfig); err == nil {
-			service.DeploymentConfiguration = &deploymentConfig
+		// Override defaults with stored configuration
+		if err := json.Unmarshal([]byte(storageService.DeploymentConfiguration), deploymentConfig); err == nil {
+			service.DeploymentConfiguration = deploymentConfig
+		} else {
+			// If unmarshal fails, use defaults
+			service.DeploymentConfiguration = deploymentConfig
 		}
+	} else {
+		// No configuration stored, use defaults
+		service.DeploymentConfiguration = deploymentConfig
 	}
 	if storageService.PlacementConstraints != "" && storageService.PlacementConstraints != "null" {
 		var placementConstraints []generated.PlacementConstraint
