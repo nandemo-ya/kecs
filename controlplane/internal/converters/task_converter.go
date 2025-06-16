@@ -616,10 +616,42 @@ func (c *TaskConverter) applyResourceConstraints(pod *corev1.Pod, taskCPU, taskM
 					}
 				}
 			}
-		} else if totalRequestedCPU > cpuMillis || totalRequestedMemory > memoryMi {
-			// If containers request more than task level, we need to handle this
-			// For now, we'll let Kubernetes handle the scheduling
-			// In production, you might want to scale down proportionally
+		} else if totalRequestedCPU > 0 || totalRequestedMemory > 0 {
+			// Scale existing resources proportionally to fit task constraints
+			if cpuMillis > 0 && totalRequestedCPU > 0 {
+				cpuScale := float64(cpuMillis) / float64(totalRequestedCPU)
+				for i := range pod.Spec.Containers {
+					container := &pod.Spec.Containers[i]
+					if container.Resources.Requests != nil {
+						if cpu, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
+							scaledCPU := int64(float64(cpu.MilliValue()) * cpuScale)
+							if container.Resources.Limits == nil {
+								container.Resources.Limits = corev1.ResourceList{}
+							}
+							container.Resources.Requests[corev1.ResourceCPU] = *resource.NewMilliQuantity(scaledCPU, resource.DecimalSI)
+							container.Resources.Limits[corev1.ResourceCPU] = *resource.NewMilliQuantity(scaledCPU, resource.DecimalSI)
+						}
+					}
+				}
+			}
+			
+			if memoryMi > 0 && totalRequestedMemory > 0 {
+				memScale := float64(memoryMi) / float64(totalRequestedMemory)
+				for i := range pod.Spec.Containers {
+					container := &pod.Spec.Containers[i]
+					if container.Resources.Requests != nil {
+						if mem, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
+							scaledMemMiB := int64(float64(mem.Value()/(1024*1024)) * memScale)
+							memQuantity := resource.MustParse(fmt.Sprintf("%dMi", scaledMemMiB))
+							if container.Resources.Limits == nil {
+								container.Resources.Limits = corev1.ResourceList{}
+							}
+							container.Resources.Requests[corev1.ResourceMemory] = memQuantity
+							container.Resources.Limits[corev1.ResourceMemory] = memQuantity
+						}
+					}
+				}
+			}
 		}
 	}
 }
@@ -732,7 +764,7 @@ func (c *TaskConverter) applyPlacementConstraints(pod *corev1.Pod, constraints [
 		switch *constraint.Type {
 		case "memberOf":
 			if constraint.Expression != nil {
-				c.parseMemberOfExpression(*constraint.Expression, pod.Spec.Affinity.NodeAffinity)
+				c.parseMemberOfExpression(*constraint.Expression, pod)
 			}
 
 		case "distinctInstance":
@@ -741,24 +773,27 @@ func (c *TaskConverter) applyPlacementConstraints(pod *corev1.Pod, constraints [
 				pod.Spec.Affinity.PodAntiAffinity = &corev1.PodAntiAffinity{}
 			}
 
-			// Add anti-affinity rule
-			pod.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
-				pod.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				corev1.PodAffinityTerm{
-					LabelSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"kecs.dev/task-family": pod.Labels["kecs.dev/task-family"],
+			// Add anti-affinity rule as preferred (not required)
+			pod.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+				pod.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+				corev1.WeightedPodAffinityTerm{
+					Weight: 100,
+					PodAffinityTerm: corev1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"kecs.dev/task-family": pod.Labels["kecs.dev/task-family"],
+							},
 						},
+						TopologyKey: "kubernetes.io/hostname",
 					},
-					TopologyKey: "kubernetes.io/hostname",
 				},
 			)
 		}
 	}
 }
 
-// parseMemberOfExpression parses ECS memberOf expressions and converts to node affinity
-func (c *TaskConverter) parseMemberOfExpression(expression string, nodeAffinity *corev1.NodeAffinity) {
+// parseMemberOfExpression parses ECS memberOf expressions and converts to node selector or affinity
+func (c *TaskConverter) parseMemberOfExpression(expression string, pod *corev1.Pod) {
 	// ECS expressions examples:
 	// - attribute:ecs.instance-type == t2.micro
 	// - attribute:ecs.availability-zone in [us-west-2a, us-west-2b]
@@ -777,6 +812,24 @@ func (c *TaskConverter) parseMemberOfExpression(expression string, nodeAffinity 
 	// Convert ECS attribute to Kubernetes label
 	k8sLabel := c.convertECSAttributeToK8sLabel(attribute)
 
+	// For simple equality, use node selector
+	if operator == "==" {
+		if pod.Spec.NodeSelector == nil {
+			pod.Spec.NodeSelector = make(map[string]string)
+		}
+		pod.Spec.NodeSelector[k8sLabel] = value
+		return
+	}
+
+	// For other operators, use node affinity
+	if pod.Spec.Affinity == nil {
+		pod.Spec.Affinity = &corev1.Affinity{}
+	}
+	if pod.Spec.Affinity.NodeAffinity == nil {
+		pod.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
+	}
+	nodeAffinity := pod.Spec.Affinity.NodeAffinity
+
 	// Initialize node selector term
 	if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
 		nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{
@@ -789,9 +842,6 @@ func (c *TaskConverter) parseMemberOfExpression(expression string, nodeAffinity 
 	}
 
 	switch operator {
-	case "==":
-		requirement.Operator = corev1.NodeSelectorOpIn
-		requirement.Values = []string{value}
 
 	case "!=":
 		requirement.Operator = corev1.NodeSelectorOpNotIn
