@@ -12,6 +12,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/ssm"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
@@ -37,6 +38,7 @@ type Server struct {
 	localStackEvents        *LocalStackEventIntegration
 	iamIntegration          iam.Integration
 	cloudWatchIntegration   cloudwatch.Integration
+	ssmIntegration          ssm.Integration
 }
 
 // NewServer creates a new API server instance
@@ -178,6 +180,24 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 						log.Println("CloudWatch integration initialized successfully")
 					}
 				}
+				
+				// Initialize SSM integration if LocalStack is available
+				if kubeClient != nil {
+					ssmConfig := &ssm.Config{
+						LocalStackEndpoint: fmt.Sprintf("http://localhost:%d", localStackConfig.Port),
+						SecretPrefix:       "ssm-",
+						KubeNamespace:      "default",
+						SyncRetries:        3,
+						CacheTTL:           5 * time.Minute,
+					}
+					ssmIntegration, err := ssm.NewIntegration(kubeClient, localStackManager, ssmConfig)
+					if err != nil {
+						log.Printf("Warning: Failed to initialize SSM integration: %v", err)
+					} else {
+						s.ssmIntegration = ssmIntegration
+						log.Println("SSM Parameter Store integration initialized successfully")
+					}
+				}
 			}
 		}
 	}
@@ -190,6 +210,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 		if s.cloudWatchIntegration != nil {
 			defaultAPI.SetCloudWatchIntegration(s.cloudWatchIntegration)
+		}
+		if s.ssmIntegration != nil {
+			defaultAPI.SetSSMIntegration(s.ssmIntegration)
 		}
 	}
 	s.ecsAPI = ecsAPI
