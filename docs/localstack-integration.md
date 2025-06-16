@@ -13,12 +13,12 @@ LocalStack integration in KECS provides:
 
 ## Configuration
 
-### Basic Configuration
+### Using Configuration File
 
 LocalStack integration is configured in the KECS configuration file:
 
 ```yaml
-# LocalStack configuration
+# LocalStack configuration in production.yaml or development.yaml
 localstack:
   enabled: true  # Enable LocalStack integration
   services:
@@ -39,6 +39,46 @@ localstack:
   debug: false
   dataDir: "/var/lib/localstack"
 ```
+
+### Using Command Line Options
+
+You can also enable LocalStack using command line flags:
+
+```bash
+# Start KECS with LocalStack enabled
+kecs server --localstack-enabled --config configs/production.yaml
+
+# Or without a config file (uses defaults)
+kecs server --localstack-enabled
+```
+
+### Configuration Precedence
+
+1. Command line flags override config file settings
+2. Config file settings override defaults
+3. Default configuration is used if no config is specified
+
+### Server Startup with LocalStack
+
+When starting the KECS server with LocalStack enabled:
+
+```bash
+# Using config file
+kecs server --config configs/development.yaml
+
+# Using command line flag
+kecs server --localstack-enabled
+
+# Specify custom ports
+kecs server --localstack-enabled --port 8080 --admin-port 8081
+```
+
+The server will:
+1. Initialize LocalStack manager
+2. Create LocalStack deployment in Kubernetes
+3. Wait for LocalStack to be healthy
+4. Configure AWS proxy routing
+5. Start accepting requests
 
 ### Proxy Configuration
 

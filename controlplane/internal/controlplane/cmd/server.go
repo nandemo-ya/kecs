@@ -11,17 +11,21 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/admin"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 	"github.com/spf13/cobra"
 )
 
 var (
 	// Additional server-specific flags
-	kubeconfig string
-	adminPort  int
-	dataDir    string
+	kubeconfig        string
+	adminPort         int
+	dataDir           string
+	localstackEnabled bool
+	configFile        string
 
 	// serverCmd represents the server command
 	serverCmd = &cobra.Command{
@@ -45,6 +49,8 @@ func init() {
 		defaultDataDir = filepath.Join(home, ".kecs", "data")
 	}
 	serverCmd.Flags().StringVar(&dataDir, "data-dir", defaultDataDir, "Directory for storing persistent data")
+	serverCmd.Flags().BoolVar(&localstackEnabled, "localstack-enabled", false, "Enable LocalStack integration for AWS service emulation")
+	serverCmd.Flags().StringVar(&configFile, "config", "", "Path to configuration file")
 }
 
 func runServer() {
@@ -53,8 +59,36 @@ func runServer() {
 		fmt.Println("KECS_TEST_MODE is enabled - running in test mode")
 	}
 
-	fmt.Printf("Starting KECS Control Plane server on port %d with log level %s\n", port, logLevel)
-	fmt.Printf("Starting KECS Admin server on port %d\n", adminPort)
+	// Load configuration
+	cfg, err := config.LoadConfig(configFile)
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	// Override config with command line flags
+	if port != 0 {
+		cfg.Server.Port = port
+	}
+	if adminPort != 0 {
+		cfg.Server.AdminPort = adminPort
+	}
+	if dataDir != "" {
+		cfg.Server.DataDir = dataDir
+	}
+	if logLevel != "" {
+		cfg.Server.LogLevel = logLevel
+	}
+	if localstackEnabled {
+		cfg.LocalStack.Enabled = true
+	}
+
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Invalid configuration: %v", err)
+	}
+
+	fmt.Printf("Starting KECS Control Plane server on port %d with log level %s\n", cfg.Server.Port, cfg.Server.LogLevel)
+	fmt.Printf("Starting KECS Admin server on port %d\n", cfg.Server.AdminPort)
 	if kubeconfig != "" {
 		fmt.Printf("Using kubeconfig: %s\n", kubeconfig)
 	} else {
@@ -62,11 +96,11 @@ func runServer() {
 	}
 
 	// Initialize storage
-	dbPath := filepath.Join(dataDir, "kecs.db")
+	dbPath := filepath.Join(cfg.Server.DataDir, "kecs.db")
 	fmt.Printf("Using database: %s\n", dbPath)
 
 	// Create data directory if it doesn't exist
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if err := os.MkdirAll(cfg.Server.DataDir, 0755); err != nil {
 		log.Fatalf("Failed to create data directory: %v", err)
 	}
 
@@ -86,13 +120,18 @@ func runServer() {
 		log.Fatalf("Failed to initialize storage tables: %v", err)
 	}
 
-	// Initialize the API and Admin servers
-	// TODO: Load LocalStack configuration from config file or environment
-	apiServer, err := api.NewServer(port, kubeconfig, storage, nil)
+	// Initialize the API server with LocalStack configuration
+	var localstackConfig *localstack.Config
+	if cfg.LocalStack.Enabled {
+		fmt.Println("LocalStack integration is enabled")
+		localstackConfig = &cfg.LocalStack
+	}
+
+	apiServer, err := api.NewServer(cfg.Server.Port, kubeconfig, storage, localstackConfig)
 	if err != nil {
 		log.Fatalf("Failed to initialize API server: %v", err)
 	}
-	adminServer := admin.NewServer(adminPort, storage)
+	adminServer := admin.NewServer(cfg.Server.AdminPort, storage)
 
 	// Set up graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -119,6 +158,8 @@ func runServer() {
 		if err := adminServer.Stop(shutdownCtx); err != nil {
 			fmt.Printf("Error during Admin server shutdown: %v\n", err)
 		}
+		
+		// LocalStack will be stopped by the API server during shutdown
 	}()
 
 	// Start the admin server in a goroutine

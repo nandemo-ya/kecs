@@ -1,0 +1,40 @@
+# KECS Development Configuration
+
+server:
+  port: 8080
+  adminPort: 8081
+  dataDir: ~/.kecs/data
+  logLevel: debug
+
+localstack:
+  enabled: true
+  services:
+    - iam
+    - cloudwatchlogs
+    - ssm
+    - secretsmanager
+    - elbv2
+    - s3
+    - dynamodb
+  persistence: true
+  image: localstack/localstack
+  version: latest
+  namespace: kecs-system
+  port: 4566
+  edgePort: 4566
+  resources:
+    memory: 2Gi
+    cpu: 1000m
+    storageSize: 10Gi
+  environment:
+    DEFAULT_REGION: us-east-1
+    DOCKER_HOST: unix:///var/run/docker.sock
+    LAMBDA_EXECUTOR: local
+    DISABLE_CORS_CHECKS: "1"
+    DISABLE_CUSTOM_CORS_S3: "1"
+    EXTRA_CORS_ALLOWED_ORIGINS: "*"
+    EXTRA_CORS_ALLOWED_HEADERS: "x-amz-*"
+    DEBUG: "1"
+  debug: true
+  dataDir: /var/lib/localstack
+  customEndpoints: {}
