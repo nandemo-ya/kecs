@@ -1261,7 +1261,10 @@ func (c *TaskConverter) convertECSAttributeToK8sLabel(attribute string) string {
 	}
 
 	// For custom attributes, prefix with kecs.dev/
-	return "kecs.dev/" + strings.ReplaceAll(attribute, ".", "-")
+	// Replace both dots and colons with hyphens for valid K8s label names
+	sanitized := strings.ReplaceAll(attribute, ".", "-")
+	sanitized = strings.ReplaceAll(sanitized, ":", "-")
+	return "kecs.dev/" + sanitized
 }
 
 // convertSecrets converts ECS secrets to Kubernetes environment variables
