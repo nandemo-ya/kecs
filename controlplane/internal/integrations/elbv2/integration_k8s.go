@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -17,6 +18,7 @@ type k8sIntegration struct {
 	
 	// In-memory storage for load balancers and target groups
 	// In production, this should be persisted
+	mu            sync.RWMutex
 	loadBalancers map[string]*LoadBalancer
 	targetGroups  map[string]*TargetGroup
 	listeners     map[string]*Listener
@@ -65,8 +67,10 @@ func (i *k8sIntegration) CreateLoadBalancer(ctx context.Context, name string, su
 		})
 	}
 
-	// Store in memory
+	// Store in memory with lock
+	i.mu.Lock()
 	i.loadBalancers[arn] = lb
+	i.mu.Unlock()
 
 	klog.V(2).Infof("Created virtual load balancer: %s with DNS: %s", arn, lb.DNSName)
 	return lb, nil
@@ -75,6 +79,9 @@ func (i *k8sIntegration) CreateLoadBalancer(ctx context.Context, name string, su
 // DeleteLoadBalancer deletes a virtual load balancer
 func (i *k8sIntegration) DeleteLoadBalancer(ctx context.Context, arn string) error {
 	klog.V(2).Infof("Deleting virtual load balancer: %s", arn)
+
+	i.mu.Lock()
+	defer i.mu.Unlock()
 
 	if _, exists := i.loadBalancers[arn]; !exists {
 		return fmt.Errorf("load balancer not found: %s", arn)
@@ -107,9 +114,11 @@ func (i *k8sIntegration) CreateTargetGroup(ctx context.Context, name string, por
 		HealthyThresholdCount:   2,
 	}
 
-	// Store in memory
+	// Store in memory with lock
+	i.mu.Lock()
 	i.targetGroups[arn] = tg
 	i.targetHealth[arn] = make(map[string]*TargetHealth)
+	i.mu.Unlock()
 
 	klog.V(2).Infof("Created virtual target group: %s", arn)
 	return tg, nil
@@ -118,6 +127,9 @@ func (i *k8sIntegration) CreateTargetGroup(ctx context.Context, name string, por
 // DeleteTargetGroup deletes a virtual target group
 func (i *k8sIntegration) DeleteTargetGroup(ctx context.Context, arn string) error {
 	klog.V(2).Infof("Deleting virtual target group: %s", arn)
+
+	i.mu.Lock()
+	defer i.mu.Unlock()
 
 	if _, exists := i.targetGroups[arn]; !exists {
 		return fmt.Errorf("target group not found: %s", arn)
@@ -132,7 +144,9 @@ func (i *k8sIntegration) DeleteTargetGroup(ctx context.Context, arn string) erro
 func (i *k8sIntegration) RegisterTargets(ctx context.Context, targetGroupArn string, targets []Target) error {
 	klog.V(2).Infof("Registering %d targets with virtual target group: %s", len(targets), targetGroupArn)
 
+	i.mu.Lock()
 	if _, exists := i.targetGroups[targetGroupArn]; !exists {
+		i.mu.Unlock()
 		return fmt.Errorf("target group not found: %s", targetGroupArn)
 	}
 
@@ -153,13 +167,16 @@ func (i *k8sIntegration) RegisterTargets(ctx context.Context, targetGroupArn str
 		// Simulate health check transition
 		go func(tgArn, targetId string) {
 			time.Sleep(5 * time.Second)
+			i.mu.Lock()
 			if health, exists := i.targetHealth[tgArn][targetId]; exists {
 				health.HealthState = "healthy"
 				health.Reason = ""
 				health.Description = "Health checks passed"
 			}
+			i.mu.Unlock()
 		}(targetGroupArn, target.Id)
 	}
+	i.mu.Unlock()
 
 	return nil
 }
@@ -167,6 +184,9 @@ func (i *k8sIntegration) RegisterTargets(ctx context.Context, targetGroupArn str
 // DeregisterTargets deregisters targets from a virtual target group
 func (i *k8sIntegration) DeregisterTargets(ctx context.Context, targetGroupArn string, targets []Target) error {
 	klog.V(2).Infof("Deregistering %d targets from virtual target group: %s", len(targets), targetGroupArn)
+
+	i.mu.Lock()
+	defer i.mu.Unlock()
 
 	if _, exists := i.targetGroups[targetGroupArn]; !exists {
 		return fmt.Errorf("target group not found: %s", targetGroupArn)
@@ -184,13 +204,17 @@ func (i *k8sIntegration) DeregisterTargets(ctx context.Context, targetGroupArn s
 func (i *k8sIntegration) CreateListener(ctx context.Context, loadBalancerArn string, port int32, protocol string, targetGroupArn string) (*Listener, error) {
 	klog.V(2).Infof("Creating virtual listener on port %d for load balancer: %s", port, loadBalancerArn)
 
+	i.mu.RLock()
 	if _, exists := i.loadBalancers[loadBalancerArn]; !exists {
+		i.mu.RUnlock()
 		return nil, fmt.Errorf("load balancer not found: %s", loadBalancerArn)
 	}
 
 	if _, exists := i.targetGroups[targetGroupArn]; !exists {
+		i.mu.RUnlock()
 		return nil, fmt.Errorf("target group not found: %s", targetGroupArn)
 	}
+	i.mu.RUnlock()
 
 	// Generate ARN
 	arn := fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:listener/app/%s/%s",
@@ -211,8 +235,10 @@ func (i *k8sIntegration) CreateListener(ctx context.Context, loadBalancerArn str
 		},
 	}
 
-	// Store in memory
+	// Store in memory with lock
+	i.mu.Lock()
 	i.listeners[arn] = listener
+	i.mu.Unlock()
 
 	klog.V(2).Infof("Created virtual listener: %s", arn)
 	return listener, nil
@@ -221,6 +247,9 @@ func (i *k8sIntegration) CreateListener(ctx context.Context, loadBalancerArn str
 // DeleteListener deletes a virtual listener
 func (i *k8sIntegration) DeleteListener(ctx context.Context, arn string) error {
 	klog.V(2).Infof("Deleting virtual listener: %s", arn)
+
+	i.mu.Lock()
+	defer i.mu.Unlock()
 
 	if _, exists := i.listeners[arn]; !exists {
 		return fmt.Errorf("listener not found: %s", arn)
@@ -234,6 +263,9 @@ func (i *k8sIntegration) DeleteListener(ctx context.Context, arn string) error {
 func (i *k8sIntegration) GetLoadBalancer(ctx context.Context, arn string) (*LoadBalancer, error) {
 	klog.V(2).Infof("Getting virtual load balancer: %s", arn)
 
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+
 	lb, exists := i.loadBalancers[arn]
 	if !exists {
 		return nil, fmt.Errorf("load balancer not found: %s", arn)
@@ -245,6 +277,9 @@ func (i *k8sIntegration) GetLoadBalancer(ctx context.Context, arn string) (*Load
 // GetTargetHealth gets the health status of virtual targets
 func (i *k8sIntegration) GetTargetHealth(ctx context.Context, targetGroupArn string) ([]TargetHealth, error) {
 	klog.V(2).Infof("Getting target health for virtual target group: %s", targetGroupArn)
+
+	i.mu.RLock()
+	defer i.mu.RUnlock()
 
 	if _, exists := i.targetGroups[targetGroupArn]; !exists {
 		return nil, fmt.Errorf("target group not found: %s", targetGroupArn)
