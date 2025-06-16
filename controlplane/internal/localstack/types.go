@@ -179,6 +179,7 @@ var DefaultServices = []string{
 	"ssm",
 	"secretsmanager",
 	"elbv2",
+	"s3",
 }
 
 // ServicePortMap maps service names to their default ports
