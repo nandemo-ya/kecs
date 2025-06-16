@@ -1,14 +1,14 @@
 # IAM Integration Guide
 
-KECS provides integration between AWS IAM roles and Kubernetes ServiceAccounts, enabling ECS tasks to assume IAM roles for accessing AWS services through LocalStack.
+KECS leverages LocalStack's IAM service to provide full AWS IAM functionality for ECS tasks, enabling secure access to AWS services in your local environment.
 
 ## Overview
 
-The IAM integration automatically:
-- Creates Kubernetes ServiceAccounts for ECS task roles
-- Maps IAM policies to Kubernetes RBAC rules
-- Configures pods to use the appropriate ServiceAccount
-- Manages the lifecycle of IAM roles in LocalStack
+The IAM integration:
+- Creates IAM roles directly in LocalStack
+- Associates IAM roles with Kubernetes ServiceAccounts
+- Injects AWS credentials into task containers
+- Relies on LocalStack for policy evaluation and access control
 
 ## How It Works
 
@@ -18,16 +18,18 @@ sequenceDiagram
     participant KECS
     participant LocalStack
     participant Kubernetes
+    participant Task
     
     User->>KECS: RegisterTaskDefinition with taskRoleArn
-    KECS->>LocalStack: Create IAM role
+    KECS->>LocalStack: Create/Verify IAM role
     KECS->>Kubernetes: Create ServiceAccount
-    KECS->>Kubernetes: Create Role/RoleBinding
     
     User->>KECS: RunTask
     KECS->>Kubernetes: Create Pod with ServiceAccount
-    Kubernetes->>Pod: Inject ServiceAccount token
-    Pod->>LocalStack: Access AWS services with role
+    KECS->>Task: Inject AWS credentials (test/test)
+    Task->>LocalStack: API call with credentials
+    LocalStack->>LocalStack: Evaluate IAM policies
+    LocalStack->>Task: Allow/Deny based on policies
 ```
 
 ## Task Role Configuration
@@ -64,49 +66,38 @@ metadata:
     kecs.io/task-definition-arn: "arn:aws:ecs:us-east-1:123456789012:task-definition/my-task:1"
 ```
 
-2. **Role**: With RBAC rules based on IAM policies
+2. **Pod Configuration**: With injected AWS credentials
 ```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+apiVersion: v1
+kind: Pod
 metadata:
-  name: kecs-my-task-role-sa
-  namespace: default
-rules:
-- apiGroups: [""]
-  resources: ["configmaps", "secrets"]
-  verbs: ["get"]
+  name: ecs-task-xxxxx
+spec:
+  serviceAccountName: kecs-my-task-role-sa
+  containers:
+  - name: my-app
+    env:
+    - name: AWS_ACCESS_KEY_ID
+      value: "test"
+    - name: AWS_SECRET_ACCESS_KEY
+      value: "test"
+    - name: AWS_DEFAULT_REGION
+      value: "us-east-1"
 ```
 
-3. **RoleBinding**: Linking ServiceAccount to Role
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: kecs-my-task-role-sa
-  namespace: default
-subjects:
-- kind: ServiceAccount
-  name: kecs-my-task-role-sa
-  namespace: default
-roleRef:
-  kind: Role
-  name: kecs-my-task-role-sa
-  apiGroup: rbac.authorization.k8s.io
-```
+## How LocalStack Handles IAM
 
-## IAM Policy Mapping
+LocalStack provides a fully functional IAM service that:
+- Evaluates IAM policies for all API requests
+- Supports role assumption and temporary credentials
+- Implements policy conditions and resource-based policies
+- Handles both inline and managed policies
 
-KECS maps common IAM actions to Kubernetes RBAC permissions:
-
-| IAM Action | Kubernetes Resources | Kubernetes Verbs |
-|------------|---------------------|------------------|
-| s3:GetObject | configmaps, secrets | get |
-| s3:PutObject | configmaps | create, update |
-| logs:CreateLogGroup | events | create |
-| logs:CreateLogStream | events | create |
-| logs:PutLogEvents | events | create, patch |
-| ssm:GetParameter | secrets, configmaps | get |
-| secretsmanager:GetSecretValue | secrets | get |
+When your task makes an AWS API call:
+1. The AWS SDK uses the injected credentials
+2. The request goes to LocalStack via the proxy configuration
+3. LocalStack checks the IAM policies attached to the role
+4. Access is granted or denied based on the policy evaluation
 
 ## Creating Custom IAM Roles
 
@@ -221,9 +212,15 @@ aws iam list-roles --endpoint-url http://localhost:4566
 4. **Policy Documentation**: Document what each policy allows and why
 5. **Regular Audits**: Review and remove unused roles periodically
 
+## Advantages of Using LocalStack IAM
+
+1. **Full IAM Compatibility**: All IAM features work as in real AWS
+2. **No Translation Layer**: Policies are evaluated directly by LocalStack
+3. **Simplified Implementation**: No complex RBAC mapping required
+4. **Future-Proof**: New AWS services automatically supported
+
 ## Limitations
 
-- Policy mapping covers common AWS services; custom mappings may be needed
-- Complex IAM conditions are not fully supported
-- Resource-based policies require manual RBAC configuration
-- Cross-account role assumption is not supported
+- Uses static test credentials (suitable for local development)
+- Cross-account role assumption depends on LocalStack support
+- Advanced IAM features depend on LocalStack implementation

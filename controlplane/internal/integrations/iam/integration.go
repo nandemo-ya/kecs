@@ -2,7 +2,6 @@ package iam
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -10,9 +9,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamTypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	v1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -20,7 +19,8 @@ import (
 
 // integration implements the IAM Integration interface
 type integration struct {
-	iamClient         *iam.Client
+	iamClient         IAMClient
+	stsClient         STSClient
 	kubeClient        kubernetes.Interface
 	localstackManager localstack.Manager
 	config            *Config
@@ -43,14 +43,35 @@ func NewIntegration(kubeClient kubernetes.Interface, localstackManager localstac
 	}
 
 	iamClient := iam.NewFromConfig(cfg)
+	stsClient := sts.NewFromConfig(cfg)
 
 	return &integration{
 		iamClient:         iamClient,
+		stsClient:         stsClient,
 		kubeClient:        kubeClient,
 		localstackManager: localstackManager,
 		config:            config,
 		roleMappings:      make(map[string]*TaskRoleMapping),
 	}, nil
+}
+
+// NewIntegrationWithClients creates a new IAM integration with custom clients (for testing)
+func NewIntegrationWithClients(kubeClient kubernetes.Interface, localstackManager localstack.Manager, config *Config, iamClient IAMClient, stsClient STSClient) Integration {
+	if config == nil {
+		config = &Config{
+			KubeNamespace: "default",
+			RolePrefix:    "kecs-",
+		}
+	}
+
+	return &integration{
+		iamClient:         iamClient,
+		stsClient:         stsClient,
+		kubeClient:        kubeClient,
+		localstackManager: localstackManager,
+		config:            config,
+		roleMappings:      make(map[string]*TaskRoleMapping),
+	}
 }
 
 // CreateTaskRole creates an IAM role and corresponding ServiceAccount
@@ -191,21 +212,7 @@ func (i *integration) AttachPolicyToRole(roleName, policyArn string) error {
 		return fmt.Errorf("failed to attach policy: %w", err)
 	}
 
-	// Update RBAC if this is a task role
-	if mapping, exists := i.roleMappings[roleName]; exists {
-		// Get the policy document
-		policyDoc, err := i.getPolicyDocument(policyArn)
-		if err != nil {
-			klog.Warningf("Failed to get policy document for RBAC mapping: %v", err)
-			return nil // Don't fail, just log
-		}
-
-		// Map to RBAC and update Role/RoleBinding
-		if err := i.updateRBACForServiceAccount(mapping.ServiceAccountName, policyDoc); err != nil {
-			klog.Warningf("Failed to update RBAC: %v", err)
-		}
-	}
-
+	klog.Infof("Attached policy %s to role %s", policyArn, roleName)
 	return nil
 }
 
@@ -222,13 +229,7 @@ func (i *integration) CreateInlinePolicy(roleName, policyName, policyDocument st
 		return fmt.Errorf("failed to create inline policy: %w", err)
 	}
 
-	// Update RBAC if this is a task role
-	if mapping, exists := i.roleMappings[roleName]; exists {
-		if err := i.updateRBACForServiceAccount(mapping.ServiceAccountName, policyDocument); err != nil {
-			klog.Warningf("Failed to update RBAC: %v", err)
-		}
-	}
-
+	klog.Infof("Created inline policy %s for role %s", policyName, roleName)
 	return nil
 }
 
@@ -250,22 +251,9 @@ func (i *integration) DeleteRole(roleName string) error {
 		}
 	}
 
-	// Delete ServiceAccount and RBAC resources
+	// Delete ServiceAccount
 	if mapping != nil {
-		// Delete RoleBinding
-		err := i.kubeClient.RbacV1().RoleBindings(mapping.Namespace).Delete(ctx, mapping.ServiceAccountName, metav1.DeleteOptions{})
-		if err != nil {
-			klog.Warningf("Failed to delete RoleBinding: %v", err)
-		}
-
-		// Delete Role
-		err = i.kubeClient.RbacV1().Roles(mapping.Namespace).Delete(ctx, mapping.ServiceAccountName, metav1.DeleteOptions{})
-		if err != nil {
-			klog.Warningf("Failed to delete Role: %v", err)
-		}
-
-		// Delete ServiceAccount
-		err = i.kubeClient.CoreV1().ServiceAccounts(mapping.Namespace).Delete(ctx, mapping.ServiceAccountName, metav1.DeleteOptions{})
+		err := i.kubeClient.CoreV1().ServiceAccounts(mapping.Namespace).Delete(ctx, mapping.ServiceAccountName, metav1.DeleteOptions{})
 		if err != nil {
 			klog.Warningf("Failed to delete ServiceAccount: %v", err)
 		}
@@ -328,51 +316,11 @@ func (i *integration) GetServiceAccountForRole(roleName string) (string, error) 
 	return sa.Name, nil
 }
 
-// MapIAMPolicyToRBAC converts IAM policy to RBAC rules
-func (i *integration) MapIAMPolicyToRBAC(policyDocument string) ([]rbacv1.PolicyRule, error) {
-	var policy struct {
-		Version   string `json:"Version"`
-		Statement []struct {
-			Effect   string   `json:"Effect"`
-			Action   []string `json:"Action"`
-			Resource []string `json:"Resource"`
-		} `json:"Statement"`
-	}
-
-	if err := json.Unmarshal([]byte(policyDocument), &policy); err != nil {
-		return nil, fmt.Errorf("failed to parse policy document: %w", err)
-	}
-
-	var rules []rbacv1.PolicyRule
-	processedActions := make(map[string]bool)
-
-	for _, statement := range policy.Statement {
-		if statement.Effect != "Allow" {
-			continue
-		}
-
-		for _, action := range statement.Action {
-			if processedActions[action] {
-				continue
-			}
-			processedActions[action] = true
-
-			// Find mapping for this action
-			for _, mapping := range commonPolicyMappings {
-				if matchAction(action, mapping.IAMAction) {
-					rule := rbacv1.PolicyRule{
-						APIGroups: mapping.RBACGroups,
-						Resources: mapping.RBACResources,
-						Verbs:     mapping.RBACVerbs,
-					}
-					rules = append(rules, rule)
-					break
-				}
-			}
-		}
-	}
-
-	return rules, nil
+// GetRoleCredentials gets temporary credentials for a role (if using STS)
+func (i *integration) GetRoleCredentials(roleName string) (*Credentials, error) {
+	// For LocalStack, we use static test credentials
+	// In a real implementation, this could use STS AssumeRole
+	return &DefaultLocalStackCredentials, nil
 }
 
 // Helper functions
@@ -415,80 +363,6 @@ func (i *integration) createExecutionRolePolicy(roleName string) error {
 	return i.CreateInlinePolicy(roleName, "TaskExecutionPolicy", policyDocument)
 }
 
-func (i *integration) getPolicyDocument(policyArn string) (string, error) {
-	ctx := context.Background()
-
-	// For managed policies, we'd need to get the policy version and then the document
-	// For now, return empty - this would need full implementation
-	return "", fmt.Errorf("policy document retrieval not implemented")
-}
-
-func (i *integration) updateRBACForServiceAccount(serviceAccountName, policyDocument string) error {
-	ctx := context.Background()
-
-	// Map IAM policy to RBAC rules
-	rules, err := i.MapIAMPolicyToRBAC(policyDocument)
-	if err != nil {
-		return err
-	}
-
-	// Create or update Role
-	role := &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceAccountName,
-			Namespace: i.config.KubeNamespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/managed-by": "kecs",
-				"kecs.io/iam-integration":      "true",
-			},
-		},
-		Rules: rules,
-	}
-
-	_, err = i.kubeClient.RbacV1().Roles(i.config.KubeNamespace).Create(ctx, role, metav1.CreateOptions{})
-	if err != nil {
-		// Try update if already exists
-		_, err = i.kubeClient.RbacV1().Roles(i.config.KubeNamespace).Update(ctx, role, metav1.UpdateOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to create/update Role: %w", err)
-		}
-	}
-
-	// Create or update RoleBinding
-	roleBinding := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceAccountName,
-			Namespace: i.config.KubeNamespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/managed-by": "kecs",
-				"kecs.io/iam-integration":      "true",
-			},
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      serviceAccountName,
-				Namespace: i.config.KubeNamespace,
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "Role",
-			Name:     serviceAccountName,
-		},
-	}
-
-	_, err = i.kubeClient.RbacV1().RoleBindings(i.config.KubeNamespace).Create(ctx, roleBinding, metav1.CreateOptions{})
-	if err != nil {
-		// Try update if already exists
-		_, err = i.kubeClient.RbacV1().RoleBindings(i.config.KubeNamespace).Update(ctx, roleBinding, metav1.UpdateOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to create/update RoleBinding: %w", err)
-		}
-	}
-
-	return nil
-}
 
 func (i *integration) findServiceAccountByRole(roleName string) (*v1.ServiceAccount, error) {
 	ctx := context.Background()
@@ -510,17 +384,3 @@ func (i *integration) findServiceAccountByRole(roleName string) (*v1.ServiceAcco
 	return nil, nil
 }
 
-func matchAction(action, pattern string) bool {
-	// Simple wildcard matching
-	if pattern == "*" || action == pattern {
-		return true
-	}
-
-	// Handle service:* patterns
-	if strings.HasSuffix(pattern, ":*") {
-		prefix := strings.TrimSuffix(pattern, "*")
-		return strings.HasPrefix(action, prefix)
-	}
-
-	return false
-}

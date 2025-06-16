@@ -2,38 +2,169 @@ package iam_test
 
 import (
 	"context"
-	"encoding/json"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamTypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
+	kecsIAM "github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
-	v1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+// mockIAMClient is a mock implementation of IAMClient
+type mockIAMClient struct{}
+
+func (m *mockIAMClient) CreateRole(ctx context.Context, params *iam.CreateRoleInput, optFns ...func(*iam.Options)) (*iam.CreateRoleOutput, error) {
+	return &iam.CreateRoleOutput{
+		Role: &iamTypes.Role{
+			RoleName: params.RoleName,
+			Arn:      aws.String("arn:aws:iam::123456789012:role/" + *params.RoleName),
+		},
+	}, nil
+}
+
+func (m *mockIAMClient) DeleteRole(ctx context.Context, params *iam.DeleteRoleInput, optFns ...func(*iam.Options)) (*iam.DeleteRoleOutput, error) {
+	return &iam.DeleteRoleOutput{}, nil
+}
+
+func (m *mockIAMClient) AttachRolePolicy(ctx context.Context, params *iam.AttachRolePolicyInput, optFns ...func(*iam.Options)) (*iam.AttachRolePolicyOutput, error) {
+	return &iam.AttachRolePolicyOutput{}, nil
+}
+
+func (m *mockIAMClient) DetachRolePolicy(ctx context.Context, params *iam.DetachRolePolicyInput, optFns ...func(*iam.Options)) (*iam.DetachRolePolicyOutput, error) {
+	return &iam.DetachRolePolicyOutput{}, nil
+}
+
+func (m *mockIAMClient) PutRolePolicy(ctx context.Context, params *iam.PutRolePolicyInput, optFns ...func(*iam.Options)) (*iam.PutRolePolicyOutput, error) {
+	return &iam.PutRolePolicyOutput{}, nil
+}
+
+func (m *mockIAMClient) DeleteRolePolicy(ctx context.Context, params *iam.DeleteRolePolicyInput, optFns ...func(*iam.Options)) (*iam.DeleteRolePolicyOutput, error) {
+	return &iam.DeleteRolePolicyOutput{}, nil
+}
+
+func (m *mockIAMClient) ListAttachedRolePolicies(ctx context.Context, params *iam.ListAttachedRolePoliciesInput, optFns ...func(*iam.Options)) (*iam.ListAttachedRolePoliciesOutput, error) {
+	return &iam.ListAttachedRolePoliciesOutput{
+		AttachedPolicies: []iamTypes.AttachedPolicy{},
+	}, nil
+}
+
+func (m *mockIAMClient) ListRolePolicies(ctx context.Context, params *iam.ListRolePoliciesInput, optFns ...func(*iam.Options)) (*iam.ListRolePoliciesOutput, error) {
+	return &iam.ListRolePoliciesOutput{
+		PolicyNames: []string{},
+	}, nil
+}
+
+// mockSTSClient is a mock implementation of STSClient
+type mockSTSClient struct{}
+
+func (m *mockSTSClient) AssumeRole(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+	return &sts.AssumeRoleOutput{}, nil
+}
+
+// mockLocalStackManager is a mock implementation of localstack.Manager
+type mockLocalStackManager struct{}
+
+func (m *mockLocalStackManager) Start(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockLocalStackManager) Stop(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockLocalStackManager) Restart(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockLocalStackManager) IsRunning() bool {
+	return true
+}
+
+func (m *mockLocalStackManager) IsHealthy() bool {
+	return true
+}
+
+func (m *mockLocalStackManager) GetEndpoint() (string, error) {
+	return "http://localhost:4566", nil
+}
+
+func (m *mockLocalStackManager) GetStatus() (*localstack.Status, error) {
+	return &localstack.Status{
+		Running: true,
+		Healthy: true,
+	}, nil
+}
+
+func (m *mockLocalStackManager) EnableService(service string) error {
+	return nil
+}
+
+func (m *mockLocalStackManager) DisableService(service string) error {
+	return nil
+}
+
+func (m *mockLocalStackManager) GetEnabledServices() ([]string, error) {
+	return []string{"iam", "s3"}, nil
+}
+
+func (m *mockLocalStackManager) GetConfig() *localstack.Config {
+	return &localstack.Config{
+		Enabled: true,
+	}
+}
+
+func (m *mockLocalStackManager) GetContainer() *localstack.LocalStackContainer {
+	return nil
+}
+
+func (m *mockLocalStackManager) UpdateServices(services []string) error {
+	return nil
+}
+
+func (m *mockLocalStackManager) GetServiceEndpoint(service string) (string, error) {
+	return "http://localhost:4566", nil
+}
+
+func (m *mockLocalStackManager) WaitForReady(ctx context.Context, timeout time.Duration) error {
+	return nil
+}
+
 var _ = Describe("IAM Integration", func() {
 	var (
-		integration       iam.Integration
+		integration       kecsIAM.Integration
 		kubeClient        *fake.Clientset
 		localstackManager localstack.Manager
-		config            *iam.Config
+		config            *kecsIAM.Config
+		iamClient         kecsIAM.IAMClient
+		stsClient         kecsIAM.STSClient
 	)
 
 	BeforeEach(func() {
 		kubeClient = fake.NewSimpleClientset()
 		localstackManager = &mockLocalStackManager{}
-		config = &iam.Config{
+		config = &kecsIAM.Config{
 			LocalStackEndpoint: "http://localhost:4566",
 			KubeNamespace:      "default",
 			RolePrefix:         "kecs-",
 		}
 
-		var err error
-		integration, err = iam.NewIntegration(kubeClient, localstackManager, config)
-		Expect(err).NotTo(HaveOccurred())
+		iamClient = &mockIAMClient{}
+		stsClient = &mockSTSClient{}
+		
+		// Use the test constructor with mocked clients
+		integration = kecsIAM.NewIntegrationWithClients(
+			kubeClient,
+			localstackManager,
+			config,
+			iamClient,
+			stsClient,
+		)
 	})
 
 	Describe("CreateTaskRole", func() {
@@ -57,8 +188,8 @@ var _ = Describe("IAM Integration", func() {
 			sa, err := kubeClient.CoreV1().ServiceAccounts("default").Get(context.Background(), serviceAccountName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(sa.Name).To(Equal(serviceAccountName))
-			Expect(sa.Annotations[iam.ServiceAccountAnnotations.RoleName]).To(Equal("kecs-my-task-role"))
-			Expect(sa.Annotations[iam.ServiceAccountAnnotations.TaskDefinitionArn]).To(Equal(taskDefArn))
+			Expect(sa.Annotations[kecsIAM.ServiceAccountAnnotations.RoleName]).To(Equal("kecs-my-task-role"))
+			Expect(sa.Annotations[kecsIAM.ServiceAccountAnnotations.TaskDefinitionArn]).To(Equal(taskDefArn))
 		})
 
 		It("should add prefix to role name if not present", func() {
@@ -73,7 +204,7 @@ var _ = Describe("IAM Integration", func() {
 			serviceAccountName := "kecs-unprefixed-role-sa"
 			sa, err := kubeClient.CoreV1().ServiceAccounts("default").Get(context.Background(), serviceAccountName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(sa.Annotations[iam.ServiceAccountAnnotations.RoleName]).To(Equal("kecs-unprefixed-role"))
+			Expect(sa.Annotations[kecsIAM.ServiceAccountAnnotations.RoleName]).To(Equal("kecs-unprefixed-role"))
 		})
 	})
 
@@ -99,84 +230,18 @@ var _ = Describe("IAM Integration", func() {
 		})
 	})
 
-	Describe("MapIAMPolicyToRBAC", func() {
-		It("should map S3 permissions to ConfigMap access", func() {
-			policyDoc := `{
-				"Version": "2012-10-17",
-				"Statement": [{
-					"Effect": "Allow",
-					"Action": ["s3:GetObject", "s3:PutObject"],
-					"Resource": "*"
-				}]
-			}`
-
-			rules, err := integration.MapIAMPolicyToRBAC(policyDoc)
+	Describe("GetRoleCredentials", func() {
+		It("should return LocalStack test credentials", func() {
+			creds, err := integration.GetRoleCredentials("test-role")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(rules).To(HaveLen(2))
-
-			// Check GetObject mapping
-			Expect(rules[0].Verbs).To(ContainElement("get"))
-			Expect(rules[0].Resources).To(ContainElements("configmaps", "secrets"))
-
-			// Check PutObject mapping
-			Expect(rules[1].Verbs).To(ContainElements("create", "update"))
-			Expect(rules[1].Resources).To(ContainElement("configmaps"))
-		})
-
-		It("should map CloudWatch Logs permissions", func() {
-			policyDoc := `{
-				"Version": "2012-10-17",
-				"Statement": [{
-					"Effect": "Allow",
-					"Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
-					"Resource": "*"
-				}]
-			}`
-
-			rules, err := integration.MapIAMPolicyToRBAC(policyDoc)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rules).To(HaveLen(3))
-
-			// All should map to events
-			for _, rule := range rules {
-				Expect(rule.Resources).To(ContainElement("events"))
-			}
-		})
-
-		It("should handle wildcard actions", func() {
-			policyDoc := `{
-				"Version": "2012-10-17",
-				"Statement": [{
-					"Effect": "Allow",
-					"Action": "s3:*",
-					"Resource": "*"
-				}]
-			}`
-
-			rules, err := integration.MapIAMPolicyToRBAC(policyDoc)
-			Expect(err).NotTo(HaveOccurred())
-			// Should match s3:GetObject and s3:PutObject
-			Expect(len(rules)).To(BeNumerically(">=", 2))
-		})
-
-		It("should ignore Deny statements", func() {
-			policyDoc := `{
-				"Version": "2012-10-17",
-				"Statement": [{
-					"Effect": "Deny",
-					"Action": "s3:GetObject",
-					"Resource": "*"
-				}]
-			}`
-
-			rules, err := integration.MapIAMPolicyToRBAC(policyDoc)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rules).To(BeEmpty())
+			Expect(creds).NotTo(BeNil())
+			Expect(creds.AccessKeyId).To(Equal("test"))
+			Expect(creds.SecretAccessKey).To(Equal("test"))
 		})
 	})
 
 	Describe("CreateInlinePolicy", func() {
-		It("should create inline policy and update RBAC", func() {
+		It("should create inline policy without RBAC", func() {
 			// First create a role
 			taskDefArn := "arn:aws:ecs:us-east-1:123456789012:task-definition/my-task:1"
 			roleName := "test-role"
@@ -198,12 +263,10 @@ var _ = Describe("IAM Integration", func() {
 
 			err = integration.CreateInlinePolicy("kecs-test-role", policyName, policyDoc)
 			Expect(err).NotTo(HaveOccurred())
-
-			// Verify RBAC was created
-			role, err := kubeClient.RbacV1().Roles("default").Get(context.Background(), "kecs-test-role-sa", metav1.GetOptions{})
+			
+			// Only ServiceAccount should exist, no RBAC resources
+			_, err = kubeClient.CoreV1().ServiceAccounts("default").Get(context.Background(), "kecs-test-role-sa", metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(role.Rules).To(HaveLen(1))
-			Expect(role.Rules[0].Verbs).To(ContainElement("get"))
 		})
 	})
 
@@ -227,63 +290,3 @@ var _ = Describe("IAM Integration", func() {
 		})
 	})
 })
-
-// mockLocalStackManager is a mock implementation of localstack.Manager
-type mockLocalStackManager struct{}
-
-func (m *mockLocalStackManager) Start(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockLocalStackManager) Stop(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockLocalStackManager) Restart(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockLocalStackManager) IsRunning() bool {
-	return true
-}
-
-func (m *mockLocalStackManager) IsHealthy() bool {
-	return true
-}
-
-func (m *mockLocalStackManager) GetEndpoint() string {
-	return "http://localhost:4566"
-}
-
-func (m *mockLocalStackManager) GetStatus() *localstack.Status {
-	return &localstack.Status{
-		Running: true,
-		Healthy: true,
-	}
-}
-
-func (m *mockLocalStackManager) EnableService(service string) error {
-	return nil
-}
-
-func (m *mockLocalStackManager) DisableService(service string) error {
-	return nil
-}
-
-func (m *mockLocalStackManager) GetEnabledServices() []string {
-	return []string{"iam", "s3"}
-}
-
-func (m *mockLocalStackManager) GetConfig() *localstack.Config {
-	return &localstack.Config{
-		Enabled: true,
-	}
-}
-
-func (m *mockLocalStackManager) GetContainer() *localstack.LocalStackContainer {
-	return nil
-}
-
-func (m *mockLocalStackManager) UpdateServices(services []string) error {
-	return nil
-}

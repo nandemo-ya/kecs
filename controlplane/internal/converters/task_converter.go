@@ -1304,5 +1304,45 @@ func (c *TaskConverter) applyIAMRole(pod *corev1.Pod, roleArn string) {
 		
 		// Add label for easier querying
 		pod.ObjectMeta.Labels["kecs.dev/iam-role"] = roleName
+		
+		// Inject AWS credentials for LocalStack
+		c.injectAWSCredentials(pod)
+	}
+}
+
+// injectAWSCredentials adds AWS credential environment variables for LocalStack
+func (c *TaskConverter) injectAWSCredentials(pod *corev1.Pod) {
+	// AWS credentials for LocalStack
+	awsEnvVars := []corev1.EnvVar{
+		{
+			Name:  "AWS_ACCESS_KEY_ID",
+			Value: "test",
+		},
+		{
+			Name:  "AWS_SECRET_ACCESS_KEY",
+			Value: "test",
+		},
+		{
+			Name:  "AWS_DEFAULT_REGION",
+			Value: c.region,
+		},
+	}
+	
+	// Add credentials to all containers
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		
+		// Check if env vars already exist to avoid duplicates
+		envMap := make(map[string]bool)
+		for _, env := range container.Env {
+			envMap[env.Name] = true
+		}
+		
+		// Add AWS env vars if not already present
+		for _, envVar := range awsEnvVars {
+			if !envMap[envVar.Name] {
+				container.Env = append(container.Env, envVar)
+			}
+		}
 	}
 }
