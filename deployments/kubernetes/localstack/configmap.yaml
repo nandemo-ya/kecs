@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: localstack-config
+  namespace: aws-services
+  labels:
+    app: localstack
+    app.kubernetes.io/name: localstack
+    app.kubernetes.io/managed-by: kecs
+    app.kubernetes.io/component: localstack
+data:
+  services: "iam,logs,ssm,secretsmanager,elbv2"
+  # Additional configuration can be added here
+  # For example, custom init scripts or configuration files

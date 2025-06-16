@@ -80,3 +80,41 @@ health:
   path: /health
   readinessPath: /ready
   livenessPath: /live
+
+# LocalStack configuration
+localstack:
+  enabled: false  # Set to true to enable LocalStack integration
+  services:
+    - iam
+    - logs
+    - ssm
+    - secretsmanager
+    - elbv2
+  persistence: true
+  image: "localstack/localstack:latest"
+  namespace: "aws-services"
+  port: 4566
+  edgePort: 4566
+  resources:
+    memory: "2Gi"
+    cpu: "1000m"
+    storageSize: "10Gi"
+  environment:
+    DEFAULT_REGION: "us-east-1"
+    DOCKER_HOST: "unix:///var/run/docker.sock"
+    LAMBDA_EXECUTOR: "local"
+    DISABLE_CORS_CHECKS: "1"
+    DISABLE_CUSTOM_CORS_S3: "1"
+    EXTRA_CORS_ALLOWED_ORIGINS: "*"
+    EXTRA_CORS_ALLOWED_HEADERS: "x-amz-*"
+  debug: false
+  dataDir: "/var/lib/localstack"
+  
+# AWS Proxy configuration  
+proxy:
+  mode: "environment"  # Options: environment, sidecar, ebpf, disabled
+  localstackEndpoint: "http://localstack.aws-services.svc.cluster.local:4566"
+  fallbackEnabled: true
+  fallbackOrder:
+    - sidecar
+    - environment
