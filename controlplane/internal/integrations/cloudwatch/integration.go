@@ -268,16 +268,13 @@ func (i *integration) generateFluentBitConfig(logGroupName, logStreamPrefix stri
 // Helper functions
 
 func createLocalStackConfig(endpoint string) (aws.Config, error) {
+	if endpoint == "" {
+		return aws.Config{}, fmt.Errorf("no endpoint configured")
+	}
+	
 	return config.LoadDefaultConfig(context.Background(),
 		config.WithRegion("us-east-1"),
-		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
-			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-				if endpoint != "" {
-					return aws.Endpoint{URL: endpoint}, nil
-				}
-				return aws.Endpoint{}, fmt.Errorf("no endpoint configured")
-			}),
-		),
+		config.WithBaseEndpoint(endpoint),
 		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
 	)
 }
