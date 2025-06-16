@@ -32,6 +32,7 @@ type Server struct {
 	testModeWorker    *TestModeTaskWorker
 	localStackManager localstack.Manager
 	awsProxyRouter    *AWSProxyRouter
+	localStackEvents  *LocalStackEventIntegration
 }
 
 // NewServer creates a new API server instance
@@ -133,6 +134,13 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				} else {
 					s.awsProxyRouter = awsProxyRouter
 				}
+				
+				// Create LocalStack event integration
+				s.localStackEvents = NewLocalStackEventIntegration(
+					localStackManager,
+					s.webSocketHub,
+					DefaultLocalStackEventConfig(),
+				)
 			}
 		}
 	}
@@ -155,6 +163,13 @@ func (s *Server) Start() error {
 	if s.localStackManager != nil {
 		if err := s.localStackManager.Start(ctx); err != nil {
 			log.Printf("Failed to start LocalStack manager: %v", err)
+		} else {
+			// Start LocalStack event integration after LocalStack is running
+			if s.localStackEvents != nil {
+				if err := s.localStackEvents.Start(ctx); err != nil {
+					log.Printf("Failed to start LocalStack event integration: %v", err)
+				}
+			}
 		}
 	}
 
@@ -186,6 +201,13 @@ func (s *Server) Stop(ctx context.Context) error {
 	// Stop test mode worker if running
 	if s.testModeWorker != nil {
 		s.testModeWorker.Stop()
+	}
+	
+	// Stop LocalStack event integration if running
+	if s.localStackEvents != nil {
+		if err := s.localStackEvents.Stop(ctx); err != nil {
+			log.Printf("Error stopping LocalStack event integration: %v", err)
+		}
 	}
 	
 	// Stop LocalStack manager if running
