@@ -20,7 +20,8 @@ var _ = Describe("LocalStack Configuration", func() {
 			Expect(config.Enabled).To(BeFalse())
 			Expect(config.Services).To(ConsistOf("iam", "logs", "ssm", "secretsmanager", "elbv2"))
 			Expect(config.Persistence).To(BeTrue())
-			Expect(config.Image).To(Equal("localstack/localstack:latest"))
+			Expect(config.Image).To(Equal("localstack/localstack"))
+			Expect(config.Version).To(Equal("latest"))
 			Expect(config.Namespace).To(Equal("aws-services"))
 			Expect(config.Port).To(Equal(4566))
 			Expect(config.EdgePort).To(Equal(4566))
@@ -50,6 +51,12 @@ var _ = Describe("LocalStack Configuration", func() {
 
 			It("should return error for empty image", func() {
 				config.Image = ""
+				err := config.Validate()
+				Expect(err).To(HaveOccurred())
+			})
+
+			It("should return error for empty version", func() {
+				config.Version = ""
 				err := config.Validate()
 				Expect(err).To(HaveOccurred())
 			})

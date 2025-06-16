@@ -13,6 +13,7 @@ func DefaultConfig() *Config {
 		Services:    DefaultServices,
 		Persistence: true,
 		Image:       DefaultImage,
+		Version:     DefaultVersion,
 		Namespace:   DefaultNamespace,
 		Port:        DefaultPort,
 		EdgePort:    DefaultEdgePort,
@@ -45,6 +46,11 @@ func (c *Config) Validate() error {
 	// Validate image
 	if c.Image == "" {
 		return fmt.Errorf("image cannot be empty")
+	}
+	
+	// Validate version
+	if c.Version == "" {
+		return fmt.Errorf("version cannot be empty")
 	}
 
 	// Validate namespace

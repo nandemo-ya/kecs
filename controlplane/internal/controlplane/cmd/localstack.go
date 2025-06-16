@@ -13,6 +13,11 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+var (
+	localstackVersion string
+	localstackImage   string
+)
+
 var localstackCmd = &cobra.Command{
 	Use:   "localstack",
 	Short: "Manage LocalStack integration",
@@ -85,6 +90,9 @@ var localstackStatusCmd = &cobra.Command{
 		if status.Running {
 			fmt.Printf("  Endpoint: %s\n", status.Endpoint)
 			fmt.Printf("  Uptime: %s\n", status.Uptime)
+			if status.Version != "" {
+				fmt.Printf("  Version: %s\n", status.Version)
+			}
 		}
 
 		// Print enabled services
@@ -250,6 +258,10 @@ var localstackServicesCmd = &cobra.Command{
 }
 
 func init() {
+	// Add persistent flags
+	localstackCmd.PersistentFlags().StringVar(&localstackVersion, "version", "", "LocalStack version to use (default: latest)")
+	localstackCmd.PersistentFlags().StringVar(&localstackImage, "image", "", "LocalStack image to use (default: localstack/localstack)")
+	
 	// Add subcommands
 	localstackCmd.AddCommand(localstackStartCmd)
 	localstackCmd.AddCommand(localstackStopCmd)
@@ -276,6 +288,16 @@ func getLocalStackManager() (localstack.Manager, error) {
 	// Create LocalStack configuration
 	lsConfig := localstack.DefaultConfig()
 	lsConfig.Enabled = true
+	
+	// Override version if specified
+	if localstackVersion != "" {
+		lsConfig.Version = localstackVersion
+	}
+	
+	// Override image if specified
+	if localstackImage != "" {
+		lsConfig.Image = localstackImage
+	}
 
 	// Create and return manager
 	manager, err := localstack.NewManager(lsConfig, clientset)

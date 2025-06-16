@@ -58,6 +58,7 @@ type Config struct {
 	
 	// Deployment configuration
 	Image           string            `yaml:"image" json:"image"`
+	Version         string            `yaml:"version" json:"version"`
 	Namespace       string            `yaml:"namespace" json:"namespace"`
 	Port            int               `yaml:"port" json:"port"`
 	EdgePort        int               `yaml:"edge_port" json:"edge_port"`
@@ -147,7 +148,8 @@ type ProxyConfig struct {
 // Constants for LocalStack
 const (
 	DefaultNamespace     = "aws-services"
-	DefaultImage         = "localstack/localstack:latest"
+	DefaultImage         = "localstack/localstack"
+	DefaultVersion       = "latest"
 	DefaultPort          = 4566
 	DefaultEdgePort      = 4566
 	DefaultHealthTimeout = 2 * time.Minute

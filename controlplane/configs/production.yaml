@@ -91,7 +91,8 @@ localstack:
     - secretsmanager
     - elbv2
   persistence: true
-  image: "localstack/localstack:latest"
+  image: "localstack/localstack"
+  version: "latest"
   namespace: "aws-services"
   port: 4566
   edgePort: 4566

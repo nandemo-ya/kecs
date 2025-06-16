@@ -185,7 +185,7 @@ func (km *kubernetesManager) createDeployment(ctx context.Context, config *Confi
 					Containers: []corev1.Container{
 						{
 							Name:  "localstack",
-							Image: config.Image,
+							Image: fmt.Sprintf("%s:%s", config.Image, config.Version),
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "edge",
