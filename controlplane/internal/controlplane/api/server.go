@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
@@ -33,6 +34,7 @@ type Server struct {
 	localStackManager localstack.Manager
 	awsProxyRouter    *AWSProxyRouter
 	localStackEvents  *LocalStackEventIntegration
+	iamIntegration    iam.Integration
 }
 
 // NewServer creates a new API server instance
@@ -71,7 +73,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		kubeconfig:   kubeconfig,
 		region:       "ap-northeast-1", // Default region
 		accountID:    "123456789012",   // Default account ID
-		ecsAPI:       NewDefaultECSAPI(storage, kindManager),
+		ecsAPI:       nil, // Will be set after IAM integration
 		storage:      storage,
 		kindManager:  kindManager,
 		webSocketHub: NewWebSocketHubWithConfig(wsConfig),
@@ -141,9 +143,32 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					s.webSocketHub,
 					DefaultLocalStackEventConfig(),
 				)
+				
+				// Initialize IAM integration if LocalStack is available
+				if kubeClient != nil {
+					iamConfig := &iam.Config{
+						LocalStackEndpoint: fmt.Sprintf("http://localhost:%d", localStackConfig.Port),
+						KubeNamespace:      "default",
+						RolePrefix:         "kecs-",
+					}
+					iamIntegration, err := iam.NewIntegration(kubeClient, localStackManager, iamConfig)
+					if err != nil {
+						log.Printf("Warning: Failed to initialize IAM integration: %v", err)
+					} else {
+						s.iamIntegration = iamIntegration
+						log.Println("IAM integration initialized successfully")
+					}
+				}
 			}
 		}
 	}
+
+	// Create ECS API with or without IAM integration
+	ecsAPI := NewDefaultECSAPI(storage, kindManager)
+	if defaultAPI, ok := ecsAPI.(*DefaultECSAPI); ok && s.iamIntegration != nil {
+		defaultAPI.SetIAMIntegration(s.iamIntegration)
+	}
+	s.ecsAPI = ecsAPI
 
 	return s, nil
 }
