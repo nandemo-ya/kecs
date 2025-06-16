@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
 
 // RunTask implements the RunTask operation
@@ -144,6 +146,20 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 		// Set enable execute command
 		if req.EnableExecuteCommand != nil {
 			task.EnableExecuteCommand = *req.EnableExecuteCommand
+		}
+
+		// Sync SSM parameters if SSM integration is available
+		if api.ssmIntegration != nil {
+			// Extract SSM parameters from task definition
+			ssmParams := extractSSMParameters(taskDef)
+			if len(ssmParams) > 0 {
+				namespace := getNamespaceFromCluster(cluster)
+				if err := api.ssmIntegration.SyncParameters(ctx, ssmParams, namespace); err != nil {
+					// Log warning but don't fail the task creation
+					// This allows tasks to proceed even if parameter sync fails
+					log.Printf("Warning: Failed to sync SSM parameters for task %s: %v", taskID, err)
+				}
+			}
 		}
 
 		// Convert to Kubernetes pod
@@ -540,6 +556,48 @@ func parseRevision(revisionStr string) (int, error) {
 func extractSecretsFromPod(pod interface{}) map[string]*converters.SecretInfo {
 	// TODO: Extract secrets from pod spec if needed
 	return make(map[string]*converters.SecretInfo)
+}
+
+// Helper function to extract SSM parameters from task definition
+func extractSSMParameters(taskDef *storage.TaskDefinition) []string {
+	var ssmParams []string
+	
+	// Parse container definitions
+	var containerDefs []types.ContainerDefinition
+	if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
+		return ssmParams
+	}
+	
+	// Extract SSM parameter ARNs from each container's secrets
+	for _, container := range containerDefs {
+		if container.Secrets != nil {
+			for _, secret := range container.Secrets {
+				if secret.ValueFrom != nil && strings.Contains(*secret.ValueFrom, ":ssm:") {
+					// Parse SSM parameter name from ARN
+					// Format: arn:aws:ssm:region:account-id:parameter/name
+					parts := strings.Split(*secret.ValueFrom, ":")
+					if len(parts) >= 6 {
+						resourcePart := parts[5]
+						if strings.HasPrefix(resourcePart, "parameter/") {
+							paramName := strings.TrimPrefix(resourcePart, "parameter/")
+							ssmParams = append(ssmParams, "/"+paramName)
+						} else if strings.HasPrefix(resourcePart, "parameter") && len(parts) > 6 {
+							ssmParams = append(ssmParams, "/"+parts[6])
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	return ssmParams
+}
+
+// Helper function to get namespace from cluster
+func getNamespaceFromCluster(cluster *storage.Cluster) string {
+	// Default to "default" namespace
+	// In the future, this could be derived from cluster configuration
+	return "default"
 }
 
 // mockTaskManager is a simple mock for testing

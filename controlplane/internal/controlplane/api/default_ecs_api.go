@@ -4,6 +4,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/ssm"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
@@ -16,6 +17,7 @@ type DefaultECSAPI struct {
 	accountID             string
 	iamIntegration        iam.Integration
 	cloudWatchIntegration cloudwatch.Integration
+	ssmIntegration        ssm.Integration
 }
 
 // NewDefaultECSAPI creates a new default ECS API implementation with storage and kubernetes manager
@@ -36,6 +38,11 @@ func (api *DefaultECSAPI) SetIAMIntegration(iamIntegration iam.Integration) {
 // SetCloudWatchIntegration sets the CloudWatch integration for the ECS API
 func (api *DefaultECSAPI) SetCloudWatchIntegration(cloudWatchIntegration cloudwatch.Integration) {
 	api.cloudWatchIntegration = cloudWatchIntegration
+}
+
+// SetSSMIntegration sets the SSM integration for the ECS API
+func (api *DefaultECSAPI) SetSSMIntegration(ssmIntegration ssm.Integration) {
+	api.ssmIntegration = ssmIntegration
 }
 
 // NewDefaultECSAPIWithConfig creates a new default ECS API implementation with custom region and accountID
