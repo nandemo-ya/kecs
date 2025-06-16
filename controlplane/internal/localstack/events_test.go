@@ -152,12 +152,14 @@ var _ = Describe("LocalStack Events", func() {
 
 	Describe("Event Marshaling", func() {
 		It("should marshal and unmarshal events correctly", func() {
+			// Use UTC time to avoid timezone issues
+			testTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 			originalEvent := &localstack.Event{
 				Service:   "ecs",
 				EventType: localstack.EventTypeTaskStateChange,
 				Region:    "us-east-1",
 				Account:   "123456789012",
-				Time:      time.Now().Truncate(time.Second), // Truncate for comparison
+				Time:      testTime,
 				Detail: map[string]interface{}{
 					"clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/test",
 					"taskArn":    "arn:aws:ecs:us-east-1:123456789012:task/test/abc123",
@@ -169,6 +171,7 @@ var _ = Describe("LocalStack Events", func() {
 			jsonData, err := originalEvent.MarshalJSON()
 			Expect(err).NotTo(HaveOccurred())
 
+
 			// Unmarshal from JSON
 			var unmarshaledEvent localstack.Event
 			err = unmarshaledEvent.UnmarshalJSON(jsonData)
@@ -179,7 +182,8 @@ var _ = Describe("LocalStack Events", func() {
 			Expect(unmarshaledEvent.EventType).To(Equal(originalEvent.EventType))
 			Expect(unmarshaledEvent.Region).To(Equal(originalEvent.Region))
 			Expect(unmarshaledEvent.Account).To(Equal(originalEvent.Account))
-			Expect(unmarshaledEvent.Time.Truncate(time.Second)).To(Equal(originalEvent.Time))
+			// Compare times with second precision
+			Expect(unmarshaledEvent.Time.Unix()).To(Equal(originalEvent.Time.Unix()))
 		})
 	})
 })
