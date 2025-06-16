@@ -345,12 +345,21 @@ var _ = Describe("WebSocketRateLimit", func() {
 			Expect(err).NotTo(HaveOccurred())
 			connections = append(connections, conn2)
 
-			// Third connection should fail
-			_, resp, err := websocket.DefaultDialer.Dial(wsURL, header1)
-			Expect(err).To(HaveOccurred())
-			if resp != nil {
-				Expect(resp.StatusCode).To(Equal(http.StatusTooManyRequests))
+			// Wait a bit to ensure connections are registered
+			time.Sleep(100 * time.Millisecond)
+
+			// Third connection should fail with 429 status
+			conn3, resp, err := websocket.DefaultDialer.Dial(wsURL, header1)
+			if conn3 != nil {
+				conn3.Close()
 			}
+			
+			// The server should return 429 before WebSocket upgrade
+			Expect(resp).NotTo(BeNil())
+			Expect(resp.StatusCode).To(Equal(http.StatusTooManyRequests))
+			
+			// WebSocket dial may or may not return an error depending on the client implementation
+			// The important thing is that we get a 429 response
 		})
 
 		It("should enforce total connection limit", func() {
@@ -376,15 +385,24 @@ var _ = Describe("WebSocketRateLimit", func() {
 			Expect(err).NotTo(HaveOccurred())
 			connections = append(connections, conn3)
 
+			// Wait a bit to ensure connections are registered
+			time.Sleep(100 * time.Millisecond)
+
 			// Fourth total connection should fail (we have 3 connections already)
 			header3 := http.Header{}
 			header3.Set("X-User-ID", "user3")
 
-			_, resp, err := websocket.DefaultDialer.Dial(wsURL, header3)
-			Expect(err).To(HaveOccurred())
-			if resp != nil {
-				Expect(resp.StatusCode).To(Equal(http.StatusTooManyRequests))
+			conn4, resp, err := websocket.DefaultDialer.Dial(wsURL, header3)
+			if conn4 != nil {
+				conn4.Close()
 			}
+			
+			// The server should return 429 before WebSocket upgrade
+			Expect(resp).NotTo(BeNil())
+			Expect(resp.StatusCode).To(Equal(http.StatusTooManyRequests))
+			
+			// WebSocket dial may or may not return an error depending on the client implementation
+			// The important thing is that we get a 429 response
 		})
 	})
 
