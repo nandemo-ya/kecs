@@ -1,8 +1,11 @@
 package localstack
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -294,6 +297,88 @@ func (km *kubernetesManager) createService(ctx context.Context, config *Config) 
 	}
 
 	return nil
+}
+
+// WaitForLocalStackReady waits for LocalStack to output "Ready." in its logs
+func (km *kubernetesManager) WaitForLocalStackReady(ctx context.Context, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	
+	// First, wait for pod to be running
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			if time.Now().After(deadline) {
+				return fmt.Errorf("timeout waiting for LocalStack to be ready")
+			}
+			
+			pods, err := km.client.CoreV1().Pods(km.namespace).List(ctx, metav1.ListOptions{
+				LabelSelector: "app=localstack",
+			})
+			if err != nil {
+				klog.Warningf("Failed to list pods: %v", err)
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			
+			if len(pods.Items) == 0 {
+				klog.Info("No LocalStack pods found yet")
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			
+			pod := &pods.Items[0]
+			if pod.Status.Phase == corev1.PodRunning {
+				// Pod is running, now check logs for "Ready."
+				return km.waitForReadyInLogs(ctx, pod.Name, deadline)
+			}
+			
+			klog.Infof("Pod status: %s", pod.Status.Phase)
+			time.Sleep(2 * time.Second)
+		}
+	}
+}
+
+// waitForReadyInLogs monitors pod logs for the "Ready." message
+func (km *kubernetesManager) waitForReadyInLogs(ctx context.Context, podName string, deadline time.Time) error {
+	req := km.client.CoreV1().Pods(km.namespace).GetLogs(podName, &corev1.PodLogOptions{
+		Follow: true,
+		Container: "localstack",
+	})
+	
+	stream, err := req.Stream(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get log stream: %w", err)
+	}
+	defer stream.Close()
+	
+	scanner := bufio.NewScanner(stream)
+	for scanner.Scan() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			if time.Now().After(deadline) {
+				return fmt.Errorf("timeout waiting for LocalStack Ready message")
+			}
+			
+			line := scanner.Text()
+			klog.V(4).Infof("LocalStack log: %s", line)
+			
+			// Check for "Ready." in the log line
+			if strings.Contains(line, "Ready.") {
+				klog.Info("LocalStack is ready!")
+				return nil
+			}
+		}
+	}
+	
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading logs: %w", err)
+	}
+	
+	return fmt.Errorf("log stream ended without Ready message")
 }
 
 // DeleteLocalStack deletes all LocalStack resources

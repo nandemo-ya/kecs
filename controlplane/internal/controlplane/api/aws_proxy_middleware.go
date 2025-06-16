@@ -9,8 +9,8 @@ import (
 
 // AWSProxyRouter routes AWS API calls to appropriate handlers
 type AWSProxyRouter struct {
-	localStackManager localstack.Manager
-	awsProxyHandler   *AWSProxyHandler
+	LocalStackManager localstack.Manager
+	AWSProxyHandler   *AWSProxyHandler
 }
 
 // NewAWSProxyRouter creates a new AWS proxy router
@@ -21,29 +21,24 @@ func NewAWSProxyRouter(localStackManager localstack.Manager) (*AWSProxyRouter, e
 	}
 
 	return &AWSProxyRouter{
-		localStackManager: localStackManager,
-		awsProxyHandler:   awsProxyHandler,
+		LocalStackManager: localStackManager,
+		AWSProxyHandler:   awsProxyHandler,
 	}, nil
 }
 
 // RegisterRoutes registers AWS proxy routes on the provided mux
 func (apr *AWSProxyRouter) RegisterRoutes(mux *http.ServeMux) {
-	// Register AWS service endpoints
-	awsServices := []string{
-		"s3",
-		"iam",
-		"logs",
-		"ssm",
-		"secretsmanager",
-		"elbv2",
-		"rds",
-		"dynamodb",
-	}
-
-	for _, service := range awsServices {
-		pattern := "/api/v1/" + service + "/"
-		mux.Handle(pattern, apr.awsProxyHandler)
-	}
+	// Register a catch-all handler for AWS API calls
+	// This will handle all non-ECS AWS service calls
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Check if this should be proxied to LocalStack
+		if ShouldProxyToLocalStack(r, apr.LocalStackManager) {
+			apr.AWSProxyHandler.ServeHTTP(w, r)
+		} else {
+			// Not an AWS API call or LocalStack is not available
+			http.NotFound(w, r)
+		}
+	})
 }
 
 // ShouldProxyToLocalStack determines if a request should be proxied to LocalStack
@@ -63,33 +58,33 @@ func ShouldProxyToLocalStack(r *http.Request, localStackManager localstack.Manag
 
 // isAWSAPIRequest checks if the request is for an AWS API
 func isAWSAPIRequest(r *http.Request) bool {
-	path := r.URL.Path
-
-	// Check for AWS API path patterns
-	awsAPIPrefixes := []string{
-		"/api/v1/s3/",
-		"/api/v1/iam/",
-		"/api/v1/logs/",
-		"/api/v1/ssm/",
-		"/api/v1/secretsmanager/",
-		"/api/v1/elbv2/",
-		"/api/v1/rds/",
-		"/api/v1/dynamodb/",
-	}
-
-	for _, prefix := range awsAPIPrefixes {
-		if strings.HasPrefix(path, prefix) {
-			return true
-		}
-	}
-
-	// Check for AWS SDK headers
+	// Check for AWS SDK headers first (most reliable)
 	if r.Header.Get("X-Amz-Target") != "" ||
-		strings.Contains(r.Header.Get("Authorization"), "AWS4-HMAC-SHA256") {
-		// But exclude ECS calls
-		if !isECSRequest(r) {
-			return true
-		}
+		strings.Contains(r.Header.Get("Authorization"), "AWS4-HMAC-SHA256") ||
+		r.Header.Get("X-Amz-Date") != "" ||
+		r.Header.Get("X-Amz-Security-Token") != "" {
+		return true
+	}
+
+	// Check for AWS-style endpoints
+	host := r.Host
+	if host == "" {
+		host = r.URL.Host
+	}
+	
+	// Check for common AWS patterns
+	if strings.Contains(host, ".amazonaws.com") ||
+		strings.Contains(host, "aws.amazon.com") ||
+		host == "169.254.169.254" { // EC2 metadata service
+		return true
+	}
+
+	// Check URL path for AWS service patterns
+	path := r.URL.Path
+	// AWS services often use /v1/, /v2/, or service-specific patterns
+	if strings.HasPrefix(path, "/v1/") || strings.HasPrefix(path, "/v2/") {
+		// Could be an AWS API call
+		return true
 	}
 
 	return false

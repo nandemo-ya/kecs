@@ -99,7 +99,18 @@ func (m *localStackManager) Start(ctx context.Context) error {
 	// Update health checker endpoint
 	m.healthChecker = NewHealthChecker(endpoint)
 
-	// Wait for LocalStack to be healthy
+	// Wait for LocalStack to output "Ready." in logs
+	klog.Info("Waiting for LocalStack to be ready...")
+	readyCtx, readyCancel := context.WithTimeout(ctx, DefaultHealthTimeout)
+	defer readyCancel()
+	
+	if kubeManager, ok := m.kubeManager.(*kubernetesManager); ok {
+		if err := kubeManager.WaitForLocalStackReady(readyCtx, DefaultHealthTimeout); err != nil {
+			klog.Warningf("Failed to detect Ready message: %v, falling back to health check", err)
+		}
+	}
+	
+	// Also wait for health check
 	if err := m.healthChecker.WaitForHealthy(ctx, DefaultHealthTimeout); err != nil {
 		return fmt.Errorf("LocalStack failed to become healthy: %w", err)
 	}

@@ -93,32 +93,13 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Extract service name from the request
+	// Extract service name from the request (for logging/debugging)
 	service := h.extractServiceFromRequest(r)
-	if service == "" {
-		http.Error(w, "Unable to determine AWS service", http.StatusBadRequest)
-		return
-	}
-
-	// Check if the service is enabled in LocalStack
-	enabledServices, err := h.localStackManager.GetEnabledServices()
-	if err != nil {
-		http.Error(w, "Failed to get enabled services", http.StatusInternalServerError)
-		return
-	}
-
-	serviceEnabled := false
-	for _, s := range enabledServices {
-		if s == service {
-			serviceEnabled = true
-			break
-		}
-	}
-
-	if !serviceEnabled {
-		http.Error(w, fmt.Sprintf("Service '%s' is not enabled in LocalStack", service), http.StatusNotFound)
-		return
-	}
+	klog.V(3).Infof("Proxying request for AWS service: %s", service)
+	
+	// Note: We don't check if the service is enabled here anymore.
+	// LocalStack will handle unknown or disabled services appropriately.
+	// This allows for more flexibility and reduces maintenance.
 
 	// Proxy the request to LocalStack
 	h.reverseProxy.ServeHTTP(w, r)
@@ -126,46 +107,33 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // extractServiceFromRequest determines which AWS service is being called
 func (h *AWSProxyHandler) extractServiceFromRequest(r *http.Request) string {
-	// Check URL path patterns
-	path := r.URL.Path
-	
-	// Common AWS service path patterns
-	if strings.HasPrefix(path, "/api/v1/s3/") {
-		return "s3"
-	}
-	if strings.HasPrefix(path, "/api/v1/iam/") {
-		return "iam"
-	}
-	if strings.HasPrefix(path, "/api/v1/logs/") {
-		return "logs"
-	}
-	if strings.HasPrefix(path, "/api/v1/ssm/") {
-		return "ssm"
-	}
-	if strings.HasPrefix(path, "/api/v1/secretsmanager/") {
-		return "secretsmanager"
-	}
-	if strings.HasPrefix(path, "/api/v1/elbv2/") {
-		return "elbv2"
-	}
-	if strings.HasPrefix(path, "/api/v1/rds/") {
-		return "rds"
-	}
-	if strings.HasPrefix(path, "/api/v1/dynamodb/") {
-		return "dynamodb"
-	}
-
-	// Check for service in query parameters (some AWS APIs use this)
-	if service := r.URL.Query().Get("Service"); service != "" {
-		return strings.ToLower(service)
-	}
-
-	// Check for service in headers
+	// Check for service in headers (most reliable)
 	if target := r.Header.Get("X-Amz-Target"); target != "" {
-		// X-Amz-Target format: "ServiceName_YYYYMMDD.OperationName"
-		parts := strings.Split(target, "_")
+		// X-Amz-Target format: "ServiceName_YYYYMMDD.OperationName" or "ServiceName.OperationName"
+		parts := strings.SplitN(target, ".", 2)
 		if len(parts) > 0 {
-			return strings.ToLower(parts[0])
+			servicePart := parts[0]
+			// Remove date suffix if present
+			if idx := strings.Index(servicePart, "_"); idx > 0 {
+				servicePart = servicePart[:idx]
+			}
+			// Common service name mappings
+			switch strings.ToLower(servicePart) {
+			case "amazondynamodbv20120810", "dynamodb":
+				return "dynamodb"
+			case "amazons3":
+				return "s3"
+			case "awsie":
+				return "iam"
+			case "logs":
+				return "logs"
+			case "awsssm":
+				return "ssm"
+			case "secretsmanager":
+				return "secretsmanager"
+			default:
+				return strings.ToLower(servicePart)
+			}
 		}
 	}
 
@@ -180,7 +148,27 @@ func (h *AWSProxyHandler) extractServiceFromRequest(r *http.Request) string {
 		}
 	}
 
-	return ""
+	// Check host for service hint
+	host := r.Host
+	if host == "" {
+		host = r.URL.Host
+	}
+	
+	// Extract service from AWS endpoint pattern: service.region.amazonaws.com
+	if strings.Contains(host, ".amazonaws.com") {
+		parts := strings.Split(host, ".")
+		if len(parts) > 0 {
+			return parts[0]
+		}
+	}
+
+	// Check for service in query parameters (some AWS APIs use this)
+	if service := r.URL.Query().Get("Service"); service != "" {
+		return strings.ToLower(service)
+	}
+
+	// Default to unknown - let LocalStack handle it
+	return "unknown"
 }
 
 // HealthCheck returns the health status of the AWS proxy

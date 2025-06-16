@@ -11,7 +11,9 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	k8s "k8s.io/client-go/kubernetes"
 )
 
 // Server represents the HTTP API server for KECS Control Plane
@@ -28,10 +30,12 @@ type Server struct {
 	webSocketHub      *WebSocketHub
 	webUIHandler      *WebUIHandler
 	testModeWorker    *TestModeTaskWorker
+	localStackManager localstack.Manager
+	awsProxyRouter    *AWSProxyRouter
 }
 
 // NewServer creates a new API server instance
-func NewServer(port int, kubeconfig string, storage storage.Storage) (*Server, error) {
+func NewServer(port int, kubeconfig string, storage storage.Storage, localStackConfig *localstack.Config) (*Server, error) {
 	// Create WebSocket configuration
 	wsConfig := &WebSocketConfig{
 		AllowedOrigins: []string{
@@ -99,6 +103,40 @@ func NewServer(port int, kubeconfig string, storage storage.Storage) (*Server, e
 		s.testModeWorker = NewTestModeTaskWorker(storage)
 	}
 
+	// Initialize LocalStack manager if configured
+	if localStackConfig != nil && localStackConfig.Enabled {
+		// Get Kubernetes client for LocalStack
+		var kubeClient k8s.Interface
+		if s.taskManager != nil {
+			// Get the kubernetes client from task manager
+			kubeConfig, err := kubernetes.GetKubeConfig()
+			if err != nil {
+				log.Printf("Warning: Failed to get kubernetes config for LocalStack: %v", err)
+			} else {
+				kubeClient, err = k8s.NewForConfig(kubeConfig)
+				if err != nil {
+					log.Printf("Warning: Failed to create kubernetes client for LocalStack: %v", err)
+				}
+			}
+		}
+		
+		if kubeClient != nil {
+			localStackManager, err := localstack.NewManager(localStackConfig, kubeClient)
+			if err != nil {
+				log.Printf("Warning: Failed to initialize LocalStack manager: %v", err)
+			} else {
+				s.localStackManager = localStackManager
+				// Create AWS proxy router
+				awsProxyRouter, err := NewAWSProxyRouter(localStackManager)
+				if err != nil {
+					log.Printf("Warning: Failed to initialize AWS proxy router: %v", err)
+				} else {
+					s.awsProxyRouter = awsProxyRouter
+				}
+			}
+		}
+	}
+
 	return s, nil
 }
 
@@ -111,6 +149,13 @@ func (s *Server) Start() error {
 	// Start test mode worker if available
 	if s.testModeWorker != nil {
 		s.testModeWorker.Start(ctx)
+	}
+
+	// Start LocalStack manager if available
+	if s.localStackManager != nil {
+		if err := s.localStackManager.Start(ctx); err != nil {
+			log.Printf("Failed to start LocalStack manager: %v", err)
+		}
 	}
 
 	router := s.setupRoutes()
@@ -141,6 +186,13 @@ func (s *Server) Stop(ctx context.Context) error {
 	// Stop test mode worker if running
 	if s.testModeWorker != nil {
 		s.testModeWorker.Stop()
+	}
+	
+	// Stop LocalStack manager if running
+	if s.localStackManager != nil {
+		if err := s.localStackManager.Stop(ctx); err != nil {
+			log.Printf("Error stopping LocalStack manager: %v", err)
+		}
 	}
 	
 	return s.httpServer.Shutdown(ctx)
@@ -188,6 +240,10 @@ func (s *Server) setupRoutes() http.Handler {
 
 	// Apply middleware
 	handler := http.Handler(mux)
+	// Add LocalStack proxy middleware if available
+	if s.awsProxyRouter != nil {
+		handler = LocalStackProxyMiddleware(handler, s.awsProxyRouter)
+	}
 	handler = APIProxyMiddleware(handler)
 	handler = SecurityHeadersMiddleware(handler)
 	handler = CORSMiddleware(handler)

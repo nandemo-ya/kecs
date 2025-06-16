@@ -72,3 +72,17 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// LocalStackProxyMiddleware intercepts AWS API calls and routes them to LocalStack
+func LocalStackProxyMiddleware(next http.Handler, awsProxyRouter *AWSProxyRouter) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if this request should be proxied to LocalStack
+		if ShouldProxyToLocalStack(r, awsProxyRouter.LocalStackManager) {
+			awsProxyRouter.AWSProxyHandler.ServeHTTP(w, r)
+			return
+		}
+		
+		// Not an AWS API call or LocalStack is not available
+		next.ServeHTTP(w, r)
+	})
+}
