@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
@@ -9,11 +10,12 @@ import (
 
 // DefaultECSAPI provides the default implementation of ECS API operations
 type DefaultECSAPI struct {
-	storage        storage.Storage
-	kindManager    *kubernetes.KindManager
-	region         string
-	accountID      string
-	iamIntegration iam.Integration
+	storage               storage.Storage
+	kindManager           *kubernetes.KindManager
+	region                string
+	accountID             string
+	iamIntegration        iam.Integration
+	cloudWatchIntegration cloudwatch.Integration
 }
 
 // NewDefaultECSAPI creates a new default ECS API implementation with storage and kubernetes manager
@@ -29,6 +31,11 @@ func NewDefaultECSAPI(storage storage.Storage, kindManager *kubernetes.KindManag
 // SetIAMIntegration sets the IAM integration for the ECS API
 func (api *DefaultECSAPI) SetIAMIntegration(iamIntegration iam.Integration) {
 	api.iamIntegration = iamIntegration
+}
+
+// SetCloudWatchIntegration sets the CloudWatch integration for the ECS API
+func (api *DefaultECSAPI) SetCloudWatchIntegration(cloudWatchIntegration cloudwatch.Integration) {
+	api.cloudWatchIntegration = cloudWatchIntegration
 }
 
 // NewDefaultECSAPIWithConfig creates a new default ECS API implementation with custom region and accountID

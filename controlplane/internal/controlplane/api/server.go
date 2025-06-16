@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
@@ -31,10 +32,11 @@ type Server struct {
 	webSocketHub      *WebSocketHub
 	webUIHandler      *WebUIHandler
 	testModeWorker    *TestModeTaskWorker
-	localStackManager localstack.Manager
-	awsProxyRouter    *AWSProxyRouter
-	localStackEvents  *LocalStackEventIntegration
-	iamIntegration    iam.Integration
+	localStackManager       localstack.Manager
+	awsProxyRouter          *AWSProxyRouter
+	localStackEvents        *LocalStackEventIntegration
+	iamIntegration          iam.Integration
+	cloudWatchIntegration   cloudwatch.Integration
 }
 
 // NewServer creates a new API server instance
@@ -159,14 +161,36 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 						log.Println("IAM integration initialized successfully")
 					}
 				}
+				
+				// Initialize CloudWatch integration if LocalStack is available
+				if kubeClient != nil {
+					cwConfig := &cloudwatch.Config{
+						LocalStackEndpoint: fmt.Sprintf("http://localhost:%d", localStackConfig.Port),
+						LogGroupPrefix:     "/ecs/",
+						RetentionDays:      7,
+						KubeNamespace:      "default",
+					}
+					cwIntegration, err := cloudwatch.NewIntegration(kubeClient, localStackManager, cwConfig)
+					if err != nil {
+						log.Printf("Warning: Failed to initialize CloudWatch integration: %v", err)
+					} else {
+						s.cloudWatchIntegration = cwIntegration
+						log.Println("CloudWatch integration initialized successfully")
+					}
+				}
 			}
 		}
 	}
 
-	// Create ECS API with or without IAM integration
+	// Create ECS API with integrations
 	ecsAPI := NewDefaultECSAPI(storage, kindManager)
-	if defaultAPI, ok := ecsAPI.(*DefaultECSAPI); ok && s.iamIntegration != nil {
-		defaultAPI.SetIAMIntegration(s.iamIntegration)
+	if defaultAPI, ok := ecsAPI.(*DefaultECSAPI); ok {
+		if s.iamIntegration != nil {
+			defaultAPI.SetIAMIntegration(s.iamIntegration)
+		}
+		if s.cloudWatchIntegration != nil {
+			defaultAPI.SetCloudWatchIntegration(s.cloudWatchIntegration)
+		}
 	}
 	s.ecsAPI = ecsAPI
 
