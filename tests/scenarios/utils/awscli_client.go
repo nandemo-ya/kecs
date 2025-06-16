@@ -444,3 +444,10 @@ func (c *AWSCLIClient) DeleteAttributes(clusterName string, attributes []Attribu
 	// This would need to be implemented differently or use the API directly
 	return fmt.Errorf("delete-attributes not supported via AWS CLI")
 }
+
+// GetLocalStackStatus gets the LocalStack status
+func (c *AWSCLIClient) GetLocalStackStatus(clusterName string) (string, error) {
+	// Note: This is a KECS-specific extension, not part of standard ECS API
+	// For now, we'll return "unknown" as AWS CLI doesn't support this
+	return "unknown", nil
+}
