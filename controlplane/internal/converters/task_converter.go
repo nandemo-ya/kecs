@@ -126,6 +126,21 @@ func (c *TaskConverter) ConvertTaskToPod(
 		pod.Spec.HostPID = true
 	}
 
+	// Apply task role via ServiceAccount
+	if taskDef.TaskRoleARN != "" {
+		// Extract role name from ARN
+		roleName := c.extractRoleNameFromARN(taskDef.TaskRoleARN)
+		if roleName != "" {
+			// ServiceAccount name is typically rolename-sa
+			serviceAccountName := fmt.Sprintf("%s-sa", roleName)
+			pod.Spec.ServiceAccountName = serviceAccountName
+			
+			// Add annotations for tracking
+			pod.Annotations["kecs.dev/task-role-arn"] = taskDef.TaskRoleARN
+			pod.Annotations["kecs.dev/task-role-name"] = roleName
+		}
+	}
+
 	// Apply IPC mode
 	if taskDef.IpcMode == "host" {
 		pod.Spec.HostIPC = true
@@ -1469,6 +1484,30 @@ func (c *TaskConverter) sanitizeSecretName(name string) string {
 
 	// Prefix with kecs-secret to avoid conflicts
 	return fmt.Sprintf("kecs-secret-%s", name)
+}
+
+// extractRoleNameFromARN extracts the role name from an IAM role ARN
+func (c *TaskConverter) extractRoleNameFromARN(arn string) string {
+	if arn == "" {
+		return ""
+	}
+	
+	// ARN format: arn:aws:iam::account-id:role/role-name
+	parts := strings.Split(arn, ":")
+	if len(parts) >= 6 && parts[2] == "iam" {
+		// Get the last part after "role/"
+		resourcePart := parts[5]
+		if strings.HasPrefix(resourcePart, "role/") {
+			return strings.TrimPrefix(resourcePart, "role/")
+		}
+	}
+	
+	// If it's not a valid ARN, assume it's already a role name
+	if !strings.HasPrefix(arn, "arn:") {
+		return arn
+	}
+	
+	return ""
 }
 
 // distributeResourcesEvenly distributes task-level resources evenly among containers

@@ -14,6 +14,31 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
+// extractRoleNameFromARN extracts the role name from an IAM role ARN
+// Example: arn:aws:iam::123456789012:role/MyRole -> MyRole
+func extractRoleNameFromARN(arn string) string {
+	if arn == "" {
+		return ""
+	}
+	
+	// ARN format: arn:aws:iam::account-id:role/role-name
+	parts := strings.Split(arn, ":")
+	if len(parts) >= 6 && parts[2] == "iam" {
+		// Get the last part after "role/"
+		resourcePart := parts[5]
+		if strings.HasPrefix(resourcePart, "role/") {
+			return strings.TrimPrefix(resourcePart, "role/")
+		}
+	}
+	
+	// If it's not a valid ARN, assume it's already a role name
+	if !strings.HasPrefix(arn, "arn:") {
+		return arn
+	}
+	
+	return ""
+}
+
 // RegisterTaskDefinition implements the RegisterTaskDefinition operation
 func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *generated.RegisterTaskDefinitionRequest) (*generated.RegisterTaskDefinitionResponse, error) {
 	// Validate required fields
@@ -147,6 +172,44 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	registeredTaskDef, err := api.storage.TaskDefinitionStore().Register(ctx, storageTaskDef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register task definition: %w", err)
+	}
+
+	// Create IAM roles if IAM integration is available
+	if api.iamIntegration != nil {
+		// Create task role if specified
+		if registeredTaskDef.TaskRoleARN != "" {
+			roleName := extractRoleNameFromARN(registeredTaskDef.TaskRoleARN)
+			if roleName != "" {
+				// Default trust policy for ECS tasks
+				trustPolicy := `{
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Effect": "Allow",
+						"Principal": {
+							"Service": "ecs-tasks.amazonaws.com"
+						},
+						"Action": "sts:AssumeRole"
+					}]
+				}`
+				if err := api.iamIntegration.CreateTaskRole(registeredTaskDef.ARN, roleName, trustPolicy); err != nil {
+					log.Printf("Warning: Failed to create task role %s: %v", roleName, err)
+				} else {
+					log.Printf("Created task role %s for task definition %s", roleName, registeredTaskDef.ARN)
+				}
+			}
+		}
+
+		// Create execution role if specified
+		if registeredTaskDef.ExecutionRoleARN != "" {
+			roleName := extractRoleNameFromARN(registeredTaskDef.ExecutionRoleARN)
+			if roleName != "" {
+				if err := api.iamIntegration.CreateTaskExecutionRole(roleName); err != nil {
+					log.Printf("Warning: Failed to create execution role %s: %v", roleName, err)
+				} else {
+					log.Printf("Created execution role %s for task definition %s", roleName, registeredTaskDef.ARN)
+				}
+			}
+		}
 	}
 
 	// Convert storage task definition to generated response
