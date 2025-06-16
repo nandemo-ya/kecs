@@ -1,222 +1,295 @@
-package artifacts
+package artifacts_test
 
 import (
 	"context"
+	"crypto/md5"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"testing"
+	"strings"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"k8s.io/utils/ptr"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/s3"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestArtifactManager_DownloadHTTPArtifact(t *testing.T) {
-	// Create test server
-	testContent := "test artifact content"
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(testContent))
-	}))
-	defer server.Close()
-
-	// Create temp directory
-	tempDir, err := os.MkdirTemp("", "artifact-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
-
-	// Create artifact manager
-	am, err := NewArtifactManager(filepath.Join(tempDir, "cache"))
-	require.NoError(t, err)
-
-	// Test artifact
-	artifact := types.Artifact{
-		Name:        stringPtr("test-artifact"),
-		ArtifactUrl: stringPtr(server.URL + "/test.txt"),
-		TargetPath:  stringPtr("artifacts/test.txt"),
-		Type:        stringPtr("http"),
-	}
-
-	// Download artifact
-	ctx := context.Background()
-	workDir := filepath.Join(tempDir, "work")
-	err = am.DownloadArtifacts(ctx, []types.Artifact{artifact}, workDir)
-	require.NoError(t, err)
-
-	// Verify file exists
-	targetPath := filepath.Join(workDir, "artifacts/test.txt")
-	assert.FileExists(t, targetPath)
-
-	// Verify content
-	content, err := os.ReadFile(targetPath)
-	require.NoError(t, err)
-	assert.Equal(t, testContent, string(content))
-
-	// Cleanup
-	err = am.CleanupArtifacts(workDir)
-	require.NoError(t, err)
-	assert.NoDirExists(t, workDir)
+// Mock S3 integration
+type mockS3Integration struct {
+	downloadFunc func(ctx context.Context, bucket, key string) (io.ReadCloser, error)
 }
 
-func TestArtifactManager_ValidateChecksum(t *testing.T) {
-	// Create temp directory
-	tempDir, err := os.MkdirTemp("", "artifact-checksum-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
-
-	// Create test file
-	testFile := filepath.Join(tempDir, "test.txt")
-	testContent := "test content"
-	err = os.WriteFile(testFile, []byte(testContent), 0644)
-	require.NoError(t, err)
-
-	// Create artifact manager
-	am, err := NewArtifactManager(filepath.Join(tempDir, "cache"))
-	require.NoError(t, err)
-
-	tests := []struct {
-		name         string
-		checksumType string
-		checksum     string
-		expectError  bool
-	}{
-		{
-			name:         "valid sha256",
-			checksumType: "sha256",
-			checksum:     "6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72",
-			expectError:  false,
-		},
-		{
-			name:         "invalid sha256",
-			checksumType: "sha256",
-			checksum:     "invalid",
-			expectError:  true,
-		},
-		{
-			name:         "valid md5",
-			checksumType: "md5",
-			checksum:     "9473fdd0d880a43c21b7778d34872157",
-			expectError:  false,
-		},
-		{
-			name:         "unsupported type",
-			checksumType: "sha1",
-			checksum:     "any",
-			expectError:  true,
-		},
+func (m *mockS3Integration) DownloadFile(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
+	if m.downloadFunc != nil {
+		return m.downloadFunc(ctx, bucket, key)
 	}
+	return nil, errors.New("not implemented")
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := am.validateChecksum(testFile, tt.checksum, tt.checksumType)
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
+func (m *mockS3Integration) UploadFile(ctx context.Context, bucket, key string, reader io.Reader) error {
+	return errors.New("not implemented")
+}
+
+func (m *mockS3Integration) HeadObject(ctx context.Context, bucket, key string) (*s3.ObjectMetadata, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockS3Integration) CreateBucket(ctx context.Context, bucket string) error {
+	return errors.New("not implemented")
+}
+
+func (m *mockS3Integration) DeleteObject(ctx context.Context, bucket, key string) error {
+	return errors.New("not implemented")
+}
+
+var _ = Describe("Artifact Manager", func() {
+	var (
+		manager      *artifacts.Manager
+		mockS3       *mockS3Integration
+		tempDir      string
+		testServer   *httptest.Server
+	)
+
+	BeforeEach(func() {
+		var err error
+		tempDir, err = os.MkdirTemp("", "artifact-test-*")
+		Expect(err).NotTo(HaveOccurred())
+
+		mockS3 = &mockS3Integration{}
+		manager = artifacts.NewManager(mockS3)
+
+		// Set up test HTTP server
+		testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/test-file.txt":
+				w.Write([]byte("test content"))
+			case "/test-with-checksum.txt":
+				w.Write([]byte("checksummed content"))
+			default:
+				w.WriteHeader(http.StatusNotFound)
 			}
+		}))
+	})
+
+	AfterEach(func() {
+		os.RemoveAll(tempDir)
+		testServer.Close()
+	})
+
+	Describe("DownloadArtifact", func() {
+		Context("from S3", func() {
+			It("should download file from S3", func() {
+				content := "s3 test content"
+				mockS3.downloadFunc = func(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
+					Expect(bucket).To(Equal("test-bucket"))
+					Expect(key).To(Equal("test-key"))
+					return io.NopCloser(strings.NewReader(content)), nil
+				}
+
+				artifact := &types.Artifact{
+					ArtifactUrl: ptr.To("s3://test-bucket/test-key"),
+					TargetPath:  ptr.To(filepath.Join(tempDir, "s3-file.txt")),
+				}
+
+				err := manager.DownloadArtifact(context.Background(), artifact)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify file content
+				data, err := os.ReadFile(*artifact.TargetPath)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(data)).To(Equal(content))
+			})
+
+			It("should handle S3 download errors", func() {
+				mockS3.downloadFunc = func(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
+					return nil, errors.New("s3 error")
+				}
+
+				artifact := &types.Artifact{
+					ArtifactUrl: ptr.To("s3://test-bucket/test-key"),
+					TargetPath:  ptr.To(filepath.Join(tempDir, "s3-file.txt")),
+				}
+
+				err := manager.DownloadArtifact(context.Background(), artifact)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("s3 error"))
+			})
 		})
-	}
-}
 
-func TestArtifactManager_DetermineArtifactType(t *testing.T) {
-	am := &ArtifactManager{}
+		Context("from HTTP", func() {
+			It("should download file from HTTP", func() {
+				artifact := &types.Artifact{
+					ArtifactUrl: ptr.To(testServer.URL + "/test-file.txt"),
+					TargetPath:  ptr.To(filepath.Join(tempDir, "http-file.txt")),
+				}
 
-	tests := []struct {
-		name         string
-		url          string
-		explicitType *string
-		expected     string
-	}{
-		{
-			name:     "s3 URL",
-			url:      "s3://my-bucket/path/to/file.txt",
-			expected: "s3",
-		},
-		{
-			name:     "http URL",
-			url:      "http://example.com/file.txt",
-			expected: "http",
-		},
-		{
-			name:     "https URL",
-			url:      "https://example.com/file.txt",
-			expected: "https",
-		},
-		{
-			name:         "explicit type overrides",
-			url:          "https://example.com/file.txt",
-			explicitType: stringPtr("s3"),
-			expected:     "s3",
-		},
-		{
-			name:     "unknown type",
-			url:      "ftp://example.com/file.txt",
-			expected: "unknown",
-		},
-	}
+				err := manager.DownloadArtifact(context.Background(), artifact)
+				Expect(err).NotTo(HaveOccurred())
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := am.determineArtifactType(tt.url, tt.explicitType)
-			assert.Equal(t, tt.expected, result)
+				// Verify file content
+				data, err := os.ReadFile(*artifact.TargetPath)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(data)).To(Equal("test content"))
+			})
+
+			It("should handle HTTP errors", func() {
+				artifact := &types.Artifact{
+					ArtifactUrl: ptr.To(testServer.URL + "/not-found"),
+					TargetPath:  ptr.To(filepath.Join(tempDir, "http-file.txt")),
+				}
+
+				err := manager.DownloadArtifact(context.Background(), artifact)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("404"))
+			})
 		})
-	}
-}
 
-func TestParseFileMode(t *testing.T) {
-	tests := []struct {
-		name        string
-		mode        string
-		expected    os.FileMode
-		expectError bool
-	}{
-		{
-			name:     "valid mode with leading zero",
-			mode:     "0644",
-			expected: 0644,
-		},
-		{
-			name:     "valid mode without leading zero",
-			mode:     "755",
-			expected: 0755,
-		},
-		{
-			name:        "invalid mode",
-			mode:        "invalid",
-			expectError: true,
-		},
-	}
+		Context("with checksum validation", func() {
+			It("should validate SHA256 checksum", func() {
+				content := "checksummed content"
+				h := sha256.Sum256([]byte(content))
+				checksum := hex.EncodeToString(h[:])
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseFileMode(tt.mode)
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
+				artifact := &types.Artifact{
+					ArtifactUrl:  ptr.To(testServer.URL + "/test-with-checksum.txt"),
+					TargetPath:   ptr.To(filepath.Join(tempDir, "checksum-file.txt")),
+					Checksum:     ptr.To(checksum),
+					ChecksumType: ptr.To("sha256"),
+				}
+
+				err := manager.DownloadArtifact(context.Background(), artifact)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify file exists
+				_, err = os.Stat(*artifact.TargetPath)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should fail on checksum mismatch", func() {
+				artifact := &types.Artifact{
+					ArtifactUrl:  ptr.To(testServer.URL + "/test-with-checksum.txt"),
+					TargetPath:   ptr.To(filepath.Join(tempDir, "checksum-file.txt")),
+					Checksum:     ptr.To("invalid-checksum"),
+					ChecksumType: ptr.To("sha256"),
+				}
+
+				err := manager.DownloadArtifact(context.Background(), artifact)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("checksum mismatch"))
+			})
+
+			It("should validate MD5 checksum", func() {
+				content := "checksummed content"
+				h := md5.Sum([]byte(content))
+				checksum := hex.EncodeToString(h[:])
+
+				artifact := &types.Artifact{
+					ArtifactUrl:  ptr.To(testServer.URL + "/test-with-checksum.txt"),
+					TargetPath:   ptr.To(filepath.Join(tempDir, "checksum-file.txt")),
+					Checksum:     ptr.To(checksum),
+					ChecksumType: ptr.To("md5"),
+				}
+
+				err := manager.DownloadArtifact(context.Background(), artifact)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify file exists
+				_, err = os.Stat(*artifact.TargetPath)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		Context("with file permissions", func() {
+			It("should set file permissions", func() {
+				artifact := &types.Artifact{
+					ArtifactUrl: ptr.To(testServer.URL + "/test-file.txt"),
+					TargetPath:  ptr.To(filepath.Join(tempDir, "perm-file.txt")),
+					Permissions: ptr.To("0600"),
+				}
+
+				err := manager.DownloadArtifact(context.Background(), artifact)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify permissions
+				info, err := os.Stat(*artifact.TargetPath)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(info.Mode().Perm()).To(Equal(os.FileMode(0600)))
+			})
+		})
+
+		Context("edge cases", func() {
+			It("should create target directory if it doesn't exist", func() {
+				artifact := &types.Artifact{
+					ArtifactUrl: ptr.To(testServer.URL + "/test-file.txt"),
+					TargetPath:  ptr.To(filepath.Join(tempDir, "subdir", "nested", "file.txt")),
+				}
+
+				err := manager.DownloadArtifact(context.Background(), artifact)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify file exists
+				_, err = os.Stat(*artifact.TargetPath)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should require artifact URL and target path", func() {
+				artifact := &types.Artifact{}
+				err := manager.DownloadArtifact(context.Background(), artifact)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("required"))
+
+				artifact.ArtifactUrl = ptr.To("http://example.com")
+				err = manager.DownloadArtifact(context.Background(), artifact)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("required"))
+			})
+		})
+	})
+
+	Describe("CleanupArtifacts", func() {
+		It("should remove downloaded artifacts", func() {
+			// Create test files
+			file1 := filepath.Join(tempDir, "file1.txt")
+			file2 := filepath.Join(tempDir, "file2.txt")
+			os.WriteFile(file1, []byte("content1"), 0644)
+			os.WriteFile(file2, []byte("content2"), 0644)
+
+			artifacts := []types.Artifact{
+				{TargetPath: ptr.To(file1)},
+				{TargetPath: ptr.To(file2)},
 			}
+
+			// Verify files exist
+			_, err := os.Stat(file1)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = os.Stat(file2)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Cleanup
+			manager.CleanupArtifacts(artifacts)
+
+			// Verify files are removed
+			_, err = os.Stat(file1)
+			Expect(os.IsNotExist(err)).To(BeTrue())
+			_, err = os.Stat(file2)
+			Expect(os.IsNotExist(err)).To(BeTrue())
 		})
-	}
-}
 
-func TestArtifactManager_SetS3Endpoint(t *testing.T) {
-	// Create artifact manager
-	am, err := NewArtifactManager("/tmp/cache")
-	require.NoError(t, err)
+		It("should not fail if files don't exist", func() {
+			artifacts := []types.Artifact{
+				{TargetPath: ptr.To(filepath.Join(tempDir, "nonexistent.txt"))},
+			}
 
-	// Set S3 endpoint
-	endpoint := "http://localhost:4566"
-	am.SetS3Endpoint(endpoint)
-
-	// Verify endpoint is set
-	assert.Equal(t, endpoint, am.s3Endpoint)
-	assert.Nil(t, am.s3Client) // Client should be nil, will be initialized on first use
-}
-
-// Helper function to create string pointers
-func stringPtr(s string) *string {
-	return &s
-}
+			// Should not panic or error
+			manager.CleanupArtifacts(artifacts)
+		})
+	})
+})
