@@ -4,7 +4,7 @@
 
 ## Status
 
-Proposed
+In Progress
 
 ## Context
 
@@ -264,23 +264,34 @@ kecs localstack restart
 
 ### ECS Integration Enhancements
 
-#### Load Balancer Integration
+#### Secrets Integration (SSM & Secrets Manager)
 
 ```go
-type LoadBalancerIntegration struct {
-    localstackClient *elbv2.Client
-    serviceManager   *ServiceManager
+type SecretsIntegration struct {
+    ssmClient         *ssm.Client
+    secretsClient     *secretsmanager.Client
+    k8sClient        kubernetes.Interface
 }
 
-func (lbi *LoadBalancerIntegration) CreateTargetGroup(service *ECSService) error {
-    // Create ALB target group in LocalStack
-    // Configure Kubernetes Service to match
+func (si *SecretsIntegration) SyncSecrets(taskDef *TaskDefinition) error {
+    // Extract secrets from container definitions
+    for _, container := range taskDef.ContainerDefinitions {
+        for _, secret := range container.Secrets {
+            // Parse ARN to determine source (SSM or Secrets Manager)
+            // Fetch secret value from LocalStack
+            // Create/update Kubernetes Secret
+        }
+    }
 }
 
-func (lbi *LoadBalancerIntegration) RegisterTasks(service *ECSService, tasks []*Task) error {
-    // Register pod IPs as targets in LocalStack ALB
+func (si *SecretsIntegration) CreateK8sSecret(name, namespace string, data map[string][]byte) error {
+    // Create Kubernetes secret that can be referenced by pods
 }
 ```
+
+#### Load Balancer Integration
+
+*Note: ELBv2 integration has been implemented using Kubernetes native Services and Ingress resources to avoid LocalStack Pro dependency. See `internal/integrations/elbv2/integration_k8s.go` for the virtual implementation.*
 
 #### IAM Role Integration
 
@@ -388,17 +399,19 @@ const LocalStackStatus: React.FC = () => {
 
 ## Implementation Plan
 
-### Phase 1: Foundation (4 weeks)
-1. LocalStack lifecycle management in KECS
-2. Basic AWS API proxy implementation
-3. Simple sidecar proxy for user containers
-4. CLI commands for LocalStack management
+### Phase 1: Foundation (4 weeks) - COMPLETED
+1. ✅ LocalStack lifecycle management in KECS
+2. ✅ Basic AWS API proxy implementation
+3. ✅ Simple sidecar proxy for user containers
+4. ✅ CLI commands for LocalStack management
 
 ### Phase 2: Core Integrations (6 weeks)
 1. IAM role integration with ServiceAccounts
-2. Load balancer integration with Kubernetes Services
+2. ~~Load balancer integration with Kubernetes Services~~ (Completed with Kubernetes native implementation)
 3. CloudWatch logs integration
 4. Basic S3 integration for task artifacts
+5. SSM Parameter Store integration for container secrets
+6. Secrets Manager integration for sensitive configuration
 
 ### Phase 3: Advanced Features (4 weeks)
 1. Automatic sidecar injection
