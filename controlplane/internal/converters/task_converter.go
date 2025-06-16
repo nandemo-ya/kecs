@@ -126,6 +126,14 @@ func (c *TaskConverter) ConvertTaskToPod(
 	// Add volume configuration annotations
 	c.addVolumeAnnotations(pod, volumes)
 
+	// Apply IAM role if specified
+	if taskDef.TaskRoleARN != "" {
+		c.applyIAMRole(pod, taskDef.TaskRoleARN)
+	}
+	if taskDef.ExecutionRoleARN != "" {
+		pod.ObjectMeta.Annotations["kecs.dev/execution-role-arn"] = taskDef.ExecutionRoleARN
+	}
+
 	return pod, nil
 }
 
@@ -1274,5 +1282,27 @@ func (c *TaskConverter) addVolumeAnnotations(pod *corev1.Pod, volumes []types.Vo
 				}
 			}
 		}
+	}
+}
+
+// applyIAMRole applies IAM role configuration to the pod
+func (c *TaskConverter) applyIAMRole(pod *corev1.Pod, roleArn string) {
+	// Add role ARN annotation
+	pod.ObjectMeta.Annotations["kecs.dev/task-role-arn"] = roleArn
+	
+	// Extract role name from ARN
+	// ARN format: arn:aws:iam::account-id:role/role-name
+	parts := strings.Split(roleArn, "/")
+	if len(parts) >= 2 {
+		roleName := parts[len(parts)-1]
+		
+		// ServiceAccount name would be created by IAM integration
+		serviceAccountName := fmt.Sprintf("%s-sa", roleName)
+		
+		// Set ServiceAccount on the pod
+		pod.Spec.ServiceAccountName = serviceAccountName
+		
+		// Add label for easier querying
+		pod.ObjectMeta.Labels["kecs.dev/iam-role"] = roleName
 	}
 }
