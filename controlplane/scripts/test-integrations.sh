@@ -9,9 +9,11 @@ echo "Running LocalStack integration tests..."
 echo "Testing IAM integration..."
 go test ./internal/integrations/iam/... -v
 
+# Test CloudWatch integration
+echo "Testing CloudWatch integration..."
+go test ./internal/integrations/cloudwatch/... -v
+
 # Future integration tests can be added here
-# echo "Testing CloudWatch integration..."
-# go test ./internal/integrations/cloudwatch/... -v
 
 # echo "Testing S3 integration..."
 # go test ./internal/integrations/s3/... -v

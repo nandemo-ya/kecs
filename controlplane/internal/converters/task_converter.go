@@ -12,14 +12,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
 
 // TaskConverter converts ECS task definitions to Kubernetes resources
 type TaskConverter struct {
-	region    string
-	accountID string
+	region                string
+	accountID             string
+	cloudWatchIntegration cloudwatch.Integration
 }
 
 // SecretInfo holds parsed information from a secret ARN
@@ -34,6 +36,15 @@ func NewTaskConverter(region, accountID string) *TaskConverter {
 	return &TaskConverter{
 		region:    region,
 		accountID: accountID,
+	}
+}
+
+// NewTaskConverterWithCloudWatch creates a new task converter with CloudWatch integration
+func NewTaskConverterWithCloudWatch(region, accountID string, cwIntegration cloudwatch.Integration) *TaskConverter {
+	return &TaskConverter{
+		region:                region,
+		accountID:             accountID,
+		cloudWatchIntegration: cwIntegration,
 	}
 }
 
@@ -134,6 +145,11 @@ func (c *TaskConverter) ConvertTaskToPod(
 		pod.ObjectMeta.Annotations["kecs.dev/execution-role-arn"] = taskDef.ExecutionRoleARN
 	}
 
+	// Apply CloudWatch logs configuration
+	if c.cloudWatchIntegration != nil {
+		c.applyCloudWatchLogsConfiguration(pod, containerDefs, taskDef)
+	}
+
 	return pod, nil
 }
 
@@ -144,6 +160,9 @@ func (c *TaskConverter) convertContainers(
 	runTaskReq *types.RunTaskRequest,
 ) []corev1.Container {
 	containers := make([]corev1.Container, 0, len(containerDefs))
+	
+	// Generate task ARN for logging
+	taskArn := taskDef.ARN
 
 	for _, def := range containerDefs {
 		container := corev1.Container{
@@ -249,7 +268,40 @@ func (c *TaskConverter) convertContainers(
 			container.SecurityContext.ReadOnlyRootFilesystem = ptr.To(true)
 		}
 
+		// Process log configuration if CloudWatch integration is available
+		if c.cloudWatchIntegration != nil && def.LogConfiguration != nil {
+			if def.LogConfiguration.LogDriver != nil && *def.LogConfiguration.LogDriver == "awslogs" {
+				// Configure CloudWatch logging
+				logConfig, err := c.cloudWatchIntegration.ConfigureContainerLogging(
+					taskArn,
+					*def.Name,
+					*def.LogConfiguration.LogDriver,
+					def.LogConfiguration.Options,
+				)
+				if err == nil && logConfig != nil {
+					// Add annotations for log configuration
+					if containerDefs[0].Name != nil && container.Name == *containerDefs[0].Name { // Only add to first container to avoid duplication
+						container.Env = append(container.Env, corev1.EnvVar{
+							Name:  "FLUENT_BIT_CONFIG",
+							Value: logConfig.FluentBitConfig,
+						})
+					}
+				}
+			}
+		}
+
 		containers = append(containers, container)
+	}
+
+	// Apply container overrides if any
+	if runTaskReq.Overrides != nil && runTaskReq.Overrides.ContainerOverrides != nil {
+		for i := range containers {
+			for _, override := range runTaskReq.Overrides.ContainerOverrides {
+				if override.Name != nil && containers[i].Name == *override.Name {
+					c.applyContainerOverride(&containers[i], &override)
+				}
+			}
+		}
 	}
 
 	return containers
@@ -257,70 +309,43 @@ func (c *TaskConverter) convertContainers(
 
 // convertEnvironment converts ECS environment variables to Kubernetes
 func (c *TaskConverter) convertEnvironment(env []types.KeyValuePair) []corev1.EnvVar {
-	envVars := make([]corev1.EnvVar, 0, len(env))
+	k8sEnv := make([]corev1.EnvVar, 0, len(env))
 	for _, e := range env {
 		if e.Name != nil && e.Value != nil {
-			envVars = append(envVars, corev1.EnvVar{
+			k8sEnv = append(k8sEnv, corev1.EnvVar{
 				Name:  *e.Name,
 				Value: *e.Value,
 			})
 		}
 	}
-	return envVars
-}
-
-// convertSecrets converts ECS secrets to Kubernetes environment variables
-func (c *TaskConverter) convertSecrets(secrets []types.Secret) []corev1.EnvVar {
-	envVars := make([]corev1.EnvVar, 0, len(secrets))
-
-	for _, secret := range secrets {
-		if secret.Name == nil || secret.ValueFrom == nil {
-			continue
-		}
-
-		// Parse the valueFrom ARN to extract secret information
-		// Format: arn:aws:secretsmanager:region:account:secret:name-xxxx:key::
-		// or arn:aws:ssm:region:account:parameter/path
-		secretInfo := c.parseSecretARN(*secret.ValueFrom)
-
-		if secretInfo != nil {
-			envVar := corev1.EnvVar{
-				Name: *secret.Name,
-			}
-
-			// Reference the Kubernetes secret
-			envVar.ValueFrom = &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretInfo.SecretName,
-					},
-					Key: secretInfo.Key,
-				},
-			}
-
-			envVars = append(envVars, envVar)
-		}
-	}
-
-	return envVars
+	return k8sEnv
 }
 
 // convertPortMappings converts ECS port mappings to Kubernetes
 func (c *TaskConverter) convertPortMappings(mappings []types.PortMapping) []corev1.ContainerPort {
 	ports := make([]corev1.ContainerPort, 0, len(mappings))
-	for _, mapping := range mappings {
-		port := corev1.ContainerPort{}
 
-		if mapping.ContainerPort != nil {
-			port.ContainerPort = int32(*mapping.ContainerPort)
+	for _, m := range mappings {
+		if m.ContainerPort == nil {
+			continue
 		}
 
-		if mapping.Protocol != nil {
-			switch strings.ToLower(*mapping.Protocol) {
+		port := corev1.ContainerPort{
+			ContainerPort: int32(*m.ContainerPort),
+		}
+
+		if m.HostPort != nil {
+			port.HostPort = int32(*m.HostPort)
+		}
+
+		if m.Protocol != nil {
+			switch strings.ToLower(*m.Protocol) {
 			case "tcp":
 				port.Protocol = corev1.ProtocolTCP
 			case "udp":
 				port.Protocol = corev1.ProtocolUDP
+			case "sctp":
+				port.Protocol = corev1.ProtocolSCTP
 			default:
 				port.Protocol = corev1.ProtocolTCP
 			}
@@ -328,15 +353,13 @@ func (c *TaskConverter) convertPortMappings(mappings []types.PortMapping) []core
 			port.Protocol = corev1.ProtocolTCP
 		}
 
-		if mapping.Name != nil {
-			port.Name = *mapping.Name
+		if m.Name != nil {
+			port.Name = *m.Name
 		}
-
-		// Note: HostPort is not set by default in Kubernetes
-		// It would require special handling for host network mode
 
 		ports = append(ports, port)
 	}
+
 	return ports
 }
 
@@ -412,12 +435,8 @@ func (c *TaskConverter) convertMountPoints(mountPoints []types.MountPoint) []cor
 	return mounts
 }
 
-// convertHealthCheck converts ECS health check to Kubernetes liveness probe
+// convertHealthCheck converts ECS health check to Kubernetes probe
 func (c *TaskConverter) convertHealthCheck(hc *types.HealthCheck) *corev1.Probe {
-	if hc.Command == nil || len(hc.Command) == 0 {
-		return nil
-	}
-
 	probe := &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
 			Exec: &corev1.ExecAction{
@@ -445,20 +464,22 @@ func (c *TaskConverter) convertHealthCheck(hc *types.HealthCheck) *corev1.Probe 
 	return probe
 }
 
-// parseUser parses ECS user string to SecurityContext
+// parseUser parses user string and returns SecurityContext
 func (c *TaskConverter) parseUser(user string) *corev1.SecurityContext {
-	// ECS user format: "uid:gid" or just "uid"
-	parts := strings.Split(user, ":")
-
 	sc := &corev1.SecurityContext{}
 
-	// Try to parse as integer
-	if uid, err := parseInt64(parts[0]); err == nil {
-		sc.RunAsUser = ptr.To(uid)
+	// Parse user:group format
+	parts := strings.Split(user, ":")
+	if len(parts) > 0 && parts[0] != "" {
+		// Try to parse as number
+		if uid, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+			sc.RunAsUser = ptr.To(uid)
+		}
 	}
 
-	if len(parts) > 1 {
-		if gid, err := parseInt64(parts[1]); err == nil {
+	if len(parts) > 1 && parts[1] != "" {
+		// Try to parse as number
+		if gid, err := strconv.ParseInt(parts[1], 10, 64); err == nil {
 			sc.RunAsGroup = ptr.To(gid)
 		}
 	}
@@ -466,153 +487,157 @@ func (c *TaskConverter) parseUser(user string) *corev1.SecurityContext {
 	return sc
 }
 
-// Helper functions
-
+// getNamespace determines the namespace for the pod
 func (c *TaskConverter) getNamespace(cluster *storage.Cluster) string {
-	// Format: <cluster-name>-<region>
+	// Create namespace based on cluster name and region
 	return fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
 }
 
+// getLaunchType determines the launch type from the request
 func (c *TaskConverter) getLaunchType(req *types.RunTaskRequest) string {
 	if req.LaunchType != nil {
 		return *req.LaunchType
 	}
-	return "FARGATE" // Default
+	if req.CapacityProviderStrategy != nil && len(req.CapacityProviderStrategy) > 0 {
+		return "CAPACITY_PROVIDER"
+	}
+	return "EC2"
 }
 
+// generateTaskARN generates a task ARN
 func (c *TaskConverter) generateTaskARN(clusterName, taskID string) string {
-	return fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s",
-		c.region, c.accountID, clusterName, taskID)
+	return fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", c.region, c.accountID, clusterName, taskID)
 }
 
-func (c *TaskConverter) applyResourceConstraints(pod *corev1.Pod, cpu, memory string) {
-	// Apply task-level resource constraints to containers
-	if cpu == "" && memory == "" {
-		return
-	}
+// applyResourceConstraints applies task-level resource constraints to the pod
+func (c *TaskConverter) applyResourceConstraints(pod *corev1.Pod, taskCPU, taskMemory string) {
+	var cpuMillis int64
+	var memoryMi int64
 
-	// Parse task-level resources
-	var taskCPUMillis int64
-	var taskMemoryMi int64
-
-	if cpu != "" {
-		// ECS CPU units: 1024 = 1 vCPU
-		cpuUnits, err := strconv.ParseInt(cpu, 10, 64)
-		if err == nil {
-			taskCPUMillis = cpuUnits * 1000 / 1024
-		}
-	}
-
-	if memory != "" {
-		// ECS memory is in MiB
-		memMiB, err := strconv.ParseInt(memory, 10, 64)
-		if err == nil {
-			taskMemoryMi = memMiB
-		}
-	}
-
-	// Calculate total requested resources by containers
-	var totalRequestedCPU int64
-	var totalRequestedMemory int64
-
-	for _, container := range pod.Spec.Containers {
-		if container.Resources.Requests != nil {
-			if cpuReq, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
-				totalRequestedCPU += cpuReq.MilliValue()
+	// Parse CPU (can be "256", "0.25 vCPU", "1 vCPU", etc.)
+	if taskCPU != "" {
+		if strings.Contains(taskCPU, "vCPU") {
+			// Parse vCPU format
+			cpuStr := strings.TrimSuffix(strings.TrimSpace(taskCPU), " vCPU")
+			if cpuFloat, err := strconv.ParseFloat(cpuStr, 64); err == nil {
+				cpuMillis = int64(cpuFloat * 1000)
 			}
-			if memReq, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
-				// Convert to MiB for calculation
-				totalRequestedMemory += memReq.Value() / (1024 * 1024)
+		} else {
+			// Parse CPU units (1024 = 1 vCPU)
+			if cpuUnits, err := strconv.ParseInt(taskCPU, 10, 64); err == nil {
+				cpuMillis = cpuUnits * 1000 / 1024
 			}
 		}
 	}
 
-	// If no containers have requested resources, distribute evenly
-	if totalRequestedCPU == 0 && totalRequestedMemory == 0 {
-		c.distributeResourcesEvenly(pod, taskCPUMillis, taskMemoryMi)
-		return
-	}
-
-	// Apply proportional distribution based on requested resources
-	c.distributeResourcesProportionally(pod, taskCPUMillis, taskMemoryMi, totalRequestedCPU, totalRequestedMemory)
-}
-
-func (c *TaskConverter) applyOverrides(pod *corev1.Pod, overrides *types.TaskOverride) {
-	if overrides == nil {
-		return
-	}
-
-	// Apply task-level resource overrides
-	if overrides.Cpu != nil || overrides.Memory != nil {
-		cpu := ""
-		memory := ""
-		if overrides.Cpu != nil {
-			cpu = *overrides.Cpu
+	// Parse Memory (in MiB)
+	if taskMemory != "" {
+		if mem, err := strconv.ParseInt(taskMemory, 10, 64); err == nil {
+			memoryMi = mem
 		}
-		if overrides.Memory != nil {
-			memory = *overrides.Memory
-		}
-		c.applyResourceConstraints(pod, cpu, memory)
 	}
 
-	// Apply container-specific overrides
-	if overrides.ContainerOverrides != nil {
-		for _, containerOverride := range overrides.ContainerOverrides {
-			if containerOverride.Name == nil {
-				continue
+	// Apply constraints to containers
+	if cpuMillis > 0 || memoryMi > 0 {
+		// Count containers with existing resource requests
+		var totalRequestedCPU int64
+		var totalRequestedMemory int64
+		containersWithoutResources := 0
+
+		for i := range pod.Spec.Containers {
+			container := &pod.Spec.Containers[i]
+			if container.Resources.Requests != nil {
+				if cpu, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
+					totalRequestedCPU += cpu.MilliValue()
+				}
+				if mem, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
+					// Convert to MiB
+					totalRequestedMemory += mem.Value() / (1024 * 1024)
+				}
+			} else {
+				containersWithoutResources++
 			}
+		}
 
-			// Find the container by name
-			for i := range pod.Spec.Containers {
-				if pod.Spec.Containers[i].Name == *containerOverride.Name {
-					c.applyContainerOverride(&pod.Spec.Containers[i], &containerOverride)
-					break
+		// If some containers don't have resources defined, distribute remaining resources
+		if containersWithoutResources > 0 {
+			remainingCPU := cpuMillis - totalRequestedCPU
+			remainingMemory := memoryMi - totalRequestedMemory
+
+			if remainingCPU > 0 || remainingMemory > 0 {
+				cpuPerContainer := remainingCPU / int64(containersWithoutResources)
+				memoryPerContainer := remainingMemory / int64(containersWithoutResources)
+
+				for i := range pod.Spec.Containers {
+					container := &pod.Spec.Containers[i]
+					if container.Resources.Requests == nil {
+						container.Resources.Requests = corev1.ResourceList{}
+					}
+					if container.Resources.Limits == nil {
+						container.Resources.Limits = corev1.ResourceList{}
+					}
+
+					// Only set if not already set
+					if _, ok := container.Resources.Requests[corev1.ResourceCPU]; !ok && cpuPerContainer > 0 {
+						container.Resources.Requests[corev1.ResourceCPU] = *resource.NewMilliQuantity(cpuPerContainer, resource.DecimalSI)
+						container.Resources.Limits[corev1.ResourceCPU] = *resource.NewMilliQuantity(cpuPerContainer, resource.DecimalSI)
+					}
+					if _, ok := container.Resources.Requests[corev1.ResourceMemory]; !ok && memoryPerContainer > 0 {
+						memQuantity := resource.MustParse(fmt.Sprintf("%dMi", memoryPerContainer))
+						container.Resources.Requests[corev1.ResourceMemory] = memQuantity
+						container.Resources.Limits[corev1.ResourceMemory] = memQuantity
+					}
 				}
 			}
+		} else if totalRequestedCPU > cpuMillis || totalRequestedMemory > memoryMi {
+			// If containers request more than task level, we need to handle this
+			// For now, we'll let Kubernetes handle the scheduling
+			// In production, you might want to scale down proportionally
 		}
 	}
+}
 
-	// Apply task role ARN as annotation
+// applyOverrides applies task overrides to the pod
+func (c *TaskConverter) applyOverrides(pod *corev1.Pod, overrides *types.TaskOverride) {
+	// Apply task-level overrides
+	if overrides.Cpu != nil {
+		c.applyResourceConstraints(pod, *overrides.Cpu, "")
+	}
+	if overrides.Memory != nil {
+		c.applyResourceConstraints(pod, "", *overrides.Memory)
+	}
+
 	if overrides.TaskRoleArn != nil {
-		if pod.Annotations == nil {
-			pod.Annotations = make(map[string]string)
-		}
 		pod.Annotations["kecs.dev/task-role-arn"] = *overrides.TaskRoleArn
 	}
 
-	// Apply execution role ARN as annotation
 	if overrides.ExecutionRoleArn != nil {
-		if pod.Annotations == nil {
-			pod.Annotations = make(map[string]string)
-		}
 		pod.Annotations["kecs.dev/execution-role-arn"] = *overrides.ExecutionRoleArn
 	}
+
+	// Container overrides are handled in convertContainers
 }
 
-// applyContainerOverride applies overrides to a specific container
+// applyContainerOverride applies container-specific overrides
 func (c *TaskConverter) applyContainerOverride(container *corev1.Container, override *types.ContainerOverride) {
-	// Override command
-	if override.Command != nil && len(override.Command) > 0 {
+	if override.Command != nil {
 		container.Command = override.Command
 	}
 
-	// Override or add environment variables
 	if override.Environment != nil {
+		// Merge or replace environment variables
 		envMap := make(map[string]string)
-
-		// First, collect existing environment variables
 		for _, env := range container.Env {
 			envMap[env.Name] = env.Value
 		}
 
-		// Then, apply overrides
 		for _, envVar := range override.Environment {
 			if envVar.Name != nil && envVar.Value != nil {
 				envMap[*envVar.Name] = *envVar.Value
 			}
 		}
 
-		// Rebuild the environment variables list
+		// Rebuild env array
 		container.Env = make([]corev1.EnvVar, 0, len(envMap))
 		for name, value := range envMap {
 			container.Env = append(container.Env, corev1.EnvVar{
@@ -622,57 +647,56 @@ func (c *TaskConverter) applyContainerOverride(container *corev1.Container, over
 		}
 	}
 
-	// Override CPU and memory
-	if override.Cpu != nil || override.Memory != nil || override.MemoryReservation != nil {
+	// Apply resource overrides
+	if override.Cpu != nil {
+		cpuMillis := *override.Cpu * 1000 / 1024
 		if container.Resources.Requests == nil {
 			container.Resources.Requests = corev1.ResourceList{}
 		}
 		if container.Resources.Limits == nil {
 			container.Resources.Limits = corev1.ResourceList{}
 		}
+		cpuQuantity := resource.NewMilliQuantity(int64(cpuMillis), resource.DecimalSI)
+		container.Resources.Requests[corev1.ResourceCPU] = *cpuQuantity
+		container.Resources.Limits[corev1.ResourceCPU] = *cpuQuantity
+	}
 
-		// Override CPU
-		if override.Cpu != nil {
-			cpuMillis := *override.Cpu * 1000 / 1024
-			cpuQuantity := resource.NewMilliQuantity(int64(cpuMillis), resource.DecimalSI)
-			container.Resources.Requests[corev1.ResourceCPU] = *cpuQuantity
-			container.Resources.Limits[corev1.ResourceCPU] = *cpuQuantity
+	if override.Memory != nil {
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = corev1.ResourceList{}
 		}
+		if container.Resources.Limits == nil {
+			container.Resources.Limits = corev1.ResourceList{}
+		}
+		memQuantity := resource.MustParse(fmt.Sprintf("%dMi", *override.Memory))
+		container.Resources.Requests[corev1.ResourceMemory] = memQuantity
+		container.Resources.Limits[corev1.ResourceMemory] = memQuantity
+	}
 
-		// Override Memory
-		if override.Memory != nil {
-			memQuantity := resource.MustParse(fmt.Sprintf("%dMi", *override.Memory))
-			container.Resources.Requests[corev1.ResourceMemory] = memQuantity
-			container.Resources.Limits[corev1.ResourceMemory] = memQuantity
-		} else if override.MemoryReservation != nil {
-			// Use memory reservation as request if memory limit not set
-			memQuantity := resource.MustParse(fmt.Sprintf("%dMi", *override.MemoryReservation))
-			container.Resources.Requests[corev1.ResourceMemory] = memQuantity
+	if override.MemoryReservation != nil {
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = corev1.ResourceList{}
 		}
+		memQuantity := resource.MustParse(fmt.Sprintf("%dMi", *override.MemoryReservation))
+		container.Resources.Requests[corev1.ResourceMemory] = memQuantity
 	}
 }
 
+// applyPlacementConstraints converts ECS placement constraints to Kubernetes node affinity
 func (c *TaskConverter) applyPlacementConstraints(pod *corev1.Pod, constraints []types.PlacementConstraint) {
 	if len(constraints) == 0 {
 		return
 	}
 
-	// Initialize node selector if not present
-	if pod.Spec.NodeSelector == nil {
-		pod.Spec.NodeSelector = make(map[string]string)
+	// Initialize node affinity if needed
+	if pod.Spec.Affinity == nil {
+		pod.Spec.Affinity = &corev1.Affinity{}
+	}
+	if pod.Spec.Affinity.NodeAffinity == nil {
+		pod.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
 	}
 
-	// Initialize affinity if needed
-	var nodeAffinity *corev1.NodeAffinity
-	var podAffinity *corev1.PodAffinity
-	var podAntiAffinity *corev1.PodAntiAffinity
-
-	if pod.Spec.Affinity != nil {
-		nodeAffinity = pod.Spec.Affinity.NodeAffinity
-		podAffinity = pod.Spec.Affinity.PodAffinity
-		podAntiAffinity = pod.Spec.Affinity.PodAntiAffinity
-	}
-
+	// Handle different constraint types
 	for _, constraint := range constraints {
 		if constraint.Type == nil {
 			continue
@@ -680,332 +704,76 @@ func (c *TaskConverter) applyPlacementConstraints(pod *corev1.Pod, constraints [
 
 		switch *constraint.Type {
 		case "memberOf":
-			// Handle memberOf constraints
-			c.applyMemberOfConstraint(pod, constraint, &nodeAffinity)
+			if constraint.Expression != nil {
+				c.parseMemberOfExpression(*constraint.Expression, pod.Spec.Affinity.NodeAffinity)
+			}
 
 		case "distinctInstance":
-			// Ensure tasks run on different instances
-			c.applyDistinctInstanceConstraint(pod, &podAntiAffinity)
-
-		default:
-			// Unknown constraint type, add as annotation
-			if pod.Annotations == nil {
-				pod.Annotations = make(map[string]string)
+			// Implement anti-affinity to ensure tasks run on different nodes
+			if pod.Spec.Affinity.PodAntiAffinity == nil {
+				pod.Spec.Affinity.PodAntiAffinity = &corev1.PodAntiAffinity{}
 			}
-			pod.Annotations[fmt.Sprintf("kecs.dev/constraint-%s", *constraint.Type)] =
-				fmt.Sprintf("%v", constraint.Expression)
-		}
-	}
 
-	// Apply affinity if any rules were added
-	if nodeAffinity != nil || podAffinity != nil || podAntiAffinity != nil {
-		pod.Spec.Affinity = &corev1.Affinity{
-			NodeAffinity:    nodeAffinity,
-			PodAffinity:     podAffinity,
-			PodAntiAffinity: podAntiAffinity,
-		}
-	}
-}
-
-func (c *TaskConverter) applyTags(pod *corev1.Pod, tags []types.Tag) {
-	for _, tag := range tags {
-		if tag.Key != nil && tag.Value != nil {
-			// Convert tags to labels, ensuring they're valid K8s label format
-			key := strings.ReplaceAll(*tag.Key, "/", "-")
-			key = strings.ReplaceAll(key, ".", "-")
-			pod.Labels[fmt.Sprintf("kecs.dev/tag-%s", key)] = *tag.Value
+			// Add anti-affinity rule
+			pod.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+				pod.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+				corev1.PodAffinityTerm{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"kecs.dev/task-family": pod.Labels["kecs.dev/task-family"],
+						},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			)
 		}
 	}
 }
 
-func parseInt64(s string) (int64, error) {
-	var i int64
-	_, err := fmt.Sscanf(s, "%d", &i)
-	return i, err
-}
+// parseMemberOfExpression parses ECS memberOf expressions and converts to node affinity
+func (c *TaskConverter) parseMemberOfExpression(expression string, nodeAffinity *corev1.NodeAffinity) {
+	// ECS expressions examples:
+	// - attribute:ecs.instance-type == t2.micro
+	// - attribute:ecs.availability-zone in [us-west-2a, us-west-2b]
+	// - attribute:custom-attribute =~ pattern*
 
-// parseSecretARN parses an AWS secret ARN and returns secret information
-func (c *TaskConverter) parseSecretARN(arn string) *SecretInfo {
-	// Pattern for Secrets Manager ARN: arn:aws:secretsmanager:region:account:secret:name-xxxx:jsonkey::
-	secretsManagerPattern := regexp.MustCompile(`^arn:aws:secretsmanager:[^:]+:[^:]+:secret:([^:]+)(?::([^:]+))?`)
-
-	// Pattern for SSM Parameter Store ARN: arn:aws:ssm:region:account:parameter/path/to/param
-	ssmPattern := regexp.MustCompile(`^arn:aws:ssm:[^:]+:[^:]+:parameter/(.+)$`)
-
-	// Check Secrets Manager pattern
-	if matches := secretsManagerPattern.FindStringSubmatch(arn); matches != nil {
-		info := &SecretInfo{
-			Source: "secretsmanager",
-		}
-
-		// Extract secret name (remove the random suffix like -AbCdEf)
-		secretFullName := matches[1]
-		parts := strings.Split(secretFullName, "-")
-		if len(parts) > 1 && len(parts[len(parts)-1]) == 6 {
-			// Remove the random suffix
-			info.SecretName = strings.Join(parts[:len(parts)-1], "-")
-		} else {
-			info.SecretName = secretFullName
-		}
-
-		// JSON key is optional
-		if len(matches) > 2 && matches[2] != "" {
-			info.Key = matches[2]
-		} else {
-			info.Key = "value" // Default key
-		}
-
-		// Convert to Kubernetes-compatible secret name
-		info.SecretName = c.sanitizeSecretName(info.SecretName)
-
-		return info
-	}
-
-	// Check SSM pattern
-	if matches := ssmPattern.FindStringSubmatch(arn); matches != nil {
-		paramPath := matches[1]
-
-		info := &SecretInfo{
-			Source: "ssm",
-			Key:    "value", // Default key for SSM parameters
-		}
-
-		// Convert path to secret name (replace / with -)
-		info.SecretName = c.sanitizeSecretName(strings.ReplaceAll(paramPath, "/", "-"))
-
-		return info
-	}
-
-	return nil
-}
-
-// sanitizeSecretName converts a name to be Kubernetes-compatible
-func (c *TaskConverter) sanitizeSecretName(name string) string {
-	// Kubernetes names must be lowercase alphanumeric or '-'
-	// and must start and end with alphanumeric
-	name = strings.ToLower(name)
-	name = regexp.MustCompile(`[^a-z0-9-]`).ReplaceAllString(name, "-")
-	name = strings.Trim(name, "-")
-
-	// Prefix with kecs to avoid conflicts
-	return fmt.Sprintf("kecs-secret-%s", name)
-}
-
-// CollectSecrets collects all secrets used in a task definition
-func (c *TaskConverter) CollectSecrets(containerDefs []types.ContainerDefinition) map[string]*SecretInfo {
-	secrets := make(map[string]*SecretInfo)
-
-	for _, def := range containerDefs {
-		if def.Secrets != nil {
-			for _, secret := range def.Secrets {
-				if secret.ValueFrom != nil {
-					if info := c.parseSecretARN(*secret.ValueFrom); info != nil {
-						// Use the ARN as key to avoid duplicates
-						secrets[*secret.ValueFrom] = info
-					}
-				}
-			}
-		}
-	}
-
-	return secrets
-}
-
-// distributeResourcesEvenly distributes task-level resources evenly among containers
-func (c *TaskConverter) distributeResourcesEvenly(pod *corev1.Pod, taskCPUMillis, taskMemoryMi int64) {
-	if len(pod.Spec.Containers) == 0 {
+	// Simple parser for common patterns
+	parts := strings.Fields(expression)
+	if len(parts) < 3 {
 		return
 	}
 
-	// Divide resources evenly
-	cpuPerContainer := taskCPUMillis / int64(len(pod.Spec.Containers))
-	memoryPerContainer := taskMemoryMi / int64(len(pod.Spec.Containers))
+	attribute := strings.TrimPrefix(parts[0], "attribute:")
+	operator := parts[1]
+	value := strings.Join(parts[2:], " ")
 
-	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Resources.Requests == nil {
-			pod.Spec.Containers[i].Resources.Requests = corev1.ResourceList{}
-		}
-		if pod.Spec.Containers[i].Resources.Limits == nil {
-			pod.Spec.Containers[i].Resources.Limits = corev1.ResourceList{}
-		}
+	// Convert ECS attribute to Kubernetes label
+	k8sLabel := c.convertECSAttributeToK8sLabel(attribute)
 
-		// Set CPU
-		if cpuPerContainer > 0 {
-			cpuQuantity := resource.NewMilliQuantity(cpuPerContainer, resource.DecimalSI)
-			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceCPU] = *cpuQuantity
-			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceCPU] = *cpuQuantity
-		}
-
-		// Set Memory
-		if memoryPerContainer > 0 {
-			memQuantity := resource.MustParse(fmt.Sprintf("%dMi", memoryPerContainer))
-			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceMemory] = memQuantity
-			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceMemory] = memQuantity
-		}
-	}
-}
-
-// distributeResourcesProportionally distributes task-level resources proportionally based on container requests
-func (c *TaskConverter) distributeResourcesProportionally(pod *corev1.Pod, taskCPUMillis, taskMemoryMi, totalRequestedCPU, totalRequestedMemory int64) {
-	for i := range pod.Spec.Containers {
-		container := &pod.Spec.Containers[i]
-
-		// Get current container requests
-		var containerCPU int64
-		var containerMemory int64
-
-		if container.Resources.Requests != nil {
-			if cpuReq, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
-				containerCPU = cpuReq.MilliValue()
-			}
-			if memReq, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
-				containerMemory = memReq.Value() / (1024 * 1024) // Convert to MiB
-			}
-		}
-
-		// Calculate proportional resources
-		if taskCPUMillis > 0 && totalRequestedCPU > 0 {
-			proportionalCPU := (containerCPU * taskCPUMillis) / totalRequestedCPU
-			if proportionalCPU > 0 {
-				cpuQuantity := resource.NewMilliQuantity(proportionalCPU, resource.DecimalSI)
-				if container.Resources.Requests == nil {
-					container.Resources.Requests = corev1.ResourceList{}
-				}
-				if container.Resources.Limits == nil {
-					container.Resources.Limits = corev1.ResourceList{}
-				}
-				container.Resources.Requests[corev1.ResourceCPU] = *cpuQuantity
-				container.Resources.Limits[corev1.ResourceCPU] = *cpuQuantity
-			}
-		}
-
-		if taskMemoryMi > 0 && totalRequestedMemory > 0 {
-			proportionalMemory := (containerMemory * taskMemoryMi) / totalRequestedMemory
-			if proportionalMemory > 0 {
-				memQuantity := resource.MustParse(fmt.Sprintf("%dMi", proportionalMemory))
-				if container.Resources.Requests == nil {
-					container.Resources.Requests = corev1.ResourceList{}
-				}
-				if container.Resources.Limits == nil {
-					container.Resources.Limits = corev1.ResourceList{}
-				}
-				container.Resources.Requests[corev1.ResourceMemory] = memQuantity
-				container.Resources.Limits[corev1.ResourceMemory] = memQuantity
-			}
-		}
-	}
-}
-
-// applyMemberOfConstraint applies ECS memberOf placement constraints
-func (c *TaskConverter) applyMemberOfConstraint(pod *corev1.Pod, constraint types.PlacementConstraint, nodeAffinity **corev1.NodeAffinity) {
-	if constraint.Expression == nil {
-		return
-	}
-
-	expr := *constraint.Expression
-
-	// Parse common ECS memberOf expressions
-	// Examples:
-	// - "attribute:ecs.instance-type =~ t2.*"
-	// - "attribute:ecs.availability-zone in [us-east-1a, us-east-1b]"
-	// - "attribute:ecs.instance-type == t2.micro"
-
-	// Simple parsing for common patterns
-	if strings.HasPrefix(expr, "attribute:") {
-		// Extract attribute name and condition
-		parts := strings.SplitN(expr[10:], " ", 2) // Skip "attribute:"
-		if len(parts) != 2 {
-			return
-		}
-
-		attribute := parts[0]
-		condition := parts[1]
-
-		// Convert ECS attributes to Kubernetes labels
-		k8sLabel := c.convertECSAttributeToK8sLabel(attribute)
-
-		// Parse the condition
-		if strings.HasPrefix(condition, "=~ ") {
-			// Regex match - use node affinity with In operator
-			pattern := strings.TrimSpace(condition[3:])
-			c.addNodeAffinityRule(nodeAffinity, k8sLabel, pattern, "regex")
-		} else if strings.HasPrefix(condition, "== ") {
-			// Exact match - use node selector
-			value := strings.TrimSpace(condition[3:])
-			pod.Spec.NodeSelector[k8sLabel] = value
-		} else if strings.HasPrefix(condition, "in ") {
-			// In list - use node affinity
-			valueList := strings.TrimSpace(condition[3:])
-			c.addNodeAffinityRule(nodeAffinity, k8sLabel, valueList, "in")
-		}
-	}
-}
-
-// applyDistinctInstanceConstraint ensures tasks run on different instances
-func (c *TaskConverter) applyDistinctInstanceConstraint(pod *corev1.Pod, podAntiAffinity **corev1.PodAntiAffinity) {
-	if *podAntiAffinity == nil {
-		*podAntiAffinity = &corev1.PodAntiAffinity{}
-	}
-
-	// Add anti-affinity rule to avoid scheduling on the same node
-	antiAffinityTerm := corev1.PodAffinityTerm{
-		LabelSelector: &metav1.LabelSelector{
-			MatchLabels: map[string]string{
-				"kecs.dev/task-family": pod.Labels["kecs.dev/task-family"],
-			},
-		},
-		TopologyKey: "kubernetes.io/hostname", // Ensure different nodes
-	}
-
-	// Use preferred anti-affinity to allow scheduling if needed
-	(*podAntiAffinity).PreferredDuringSchedulingIgnoredDuringExecution = append(
-		(*podAntiAffinity).PreferredDuringSchedulingIgnoredDuringExecution,
-		corev1.WeightedPodAffinityTerm{
-			Weight:          100,
-			PodAffinityTerm: antiAffinityTerm,
-		},
-	)
-}
-
-// convertECSAttributeToK8sLabel converts ECS attribute names to Kubernetes label format
-func (c *TaskConverter) convertECSAttributeToK8sLabel(attribute string) string {
-	// Common ECS attributes mapping
-	attributeMap := map[string]string{
-		"ecs.instance-type":     "node.kubernetes.io/instance-type",
-		"ecs.availability-zone": "topology.kubernetes.io/zone",
-		"ecs.ami-id":            "kecs.dev/ami-id",
-		"ecs.instance-id":       "kecs.dev/instance-id",
-		"ecs.os-type":           "kubernetes.io/os",
-		"ecs.cpu-architecture":  "kubernetes.io/arch",
-	}
-
-	if k8sLabel, ok := attributeMap[attribute]; ok {
-		return k8sLabel
-	}
-
-	// Default: convert to kecs.dev namespace
-	sanitized := strings.ReplaceAll(attribute, ".", "-")
-	sanitized = strings.ReplaceAll(sanitized, ":", "-")
-	return fmt.Sprintf("kecs.dev/%s", sanitized)
-}
-
-// addNodeAffinityRule adds a node affinity rule
-func (c *TaskConverter) addNodeAffinityRule(nodeAffinity **corev1.NodeAffinity, key, value, matchType string) {
-	if *nodeAffinity == nil {
-		*nodeAffinity = &corev1.NodeAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-				NodeSelectorTerms: []corev1.NodeSelectorTerm{},
-			},
+	// Initialize node selector term
+	if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{
+			NodeSelectorTerms: []corev1.NodeSelectorTerm{},
 		}
 	}
 
-	var requirement corev1.NodeSelectorRequirement
-	requirement.Key = key
+	requirement := corev1.NodeSelectorRequirement{
+		Key: k8sLabel,
+	}
 
-	switch matchType {
-	case "regex":
-		// For regex patterns, we'll use In operator with expanded values
-		// This is a simplified approach - in production, you might want to
+	switch operator {
+	case "==":
+		requirement.Operator = corev1.NodeSelectorOpIn
+		requirement.Values = []string{value}
+
+	case "!=":
+		requirement.Operator = corev1.NodeSelectorOpNotIn
+		requirement.Values = []string{value}
+
+	case "=~":
+		// Regex matching - Kubernetes doesn't support regex in node selectors
+		// We'll need to expand common patterns or use a different approach
+		// For now, treat as exact match but in production you might want to
 		// use a webhook or operator to handle regex matching
 		requirement.Operator = corev1.NodeSelectorOpIn
 		requirement.Values = c.expandRegexPattern(value)
@@ -1342,6 +1110,355 @@ func (c *TaskConverter) injectAWSCredentials(pod *corev1.Pod) {
 		for _, envVar := range awsEnvVars {
 			if !envMap[envVar.Name] {
 				container.Env = append(container.Env, envVar)
+			}
+		}
+	}
+}
+
+// applyCloudWatchLogsConfiguration applies CloudWatch logs configuration to the pod
+func (c *TaskConverter) applyCloudWatchLogsConfiguration(pod *corev1.Pod, containerDefs []types.ContainerDefinition, taskDef *storage.TaskDefinition) {
+	if c.cloudWatchIntegration == nil {
+		return
+	}
+
+	// Check if any container has awslogs driver
+	hasAwslogs := false
+	for _, def := range containerDefs {
+		if def.LogConfiguration != nil && def.LogConfiguration.LogDriver != nil && *def.LogConfiguration.LogDriver == "awslogs" {
+			hasAwslogs = true
+			break
+		}
+	}
+
+	if !hasAwslogs {
+		return
+	}
+
+	// Add CloudWatch logs annotations to the pod
+	for _, def := range containerDefs {
+		if def.LogConfiguration != nil && def.LogConfiguration.LogDriver != nil && *def.LogConfiguration.LogDriver == "awslogs" {
+			if def.Name == nil {
+				continue
+			}
+			
+			options := def.LogConfiguration.Options
+			if options == nil {
+				options = make(map[string]string)
+			}
+
+			// Get log group and stream names
+			logGroupName := options["awslogs-group"]
+			if logGroupName == "" {
+				logGroupName = c.cloudWatchIntegration.GetLogGroupForTask(taskDef.ARN)
+			}
+			
+			logStreamName := c.cloudWatchIntegration.GetLogStreamForContainer(taskDef.ARN, *def.Name)
+			
+			// Add annotations for each container's log configuration
+			annotationPrefix := fmt.Sprintf("kecs.dev/container-%s-logs", *def.Name)
+			pod.Annotations[annotationPrefix+"-driver"] = "awslogs"
+			pod.Annotations[annotationPrefix+"-group"] = logGroupName
+			pod.Annotations[annotationPrefix+"-stream"] = logStreamName
+			
+			if region, ok := options["awslogs-region"]; ok {
+				pod.Annotations[annotationPrefix+"-region"] = region
+			}
+		}
+	}
+
+	// Add global CloudWatch logs enabled annotation
+	pod.Annotations["kecs.dev/cloudwatch-logs-enabled"] = "true"
+}
+
+// applyTags adds tags as labels to the pod
+func (c *TaskConverter) applyTags(pod *corev1.Pod, tags []types.Tag) {
+	for _, tag := range tags {
+		if tag.Key != nil && tag.Value != nil {
+			// Kubernetes labels have restrictions, so we need to sanitize
+			key := c.sanitizeLabelKey(*tag.Key)
+			value := c.sanitizeLabelValue(*tag.Value)
+
+			// Skip if sanitization results in empty key
+			if key != "" {
+				pod.Labels[key] = value
+			}
+		}
+	}
+}
+
+// sanitizeLabelKey converts a tag key to a valid Kubernetes label key
+func (c *TaskConverter) sanitizeLabelKey(key string) string {
+	// Kubernetes label keys must:
+	// - Be 63 characters or less
+	// - Begin and end with alphanumeric
+	// - Contain only alphanumeric, '-', '_', '.'
+	// - Have optional prefix (up to 253 chars) separated by '/'
+
+	// For simplicity, prefix with "tag." to avoid conflicts
+	key = "tag." + key
+
+	// Replace invalid characters
+	key = regexp.MustCompile(`[^a-zA-Z0-9\-_\./]`).ReplaceAllString(key, "-")
+
+	// Ensure it starts and ends with alphanumeric
+	key = regexp.MustCompile(`^[^a-zA-Z0-9]+`).ReplaceAllString(key, "")
+	key = regexp.MustCompile(`[^a-zA-Z0-9]+$`).ReplaceAllString(key, "")
+
+	// Truncate if necessary
+	if len(key) > 63 {
+		key = key[:63]
+		// Ensure it still ends with alphanumeric after truncation
+		key = regexp.MustCompile(`[^a-zA-Z0-9]+$`).ReplaceAllString(key, "")
+	}
+
+	return key
+}
+
+// sanitizeLabelValue converts a tag value to a valid Kubernetes label value
+func (c *TaskConverter) sanitizeLabelValue(value string) string {
+	// Kubernetes label values must:
+	// - Be 63 characters or less
+	// - Be empty or begin and end with alphanumeric
+	// - Contain only alphanumeric, '-', '_', '.'
+
+	if value == "" {
+		return ""
+	}
+
+	// Replace invalid characters
+	value = regexp.MustCompile(`[^a-zA-Z0-9\-_\.]`).ReplaceAllString(value, "-")
+
+	// Ensure it starts and ends with alphanumeric
+	value = regexp.MustCompile(`^[^a-zA-Z0-9]+`).ReplaceAllString(value, "")
+	value = regexp.MustCompile(`[^a-zA-Z0-9]+$`).ReplaceAllString(value, "")
+
+	// Truncate if necessary
+	if len(value) > 63 {
+		value = value[:63]
+		// Ensure it still ends with alphanumeric after truncation
+		value = regexp.MustCompile(`[^a-zA-Z0-9]+$`).ReplaceAllString(value, "")
+	}
+
+	return value
+}
+
+// convertECSAttributeToK8sLabel maps ECS attributes to Kubernetes labels
+func (c *TaskConverter) convertECSAttributeToK8sLabel(attribute string) string {
+	// Common ECS attributes mapping
+	mappings := map[string]string{
+		"ecs.instance-type":      "node.kubernetes.io/instance-type",
+		"ecs.availability-zone":  "topology.kubernetes.io/zone",
+		"ecs.os-type":           "kubernetes.io/os",
+		"ecs.cpu-architecture":   "kubernetes.io/arch",
+		"ecs.ami-id":            "kecs.dev/ami-id",
+		"ecs.instance-id":       "kecs.dev/instance-id",
+		"ecs.subnet-id":         "kecs.dev/subnet-id",
+		"ecs.vpc-id":            "kecs.dev/vpc-id",
+	}
+
+	if k8sLabel, ok := mappings[attribute]; ok {
+		return k8sLabel
+	}
+
+	// For custom attributes, prefix with kecs.dev/
+	return "kecs.dev/" + strings.ReplaceAll(attribute, ".", "-")
+}
+
+// convertSecrets converts ECS secrets to Kubernetes environment variables
+func (c *TaskConverter) convertSecrets(secrets []types.Secret) []corev1.EnvVar {
+	envVars := make([]corev1.EnvVar, 0, len(secrets))
+
+	for _, secret := range secrets {
+		if secret.Name == nil || secret.ValueFrom == nil {
+			continue
+		}
+
+		// Parse the secret ARN
+		secretInfo, err := c.parseSecretArn(*secret.ValueFrom)
+		if err != nil {
+			// If we can't parse it, skip it
+			// In production, you might want to handle this differently
+			continue
+		}
+
+		envVar := corev1.EnvVar{
+			Name: *secret.Name,
+		}
+
+		switch secretInfo.Source {
+		case "secretsmanager":
+			// Reference Kubernetes secret created from Secrets Manager
+			envVar.ValueFrom = &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: c.sanitizeSecretName(secretInfo.SecretName),
+					},
+					Key: secretInfo.Key,
+				},
+			}
+
+		case "ssm":
+			// Reference Kubernetes secret created from SSM Parameter Store
+			envVar.ValueFrom = &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: c.sanitizeSecretName(secretInfo.SecretName),
+					},
+					Key: "value", // SSM parameters typically have a single value
+				},
+			}
+		}
+
+		envVars = append(envVars, envVar)
+	}
+
+	return envVars
+}
+
+// parseSecretArn parses an AWS secret ARN and extracts relevant information
+func (c *TaskConverter) parseSecretArn(arn string) (*SecretInfo, error) {
+	// ARN formats:
+	// Secrets Manager: arn:aws:secretsmanager:region:account-id:secret:name-6RandomChars:key::
+	// SSM: arn:aws:ssm:region:account-id:parameter/name
+
+	parts := strings.Split(arn, ":")
+	if len(parts) < 6 {
+		return nil, fmt.Errorf("invalid ARN format: %s", arn)
+	}
+
+	service := parts[2]
+	info := &SecretInfo{}
+
+	switch service {
+	case "secretsmanager":
+		info.Source = "secretsmanager"
+		// Extract secret name and key from remaining parts
+		// Format: arn:aws:secretsmanager:region:account-id:secret:name-6RandomChars:key::
+		if len(parts) >= 7 {
+			info.SecretName = parts[6]
+			if len(parts) >= 8 && parts[7] != "" {
+				info.Key = parts[7]
+			} else {
+				info.Key = "default"
+			}
+		} else {
+			// No JSON key specified
+			info.SecretName = parts[6]
+			info.Key = "default"
+		}
+
+	case "ssm":
+		info.Source = "ssm"
+		// Extract parameter name from ARN
+		// Format: arn:aws:ssm:region:account-id:parameter/path/to/param
+		// The parameter path starts after "parameter/"
+		resourcePart := parts[5]
+		if strings.HasPrefix(resourcePart, "parameter/") {
+			info.SecretName = strings.TrimPrefix(resourcePart, "parameter/")
+		} else if strings.HasPrefix(resourcePart, "parameter") && len(parts) > 6 {
+			// Sometimes the path might be in the next part
+			info.SecretName = parts[6]
+		} else {
+			info.SecretName = resourcePart
+		}
+		info.Key = "value"
+
+	default:
+		return nil, fmt.Errorf("unsupported secret service: %s", service)
+	}
+
+	return info, nil
+}
+
+// sanitizeSecretName converts a secret name to be Kubernetes-compatible
+func (c *TaskConverter) sanitizeSecretName(name string) string {
+	// Remove the random suffix from Secrets Manager secret names
+	// Format: my-secret-AbCdEf -> my-secret
+	if idx := strings.LastIndex(name, "-"); idx > 0 && len(name)-idx == 7 {
+		// Check if last part looks like a random suffix (6 chars)
+		suffix := name[idx+1:]
+		if len(suffix) == 6 && regexp.MustCompile(`^[A-Za-z0-9]+$`).MatchString(suffix) {
+			name = name[:idx]
+		}
+	}
+	
+	// Similar to volume names, but for secrets
+	name = strings.ToLower(name)
+	name = regexp.MustCompile(`[^a-z0-9-]`).ReplaceAllString(name, "-")
+	name = strings.Trim(name, "-")
+
+	// Prefix with kecs-secret to avoid conflicts
+	return fmt.Sprintf("kecs-secret-%s", name)
+}
+
+// distributeResourcesEvenly distributes task-level resources evenly among containers
+func (c *TaskConverter) distributeResourcesEvenly(pod *corev1.Pod, taskCPUMillis, taskMemoryMi int64) {
+	if len(pod.Spec.Containers) == 0 {
+		return
+	}
+
+	// Divide resources evenly
+	cpuPerContainer := taskCPUMillis / int64(len(pod.Spec.Containers))
+	memoryPerContainer := taskMemoryMi / int64(len(pod.Spec.Containers))
+
+	for i := range pod.Spec.Containers {
+		if pod.Spec.Containers[i].Resources.Requests == nil {
+			pod.Spec.Containers[i].Resources.Requests = corev1.ResourceList{}
+		}
+		if pod.Spec.Containers[i].Resources.Limits == nil {
+			pod.Spec.Containers[i].Resources.Limits = corev1.ResourceList{}
+		}
+
+		// Set CPU
+		if cpuPerContainer > 0 {
+			cpuQuantity := resource.NewMilliQuantity(cpuPerContainer, resource.DecimalSI)
+			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceCPU] = *cpuQuantity
+			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceCPU] = *cpuQuantity
+		}
+
+		// Set Memory
+		if memoryPerContainer > 0 {
+			memQuantity := resource.MustParse(fmt.Sprintf("%dMi", memoryPerContainer))
+			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceMemory] = memQuantity
+			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceMemory] = memQuantity
+		}
+	}
+}
+
+// distributeResourcesProportionally distributes task-level resources proportionally based on container requests
+func (c *TaskConverter) distributeResourcesProportionally(pod *corev1.Pod, taskCPUMillis, taskMemoryMi, totalRequestedCPU, totalRequestedMemory int64) {
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+
+		// Get current container requests
+		var containerCPU int64
+		var containerMemory int64
+
+		if container.Resources.Requests != nil {
+			if cpuReq, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
+				containerCPU = cpuReq.MilliValue()
+			}
+			if memReq, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
+				containerMemory = memReq.Value() / (1024 * 1024) // Convert to MiB
+			}
+		}
+
+		// Calculate proportional resources
+		if totalRequestedCPU > 0 && taskCPUMillis > 0 {
+			proportionalCPU := (containerCPU * taskCPUMillis) / totalRequestedCPU
+			if proportionalCPU > 0 {
+				cpuQuantity := resource.NewMilliQuantity(proportionalCPU, resource.DecimalSI)
+				container.Resources.Requests[corev1.ResourceCPU] = *cpuQuantity
+				container.Resources.Limits[corev1.ResourceCPU] = *cpuQuantity
+			}
+		}
+
+		if totalRequestedMemory > 0 && taskMemoryMi > 0 {
+			proportionalMemory := (containerMemory * taskMemoryMi) / totalRequestedMemory
+			if proportionalMemory > 0 {
+				memQuantity := resource.MustParse(fmt.Sprintf("%dMi", proportionalMemory))
+				container.Resources.Requests[corev1.ResourceMemory] = memQuantity
+				container.Resources.Limits[corev1.ResourceMemory] = memQuantity
 			}
 		}
 	}
