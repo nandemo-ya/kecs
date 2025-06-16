@@ -1,140 +1,51 @@
 # Task Artifacts in KECS
 
-KECS supports downloading artifacts (files) before starting task containers. This feature enables tasks to download configuration files, static assets, or other resources from S3, HTTP, or HTTPS sources.
+KECS supports downloading artifacts for ECS tasks, allowing containers to access configuration files, static assets, or other resources from S3 or HTTP/HTTPS sources before the main container starts.
 
 ## Overview
 
-Task artifacts are downloaded using init containers in Kubernetes. When a task definition includes artifacts, KECS automatically:
-
-1. Creates init containers to download the artifacts
-2. Mounts shared volumes between init and main containers
-3. Downloads artifacts to the specified paths
-4. Validates checksums if specified
-5. Sets file permissions if specified
-
-## Supported Features
-
-- **S3 Downloads**: Download files from S3 buckets (via LocalStack)
-- **HTTP/HTTPS Downloads**: Download files from web servers
-- **Checksum Validation**: SHA256 and MD5 checksum verification
-- **File Permissions**: Set specific file permissions on downloaded files
-- **LocalStack Integration**: Full support for LocalStack S3 service
-
-## Task Definition Example
-
-```json
-{
-  "family": "my-app",
-  "containerDefinitions": [
-    {
-      "name": "app",
-      "image": "myapp:latest",
-      "memory": 512,
-      "artifacts": [
-        {
-          "name": "config",
-          "artifactUrl": "s3://my-bucket/config/app.json",
-          "targetPath": "/config/app.json",
-          "type": "s3",
-          "permissions": "0644"
-        },
-        {
-          "name": "static-assets",
-          "artifactUrl": "https://cdn.example.com/assets.tar.gz",
-          "targetPath": "/static/assets.tar.gz",
-          "type": "https",
-          "checksum": "abc123...",
-          "checksumType": "sha256"
-        }
-      ]
-    }
-  ]
-}
-```
-
-## Artifact Fields
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Unique name for the artifact |
-| `artifactUrl` | string | Yes | URL to download the artifact from (s3://, http://, https://) |
-| `targetPath` | string | Yes | Path within the container where the artifact will be placed |
-| `type` | string | No | Type of artifact source (s3, http, https). Auto-detected from URL if not specified |
-| `permissions` | string | No | File permissions in octal format (e.g., "0644") |
-| `checksum` | string | No | Expected checksum of the file |
-| `checksumType` | string | No | Type of checksum (sha256, md5). Required if checksum is specified |
+Task artifacts enable you to:
+- Download configuration files from S3 before container startup
+- Fetch static assets or binaries from HTTP/HTTPS URLs
+- Set proper file permissions on downloaded artifacts
+- Validate artifact integrity with checksums
+- Access artifacts through a shared volume in your containers
 
 ## How It Works
 
-### 1. Init Container Creation
+When a task definition includes artifacts:
 
-For each container with artifacts, KECS creates an init container that:
-- Downloads all artifacts for that container
-- Validates checksums if specified
-- Sets file permissions if specified
-- Stores files in a shared volume
+1. KECS creates init containers that run before the main containers
+2. Each init container downloads the specified artifacts to a shared volume
+3. The main containers can access these artifacts at `/artifacts/*`
+4. Artifacts are downloaded once per task and shared among containers
 
-### 2. Volume Mounting
+## Task Definition Format
 
-- Init containers mount an EmptyDir volume at `/artifacts`
-- Main containers mount the same volume (read-only) at `/artifacts`
-- Artifacts are accessible at `/artifacts/<targetPath>`
-
-### 3. S3 Integration with LocalStack
-
-When downloading from S3:
-- Uses LocalStack S3 endpoint
-- Credentials are automatically configured (AWS_ACCESS_KEY_ID=test, AWS_SECRET_ACCESS_KEY=test)
-- Supports all S3 URL formats: `s3://bucket/key`
-
-## Example: Configuration File
+Add an `artifacts` array to any container definition:
 
 ```json
 {
   "containerDefinitions": [
     {
-      "name": "web-server",
+      "name": "webapp",
       "image": "nginx:latest",
       "artifacts": [
         {
-          "name": "nginx-config",
-          "artifactUrl": "s3://configs/nginx.conf",
-          "targetPath": "/etc/nginx/nginx.conf",
-          "permissions": "0644"
-        }
-      ],
-      "command": ["nginx", "-c", "/artifacts/etc/nginx/nginx.conf"]
-    }
-  ]
-}
-```
-
-## Example: Multiple Artifacts
-
-```json
-{
-  "containerDefinitions": [
-    {
-      "name": "app",
-      "image": "myapp:latest",
-      "artifacts": [
-        {
           "name": "app-config",
-          "artifactUrl": "s3://configs/app/config.json",
-          "targetPath": "/config/config.json"
-        },
-        {
-          "name": "certificates",
-          "artifactUrl": "https://vault.example.com/certs.tar.gz",
-          "targetPath": "/certs/bundle.tar.gz",
-          "checksum": "d2d2d2...",
+          "artifactUrl": "s3://my-bucket/configs/app.conf",
+          "type": "s3",
+          "targetPath": "config/app.conf",
+          "permissions": "0644",
+          "checksum": "sha256:abc123...",
           "checksumType": "sha256"
         },
         {
-          "name": "static-data",
-          "artifactUrl": "s3://data/static/data.db",
-          "targetPath": "/data/app.db",
-          "permissions": "0600"
+          "name": "static-assets",
+          "artifactUrl": "https://example.com/assets.tar.gz",
+          "type": "https",
+          "targetPath": "assets/assets.tar.gz",
+          "permissions": "0755"
         }
       ]
     }
@@ -142,50 +53,173 @@ When downloading from S3:
 }
 ```
 
-## Testing with LocalStack
+### Artifact Fields
 
-1. Upload a file to LocalStack S3:
-```bash
-aws --endpoint-url=http://localhost:4566 s3 mb s3://test-bucket
-aws --endpoint-url=http://localhost:4566 s3 cp config.json s3://test-bucket/config.json
-```
+- **name** (required): A unique name for the artifact
+- **artifactUrl** (required): The URL to download from (s3://, http://, or https://)
+- **targetPath** (required): Where to place the artifact within `/artifacts/`
+- **type** (optional): Explicitly specify the type ("s3", "http", "https")
+- **permissions** (optional): Unix file permissions (e.g., "0644")
+- **checksum** (optional): Expected checksum for validation
+- **checksumType** (optional): Type of checksum ("sha256" or "md5")
 
-2. Create a task definition with the artifact:
+## S3 Integration
+
+### Using LocalStack
+
+KECS integrates with LocalStack for local S3 emulation:
+
+1. Ensure LocalStack is running with S3 enabled
+2. Configure KECS to use LocalStack (see LocalStack integration docs)
+3. Upload artifacts to LocalStack S3:
+   ```bash
+   aws s3 cp app.conf s3://my-bucket/configs/ --endpoint-url http://localhost:4566
+   ```
+
+### AWS Credentials
+
+When using LocalStack, KECS automatically sets:
+- `AWS_ACCESS_KEY_ID=test`
+- `AWS_SECRET_ACCESS_KEY=test`
+- `AWS_DEFAULT_REGION=<your-configured-region>`
+
+For production use with real S3, configure appropriate IAM roles.
+
+## Implementation Details
+
+### Init Containers
+
+For each container with artifacts, KECS creates an init container:
+- Name: `artifact-downloader-<container-name>`
+- Image: `busybox:latest` (configurable in production)
+- Volume: `artifacts-<container-name>` mounted at `/artifacts`
+
+### Download Scripts
+
+The init container runs a shell script that:
+1. Creates necessary directories
+2. Downloads artifacts using wget (HTTP/HTTPS) or AWS CLI (S3)
+3. Sets file permissions if specified
+4. Validates checksums if provided
+
+### Volume Sharing
+
+Each container with artifacts gets:
+- An EmptyDir volume for storing artifacts
+- A volume mount at `/artifacts` (read-only)
+- Access to all artifacts defined for that container
+
+## Examples
+
+### Configuration File from S3
+
 ```json
 {
-  "family": "test-app",
-  "containerDefinitions": [
+  "artifacts": [
     {
-      "name": "app",
-      "image": "busybox",
-      "artifacts": [
-        {
-          "name": "config",
-          "artifactUrl": "s3://test-bucket/config.json",
-          "targetPath": "/config/app.json"
-        }
-      ],
-      "command": ["cat", "/artifacts/config/app.json"]
+      "name": "nginx-config",
+      "artifactUrl": "s3://config-bucket/nginx/nginx.conf",
+      "targetPath": "nginx/nginx.conf",
+      "permissions": "0644"
     }
   ]
 }
 ```
 
-3. Run the task and verify the artifact was downloaded.
+Access in container: `/artifacts/nginx/nginx.conf`
 
-## Current Limitations
+### Binary from HTTPS
 
-- **Init Container Image**: Currently uses `busybox:latest`. In production, a custom image with AWS CLI should be used.
-- **S3 Authentication**: Uses hardcoded test credentials for LocalStack. Production would need proper IAM integration.
-- **Download Script**: Uses basic wget/curl commands. Production should use AWS CLI for S3.
-- **Error Handling**: Basic error handling. Production needs retry logic and better error reporting.
+```json
+{
+  "artifacts": [
+    {
+      "name": "custom-tool",
+      "artifactUrl": "https://releases.example.com/tool-v1.0.0-linux-amd64",
+      "targetPath": "bin/tool",
+      "permissions": "0755",
+      "checksum": "sha256:1234567890abcdef...",
+      "checksumType": "sha256"
+    }
+  ]
+}
+```
 
-## Implementation Details
+Access in container: `/artifacts/bin/tool`
 
-The artifact support is implemented in:
-- `internal/types/task_definition.go`: Artifact type definition
-- `internal/artifacts/manager.go`: Artifact download manager
-- `internal/converters/task_converter.go`: Init container generation
-- `internal/integrations/s3/`: S3 integration with LocalStack
+### Multiple Artifacts
 
-The implementation provides a solid foundation for task artifacts, enabling configuration management and asset distribution in KECS.
+```json
+{
+  "artifacts": [
+    {
+      "name": "app-config",
+      "artifactUrl": "s3://configs/app/config.yaml",
+      "targetPath": "config/app.yaml",
+      "permissions": "0640"
+    },
+    {
+      "name": "ssl-cert",
+      "artifactUrl": "s3://certs/app.crt",
+      "targetPath": "certs/app.crt",
+      "permissions": "0644"
+    },
+    {
+      "name": "ssl-key",
+      "artifactUrl": "s3://certs/app.key",
+      "targetPath": "certs/app.key",
+      "permissions": "0600"
+    }
+  ]
+}
+```
+
+## Limitations
+
+Current limitations in KECS:
+
+1. **S3 Download**: Currently shows placeholder output. Full AWS CLI integration planned.
+2. **Init Container Image**: Uses `busybox:latest`. Production deployments should use a custom image with AWS CLI.
+3. **Checksum Validation**: Implemented in artifact manager but not yet in init containers.
+4. **Error Handling**: Basic error handling. Production use requires more robust retry logic.
+
+## Future Enhancements
+
+Planned improvements:
+
+1. Custom init container image with pre-installed AWS CLI
+2. Support for additional artifact sources (Git, GCS, etc.)
+3. Artifact caching across tasks
+4. Progress reporting for large downloads
+5. Integration with ECS task IAM roles for S3 access
+6. Support for artifact encryption/decryption
+
+## Testing
+
+Test artifact functionality:
+
+```bash
+# Register task definition
+cd examples
+./test-task-with-artifacts.sh
+
+# Upload test file to LocalStack S3
+aws s3 mb s3://my-bucket --endpoint-url http://localhost:4566
+echo "test config" | aws s3 cp - s3://my-bucket/configs/app.conf --endpoint-url http://localhost:4566
+
+# Run task
+curl -X POST "http://localhost:8080/v1/RunTask" \
+  -H "Content-Type: application/x-amz-json-1.1" \
+  -H "X-Amz-Target: AmazonEC2ContainerServiceV20141113.RunTask" \
+  -d '{
+    "cluster": "default",
+    "taskDefinition": "webapp-with-artifacts"
+  }'
+```
+
+Check Kubernetes pods to see init containers and artifact volumes:
+
+```bash
+kubectl get pods -n kecs-default
+kubectl describe pod ecs-task-<task-id> -n kecs-default
+```
