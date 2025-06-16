@@ -232,6 +232,7 @@ clusters:
   - name: default
     localstack:
       enabled: true
+      version: "4.5"  # LocalStack version (default: latest)
       services:
         - iam
         - s3

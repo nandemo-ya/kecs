@@ -43,6 +43,7 @@ func init() {
 	// Add subcommands
 	RootCmd.AddCommand(serverCmd)
 	RootCmd.AddCommand(versionCmd)
+	RootCmd.AddCommand(localstackCmd)
 }
 
 // startServer is the default action when no subcommands are specified

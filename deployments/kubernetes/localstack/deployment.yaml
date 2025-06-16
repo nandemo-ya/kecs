@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+  namespace: aws-services
+  labels:
+    app: localstack
+    app.kubernetes.io/name: localstack
+    app.kubernetes.io/managed-by: kecs
+    app.kubernetes.io/component: localstack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localstack
+  template:
+    metadata:
+      labels:
+        app: localstack
+        app.kubernetes.io/name: localstack
+        app.kubernetes.io/managed-by: kecs
+        app.kubernetes.io/component: localstack
+    spec:
+      containers:
+      - name: localstack
+        image: localstack/localstack:latest
+        ports:
+        - name: edge
+          containerPort: 4566
+          protocol: TCP
+        env:
+        - name: SERVICES
+          value: "iam,logs,ssm,secretsmanager,elbv2"
+        - name: DEBUG
+          value: "0"
+        - name: PERSISTENCE
+          value: "1"
+        - name: DATA_DIR
+          value: "/var/lib/localstack"
+        - name: EDGE_PORT
+          value: "4566"
+        - name: DEFAULT_REGION
+          value: "us-east-1"
+        - name: DOCKER_HOST
+          value: "unix:///var/run/docker.sock"
+        - name: LAMBDA_EXECUTOR
+          value: "local"
+        - name: DISABLE_CORS_CHECKS
+          value: "1"
+        - name: DISABLE_CUSTOM_CORS_S3
+          value: "1"
+        - name: EXTRA_CORS_ALLOWED_ORIGINS
+          value: "*"
+        - name: EXTRA_CORS_ALLOWED_HEADERS
+          value: "x-amz-*"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /_localstack/health
+            port: 4566
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /_localstack/health
+            port: 4566
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: localstack-data
+          mountPath: /var/lib/localstack
+      volumes:
+      - name: localstack-data
+        persistentVolumeClaim:
+          claimName: localstack-data

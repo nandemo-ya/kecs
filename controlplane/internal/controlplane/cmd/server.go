@@ -87,7 +87,8 @@ func runServer() {
 	}
 
 	// Initialize the API and Admin servers
-	apiServer, err := api.NewServer(port, kubeconfig, storage)
+	// TODO: Load LocalStack configuration from config file or environment
+	apiServer, err := api.NewServer(port, kubeconfig, storage, nil)
 	if err != nil {
 		log.Fatalf("Failed to initialize API server: %v", err)
 	}
