@@ -18,7 +18,7 @@ var _ = Describe("LocalStack Configuration", func() {
 		It("should return valid default configuration", func() {
 			Expect(config).NotTo(BeNil())
 			Expect(config.Enabled).To(BeFalse())
-			Expect(config.Services).To(ConsistOf("iam", "logs", "ssm", "secretsmanager", "elbv2"))
+			Expect(config.Services).To(ConsistOf("iam", "logs", "ssm", "secretsmanager", "elbv2", "s3"))
 			Expect(config.Persistence).To(BeTrue())
 			Expect(config.Image).To(Equal("localstack/localstack"))
 			Expect(config.Version).To(Equal("latest"))

@@ -254,42 +254,30 @@ var _ = Describe("Artifact Manager", func() {
 		})
 	})
 
-	Describe("CleanupArtifacts", func() {
-		It("should remove downloaded artifacts", func() {
-			// Create test files
-			file1 := filepath.Join(tempDir, "file1.txt")
-			file2 := filepath.Join(tempDir, "file2.txt")
-			os.WriteFile(file1, []byte("content1"), 0644)
-			os.WriteFile(file2, []byte("content2"), 0644)
-
+	Describe("GetArtifactScript", func() {
+		It("should generate shell script for artifacts", func() {
 			artifacts := []types.Artifact{
-				{TargetPath: ptr.To(file1)},
-				{TargetPath: ptr.To(file2)},
+				{
+					ArtifactUrl: ptr.To("https://example.com/file.txt"),
+					TargetPath:  ptr.To("config/file.txt"),
+					Permissions: ptr.To("0644"),
+				},
+				{
+					ArtifactUrl: ptr.To("s3://bucket/key"),
+					TargetPath:  ptr.To("data/key"),
+				},
 			}
 
-			// Verify files exist
-			_, err := os.Stat(file1)
-			Expect(err).NotTo(HaveOccurred())
-			_, err = os.Stat(file2)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Cleanup
-			manager.CleanupArtifacts(artifacts)
-
-			// Verify files are removed
-			_, err = os.Stat(file1)
-			Expect(os.IsNotExist(err)).To(BeTrue())
-			_, err = os.Stat(file2)
-			Expect(os.IsNotExist(err)).To(BeTrue())
+			script := manager.GetArtifactScript(artifacts)
+			Expect(script).To(ContainSubstring("#!/bin/sh"))
+			Expect(script).To(ContainSubstring("wget -O /artifacts/config/file.txt"))
+			Expect(script).To(ContainSubstring("chmod 0644"))
+			Expect(script).To(ContainSubstring("S3 download placeholder"))
 		})
 
-		It("should not fail if files don't exist", func() {
-			artifacts := []types.Artifact{
-				{TargetPath: ptr.To(filepath.Join(tempDir, "nonexistent.txt"))},
-			}
-
-			// Should not panic or error
-			manager.CleanupArtifacts(artifacts)
+		It("should return empty string for no artifacts", func() {
+			script := manager.GetArtifactScript([]types.Artifact{})
+			Expect(script).To(Equal(""))
 		})
 	})
 })

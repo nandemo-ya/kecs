@@ -42,221 +42,229 @@ func (m *Manager) DownloadArtifact(ctx context.Context, artifact *types.Artifact
 	artifactURL := *artifact.ArtifactUrl
 	targetPath := *artifact.TargetPath
 
-	// Ensure target directory exists
+	klog.V(2).Infof("Downloading artifact from %s to %s", artifactURL, targetPath)
+
+	// Create target directory if it doesn't exist
 	targetDir := filepath.Dir(targetPath)
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		return fmt.Errorf("failed to create target directory: %w", err)
+		return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
 	}
 
-	// Download based on type
-	var reader io.ReadCloser
-
-	artifactType := m.detectArtifactType(artifactURL, artifact.Type)
-	
-	switch artifactType {
-	case "s3":
-		reader, err = m.downloadFromS3(ctx, artifactURL)
-	case "http", "https":
-		reader, err = m.downloadFromHTTP(ctx, artifactURL)
-	default:
-		return fmt.Errorf("unsupported artifact type: %s", artifactType)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to download artifact: %w", err)
-	}
-	defer reader.Close()
-
-	// Create temporary file
-	tempFile, tempErr := os.CreateTemp(targetDir, ".download-*")
-	if tempErr != nil {
-		return fmt.Errorf("failed to create temp file: %w", tempErr)
-	}
-	tempPath := tempFile.Name()
-	defer os.Remove(tempPath) // Clean up temp file on error
-
-	// Download to temp file with optional checksum validation
-	var hasher io.Writer
-	if artifact.Checksum != nil && artifact.ChecksumType != nil {
-		switch strings.ToLower(*artifact.ChecksumType) {
-		case "sha256":
-			h := sha256.New()
-			hasher = h
-			defer func() {
-				if err == nil {
-					checksum := hex.EncodeToString(h.Sum(nil))
-					if checksum != *artifact.Checksum {
-						err = fmt.Errorf("checksum mismatch: expected %s, got %s", *artifact.Checksum, checksum)
-					}
-				}
-			}()
-		case "md5":
-			h := md5.New()
-			hasher = h
-			defer func() {
-				if err == nil {
-					checksum := hex.EncodeToString(h.Sum(nil))
-					if checksum != *artifact.Checksum {
-						err = fmt.Errorf("checksum mismatch: expected %s, got %s", *artifact.Checksum, checksum)
-					}
-				}
-			}()
-		default:
-			return fmt.Errorf("unsupported checksum type: %s", *artifact.ChecksumType)
-		}
-	}
-
-	// Copy data
-	var writer io.Writer = tempFile
-	if hasher != nil {
-		writer = io.MultiWriter(tempFile, hasher)
-	}
-
-	if _, copyErr := io.Copy(writer, reader); copyErr != nil {
-		tempFile.Close()
-		return fmt.Errorf("failed to write artifact: %w", copyErr)
-	}
-	tempFile.Close()
-
-	// Set permissions if specified
-	if artifact.Permissions != nil {
-		mode, parseErr := parseFileMode(*artifact.Permissions)
-		if parseErr != nil {
-			return fmt.Errorf("invalid permissions: %w", parseErr)
-		}
-		if chmodErr := os.Chmod(tempPath, mode); chmodErr != nil {
-			return fmt.Errorf("failed to set permissions: %w", chmodErr)
-		}
-	}
-
-	// Move temp file to final location
-	if renameErr := os.Rename(tempPath, targetPath); renameErr != nil {
-		// If rename fails (e.g., across filesystems), try copy
-		if copyErr := copyFile(tempPath, targetPath); copyErr != nil {
-			return fmt.Errorf("failed to move artifact to target: %w", copyErr)
-		}
-		os.Remove(tempPath)
-	}
-
-	klog.Infof("Successfully downloaded artifact to: %s", targetPath)
-	return nil
-}
-
-// detectArtifactType detects the artifact type from URL or explicit type
-func (m *Manager) detectArtifactType(artifactURL string, explicitType *string) string {
-	if explicitType != nil {
-		return strings.ToLower(*explicitType)
-	}
-
-	// Auto-detect from URL
+	// Download based on URL scheme
 	if strings.HasPrefix(artifactURL, "s3://") {
-		return "s3"
-	} else if strings.HasPrefix(artifactURL, "http://") {
-		return "http"
-	} else if strings.HasPrefix(artifactURL, "https://") {
-		return "https"
+		return m.downloadFromS3(ctx, artifact)
+	} else if strings.HasPrefix(artifactURL, "http://") || strings.HasPrefix(artifactURL, "https://") {
+		return m.downloadFromHTTP(ctx, artifact)
 	}
 
-	// Default to https for URLs without scheme
-	return "https"
+	return fmt.Errorf("unsupported artifact URL scheme: %s", artifactURL)
 }
 
 // downloadFromS3 downloads an artifact from S3
-func (m *Manager) downloadFromS3(ctx context.Context, s3URL string) (io.ReadCloser, error) {
-	// Parse S3 URL: s3://bucket/key
-	if !strings.HasPrefix(s3URL, "s3://") {
-		return nil, fmt.Errorf("invalid S3 URL format: %s", s3URL)
-	}
+func (m *Manager) downloadFromS3(ctx context.Context, artifact *types.Artifact) error {
+	artifactURL := *artifact.ArtifactUrl
+	targetPath := *artifact.TargetPath
 
-	s3Path := strings.TrimPrefix(s3URL, "s3://")
-	parts := strings.SplitN(s3Path, "/", 2)
+	klog.V(2).Infof("Downloading artifact from S3: %s", artifactURL)
+
+	// Parse S3 URL (s3://bucket/key)
+	s3URL := strings.TrimPrefix(artifactURL, "s3://")
+	parts := strings.SplitN(s3URL, "/", 2)
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid S3 URL format: %s", s3URL)
+		return fmt.Errorf("invalid S3 URL format: %s", artifactURL)
 	}
 
 	bucket := parts[0]
 	key := parts[1]
 
-	return m.s3Integration.DownloadFile(ctx, bucket, key)
+	// Download from S3 using integration
+	reader, err := m.s3Integration.DownloadFile(ctx, bucket, key)
+	if err != nil {
+		return fmt.Errorf("failed to download from S3: %w", err)
+	}
+	defer reader.Close()
+
+	// Create target file
+	file, err := os.Create(targetPath)
+	if err != nil {
+		return fmt.Errorf("failed to create target file %s: %w", targetPath, err)
+	}
+	defer file.Close()
+
+	// Copy S3 data to file
+	_, err = io.Copy(file, reader)
+	if err != nil {
+		return fmt.Errorf("failed to write artifact to %s: %w", targetPath, err)
+	}
+
+	// Set permissions if specified
+	if artifact.Permissions != nil {
+		if err := m.setFilePermissions(targetPath, *artifact.Permissions); err != nil {
+			return fmt.Errorf("failed to set permissions: %w", err)
+		}
+	}
+
+	// Validate checksum if specified
+	if artifact.Checksum != nil {
+		if err := m.validateChecksum(targetPath, *artifact.Checksum, artifact.ChecksumType); err != nil {
+			return fmt.Errorf("checksum validation failed: %w", err)
+		}
+	}
+
+	klog.V(2).Infof("Successfully downloaded S3 artifact to %s", targetPath)
+	return nil
 }
 
 // downloadFromHTTP downloads an artifact from HTTP/HTTPS
-func (m *Manager) downloadFromHTTP(ctx context.Context, artifactURL string) (io.ReadCloser, error) {
+func (m *Manager) downloadFromHTTP(ctx context.Context, artifact *types.Artifact) error {
+	artifactURL := *artifact.ArtifactUrl
+	targetPath := *artifact.TargetPath
+
+	klog.V(2).Infof("Downloading artifact from HTTP: %s", artifactURL)
+
+	// Create HTTP request
 	req, err := http.NewRequestWithContext(ctx, "GET", artifactURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
+	// Execute request
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to download: %w", err)
+		return fmt.Errorf("failed to download from %s: %w", artifactURL, err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
-		return nil, fmt.Errorf("HTTP error: %s", resp.Status)
+		return fmt.Errorf("HTTP request failed with status %d: %s", resp.StatusCode, resp.Status)
 	}
 
-	return resp.Body, nil
-}
-
-// parseFileMode parses file permissions string (e.g., "0644") to os.FileMode
-func parseFileMode(permissions string) (os.FileMode, error) {
-	// Parse as octal
-	mode, err := parseOctal(permissions)
+	// Create target file
+	file, err := os.Create(targetPath)
 	if err != nil {
-		return 0, err
+		return fmt.Errorf("failed to create target file %s: %w", targetPath, err)
 	}
-	return os.FileMode(mode), nil
-}
+	defer file.Close()
 
-// parseOctal parses an octal string to uint32
-func parseOctal(s string) (uint32, error) {
-	// Remove leading zeros
-	s = strings.TrimLeft(s, "0")
-	if s == "" {
-		return 0, nil
+	// Copy response body to file
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to write artifact to %s: %w", targetPath, err)
 	}
 
-	var result uint32
-	for _, c := range s {
-		if c < '0' || c > '7' {
-			return 0, fmt.Errorf("invalid octal digit: %c", c)
+	// Set permissions if specified
+	if artifact.Permissions != nil {
+		if err := m.setFilePermissions(targetPath, *artifact.Permissions); err != nil {
+			return fmt.Errorf("failed to set permissions: %w", err)
 		}
-		result = result*8 + uint32(c-'0')
 	}
-	return result, nil
+
+	// Validate checksum if specified
+	if artifact.Checksum != nil {
+		if err := m.validateChecksum(targetPath, *artifact.Checksum, artifact.ChecksumType); err != nil {
+			return fmt.Errorf("checksum validation failed: %w", err)
+		}
+	}
+
+	klog.V(2).Infof("Successfully downloaded HTTP artifact to %s", targetPath)
+	return nil
 }
 
-// copyFile copies a file from src to dst
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
+// setFilePermissions sets file permissions
+func (m *Manager) setFilePermissions(filePath, permissions string) error {
+	// Convert octal string to file mode
+	var mode os.FileMode
+	_, err := fmt.Sscanf(permissions, "%o", &mode)
 	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
+		return fmt.Errorf("invalid permissions format %s: %w", permissions, err)
 	}
 
-	return out.Sync()
+	if err := os.Chmod(filePath, mode); err != nil {
+		return fmt.Errorf("failed to set permissions %s on %s: %w", permissions, filePath, err)
+	}
+
+	klog.V(3).Infof("Set permissions %s on %s", permissions, filePath)
+	return nil
 }
 
-// CleanupArtifacts removes downloaded artifacts
-func (m *Manager) CleanupArtifacts(artifacts []types.Artifact) {
+// validateChecksum validates file checksum
+func (m *Manager) validateChecksum(filePath, expectedChecksum string, checksumType *string) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to open file for checksum validation: %w", err)
+	}
+	defer file.Close()
+
+	var hash string
+	checksumMethod := "sha256" // default
+	if checksumType != nil {
+		checksumMethod = strings.ToLower(*checksumType)
+	}
+
+	switch checksumMethod {
+	case "sha256":
+		hasher := sha256.New()
+		if _, err := io.Copy(hasher, file); err != nil {
+			return fmt.Errorf("failed to compute SHA256 hash: %w", err)
+		}
+		hash = hex.EncodeToString(hasher.Sum(nil))
+	case "md5":
+		hasher := md5.New()
+		if _, err := io.Copy(hasher, file); err != nil {
+			return fmt.Errorf("failed to compute MD5 hash: %w", err)
+		}
+		hash = hex.EncodeToString(hasher.Sum(nil))
+	default:
+		return fmt.Errorf("unsupported checksum type: %s", checksumMethod)
+	}
+
+	if hash != expectedChecksum {
+		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, hash)
+	}
+
+	klog.V(3).Infof("Checksum validation passed for %s", filePath)
+	return nil
+}
+
+// GetArtifactScript generates a shell script for downloading artifacts in init containers
+func (m *Manager) GetArtifactScript(artifacts []types.Artifact) string {
+	if len(artifacts) == 0 {
+		return ""
+	}
+
+	var script strings.Builder
+	script.WriteString("#!/bin/sh\n")
+	script.WriteString("set -e\n\n")
+
 	for _, artifact := range artifacts {
-		if artifact.TargetPath != nil {
-			if err := os.Remove(*artifact.TargetPath); err != nil && !os.IsNotExist(err) {
-				klog.Warningf("Failed to cleanup artifact %s: %v", *artifact.TargetPath, err)
-			}
+		if artifact.ArtifactUrl == nil || artifact.TargetPath == nil {
+			continue
 		}
+
+		artifactURL := *artifact.ArtifactUrl
+		targetPath := *artifact.TargetPath
+		fullPath := "/artifacts/" + targetPath
+
+		// Create directory
+		script.WriteString(fmt.Sprintf("mkdir -p $(dirname %s)\n", fullPath))
+
+		// Download based on URL scheme
+		if strings.HasPrefix(artifactURL, "s3://") {
+			// S3 download - placeholder for now
+			script.WriteString(fmt.Sprintf("echo 'Downloading %s from S3 to %s'\n", artifactURL, fullPath))
+			script.WriteString(fmt.Sprintf("echo 'S3 download placeholder' > %s\n", fullPath))
+		} else if strings.HasPrefix(artifactURL, "http://") || strings.HasPrefix(artifactURL, "https://") {
+			// HTTP/HTTPS download
+			script.WriteString(fmt.Sprintf("wget -O %s %s\n", fullPath, artifactURL))
+		}
+
+		// Set permissions if specified
+		if artifact.Permissions != nil {
+			script.WriteString(fmt.Sprintf("chmod %s %s\n", *artifact.Permissions, fullPath))
+		}
+
+		script.WriteString("\n")
 	}
+
+	return script.String()
 }
