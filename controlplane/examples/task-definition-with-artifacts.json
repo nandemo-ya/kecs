@@ -1,0 +1,67 @@
+{
+  "family": "webapp-with-artifacts",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "containerDefinitions": [
+    {
+      "name": "webapp",
+      "image": "nginx:latest",
+      "cpu": 512,
+      "memory": 1024,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "artifacts": [
+        {
+          "name": "app-config",
+          "artifactUrl": "s3://my-bucket/configs/app.conf",
+          "type": "s3",
+          "targetPath": "config/app.conf",
+          "permissions": "0644"
+        },
+        {
+          "name": "static-assets",
+          "artifactUrl": "https://example.com/assets.tar.gz",
+          "type": "https",
+          "targetPath": "assets/assets.tar.gz",
+          "permissions": "0755"
+        }
+      ],
+      "environment": [
+        {
+          "name": "APP_ENV",
+          "value": "production"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "app-data",
+          "containerPath": "/data",
+          "readOnly": false
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/webapp",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "webapp"
+        }
+      }
+    }
+  ],
+  "volumes": [
+    {
+      "name": "app-data",
+      "host": {
+        "sourcePath": "/tmp/app-data"
+      }
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package converters
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
@@ -22,6 +24,7 @@ type TaskConverter struct {
 	region                string
 	accountID             string
 	cloudWatchIntegration cloudwatch.Integration
+	artifactManager       artifacts.Manager
 }
 
 // SecretInfo holds parsed information from a secret ARN
@@ -46,6 +49,11 @@ func NewTaskConverterWithCloudWatch(region, accountID string, cwIntegration clou
 		accountID:             accountID,
 		cloudWatchIntegration: cwIntegration,
 	}
+}
+
+// SetArtifactManager sets the artifact manager for the task converter
+func (c *TaskConverter) SetArtifactManager(am artifacts.Manager) {
+	c.artifactManager = am
 }
 
 // ConvertTaskToPod converts an ECS task definition and RunTask request to a Kubernetes Pod
@@ -97,6 +105,15 @@ func (c *TaskConverter) ConvertTaskToPod(
 			Containers:    c.convertContainers(containerDefs, taskDef, &runTaskReq),
 			Volumes:       c.convertVolumes(volumes),
 		},
+	}
+
+	// Add init containers and volumes for artifacts if needed
+	if c.artifactManager != nil {
+		initContainers, artifactVolumes := c.createArtifactInitContainers(containerDefs)
+		if len(initContainers) > 0 {
+			pod.Spec.InitContainers = initContainers
+			pod.Spec.Volumes = append(pod.Spec.Volumes, artifactVolumes...)
+		}
 	}
 
 	// Apply network mode
@@ -228,6 +245,16 @@ func (c *TaskConverter) convertContainers(
 		// Volume mounts
 		if def.MountPoints != nil {
 			container.VolumeMounts = c.convertMountPoints(def.MountPoints)
+		}
+
+		// Add artifact volume mounts
+		if c.artifactManager != nil && def.Artifacts != nil && len(def.Artifacts) > 0 {
+			artifactVolumeMount := corev1.VolumeMount{
+				Name:      fmt.Sprintf("artifacts-%s", *def.Name),
+				MountPath: "/artifacts",
+				ReadOnly:  true,
+			}
+			container.VolumeMounts = append(container.VolumeMounts, artifactVolumeMount)
 		}
 
 		// Working directory
@@ -1465,4 +1492,105 @@ func (c *TaskConverter) distributeResourcesProportionally(pod *corev1.Pod, taskC
 			}
 		}
 	}
+}
+
+// createArtifactInitContainers creates init containers for downloading artifacts
+func (c *TaskConverter) createArtifactInitContainers(containerDefs []types.ContainerDefinition) ([]corev1.Container, []corev1.Volume) {
+	var initContainers []corev1.Container
+	var volumes []corev1.Volume
+
+	for _, def := range containerDefs {
+		if def.Artifacts == nil || len(def.Artifacts) == 0 {
+			continue
+		}
+
+		// Create volume for this container's artifacts
+		volumeName := fmt.Sprintf("artifacts-%s", *def.Name)
+		volume := corev1.Volume{
+			Name: volumeName,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		}
+		volumes = append(volumes, volume)
+
+		// Create init container for downloading artifacts
+		initContainer := corev1.Container{
+			Name:  fmt.Sprintf("artifact-downloader-%s", *def.Name),
+			Image: "busybox:latest", // In production, use a custom artifact downloader image
+			Command: []string{"/bin/sh", "-c"},
+			Args: []string{c.generateArtifactDownloadScript(def.Artifacts)},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      volumeName,
+					MountPath: "/artifacts",
+				},
+			},
+			// Add environment variables for S3 endpoint if LocalStack is configured
+			Env: c.getArtifactEnvironment(),
+		}
+
+		initContainers = append(initContainers, initContainer)
+	}
+
+	return initContainers, volumes
+}
+
+// generateArtifactDownloadScript generates a shell script to download artifacts
+func (c *TaskConverter) generateArtifactDownloadScript(artifacts []types.Artifact) string {
+	var commands []string
+
+	for _, artifact := range artifacts {
+		if artifact.ArtifactUrl == nil || artifact.TargetPath == nil {
+			continue
+		}
+
+		url := *artifact.ArtifactUrl
+		targetPath := filepath.Join("/artifacts", *artifact.TargetPath)
+
+		// Create directory for target
+		commands = append(commands, fmt.Sprintf("mkdir -p $(dirname %s)", targetPath))
+
+		// Download based on URL type
+		if strings.HasPrefix(url, "s3://") {
+			// For S3, we would use AWS CLI in a real implementation
+			// For now, use a placeholder that shows the intent
+			commands = append(commands, fmt.Sprintf("echo 'Downloading %s to %s'", url, targetPath))
+			commands = append(commands, fmt.Sprintf("echo 'S3 download would happen here with AWS CLI'"))
+			// In production: aws s3 cp ${url} ${targetPath}
+		} else if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+			// Use wget for HTTP/HTTPS
+			commands = append(commands, fmt.Sprintf("wget -q -O %s %s", targetPath, url))
+		}
+
+		// Set permissions if specified
+		if artifact.Permissions != nil {
+			commands = append(commands, fmt.Sprintf("chmod %s %s", *artifact.Permissions, targetPath))
+		}
+	}
+
+	// Join all commands with && to ensure they all succeed
+	return strings.Join(commands, " && ")
+}
+
+// getArtifactEnvironment returns environment variables for artifact downloading
+func (c *TaskConverter) getArtifactEnvironment() []corev1.EnvVar {
+	var env []corev1.EnvVar
+
+	// If using LocalStack, set AWS endpoint
+	// This would be configured based on the proxy mode
+	env = append(env, corev1.EnvVar{
+		Name:  "AWS_ACCESS_KEY_ID",
+		Value: "test",
+	})
+	env = append(env, corev1.EnvVar{
+		Name:  "AWS_SECRET_ACCESS_KEY",
+		Value: "test",
+	})
+	env = append(env, corev1.EnvVar{
+		Name:  "AWS_DEFAULT_REGION",
+		Value: c.region,
+	})
+
+	return env
 }

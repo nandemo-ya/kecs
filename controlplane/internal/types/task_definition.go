@@ -68,6 +68,7 @@ type ContainerDefinition struct {
 	SystemControls         []SystemControl        `json:"systemControls,omitempty"`
 	ResourceRequirements   []ResourceRequirement  `json:"resourceRequirements,omitempty"`
 	FirelensConfiguration  *FirelensConfiguration `json:"firelensConfiguration,omitempty"`
+	Artifacts              []Artifact             `json:"artifacts,omitempty"`
 }
 
 // PortMapping represents a port mapping for a container
@@ -272,4 +273,15 @@ type EphemeralStorage struct {
 type RuntimePlatform struct {
 	CpuArchitecture       *string `json:"cpuArchitecture,omitempty"`
 	OperatingSystemFamily *string `json:"operatingSystemFamily,omitempty"`
+}
+
+// Artifact represents a container artifact to be downloaded
+type Artifact struct {
+	Name          *string `json:"name"`
+	ArtifactUrl   *string `json:"artifactUrl"`
+	Type          *string `json:"type,omitempty"` // "s3", "http", "https"
+	TargetPath    *string `json:"targetPath"`      // Path in container where artifact will be placed
+	Permissions   *string `json:"permissions,omitempty"` // File permissions (e.g., "0644")
+	Checksum      *string `json:"checksum,omitempty"`    // Optional checksum for validation
+	ChecksumType  *string `json:"checksumType,omitempty"` // "sha256", "md5"
 }
