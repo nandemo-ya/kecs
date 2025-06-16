@@ -185,15 +185,7 @@ func createLocalStackConfig(endpoint, region string) (aws.Config, error) {
 
 	return config.LoadDefaultConfig(context.Background(),
 		config.WithRegion(region),
-		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
-			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-				return aws.Endpoint{
-					URL:               endpoint,
-					SigningRegion:     region,
-					HostnameImmutable: true,
-				}, nil
-			}),
-		),
+		config.WithBaseEndpoint(endpoint),
 		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
 	)
 }
