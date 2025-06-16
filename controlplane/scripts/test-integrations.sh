@@ -21,9 +21,8 @@ go test ./internal/integrations/s3/... -v
 echo "Testing Artifacts manager..."
 go test ./internal/artifacts/... -v
 
-# Future integration tests can be added here
-
-# echo "Testing ELBv2 integration..."
-# go test ./internal/integrations/elbv2/... -v
+# Test ELBv2 integration
+echo "Testing ELBv2 integration..."
+go test ./internal/integrations/elbv2/... -v
 
 echo "All integration tests passed!"
