@@ -75,8 +75,8 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 		taskManager = &mockTaskManager{storage: api.storage}
 	}
 
-	// Create task converter
-	taskConverter := converters.NewTaskConverter(api.region, api.accountID)
+	// Create task converter with CloudWatch integration
+	taskConverter := converters.NewTaskConverterWithCloudWatch(api.region, api.accountID, api.cloudWatchIntegration)
 
 	// Marshal the request for the converter
 	reqJSON, err := json.Marshal(req)
