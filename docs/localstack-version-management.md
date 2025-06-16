@@ -12,7 +12,7 @@ In your `production.yaml` or cluster configuration:
 localstack:
   enabled: true
   image: "localstack/localstack"
-  version: "3.0.2"  # Specify the desired version
+  version: "4.5"  # Specify the desired version
   # version: "latest"  # Default if not specified
 ```
 
@@ -22,7 +22,7 @@ When using the `kecs localstack` commands, you can specify the version:
 
 ```bash
 # Start LocalStack with a specific version
-kecs localstack start --version 3.0.2
+kecs localstack start --version 4.5
 
 # Use a custom image repository
 kecs localstack start --image my-registry/localstack --version custom-tag
@@ -32,7 +32,7 @@ kecs localstack start --image my-registry/localstack --version custom-tag
 
 ### Recommended Versions
 
-- **Production**: Use specific version tags (e.g., `3.0.2`) for stability
+- **Production**: Use specific version tags (e.g., `4.5`) for stability
 - **Development**: `latest` tag is acceptable but may introduce breaking changes
 - **Testing**: Match the version used in your CI/CD pipeline
 
@@ -40,6 +40,7 @@ kecs localstack start --image my-registry/localstack --version custom-tag
 
 Different LocalStack versions support different AWS service features:
 
+- **v4.0+**: Latest features with improved AWS parity and performance
 - **v3.0+**: Full support for all services with improved performance
 - **v2.3+**: Stable support for core services (IAM, S3, Lambda, etc.)
 - **v1.x**: Legacy version, not recommended for new deployments
@@ -58,7 +59,7 @@ LocalStack Status:
   Running: true
   Healthy: true
   Endpoint: http://localstack.aws-services.svc.cluster.local:4566
-  Version: 3.0.2
+  Version: 4.5
 ```
 
 ### Upgrading LocalStack
@@ -70,7 +71,7 @@ To upgrade to a new version:
 kecs localstack stop
 
 # Start with new version
-kecs localstack start --version 3.1.0
+kecs localstack start --version 4.6
 ```
 
 ### Rolling Back
@@ -79,7 +80,7 @@ If issues occur with a new version:
 
 ```bash
 # Revert to previous version
-kecs localstack restart --version 3.0.2
+kecs localstack restart --version 4.5
 ```
 
 ## Best Practices
@@ -105,8 +106,8 @@ For custom registries or specific versions:
 
 ```bash
 # Pre-pull the image
-docker pull localstack/localstack:3.0.2
+docker pull localstack/localstack:4.5
 
 # Or use a private registry
-kecs localstack start --image private.registry.com/localstack --version 3.0.2
+kecs localstack start --image private.registry.com/localstack --version 4.5
 ```
