@@ -12,6 +12,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/s3"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/ssm"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
@@ -41,6 +42,7 @@ type Server struct {
 	cloudWatchIntegration   cloudwatch.Integration
 	ssmIntegration          ssm.Integration
 	secretsManagerIntegration secretsmanager.Integration
+	s3Integration           s3.Integration
 }
 
 // NewServer creates a new API server instance
@@ -218,6 +220,22 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 						log.Println("Secrets Manager integration initialized successfully")
 					}
 				}
+				
+				// Initialize S3 integration if LocalStack is available
+				if kubeClient != nil {
+					s3Config := &s3.Config{
+						LocalStackEndpoint: fmt.Sprintf("http://localhost:%d", localStackConfig.Port),
+						Region:             "us-east-1",
+						ForcePathStyle:     true, // Required for LocalStack
+					}
+					s3Integration, err := s3.NewIntegration(kubeClient, localStackManager, s3Config)
+					if err != nil {
+						log.Printf("Warning: Failed to initialize S3 integration: %v", err)
+					} else {
+						s.s3Integration = s3Integration
+						log.Println("S3 integration initialized successfully")
+					}
+				}
 			}
 		}
 	}
@@ -236,6 +254,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 		if s.secretsManagerIntegration != nil {
 			defaultAPI.SetSecretsManagerIntegration(s.secretsManagerIntegration)
+		}
+		if s.s3Integration != nil {
+			defaultAPI.SetS3Integration(s.s3Integration)
 		}
 	}
 	s.ecsAPI = ecsAPI
