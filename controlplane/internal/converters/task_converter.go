@@ -16,6 +16,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
+	"github.com/nandemo-ya/kecs/controlplane/internal/proxy"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
@@ -26,6 +27,7 @@ type TaskConverter struct {
 	accountID             string
 	cloudWatchIntegration cloudwatch.Integration
 	artifactManager       *artifacts.Manager
+	proxyManager          *proxy.Manager
 }
 
 // SecretInfo holds parsed information from a secret ARN
@@ -55,6 +57,11 @@ func NewTaskConverterWithCloudWatch(region, accountID string, cwIntegration clou
 // SetArtifactManager sets the artifact manager for the task converter
 func (c *TaskConverter) SetArtifactManager(am *artifacts.Manager) {
 	c.artifactManager = am
+}
+
+// SetProxyManager sets the proxy manager for the task converter
+func (c *TaskConverter) SetProxyManager(pm *proxy.Manager) {
+	c.proxyManager = pm
 }
 
 // ConvertTaskToPod converts an ECS task definition and RunTask request to a Kubernetes Pod
@@ -214,6 +221,16 @@ func (c *TaskConverter) ConvertTaskToPod(
 			if configMap != nil {
 				pod.Annotations["kecs.dev/fluent-bit-configmap"] = configMap.Name
 				pod.Annotations["kecs.dev/fluent-bit-config"] = configMap.Data["fluent-bit.conf"]
+			}
+		}
+	}
+
+	// Add AWS proxy sidecar if proxy manager is available
+	if c.proxyManager != nil && c.proxyManager.GetSidecarProxy() != nil {
+		sidecarProxy := c.proxyManager.GetSidecarProxy()
+		if sidecarProxy.ShouldInjectSidecar(pod) {
+			if err := sidecarProxy.InjectSidecar(pod); err != nil {
+				log.Printf("Warning: Failed to inject AWS proxy sidecar: %v", err)
 			}
 		}
 	}
