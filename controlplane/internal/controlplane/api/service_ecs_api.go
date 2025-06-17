@@ -239,6 +239,14 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		return nil, fmt.Errorf("failed to create kubernetes deployment: %w", err)
 	}
 
+	// Handle Service Discovery registration if ServiceRegistries are specified
+	if req.ServiceRegistries != nil && len(req.ServiceRegistries) > 0 {
+		if err := api.registerServiceWithDiscovery(ctx, storageService, req.ServiceRegistries); err != nil {
+			// Log error but don't fail service creation
+			log.Printf("Warning: Failed to register service with service discovery: %v", err)
+		}
+	}
+
 	// Convert storage service to API response
 	responseService := storageServiceToGeneratedService(storageService)
 
@@ -1217,4 +1225,56 @@ func storageServiceToGeneratedService(storageService *storage.Service) *generate
 	service.Deployments = []generated.Deployment{deployment}
 
 	return service
+}
+
+// registerServiceWithDiscovery registers the service with service discovery
+func (api *DefaultECSAPI) registerServiceWithDiscovery(ctx context.Context, service *storage.Service, serviceRegistries []generated.ServiceRegistry) error {
+	// Check if service discovery manager is available
+	if api.serviceDiscoveryManager == nil {
+		return fmt.Errorf("service discovery not configured")
+	}
+
+	// For each service registry
+	for _, registry := range serviceRegistries {
+		if registry.RegistryArn == nil {
+			continue
+		}
+
+		// Parse the registry ARN to extract service ID
+		// Format: arn:aws:servicediscovery:region:account-id:service/srv-xxxxx
+		arnParts := strings.Split(*registry.RegistryArn, ":")
+		if len(arnParts) < 6 {
+			log.Printf("Invalid service registry ARN: %s", *registry.RegistryArn)
+			continue
+		}
+
+		resourceParts := strings.Split(arnParts[5], "/")
+		if len(resourceParts) < 2 || resourceParts[0] != "service" {
+			log.Printf("Invalid service registry resource: %s", arnParts[5])
+			continue
+		}
+
+		serviceID := resourceParts[1]
+
+		// Register service instances (tasks will register themselves when they start)
+		// For now, we'll just log the registration intent
+		log.Printf("Service %s registered with service discovery service %s", service.ServiceName, serviceID)
+		
+		// Store the service registry information in service metadata
+		// This will be used by tasks when they start
+		if service.ServiceRegistryMetadata == nil {
+			service.ServiceRegistryMetadata = make(map[string]string)
+		}
+		
+		service.ServiceRegistryMetadata[serviceID] = fmt.Sprintf("{\"containerName\":\"%s\",\"containerPort\":%d}", 
+			ptr.ToString(registry.ContainerName, ""), 
+			ptr.ToInt32(registry.ContainerPort, 0))
+	}
+
+	// Update service in storage with registry metadata
+	if err := api.storage.ServiceStore().Update(ctx, service); err != nil {
+		return fmt.Errorf("failed to update service with registry metadata: %w", err)
+	}
+
+	return nil
 }

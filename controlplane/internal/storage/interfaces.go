@@ -341,6 +341,9 @@ type Service struct {
 	DeploymentName string `json:"deploymentName,omitempty"`
 	Namespace      string `json:"namespace,omitempty"`
 
+	// Service registry metadata for service discovery
+	ServiceRegistryMetadata map[string]string `json:"serviceRegistryMetadata,omitempty"`
+
 	// Timestamps
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`

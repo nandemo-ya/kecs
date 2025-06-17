@@ -17,6 +17,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/ssm"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	k8s "k8s.io/client-go/kubernetes"
 )
@@ -43,6 +44,7 @@ type Server struct {
 	ssmIntegration          ssm.Integration
 	secretsManagerIntegration secretsmanager.Integration
 	s3Integration           s3.Integration
+	serviceDiscoveryAPI     *ServiceDiscoveryAPI
 }
 
 // NewServer creates a new API server instance
@@ -258,6 +260,27 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		if s.s3Integration != nil {
 			defaultAPI.SetS3Integration(s.s3Integration)
 		}
+		
+		// Initialize Service Discovery if we have kubernetes client
+		if localStackConfig != nil && localStackConfig.Enabled {
+			var kubeClient k8s.Interface
+			if s.taskManager != nil {
+				kubeConfig, err := kubernetes.GetKubeConfig()
+				if err == nil {
+					kubeClient, _ = k8s.NewForConfig(kubeConfig)
+				}
+			}
+			
+			if kubeClient != nil {
+				serviceDiscoveryManager := servicediscovery.NewManager(kubeClient, "us-east-1", "123456789012")
+				defaultAPI.SetServiceDiscoveryManager(serviceDiscoveryManager)
+				
+				// Create Service Discovery API handler
+				s.serviceDiscoveryAPI = NewServiceDiscoveryAPI(serviceDiscoveryManager, "us-east-1", "123456789012")
+				
+				log.Println("Service Discovery integration initialized successfully")
+			}
+		}
 	}
 	s.ecsAPI = ecsAPI
 
@@ -341,7 +364,16 @@ func (s *Server) setupRoutes() http.Handler {
 	mux := http.NewServeMux()
 
 	// AWS ECS API endpoint (AWS CLI format)
-	mux.HandleFunc("/", generated.HandleECSRequest(s.ecsAPI))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Check if it's a Service Discovery request
+		target := r.Header.Get("X-Amz-Target")
+		if target != "" && strings.Contains(target, "ServiceDiscovery") && s.serviceDiscoveryAPI != nil {
+			s.serviceDiscoveryAPI.HandleServiceDiscoveryRequest(w, r)
+			return
+		}
+		// Otherwise handle as ECS request
+		generated.HandleECSRequest(s.ecsAPI)(w, r)
+	})
 
 	// Health check endpoint
 	mux.HandleFunc("/health", s.handleHealthCheck)
