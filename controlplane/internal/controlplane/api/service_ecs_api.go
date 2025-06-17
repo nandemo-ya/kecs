@@ -1266,9 +1266,16 @@ func (api *DefaultECSAPI) registerServiceWithDiscovery(ctx context.Context, serv
 			service.ServiceRegistryMetadata = make(map[string]string)
 		}
 		
+		containerName := ""
+		if registry.ContainerName != nil {
+			containerName = *registry.ContainerName
+		}
+		containerPort := int32(0)
+		if registry.ContainerPort != nil {
+			containerPort = *registry.ContainerPort
+		}
 		service.ServiceRegistryMetadata[serviceID] = fmt.Sprintf("{\"containerName\":\"%s\",\"containerPort\":%d}", 
-			ptr.ToString(registry.ContainerName, ""), 
-			ptr.ToInt32(registry.ContainerPort, 0))
+			containerName, containerPort)
 	}
 
 	// Update service in storage with registry metadata

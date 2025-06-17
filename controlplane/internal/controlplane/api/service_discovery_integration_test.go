@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -14,9 +15,9 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
-	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage/inmemory"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 )
 
 var _ = Describe("Service Discovery Integration", func() {
@@ -24,12 +25,22 @@ var _ = Describe("Service Discovery Integration", func() {
 		server              *httptest.Server
 		serviceDiscoveryMgr servicediscovery.Manager
 		ecsAPI             *api.DefaultECSAPI
-		storage            *inmemory.Storage
+		store              storage.Storage
 	)
 
 	BeforeEach(func() {
+		// Set test mode environment variable
+		os.Setenv("KECS_TEST_MODE", "true")
+		
 		// Create storage
-		storage = inmemory.NewStorage()
+		var err error
+		store, err = duckdb.NewDuckDBStorage(":memory:")
+		Expect(err).NotTo(HaveOccurred())
+		
+		// Initialize the database schema
+		ctx := context.Background()
+		err = store.Initialize(ctx)
+		Expect(err).NotTo(HaveOccurred())
 
 		// Create fake Kubernetes client
 		fakeClient := fake.NewSimpleClientset()
@@ -38,8 +49,8 @@ var _ = Describe("Service Discovery Integration", func() {
 		serviceDiscoveryMgr = servicediscovery.NewManager(fakeClient, "us-east-1", "123456789012")
 
 		// Create ECS API with service discovery
-		kindManager := &kubernetes.KindManager{}
-		ecsAPI = api.NewDefaultECSAPIWithConfig(storage, kindManager, "us-east-1", "123456789012").(*api.DefaultECSAPI)
+		// Use nil KindManager for test mode
+		ecsAPI = api.NewDefaultECSAPIWithConfig(store, nil, "us-east-1", "123456789012").(*api.DefaultECSAPI)
 		ecsAPI.SetServiceDiscoveryManager(serviceDiscoveryMgr)
 
 		// Create test server
@@ -76,8 +87,20 @@ var _ = Describe("Service Discovery Integration", func() {
 			resp := makeRequest(server.URL, "ServiceDiscovery.CreatePrivateDnsNamespace", body)
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-			// For testing, we'll use a fixed namespace ID
-			namespaceID = "ns-test123"
+			// Get namespace ID by listing namespaces and finding the one we just created
+			namespaces, err := serviceDiscoveryMgr.ListNamespaces(context.Background())
+			Expect(err).NotTo(HaveOccurred())
+			
+			// Find the namespace with name "test.local"
+			var foundNamespace *servicediscovery.Namespace
+			for _, ns := range namespaces {
+				if ns.Name == "test.local" {
+					foundNamespace = ns
+					break
+				}
+			}
+			Expect(foundNamespace).NotTo(BeNil())
+			namespaceID = foundNamespace.ID
 
 			// Create a service discovery service
 			sdReq := api.CreateServiceDiscoveryServiceRequest{
