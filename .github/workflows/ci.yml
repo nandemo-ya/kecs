@@ -18,6 +18,8 @@ jobs:
     defaults:
       run:
         working-directory: ./controlplane
+    env:
+      KECS_TEST_MODE: "true"
     steps:
       - uses: actions/checkout@v4
         with:

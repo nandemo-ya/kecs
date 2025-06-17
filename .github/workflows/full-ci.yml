@@ -22,6 +22,8 @@ jobs:
       
       - name: Run Go tests
         working-directory: ./controlplane
+        env:
+          KECS_TEST_MODE: "true"
         run: |
           echo "Running Go tests..."
           go test -v -race ./...
