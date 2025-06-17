@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
@@ -81,6 +82,12 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 
 	// Create task converter with CloudWatch integration
 	taskConverter := converters.NewTaskConverterWithCloudWatch(api.region, api.accountID, api.cloudWatchIntegration)
+	
+	// Set artifact manager if S3 integration is available
+	if api.s3Integration != nil {
+		artifactManager := artifacts.NewManager(api.s3Integration)
+		taskConverter.SetArtifactManager(artifactManager)
+	}
 
 	// Marshal the request for the converter
 	reqJSON, err := json.Marshal(req)

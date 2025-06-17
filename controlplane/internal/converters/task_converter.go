@@ -1804,7 +1804,7 @@ func (c *TaskConverter) createArtifactInitContainers(containerDefs []types.Conta
 		// Create init container for downloading artifacts
 		initContainer := corev1.Container{
 			Name:  fmt.Sprintf("artifact-downloader-%s", *def.Name),
-			Image: "busybox:latest", // In production, use a custom artifact downloader image
+			Image: "amazon/aws-cli:latest", // Use AWS CLI image for S3 support
 			Command: []string{"/bin/sh", "-c"},
 			Args: []string{c.generateArtifactDownloadScript(def.Artifacts)},
 			VolumeMounts: []corev1.VolumeMount{
@@ -1840,14 +1840,11 @@ func (c *TaskConverter) generateArtifactDownloadScript(artifacts []types.Artifac
 
 		// Download based on URL type
 		if strings.HasPrefix(url, "s3://") {
-			// For S3, we would use AWS CLI in a real implementation
-			// For now, use a placeholder that shows the intent
-			commands = append(commands, fmt.Sprintf("echo 'Downloading %s to %s'", url, targetPath))
-			commands = append(commands, fmt.Sprintf("echo 'S3 download would happen here with AWS CLI'"))
-			// In production: aws s3 cp ${url} ${targetPath}
+			// Use AWS CLI to download from S3
+			commands = append(commands, fmt.Sprintf("aws s3 cp %s %s", url, targetPath))
 		} else if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
-			// Use wget for HTTP/HTTPS
-			commands = append(commands, fmt.Sprintf("wget -q -O %s %s", targetPath, url))
+			// Use curl for HTTP/HTTPS (available in aws-cli image)
+			commands = append(commands, fmt.Sprintf("curl -s -L -o %s %s", targetPath, url))
 		}
 
 		// Set permissions if specified
@@ -1864,8 +1861,7 @@ func (c *TaskConverter) generateArtifactDownloadScript(artifacts []types.Artifac
 func (c *TaskConverter) getArtifactEnvironment() []corev1.EnvVar {
 	var env []corev1.EnvVar
 
-	// If using LocalStack, set AWS endpoint
-	// This would be configured based on the proxy mode
+	// Basic AWS credentials
 	env = append(env, corev1.EnvVar{
 		Name:  "AWS_ACCESS_KEY_ID",
 		Value: "test",
@@ -1878,6 +1874,22 @@ func (c *TaskConverter) getArtifactEnvironment() []corev1.EnvVar {
 		Name:  "AWS_DEFAULT_REGION",
 		Value: c.region,
 	})
+
+	// Add LocalStack S3 endpoint if available
+	// In proxy mode, use http://localstack-proxy.default.svc.cluster.local:4566
+	// Otherwise, use direct LocalStack endpoint
+	if c.artifactManager != nil {
+		// Add S3 endpoint for LocalStack
+		env = append(env, corev1.EnvVar{
+			Name:  "AWS_ENDPOINT_URL_S3",
+			Value: "http://localstack-proxy.default.svc.cluster.local:4566",
+		})
+		// For aws-cli v1 compatibility
+		env = append(env, corev1.EnvVar{
+			Name:  "S3_ENDPOINT_URL",
+			Value: "http://localstack-proxy.default.svc.cluster.local:4566",
+		})
+	}
 
 	return env
 }
