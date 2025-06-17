@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,6 +29,9 @@ var _ = Describe("LocalStack Dashboard Integration", func() {
 	)
 
 	BeforeEach(func() {
+		// Set test mode to avoid Kubernetes initialization
+		os.Setenv("KECS_TEST_MODE", "true")
+		
 		mockStore = mocks.NewMockStorage()
 		mockServiceStore = mocks.NewMockServiceStore()
 		mockStore.SetServiceStore(mockServiceStore)
@@ -55,29 +59,33 @@ var _ = Describe("LocalStack Dashboard Integration", func() {
 		cancel()
 		testServer.Close()
 		time.Sleep(100 * time.Millisecond) // Allow cleanup
+		
+		// Clean up environment variable
+		os.Unsetenv("KECS_TEST_MODE")
 	})
 
 	Describe("LocalStack Dashboard API", func() {
 		It("should return dashboard data", func() {
-			// Setup test data
-			testService := &storage.Service{
-				ServiceName:       "my-service",
-				ClusterARN:        "arn:aws:ecs:us-east-1:123456789012:cluster/test",
-				TaskDefinitionARN: "arn:aws:ecs:us-east-1:123456789012:task-definition/my-task:1",
-			}
-			err := mockServiceStore.Create(ctx, testService)
-			Expect(err).NotTo(HaveOccurred())
-
 			// Setup task definition store with test data
 			mockTaskDefStore := mocks.NewMockTaskDefinitionStore()
 			taskDef := &storage.TaskDefinition{
 				Family:   "my-task",
 				Revision: 1,
+				ARN:      "arn:aws:ecs:us-east-1:123456789012:task-definition/my-task:1",
 				ContainerDefinitions: `[{"name":"app","image":"nginx:latest","environment":[{"name":"AWS_REGION","value":"us-east-1"}]}]`,
 			}
-			_, err = mockTaskDefStore.Register(ctx, taskDef)
+			_, err := mockTaskDefStore.Register(ctx, taskDef)
 			Expect(err).NotTo(HaveOccurred())
 			mockStore.SetTaskDefinitionStore(mockTaskDefStore)
+
+			// Setup test service
+			testService := &storage.Service{
+				ServiceName:       "my-service",
+				ClusterARN:        "arn:aws:ecs:us-east-1:123456789012:cluster/test",
+				TaskDefinitionARN: "arn:aws:ecs:us-east-1:123456789012:task-definition/my-task:1",
+			}
+			err = mockServiceStore.Create(ctx, testService)
+			Expect(err).NotTo(HaveOccurred())
 
 			// Get dashboard data
 			resp, err := http.Get(baseURL + "/localstack/dashboard")
@@ -162,6 +170,29 @@ var _ = Describe("LocalStack Dashboard Integration", func() {
 		})
 
 		It("should discover LocalStack services from task definitions", func() {
+			// Setup task definitions
+			mockTaskDefStore := mocks.NewMockTaskDefinitionStore()
+			taskDefs := []*storage.TaskDefinition{
+				{
+					Family:   "api-task",
+					Revision: 1,
+					ARN:      "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:1",
+					ContainerDefinitions: `[{"name":"api","image":"myapp:latest","environment":[{"name":"AWS_REGION","value":"us-east-1"},{"name":"S3_BUCKET","value":"my-bucket"},{"name":"DYNAMODB_TABLE","value":"my-table"}]}]`,
+				},
+				{
+					Family:   "worker-task",
+					Revision: 1,
+					ARN:      "arn:aws:ecs:us-east-1:123456789012:task-definition/worker-task:1",
+					ContainerDefinitions: `[{"name":"worker","image":"worker:latest","environment":[{"name":"AWS_REGION","value":"us-east-1"},{"name":"SQS_QUEUE","value":"my-queue"},{"name":"SNS_TOPIC","value":"my-topic"}]}]`,
+				},
+			}
+
+			for _, td := range taskDefs {
+				_, err := mockTaskDefStore.Register(ctx, td)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			mockStore.SetTaskDefinitionStore(mockTaskDefStore)
+
 			// Setup test services
 			services := []*storage.Service{
 				{
@@ -180,27 +211,6 @@ var _ = Describe("LocalStack Dashboard Integration", func() {
 				err := mockServiceStore.Create(ctx, svc)
 				Expect(err).NotTo(HaveOccurred())
 			}
-
-			// Setup task definitions
-			mockTaskDefStore := mocks.NewMockTaskDefinitionStore()
-			taskDefs := []*storage.TaskDefinition{
-				{
-					Family:   "api-task",
-					Revision: 1,
-					ContainerDefinitions: `[{"name":"api","image":"myapp:latest","environment":[{"name":"AWS_REGION","value":"us-east-1"},{"name":"S3_BUCKET","value":"my-bucket"},{"name":"DYNAMODB_TABLE","value":"my-table"}]}]`,
-				},
-				{
-					Family:   "worker-task",
-					Revision: 1,
-					ContainerDefinitions: `[{"name":"worker","image":"worker:latest","environment":[{"name":"AWS_REGION","value":"us-east-1"},{"name":"SQS_QUEUE","value":"my-queue"},{"name":"SNS_TOPIC","value":"my-topic"}]}]`,
-				},
-			}
-
-			for _, td := range taskDefs {
-				_, err := mockTaskDefStore.Register(ctx, td)
-				Expect(err).NotTo(HaveOccurred())
-			}
-			mockStore.SetTaskDefinitionStore(mockTaskDefStore)
 
 			// Get dashboard
 			resp, err := http.Get(baseURL + "/localstack/dashboard")
