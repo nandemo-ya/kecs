@@ -28,6 +28,7 @@ type TaskConverter struct {
 	cloudWatchIntegration cloudwatch.Integration
 	artifactManager       *artifacts.Manager
 	proxyManager          *proxy.Manager
+	networkConverter      *NetworkConverter
 }
 
 // SecretInfo holds parsed information from a secret ARN
@@ -51,6 +52,7 @@ func NewTaskConverterWithCloudWatch(region, accountID string, cwIntegration clou
 		region:                region,
 		accountID:             accountID,
 		cloudWatchIntegration: cwIntegration,
+		networkConverter:      NewNetworkConverter(region, accountID),
 	}
 }
 
@@ -71,8 +73,31 @@ func (c *TaskConverter) ConvertTaskToPod(
 	cluster *storage.Cluster,
 	taskID string,
 ) (*corev1.Pod, error) {
-	// Parse the request JSON
-	var runTaskReq types.RunTaskRequest
+	// Import the generated types to properly handle network configuration
+	var runTaskReq struct {
+		Cluster                  *string `json:"cluster,omitempty"`
+		TaskDefinition           *string `json:"taskDefinition"`
+		Count                    *int    `json:"count,omitempty"`
+		Group                    *string `json:"group,omitempty"`
+		StartedBy                *string `json:"startedBy,omitempty"`
+		LaunchType               *string `json:"launchType,omitempty"`
+		NetworkConfiguration     *struct {
+			AwsvpcConfiguration *struct {
+				Subnets        []string `json:"subnets"`
+				SecurityGroups []string `json:"securityGroups,omitempty"`
+				AssignPublicIp *string  `json:"assignPublicIp,omitempty"`
+			} `json:"awsvpcConfiguration,omitempty"`
+		} `json:"networkConfiguration,omitempty"`
+		PlacementConstraints []types.PlacementConstraint `json:"placementConstraints,omitempty"`
+		PlacementStrategy    []types.PlacementStrategy   `json:"placementStrategy,omitempty"`
+		PlatformVersion      *string                     `json:"platformVersion,omitempty"`
+		EnableECSManagedTags *bool                       `json:"enableECSManagedTags,omitempty"`
+		PropagateTags        *string                     `json:"propagateTags,omitempty"`
+		ReferenceId          *string                     `json:"referenceId,omitempty"`
+		Tags                 []types.Tag                 `json:"tags,omitempty"`
+		EnableExecuteCommand *bool                       `json:"enableExecuteCommand,omitempty"`
+		Overrides            *types.TaskOverride         `json:"overrides,omitempty"`
+	}
 	if err := json.Unmarshal(runTaskReqJSON, &runTaskReq); err != nil {
 		return nil, fmt.Errorf("failed to parse RunTask request: %w", err)
 	}
@@ -100,7 +125,7 @@ func (c *TaskConverter) ConvertTaskToPod(
 				"kecs.dev/task-id":       taskID,
 				"kecs.dev/task-family":   taskDef.Family,
 				"kecs.dev/task-revision": fmt.Sprintf("%d", taskDef.Revision),
-				"kecs.dev/launch-type":   c.getLaunchType(&runTaskReq),
+				"kecs.dev/launch-type":   c.getLaunchTypeFromRequest(runTaskReq.LaunchType),
 				"kecs.dev/managed-by":    "kecs",
 			},
 			Annotations: map[string]string{
@@ -110,7 +135,7 @@ func (c *TaskConverter) ConvertTaskToPod(
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyNever, // ECS tasks don't restart by default
-			Containers:    c.convertContainers(containerDefs, taskDef, &runTaskReq),
+			Containers:    c.convertContainersWithOverrides(containerDefs, taskDef, runTaskReq.Overrides),
 			Volumes:       c.convertVolumes(volumes),
 		},
 	}
@@ -125,8 +150,32 @@ func (c *TaskConverter) ConvertTaskToPod(
 	}
 
 	// Apply network mode
-	if taskDef.NetworkMode == "host" {
+	networkMode := types.GetNetworkMode(&taskDef.NetworkMode)
+	if networkMode == types.NetworkModeHost {
 		pod.Spec.HostNetwork = true
+	}
+
+	// Add network configuration annotations
+	if runTaskReq.NetworkConfiguration != nil && c.networkConverter != nil {
+		// Add network mode annotation
+		pod.Annotations["ecs.amazonaws.com/network-mode"] = string(networkMode)
+
+		// Add awsvpc configuration if present
+		if runTaskReq.NetworkConfiguration.AwsvpcConfiguration != nil {
+			awsvpc := runTaskReq.NetworkConfiguration.AwsvpcConfiguration
+			if len(awsvpc.Subnets) > 0 {
+				pod.Annotations["ecs.amazonaws.com/subnets"] = strings.Join(awsvpc.Subnets, ",")
+			}
+			if len(awsvpc.SecurityGroups) > 0 {
+				pod.Annotations["ecs.amazonaws.com/security-groups"] = strings.Join(awsvpc.SecurityGroups, ",")
+			}
+			if awsvpc.AssignPublicIp != nil {
+				pod.Annotations["ecs.amazonaws.com/assign-public-ip"] = *awsvpc.AssignPublicIp
+			}
+		}
+	} else {
+		// Just add the network mode from task definition
+		pod.Annotations["ecs.amazonaws.com/network-mode"] = string(networkMode)
 	}
 
 	// Apply PID mode
@@ -458,6 +507,19 @@ func (c *TaskConverter) convertPortMappings(mappings []types.PortMapping) []core
 	return ports
 }
 
+// convertContainersWithOverrides converts ECS container definitions to Kubernetes containers with overrides
+func (c *TaskConverter) convertContainersWithOverrides(
+	containerDefs []types.ContainerDefinition,
+	taskDef *storage.TaskDefinition,
+	overrides *types.TaskOverride,
+) []corev1.Container {
+	// Create a minimal RunTaskRequest with just the overrides
+	runTaskReq := &types.RunTaskRequest{
+		Overrides: overrides,
+	}
+	return c.convertContainers(containerDefs, taskDef, runTaskReq)
+}
+
 // convertVolumes converts ECS volumes to Kubernetes volumes
 func (c *TaskConverter) convertVolumes(volumes []types.Volume) []corev1.Volume {
 	k8sVolumes := make([]corev1.Volume, 0, len(volumes))
@@ -595,6 +657,14 @@ func (c *TaskConverter) getLaunchType(req *types.RunTaskRequest) string {
 	}
 	if req.CapacityProviderStrategy != nil && len(req.CapacityProviderStrategy) > 0 {
 		return "CAPACITY_PROVIDER"
+	}
+	return "EC2"
+}
+
+// getLaunchTypeFromRequest determines the launch type from a string pointer
+func (c *TaskConverter) getLaunchTypeFromRequest(launchType *string) string {
+	if launchType != nil {
+		return *launchType
 	}
 	return "EC2"
 }

@@ -151,10 +151,11 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		DesiredCount: int(desiredCount),
 		LaunchType:   string(launchType),
 	}
-	deployment, kubeService, err := serviceConverter.ConvertServiceToDeployment(
+	deployment, kubeService, err := serviceConverter.ConvertServiceToDeploymentWithNetworkConfig(
 		storageServiceTemp,
 		taskDef,
 		cluster,
+		req.NetworkConfiguration,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert service to deployment: %w", err)
