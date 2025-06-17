@@ -103,6 +103,20 @@ docker-push: docker-build
 	$(DOCKER) push $(DOCKER_IMAGE):$(VERSION)
 	$(DOCKER) push $(DOCKER_IMAGE):latest
 
+# Build AWS Proxy Docker image
+.PHONY: docker-build-awsproxy
+docker-build-awsproxy:
+	@echo "Building AWS Proxy Docker image..."
+	$(DOCKER) build -t $(DOCKER_REGISTRY)/aws-proxy:$(VERSION) -f $(CONTROLPLANE_DIR)/awsproxy/Dockerfile $(CONTROLPLANE_DIR)
+	$(DOCKER) tag $(DOCKER_REGISTRY)/aws-proxy:$(VERSION) $(DOCKER_REGISTRY)/aws-proxy:latest
+
+# Push AWS Proxy Docker image
+.PHONY: docker-push-awsproxy
+docker-push-awsproxy: docker-build-awsproxy
+	@echo "Pushing AWS Proxy Docker image..."
+	$(DOCKER) push $(DOCKER_REGISTRY)/aws-proxy:$(VERSION)
+	$(DOCKER) push $(DOCKER_REGISTRY)/aws-proxy:latest
+
 # Generate API code from Smithy models
 .PHONY: gen-api
 gen-api:
@@ -126,6 +140,8 @@ help:
 	@echo "  deps           - Install dependencies"
 	@echo "  docker-build   - Build Docker image"
 	@echo "  docker-push    - Push Docker image"
+	@echo "  docker-build-awsproxy - Build AWS Proxy Docker image"
+	@echo "  docker-push-awsproxy  - Push AWS Proxy Docker image"
 	@echo "  gen-api        - Generate API code from Smithy models"
 	@echo "  build-webui    - Build Web UI"
 	@echo "  build-with-ui  - Build with embedded Web UI"

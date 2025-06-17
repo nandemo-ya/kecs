@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"k8s.io/client-go/kubernetes"
@@ -16,6 +17,7 @@ type Manager struct {
 	localStackEndpoint string
 	kubeClient         kubernetes.Interface
 	envProxy           *EnvironmentVariableProxy
+	sidecarProxy       *SidecarProxy
 	webhookServer      *WebhookServer
 }
 
@@ -90,8 +92,20 @@ func (m *Manager) startEnvironmentMode(ctx context.Context) error {
 // startSidecarMode starts the sidecar proxy mode
 func (m *Manager) startSidecarMode(ctx context.Context) error {
 	klog.Info("Starting sidecar proxy mode")
-	// TODO: Implement sidecar mode
-	return fmt.Errorf("sidecar mode not yet implemented")
+	
+	// Create sidecar proxy
+	sidecarProxy := NewSidecarProxy(m.localStackEndpoint)
+	
+	// Set custom proxy image if configured
+	if proxyImage := os.Getenv("KECS_AWS_PROXY_IMAGE"); proxyImage != "" {
+		sidecarProxy.SetProxyImage(proxyImage)
+	}
+	
+	// Store reference for later use
+	m.sidecarProxy = sidecarProxy
+	
+	klog.Info("Sidecar proxy mode initialized successfully")
+	return nil
 }
 
 // GetMode returns the current proxy mode
@@ -106,4 +120,13 @@ func (m *Manager) UpdateEndpoint(endpoint string) {
 	if m.envProxy != nil {
 		m.envProxy.UpdateEndpoint(endpoint)
 	}
+	
+	if m.sidecarProxy != nil {
+		m.sidecarProxy.UpdateEndpoint(endpoint)
+	}
+}
+
+// GetSidecarProxy returns the sidecar proxy if available
+func (m *Manager) GetSidecarProxy() *SidecarProxy {
+	return m.sidecarProxy
 }
