@@ -6,6 +6,7 @@ import (
 	"log"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -16,7 +17,6 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
-	"github.com/nandemo-ya/kecs/controlplane/internal/proxy"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
@@ -27,7 +27,6 @@ type TaskConverter struct {
 	accountID             string
 	cloudWatchIntegration cloudwatch.Integration
 	artifactManager       *artifacts.Manager
-	proxyManager          *proxy.Manager
 }
 
 // SecretInfo holds parsed information from a secret ARN
@@ -59,10 +58,6 @@ func (c *TaskConverter) SetArtifactManager(am *artifacts.Manager) {
 	c.artifactManager = am
 }
 
-// SetProxyManager sets the proxy manager for the task converter
-func (c *TaskConverter) SetProxyManager(pm *proxy.Manager) {
-	c.proxyManager = pm
-}
 
 // ConvertTaskToPod converts an ECS task definition and RunTask request to a Kubernetes Pod
 func (c *TaskConverter) ConvertTaskToPod(
@@ -225,15 +220,8 @@ func (c *TaskConverter) ConvertTaskToPod(
 		}
 	}
 
-	// Add AWS proxy sidecar if proxy manager is available
-	if c.proxyManager != nil && c.proxyManager.GetSidecarProxy() != nil {
-		sidecarProxy := c.proxyManager.GetSidecarProxy()
-		if sidecarProxy.ShouldInjectSidecar(pod) {
-			if err := sidecarProxy.InjectSidecar(pod); err != nil {
-				log.Printf("Warning: Failed to inject AWS proxy sidecar: %v", err)
-			}
-		}
-	}
+	// Add LocalStack sidecar injection annotation if needed
+	c.addLocalStackSidecarAnnotation(pod, containerDefs, &runTaskReq)
 
 	return pod, nil
 }
@@ -1909,4 +1897,121 @@ func (c *TaskConverter) getArtifactEnvironment() []corev1.EnvVar {
 	}
 
 	return env
+}
+
+// addLocalStackSidecarAnnotation adds annotation for LocalStack sidecar injection
+func (c *TaskConverter) addLocalStackSidecarAnnotation(pod *corev1.Pod, containerDefs []types.ContainerDefinition, runTaskReq *types.RunTaskRequest) {
+	// Check if any container uses AWS services
+	hasAWSUsage := false
+	
+	// Check environment variables for AWS usage
+	for _, containerDef := range containerDefs {
+		if containerDef.Environment != nil {
+			for _, env := range containerDef.Environment {
+				if env.Name != nil && strings.HasPrefix(*env.Name, "AWS_") {
+					hasAWSUsage = true
+					break
+				}
+			}
+		}
+		
+		// Check if container has secrets (implies AWS service usage)
+		if containerDef.Secrets != nil && len(containerDef.Secrets) > 0 {
+			hasAWSUsage = true
+		}
+		
+		// Check if container has artifacts (implies S3 usage)
+		if containerDef.Artifacts != nil && len(containerDef.Artifacts) > 0 {
+			hasAWSUsage = true
+		}
+		
+		// Check log configuration for CloudWatch
+		if containerDef.LogConfiguration != nil && containerDef.LogConfiguration.LogDriver != nil && *containerDef.LogConfiguration.LogDriver == "awslogs" {
+			hasAWSUsage = true
+		}
+		
+		if hasAWSUsage {
+			break
+		}
+	}
+	
+	// Check task overrides for sidecar injection preference
+	if runTaskReq.Overrides != nil && runTaskReq.Overrides.InferenceAcceleratorOverrides != nil {
+		// If overrides specify accelerators, it might need AWS services
+		hasAWSUsage = true
+	}
+	
+	// If AWS usage is detected, add sidecar injection annotation
+	if hasAWSUsage {
+		pod.Annotations["kecs.io/inject-aws-proxy"] = "true"
+		
+		// Optionally specify which services to proxy based on detected usage
+		services := c.detectRequiredServices(containerDefs)
+		if len(services) > 0 {
+			pod.Annotations["kecs.io/proxy-services"] = strings.Join(services, ",")
+		}
+	}
+}
+
+// detectRequiredServices detects which AWS services are needed based on container definitions
+func (c *TaskConverter) detectRequiredServices(containerDefs []types.ContainerDefinition) []string {
+	servicesMap := make(map[string]bool)
+	
+	for _, containerDef := range containerDefs {
+		// Check for secrets usage
+		if containerDef.Secrets != nil && len(containerDef.Secrets) > 0 {
+			for _, secret := range containerDef.Secrets {
+				if secret.ValueFrom != nil {
+					if strings.Contains(*secret.ValueFrom, "secretsmanager") {
+						servicesMap["secretsmanager"] = true
+					} else if strings.Contains(*secret.ValueFrom, "ssm") {
+						servicesMap["ssm"] = true
+					}
+				}
+			}
+		}
+		
+		// Check for S3 usage in artifacts
+		if containerDef.Artifacts != nil && len(containerDef.Artifacts) > 0 {
+			servicesMap["s3"] = true
+		}
+		
+		// Check for CloudWatch logs
+		if containerDef.LogConfiguration != nil && containerDef.LogConfiguration.LogDriver != nil && *containerDef.LogConfiguration.LogDriver == "awslogs" {
+			servicesMap["cloudwatch"] = true
+			servicesMap["logs"] = true
+		}
+		
+		// Check environment variables for service hints
+		if containerDef.Environment != nil {
+			for _, env := range containerDef.Environment {
+				if env.Name != nil && env.Value != nil {
+					envName := strings.ToUpper(*env.Name)
+					if strings.Contains(envName, "DYNAMODB") || strings.Contains(envName, "DDB") {
+						servicesMap["dynamodb"] = true
+					}
+					if strings.Contains(envName, "SQS") || strings.Contains(envName, "QUEUE") {
+						servicesMap["sqs"] = true
+					}
+					if strings.Contains(envName, "SNS") || strings.Contains(envName, "TOPIC") {
+						servicesMap["sns"] = true
+					}
+					if strings.Contains(envName, "S3") || strings.Contains(envName, "BUCKET") {
+						servicesMap["s3"] = true
+					}
+				}
+			}
+		}
+	}
+	
+	// Convert map to slice
+	var services []string
+	for service := range servicesMap {
+		services = append(services, service)
+	}
+	
+	// Sort for consistent ordering
+	sort.Strings(services)
+	
+	return services
 }
