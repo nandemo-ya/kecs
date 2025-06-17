@@ -13,8 +13,10 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // RunTask implements the RunTask operation
@@ -158,6 +160,19 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 					// Log warning but don't fail the task creation
 					// This allows tasks to proceed even if parameter sync fails
 					log.Printf("Warning: Failed to sync SSM parameters for task %s: %v", taskID, err)
+				}
+			}
+		}
+		
+		// Sync Secrets Manager secrets if integration is available
+		if api.secretsManagerIntegration != nil {
+			// Extract Secrets Manager secrets from task definition
+			secretsManagerARNs := extractSecretsManagerSecrets(taskDef)
+			if len(secretsManagerARNs) > 0 {
+				namespace := getNamespaceFromCluster(cluster)
+				if err := api.secretsManagerIntegration.SyncSecrets(ctx, secretsManagerARNs, namespace); err != nil {
+					// Log warning but don't fail the task creation
+					log.Printf("Warning: Failed to sync Secrets Manager secrets for task %s: %v", taskID, err)
 				}
 			}
 		}
@@ -554,8 +569,49 @@ func parseRevision(revisionStr string) (int, error) {
 
 // Helper function to extract secrets from pod (placeholder - actual implementation would analyze pod spec)
 func extractSecretsFromPod(pod interface{}) map[string]*converters.SecretInfo {
-	// TODO: Extract secrets from pod spec if needed
-	return make(map[string]*converters.SecretInfo)
+	// Extract secrets from pod spec
+	result := make(map[string]*converters.SecretInfo)
+	
+	// Type assert to *corev1.Pod
+	p, ok := pod.(*corev1.Pod)
+	if !ok {
+		return result
+	}
+	
+	// Check annotations for secret ARNs
+	for _, container := range p.Spec.Containers {
+		for _, env := range container.Env {
+			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
+				// Check if this is a KECS-managed secret by looking at annotations
+				secretName := env.ValueFrom.SecretKeyRef.Name
+				if strings.HasPrefix(secretName, "kecs-secret-") || strings.HasPrefix(secretName, "ssm-") || strings.HasPrefix(secretName, "sm-") {
+					// Extract ARN from pod annotations if available
+					for annKey, annValue := range p.Annotations {
+						if strings.Contains(annKey, "secret-arn") && strings.Contains(annValue, env.Name) {
+							// Parse the ARN to determine source
+							var source string
+							if strings.Contains(annValue, ":secretsmanager:") {
+								source = "secretsmanager"
+							} else if strings.Contains(annValue, ":ssm:") {
+								source = "ssm"
+							}
+							
+							if source != "" {
+								result[annValue] = &converters.SecretInfo{
+									SecretName: secretName,
+									Key:        env.ValueFrom.SecretKeyRef.Key,
+									Source:     source,
+								}
+							}
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	return result
 }
 
 // Helper function to extract SSM parameters from task definition
@@ -591,6 +647,63 @@ func extractSSMParameters(taskDef *storage.TaskDefinition) []string {
 	}
 	
 	return ssmParams
+}
+
+// Helper function to extract Secrets Manager secrets from task definition
+func extractSecretsManagerSecrets(taskDef *storage.TaskDefinition) []secretsmanager.SecretReference {
+	var secretRefs []secretsmanager.SecretReference
+	
+	// Parse container definitions
+	var containerDefs []types.ContainerDefinition
+	if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
+		return secretRefs
+	}
+	
+	// Extract Secrets Manager ARNs from each container's secrets
+	for _, container := range containerDefs {
+		if container.Secrets != nil {
+			for _, secret := range container.Secrets {
+				if secret.ValueFrom != nil && strings.Contains(*secret.ValueFrom, ":secretsmanager:") {
+					// Parse the ARN to extract secret name and JSON key
+					secretRef := parseSecretsManagerARN(*secret.ValueFrom)
+					if secretRef.SecretName != "" {
+						secretRefs = append(secretRefs, secretRef)
+					}
+				}
+			}
+		}
+	}
+	
+	return secretRefs
+}
+
+// Helper function to parse Secrets Manager ARN
+func parseSecretsManagerARN(arn string) secretsmanager.SecretReference {
+	// Format: arn:aws:secretsmanager:region:account:secret:name-XXXXXX:json-key:version-stage:version-id
+	parts := strings.Split(arn, ":")
+	ref := secretsmanager.SecretReference{}
+	
+	if len(parts) >= 7 && parts[2] == "secretsmanager" {
+		// Extract secret name (6th part)
+		ref.SecretName = parts[6]
+		
+		// Check for JSON key (7th part)
+		if len(parts) >= 8 && parts[7] != "" {
+			ref.JSONKey = parts[7]
+		}
+		
+		// Check for version stage (8th part)
+		if len(parts) >= 9 && parts[8] != "" {
+			ref.VersionStage = parts[8]
+		}
+		
+		// Check for version ID (9th part)
+		if len(parts) >= 10 && parts[9] != "" {
+			ref.VersionId = parts[9]
+		}
+	}
+	
+	return ref
 }
 
 // Helper function to get namespace from cluster
