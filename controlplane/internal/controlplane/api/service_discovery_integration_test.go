@@ -1,4 +1,4 @@
-package api_test
+package api
 
 import (
 	"bytes"
@@ -7,13 +7,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
@@ -24,7 +22,7 @@ var _ = Describe("Service Discovery Integration", func() {
 	var (
 		server              *httptest.Server
 		serviceDiscoveryMgr servicediscovery.Manager
-		ecsAPI             *api.DefaultECSAPI
+		ecsAPI             *DefaultECSAPI
 		store              storage.Storage
 	)
 
@@ -50,14 +48,14 @@ var _ = Describe("Service Discovery Integration", func() {
 
 		// Create ECS API with service discovery
 		// Use nil KindManager for test mode
-		ecsAPI = api.NewDefaultECSAPIWithConfig(store, nil, "us-east-1", "123456789012").(*api.DefaultECSAPI)
+		ecsAPI = NewDefaultECSAPIWithConfig(store, nil, "us-east-1", "123456789012").(*DefaultECSAPI)
 		ecsAPI.SetServiceDiscoveryManager(serviceDiscoveryMgr)
 
 		// Create test server
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			target := r.Header.Get("X-Amz-Target")
 			if target != "" && contains(target, "ServiceDiscovery") {
-				serviceDiscoveryAPI := api.NewServiceDiscoveryAPI(serviceDiscoveryMgr, "us-east-1", "123456789012")
+				serviceDiscoveryAPI := NewServiceDiscoveryAPI(serviceDiscoveryMgr, "us-east-1", "123456789012")
 				serviceDiscoveryAPI.HandleServiceDiscoveryRequest(w, r)
 			} else {
 				generated.HandleECSRequest(ecsAPI)(w, r)
@@ -78,7 +76,7 @@ var _ = Describe("Service Discovery Integration", func() {
 
 		BeforeEach(func() {
 			// Create a namespace first
-			req := api.CreatePrivateDnsNamespaceRequest{
+			req := CreatePrivateDnsNamespaceRequest{
 				Name: "test.local",
 				Vpc:  "vpc-123456",
 			}
@@ -103,7 +101,7 @@ var _ = Describe("Service Discovery Integration", func() {
 			namespaceID = foundNamespace.ID
 
 			// Create a service discovery service
-			sdReq := api.CreateServiceDiscoveryServiceRequest{
+			sdReq := CreateServiceDiscoveryServiceRequest{
 				Name:        "my-service",
 				NamespaceId: namespaceID,
 				DnsConfig: &servicediscovery.DnsConfig{
@@ -118,7 +116,7 @@ var _ = Describe("Service Discovery Integration", func() {
 			resp = makeRequest(server.URL, "ServiceDiscovery.CreateService", body)
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-			var sdResp api.CreateServiceDiscoveryServiceResponse
+			var sdResp CreateServiceDiscoveryServiceResponse
 			json.NewDecoder(resp.Body).Decode(&sdResp)
 			serviceID = sdResp.Service.ID
 		})
@@ -181,7 +179,7 @@ var _ = Describe("Service Discovery Integration", func() {
 
 		It("should discover instances after task registration", func() {
 			// Register an instance
-			regReq := api.RegisterInstanceRequest{
+			regReq := RegisterInstanceRequest{
 				ServiceId:  serviceID,
 				InstanceId: "task-123",
 				Attributes: map[string]string{
@@ -237,9 +235,4 @@ func strPtr(s string) *string {
 
 func intPtr(i int32) *int32 {
 	return &i
-}
-
-func TestServiceDiscoveryIntegration(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Service Discovery Integration Suite")
 }
