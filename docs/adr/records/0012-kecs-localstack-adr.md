@@ -414,8 +414,8 @@ const LocalStackStatus: React.FC = () => {
 6. ~~Secrets Manager integration for sensitive configuration~~ (Completed)
 
 ### Phase 3: Advanced Features (4 weeks)
-1. Automatic sidecar injection
-2. Web UI LocalStack dashboard
+1. ~~Automatic sidecar injection~~ (Completed - PR #155)
+2. ~~Web UI LocalStack dashboard~~ (Completed - PR #156)
 3. Service discovery integration
 4. Advanced networking configurations
 
