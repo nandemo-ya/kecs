@@ -54,7 +54,33 @@ func (m *mockLocalStackManager) IsHealthy() bool {
 	return true
 }
 
+func (m *mockLocalStackManager) IsRunning() bool {
+	return true
+}
+
 func (m *mockLocalStackManager) WaitForReady(ctx context.Context, timeout time.Duration) error {
+	return nil
+}
+
+func (m *mockLocalStackManager) CheckServiceHealth(service string) error {
+	return nil
+}
+
+func (m *mockLocalStackManager) GetConfig() *localstack.Config {
+	return &localstack.Config{
+		Enabled: true,
+	}
+}
+
+func (m *mockLocalStackManager) GetContainer() *localstack.LocalStackContainer {
+	return nil
+}
+
+func (m *mockLocalStackManager) EnableService(service string) error {
+	return nil
+}
+
+func (m *mockLocalStackManager) DisableService(service string) error {
 	return nil
 }
 

@@ -135,6 +135,10 @@ func (m *mockLocalStackManager) WaitForReady(ctx context.Context, timeout time.D
 	return nil
 }
 
+func (m *mockLocalStackManager) CheckServiceHealth(service string) error {
+	return nil
+}
+
 var _ = Describe("IAM Integration", func() {
 	var (
 		integration       kecsIAM.Integration

@@ -273,6 +273,67 @@ func (m *localStackManager) IsHealthy() bool {
 	return m.status.Healthy
 }
 
+// IsRunning returns whether LocalStack is currently running
+func (m *localStackManager) IsRunning() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.status.Running
+}
+
+// GetConfig returns the current LocalStack configuration
+func (m *localStackManager) GetConfig() *Config {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.config
+}
+
+// CheckServiceHealth checks if a specific service is healthy
+func (m *localStackManager) CheckServiceHealth(service string) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	
+	if !m.status.Running {
+		return fmt.Errorf("LocalStack is not running")
+	}
+	
+	// Check if service is enabled
+	serviceEnabled := false
+	for _, s := range m.config.Services {
+		if s == service {
+			serviceEnabled = true
+			break
+		}
+	}
+	
+	if !serviceEnabled {
+		return fmt.Errorf("service %s is not enabled", service)
+	}
+	
+	// Perform health check
+	if m.healthChecker != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		
+		health, err := m.healthChecker.CheckHealth(ctx)
+		if err != nil {
+			return fmt.Errorf("health check failed: %w", err)
+		}
+		
+		if !health.Healthy {
+			return fmt.Errorf("LocalStack is not healthy: %s", health.Message)
+		}
+		
+		// Check specific service health if available
+		if serviceHealth, ok := health.ServiceHealth[service]; ok {
+			if !serviceHealth.Healthy {
+				return fmt.Errorf("service %s is not healthy: %s", service, serviceHealth.Error)
+			}
+		}
+	}
+	
+	return nil
+}
+
 // WaitForReady waits for LocalStack to become ready
 func (m *localStackManager) WaitForReady(ctx context.Context, timeout time.Duration) error {
 	if !m.status.Running {

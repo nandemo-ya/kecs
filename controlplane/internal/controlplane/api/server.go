@@ -346,6 +346,10 @@ func (s *Server) setupRoutes() http.Handler {
 	// Health check endpoint
 	mux.HandleFunc("/health", s.handleHealthCheck)
 
+	// LocalStack endpoints
+	mux.HandleFunc("/api/localstack/status", s.GetLocalStackStatus)
+	mux.HandleFunc("/localstack/dashboard", s.GetLocalStackDashboard)
+
 	// WebSocket endpoints
 	mux.HandleFunc("/ws", s.HandleWebSocket(s.webSocketHub))
 	mux.HandleFunc("/ws/logs", s.HandleWebSocket(s.webSocketHub))
