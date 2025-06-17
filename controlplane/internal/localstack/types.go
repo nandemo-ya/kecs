@@ -25,7 +25,12 @@ type Manager interface {
 	
 	// Health checks
 	IsHealthy() bool
+	IsRunning() bool
 	WaitForReady(ctx context.Context, timeout time.Duration) error
+	CheckServiceHealth(service string) error
+	
+	// Configuration
+	GetConfig() *Config
 }
 
 // Status represents the current status of LocalStack

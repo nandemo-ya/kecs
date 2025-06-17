@@ -192,3 +192,12 @@ func (m *mockLocalStackManagerForWS) GetEnabledServices() ([]string, error) { re
 func (m *mockLocalStackManagerForWS) GetEndpoint() (string, error) { return "http://localhost:4566", nil }
 func (m *mockLocalStackManagerForWS) GetServiceEndpoint(service string) (string, error) { return "http://localhost:4566", nil }
 func (m *mockLocalStackManagerForWS) WaitForReady(ctx context.Context, timeout time.Duration) error { return nil }
+func (m *mockLocalStackManagerForWS) IsRunning() bool { return m.healthy }
+func (m *mockLocalStackManagerForWS) CheckServiceHealth(service string) error { return nil }
+func (m *mockLocalStackManagerForWS) GetConfig() *localstack.Config { 
+	return &localstack.Config{
+		Enabled: true,
+		Services: []string{"ecs"},
+		Version: "latest",
+	}
+}
