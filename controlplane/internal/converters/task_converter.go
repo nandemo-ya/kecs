@@ -170,6 +170,9 @@ func (c *TaskConverter) ConvertTaskToPod(
 	// Add volume configuration annotations
 	c.addVolumeAnnotations(pod, volumes)
 
+	// Add secret annotations
+	c.addSecretAnnotations(pod, containerDefs)
+
 	// Apply IAM role if specified
 	if taskDef.TaskRoleARN != "" {
 		c.applyIAMRole(pod, taskDef.TaskRoleARN)
@@ -1178,6 +1181,29 @@ func (c *TaskConverter) addVolumeAnnotations(pod *corev1.Pod, volumes []types.Vo
 	}
 }
 
+// addSecretAnnotations adds annotations for secrets used by the task
+func (c *TaskConverter) addSecretAnnotations(pod *corev1.Pod, containerDefs []types.ContainerDefinition) {
+	secretIndex := 0
+	for _, containerDef := range containerDefs {
+		if containerDef.Secrets != nil {
+			for _, secret := range containerDef.Secrets {
+				if secret.Name != nil && secret.ValueFrom != nil {
+					// Add annotation for each secret with container and environment variable info
+					annotationKey := fmt.Sprintf("kecs.dev/secret-%d-arn", secretIndex)
+					annotationValue := fmt.Sprintf("%s:%s:%s", *containerDef.Name, *secret.Name, *secret.ValueFrom)
+					pod.Annotations[annotationKey] = annotationValue
+					secretIndex++
+				}
+			}
+		}
+	}
+	
+	// Add total count of secrets
+	if secretIndex > 0 {
+		pod.Annotations["kecs.dev/secret-count"] = fmt.Sprintf("%d", secretIndex)
+	}
+}
+
 // applyIAMRole applies IAM role configuration to the pod
 func (c *TaskConverter) applyIAMRole(pod *corev1.Pod, roleArn string) {
 	// Add role ARN annotation
@@ -1542,10 +1568,12 @@ func (c *TaskConverter) convertSecrets(secrets []types.Secret) []corev1.EnvVar {
 		switch secretInfo.Source {
 		case "secretsmanager":
 			// Reference Kubernetes secret created from Secrets Manager
+			// The integration uses "sm-" prefix
+			secretName := "sm-" + c.sanitizeSecretName(secretInfo.SecretName)
 			envVar.ValueFrom = &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: c.sanitizeSecretName(secretInfo.SecretName),
+						Name: secretName,
 					},
 					Key: secretInfo.Key,
 				},
@@ -1553,10 +1581,12 @@ func (c *TaskConverter) convertSecrets(secrets []types.Secret) []corev1.EnvVar {
 
 		case "ssm":
 			// Reference Kubernetes secret created from SSM Parameter Store
+			// The integration uses "ssm-" prefix
+			secretName := "ssm-" + c.sanitizeSecretName(secretInfo.SecretName)
 			envVar.ValueFrom = &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: c.sanitizeSecretName(secretInfo.SecretName),
+						Name: secretName,
 					},
 					Key: "value", // SSM parameters typically have a single value
 				},
@@ -1590,15 +1620,16 @@ func (c *TaskConverter) parseSecretArn(arn string) (*SecretInfo, error) {
 		// Format: arn:aws:secretsmanager:region:account-id:secret:name-6RandomChars:key::
 		if len(parts) >= 7 {
 			info.SecretName = parts[6]
-			if len(parts) >= 8 && parts[7] != "" {
+			// Check if a JSON key is specified at index 7
+			if len(parts) > 7 && parts[7] != "" && parts[7] != "*" {
 				info.Key = parts[7]
 			} else {
-				info.Key = "default"
+				// No JSON key specified, the entire secret value will be used
+				// When synced by Secrets Manager integration, JSON secrets will have all keys available
+				info.Key = "value"
 			}
 		} else {
-			// No JSON key specified
-			info.SecretName = parts[6]
-			info.Key = "default"
+			return nil, fmt.Errorf("invalid Secrets Manager ARN format: %s", arn)
 		}
 
 	case "ssm":
@@ -1626,6 +1657,10 @@ func (c *TaskConverter) parseSecretArn(arn string) (*SecretInfo, error) {
 
 // sanitizeSecretName converts a secret name to be Kubernetes-compatible
 func (c *TaskConverter) sanitizeSecretName(name string) string {
+	// Determine the prefix based on the source
+	// The integration modules will handle the actual prefixing,
+	// but we need to ensure consistency here
+	
 	// Remove the random suffix from Secrets Manager secret names
 	// Format: my-secret-AbCdEf -> my-secret
 	if idx := strings.LastIndex(name, "-"); idx > 0 && len(name)-idx == 7 {
@@ -1636,13 +1671,17 @@ func (c *TaskConverter) sanitizeSecretName(name string) string {
 		}
 	}
 	
+	// Handle path separators for hierarchical secrets
+	name = strings.ReplaceAll(name, "/", "-")
+	
 	// Similar to volume names, but for secrets
 	name = strings.ToLower(name)
 	name = regexp.MustCompile(`[^a-z0-9-]`).ReplaceAllString(name, "-")
 	name = strings.Trim(name, "-")
 
-	// Prefix with kecs-secret to avoid conflicts
-	return fmt.Sprintf("kecs-secret-%s", name)
+	// Return the sanitized name without prefix
+	// The actual prefix (sm- or ssm-) will be added by the integration modules
+	return name
 }
 
 // extractRoleNameFromARN extracts the role name from an IAM role ARN

@@ -411,7 +411,7 @@ const LocalStackStatus: React.FC = () => {
 3. ~~CloudWatch logs integration~~ (Completed)
 4. Basic S3 integration for task artifacts
 5. ~~SSM Parameter Store integration for container secrets~~ (Completed)
-6. Secrets Manager integration for sensitive configuration
+6. ~~Secrets Manager integration for sensitive configuration~~ (Completed)
 
 ### Phase 3: Advanced Features (4 weeks)
 1. Automatic sidecar injection

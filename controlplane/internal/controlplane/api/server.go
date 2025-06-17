@@ -12,6 +12,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/ssm"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
@@ -39,6 +40,7 @@ type Server struct {
 	iamIntegration          iam.Integration
 	cloudWatchIntegration   cloudwatch.Integration
 	ssmIntegration          ssm.Integration
+	secretsManagerIntegration secretsmanager.Integration
 }
 
 // NewServer creates a new API server instance
@@ -198,6 +200,24 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 						log.Println("SSM Parameter Store integration initialized successfully")
 					}
 				}
+				
+				// Initialize Secrets Manager integration if LocalStack is available
+				if kubeClient != nil {
+					smConfig := &secretsmanager.Config{
+						LocalStackEndpoint: fmt.Sprintf("http://localhost:%d", localStackConfig.Port),
+						SecretPrefix:       "sm-",
+						KubeNamespace:      "default",
+						SyncRetries:        3,
+						CacheTTL:           5 * time.Minute,
+					}
+					smIntegration, err := secretsmanager.NewIntegration(kubeClient, localStackManager, smConfig)
+					if err != nil {
+						log.Printf("Warning: Failed to initialize Secrets Manager integration: %v", err)
+					} else {
+						s.secretsManagerIntegration = smIntegration
+						log.Println("Secrets Manager integration initialized successfully")
+					}
+				}
 			}
 		}
 	}
@@ -213,6 +233,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 		if s.ssmIntegration != nil {
 			defaultAPI.SetSSMIntegration(s.ssmIntegration)
+		}
+		if s.secretsManagerIntegration != nil {
+			defaultAPI.SetSecretsManagerIntegration(s.secretsManagerIntegration)
 		}
 	}
 	s.ecsAPI = ecsAPI

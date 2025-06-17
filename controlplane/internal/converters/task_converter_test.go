@@ -37,7 +37,7 @@ var _ = Describe("TaskConverter", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).NotTo(BeNil())
 			Expect(result.SecretName).To(Equal("my-secret-AbCdEf"))
-			Expect(result.Key).To(Equal("default"))
+			Expect(result.Key).To(Equal("value"))
 			Expect(result.Source).To(Equal("secretsmanager"))
 		})
 
@@ -185,8 +185,8 @@ var _ = Describe("TaskConverter", func() {
 			Expect(container.Env[0].Name).To(Equal("DB_PASSWORD"))
 			Expect(container.Env[0].ValueFrom).NotTo(BeNil())
 			Expect(container.Env[0].ValueFrom.SecretKeyRef).NotTo(BeNil())
-			Expect(container.Env[0].ValueFrom.SecretKeyRef.Name).To(Equal("kecs-secret-db-pass"))
-			Expect(container.Env[0].ValueFrom.SecretKeyRef.Key).To(Equal("default"))
+			Expect(container.Env[0].ValueFrom.SecretKeyRef.Name).To(Equal("sm-db-pass"))
+			Expect(container.Env[0].ValueFrom.SecretKeyRef.Key).To(Equal("value"))
 		})
 
 		It("should handle overrides from RunTask request", func() {
