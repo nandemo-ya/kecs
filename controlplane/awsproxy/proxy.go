@@ -98,7 +98,7 @@ func (p *AWSProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // extractAWSService attempts to identify the AWS service from the request
 func (p *AWSProxy) extractAWSService(r *http.Request) string {
-	// Check Authorization header for service hints
+	// Check Authorization header for service hints (most reliable)
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
 		// AWS Signature Version 4 format: AWS4-HMAC-SHA256 Credential=.../20230101/us-east-1/s3/aws4_request
@@ -110,22 +110,16 @@ func (p *AWSProxy) extractAWSService(r *http.Request) string {
 		}
 	}
 
-	// Check host header
-	host := r.Host
-	if host != "" {
-		// Extract service from host (e.g., s3.localhost.localstack.cloud:4566)
-		parts := strings.Split(host, ".")
-		if len(parts) > 0 && parts[0] != "localhost" && parts[0] != "localstack" {
-			return parts[0]
-		}
-	}
-
 	// Check X-Amz-Target header (used by some services like DynamoDB)
 	target := r.Header.Get("X-Amz-Target")
 	if target != "" {
+		// Target format is like "DynamoDB_20120810.ListTables"
 		parts := strings.Split(target, ".")
 		if len(parts) > 0 {
-			return strings.ToLower(parts[0])
+			// Extract service and version (e.g., "DynamoDB_20120810" -> "dynamodb_20120810")
+			servicePart := strings.ToLower(parts[0])
+			// Replace DynamoDB with dynamodb for consistency
+			return servicePart
 		}
 	}
 
@@ -137,9 +131,20 @@ func (p *AWSProxy) extractAWSService(r *http.Request) string {
 		parts := strings.Fields(userAgent)
 		if len(parts) > 0 {
 			lastPart := parts[len(parts)-1]
-			if !strings.Contains(lastPart, "/") && !strings.Contains(lastPart, "(") {
+			// Check if it's a service name (not a version or parenthetical)
+			if !strings.Contains(lastPart, "/") && !strings.Contains(lastPart, "(") && !strings.Contains(lastPart, ")") {
 				return strings.ToLower(lastPart)
 			}
+		}
+	}
+
+	// Check host header last (least reliable due to various formats)
+	host := r.Host
+	if host != "" {
+		// Extract service from host (e.g., s3.localhost.localstack.cloud:4566)
+		parts := strings.Split(host, ".")
+		if len(parts) > 0 && parts[0] != "localhost" && parts[0] != "localstack" && parts[0] != "example" {
+			return parts[0]
 		}
 	}
 
