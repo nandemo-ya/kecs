@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: testapp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: testapp
+      DB_USER: postgres
+      DB_PASSWORD: mysecretpassword
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AWS_ENDPOINT_URL: http://localstack:4566
+      S3_BUCKET: test-bucket
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - backend.kecs.local
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      default:
+        aliases:
+          - frontend.kecs.local
+
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3,ssm,logs
+      DEFAULT_REGION: us-east-1
+      DATA_DIR: /tmp/localstack/data
+    volumes:
+      - "./localstack-init.sh:/etc/localstack/init/ready.d/init.sh"
+      - localstack_data:/tmp/localstack
+
+volumes:
+  postgres_data:
+  localstack_data:
+
+networks:
+  default:
+    name: three-tier-network

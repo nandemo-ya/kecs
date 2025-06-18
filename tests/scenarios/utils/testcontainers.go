@@ -131,14 +131,20 @@ func (k *KECSContainer) ExecuteCommand(args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(k.ctx, 30*time.Second)
 	defer cancel()
 
-	exitCode, output, err := k.container.Exec(ctx, append([]string{"kecs"}, args...))
+	exitCode, reader, err := k.container.Exec(ctx, append([]string{"kecs"}, args...))
 	if err != nil {
 		return "", fmt.Errorf("failed to execute command: %w", err)
 	}
+	
+	// Read output from reader
+	buf := make([]byte, 4096)
+	n, _ := reader.Read(buf)
+	output := string(buf[:n])
+	
 	if exitCode != 0 {
-		return string(output), fmt.Errorf("command exited with code %d: %s", exitCode, string(output))
+		return output, fmt.Errorf("command exited with code %d: %s", exitCode, output)
 	}
-	return string(output), nil
+	return output, nil
 }
 
 // Cleanup terminates the container and cleans up resources
