@@ -2,9 +2,8 @@ package networking_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"time"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -12,8 +11,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
-	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 )
 
@@ -21,21 +19,28 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 	var (
 		ctx       context.Context
 		ecsAPI    *api.DefaultECSAPI
-		storage   *duckdb.Storage
+		store     storage.Storage
 		region    = "us-east-1"
 		accountID = "123456789012"
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
+		
+		// Set test mode to avoid requiring actual Kubernetes cluster
+		os.Setenv("KECS_TEST_MODE", "true")
 
 		// Initialize storage
 		var err error
-		storage, err = duckdb.NewMemoryStorage()
+		store, err = duckdb.NewDuckDBStorage(":memory:")
+		Expect(err).NotTo(HaveOccurred())
+		
+		// Initialize the database schema
+		err = store.Initialize(ctx)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Initialize ECS API
-		ecsAPI = api.NewDefaultECSAPI(storage, region, accountID)
+		// Initialize ECS API with nil KindManager for test mode
+		ecsAPI = api.NewDefaultECSAPIWithConfig(store, nil, region, accountID).(*api.DefaultECSAPI)
 
 		// Create default cluster
 		_, err = ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{
@@ -45,8 +50,8 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 	})
 
 	AfterEach(func() {
-		if storage != nil {
-			storage.Close()
+		if store != nil {
+			store.Close()
 		}
 	})
 
@@ -61,7 +66,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 				PortMappings: []generated.PortMapping{
 					{
 						ContainerPort: ptr.Int32(80),
-						Protocol:      ptr.String("tcp"),
+						Protocol:      (*generated.TransportProtocol)(ptr.String("tcp")),
 					},
 				},
 				Memory: ptr.Int32(512),
@@ -164,7 +169,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 				PortMappings: []generated.PortMapping{
 					{
 						ContainerPort: ptr.Int32(80),
-						Protocol:      ptr.String("tcp"),
+						Protocol:      (*generated.TransportProtocol)(ptr.String("tcp")),
 					},
 				},
 				Memory: ptr.Int32(256),
@@ -283,7 +288,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 					{
 						ContainerPort: ptr.Int32(8080),
 						HostPort:      ptr.Int32(0), // Dynamic port
-						Protocol:      ptr.String("tcp"),
+						Protocol:      (*generated.TransportProtocol)(ptr.String("tcp")),
 					},
 				},
 				Memory: ptr.Int32(128),
@@ -321,7 +326,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 				PortMappings: []generated.PortMapping{
 					{
 						ContainerPort: ptr.Int32(80),
-						Protocol:      ptr.String("tcp"),
+						Protocol:      (*generated.TransportProtocol)(ptr.String("tcp")),
 					},
 				},
 				Memory: ptr.Int32(128),
