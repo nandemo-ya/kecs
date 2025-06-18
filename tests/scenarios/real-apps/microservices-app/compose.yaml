@@ -1,0 +1,53 @@
+services:
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: dynamodb,s3,sqs,sns,servicediscovery,iam,logs
+      DEFAULT_REGION: us-east-1
+      DATA_DIR: /tmp/localstack/data
+    volumes:
+      - "./localstack-init.sh:/etc/localstack/init/ready.d/init.sh"
+      - localstack_data:/tmp/localstack
+
+  api-gateway:
+    build: ./services/api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      SERVICE_NAME: api-gateway
+      LOCALSTACK_ENDPOINT: http://localstack:4566
+      SERVICE_DISCOVERY_NAMESPACE: microservices
+    depends_on:
+      - localstack
+    networks:
+      default:
+        aliases:
+          - api-gateway.microservices.local
+
+  user-service:
+    build: ./services/user-service
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      SERVICE_NAME: user-service
+      DYNAMODB_TABLE: users
+      LOCALSTACK_ENDPOINT: http://localstack:4566
+      JWT_SECRET: test-secret-key
+      SERVICE_ID: srv-users
+    depends_on:
+      - localstack
+    networks:
+      default:
+        aliases:
+          - user-service.microservices.local
+
+volumes:
+  localstack_data:
+
+networks:
+  default:
+    name: microservices-network

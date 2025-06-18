@@ -1,0 +1,49 @@
+{
+  "family": "microservices-api-gateway",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["EC2"],
+  "cpu": "512",
+  "memory": "1024",
+  "containerDefinitions": [
+    {
+      "name": "api-gateway",
+      "image": "microservices-api-gateway:latest",
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "PORT",
+          "value": "8080"
+        },
+        {
+          "name": "SERVICE_NAME",
+          "value": "api-gateway"
+        },
+        {
+          "name": "SERVICE_DISCOVERY_NAMESPACE",
+          "value": "microservices"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/api-gateway",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "api-gateway"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}
