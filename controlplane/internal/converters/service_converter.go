@@ -11,20 +11,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
 
 // ServiceConverter converts ECS service definitions to Kubernetes Deployments
 type ServiceConverter struct {
-	region    string
-	accountID string
+	region           string
+	accountID        string
+	networkConverter *NetworkConverter
 }
 
 // NewServiceConverter creates a new ServiceConverter
 func NewServiceConverter(region, accountID string) *ServiceConverter {
 	return &ServiceConverter{
-		region:    region,
-		accountID: accountID,
+		region:           region,
+		accountID:        accountID,
+		networkConverter: NewNetworkConverter(region, accountID),
 	}
 }
 
@@ -33,6 +37,16 @@ func (c *ServiceConverter) ConvertServiceToDeployment(
 	service *storage.Service,
 	taskDef *storage.TaskDefinition,
 	cluster *storage.Cluster,
+) (*appsv1.Deployment, *corev1.Service, error) {
+	return c.ConvertServiceToDeploymentWithNetworkConfig(service, taskDef, cluster, nil)
+}
+
+// ConvertServiceToDeploymentWithNetworkConfig converts an ECS service to a Kubernetes Deployment with network configuration
+func (c *ServiceConverter) ConvertServiceToDeploymentWithNetworkConfig(
+	service *storage.Service,
+	taskDef *storage.TaskDefinition,
+	cluster *storage.Cluster,
+	networkConfig *generated.NetworkConfiguration,
 ) (*appsv1.Deployment, *corev1.Service, error) {
 	// Parse container definitions from task definition
 	var containerDefs []map[string]interface{}
@@ -44,14 +58,17 @@ func (c *ServiceConverter) ConvertServiceToDeployment(
 		return nil, nil, fmt.Errorf("no container definitions found in task definition")
 	}
 
+	// Determine network mode from task definition
+	networkMode := types.GetNetworkMode(&taskDef.NetworkMode)
+
 	// Create Deployment
-	deployment, err := c.createDeployment(service, containerDefs, cluster)
+	deployment, err := c.createDeployment(service, containerDefs, cluster, networkConfig, networkMode)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create deployment: %w", err)
 	}
 
 	// Create Service (if needed for load balancing)
-	kubeService, err := c.createKubernetesService(service, containerDefs, cluster)
+	kubeService, err := c.createKubernetesService(service, containerDefs, cluster, networkConfig, networkMode)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create kubernetes service: %w", err)
 	}
@@ -64,6 +81,8 @@ func (c *ServiceConverter) createDeployment(
 	service *storage.Service,
 	containerDefs []map[string]interface{},
 	cluster *storage.Cluster,
+	networkConfig *generated.NetworkConfiguration,
+	networkMode types.NetworkMode,
 ) (*appsv1.Deployment, error) {
 	// Create namespace name
 	namespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
@@ -89,17 +108,34 @@ func (c *ServiceConverter) createDeployment(
 		"app":                  service.ServiceName, // Standard Kubernetes label
 	}
 
+	// Create annotations
+	annotations := map[string]string{
+		"kecs.dev/service-arn":         service.ARN,
+		"kecs.dev/task-definition":     service.TaskDefinitionARN,
+		"kecs.dev/scheduling-strategy": service.SchedulingStrategy,
+	}
+
+	// Add network configuration annotations
+	if networkConfig != nil {
+		networkAnnotations := c.networkConverter.ConvertNetworkConfiguration(networkConfig, networkMode)
+		for k, v := range networkAnnotations {
+			annotations[k] = v
+		}
+	}
+
+	// Create pod template annotations
+	podAnnotations := make(map[string]string)
+	for k, v := range annotations {
+		podAnnotations[k] = v
+	}
+
 	// Create Deployment
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      deploymentName,
-			Namespace: namespace,
-			Labels:    labels,
-			Annotations: map[string]string{
-				"kecs.dev/service-arn":         service.ARN,
-				"kecs.dev/task-definition":     service.TaskDefinitionARN,
-				"kecs.dev/scheduling-strategy": service.SchedulingStrategy,
-			},
+			Name:        deploymentName,
+			Namespace:   namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -111,7 +147,8 @@ func (c *ServiceConverter) createDeployment(
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Labels:      labels,
+					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyAlways,
@@ -264,6 +301,8 @@ func (c *ServiceConverter) createKubernetesService(
 	service *storage.Service,
 	containerDefs []map[string]interface{},
 	cluster *storage.Cluster,
+	networkConfig *generated.NetworkConfiguration,
+	networkMode types.NetworkMode,
 ) (*corev1.Service, error) {
 	// Check if service has load balancers configured
 	if service.LoadBalancers == "" || service.LoadBalancers == "null" || service.LoadBalancers == "[]" {
@@ -319,6 +358,19 @@ func (c *ServiceConverter) createKubernetesService(
 		return nil, nil
 	}
 
+	// Create annotations for the service
+	serviceAnnotations := map[string]string{
+		"kecs.dev/service-arn": service.ARN,
+	}
+
+	// Add network configuration annotations if available
+	if networkConfig != nil {
+		networkAnnotations := c.networkConverter.ConvertNetworkConfiguration(networkConfig, networkMode)
+		for k, v := range networkAnnotations {
+			serviceAnnotations[k] = v
+		}
+	}
+
 	// Create Kubernetes Service
 	kubeService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -328,10 +380,9 @@ func (c *ServiceConverter) createKubernetesService(
 				"kecs.dev/service":    service.ServiceName,
 				"kecs.dev/cluster":    cluster.Name,
 				"kecs.dev/managed-by": "kecs",
+				"app":                 service.ServiceName,
 			},
-			Annotations: map[string]string{
-				"kecs.dev/service-arn": service.ARN,
-			},
+			Annotations: serviceAnnotations,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{

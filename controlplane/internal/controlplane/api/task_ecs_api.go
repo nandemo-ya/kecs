@@ -726,7 +726,29 @@ type mockTaskManager struct {
 }
 
 func (m *mockTaskManager) CreateTask(ctx context.Context, pod interface{}, task *storage.Task, secrets map[string]*converters.SecretInfo) error {
-	// Simply store the task
+	// Extract network interface information from pod
+	if podObj, ok := pod.(*corev1.Pod); ok {
+		// Create containers with network interface information
+		containers := m.createContainersFromPod(podObj, task)
+		if len(containers) > 0 {
+			containersJSON, err := json.Marshal(containers)
+			if err == nil {
+				task.Containers = string(containersJSON)
+			}
+		}
+		
+		// Check for awsvpc network mode and create attachments
+		if networkMode, ok := podObj.Annotations["ecs.amazonaws.com/network-mode"]; ok && networkMode == "awsvpc" {
+			attachments := m.createNetworkAttachments(podObj)
+			if len(attachments) > 0 {
+				attachmentsJSON, err := json.Marshal(attachments)
+				if err == nil {
+					task.Attachments = string(attachmentsJSON)
+				}
+			}
+		}
+	}
+	
 	// Keep the LastStatus that was set by RunTask (PROVISIONING)
 	task.Connectivity = "CONNECTED"
 	now := time.Now()
@@ -744,4 +766,98 @@ func (m *mockTaskManager) StopTask(ctx context.Context, cluster, taskID, reason 
 	task.StoppedReason = reason
 	task.StoppingAt = &now
 	return m.storage.TaskStore().Update(ctx, task)
+}
+
+// createContainersFromPod creates container information from a Kubernetes pod
+func (m *mockTaskManager) createContainersFromPod(pod *corev1.Pod, task *storage.Task) []generated.Container {
+	var containers []generated.Container
+	
+	// Get pod IP for network interface
+	podIP := pod.Status.PodIP
+	if podIP == "" {
+		// Use a placeholder IP for newly created pods
+		podIP = "10.0.0.1"
+	}
+	
+	for _, container := range pod.Spec.Containers {
+		genContainer := generated.Container{
+			Name:   ptr.String(container.Name),
+			Image:  ptr.String(container.Image),
+			TaskArn: ptr.String(task.ARN),
+			LastStatus: ptr.String("PENDING"),
+		}
+		
+		// Add network interfaces for awsvpc mode
+		if networkMode := pod.Annotations["ecs.amazonaws.com/network-mode"]; networkMode == "awsvpc" {
+			genContainer.NetworkInterfaces = []generated.NetworkInterface{
+				{
+					AttachmentId:       ptr.String(fmt.Sprintf("eni-attach-%s", pod.UID)),
+					PrivateIpv4Address: ptr.String(podIP),
+				},
+			}
+		}
+		
+		// Add network bindings from container ports
+		for _, port := range container.Ports {
+			protocol := generated.TransportProtocol(port.Protocol)
+			genContainer.NetworkBindings = append(genContainer.NetworkBindings, generated.NetworkBinding{
+				ContainerPort: ptr.Int32(port.ContainerPort),
+				Protocol:      &protocol,
+				BindIP:        ptr.String(podIP),
+			})
+		}
+		
+		containers = append(containers, genContainer)
+	}
+	
+	return containers
+}
+
+// createNetworkAttachments creates network attachments for awsvpc mode
+func (m *mockTaskManager) createNetworkAttachments(pod *corev1.Pod) []generated.Attachment {
+	var attachments []generated.Attachment
+	
+	// Get network configuration from annotations
+	subnets := pod.Annotations["ecs.amazonaws.com/subnets"]
+	privateIP := pod.Status.PodIP
+	if privateIP == "" {
+		privateIP = "10.0.0.1"
+	}
+	
+	// Create elastic network interface attachment
+	var details []generated.KeyValuePair
+	if subnets != "" {
+		details = append(details, generated.KeyValuePair{
+			Name:  ptr.String("subnetId"),
+			Value: ptr.String(strings.Split(subnets, ",")[0]), // Use first subnet
+		})
+	}
+	details = append(details,
+		generated.KeyValuePair{
+			Name:  ptr.String("networkInterfaceId"),
+			Value: ptr.String(fmt.Sprintf("eni-%s", pod.UID)),
+		},
+		generated.KeyValuePair{
+			Name:  ptr.String("macAddress"),
+			Value: ptr.String("02:00:00:00:00:01"),
+		},
+		generated.KeyValuePair{
+			Name:  ptr.String("privateDnsName"),
+			Value: ptr.String(fmt.Sprintf("ip-%s.ec2.internal", strings.ReplaceAll(privateIP, ".", "-"))),
+		},
+		generated.KeyValuePair{
+			Name:  ptr.String("privateIPv4Address"),
+			Value: ptr.String(privateIP),
+		},
+	)
+	
+	attachment := generated.Attachment{
+		Id:      ptr.String(fmt.Sprintf("eni-attach-%s", pod.UID)),
+		Type:    ptr.String("ElasticNetworkInterface"),
+		Status:  ptr.String("ATTACHED"),
+		Details: details,
+	}
+	
+	attachments = append(attachments, attachment)
+	return attachments
 }
