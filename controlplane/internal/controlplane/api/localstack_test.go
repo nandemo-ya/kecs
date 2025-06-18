@@ -23,10 +23,14 @@ var _ = Describe("LocalStack API", func() {
 		server, err = api.NewServer(8080, "", nil, nil)
 		Expect(err).NotTo(HaveOccurred())
 		
-		// Create a dummy handler for testing since setupRoutes is private
+		// Create a handler that properly routes the request
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Just delegate to the server's health check for testing
-			server.GetLocalStackStatus(w, r)
+			// Route based on path
+			if r.URL.Path == "/api/localstack/status" {
+				server.GetLocalStackStatus(w, r)
+			} else {
+				http.NotFound(w, r)
+			}
 		})
 		testServer = httptest.NewServer(handler)
 	})
