@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three-Tier App - Frontend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.healthy {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.unhealthy {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .user-list {
+            margin-top: 20px;
+        }
+        .user-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .source-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .source-cache {
+            background-color: #ffc107;
+            color: #856404;
+        }
+        .source-database {
+            background-color: #17a2b8;
+            color: white;
+        }
+        .services-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .service-item {
+            margin: 5px 0;
+            font-family: monospace;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Three-Tier Application Test</h1>
+        
+        <h2>Health Status</h2>
+        <div id="health-status" class="status">Checking...</div>
+        
+        <h2>Actions</h2>
+        <button onclick="checkHealth()">Check Health</button>
+        <button onclick="loadUsers()">Load Users</button>
+        <button onclick="checkServices()">Check Services</button>
+        <button onclick="listFiles()">List S3 Files</button>
+        
+        <h2>Add User</h2>
+        <input type="text" id="userName" placeholder="Name">
+        <input type="email" id="userEmail" placeholder="Email">
+        <button onclick="addUser()">Add User</button>
+        
+        <h2>Users</h2>
+        <div id="users" class="user-list">Click "Load Users" to fetch data</div>
+        
+        <h2>Service Discovery</h2>
+        <div id="services" class="services-info">Click "Check Services" to see service endpoints</div>
+        
+        <h2>S3 Files</h2>
+        <div id="files" class="user-list">Click "List S3 Files" to see files</div>
+    </div>
+
+    <script>
+        const API_URL = window.location.protocol + '//' + window.location.hostname + '/api';
+        
+        async function checkHealth() {
+            try {
+                const response = await fetch(API_URL + '/health');
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('health-status');
+                if (response.ok) {
+                    statusDiv.className = 'status healthy';
+                    statusDiv.innerHTML = `
+                        <strong>Status:</strong> ${data.status}<br>
+                        <strong>Database:</strong> ${data.database}<br>
+                        <strong>Cache:</strong> ${data.cache}<br>
+                        <strong>Time:</strong> ${new Date(data.timestamp).toLocaleString()}
+                    `;
+                } else {
+                    statusDiv.className = 'status unhealthy';
+                    statusDiv.textContent = `Unhealthy: ${data.error}`;
+                }
+            } catch (error) {
+                const statusDiv = document.getElementById('health-status');
+                statusDiv.className = 'status unhealthy';
+                statusDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        async function loadUsers() {
+            try {
+                const response = await fetch(API_URL + '/users');
+                const data = await response.json();
+                
+                const usersDiv = document.getElementById('users');
+                if (response.ok) {
+                    const sourceClass = data.source === 'cache' ? 'source-cache' : 'source-database';
+                    let html = `<span class="source-badge ${sourceClass}">From ${data.source}</span><br><br>`;
+                    
+                    if (data.data.length === 0) {
+                        html += '<p>No users found. Add some users!</p>';
+                    } else {
+                        data.data.forEach(user => {
+                            html += `<div class="user-item">
+                                <strong>${user.name}</strong> - ${user.email}
+                                <br><small>ID: ${user.id}, Created: ${new Date(user.created_at).toLocaleString()}</small>
+                            </div>`;
+                        });
+                    }
+                    usersDiv.innerHTML = html;
+                } else {
+                    usersDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+                }
+            } catch (error) {
+                document.getElementById('users').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        async function addUser() {
+            const name = document.getElementById('userName').value;
+            const email = document.getElementById('userEmail').value;
+            
+            if (!name || !email) {
+                alert('Please enter both name and email');
+                return;
+            }
+            
+            try {
+                const response = await fetch(API_URL + '/users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name, email }),
+                });
+                
+                if (response.ok) {
+                    document.getElementById('userName').value = '';
+                    document.getElementById('userEmail').value = '';
+                    alert('User added successfully!');
+                    loadUsers();
+                } else {
+                    const data = await response.json();
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+        
+        async function checkServices() {
+            try {
+                const response = await fetch(API_URL + '/services');
+                const data = await response.json();
+                
+                const servicesDiv = document.getElementById('services');
+                if (response.ok) {
+                    let html = '<h3>Discovered Services:</h3>';
+                    Object.entries(data.services).forEach(([name, info]) => {
+                        html += `<div class="service-item"><strong>${name}:</strong> ${info.host}:${info.port}</div>`;
+                    });
+                    servicesDiv.innerHTML = html;
+                } else {
+                    servicesDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+                }
+            } catch (error) {
+                document.getElementById('services').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        async function listFiles() {
+            try {
+                const response = await fetch(API_URL + '/files');
+                const data = await response.json();
+                
+                const filesDiv = document.getElementById('files');
+                if (response.ok) {
+                    let html = '';
+                    if (data.files.length === 0) {
+                        html = '<p>No files in S3 bucket</p>';
+                    } else {
+                        data.files.forEach(file => {
+                            html += `<div class="user-item">
+                                <strong>${file.Key}</strong> - ${file.Size} bytes
+                                <br><small>Modified: ${new Date(file.LastModified).toLocaleString()}</small>
+                            </div>`;
+                        });
+                    }
+                    filesDiv.innerHTML = html;
+                } else {
+                    filesDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+                }
+            } catch (error) {
+                document.getElementById('files').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Check health on page load
+        window.onload = checkHealth;
+    </script>
+</body>
+</html>

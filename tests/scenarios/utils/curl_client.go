@@ -478,9 +478,10 @@ func (c *CurlClient) GetLocalStackStatus(clusterName string) (string, error) {
 		url,
 	}
 
-	output, err := c.runCommand(args...)
+	cmd := exec.Command("curl", args...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("curl command failed: %w\nOutput: %s", err, output)
 	}
 
 	var result struct {
