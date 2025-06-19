@@ -2,11 +2,14 @@ Build KECS and start it running in the background. The server will run on port 8
 
 Execute:
 ```bash
+# Find project root
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+
 echo "Building KECS..."
-cd .. && make build || { echo "Build failed"; exit 1; }
+(cd "$PROJECT_ROOT" && make build) || { echo "Build failed"; exit 1; }
 
 echo "Starting KECS in background..."
-cd controlplane && nohup ../bin/kecs server > kecs.log 2>&1 &
+nohup "$PROJECT_ROOT/bin/kecs" server > kecs.log 2>&1 &
 echo $! > kecs.pid
 
 echo "KECS started with PID: $(cat kecs.pid)"
