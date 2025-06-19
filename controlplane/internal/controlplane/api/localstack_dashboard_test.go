@@ -47,7 +47,7 @@ var _ = Describe("LocalStack Dashboard Integration", func() {
 		Expect(err).NotTo(HaveOccurred())
 		
 		// Get the router from server
-		router := server.setupRoutes()
+		router := server.SetupRoutes()
 		testServer = httptest.NewServer(router)
 		baseURL = testServer.URL
 		
