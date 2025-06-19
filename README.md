@@ -1,4 +1,12 @@
-# kecs
+<div align="center">
+  <img src="./assets/logo.svg" alt="KECS Logo" width="200" />
+  
+  # KECS
+  
+  **Kubernetes-based ECS Compatible Service**
+</div>
+
+<div align="center">
 
 [![CI/CD Pipeline](https://github.com/nandemo-ya/kecs/actions/workflows/ci.yml/badge.svg)](https://github.com/nandemo-ya/kecs/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/nandemo-ya/kecs/branch/main/graph/badge.svg)](https://codecov.io/gh/nandemo-ya/kecs)
@@ -7,6 +15,8 @@
 [![Release](https://img.shields.io/github/release/nandemo-ya/kecs.svg)](https://github.com/nandemo-ya/kecs/releases/latest)
 [![Go Report Card](https://goreportcard.com/badge/github.com/nandemo-ya/kecs)](https://goreportcard.com/report/github.com/nandemo-ya/kecs)
 [![GoDoc](https://pkg.go.dev/badge/github.com/nandemo-ya/kecs)](https://pkg.go.dev/github.com/nandemo-ya/kecs)
+
+</div>
 
 ## Overview
 

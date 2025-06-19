@@ -5,6 +5,9 @@ hero:
   name: "KECS"
   text: "Kubernetes-based ECS Compatible Service"
   tagline: "Run Amazon ECS workloads locally on Kubernetes"
+  image:
+    src: /logo.svg
+    alt: KECS Logo
   actions:
     - theme: brand
       text: Get Started
