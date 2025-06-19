@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -15,9 +16,14 @@ var _ = Describe("LocalStack API", func() {
 	var (
 		server      *api.Server
 		testServer  *httptest.Server
+		originalTestMode string
 	)
 
 	BeforeEach(func() {
+		// Set test mode to avoid Kubernetes initialization issues
+		originalTestMode = os.Getenv("KECS_TEST_MODE")
+		os.Setenv("KECS_TEST_MODE", "true")
+		
 		// Create server without LocalStack manager to test disabled state
 		var err error
 		server, err = api.NewServer(8080, "", nil, nil)
@@ -37,6 +43,13 @@ var _ = Describe("LocalStack API", func() {
 
 	AfterEach(func() {
 		testServer.Close()
+		
+		// Restore original test mode setting
+		if originalTestMode == "" {
+			os.Unsetenv("KECS_TEST_MODE")
+		} else {
+			os.Setenv("KECS_TEST_MODE", originalTestMode)
+		}
 	})
 
 	Describe("LocalStack Status Endpoint", func() {
