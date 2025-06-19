@@ -2,8 +2,11 @@ Build KECS Docker image and run it as a container. The container will expose por
 
 Execute:
 ```bash
+# Find project root
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+
 echo "Building KECS Docker image..."
-cd .. && make docker-build || { echo "Docker build failed"; exit 1; }
+(cd "$PROJECT_ROOT" && make docker-build) || { echo "Docker build failed"; exit 1; }
 
 echo "Starting KECS container..."
 docker run -d \
