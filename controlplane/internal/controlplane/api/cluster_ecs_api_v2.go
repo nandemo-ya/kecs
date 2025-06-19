@@ -245,3 +245,297 @@ func convertSettingsJSONToSDK(settingsJSON string) []ecstypes.ClusterSetting {
 	}
 	return sdkSettings
 }
+
+// DescribeClustersV2 implements the DescribeClusters operation using AWS SDK types
+func (api *DefaultECSAPIV2) DescribeClustersV2(ctx context.Context, req *ecs.DescribeClustersInput) (*ecs.DescribeClustersOutput, error) {
+	// If no clusters specified, describe all clusters
+	clusterIdentifiers := req.Clusters
+	if len(clusterIdentifiers) == 0 {
+		clusters, err := api.storage.ClusterStore().List(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list clusters: %w", err)
+		}
+		for _, cluster := range clusters {
+			clusterIdentifiers = append(clusterIdentifiers, cluster.Name)
+		}
+	}
+
+	// Fetch details for each cluster
+	var describedClusters []ecstypes.Cluster
+	var failures []ecstypes.Failure
+
+	for _, identifier := range clusterIdentifiers {
+		// Extract cluster name from ARN if necessary
+		clusterName := extractClusterNameFromARN(identifier)
+
+		cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
+
+		if err != nil {
+			failures = append(failures, ecstypes.Failure{
+				Arn:    aws.String(identifier),
+				Reason: aws.String("MISSING"),
+				Detail: aws.String(fmt.Sprintf("Could not find cluster %s", identifier)),
+			})
+			continue
+		}
+
+		// Build cluster response
+		clusterResp := ecstypes.Cluster{
+			ClusterArn:                        aws.String(cluster.ARN),
+			ClusterName:                       aws.String(cluster.Name),
+			Status:                            aws.String(cluster.Status),
+			RegisteredContainerInstancesCount: int32(cluster.RegisteredContainerInstancesCount),
+			RunningTasksCount:                 int32(cluster.RunningTasksCount),
+			PendingTasksCount:                 int32(cluster.PendingTasksCount),
+			ActiveServicesCount:               int32(cluster.ActiveServicesCount),
+		}
+
+		// Add settings if requested
+		if req.Include != nil {
+			for _, include := range req.Include {
+				switch include {
+				case ecstypes.ClusterFieldSettings:
+					if cluster.Settings != "" {
+						settings := parseClusterSettingsForV2(cluster.Settings)
+						if settings != nil {
+							clusterResp.Settings = settings
+						}
+					}
+				case ecstypes.ClusterFieldConfigurations:
+					if cluster.Configuration != "" {
+						config := parseClusterConfigurationForV2(cluster.Configuration)
+						if config != nil {
+							clusterResp.Configuration = config
+						}
+					}
+				case ecstypes.ClusterFieldTags:
+					if cluster.Tags != "" {
+						clusterResp.Tags = convertStorageTagsToSDK(cluster.Tags)
+					}
+				}
+			}
+		}
+
+		describedClusters = append(describedClusters, clusterResp)
+	}
+
+	return &ecs.DescribeClustersOutput{
+		Clusters: describedClusters,
+		Failures: failures,
+	}, nil
+}
+
+// DeleteClusterV2 implements the DeleteCluster operation using AWS SDK types
+func (api *DefaultECSAPIV2) DeleteClusterV2(ctx context.Context, req *ecs.DeleteClusterInput) (*ecs.DeleteClusterOutput, error) {
+	if req.Cluster == nil {
+		return nil, fmt.Errorf("cluster identifier is required")
+	}
+
+	// Extract cluster name from ARN if necessary
+	clusterName := extractClusterNameFromARN(*req.Cluster)
+
+	// Look up cluster
+	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
+
+	if err != nil {
+		return nil, fmt.Errorf("cluster not found: %s", *req.Cluster)
+	}
+
+	// Check if cluster has active resources
+	if cluster.ActiveServicesCount > 0 || cluster.RunningTasksCount > 0 {
+		return nil, fmt.Errorf("cluster has active services or tasks")
+	}
+
+	// Update status to INACTIVE
+	cluster.Status = "INACTIVE"
+	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
+		return nil, fmt.Errorf("failed to update cluster status: %w", err)
+	}
+
+	// Delete the cluster
+	if err := api.storage.ClusterStore().Delete(ctx, cluster.Name); err != nil {
+		return nil, fmt.Errorf("failed to delete cluster: %w", err)
+	}
+
+	// Delete kind cluster and namespace asynchronously
+	go api.deleteKindClusterAndNamespace(cluster)
+
+	// Build response with the deleted cluster info
+	response := &ecs.DeleteClusterOutput{
+		Cluster: &ecstypes.Cluster{
+			ClusterArn:  aws.String(cluster.ARN),
+			ClusterName: aws.String(cluster.Name),
+			Status:      aws.String("INACTIVE"),
+		},
+	}
+
+	return response, nil
+}
+
+// UpdateClusterV2 implements the UpdateCluster operation using AWS SDK types
+func (api *DefaultECSAPIV2) UpdateClusterV2(ctx context.Context, req *ecs.UpdateClusterInput) (*ecs.UpdateClusterOutput, error) {
+	if req.Cluster == nil {
+		return nil, fmt.Errorf("cluster identifier is required")
+	}
+
+	// Extract cluster name from ARN if necessary
+	clusterName := extractClusterNameFromARN(*req.Cluster)
+
+	// Look up cluster
+	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
+	if err != nil {
+		return nil, fmt.Errorf("cluster not found: %s", *req.Cluster)
+	}
+
+	// Update settings if provided
+	if req.Settings != nil && len(req.Settings) > 0 {
+		settingsData := make([]map[string]string, 0)
+		for _, s := range req.Settings {
+			if s.Value != nil {
+				settingsData = append(settingsData, map[string]string{
+					"name":  string(s.Name),
+					"value": *s.Value,
+				})
+			}
+		}
+		if data, err := json.Marshal(settingsData); err == nil {
+			cluster.Settings = string(data)
+		}
+	}
+
+	// Update configuration if provided
+	if req.Configuration != nil {
+		configJSON, err := json.Marshal(req.Configuration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal cluster configuration: %w", err)
+		}
+		cluster.Configuration = string(configJSON)
+	}
+
+	// Update service connect defaults if provided
+	if req.ServiceConnectDefaults != nil {
+		// For now, we'll store this in the Configuration field
+		// In a real implementation, this might need a separate field
+		log.Printf("ServiceConnectDefaults update requested but not fully implemented yet")
+	}
+
+	// Update the cluster
+	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
+		return nil, fmt.Errorf("failed to update cluster: %w", err)
+	}
+
+	// Build response
+	responseCluster := &ecstypes.Cluster{
+		ClusterArn:                        aws.String(cluster.ARN),
+		ClusterName:                       aws.String(cluster.Name),
+		Status:                            aws.String(cluster.Status),
+		RegisteredContainerInstancesCount: int32(cluster.RegisteredContainerInstancesCount),
+		RunningTasksCount:                 int32(cluster.RunningTasksCount),
+		PendingTasksCount:                 int32(cluster.PendingTasksCount),
+		ActiveServicesCount:               int32(cluster.ActiveServicesCount),
+	}
+
+	// Add settings if present
+	if cluster.Settings != "" {
+		settings := parseClusterSettingsForV2(cluster.Settings)
+		if settings != nil {
+			responseCluster.Settings = settings
+		}
+	}
+
+	// Add configuration if present
+	if cluster.Configuration != "" {
+		config := parseClusterConfigurationForV2(cluster.Configuration)
+		if config != nil {
+			responseCluster.Configuration = config
+		}
+	}
+
+	// Add tags if present
+	if cluster.Tags != "" {
+		responseCluster.Tags = convertStorageTagsToSDK(cluster.Tags)
+	}
+
+	return &ecs.UpdateClusterOutput{
+		Cluster: responseCluster,
+	}, nil
+}
+
+// Helper functions for V2 type conversions
+func parseClusterSettingsForV2(settingsJSON string) []ecstypes.ClusterSetting {
+	if settingsJSON == "" {
+		return nil
+	}
+	
+	var settingsData []map[string]string
+	if err := json.Unmarshal([]byte(settingsJSON), &settingsData); err != nil {
+		// Try parsing as generated type format
+		var generatedSettings []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		}
+		if err := json.Unmarshal([]byte(settingsJSON), &generatedSettings); err != nil {
+			return nil
+		}
+		// Convert to expected format
+		for _, s := range generatedSettings {
+			settingsData = append(settingsData, map[string]string{
+				"name":  s.Name,
+				"value": s.Value,
+			})
+		}
+	}
+	
+	sdkSettings := make([]ecstypes.ClusterSetting, 0, len(settingsData))
+	for _, s := range settingsData {
+		if name, ok := s["name"]; ok {
+			if value, ok := s["value"]; ok {
+				sdkSettings = append(sdkSettings, ecstypes.ClusterSetting{
+					Name:  ecstypes.ClusterSettingName(name),
+					Value: aws.String(value),
+				})
+			}
+		}
+	}
+	return sdkSettings
+}
+
+func parseClusterConfigurationForV2(configJSON string) *ecstypes.ClusterConfiguration {
+	if configJSON == "" {
+		return nil
+	}
+	
+	var config ecstypes.ClusterConfiguration
+	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		return nil
+	}
+	return &config
+}
+
+// deleteKindClusterAndNamespace deletes the Kind cluster and namespace for an ECS cluster
+func (api *DefaultECSAPIV2) deleteKindClusterAndNamespace(cluster *storage.Cluster) {
+	ctx := context.Background()
+
+	// Skip kind cluster deletion if kindManager is nil (test mode)
+	if api.kindManager == nil {
+		log.Printf("Skipping kind cluster deletion for %s (kindManager is nil)", cluster.Name)
+		return
+	}
+
+	// Delete namespace first (while we still have access to the cluster)
+	kubeClient, err := api.kindManager.GetKubeClient(cluster.KindClusterName)
+	if err == nil {
+		namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
+		if err := namespaceManager.DeleteNamespace(ctx, cluster.Name, cluster.Region); err != nil {
+			log.Printf("Failed to delete namespace for %s: %v", cluster.Name, err)
+		}
+	}
+
+	// Delete the kind cluster
+	if err := api.kindManager.DeleteCluster(ctx, cluster.KindClusterName); err != nil {
+		log.Printf("Failed to delete kind cluster %s for ECS cluster %s: %v", cluster.KindClusterName, cluster.Name, err)
+		return
+	}
+
+	log.Printf("Successfully deleted kind cluster %s and namespace for ECS cluster %s", cluster.KindClusterName, cluster.Name)
+}

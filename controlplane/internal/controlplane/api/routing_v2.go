@@ -15,6 +15,9 @@ import (
 type ECSAPIV2 interface {
 	ListClustersV2(ctx context.Context, req *ecs.ListClustersInput) (*ecs.ListClustersOutput, error)
 	CreateClusterV2(ctx context.Context, req *ecs.CreateClusterInput) (*ecs.CreateClusterOutput, error)
+	DescribeClustersV2(ctx context.Context, req *ecs.DescribeClustersInput) (*ecs.DescribeClustersOutput, error)
+	DeleteClusterV2(ctx context.Context, req *ecs.DeleteClusterInput) (*ecs.DeleteClusterOutput, error)
+	UpdateClusterV2(ctx context.Context, req *ecs.UpdateClusterInput) (*ecs.UpdateClusterOutput, error)
 }
 
 // handleRequestV2 is a generic handler for ECS operations using AWS SDK types
@@ -89,6 +92,12 @@ func AdapterMiddleware(v1API generated.ECSAPIInterface, v2API ECSAPIV2) http.Han
 			handleRequestV2(v2API.ListClustersV2, w, r)
 		case "CreateCluster":
 			handleRequestV2(v2API.CreateClusterV2, w, r)
+		case "DescribeClusters":
+			handleRequestV2(v2API.DescribeClustersV2, w, r)
+		case "DeleteCluster":
+			handleRequestV2(v2API.DeleteClusterV2, w, r)
+		case "UpdateCluster":
+			handleRequestV2(v2API.UpdateClusterV2, w, r)
 		default:
 			// Fall back to v1 handler for non-migrated operations
 			generated.HandleECSRequest(v1API)(w, r)
