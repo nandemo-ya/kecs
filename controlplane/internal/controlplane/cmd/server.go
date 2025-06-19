@@ -15,6 +15,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/admin"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage/cache"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 	"github.com/spf13/cobra"
 )
@@ -104,21 +105,31 @@ func runServer() {
 		log.Fatalf("Failed to create data directory: %v", err)
 	}
 
-	storage, err := duckdb.NewDuckDBStorage(dbPath)
+	// Initialize DuckDB storage
+	dbStorage, err := duckdb.NewDuckDBStorage(dbPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
+
+	// Initialize storage tables
+	ctx := context.Background()
+	if err := dbStorage.Initialize(ctx); err != nil {
+		log.Fatalf("Failed to initialize storage tables: %v", err)
+	}
+
+	// Wrap storage with cache layer
+	// Default cache settings: 5 minute TTL, 10000 max items
+	cacheTTL := 5 * time.Minute
+	cacheSize := 10000
+	storage := cache.NewCachedStorage(dbStorage, cacheSize, cacheTTL)
+	
 	defer func() {
 		if err := storage.Close(); err != nil {
 			log.Printf("Error closing storage: %v", err)
 		}
 	}()
 
-	// Initialize storage tables
-	ctx := context.Background()
-	if err := storage.Initialize(ctx); err != nil {
-		log.Fatalf("Failed to initialize storage tables: %v", err)
-	}
+	fmt.Printf("Initialized in-memory cache (TTL: %v, Max Size: %d)\n", cacheTTL, cacheSize)
 
 	// Initialize the API server with LocalStack configuration
 	var localstackConfig *localstack.Config

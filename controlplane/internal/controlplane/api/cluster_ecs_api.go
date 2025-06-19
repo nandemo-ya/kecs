@@ -37,24 +37,15 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 			Status:      ptr.String(existing.Status),
 		}
 
-		// Parse settings, configuration, and tags
-		if existing.Settings != "" {
-			var settings []generated.ClusterSetting
-			if err := json.Unmarshal([]byte(existing.Settings), &settings); err == nil {
-				cluster.Settings = settings
-			}
+		// Parse settings, configuration, and tags with caching
+		if settings, err := parseClusterSettings(existing.Name, existing.Settings); err == nil {
+			cluster.Settings = settings
 		}
-		if existing.Configuration != "" {
-			var config generated.ClusterConfiguration
-			if err := json.Unmarshal([]byte(existing.Configuration), &config); err == nil {
-				cluster.Configuration = &config
-			}
+		if config, err := parseClusterConfiguration(existing.Name, existing.Configuration); err == nil {
+			cluster.Configuration = config
 		}
-		if existing.Tags != "" {
-			var tags []generated.Tag
-			if err := json.Unmarshal([]byte(existing.Tags), &tags); err == nil {
-				cluster.Tags = tags
-			}
+		if tags, err := parseTags(fmt.Sprintf("cluster:%s", existing.Name), existing.Tags); err == nil {
+			cluster.Tags = tags
 		}
 
 		return &generated.CreateClusterResponse{
@@ -294,6 +285,9 @@ func (api *DefaultECSAPI) DeleteCluster(ctx context.Context, req *generated.Dele
 	if err := api.storage.ClusterStore().Delete(ctx, cluster.Name); err != nil {
 		return nil, fmt.Errorf("failed to delete cluster: %w", err)
 	}
+	
+	// Invalidate cache for this cluster
+	invalidateClusterCache(cluster.Name)
 
 	// Delete kind cluster and namespace asynchronously
 	go api.deleteKindClusterAndNamespace(cluster)
@@ -354,6 +348,9 @@ func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.Upda
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
 		return nil, fmt.Errorf("failed to update cluster: %w", err)
 	}
+	
+	// Invalidate cache for this cluster
+	invalidateClusterCache(cluster.Name)
 
 	// Build response
 	responseCluster := &generated.Cluster{
@@ -459,6 +456,9 @@ func (api *DefaultECSAPI) UpdateClusterSettings(ctx context.Context, req *genera
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
 		return nil, fmt.Errorf("failed to update cluster: %w", err)
 	}
+	
+	// Invalidate cache for this cluster
+	invalidateClusterCache(cluster.Name)
 
 	// Build response
 	responseCluster := &generated.Cluster{
@@ -532,6 +532,9 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
 		return nil, fmt.Errorf("failed to update cluster: %w", err)
 	}
+	
+	// Invalidate cache for this cluster
+	invalidateClusterCache(cluster.Name)
 
 	// Build response
 	responseCluster := &generated.Cluster{
@@ -585,6 +588,26 @@ func (api *DefaultECSAPI) createKindClusterAndNamespace(cluster *storage.Cluster
 		return
 	}
 
+	// Use async operations if available
+	if asyncOps := api.getAsyncKindOperations(); asyncOps != nil {
+		// Create cluster asynchronously
+		operationID := asyncOps.CreateClusterAsync(ctx, cluster.KindClusterName, func(err error) {
+			if err != nil {
+				log.Printf("Async: Failed to create kind cluster %s for ECS cluster %s: %v", 
+					cluster.KindClusterName, cluster.Name, err)
+				return
+			}
+			
+			// Cluster created successfully, now create namespace
+			api.createNamespaceForCluster(cluster)
+		})
+		
+		log.Printf("Queued async creation of kind cluster %s for ECS cluster %s (operation: %s)", 
+			cluster.KindClusterName, cluster.Name, operationID)
+		return
+	}
+
+	// Fallback to synchronous operation
 	// Check if kind cluster already exists
 	if _, err := api.kindManager.GetKubeClient(cluster.KindClusterName); err != nil {
 		// Cluster doesn't exist, create it
@@ -597,6 +620,14 @@ func (api *DefaultECSAPI) createKindClusterAndNamespace(cluster *storage.Cluster
 		log.Printf("Reusing existing kind cluster %s for ECS cluster %s", cluster.KindClusterName, cluster.Name)
 	}
 
+	// Create namespace
+	api.createNamespaceForCluster(cluster)
+}
+
+// createNamespaceForCluster creates a namespace in the Kind cluster
+func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
+	ctx := context.Background()
+	
 	// Get Kubernetes client
 	kubeClient, err := api.kindManager.GetKubeClient(cluster.KindClusterName)
 	if err != nil {
@@ -611,7 +642,7 @@ func (api *DefaultECSAPI) createKindClusterAndNamespace(cluster *storage.Cluster
 		return
 	}
 
-	log.Printf("Successfully created kind cluster %s and namespace for ECS cluster %s", cluster.KindClusterName, cluster.Name)
+	log.Printf("Successfully created namespace for ECS cluster %s in kind cluster %s", cluster.Name, cluster.KindClusterName)
 }
 
 // ensureKindClusterExists ensures that a Kind cluster exists for an existing ECS cluster
@@ -657,17 +688,34 @@ func (api *DefaultECSAPI) deleteKindClusterAndNamespace(cluster *storage.Cluster
 		return
 	}
 
-	// Get Kubernetes client before deleting cluster
+	// Delete namespace first (while we still have access to the cluster)
 	kubeClient, err := api.kindManager.GetKubeClient(cluster.KindClusterName)
 	if err == nil {
-		// Delete namespace
 		namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
 		if err := namespaceManager.DeleteNamespace(ctx, cluster.Name, cluster.Region); err != nil {
 			log.Printf("Failed to delete namespace for %s: %v", cluster.Name, err)
 		}
 	}
 
-	// Delete kind cluster
+	// Use async operations if available
+	if asyncOps := api.getAsyncKindOperations(); asyncOps != nil {
+		// Delete cluster asynchronously
+		operationID := asyncOps.DeleteClusterAsync(ctx, cluster.KindClusterName, func(err error) {
+			if err != nil {
+				log.Printf("Async: Failed to delete kind cluster %s for ECS cluster %s: %v", 
+					cluster.KindClusterName, cluster.Name, err)
+			} else {
+				log.Printf("Async: Successfully deleted kind cluster %s for ECS cluster %s", 
+					cluster.KindClusterName, cluster.Name)
+			}
+		})
+		
+		log.Printf("Queued async deletion of kind cluster %s for ECS cluster %s (operation: %s)", 
+			cluster.KindClusterName, cluster.Name, operationID)
+		return
+	}
+
+	// Fallback to synchronous operation
 	if err := api.kindManager.DeleteCluster(ctx, cluster.KindClusterName); err != nil {
 		log.Printf("Failed to delete kind cluster %s for ECS cluster %s: %v", cluster.KindClusterName, cluster.Name, err)
 		return

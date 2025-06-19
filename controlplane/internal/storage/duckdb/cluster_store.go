@@ -13,7 +13,8 @@ import (
 
 // clusterStore implements storage.ClusterStore using DuckDB
 type clusterStore struct {
-	db *sql.DB
+	db   *sql.DB
+	pool *ConnectionPool
 }
 
 // Create inserts a new cluster into the database
@@ -76,40 +77,72 @@ func (s *clusterStore) Create(ctx context.Context, cluster *storage.Cluster) err
 
 // Get retrieves a cluster by name
 func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, error) {
-	query := `
-		SELECT 
-			id, arn, name, status, region, account_id,
-			configuration, settings, tags, kind_cluster_name,
-			registered_container_instances_count, running_tasks_count,
-			pending_tasks_count, active_services_count,
-			capacity_providers, default_capacity_provider_strategy,
-			created_at, updated_at
-		FROM clusters
-		WHERE name = ?`
+	var stmt *sql.Stmt
+	var err error
+
+	// Try to use prepared statement if available
+	if s.pool != nil {
+		stmt, _ = s.pool.GetPreparedStmt(QueryGetClusterByName)
+	}
 
 	cluster := &storage.Cluster{}
 	var configuration, settings, tags, kindClusterName, capacityProviders, defaultCapacityProviderStrategy sql.NullString
 
-	err := s.db.QueryRowContext(ctx, query, name).Scan(
-		&cluster.ID,
-		&cluster.ARN,
-		&cluster.Name,
-		&cluster.Status,
-		&cluster.Region,
-		&cluster.AccountID,
-		&configuration,
-		&settings,
-		&tags,
-		&kindClusterName,
-		&cluster.RegisteredContainerInstancesCount,
-		&cluster.RunningTasksCount,
-		&cluster.PendingTasksCount,
-		&cluster.ActiveServicesCount,
-		&capacityProviders,
-		&defaultCapacityProviderStrategy,
-		&cluster.CreatedAt,
-		&cluster.UpdatedAt,
-	)
+	if stmt != nil {
+		err = stmt.QueryRowContext(ctx, name).Scan(
+			&cluster.ID,
+			&cluster.ARN,
+			&cluster.Name,
+			&cluster.Status,
+			&cluster.Region,
+			&cluster.AccountID,
+			&configuration,
+			&settings,
+			&tags,
+			&kindClusterName,
+			&cluster.RegisteredContainerInstancesCount,
+			&cluster.RunningTasksCount,
+			&cluster.PendingTasksCount,
+			&cluster.ActiveServicesCount,
+			&capacityProviders,
+			&defaultCapacityProviderStrategy,
+			&cluster.CreatedAt,
+			&cluster.UpdatedAt,
+		)
+	} else {
+		// Fallback to regular query
+		query := `
+			SELECT 
+				id, arn, name, status, region, account_id,
+				configuration, settings, tags, kind_cluster_name,
+				registered_container_instances_count, running_tasks_count,
+				pending_tasks_count, active_services_count,
+				capacity_providers, default_capacity_provider_strategy,
+				created_at, updated_at
+			FROM clusters
+			WHERE name = ?`
+		
+		err = s.db.QueryRowContext(ctx, query, name).Scan(
+			&cluster.ID,
+			&cluster.ARN,
+			&cluster.Name,
+			&cluster.Status,
+			&cluster.Region,
+			&cluster.AccountID,
+			&configuration,
+			&settings,
+			&tags,
+			&kindClusterName,
+			&cluster.RegisteredContainerInstancesCount,
+			&cluster.RunningTasksCount,
+			&cluster.PendingTasksCount,
+			&cluster.ActiveServicesCount,
+			&capacityProviders,
+			&defaultCapacityProviderStrategy,
+			&cluster.CreatedAt,
+			&cluster.UpdatedAt,
+		)
+	}
 
 	if err != nil {
 		if err == sql.ErrNoRows {
