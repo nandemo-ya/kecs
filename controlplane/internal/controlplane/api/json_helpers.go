@@ -49,7 +49,6 @@ func parseClusterSettings(clusterName, settingsJSON string) ([]generated.Cluster
 		return nil, nil
 	}
 	
-	cacheKey := fmt.Sprintf("cluster_settings:%s", clusterName)
 	var settings []generated.ClusterSetting
 	
 	// Parse
@@ -66,7 +65,6 @@ func parseClusterConfiguration(clusterName, configJSON string) (*generated.Clust
 		return nil, nil
 	}
 	
-	cacheKey := fmt.Sprintf("cluster_config:%s", clusterName)
 	var config generated.ClusterConfiguration
 	
 	// Parse
@@ -83,7 +81,6 @@ func parseTags(resourceID, tagsJSON string) ([]generated.Tag, error) {
 		return nil, nil
 	}
 	
-	cacheKey := fmt.Sprintf("tags:%s", resourceID)
 	var tags []generated.Tag
 	
 	// Parse

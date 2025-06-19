@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -101,14 +100,14 @@ type cachedClusterStore struct {
 	cache   *MemoryCache
 }
 
-func (s *cachedClusterStore) Create(ctx context.Context, cluster *generated.Cluster) error {
+func (s *cachedClusterStore) Create(ctx context.Context, cluster *storage.Cluster) error {
 	if err := s.backend.Create(ctx, cluster); err != nil {
 		return err
 	}
 	
 	// Cache the created cluster
-	s.cache.Set(ctx, clusterKey(cluster.ClusterName), cluster)
-	s.cache.Set(ctx, clusterKeyByArn(cluster.ClusterArn), cluster)
+	s.cache.Set(ctx, clusterKey(cluster.Name), cluster)
+	s.cache.Set(ctx, clusterKeyByArn(cluster.ARN), cluster)
 	
 	// Invalidate list cache
 	s.cache.Delete(ctx, "clusters:list")
@@ -116,12 +115,12 @@ func (s *cachedClusterStore) Create(ctx context.Context, cluster *generated.Clus
 	return nil
 }
 
-func (s *cachedClusterStore) Get(ctx context.Context, name string) (*generated.Cluster, error) {
+func (s *cachedClusterStore) Get(ctx context.Context, name string) (*storage.Cluster, error) {
 	key := clusterKey(name)
 	
 	// Check cache
 	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.(*generated.Cluster), nil
+		return cached.(*storage.Cluster), nil
 	}
 	
 	// Fetch from backend
@@ -132,42 +131,21 @@ func (s *cachedClusterStore) Get(ctx context.Context, name string) (*generated.C
 	
 	// Cache the result
 	s.cache.Set(ctx, key, cluster)
-	s.cache.Set(ctx, clusterKeyByArn(cluster.ClusterArn), cluster)
+	s.cache.Set(ctx, clusterKeyByArn(cluster.ARN), cluster)
 	
 	return cluster, nil
 }
 
-func (s *cachedClusterStore) GetByArn(ctx context.Context, arn string) (*generated.Cluster, error) {
-	key := clusterKeyByArn(arn)
+func (s *cachedClusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
+	key := "clusters:list"
 	
 	// Check cache
 	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.(*generated.Cluster), nil
+		return cached.([]*storage.Cluster), nil
 	}
 	
 	// Fetch from backend
-	cluster, err := s.backend.GetByArn(ctx, arn)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Cache the result
-	s.cache.Set(ctx, key, cluster)
-	s.cache.Set(ctx, clusterKey(cluster.ClusterName), cluster)
-	
-	return cluster, nil
-}
-
-func (s *cachedClusterStore) List(ctx context.Context, region, accountID string) ([]*generated.Cluster, error) {
-	key := fmt.Sprintf("clusters:list:%s:%s", region, accountID)
-	
-	// Check cache
-	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.([]*generated.Cluster), nil
-	}
-	
-	// Fetch from backend
-	clusters, err := s.backend.List(ctx, region, accountID)
+	clusters, err := s.backend.List(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -177,21 +155,51 @@ func (s *cachedClusterStore) List(ctx context.Context, region, accountID string)
 	
 	// Also cache individual clusters
 	for _, cluster := range clusters {
-		s.cache.Set(ctx, clusterKey(cluster.ClusterName), cluster)
-		s.cache.Set(ctx, clusterKeyByArn(cluster.ClusterArn), cluster)
+		s.cache.Set(ctx, clusterKey(cluster.Name), cluster)
+		s.cache.Set(ctx, clusterKeyByArn(cluster.ARN), cluster)
 	}
 	
 	return clusters, nil
 }
 
-func (s *cachedClusterStore) Update(ctx context.Context, cluster *generated.Cluster) error {
+func (s *cachedClusterStore) ListWithPagination(ctx context.Context, limit int, nextToken string) ([]*storage.Cluster, string, error) {
+	key := fmt.Sprintf("clusters:list:page:%d:%s", limit, nextToken)
+	
+	// Check cache for pagination results
+	if cached, found := s.cache.Get(ctx, key); found {
+		result := cached.(paginatedClustersResult)
+		return result.Clusters, result.NextToken, nil
+	}
+	
+	// Fetch from backend
+	clusters, newNextToken, err := s.backend.ListWithPagination(ctx, limit, nextToken)
+	if err != nil {
+		return nil, "", err
+	}
+	
+	// Cache the paginated result
+	s.cache.SetWithTTL(ctx, key, paginatedClustersResult{
+		Clusters:  clusters,
+		NextToken: newNextToken,
+	}, 1*time.Minute)
+	
+	// Also cache individual clusters
+	for _, cluster := range clusters {
+		s.cache.Set(ctx, clusterKey(cluster.Name), cluster)
+		s.cache.Set(ctx, clusterKeyByArn(cluster.ARN), cluster)
+	}
+	
+	return clusters, newNextToken, nil
+}
+
+func (s *cachedClusterStore) Update(ctx context.Context, cluster *storage.Cluster) error {
 	if err := s.backend.Update(ctx, cluster); err != nil {
 		return err
 	}
 	
 	// Update cache
-	s.cache.Set(ctx, clusterKey(cluster.ClusterName), cluster)
-	s.cache.Set(ctx, clusterKeyByArn(cluster.ClusterArn), cluster)
+	s.cache.Set(ctx, clusterKey(cluster.Name), cluster)
+	s.cache.Set(ctx, clusterKeyByArn(cluster.ARN), cluster)
 	
 	// Invalidate list cache
 	s.cache.Delete(ctx, "clusters:list")
@@ -210,152 +218,11 @@ func (s *cachedClusterStore) Delete(ctx context.Context, name string) error {
 	// Remove from cache
 	s.cache.Delete(ctx, clusterKey(name))
 	if cluster != nil {
-		s.cache.Delete(ctx, clusterKeyByArn(cluster.ClusterArn))
+		s.cache.Delete(ctx, clusterKeyByArn(cluster.ARN))
 	}
 	
 	// Invalidate list cache
 	s.cache.Delete(ctx, "clusters:list")
-	
-	return nil
-}
-
-func (s *cachedClusterStore) DeleteByArn(ctx context.Context, arn string) error {
-	// Get cluster first to get name
-	cluster, _ := s.GetByArn(ctx, arn)
-	
-	if err := s.backend.DeleteByArn(ctx, arn); err != nil {
-		return err
-	}
-	
-	// Remove from cache
-	s.cache.Delete(ctx, clusterKeyByArn(arn))
-	if cluster != nil {
-		s.cache.Delete(ctx, clusterKey(cluster.ClusterName))
-	}
-	
-	// Invalidate list cache
-	s.cache.Delete(ctx, "clusters:list")
-	
-	return nil
-}
-
-// cachedServiceStore implements storage.ServiceStore with caching
-type cachedServiceStore struct {
-	backend storage.ServiceStore
-	cache   *MemoryCache
-}
-
-func (s *cachedServiceStore) Create(ctx context.Context, service *generated.Service) error {
-	if err := s.backend.Create(ctx, service); err != nil {
-		return err
-	}
-	
-	// Cache the created service
-	s.cache.Set(ctx, serviceKey(service.ServiceArn), service)
-	
-	// Invalidate list cache
-	s.cache.Delete(ctx, fmt.Sprintf("services:list:%s", service.ClusterArn))
-	
-	return nil
-}
-
-func (s *cachedServiceStore) Get(ctx context.Context, clusterArn, serviceName string) (*generated.Service, error) {
-	// Generate a key based on cluster and service name
-	key := fmt.Sprintf("service:%s:%s", clusterArn, serviceName)
-	
-	// Check cache
-	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.(*generated.Service), nil
-	}
-	
-	// Fetch from backend
-	service, err := s.backend.Get(ctx, clusterArn, serviceName)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Cache the result
-	s.cache.Set(ctx, key, service)
-	s.cache.Set(ctx, serviceKey(service.ServiceArn), service)
-	
-	return service, nil
-}
-
-func (s *cachedServiceStore) GetByArn(ctx context.Context, arn string) (*generated.Service, error) {
-	key := serviceKey(arn)
-	
-	// Check cache
-	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.(*generated.Service), nil
-	}
-	
-	// Fetch from backend
-	service, err := s.backend.GetByArn(ctx, arn)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Cache the result
-	s.cache.Set(ctx, key, service)
-	
-	return service, nil
-}
-
-func (s *cachedServiceStore) List(ctx context.Context, clusterArn string) ([]*generated.Service, error) {
-	key := fmt.Sprintf("services:list:%s", clusterArn)
-	
-	// Check cache
-	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.([]*generated.Service), nil
-	}
-	
-	// Fetch from backend
-	services, err := s.backend.List(ctx, clusterArn)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Cache the result with shorter TTL
-	s.cache.SetWithTTL(ctx, key, services, 1*time.Minute)
-	
-	// Also cache individual services
-	for _, service := range services {
-		s.cache.Set(ctx, serviceKey(service.ServiceArn), service)
-	}
-	
-	return services, nil
-}
-
-func (s *cachedServiceStore) Update(ctx context.Context, service *generated.Service) error {
-	if err := s.backend.Update(ctx, service); err != nil {
-		return err
-	}
-	
-	// Update cache
-	s.cache.Set(ctx, serviceKey(service.ServiceArn), service)
-	
-	// Invalidate list cache
-	s.cache.Delete(ctx, fmt.Sprintf("services:list:%s", service.ClusterArn))
-	
-	return nil
-}
-
-func (s *cachedServiceStore) Delete(ctx context.Context, clusterArn, serviceName string) error {
-	// Get service first to get ARN
-	service, _ := s.Get(ctx, clusterArn, serviceName)
-	
-	if err := s.backend.Delete(ctx, clusterArn, serviceName); err != nil {
-		return err
-	}
-	
-	// Remove from cache
-	if service != nil {
-		s.cache.Delete(ctx, serviceKey(service.ServiceArn))
-	}
-	s.cache.Delete(ctx, fmt.Sprintf("service:%s:%s", clusterArn, serviceName))
-	
-	// Invalidate list cache
-	s.cache.Delete(ctx, fmt.Sprintf("services:list:%s", clusterArn))
 	
 	return nil
 }
@@ -366,27 +233,42 @@ type cachedTaskDefinitionStore struct {
 	cache   *MemoryCache
 }
 
-func (s *cachedTaskDefinitionStore) Create(ctx context.Context, taskDef *generated.TaskDefinition) error {
-	if err := s.backend.Create(ctx, taskDef); err != nil {
+func (s *cachedTaskDefinitionStore) Register(ctx context.Context, taskDef *storage.TaskDefinition) (*storage.TaskDefinition, error) {
+	registered, err := s.backend.Register(ctx, taskDef)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Cache the task definition
+	s.cache.Set(ctx, taskDefKey(registered.Family, registered.Revision), registered)
+	s.cache.Set(ctx, taskDefKeyByArn(registered.ARN), registered)
+	
+	// Invalidate family cache
+	s.cache.Delete(ctx, taskDefFamilyKey(registered.Family))
+	
+	return registered, nil
+}
+
+func (s *cachedTaskDefinitionStore) Deregister(ctx context.Context, family string, revision int) error {
+	if err := s.backend.Deregister(ctx, family, revision); err != nil {
 		return err
 	}
 	
-	// Cache the created task definition
-	s.cache.Set(ctx, taskDefKey(taskDef.TaskDefinitionArn), taskDef)
-	s.cache.Set(ctx, taskDefFamilyKey(taskDef.Family), taskDef)
+	// Remove from cache
+	s.cache.Delete(ctx, taskDefKey(family, revision))
 	
-	// Invalidate list cache
-	s.cache.Delete(ctx, fmt.Sprintf("taskdefs:list:%s", taskDef.Family))
+	// Invalidate family cache
+	s.cache.Delete(ctx, taskDefFamilyKey(family))
 	
 	return nil
 }
 
-func (s *cachedTaskDefinitionStore) Get(ctx context.Context, family string, revision int32) (*generated.TaskDefinition, error) {
-	key := fmt.Sprintf("taskdef:%s:%d", family, revision)
+func (s *cachedTaskDefinitionStore) Get(ctx context.Context, family string, revision int) (*storage.TaskDefinition, error) {
+	key := taskDefKey(family, revision)
 	
 	// Check cache
 	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.(*generated.TaskDefinition), nil
+		return cached.(*storage.TaskDefinition), nil
 	}
 	
 	// Fetch from backend
@@ -397,116 +279,124 @@ func (s *cachedTaskDefinitionStore) Get(ctx context.Context, family string, revi
 	
 	// Cache the result
 	s.cache.Set(ctx, key, taskDef)
-	s.cache.Set(ctx, taskDefKey(taskDef.TaskDefinitionArn), taskDef)
+	s.cache.Set(ctx, taskDefKeyByArn(taskDef.ARN), taskDef)
 	
 	return taskDef, nil
 }
 
-func (s *cachedTaskDefinitionStore) GetByArn(ctx context.Context, arn string) (*generated.TaskDefinition, error) {
-	key := taskDefKey(arn)
+func (s *cachedTaskDefinitionStore) GetByARN(ctx context.Context, arn string) (*storage.TaskDefinition, error) {
+	key := taskDefKeyByArn(arn)
 	
 	// Check cache
 	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.(*generated.TaskDefinition), nil
+		return cached.(*storage.TaskDefinition), nil
 	}
 	
 	// Fetch from backend
-	taskDef, err := s.backend.GetByArn(ctx, arn)
+	taskDef, err := s.backend.GetByARN(ctx, arn)
 	if err != nil {
 		return nil, err
 	}
 	
 	// Cache the result
 	s.cache.Set(ctx, key, taskDef)
+	s.cache.Set(ctx, taskDefKey(taskDef.Family, taskDef.Revision), taskDef)
 	
 	return taskDef, nil
 }
 
-func (s *cachedTaskDefinitionStore) GetLatest(ctx context.Context, family string) (*generated.TaskDefinition, error) {
-	key := taskDefFamilyKey(family)
+func (s *cachedTaskDefinitionStore) GetLatest(ctx context.Context, family string) (*storage.TaskDefinition, error) {
+	// Don't cache latest queries as they change frequently
+	return s.backend.GetLatest(ctx, family)
+}
+
+func (s *cachedTaskDefinitionStore) ListFamilies(ctx context.Context, familyPrefix string, status string, limit int, nextToken string) ([]*storage.TaskDefinitionFamily, string, error) {
+	// Don't cache list operations as they change frequently
+	return s.backend.ListFamilies(ctx, familyPrefix, status, limit, nextToken)
+}
+
+func (s *cachedTaskDefinitionStore) ListRevisions(ctx context.Context, family string, status string, limit int, nextToken string) ([]*storage.TaskDefinitionRevision, string, error) {
+	// Don't cache list operations as they change frequently
+	return s.backend.ListRevisions(ctx, family, status, limit, nextToken)
+}
+
+// cachedServiceStore implements storage.ServiceStore with caching
+type cachedServiceStore struct {
+	backend storage.ServiceStore
+	cache   *MemoryCache
+}
+
+func (s *cachedServiceStore) Create(ctx context.Context, service *storage.Service) error {
+	if err := s.backend.Create(ctx, service); err != nil {
+		return err
+	}
+	
+	// Cache the service
+	s.cache.Set(ctx, serviceKey(service.ClusterARN, service.ServiceName), service)
+	
+	// Invalidate list cache
+	s.cache.Delete(ctx, fmt.Sprintf("services:list:%s", service.ClusterARN))
+	
+	return nil
+}
+
+func (s *cachedServiceStore) Get(ctx context.Context, cluster, serviceName string) (*storage.Service, error) {
+	key := serviceKey(cluster, serviceName)
 	
 	// Check cache
 	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.(*generated.TaskDefinition), nil
+		return cached.(*storage.Service), nil
 	}
 	
 	// Fetch from backend
-	taskDef, err := s.backend.GetLatest(ctx, family)
+	service, err := s.backend.Get(ctx, cluster, serviceName)
 	if err != nil {
 		return nil, err
 	}
 	
 	// Cache the result
-	s.cache.Set(ctx, key, taskDef)
-	s.cache.Set(ctx, taskDefKey(taskDef.TaskDefinitionArn), taskDef)
+	s.cache.Set(ctx, key, service)
 	
-	return taskDef, nil
+	return service, nil
 }
 
-func (s *cachedTaskDefinitionStore) ListByFamily(ctx context.Context, family string) ([]*generated.TaskDefinition, error) {
-	key := fmt.Sprintf("taskdefs:list:%s", family)
-	
-	// Check cache
-	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.([]*generated.TaskDefinition), nil
-	}
-	
-	// Fetch from backend
-	taskDefs, err := s.backend.ListByFamily(ctx, family)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Cache the result with shorter TTL
-	s.cache.SetWithTTL(ctx, key, taskDefs, 1*time.Minute)
-	
-	// Also cache individual task definitions
-	for _, taskDef := range taskDefs {
-		s.cache.Set(ctx, taskDefKey(taskDef.TaskDefinitionArn), taskDef)
-	}
-	
-	return taskDefs, nil
+func (s *cachedServiceStore) List(ctx context.Context, cluster string, serviceName string, launchType string, limit int, nextToken string) ([]*storage.Service, string, error) {
+	// Don't cache list operations as they change frequently and have complex filtering
+	return s.backend.List(ctx, cluster, serviceName, launchType, limit, nextToken)
 }
 
-func (s *cachedTaskDefinitionStore) ListFamilies(ctx context.Context, region, accountID string) ([]string, error) {
-	key := fmt.Sprintf("taskdefs:families:%s:%s", region, accountID)
-	
-	// Check cache
-	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.([]string), nil
+func (s *cachedServiceStore) Update(ctx context.Context, service *storage.Service) error {
+	if err := s.backend.Update(ctx, service); err != nil {
+		return err
 	}
 	
-	// Fetch from backend
-	families, err := s.backend.ListFamilies(ctx, region, accountID)
-	if err != nil {
-		return nil, err
-	}
+	// Update cache
+	s.cache.Set(ctx, serviceKey(service.ClusterARN, service.ServiceName), service)
 	
-	// Cache the result
-	s.cache.SetWithTTL(ctx, key, families, 2*time.Minute)
+	// Invalidate list cache
+	s.cache.Delete(ctx, fmt.Sprintf("services:list:%s", service.ClusterARN))
 	
-	return families, nil
+	return nil
 }
 
-func (s *cachedTaskDefinitionStore) Delete(ctx context.Context, family string, revision int32) error {
-	// Get task definition first to get ARN
-	taskDef, _ := s.Get(ctx, family, revision)
-	
-	if err := s.backend.Delete(ctx, family, revision); err != nil {
+func (s *cachedServiceStore) Delete(ctx context.Context, cluster, serviceName string) error {
+	if err := s.backend.Delete(ctx, cluster, serviceName); err != nil {
 		return err
 	}
 	
 	// Remove from cache
-	s.cache.Delete(ctx, fmt.Sprintf("taskdef:%s:%d", family, revision))
-	if taskDef != nil {
-		s.cache.Delete(ctx, taskDefKey(taskDef.TaskDefinitionArn))
-	}
+	s.cache.Delete(ctx, serviceKey(cluster, serviceName))
 	
-	// Invalidate family cache
-	s.cache.Delete(ctx, taskDefFamilyKey(family))
-	s.cache.Delete(ctx, fmt.Sprintf("taskdefs:list:%s", family))
+	// Invalidate list cache
+	s.cache.Delete(ctx, fmt.Sprintf("services:list:%s", cluster))
 	
 	return nil
+}
+
+func (s *cachedServiceStore) GetByARN(ctx context.Context, arn string) (*storage.Service, error) {
+	// For now, just fetch from backend
+	// TODO: extract cluster and service name from ARN to use cache
+	return s.backend.GetByARN(ctx, arn)
 }
 
 // cachedTaskStore implements storage.TaskStore with caching
@@ -515,97 +405,78 @@ type cachedTaskStore struct {
 	cache   *MemoryCache
 }
 
-func (s *cachedTaskStore) Create(ctx context.Context, task *generated.Task) error {
+func (s *cachedTaskStore) Create(ctx context.Context, task *storage.Task) error {
 	if err := s.backend.Create(ctx, task); err != nil {
 		return err
 	}
 	
-	// Cache the created task
-	s.cache.Set(ctx, taskKey(task.TaskArn), task)
+	// Cache the task
+	s.cache.Set(ctx, taskKey(task.ClusterARN, task.ID), task)
 	
 	// Invalidate list cache
-	s.cache.Delete(ctx, fmt.Sprintf("tasks:list:%s", task.ClusterArn))
+	s.cache.Delete(ctx, fmt.Sprintf("tasks:list:%s", task.ClusterARN))
 	
 	return nil
 }
 
-func (s *cachedTaskStore) Get(ctx context.Context, taskArn string) (*generated.Task, error) {
-	key := taskKey(taskArn)
+func (s *cachedTaskStore) Get(ctx context.Context, clusterArn, taskID string) (*storage.Task, error) {
+	key := taskKey(clusterArn, taskID)
 	
 	// Check cache
 	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.(*generated.Task), nil
+		return cached.(*storage.Task), nil
 	}
 	
 	// Fetch from backend
-	task, err := s.backend.Get(ctx, taskArn)
+	task, err := s.backend.Get(ctx, clusterArn, taskID)
 	if err != nil {
 		return nil, err
 	}
 	
-	// Cache the result with shorter TTL (tasks change frequently)
-	s.cache.SetWithTTL(ctx, key, task, 30*time.Second)
+	// Cache the result
+	s.cache.Set(ctx, key, task)
 	
 	return task, nil
 }
 
-func (s *cachedTaskStore) List(ctx context.Context, clusterArn, serviceName, status string) ([]*generated.Task, error) {
-	key := fmt.Sprintf("tasks:list:%s:%s:%s", clusterArn, serviceName, status)
-	
-	// Check cache
-	if cached, found := s.cache.Get(ctx, key); found {
-		return cached.([]*generated.Task), nil
-	}
-	
-	// Fetch from backend
-	tasks, err := s.backend.List(ctx, clusterArn, serviceName, status)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Cache the result with very short TTL (tasks change frequently)
-	s.cache.SetWithTTL(ctx, key, tasks, 10*time.Second)
-	
-	// Also cache individual tasks
-	for _, task := range tasks {
-		s.cache.SetWithTTL(ctx, taskKey(task.TaskArn), task, 30*time.Second)
-	}
-	
-	return tasks, nil
+func (s *cachedTaskStore) GetByARNs(ctx context.Context, arns []string) ([]*storage.Task, error) {
+	// For batch operations, fetch from backend
+	return s.backend.GetByARNs(ctx, arns)
 }
 
-func (s *cachedTaskStore) Update(ctx context.Context, task *generated.Task) error {
+func (s *cachedTaskStore) List(ctx context.Context, cluster string, filters storage.TaskFilters) ([]*storage.Task, error) {
+	// Don't cache list operations as they change frequently and have complex filtering
+	return s.backend.List(ctx, cluster, filters)
+}
+
+func (s *cachedTaskStore) Update(ctx context.Context, task *storage.Task) error {
 	if err := s.backend.Update(ctx, task); err != nil {
 		return err
 	}
 	
 	// Update cache
-	s.cache.SetWithTTL(ctx, taskKey(task.TaskArn), task, 30*time.Second)
+	s.cache.Set(ctx, taskKey(task.ClusterARN, task.ID), task)
 	
 	// Invalidate list cache
-	s.cache.Delete(ctx, fmt.Sprintf("tasks:list:%s", task.ClusterArn))
+	s.cache.Delete(ctx, fmt.Sprintf("tasks:list:%s", task.ClusterARN))
 	
 	return nil
 }
 
-func (s *cachedTaskStore) Delete(ctx context.Context, taskArn string) error {
-	// Get task first to get cluster ARN
-	task, _ := s.Get(ctx, taskArn)
-	
-	if err := s.backend.Delete(ctx, taskArn); err != nil {
+func (s *cachedTaskStore) Delete(ctx context.Context, clusterArn, taskID string) error {
+	if err := s.backend.Delete(ctx, clusterArn, taskID); err != nil {
 		return err
 	}
 	
 	// Remove from cache
-	s.cache.Delete(ctx, taskKey(taskArn))
+	s.cache.Delete(ctx, taskKey(clusterArn, taskID))
 	
 	// Invalidate list cache
-	if task != nil {
-		s.cache.Delete(ctx, fmt.Sprintf("tasks:list:%s", task.ClusterArn))
-	}
+	s.cache.Delete(ctx, fmt.Sprintf("tasks:list:%s", clusterArn))
 	
 	return nil
 }
+
 
 // Helper functions for cache keys
 func clusterKey(name string) string {
@@ -616,18 +487,28 @@ func clusterKeyByArn(arn string) string {
 	return fmt.Sprintf("cluster:arn:%s", arn)
 }
 
-func serviceKey(arn string) string {
-	return fmt.Sprintf("service:arn:%s", arn)
+func taskDefKey(family string, revision int) string {
+	return fmt.Sprintf("taskdef:%s:%d", family, revision)
 }
 
-func taskDefKey(arn string) string {
+func taskDefKeyByArn(arn string) string {
 	return fmt.Sprintf("taskdef:arn:%s", arn)
 }
 
 func taskDefFamilyKey(family string) string {
-	return fmt.Sprintf("taskdef:family:latest:%s", family)
+	return fmt.Sprintf("taskdef:family:%s", family)
 }
 
-func taskKey(arn string) string {
-	return fmt.Sprintf("task:arn:%s", arn)
+func serviceKey(cluster, serviceName string) string {
+	return fmt.Sprintf("service:%s:%s", cluster, serviceName)
+}
+
+func taskKey(cluster, taskID string) string {
+	return fmt.Sprintf("task:%s:%s", cluster, taskID)
+}
+
+// paginatedClustersResult holds paginated cluster results
+type paginatedClustersResult struct {
+	Clusters  []*storage.Cluster
+	NextToken string
 }

@@ -55,13 +55,13 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 
 	// Create stores with the pooled connection
 	s.clusterStore = &clusterStore{db: db, pool: pool}
-	s.taskDefinitionStore = &taskDefinitionStore{db: db, pool: pool}
-	s.serviceStore = &serviceStore{db: db, pool: pool}
-	s.taskStore = &taskStore{db: db, pool: pool}
+	s.taskDefinitionStore = &taskDefinitionStore{db: db}
+	s.serviceStore = &serviceStore{db: db}
+	s.taskStore = &taskStore{db: db}
 	s.accountSettingStore = &accountSettingStore{db: db}
-	s.taskSetStore = &taskSetStore{db: db, pool: pool}
-	s.containerInstanceStore = &containerInstanceStore{db: db, pool: pool}
-	s.attributeStore = &attributeStore{db: db, pool: pool}
+	s.taskSetStore = &taskSetStore{db: db}
+	s.containerInstanceStore = &containerInstanceStore{db: db}
+	s.attributeStore = &attributeStore{db: db}
 
 	return s, nil
 }

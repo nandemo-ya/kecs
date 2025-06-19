@@ -232,7 +232,7 @@ func InvalidateCached(v interface{}) {
 	defaultJSONCache.Invalidate(v)
 }
 
-// JSONCacheStats returns global cache statistics
-func JSONCacheStats() JSONCacheStats {
+// GetJSONCacheStats returns global cache statistics
+func GetJSONCacheStats() JSONCacheStats {
 	return defaultJSONCache.Stats()
 }

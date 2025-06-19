@@ -74,7 +74,10 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	var kindManager *kubernetes.KindManager
 	if os.Getenv("KECS_TEST_MODE") != "true" {
 		// Use cached kind manager for better performance
-		cachedKindManager := kubernetes.NewCachedKindManager()
+		cachedKindManager, err := kubernetes.NewCachedKindManager(kubeconfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cached kind manager: %w", err)
+		}
 		kindManager = cachedKindManager.KindManager
 		log.Println("Initialized Kubernetes client cache for improved performance")
 	} else {
