@@ -15,6 +15,7 @@ import (
 // DuckDBStorage implements storage.Storage using DuckDB
 type DuckDBStorage struct {
 	db                     *sql.DB
+	pool                   *ConnectionPool
 	dbPath                 string
 	clusterStore           *clusterStore
 	taskDefinitionStore    *taskDefinitionStore
@@ -36,24 +37,24 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 		}
 	}
 
-	// Open DuckDB connection
-	db, err := sql.Open("duckdb", dbPath)
+	// Create connection pool with optimized settings
+	// maxConns: 25 - Allow up to 25 concurrent connections
+	// maxIdleConns: 5 - Keep 5 idle connections ready
+	pool, err := NewConnectionPool(dbPath, 25, 5)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open DuckDB: %w", err)
+		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
-	// Test connection
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping DuckDB: %w", err)
-	}
+	db := pool.DB()
 
 	s := &DuckDBStorage{
 		db:     db,
+		pool:   pool,
 		dbPath: dbPath,
 	}
 
-	// Create stores
-	s.clusterStore = &clusterStore{db: db}
+	// Create stores with the pooled connection
+	s.clusterStore = &clusterStore{db: db, pool: pool}
 	s.taskDefinitionStore = &taskDefinitionStore{db: db}
 	s.serviceStore = &serviceStore{db: db}
 	s.taskStore = &taskStore{db: db}
@@ -114,14 +115,20 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 		return fmt.Errorf("failed to create attributes table: %w", err)
 	}
 
+	// Initialize prepared statements for common queries
+	if err := s.pool.InitializeCommonStatements(ctx); err != nil {
+		log.Printf("Warning: failed to initialize prepared statements: %v", err)
+		// Non-fatal error - continue initialization
+	}
+
 	log.Println("DuckDB storage initialized successfully")
 	return nil
 }
 
 // Close closes the database connection
 func (s *DuckDBStorage) Close() error {
-	if s.db != nil {
-		return s.db.Close()
+	if s.pool != nil {
+		return s.pool.Close()
 	}
 	return nil
 }

@@ -16,6 +16,7 @@ import (
 type DefaultECSAPI struct {
 	storage                    storage.Storage
 	kindManager                *kubernetes.KindManager
+	asyncKindOperations        *kubernetes.AsyncKindOperations
 	region                     string
 	accountID                  string
 	iamIntegration             iam.Integration
@@ -64,6 +65,16 @@ func (api *DefaultECSAPI) SetS3Integration(s3Integration s3.Integration) {
 // SetServiceDiscoveryManager sets the service discovery manager for the ECS API
 func (api *DefaultECSAPI) SetServiceDiscoveryManager(serviceDiscoveryManager servicediscovery.Manager) {
 	api.serviceDiscoveryManager = serviceDiscoveryManager
+}
+
+// SetAsyncKindOperations sets the async Kind operations for the ECS API
+func (api *DefaultECSAPI) SetAsyncKindOperations(asyncKindOperations *kubernetes.AsyncKindOperations) {
+	api.asyncKindOperations = asyncKindOperations
+}
+
+// getAsyncKindOperations returns the async Kind operations if available
+func (api *DefaultECSAPI) getAsyncKindOperations() *kubernetes.AsyncKindOperations {
+	return api.asyncKindOperations
 }
 
 // NewDefaultECSAPIWithConfig creates a new default ECS API implementation with custom region and accountID

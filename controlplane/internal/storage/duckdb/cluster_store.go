@@ -13,7 +13,8 @@ import (
 
 // clusterStore implements storage.ClusterStore using DuckDB
 type clusterStore struct {
-	db *sql.DB
+	db   *sql.DB
+	pool *ConnectionPool
 }
 
 // Create inserts a new cluster into the database
@@ -76,6 +77,9 @@ func (s *clusterStore) Create(ctx context.Context, cluster *storage.Cluster) err
 
 // Get retrieves a cluster by name
 func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, error) {
+	cluster := &storage.Cluster{}
+	var configuration, settings, tags, kindClusterName, capacityProviders, defaultCapacityProviderStrategy sql.NullString
+
 	query := `
 		SELECT 
 			id, arn, name, status, region, account_id,
@@ -86,9 +90,6 @@ func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, 
 			created_at, updated_at
 		FROM clusters
 		WHERE name = ?`
-
-	cluster := &storage.Cluster{}
-	var configuration, settings, tags, kindClusterName, capacityProviders, defaultCapacityProviderStrategy sql.NullString
 
 	err := s.db.QueryRowContext(ctx, query, name).Scan(
 		&cluster.ID,
