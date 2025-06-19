@@ -25,17 +25,21 @@ export default defineConfig({
           text: 'Getting Started',
           items: [
             { text: 'Introduction', link: '/guides/getting-started' },
-            { text: 'Installation', link: '/guides/installation' },
             { text: 'Quick Start', link: '/guides/quick-start' }
           ]
         },
         {
           text: 'Core Concepts',
           items: [
-            { text: 'Clusters', link: '/guides/clusters' },
             { text: 'Services', link: '/guides/services' },
-            { text: 'Tasks', link: '/guides/tasks' },
-            { text: 'Task Definitions', link: '/guides/task-definitions' }
+            { text: 'Task Definitions', link: '/guides/task-definitions' },
+            { text: 'Web UI', link: '/guides/web-ui' }
+          ]
+        },
+        {
+          text: 'Integration',
+          items: [
+            { text: 'LocalStack Integration', link: '/guides/localstack-integration' }
           ]
         },
         {
@@ -43,6 +47,12 @@ export default defineConfig({
           items: [
             { text: 'Integration Testing', link: '/guides/integration-testing' },
             { text: 'Using Testcontainers', link: '/guides/testcontainers' }
+          ]
+        },
+        {
+          text: 'Reference',
+          items: [
+            { text: 'Troubleshooting', link: '/guides/troubleshooting' }
           ]
         }
       ],
@@ -55,7 +65,8 @@ export default defineConfig({
             { text: 'Cluster APIs', link: '/api/clusters' },
             { text: 'Service APIs', link: '/api/services' },
             { text: 'Task APIs', link: '/api/tasks' },
-            { text: 'Task Definition APIs', link: '/api/task-definitions' }
+            { text: 'Task Definition APIs', link: '/api/task-definitions' },
+            { text: 'WebSocket API', link: '/api/websocket' }
           ]
         }
       ],
