@@ -28,6 +28,7 @@ type Server struct {
 	port              int
 	kubeconfig        string
 	ecsAPI            generated.ECSAPIInterface
+	ecsAPIV2          ECSAPIV2  // New V2 API using AWS SDK types
 	storage           storage.Storage
 	kindManager       *kubernetes.KindManager
 	taskManager       *kubernetes.TaskManager
@@ -289,6 +290,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 	}
 	s.ecsAPI = ecsAPI
+	
+	// Initialize V2 API using AWS SDK types
+	s.ecsAPIV2 = NewDefaultECSAPIV2(storage, kindManager)
 
 	return s, nil
 }
@@ -318,7 +322,7 @@ func (s *Server) Start() error {
 		}
 	}
 
-	router := s.setupRoutes()
+	router := s.SetupRoutes()
 
 	s.httpServer = &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),
@@ -365,8 +369,8 @@ func (s *Server) Stop(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
 
-// setupRoutes configures all the API routes
-func (s *Server) setupRoutes() http.Handler {
+// SetupRoutes configures all the API routes
+func (s *Server) SetupRoutes() http.Handler {
 	mux := http.NewServeMux()
 
 	// AWS ECS API endpoint (AWS CLI format)
@@ -378,7 +382,8 @@ func (s *Server) setupRoutes() http.Handler {
 			return
 		}
 		// Otherwise handle as ECS request
-		generated.HandleECSRequest(s.ecsAPI)(w, r)
+		// Use adapter middleware to route between v1 and v2 handlers
+		AdapterMiddleware(s.ecsAPI, s.ecsAPIV2)(w, r)
 	})
 
 	// Health check endpoint

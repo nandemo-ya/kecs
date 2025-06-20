@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -23,6 +24,11 @@ func NewTaskDefinitionStore(db *sql.DB) storage.TaskDefinitionStore {
 
 // Register creates a new task definition revision
 func (s *taskDefinitionStore) Register(ctx context.Context, taskDef *storage.TaskDefinition) (*storage.TaskDefinition, error) {
+	// Generate ID if not provided
+	if taskDef.ID == "" {
+		taskDef.ID = uuid.New().String()
+	}
+
 	// Get the next revision number for this family
 	var nextRevision int
 	err := s.db.QueryRowContext(ctx, `
