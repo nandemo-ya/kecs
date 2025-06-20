@@ -26,6 +26,12 @@ type ECSAPIV2 interface {
 	DescribeServicesV2(ctx context.Context, req *ecs.DescribeServicesInput) (*ecs.DescribeServicesOutput, error)
 	UpdateServiceV2(ctx context.Context, req *ecs.UpdateServiceInput) (*ecs.UpdateServiceOutput, error)
 	DeleteServiceV2(ctx context.Context, req *ecs.DeleteServiceInput) (*ecs.DeleteServiceOutput, error)
+	
+	// Task operations
+	RunTaskV2(ctx context.Context, req *ecs.RunTaskInput) (*ecs.RunTaskOutput, error)
+	StopTaskV2(ctx context.Context, req *ecs.StopTaskInput) (*ecs.StopTaskOutput, error)
+	DescribeTasksV2(ctx context.Context, req *ecs.DescribeTasksInput) (*ecs.DescribeTasksOutput, error)
+	ListTasksV2(ctx context.Context, req *ecs.ListTasksInput) (*ecs.ListTasksOutput, error)
 }
 
 // handleRequestV2 is a generic handler for ECS operations using AWS SDK types
@@ -118,6 +124,15 @@ func AdapterMiddleware(v1API generated.ECSAPIInterface, v2API ECSAPIV2) http.Han
 			handleRequestV2(v2API.UpdateServiceV2, w, r)
 		case "DeleteService":
 			handleRequestV2(v2API.DeleteServiceV2, w, r)
+		// Task operations
+		case "RunTask":
+			handleRequestV2(v2API.RunTaskV2, w, r)
+		case "StopTask":
+			handleRequestV2(v2API.StopTaskV2, w, r)
+		case "DescribeTasks":
+			handleRequestV2(v2API.DescribeTasksV2, w, r)
+		case "ListTasks":
+			handleRequestV2(v2API.ListTasksV2, w, r)
 		default:
 			// Fall back to v1 handler for non-migrated operations
 			generated.HandleECSRequest(v1API)(w, r)

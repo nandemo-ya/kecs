@@ -17,6 +17,8 @@ import (
 type DefaultECSAPIV2 struct {
 	storage     storage.Storage
 	kindManager *kubernetes.KindManager
+	region      string
+	accountID   string
 }
 
 // NewDefaultECSAPIV2 creates a new DefaultECSAPIV2 instance
@@ -24,6 +26,8 @@ func NewDefaultECSAPIV2(storage storage.Storage, kindManager *kubernetes.KindMan
 	return &DefaultECSAPIV2{
 		storage:     storage,
 		kindManager: kindManager,
+		region:      "ap-northeast-1",
+		accountID:   "123456789012",
 	}
 }
 
