@@ -32,6 +32,13 @@ type ECSAPIV2 interface {
 	StopTaskV2(ctx context.Context, req *ecs.StopTaskInput) (*ecs.StopTaskOutput, error)
 	DescribeTasksV2(ctx context.Context, req *ecs.DescribeTasksInput) (*ecs.DescribeTasksOutput, error)
 	ListTasksV2(ctx context.Context, req *ecs.ListTasksInput) (*ecs.ListTasksOutput, error)
+	
+	// TaskDefinition operations
+	RegisterTaskDefinitionV2(ctx context.Context, req *ecs.RegisterTaskDefinitionInput) (*ecs.RegisterTaskDefinitionOutput, error)
+	DeregisterTaskDefinitionV2(ctx context.Context, req *ecs.DeregisterTaskDefinitionInput) (*ecs.DeregisterTaskDefinitionOutput, error)
+	DescribeTaskDefinitionV2(ctx context.Context, req *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error)
+	ListTaskDefinitionFamiliesV2(ctx context.Context, req *ecs.ListTaskDefinitionFamiliesInput) (*ecs.ListTaskDefinitionFamiliesOutput, error)
+	ListTaskDefinitionsV2(ctx context.Context, req *ecs.ListTaskDefinitionsInput) (*ecs.ListTaskDefinitionsOutput, error)
 }
 
 // handleRequestV2 is a generic handler for ECS operations using AWS SDK types
@@ -133,6 +140,17 @@ func AdapterMiddleware(v1API generated.ECSAPIInterface, v2API ECSAPIV2) http.Han
 			handleRequestV2(v2API.DescribeTasksV2, w, r)
 		case "ListTasks":
 			handleRequestV2(v2API.ListTasksV2, w, r)
+		// TaskDefinition operations
+		case "RegisterTaskDefinition":
+			handleRequestV2(v2API.RegisterTaskDefinitionV2, w, r)
+		case "DeregisterTaskDefinition":
+			handleRequestV2(v2API.DeregisterTaskDefinitionV2, w, r)
+		case "DescribeTaskDefinition":
+			handleRequestV2(v2API.DescribeTaskDefinitionV2, w, r)
+		case "ListTaskDefinitionFamilies":
+			handleRequestV2(v2API.ListTaskDefinitionFamiliesV2, w, r)
+		case "ListTaskDefinitions":
+			handleRequestV2(v2API.ListTaskDefinitionsV2, w, r)
 		default:
 			// Fall back to v1 handler for non-migrated operations
 			generated.HandleECSRequest(v1API)(w, r)
