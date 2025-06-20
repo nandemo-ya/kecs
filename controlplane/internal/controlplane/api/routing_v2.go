@@ -13,11 +13,19 @@ import (
 
 // ECSAPIV2 defines the interface for ECS API v2 operations using AWS SDK types
 type ECSAPIV2 interface {
+	// Cluster operations
 	ListClustersV2(ctx context.Context, req *ecs.ListClustersInput) (*ecs.ListClustersOutput, error)
 	CreateClusterV2(ctx context.Context, req *ecs.CreateClusterInput) (*ecs.CreateClusterOutput, error)
 	DescribeClustersV2(ctx context.Context, req *ecs.DescribeClustersInput) (*ecs.DescribeClustersOutput, error)
 	DeleteClusterV2(ctx context.Context, req *ecs.DeleteClusterInput) (*ecs.DeleteClusterOutput, error)
 	UpdateClusterV2(ctx context.Context, req *ecs.UpdateClusterInput) (*ecs.UpdateClusterOutput, error)
+	
+	// Service operations
+	CreateServiceV2(ctx context.Context, req *ecs.CreateServiceInput) (*ecs.CreateServiceOutput, error)
+	ListServicesV2(ctx context.Context, req *ecs.ListServicesInput) (*ecs.ListServicesOutput, error)
+	DescribeServicesV2(ctx context.Context, req *ecs.DescribeServicesInput) (*ecs.DescribeServicesOutput, error)
+	UpdateServiceV2(ctx context.Context, req *ecs.UpdateServiceInput) (*ecs.UpdateServiceOutput, error)
+	DeleteServiceV2(ctx context.Context, req *ecs.DeleteServiceInput) (*ecs.DeleteServiceOutput, error)
 }
 
 // handleRequestV2 is a generic handler for ECS operations using AWS SDK types
@@ -88,6 +96,7 @@ func AdapterMiddleware(v1API generated.ECSAPIInterface, v2API ECSAPIV2) http.Han
 
 		// Route to v2 handlers for migrated operations
 		switch operation {
+		// Cluster operations
 		case "ListClusters":
 			handleRequestV2(v2API.ListClustersV2, w, r)
 		case "CreateCluster":
@@ -98,6 +107,17 @@ func AdapterMiddleware(v1API generated.ECSAPIInterface, v2API ECSAPIV2) http.Han
 			handleRequestV2(v2API.DeleteClusterV2, w, r)
 		case "UpdateCluster":
 			handleRequestV2(v2API.UpdateClusterV2, w, r)
+		// Service operations
+		case "CreateService":
+			handleRequestV2(v2API.CreateServiceV2, w, r)
+		case "ListServices":
+			handleRequestV2(v2API.ListServicesV2, w, r)
+		case "DescribeServices":
+			handleRequestV2(v2API.DescribeServicesV2, w, r)
+		case "UpdateService":
+			handleRequestV2(v2API.UpdateServiceV2, w, r)
+		case "DeleteService":
+			handleRequestV2(v2API.DeleteServiceV2, w, r)
 		default:
 			// Fall back to v1 handler for non-migrated operations
 			generated.HandleECSRequest(v1API)(w, r)
