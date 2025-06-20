@@ -117,13 +117,6 @@ docker-push-awsproxy: docker-build-awsproxy
 	$(DOCKER) push $(DOCKER_REGISTRY)/aws-proxy:$(VERSION)
 	$(DOCKER) push $(DOCKER_REGISTRY)/aws-proxy:latest
 
-# Generate API code from Smithy models
-.PHONY: gen-api
-gen-api:
-	@echo "Downloading latest ECS Smithy model..."
-	curl -s https://raw.githubusercontent.com/aws/aws-sdk-go-v2/main/codegen/sdk-codegen/aws-models/ecs.json -o api-models/ecs.json
-	@echo "Generating API code from Smithy models..."
-	cd $(CONTROLPLANE_DIR) && $(GO) run ./cmd/codegen -model=../api-models/ecs.json -output=internal/controlplane/api/generated
 
 # Help target
 .PHONY: help
@@ -142,7 +135,6 @@ help:
 	@echo "  docker-push    - Push Docker image"
 	@echo "  docker-build-awsproxy - Build AWS Proxy Docker image"
 	@echo "  docker-push-awsproxy  - Push AWS Proxy Docker image"
-	@echo "  gen-api        - Generate API code from Smithy models"
 	@echo "  build-webui    - Build Web UI"
 	@echo "  build-with-ui  - Build with embedded Web UI"
 	@echo "  help           - Show this help message"
