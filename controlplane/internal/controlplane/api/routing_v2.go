@@ -39,6 +39,56 @@ type ECSAPIV2 interface {
 	DescribeTaskDefinitionV2(ctx context.Context, req *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error)
 	ListTaskDefinitionFamiliesV2(ctx context.Context, req *ecs.ListTaskDefinitionFamiliesInput) (*ecs.ListTaskDefinitionFamiliesOutput, error)
 	ListTaskDefinitionsV2(ctx context.Context, req *ecs.ListTaskDefinitionsInput) (*ecs.ListTaskDefinitionsOutput, error)
+	
+	// Tag operations
+	TagResourceV2(ctx context.Context, req *ecs.TagResourceInput) (*ecs.TagResourceOutput, error)
+	UntagResourceV2(ctx context.Context, req *ecs.UntagResourceInput) (*ecs.UntagResourceOutput, error)
+	ListTagsForResourceV2(ctx context.Context, req *ecs.ListTagsForResourceInput) (*ecs.ListTagsForResourceOutput, error)
+	
+	// Container Instance operations
+	RegisterContainerInstanceV2(ctx context.Context, req *ecs.RegisterContainerInstanceInput) (*ecs.RegisterContainerInstanceOutput, error)
+	DeregisterContainerInstanceV2(ctx context.Context, req *ecs.DeregisterContainerInstanceInput) (*ecs.DeregisterContainerInstanceOutput, error)
+	DescribeContainerInstancesV2(ctx context.Context, req *ecs.DescribeContainerInstancesInput) (*ecs.DescribeContainerInstancesOutput, error)
+	ListContainerInstancesV2(ctx context.Context, req *ecs.ListContainerInstancesInput) (*ecs.ListContainerInstancesOutput, error)
+	UpdateContainerAgentV2(ctx context.Context, req *ecs.UpdateContainerAgentInput) (*ecs.UpdateContainerAgentOutput, error)
+	UpdateContainerInstancesStateV2(ctx context.Context, req *ecs.UpdateContainerInstancesStateInput) (*ecs.UpdateContainerInstancesStateOutput, error)
+	SubmitContainerStateChangeV2(ctx context.Context, req *ecs.SubmitContainerStateChangeInput) (*ecs.SubmitContainerStateChangeOutput, error)
+	
+	// Capacity Provider operations
+	CreateCapacityProviderV2(ctx context.Context, req *ecs.CreateCapacityProviderInput) (*ecs.CreateCapacityProviderOutput, error)
+	DeleteCapacityProviderV2(ctx context.Context, req *ecs.DeleteCapacityProviderInput) (*ecs.DeleteCapacityProviderOutput, error)
+	DescribeCapacityProvidersV2(ctx context.Context, req *ecs.DescribeCapacityProvidersInput) (*ecs.DescribeCapacityProvidersOutput, error)
+	UpdateCapacityProviderV2(ctx context.Context, req *ecs.UpdateCapacityProviderInput) (*ecs.UpdateCapacityProviderOutput, error)
+	
+	// Task Set operations
+	CreateTaskSetV2(ctx context.Context, req *ecs.CreateTaskSetInput) (*ecs.CreateTaskSetOutput, error)
+	DeleteTaskSetV2(ctx context.Context, req *ecs.DeleteTaskSetInput) (*ecs.DeleteTaskSetOutput, error)
+	DescribeTaskSetsV2(ctx context.Context, req *ecs.DescribeTaskSetsInput) (*ecs.DescribeTaskSetsOutput, error)
+	UpdateTaskSetV2(ctx context.Context, req *ecs.UpdateTaskSetInput) (*ecs.UpdateTaskSetOutput, error)
+	UpdateServicePrimaryTaskSetV2(ctx context.Context, req *ecs.UpdateServicePrimaryTaskSetInput) (*ecs.UpdateServicePrimaryTaskSetOutput, error)
+	
+	// Account Settings operations
+	PutAccountSettingV2(ctx context.Context, req *ecs.PutAccountSettingInput) (*ecs.PutAccountSettingOutput, error)
+	PutAccountSettingDefaultV2(ctx context.Context, req *ecs.PutAccountSettingDefaultInput) (*ecs.PutAccountSettingDefaultOutput, error)
+	DeleteAccountSettingV2(ctx context.Context, req *ecs.DeleteAccountSettingInput) (*ecs.DeleteAccountSettingOutput, error)
+	ListAccountSettingsV2(ctx context.Context, req *ecs.ListAccountSettingsInput) (*ecs.ListAccountSettingsOutput, error)
+	
+	// Attributes operations
+	PutAttributesV2(ctx context.Context, req *ecs.PutAttributesInput) (*ecs.PutAttributesOutput, error)
+	DeleteAttributesV2(ctx context.Context, req *ecs.DeleteAttributesInput) (*ecs.DeleteAttributesOutput, error)
+	ListAttributesV2(ctx context.Context, req *ecs.ListAttributesInput) (*ecs.ListAttributesOutput, error)
+	
+	// Misc operations
+	DiscoverPollEndpointV2(ctx context.Context, req *ecs.DiscoverPollEndpointInput) (*ecs.DiscoverPollEndpointOutput, error)
+	ExecuteCommandV2(ctx context.Context, req *ecs.ExecuteCommandInput) (*ecs.ExecuteCommandOutput, error)
+	SubmitAttachmentStateChangesV2(ctx context.Context, req *ecs.SubmitAttachmentStateChangesInput) (*ecs.SubmitAttachmentStateChangesOutput, error)
+	SubmitTaskStateChangeV2(ctx context.Context, req *ecs.SubmitTaskStateChangeInput) (*ecs.SubmitTaskStateChangeOutput, error)
+	DeleteTaskDefinitionsV2(ctx context.Context, req *ecs.DeleteTaskDefinitionsInput) (*ecs.DeleteTaskDefinitionsOutput, error)
+	GetTaskProtectionV2(ctx context.Context, req *ecs.GetTaskProtectionInput) (*ecs.GetTaskProtectionOutput, error)
+	UpdateTaskProtectionV2(ctx context.Context, req *ecs.UpdateTaskProtectionInput) (*ecs.UpdateTaskProtectionOutput, error)
+	StartTaskV2(ctx context.Context, req *ecs.StartTaskInput) (*ecs.StartTaskOutput, error)
+	PutClusterCapacityProvidersV2(ctx context.Context, req *ecs.PutClusterCapacityProvidersInput) (*ecs.PutClusterCapacityProvidersOutput, error)
+	UpdateClusterSettingsV2(ctx context.Context, req *ecs.UpdateClusterSettingsInput) (*ecs.UpdateClusterSettingsOutput, error)
 }
 
 // handleRequestV2 is a generic handler for ECS operations using AWS SDK types
@@ -151,6 +201,85 @@ func AdapterMiddleware(v1API generated.ECSAPIInterface, v2API ECSAPIV2) http.Han
 			handleRequestV2(v2API.ListTaskDefinitionFamiliesV2, w, r)
 		case "ListTaskDefinitions":
 			handleRequestV2(v2API.ListTaskDefinitionsV2, w, r)
+		// Tag operations
+		case "TagResource":
+			handleRequestV2(v2API.TagResourceV2, w, r)
+		case "UntagResource":
+			handleRequestV2(v2API.UntagResourceV2, w, r)
+		case "ListTagsForResource":
+			handleRequestV2(v2API.ListTagsForResourceV2, w, r)
+		// Container Instance operations
+		case "RegisterContainerInstance":
+			handleRequestV2(v2API.RegisterContainerInstanceV2, w, r)
+		case "DeregisterContainerInstance":
+			handleRequestV2(v2API.DeregisterContainerInstanceV2, w, r)
+		case "DescribeContainerInstances":
+			handleRequestV2(v2API.DescribeContainerInstancesV2, w, r)
+		case "ListContainerInstances":
+			handleRequestV2(v2API.ListContainerInstancesV2, w, r)
+		case "UpdateContainerAgent":
+			handleRequestV2(v2API.UpdateContainerAgentV2, w, r)
+		case "UpdateContainerInstancesState":
+			handleRequestV2(v2API.UpdateContainerInstancesStateV2, w, r)
+		case "SubmitContainerStateChange":
+			handleRequestV2(v2API.SubmitContainerStateChangeV2, w, r)
+		// Capacity Provider operations
+		case "CreateCapacityProvider":
+			handleRequestV2(v2API.CreateCapacityProviderV2, w, r)
+		case "DeleteCapacityProvider":
+			handleRequestV2(v2API.DeleteCapacityProviderV2, w, r)
+		case "DescribeCapacityProviders":
+			handleRequestV2(v2API.DescribeCapacityProvidersV2, w, r)
+		case "UpdateCapacityProvider":
+			handleRequestV2(v2API.UpdateCapacityProviderV2, w, r)
+		// Task Set operations
+		case "CreateTaskSet":
+			handleRequestV2(v2API.CreateTaskSetV2, w, r)
+		case "DeleteTaskSet":
+			handleRequestV2(v2API.DeleteTaskSetV2, w, r)
+		case "DescribeTaskSets":
+			handleRequestV2(v2API.DescribeTaskSetsV2, w, r)
+		case "UpdateTaskSet":
+			handleRequestV2(v2API.UpdateTaskSetV2, w, r)
+		case "UpdateServicePrimaryTaskSet":
+			handleRequestV2(v2API.UpdateServicePrimaryTaskSetV2, w, r)
+		// Account Settings operations
+		case "PutAccountSetting":
+			handleRequestV2(v2API.PutAccountSettingV2, w, r)
+		case "PutAccountSettingDefault":
+			handleRequestV2(v2API.PutAccountSettingDefaultV2, w, r)
+		case "DeleteAccountSetting":
+			handleRequestV2(v2API.DeleteAccountSettingV2, w, r)
+		case "ListAccountSettings":
+			handleRequestV2(v2API.ListAccountSettingsV2, w, r)
+		// Attributes operations
+		case "PutAttributes":
+			handleRequestV2(v2API.PutAttributesV2, w, r)
+		case "DeleteAttributes":
+			handleRequestV2(v2API.DeleteAttributesV2, w, r)
+		case "ListAttributes":
+			handleRequestV2(v2API.ListAttributesV2, w, r)
+		// Misc operations
+		case "DiscoverPollEndpoint":
+			handleRequestV2(v2API.DiscoverPollEndpointV2, w, r)
+		case "ExecuteCommand":
+			handleRequestV2(v2API.ExecuteCommandV2, w, r)
+		case "SubmitAttachmentStateChanges":
+			handleRequestV2(v2API.SubmitAttachmentStateChangesV2, w, r)
+		case "SubmitTaskStateChange":
+			handleRequestV2(v2API.SubmitTaskStateChangeV2, w, r)
+		case "DeleteTaskDefinitions":
+			handleRequestV2(v2API.DeleteTaskDefinitionsV2, w, r)
+		case "GetTaskProtection":
+			handleRequestV2(v2API.GetTaskProtectionV2, w, r)
+		case "UpdateTaskProtection":
+			handleRequestV2(v2API.UpdateTaskProtectionV2, w, r)
+		case "StartTask":
+			handleRequestV2(v2API.StartTaskV2, w, r)
+		case "PutClusterCapacityProviders":
+			handleRequestV2(v2API.PutClusterCapacityProvidersV2, w, r)
+		case "UpdateClusterSettings":
+			handleRequestV2(v2API.UpdateClusterSettingsV2, w, r)
 		default:
 			// Fall back to v1 handler for non-migrated operations
 			generated.HandleECSRequest(v1API)(w, r)

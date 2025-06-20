@@ -102,7 +102,7 @@ func (api *DefaultECSAPIV2) RunTaskV2(ctx context.Context, req *ecs.RunTaskInput
 		}
 
 		// Handle capacity provider
-		if req.CapacityProviderStrategy != nil && len(req.CapacityProviderStrategy) > 0 {
+		if len(req.CapacityProviderStrategy) > 0 {
 			storageTask.CapacityProviderName = *req.CapacityProviderStrategy[0].CapacityProvider
 		}
 

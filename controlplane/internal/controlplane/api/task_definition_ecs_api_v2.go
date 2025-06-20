@@ -63,22 +63,22 @@ func (api *DefaultECSAPIV2) RegisterTaskDefinitionV2(ctx context.Context, req *e
 	}
 
 	// Convert complex objects to JSON
-	if req.Volumes != nil && len(req.Volumes) > 0 {
+	if len(req.Volumes) > 0 {
 		volumesJSON, _ := json.Marshal(req.Volumes)
 		taskDef.Volumes = string(volumesJSON)
 	}
-	if req.PlacementConstraints != nil && len(req.PlacementConstraints) > 0 {
+	if len(req.PlacementConstraints) > 0 {
 		constraintsJSON, _ := json.Marshal(req.PlacementConstraints)
 		taskDef.PlacementConstraints = string(constraintsJSON)
 	}
-	if req.RequiresCompatibilities != nil && len(req.RequiresCompatibilities) > 0 {
+	if len(req.RequiresCompatibilities) > 0 {
 		compatibilities := make([]string, len(req.RequiresCompatibilities))
 		for i, c := range req.RequiresCompatibilities {
 			compatibilities[i] = string(c)
 		}
 		taskDef.RequiresCompatibilities = strings.Join(compatibilities, ",")
 	}
-	if req.Tags != nil && len(req.Tags) > 0 {
+	if len(req.Tags) > 0 {
 		tagsJSON, _ := json.Marshal(req.Tags)
 		taskDef.Tags = string(tagsJSON)
 	}
@@ -86,7 +86,7 @@ func (api *DefaultECSAPIV2) RegisterTaskDefinitionV2(ctx context.Context, req *e
 		proxyJSON, _ := json.Marshal(req.ProxyConfiguration)
 		taskDef.ProxyConfiguration = string(proxyJSON)
 	}
-	if req.InferenceAccelerators != nil && len(req.InferenceAccelerators) > 0 {
+	if len(req.InferenceAccelerators) > 0 {
 		accelJSON, _ := json.Marshal(req.InferenceAccelerators)
 		taskDef.InferenceAccelerators = string(accelJSON)
 	}
