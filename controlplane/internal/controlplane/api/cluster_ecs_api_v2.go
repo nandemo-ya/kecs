@@ -136,7 +136,7 @@ func (api *DefaultECSAPIV2) CreateClusterV2(ctx context.Context, req *ecs.Create
 
 	// Process settings - convert to JSON string
 	settingsJSON := ""
-	if req.Settings != nil && len(req.Settings) > 0 {
+	if len(req.Settings) > 0 {
 		settingsData := make([]map[string]string, 0)
 		for _, s := range req.Settings {
 			if s.Value != nil {
@@ -153,7 +153,7 @@ func (api *DefaultECSAPIV2) CreateClusterV2(ctx context.Context, req *ecs.Create
 
 	// Process tags - convert to JSON string
 	tagsJSON := ""
-	if req.Tags != nil && len(req.Tags) > 0 {
+	if len(req.Tags) > 0 {
 		tagsMap := convertFromSDKTags(req.Tags)
 		if data, err := json.Marshal(tagsMap); err == nil {
 			tagsJSON = string(data)
@@ -392,7 +392,7 @@ func (api *DefaultECSAPIV2) UpdateClusterV2(ctx context.Context, req *ecs.Update
 	}
 
 	// Update settings if provided
-	if req.Settings != nil && len(req.Settings) > 0 {
+	if len(req.Settings) > 0 {
 		settingsData := make([]map[string]string, 0)
 		for _, s := range req.Settings {
 			if s.Value != nil {

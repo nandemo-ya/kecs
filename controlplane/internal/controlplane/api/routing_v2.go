@@ -39,6 +39,26 @@ type ECSAPIV2 interface {
 	DescribeTaskDefinitionV2(ctx context.Context, req *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error)
 	ListTaskDefinitionFamiliesV2(ctx context.Context, req *ecs.ListTaskDefinitionFamiliesInput) (*ecs.ListTaskDefinitionFamiliesOutput, error)
 	ListTaskDefinitionsV2(ctx context.Context, req *ecs.ListTaskDefinitionsInput) (*ecs.ListTaskDefinitionsOutput, error)
+	
+	// Tag operations
+	TagResourceV2(ctx context.Context, req *ecs.TagResourceInput) (*ecs.TagResourceOutput, error)
+	UntagResourceV2(ctx context.Context, req *ecs.UntagResourceInput) (*ecs.UntagResourceOutput, error)
+	ListTagsForResourceV2(ctx context.Context, req *ecs.ListTagsForResourceInput) (*ecs.ListTagsForResourceOutput, error)
+	
+	// Container Instance operations
+	RegisterContainerInstanceV2(ctx context.Context, req *ecs.RegisterContainerInstanceInput) (*ecs.RegisterContainerInstanceOutput, error)
+	DeregisterContainerInstanceV2(ctx context.Context, req *ecs.DeregisterContainerInstanceInput) (*ecs.DeregisterContainerInstanceOutput, error)
+	DescribeContainerInstancesV2(ctx context.Context, req *ecs.DescribeContainerInstancesInput) (*ecs.DescribeContainerInstancesOutput, error)
+	ListContainerInstancesV2(ctx context.Context, req *ecs.ListContainerInstancesInput) (*ecs.ListContainerInstancesOutput, error)
+	UpdateContainerAgentV2(ctx context.Context, req *ecs.UpdateContainerAgentInput) (*ecs.UpdateContainerAgentOutput, error)
+	UpdateContainerInstancesStateV2(ctx context.Context, req *ecs.UpdateContainerInstancesStateInput) (*ecs.UpdateContainerInstancesStateOutput, error)
+	SubmitContainerStateChangeV2(ctx context.Context, req *ecs.SubmitContainerStateChangeInput) (*ecs.SubmitContainerStateChangeOutput, error)
+	
+	// Capacity Provider operations
+	CreateCapacityProviderV2(ctx context.Context, req *ecs.CreateCapacityProviderInput) (*ecs.CreateCapacityProviderOutput, error)
+	DeleteCapacityProviderV2(ctx context.Context, req *ecs.DeleteCapacityProviderInput) (*ecs.DeleteCapacityProviderOutput, error)
+	DescribeCapacityProvidersV2(ctx context.Context, req *ecs.DescribeCapacityProvidersInput) (*ecs.DescribeCapacityProvidersOutput, error)
+	UpdateCapacityProviderV2(ctx context.Context, req *ecs.UpdateCapacityProviderInput) (*ecs.UpdateCapacityProviderOutput, error)
 }
 
 // handleRequestV2 is a generic handler for ECS operations using AWS SDK types
@@ -151,6 +171,37 @@ func AdapterMiddleware(v1API generated.ECSAPIInterface, v2API ECSAPIV2) http.Han
 			handleRequestV2(v2API.ListTaskDefinitionFamiliesV2, w, r)
 		case "ListTaskDefinitions":
 			handleRequestV2(v2API.ListTaskDefinitionsV2, w, r)
+		// Tag operations
+		case "TagResource":
+			handleRequestV2(v2API.TagResourceV2, w, r)
+		case "UntagResource":
+			handleRequestV2(v2API.UntagResourceV2, w, r)
+		case "ListTagsForResource":
+			handleRequestV2(v2API.ListTagsForResourceV2, w, r)
+		// Container Instance operations
+		case "RegisterContainerInstance":
+			handleRequestV2(v2API.RegisterContainerInstanceV2, w, r)
+		case "DeregisterContainerInstance":
+			handleRequestV2(v2API.DeregisterContainerInstanceV2, w, r)
+		case "DescribeContainerInstances":
+			handleRequestV2(v2API.DescribeContainerInstancesV2, w, r)
+		case "ListContainerInstances":
+			handleRequestV2(v2API.ListContainerInstancesV2, w, r)
+		case "UpdateContainerAgent":
+			handleRequestV2(v2API.UpdateContainerAgentV2, w, r)
+		case "UpdateContainerInstancesState":
+			handleRequestV2(v2API.UpdateContainerInstancesStateV2, w, r)
+		case "SubmitContainerStateChange":
+			handleRequestV2(v2API.SubmitContainerStateChangeV2, w, r)
+		// Capacity Provider operations
+		case "CreateCapacityProvider":
+			handleRequestV2(v2API.CreateCapacityProviderV2, w, r)
+		case "DeleteCapacityProvider":
+			handleRequestV2(v2API.DeleteCapacityProviderV2, w, r)
+		case "DescribeCapacityProviders":
+			handleRequestV2(v2API.DescribeCapacityProvidersV2, w, r)
+		case "UpdateCapacityProvider":
+			handleRequestV2(v2API.UpdateCapacityProviderV2, w, r)
 		default:
 			// Fall back to v1 handler for non-migrated operations
 			generated.HandleECSRequest(v1API)(w, r)
