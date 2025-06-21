@@ -92,6 +92,7 @@ export default defineConfig({
               items: [
                 { text: 'Contributing', link: '/development/contributing' },
                 { text: 'Architecture', link: '/development/architecture' },
+                { text: 'Code Generation', link: '/development/code-generation' },
                 { text: 'Testing', link: '/development/testing' },
                 { text: 'Testcontainers Integration', link: '/development/testcontainers' },
                 { text: 'Building', link: '/development/building' }
@@ -193,6 +194,7 @@ export default defineConfig({
               items: [
                 { text: 'コントリビューション', link: '/ja/development/contributing' },
                 { text: 'アーキテクチャ', link: '/ja/development/architecture' },
+                { text: 'コード生成', link: '/ja/development/code-generation' },
                 { text: 'テスト', link: '/ja/development/testing' },
                 { text: 'Testcontainers 統合', link: '/ja/development/testcontainers' },
                 { text: 'ビルド', link: '/ja/development/building' }
