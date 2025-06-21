@@ -35,12 +35,6 @@ jobs:
           cd tests/scenarios
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
-      - name: Install AWS CLI v2
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-          version: 2
-          verbose: false
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
