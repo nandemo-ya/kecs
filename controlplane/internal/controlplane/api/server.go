@@ -28,7 +28,6 @@ type Server struct {
 	port              int
 	kubeconfig        string
 	ecsAPI            generated.ECSAPIInterface
-	ecsAPIV2          ECSAPIV2  // New V2 API using AWS SDK types
 	storage           storage.Storage
 	kindManager       *kubernetes.KindManager
 	taskManager       *kubernetes.TaskManager
@@ -291,8 +290,6 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	}
 	s.ecsAPI = ecsAPI
 	
-	// Initialize V2 API adapter that wraps the generated API
-	s.ecsAPIV2 = NewECSAPIv2Adapter(s.ecsAPI)
 
 	return s, nil
 }
@@ -382,8 +379,8 @@ func (s *Server) SetupRoutes() http.Handler {
 			return
 		}
 		// Otherwise handle as ECS request
-		// Use adapter middleware to route between v1 and v2 handlers
-		AdapterMiddleware(s.ecsAPI, s.ecsAPIV2)(w, r)
+		// Use generated ECS request handler
+		generated.HandleECSRequest(s.ecsAPI)(w, r)
 	})
 
 	// Health check endpoint
