@@ -51,7 +51,7 @@ var _ = Describe("API Performance Tests", func() {
 			numConcurrentRequests := 50
 			
 			By("Registering task definition for API tests")
-			taskDef, err := ecsClient.RegisterTaskDefinition("api-perf-task", createAPITestTaskDefinition())
+			_, err := ecsClient.RegisterTaskDefinition("api-perf-task", createAPITestTaskDefinition())
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("Making %d concurrent DescribeService requests", numConcurrentRequests))

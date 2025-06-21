@@ -55,7 +55,6 @@ var _ = Describe("Microservices Application Integration", func() {
 		var (
 			apiGatewayTaskDef   string
 			userServiceTaskDef  string
-			orderServiceTaskDef string
 		)
 
 		BeforeEach(func() {

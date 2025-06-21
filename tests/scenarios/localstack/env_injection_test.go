@@ -2,7 +2,6 @@ package localstack_test
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -14,13 +13,13 @@ import (
 var _ = Describe("Environment Variable Injection", func() {
 	var (
 		kecs            *utils.KECSContainer
-		client          utils.ECSClientInterface
+		client          *utils.ECSClient
 		testClusterName string
 	)
 
 	BeforeEach(func() {
 		// Start KECS with LocalStack enabled
-		kecs = utils.StartKECS(GinkgoT())
+		kecs = utils.StartKECS(GinkgoWrapper{GinkgoT()})
 		DeferCleanup(func() {
 			if kecs != nil {
 				kecs.Cleanup()
@@ -32,34 +31,34 @@ var _ = Describe("Environment Variable Injection", func() {
 		
 		// Create a test cluster
 		testClusterName = fmt.Sprintf("test-env-%d", time.Now().Unix())
-		err := client.CreateCluster(testClusterName)
+		err := client.CurlClient.CreateCluster(testClusterName)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Start LocalStack
-		helpers.StartLocalStack(GinkgoT(), kecs, []string{"iam", "s3"})
-		helpers.WaitForLocalStackReady(GinkgoT(), client, testClusterName, 30*time.Second)
+		helpers.StartLocalStack(&TestingTWrapper{GinkgoT()}, kecs, []string{"iam", "s3"})
+		helpers.WaitForLocalStackReady(&TestingTWrapper{GinkgoT()}, client, testClusterName, 30*time.Second)
 	})
 
 	AfterEach(func() {
 		// Clean up
 		if client != nil && testClusterName != "" {
 			// Stop any running tasks
-			tasks, _ := client.ListTasks(testClusterName, "")
+			tasks, _ := client.CurlClient.ListTasks(testClusterName, "")
 			for _, taskArn := range tasks {
-				client.StopTask(testClusterName, taskArn, "Test cleanup")
+				client.CurlClient.StopTask(testClusterName, taskArn, "Test cleanup")
 			}
 			
-			client.DeleteCluster(testClusterName)
+			client.CurlClient.DeleteCluster(testClusterName)
 		}
 		if kecs != nil {
-			helpers.StopLocalStack(GinkgoT(), kecs)
+			helpers.StopLocalStack(&TestingTWrapper{GinkgoT()}, kecs)
 		}
 	})
 
 	Describe("AWS SDK Configuration", func() {
 		It("should inject AWS endpoint environment variables into ECS tasks", func() {
 			// Register a task definition that prints environment variables
-			taskDef, err := client.RegisterTaskDefinition("env-test", `{
+			taskDef, err := client.CurlClient.RegisterTaskDefinition("env-test", `{
 				"containerDefinitions": [{
 					"name": "env-printer",
 					"image": "busybox:latest",
@@ -73,7 +72,7 @@ var _ = Describe("Environment Variable Injection", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Run the task
-			runResult, err := client.RunTask(testClusterName, fmt.Sprintf("%s:%s", taskDef.Family, taskDef.Revision), 1)
+			runResult, err := client.CurlClient.RunTask(testClusterName, fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision), 1)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(runResult.Tasks)).To(Equal(1))
 
@@ -81,7 +80,7 @@ var _ = Describe("Environment Variable Injection", func() {
 
 			// Wait for task to complete
 			Eventually(func() string {
-				tasks, err := client.DescribeTasks(testClusterName, []string{taskArn})
+				tasks, err := client.CurlClient.DescribeTasks(testClusterName, []string{taskArn})
 				if err != nil || len(tasks) == 0 {
 					return ""
 				}
@@ -90,7 +89,7 @@ var _ = Describe("Environment Variable Injection", func() {
 
 			// In a real test, we would check the task logs to verify environment variables
 			// For now, we'll check that the task ran successfully
-			tasks, err := client.DescribeTasks(testClusterName, []string{taskArn})
+			tasks, err := client.CurlClient.DescribeTasks(testClusterName, []string{taskArn})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(tasks)).To(Equal(1))
 			
@@ -100,7 +99,7 @@ var _ = Describe("Environment Variable Injection", func() {
 
 		It("should set correct LocalStack endpoint URL", func() {
 			// Register a task that uses AWS SDK
-			taskDef, err := client.RegisterTaskDefinition("sdk-test", `{
+			taskDef, err := client.CurlClient.RegisterTaskDefinition("sdk-test", `{
 				"containerDefinitions": [{
 					"name": "aws-cli",
 					"image": "amazon/aws-cli:latest",
@@ -114,7 +113,7 @@ var _ = Describe("Environment Variable Injection", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Run the task
-			runResult, err := client.RunTask(testClusterName, fmt.Sprintf("%s:%s", taskDef.Family, taskDef.Revision), 1)
+			runResult, err := client.CurlClient.RunTask(testClusterName, fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision), 1)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(runResult.Tasks)).To(Equal(1))
 
@@ -124,7 +123,7 @@ var _ = Describe("Environment Variable Injection", func() {
 
 		It("should inject AWS region configuration", func() {
 			// Register a task that checks AWS region
-			taskDef, err := client.RegisterTaskDefinition("region-test", `{
+			taskDef, err := client.CurlClient.RegisterTaskDefinition("region-test", `{
 				"containerDefinitions": [{
 					"name": "region-checker",
 					"image": "busybox:latest",
@@ -138,7 +137,7 @@ var _ = Describe("Environment Variable Injection", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Run the task
-			runResult, err := client.RunTask(testClusterName, fmt.Sprintf("%s:%s", taskDef.Family, taskDef.Revision), 1)
+			runResult, err := client.CurlClient.RunTask(testClusterName, fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision), 1)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(runResult.Tasks)).To(Equal(1))
 
@@ -150,7 +149,7 @@ var _ = Describe("Environment Variable Injection", func() {
 	Describe("Multiple Tasks", func() {
 		It("should inject environment variables into multiple tasks consistently", func() {
 			// Register task definition
-			taskDef, err := client.RegisterTaskDefinition("multi-env-test", `{
+			taskDef, err := client.CurlClient.RegisterTaskDefinition("multi-env-test", `{
 				"containerDefinitions": [{
 					"name": "env-test",
 					"image": "busybox:latest",
@@ -164,7 +163,7 @@ var _ = Describe("Environment Variable Injection", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Run multiple tasks
-			runResult, err := client.RunTask(testClusterName, fmt.Sprintf("%s:%s", taskDef.Family, taskDef.Revision), 3)
+			runResult, err := client.CurlClient.RunTask(testClusterName, fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision), 3)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(runResult.Tasks)).To(Equal(3))
 
@@ -176,7 +175,7 @@ var _ = Describe("Environment Variable Injection", func() {
 
 			// Verify all tasks are running
 			Eventually(func() bool {
-				tasks, err := client.DescribeTasks(testClusterName, taskArns)
+				tasks, err := client.CurlClient.DescribeTasks(testClusterName, taskArns)
 				if err != nil || len(tasks) != 3 {
 					return false
 				}
@@ -190,7 +189,7 @@ var _ = Describe("Environment Variable Injection", func() {
 
 			// Clean up
 			for _, taskArn := range taskArns {
-				client.StopTask(testClusterName, taskArn, "Test cleanup")
+				client.CurlClient.StopTask(testClusterName, taskArn, "Test cleanup")
 			}
 		})
 	})
@@ -198,7 +197,7 @@ var _ = Describe("Environment Variable Injection", func() {
 	Describe("Service Integration", func() {
 		It("should inject environment variables into service tasks", func() {
 			// Register task definition
-			taskDef, err := client.RegisterTaskDefinition("service-env-test", `{
+			taskDef, err := client.CurlClient.RegisterTaskDefinition("service-env-test", `{
 				"containerDefinitions": [{
 					"name": "web",
 					"image": "nginx:alpine",
@@ -213,27 +212,27 @@ var _ = Describe("Environment Variable Injection", func() {
 
 			// Create service
 			serviceName := "env-test-service"
-			err = client.CreateService(testClusterName, serviceName, fmt.Sprintf("%s:%s", taskDef.Family, taskDef.Revision), 1)
+			err = client.CurlClient.CreateService(testClusterName, serviceName, fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision), 1)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Wait for service task to start
 			Eventually(func() int {
-				tasks, _ := client.ListTasks(testClusterName, serviceName)
+				tasks, _ := client.CurlClient.ListTasks(testClusterName, serviceName)
 				return len(tasks)
 			}, 30*time.Second, 1*time.Second).Should(Equal(1))
 
 			// Service tasks should also have LocalStack environment variables
-			tasks, err := client.ListTasks(testClusterName, serviceName)
+			tasks, err := client.CurlClient.ListTasks(testClusterName, serviceName)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(tasks)).To(Equal(1))
 
 			// Clean up
-			client.UpdateService(testClusterName, serviceName, intPtr(0), "")
+			client.CurlClient.UpdateService(testClusterName, serviceName, intPtr(0), "")
 			Eventually(func() int {
-				tasks, _ := client.ListTasks(testClusterName, serviceName)
+				tasks, _ := client.CurlClient.ListTasks(testClusterName, serviceName)
 				return len(tasks)
 			}, 30*time.Second, 1*time.Second).Should(Equal(0))
-			client.DeleteService(testClusterName, serviceName)
+			client.CurlClient.DeleteService(testClusterName, serviceName)
 		})
 	})
 
@@ -242,7 +241,7 @@ var _ = Describe("Environment Variable Injection", func() {
 			// This test verifies that the default proxy mode is "environment"
 			// which injects AWS SDK configuration via environment variables
 			
-			status := helpers.GetLocalStackStatus(GinkgoT(), kecs)
+			status := helpers.GetLocalStackStatus(&TestingTWrapper{GinkgoT()}, kecs)
 			// The status output should indicate environment proxy mode
 			// Note: This depends on the actual implementation
 			Expect(status).To(ContainSubstring("Proxy Mode: environment"))
@@ -250,7 +249,7 @@ var _ = Describe("Environment Variable Injection", func() {
 
 		It("should not interfere with user-defined environment variables", func() {
 			// Register task with custom environment variables
-			taskDef, err := client.RegisterTaskDefinition("custom-env-test", `{
+			taskDef, err := client.CurlClient.RegisterTaskDefinition("custom-env-test", `{
 				"containerDefinitions": [{
 					"name": "custom-env",
 					"image": "busybox:latest",
@@ -268,7 +267,7 @@ var _ = Describe("Environment Variable Injection", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Run the task
-			runResult, err := client.RunTask(testClusterName, fmt.Sprintf("%s:%s", taskDef.Family, taskDef.Revision), 1)
+			runResult, err := client.CurlClient.RunTask(testClusterName, fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision), 1)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(runResult.Tasks)).To(Equal(1))
 
