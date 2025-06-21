@@ -1,6 +1,3 @@
-//go:build skip_ssm_tests
-// +build skip_ssm_tests
-
 package ssm_test
 
 import (
@@ -19,7 +16,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-var _ = PDescribe("SSM Integration (Pending: Migration to generated types)", func() {
+var _ = Describe("SSM Integration", func() {
 	var (
 		integration ssmIntegration.Integration
 		kubeClient  *fake.Clientset
@@ -30,7 +27,7 @@ var _ = PDescribe("SSM Integration (Pending: Migration to generated types)", fun
 	BeforeEach(func() {
 		kubeClient = fake.NewSimpleClientset()
 		mockSSM = &mockSSMClient{
-			parameters: make(map[string]*ssm.GetParameterOutput),
+			parameters: make(map[string]*ssmapi.GetParameterResult),
 		}
 		config = &ssmIntegration.Config{
 			LocalStackEndpoint: "http://localhost:4566",
@@ -47,13 +44,16 @@ var _ = PDescribe("SSM Integration (Pending: Migration to generated types)", fun
 			// Setup mock parameter
 			paramName := "/app/database/password"
 			paramValue := "secret-password-123"
-			mockSSM.parameters[paramName] = &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
-					Name:             aws.String(paramName),
-					Value:            aws.String(paramValue),
-					Type:             types.ParameterTypeSecureString,
-					Version:          1,
-					LastModifiedDate: aws.Time(time.Now()),
+			now := time.Now()
+			version := int64(1)
+			paramType := interface{}("SecureString")
+			mockSSM.parameters[paramName] = &ssmapi.GetParameterResult{
+				Parameter: &ssmapi.Parameter{
+					Name:             &paramName,
+					Value:            &paramValue,
+					Type:             &paramType,
+					Version:          &version,
+					LastModifiedDate: &now,
 				},
 			}
 
@@ -70,20 +70,23 @@ var _ = PDescribe("SSM Integration (Pending: Migration to generated types)", fun
 		It("should return error for non-existent parameter", func() {
 			_, err := integration.GetParameter(context.Background(), "/non/existent")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("parameter not found"))
+			Expect(err.Error()).To(ContainSubstring("ParameterNotFound"))
 		})
 
 		It("should cache parameters", func() {
 			// Setup mock parameter
 			paramName := "/app/cache/test"
 			paramValue := "cached-value"
-			mockSSM.parameters[paramName] = &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
-					Name:             aws.String(paramName),
-					Value:            aws.String(paramValue),
-					Type:             types.ParameterTypeString,
-					Version:          1,
-					LastModifiedDate: aws.Time(time.Now()),
+			now := time.Now()
+			version := int64(1)
+			paramType := interface{}("String")
+			mockSSM.parameters[paramName] = &ssmapi.GetParameterResult{
+				Parameter: &ssmapi.Parameter{
+					Name:             &paramName,
+					Value:            &paramValue,
+					Type:             &paramType,
+					Version:          &version,
+					LastModifiedDate: &now,
 				},
 			}
 
@@ -93,13 +96,17 @@ var _ = PDescribe("SSM Integration (Pending: Migration to generated types)", fun
 			Expect(param1.Value).To(Equal(paramValue))
 
 			// Update mock to return different value
-			mockSSM.parameters[paramName] = &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
-					Name:             aws.String(paramName),
-					Value:            aws.String("new-value"),
-					Type:             types.ParameterTypeString,
-					Version:          2,
-					LastModifiedDate: aws.Time(time.Now()),
+			now2 := time.Now()
+			version2 := int64(2)
+			newValue := "new-value"
+			paramType2 := interface{}("String")
+			mockSSM.parameters[paramName] = &ssmapi.GetParameterResult{
+				Parameter: &ssmapi.Parameter{
+					Name:             &paramName,
+					Value:            &newValue,
+					Type:             &paramType2,
+					Version:          &version2,
+					LastModifiedDate: &now2,
 				},
 			}
 
@@ -199,13 +206,16 @@ var _ = PDescribe("SSM Integration (Pending: Migration to generated types)", fun
 			// Setup mock parameter
 			paramName := "/app/sync/test"
 			paramValue := "sync-test-value"
-			mockSSM.parameters[paramName] = &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
-					Name:             aws.String(paramName),
-					Value:            aws.String(paramValue),
-					Type:             types.ParameterTypeString,
-					Version:          1,
-					LastModifiedDate: aws.Time(time.Now()),
+			now := time.Now()
+			version := int64(1)
+			paramType := interface{}("String")
+			mockSSM.parameters[paramName] = &ssmapi.GetParameterResult{
+				Parameter: &ssmapi.Parameter{
+					Name:             &paramName,
+					Value:            &paramValue,
+					Type:             &paramType,
+					Version:          &version,
+					LastModifiedDate: &now,
 				},
 			}
 
@@ -270,13 +280,18 @@ var _ = PDescribe("SSM Integration (Pending: Migration to generated types)", fun
 				"/app/batch/param3",
 			}
 			for i, paramName := range params {
-				mockSSM.parameters[paramName] = &ssm.GetParameterOutput{
-					Parameter: &types.Parameter{
-						Name:             aws.String(paramName),
-						Value:            aws.String(fmt.Sprintf("value-%d", i+1)),
-						Type:             types.ParameterTypeString,
-						Version:          1,
-						LastModifiedDate: aws.Time(time.Now()),
+				value := fmt.Sprintf("value-%d", i+1)
+				now := time.Now()
+				version := int64(1)
+				paramType := interface{}("String")
+				paramNameCopy := paramName
+				mockSSM.parameters[paramName] = &ssmapi.GetParameterResult{
+					Parameter: &ssmapi.Parameter{
+						Name:             &paramNameCopy,
+						Value:            &value,
+						Type:             &paramType,
+						Version:          &version,
+						LastModifiedDate: &now,
 					},
 				}
 			}
@@ -300,13 +315,18 @@ var _ = PDescribe("SSM Integration (Pending: Migration to generated types)", fun
 				"/app/batch/notexists",
 			}
 			// Only setup one parameter
-			mockSSM.parameters[params[0]] = &ssm.GetParameterOutput{
-				Parameter: &types.Parameter{
-					Name:             aws.String(params[0]),
-					Value:            aws.String("exists-value"),
-					Type:             types.ParameterTypeString,
-					Version:          1,
-					LastModifiedDate: aws.Time(time.Now()),
+			paramName0 := params[0]
+			value0 := "exists-value"
+			now0 := time.Now()
+			version0 := int64(1)
+			paramType0 := interface{}("String")
+			mockSSM.parameters[params[0]] = &ssmapi.GetParameterResult{
+				Parameter: &ssmapi.Parameter{
+					Name:             &paramName0,
+					Value:            &value0,
+					Type:             &paramType0,
+					Version:          &version0,
+					LastModifiedDate: &now0,
 				},
 			}
 
@@ -326,32 +346,33 @@ var _ = PDescribe("SSM Integration (Pending: Migration to generated types)", fun
 
 // mockSSMClient is a mock implementation of SSMClient for testing
 type mockSSMClient struct {
-	parameters map[string]*ssm.GetParameterOutput
+	parameters map[string]*ssmapi.GetParameterResult
 }
 
-func (m *mockSSMClient) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-	if params.Name == nil {
+func (m *mockSSMClient) GetParameter(ctx context.Context, params *ssmapi.GetParameterRequest) (*ssmapi.GetParameterResult, error) {
+	if params.Name == "" {
 		return nil, fmt.Errorf("parameter name is required")
 	}
 	
-	output, exists := m.parameters[*params.Name]
+	output, exists := m.parameters[params.Name]
 	if !exists {
-		return nil, &types.ParameterNotFound{
-			Message: aws.String(fmt.Sprintf("parameter not found: %s", *params.Name)),
+		msg := fmt.Sprintf("parameter not found: %s", params.Name)
+		return nil, &ssmapi.ParameterNotFound{
+			Message: &msg,
 		}
 	}
 	
 	return output, nil
 }
 
-func (m *mockSSMClient) GetParameters(ctx context.Context, params *ssm.GetParametersInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersOutput, error) {
+func (m *mockSSMClient) GetParameters(ctx context.Context, params *ssmapi.GetParametersRequest) (*ssmapi.GetParametersResult, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *mockSSMClient) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+func (m *mockSSMClient) PutParameter(ctx context.Context, params *ssmapi.PutParameterRequest) (*ssmapi.PutParameterResult, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *mockSSMClient) DeleteParameter(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error) {
+func (m *mockSSMClient) DeleteParameter(ctx context.Context, params *ssmapi.DeleteParameterRequest) (*ssmapi.DeleteParameterResult, error) {
 	return nil, fmt.Errorf("not implemented")
 }
