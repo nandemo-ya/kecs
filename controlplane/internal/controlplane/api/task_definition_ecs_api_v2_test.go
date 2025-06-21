@@ -3,7 +3,6 @@ package api_test
 import (
 	"context"
 	"fmt"
-	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -464,8 +463,3 @@ var _ = Describe("TaskDefinition ECS API V2", func() {
 		})
 	})
 })
-
-func TestTaskDefinitionECSAPIV2(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "TaskDefinition ECS API V2 Suite")
-}
