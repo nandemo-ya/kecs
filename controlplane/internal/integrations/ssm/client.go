@@ -52,7 +52,10 @@ func (c *ssmClient) GetParameter(ctx context.Context, params *ssmapi.GetParamete
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read error response: %w", err)
+		}
 		// Check for specific error types
 		if strings.Contains(string(body), "ParameterNotFound") {
 			return nil, fmt.Errorf("parameter not found: %s", params.Name)
@@ -90,7 +93,10 @@ func (c *ssmClient) GetParameters(ctx context.Context, params *ssmapi.GetParamet
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read error response: %w", err)
+		}
 		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -124,7 +130,10 @@ func (c *ssmClient) PutParameter(ctx context.Context, params *ssmapi.PutParamete
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read error response: %w", err)
+		}
 		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -158,7 +167,10 @@ func (c *ssmClient) DeleteParameter(ctx context.Context, params *ssmapi.DeletePa
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read error response: %w", err)
+		}
 		// Check for specific error types
 		if strings.Contains(string(body), "ParameterNotFound") {
 			return nil, fmt.Errorf("parameter not found")

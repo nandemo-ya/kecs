@@ -52,7 +52,10 @@ func (c *cloudWatchLogsClient) CreateLogGroup(ctx context.Context, params *cloud
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read error response: %w", err)
+		}
 		// Check for specific error types
 		if strings.Contains(string(body), "ResourceAlreadyExistsException") {
 			return nil, fmt.Errorf("ResourceAlreadyExistsException: log group already exists")
@@ -85,7 +88,10 @@ func (c *cloudWatchLogsClient) DeleteLogGroup(ctx context.Context, params *cloud
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read error response: %w", err)
+		}
 		// Check for specific error types
 		if strings.Contains(string(body), "ResourceNotFoundException") {
 			return nil, fmt.Errorf("ResourceNotFoundException: log group not found")
@@ -154,7 +160,10 @@ func (c *cloudWatchLogsClient) PutRetentionPolicy(ctx context.Context, params *c
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read error response: %w", err)
+		}
 		// Check for specific error types
 		if strings.Contains(string(body), "ResourceNotFoundException") {
 			return nil, fmt.Errorf("ResourceNotFoundException: log group not found")
