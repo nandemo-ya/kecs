@@ -255,6 +255,30 @@ func (g *Generator) generatePrimitiveType(name string, shape *parser.SmithyShape
 func (g *Generator) getGoType(shapeName string, shape *parser.SmithyShape, api *parser.SmithyAPI) string {
 	name := parser.GetShapeName(shapeName)
 	
+	// Handle smithy built-in types
+	if strings.HasPrefix(shapeName, "smithy.api#") {
+		switch shapeName {
+		case "smithy.api#Unit":
+			return "struct{}"
+		case "smithy.api#String":
+			return "string"
+		case "smithy.api#Integer":
+			return "int32"
+		case "smithy.api#Long":
+			return "int64"
+		case "smithy.api#Boolean":
+			return "bool"
+		case "smithy.api#Timestamp":
+			return "time.Time"
+		case "smithy.api#Blob":
+			return "[]byte"
+		case "smithy.api#Float":
+			return "float32"
+		case "smithy.api#Double":
+			return "float64"
+		}
+	}
+	
 	switch shape.Type {
 	case "string":
 		if shape.IsEnum() {
@@ -370,6 +394,9 @@ package {{.Package}}
 import (
 	"time"
 )
+
+// Unit represents an empty response
+type Unit = struct{}
 
 {{range $name := .TypeNames}}
 {{$type := index $.Types $name}}
