@@ -176,30 +176,60 @@ type Bucket struct {
 type BucketAccelerateStatus string
 
 const (
-	BucketAccelerateStatusEnabled BucketAccelerateStatus = "Enabled"
-
 	BucketAccelerateStatusSuspended BucketAccelerateStatus = "Suspended"
+
+	BucketAccelerateStatusEnabled BucketAccelerateStatus = "Enabled"
 )
 
 // BucketAlreadyExists represents the BucketAlreadyExists structure
 type BucketAlreadyExists struct {
 }
 
+// Error implements the error interface for BucketAlreadyExists
+func (e BucketAlreadyExists) Error() string {
+	return "BucketAlreadyExists: AWS client error (HTTP 409)"
+}
+
+// ErrorCode returns the AWS error code
+func (e BucketAlreadyExists) ErrorCode() string {
+	return "BucketAlreadyExists"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e BucketAlreadyExists) ErrorFault() string {
+	return "client"
+}
+
 // BucketAlreadyOwnedByYou represents the BucketAlreadyOwnedByYou structure
 type BucketAlreadyOwnedByYou struct {
+}
+
+// Error implements the error interface for BucketAlreadyOwnedByYou
+func (e BucketAlreadyOwnedByYou) Error() string {
+	return "BucketAlreadyOwnedByYou: AWS client error (HTTP 409)"
+}
+
+// ErrorCode returns the AWS error code
+func (e BucketAlreadyOwnedByYou) ErrorCode() string {
+	return "BucketAlreadyOwnedByYou"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e BucketAlreadyOwnedByYou) ErrorFault() string {
+	return "client"
 }
 
 // BucketCannedACL represents the BucketCannedACL enum type
 type BucketCannedACL string
 
 const (
+	BucketCannedACLpublic_read_write BucketCannedACL = "public_read_write"
+
 	BucketCannedACLauthenticated_read BucketCannedACL = "authenticated_read"
 
 	BucketCannedACLprivate BucketCannedACL = "private"
 
 	BucketCannedACLpublic_read BucketCannedACL = "public_read"
-
-	BucketCannedACLpublic_read_write BucketCannedACL = "public_read_write"
 )
 
 // BucketInfo represents the BucketInfo structure
@@ -225,67 +255,67 @@ const (
 
 	BucketLocationConstraintcn_northwest_1 BucketLocationConstraint = "cn_northwest_1"
 
-	BucketLocationConstrainteu_central_1 BucketLocationConstraint = "eu_central_1"
-
-	BucketLocationConstraintca_central_1 BucketLocationConstraint = "ca_central_1"
-
-	BucketLocationConstrainteu_south_1 BucketLocationConstraint = "eu_south_1"
-
-	BucketLocationConstraintus_east_2 BucketLocationConstraint = "us_east_2"
-
-	BucketLocationConstraintus_gov_east_1 BucketLocationConstraint = "us_gov_east_1"
-
 	BucketLocationConstraintus_gov_west_1 BucketLocationConstraint = "us_gov_west_1"
-
-	BucketLocationConstraintus_west_1 BucketLocationConstraint = "us_west_1"
-
-	BucketLocationConstraintus_west_2 BucketLocationConstraint = "us_west_2"
-
-	BucketLocationConstraintap_northeast_1 BucketLocationConstraint = "ap_northeast_1"
-
-	BucketLocationConstraintap_southeast_1 BucketLocationConstraint = "ap_southeast_1"
 
 	BucketLocationConstraintme_central_1 BucketLocationConstraint = "me_central_1"
 
-	BucketLocationConstraintap_southeast_2 BucketLocationConstraint = "ap_southeast_2"
-
-	BucketLocationConstraintap_southeast_5 BucketLocationConstraint = "ap_southeast_5"
-
-	BucketLocationConstraintcn_north_1 BucketLocationConstraint = "cn_north_1"
-
 	BucketLocationConstraintme_south_1 BucketLocationConstraint = "me_south_1"
-
-	BucketLocationConstraintsa_east_1 BucketLocationConstraint = "sa_east_1"
-
-	BucketLocationConstrainteu_central_2 BucketLocationConstraint = "eu_central_2"
-
-	BucketLocationConstrainteu_north_1 BucketLocationConstraint = "eu_north_1"
-
-	BucketLocationConstrainteu_west_1 BucketLocationConstraint = "eu_west_1"
-
-	BucketLocationConstrainteu_west_3 BucketLocationConstraint = "eu_west_3"
-
-	BucketLocationConstraintap_south_2 BucketLocationConstraint = "ap_south_2"
-
-	BucketLocationConstraintap_southeast_4 BucketLocationConstraint = "ap_southeast_4"
-
-	BucketLocationConstraintEU BucketLocationConstraint = "EU"
-
-	BucketLocationConstraintaf_south_1 BucketLocationConstraint = "af_south_1"
-
-	BucketLocationConstraintap_east_1 BucketLocationConstraint = "ap_east_1"
-
-	BucketLocationConstrainteu_west_2 BucketLocationConstraint = "eu_west_2"
-
-	BucketLocationConstrainteu_south_2 BucketLocationConstraint = "eu_south_2"
-
-	BucketLocationConstraintil_central_1 BucketLocationConstraint = "il_central_1"
 
 	BucketLocationConstraintap_northeast_2 BucketLocationConstraint = "ap_northeast_2"
 
+	BucketLocationConstrainteu_south_2 BucketLocationConstraint = "eu_south_2"
+
+	BucketLocationConstraintus_west_2 BucketLocationConstraint = "us_west_2"
+
+	BucketLocationConstraintap_southeast_4 BucketLocationConstraint = "ap_southeast_4"
+
+	BucketLocationConstrainteu_west_1 BucketLocationConstraint = "eu_west_1"
+
+	BucketLocationConstraintsa_east_1 BucketLocationConstraint = "sa_east_1"
+
+	BucketLocationConstraintap_southeast_2 BucketLocationConstraint = "ap_southeast_2"
+
+	BucketLocationConstraintca_central_1 BucketLocationConstraint = "ca_central_1"
+
+	BucketLocationConstrainteu_west_3 BucketLocationConstraint = "eu_west_3"
+
+	BucketLocationConstraintil_central_1 BucketLocationConstraint = "il_central_1"
+
+	BucketLocationConstraintus_gov_east_1 BucketLocationConstraint = "us_gov_east_1"
+
+	BucketLocationConstraintap_east_1 BucketLocationConstraint = "ap_east_1"
+
 	BucketLocationConstraintap_northeast_3 BucketLocationConstraint = "ap_northeast_3"
 
+	BucketLocationConstraintap_south_2 BucketLocationConstraint = "ap_south_2"
+
+	BucketLocationConstraintap_southeast_5 BucketLocationConstraint = "ap_southeast_5"
+
+	BucketLocationConstrainteu_north_1 BucketLocationConstraint = "eu_north_1"
+
+	BucketLocationConstrainteu_west_2 BucketLocationConstraint = "eu_west_2"
+
+	BucketLocationConstraintus_east_2 BucketLocationConstraint = "us_east_2"
+
+	BucketLocationConstraintap_northeast_1 BucketLocationConstraint = "ap_northeast_1"
+
 	BucketLocationConstraintap_south_1 BucketLocationConstraint = "ap_south_1"
+
+	BucketLocationConstraintus_west_1 BucketLocationConstraint = "us_west_1"
+
+	BucketLocationConstraintaf_south_1 BucketLocationConstraint = "af_south_1"
+
+	BucketLocationConstraintap_southeast_1 BucketLocationConstraint = "ap_southeast_1"
+
+	BucketLocationConstraintcn_north_1 BucketLocationConstraint = "cn_north_1"
+
+	BucketLocationConstraintEU BucketLocationConstraint = "EU"
+
+	BucketLocationConstrainteu_central_1 BucketLocationConstraint = "eu_central_1"
+
+	BucketLocationConstrainteu_central_2 BucketLocationConstraint = "eu_central_2"
+
+	BucketLocationConstrainteu_south_1 BucketLocationConstraint = "eu_south_1"
 )
 
 // BucketLocationName represents the BucketLocationName type
@@ -419,8 +449,6 @@ type Checksum struct {
 type ChecksumAlgorithm string
 
 const (
-	ChecksumAlgorithmCRC32 ChecksumAlgorithm = "CRC32"
-
 	ChecksumAlgorithmCRC32C ChecksumAlgorithm = "CRC32C"
 
 	ChecksumAlgorithmSHA1 ChecksumAlgorithm = "SHA1"
@@ -428,6 +456,8 @@ const (
 	ChecksumAlgorithmSHA256 ChecksumAlgorithm = "SHA256"
 
 	ChecksumAlgorithmCRC64NVME ChecksumAlgorithm = "CRC64NVME"
+
+	ChecksumAlgorithmCRC32 ChecksumAlgorithm = "CRC32"
 )
 
 // ChecksumAlgorithmList represents the ChecksumAlgorithmList type
@@ -584,11 +614,11 @@ type CompletedPartList []CompletedPart
 type CompressionType string
 
 const (
-	CompressionTypeNONE CompressionType = "NONE"
-
 	CompressionTypeGZIP CompressionType = "GZIP"
 
 	CompressionTypeBZIP2 CompressionType = "BZIP2"
+
+	CompressionTypeNONE CompressionType = "NONE"
 )
 
 // Condition represents the Condition structure
@@ -1313,6 +1343,21 @@ type EncryptionConfiguration struct {
 type EncryptionTypeMismatch struct {
 }
 
+// Error implements the error interface for EncryptionTypeMismatch
+func (e EncryptionTypeMismatch) Error() string {
+	return "EncryptionTypeMismatch: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e EncryptionTypeMismatch) ErrorCode() string {
+	return "EncryptionTypeMismatch"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e EncryptionTypeMismatch) ErrorFault() string {
+	return "client"
+}
+
 // End represents the End type
 type End int64
 
@@ -1356,9 +1401,31 @@ type Errors []Error
 type Event string
 
 const (
-	Events3_Replication_OperationMissedThreshold Event = "s3_Replication_OperationMissedThreshold"
+	Events3_ObjectRemoved_ Event = "s3_ObjectRemoved_"
 
 	Events3_LifecycleTransition Event = "s3_LifecycleTransition"
+
+	Events3_IntelligentTiering Event = "s3_IntelligentTiering"
+
+	Events3_LifecycleExpiration_ Event = "s3_LifecycleExpiration_"
+
+	Events3_LifecycleExpiration_Delete Event = "s3_LifecycleExpiration_Delete"
+
+	Events3_ObjectCreated_CompleteMultipartUpload Event = "s3_ObjectCreated_CompleteMultipartUpload"
+
+	Events3_ObjectRestore_Post Event = "s3_ObjectRestore_Post"
+
+	Events3_Replication_OperationFailedReplication Event = "s3_Replication_OperationFailedReplication"
+
+	Events3_ObjectRestore_Delete Event = "s3_ObjectRestore_Delete"
+
+	Events3_LifecycleExpiration_DeleteMarkerCreated Event = "s3_LifecycleExpiration_DeleteMarkerCreated"
+
+	Events3_ObjectTagging_ Event = "s3_ObjectTagging_"
+
+	Events3_ObjectCreated_Put Event = "s3_ObjectCreated_Put"
+
+	Events3_ObjectCreated_Copy Event = "s3_ObjectCreated_Copy"
 
 	Events3_ObjectRestore_Completed Event = "s3_ObjectRestore_Completed"
 
@@ -1366,49 +1433,27 @@ const (
 
 	Events3_Replication_OperationReplicatedAfterThreshold Event = "s3_Replication_OperationReplicatedAfterThreshold"
 
-	Events3_ObjectRestore_Delete Event = "s3_ObjectRestore_Delete"
-
-	Events3_IntelligentTiering Event = "s3_IntelligentTiering"
-
-	Events3_LifecycleExpiration_ Event = "s3_LifecycleExpiration_"
-
 	Events3_ObjectTagging_Put Event = "s3_ObjectTagging_Put"
-
-	Events3_ObjectCreated_CompleteMultipartUpload Event = "s3_ObjectCreated_CompleteMultipartUpload"
-
-	Events3_ObjectRemoved_ Event = "s3_ObjectRemoved_"
-
-	Events3_ObjectRemoved_DeleteMarkerCreated Event = "s3_ObjectRemoved_DeleteMarkerCreated"
-
-	Events3_Replication_OperationFailedReplication Event = "s3_Replication_OperationFailedReplication"
-
-	Events3_Replication_OperationNotTracked Event = "s3_Replication_OperationNotTracked"
-
-	Events3_LifecycleExpiration_DeleteMarkerCreated Event = "s3_LifecycleExpiration_DeleteMarkerCreated"
-
-	Events3_ReducedRedundancyLostObject Event = "s3_ReducedRedundancyLostObject"
-
-	Events3_ObjectCreated_ Event = "s3_ObjectCreated_"
-
-	Events3_ObjectCreated_Copy Event = "s3_ObjectCreated_Copy"
-
-	Events3_ObjectRestore_Post Event = "s3_ObjectRestore_Post"
-
-	Events3_ObjectAcl_Put Event = "s3_ObjectAcl_Put"
-
-	Events3_LifecycleExpiration_Delete Event = "s3_LifecycleExpiration_Delete"
-
-	Events3_ObjectTagging_ Event = "s3_ObjectTagging_"
 
 	Events3_ObjectTagging_Delete Event = "s3_ObjectTagging_Delete"
 
-	Events3_ObjectCreated_Put Event = "s3_ObjectCreated_Put"
-
-	Events3_ObjectCreated_Post Event = "s3_ObjectCreated_Post"
+	Events3_ObjectCreated_ Event = "s3_ObjectCreated_"
 
 	Events3_ObjectRemoved_Delete Event = "s3_ObjectRemoved_Delete"
 
+	Events3_ObjectRemoved_DeleteMarkerCreated Event = "s3_ObjectRemoved_DeleteMarkerCreated"
+
 	Events3_ObjectRestore_ Event = "s3_ObjectRestore_"
+
+	Events3_Replication_OperationNotTracked Event = "s3_Replication_OperationNotTracked"
+
+	Events3_Replication_OperationMissedThreshold Event = "s3_Replication_OperationMissedThreshold"
+
+	Events3_ObjectAcl_Put Event = "s3_ObjectAcl_Put"
+
+	Events3_ReducedRedundancyLostObject Event = "s3_ReducedRedundancyLostObject"
+
+	Events3_ObjectCreated_Post Event = "s3_ObjectCreated_Post"
 )
 
 // EventBridgeConfiguration represents the EventBridgeConfiguration structure
@@ -2294,6 +2339,21 @@ type ID string
 type IdempotencyParameterMismatch struct {
 }
 
+// Error implements the error interface for IdempotencyParameterMismatch
+func (e IdempotencyParameterMismatch) Error() string {
+	return "IdempotencyParameterMismatch: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e IdempotencyParameterMismatch) ErrorCode() string {
+	return "IdempotencyParameterMismatch"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e IdempotencyParameterMismatch) ErrorFault() string {
+	return "client"
+}
+
 // IfMatch represents the IfMatch type
 type IfMatch string
 
@@ -2345,9 +2405,9 @@ type InputSerialization struct {
 type IntelligentTieringAccessTier string
 
 const (
-	IntelligentTieringAccessTierDEEP_ARCHIVE_ACCESS IntelligentTieringAccessTier = "DEEP_ARCHIVE_ACCESS"
-
 	IntelligentTieringAccessTierARCHIVE_ACCESS IntelligentTieringAccessTier = "ARCHIVE_ACCESS"
+
+	IntelligentTieringAccessTierDEEP_ARCHIVE_ACCESS IntelligentTieringAccessTier = "DEEP_ARCHIVE_ACCESS"
 )
 
 // IntelligentTieringAndOperator represents the IntelligentTieringAndOperator structure
@@ -2390,9 +2450,9 @@ type IntelligentTieringId string
 type IntelligentTieringStatus string
 
 const (
-	IntelligentTieringStatusEnabled IntelligentTieringStatus = "Enabled"
-
 	IntelligentTieringStatusDisabled IntelligentTieringStatus = "Disabled"
+
+	IntelligentTieringStatusEnabled IntelligentTieringStatus = "Enabled"
 )
 
 // InvalidObjectState represents the InvalidObjectState structure
@@ -2402,12 +2462,57 @@ type InvalidObjectState struct {
 	StorageClass *interface{} `json:"storageClass,omitempty"`
 }
 
+// Error implements the error interface for InvalidObjectState
+func (e InvalidObjectState) Error() string {
+	return "InvalidObjectState: AWS client error (HTTP 403)"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidObjectState) ErrorCode() string {
+	return "InvalidObjectState"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidObjectState) ErrorFault() string {
+	return "client"
+}
+
 // InvalidRequest represents the InvalidRequest structure
 type InvalidRequest struct {
 }
 
+// Error implements the error interface for InvalidRequest
+func (e InvalidRequest) Error() string {
+	return "InvalidRequest: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidRequest) ErrorCode() string {
+	return "InvalidRequest"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidRequest) ErrorFault() string {
+	return "client"
+}
+
 // InvalidWriteOffset represents the InvalidWriteOffset structure
 type InvalidWriteOffset struct {
+}
+
+// Error implements the error interface for InvalidWriteOffset
+func (e InvalidWriteOffset) Error() string {
+	return "InvalidWriteOffset: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidWriteOffset) ErrorCode() string {
+	return "InvalidWriteOffset"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidWriteOffset) ErrorFault() string {
+	return "client"
 }
 
 // InventoryConfiguration represents the InventoryConfiguration structure
@@ -2451,20 +2556,20 @@ type InventoryFilter struct {
 type InventoryFormat string
 
 const (
+	InventoryFormatCSV InventoryFormat = "CSV"
+
 	InventoryFormatORC InventoryFormat = "ORC"
 
 	InventoryFormatParquet InventoryFormat = "Parquet"
-
-	InventoryFormatCSV InventoryFormat = "CSV"
 )
 
 // InventoryFrequency represents the InventoryFrequency enum type
 type InventoryFrequency string
 
 const (
-	InventoryFrequencyWeekly InventoryFrequency = "Weekly"
-
 	InventoryFrequencyDaily InventoryFrequency = "Daily"
+
+	InventoryFrequencyWeekly InventoryFrequency = "Weekly"
 )
 
 // InventoryId represents the InventoryId type
@@ -2474,44 +2579,44 @@ type InventoryId string
 type InventoryIncludedObjectVersions string
 
 const (
-	InventoryIncludedObjectVersionsCurrent InventoryIncludedObjectVersions = "Current"
-
 	InventoryIncludedObjectVersionsAll InventoryIncludedObjectVersions = "All"
+
+	InventoryIncludedObjectVersionsCurrent InventoryIncludedObjectVersions = "Current"
 )
 
 // InventoryOptionalField represents the InventoryOptionalField enum type
 type InventoryOptionalField string
 
 const (
-	InventoryOptionalFieldObjectOwner InventoryOptionalField = "ObjectOwner"
+	InventoryOptionalFieldStorageClass InventoryOptionalField = "StorageClass"
 
-	InventoryOptionalFieldReplicationStatus InventoryOptionalField = "ReplicationStatus"
+	InventoryOptionalFieldETag InventoryOptionalField = "ETag"
 
 	InventoryOptionalFieldObjectLockRetainUntilDate InventoryOptionalField = "ObjectLockRetainUntilDate"
+
+	InventoryOptionalFieldObjectLockMode InventoryOptionalField = "ObjectLockMode"
+
+	InventoryOptionalFieldLastModifiedDate InventoryOptionalField = "LastModifiedDate"
+
+	InventoryOptionalFieldIsMultipartUploaded InventoryOptionalField = "IsMultipartUploaded"
+
+	InventoryOptionalFieldEncryptionStatus InventoryOptionalField = "EncryptionStatus"
+
+	InventoryOptionalFieldObjectOwner InventoryOptionalField = "ObjectOwner"
+
+	InventoryOptionalFieldSize InventoryOptionalField = "Size"
+
+	InventoryOptionalFieldChecksumAlgorithm InventoryOptionalField = "ChecksumAlgorithm"
+
+	InventoryOptionalFieldObjectAccessControlList InventoryOptionalField = "ObjectAccessControlList"
+
+	InventoryOptionalFieldReplicationStatus InventoryOptionalField = "ReplicationStatus"
 
 	InventoryOptionalFieldObjectLockLegalHoldStatus InventoryOptionalField = "ObjectLockLegalHoldStatus"
 
 	InventoryOptionalFieldIntelligentTieringAccessTier InventoryOptionalField = "IntelligentTieringAccessTier"
 
-	InventoryOptionalFieldSize InventoryOptionalField = "Size"
-
-	InventoryOptionalFieldLastModifiedDate InventoryOptionalField = "LastModifiedDate"
-
-	InventoryOptionalFieldStorageClass InventoryOptionalField = "StorageClass"
-
-	InventoryOptionalFieldEncryptionStatus InventoryOptionalField = "EncryptionStatus"
-
-	InventoryOptionalFieldObjectLockMode InventoryOptionalField = "ObjectLockMode"
-
-	InventoryOptionalFieldIsMultipartUploaded InventoryOptionalField = "IsMultipartUploaded"
-
-	InventoryOptionalFieldETag InventoryOptionalField = "ETag"
-
 	InventoryOptionalFieldBucketKeyStatus InventoryOptionalField = "BucketKeyStatus"
-
-	InventoryOptionalFieldChecksumAlgorithm InventoryOptionalField = "ChecksumAlgorithm"
-
-	InventoryOptionalFieldObjectAccessControlList InventoryOptionalField = "ObjectAccessControlList"
 )
 
 // InventoryOptionalFields represents the InventoryOptionalFields type
@@ -2564,9 +2669,9 @@ type JSONOutput struct {
 type JSONType string
 
 const (
-	JSONTypeDOCUMENT JSONType = "DOCUMENT"
-
 	JSONTypeLINES JSONType = "LINES"
+
+	JSONTypeDOCUMENT JSONType = "DOCUMENT"
 )
 
 // KMSContext represents the KMSContext type
@@ -3127,9 +3232,9 @@ type Metadata map[string]string
 type MetadataDirective string
 
 const (
-	MetadataDirectiveREPLACE MetadataDirective = "REPLACE"
-
 	MetadataDirectiveCOPY MetadataDirective = "COPY"
+
+	MetadataDirectiveREPLACE MetadataDirective = "REPLACE"
 )
 
 // MetadataEntry represents the MetadataEntry structure
@@ -3268,12 +3373,57 @@ type NextVersionIdMarker string
 type NoSuchBucket struct {
 }
 
+// Error implements the error interface for NoSuchBucket
+func (e NoSuchBucket) Error() string {
+	return "NoSuchBucket: AWS client error (HTTP 404)"
+}
+
+// ErrorCode returns the AWS error code
+func (e NoSuchBucket) ErrorCode() string {
+	return "NoSuchBucket"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e NoSuchBucket) ErrorFault() string {
+	return "client"
+}
+
 // NoSuchKey represents the NoSuchKey structure
 type NoSuchKey struct {
 }
 
+// Error implements the error interface for NoSuchKey
+func (e NoSuchKey) Error() string {
+	return "NoSuchKey: AWS client error (HTTP 404)"
+}
+
+// ErrorCode returns the AWS error code
+func (e NoSuchKey) ErrorCode() string {
+	return "NoSuchKey"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e NoSuchKey) ErrorFault() string {
+	return "client"
+}
+
 // NoSuchUpload represents the NoSuchUpload structure
 type NoSuchUpload struct {
+}
+
+// Error implements the error interface for NoSuchUpload
+func (e NoSuchUpload) Error() string {
+	return "NoSuchUpload: AWS client error (HTTP 404)"
+}
+
+// ErrorCode returns the AWS error code
+func (e NoSuchUpload) ErrorCode() string {
+	return "NoSuchUpload"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e NoSuchUpload) ErrorFault() string {
+	return "client"
 }
 
 // NoncurrentVersionExpiration represents the NoncurrentVersionExpiration structure
@@ -3297,6 +3447,21 @@ type NoncurrentVersionTransitionList []NoncurrentVersionTransition
 
 // NotFound represents the NotFound structure
 type NotFound struct {
+}
+
+// Error implements the error interface for NotFound
+func (e NotFound) Error() string {
+	return "NotFound: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e NotFound) ErrorCode() string {
+	return "NotFound"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e NotFound) ErrorFault() string {
+	return "client"
 }
 
 // NotificationConfiguration represents the NotificationConfiguration structure
@@ -3343,19 +3508,34 @@ type Object struct {
 type ObjectAlreadyInActiveTierError struct {
 }
 
+// Error implements the error interface for ObjectAlreadyInActiveTierError
+func (e ObjectAlreadyInActiveTierError) Error() string {
+	return "ObjectAlreadyInActiveTierError: AWS client error (HTTP 403)"
+}
+
+// ErrorCode returns the AWS error code
+func (e ObjectAlreadyInActiveTierError) ErrorCode() string {
+	return "ObjectAlreadyInActiveTierError"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ObjectAlreadyInActiveTierError) ErrorFault() string {
+	return "client"
+}
+
 // ObjectAttributes represents the ObjectAttributes enum type
 type ObjectAttributes string
 
 const (
+	ObjectAttributesETAG ObjectAttributes = "ETAG"
+
+	ObjectAttributesCHECKSUM ObjectAttributes = "CHECKSUM"
+
 	ObjectAttributesOBJECT_PARTS ObjectAttributes = "OBJECT_PARTS"
 
 	ObjectAttributesSTORAGE_CLASS ObjectAttributes = "STORAGE_CLASS"
 
 	ObjectAttributesOBJECT_SIZE ObjectAttributes = "OBJECT_SIZE"
-
-	ObjectAttributesETAG ObjectAttributes = "ETAG"
-
-	ObjectAttributesCHECKSUM ObjectAttributes = "CHECKSUM"
 )
 
 // ObjectAttributesList represents the ObjectAttributesList type
@@ -3365,6 +3545,8 @@ type ObjectAttributesList []interface{}
 type ObjectCannedACL string
 
 const (
+	ObjectCannedACLbucket_owner_full_control ObjectCannedACL = "bucket_owner_full_control"
+
 	ObjectCannedACLprivate ObjectCannedACL = "private"
 
 	ObjectCannedACLpublic_read ObjectCannedACL = "public_read"
@@ -3376,8 +3558,6 @@ const (
 	ObjectCannedACLaws_exec_read ObjectCannedACL = "aws_exec_read"
 
 	ObjectCannedACLbucket_owner_read ObjectCannedACL = "bucket_owner_read"
-
-	ObjectCannedACLbucket_owner_full_control ObjectCannedACL = "bucket_owner_full_control"
 )
 
 // ObjectIdentifier represents the ObjectIdentifier structure
@@ -3473,6 +3653,21 @@ type ObjectLockToken string
 type ObjectNotInActiveTierError struct {
 }
 
+// Error implements the error interface for ObjectNotInActiveTierError
+func (e ObjectNotInActiveTierError) Error() string {
+	return "ObjectNotInActiveTierError: AWS client error (HTTP 403)"
+}
+
+// ErrorCode returns the AWS error code
+func (e ObjectNotInActiveTierError) ErrorCode() string {
+	return "ObjectNotInActiveTierError"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ObjectNotInActiveTierError) ErrorFault() string {
+	return "client"
+}
+
 // ObjectOwnership represents the ObjectOwnership enum type
 type ObjectOwnership string
 
@@ -3514,27 +3709,27 @@ type ObjectSizeLessThanBytes int64
 type ObjectStorageClass string
 
 const (
-	ObjectStorageClassREDUCED_REDUNDANCY ObjectStorageClass = "REDUCED_REDUNDANCY"
-
-	ObjectStorageClassGLACIER ObjectStorageClass = "GLACIER"
-
-	ObjectStorageClassSTANDARD_IA ObjectStorageClass = "STANDARD_IA"
-
-	ObjectStorageClassINTELLIGENT_TIERING ObjectStorageClass = "INTELLIGENT_TIERING"
-
-	ObjectStorageClassDEEP_ARCHIVE ObjectStorageClass = "DEEP_ARCHIVE"
-
-	ObjectStorageClassOUTPOSTS ObjectStorageClass = "OUTPOSTS"
-
-	ObjectStorageClassGLACIER_IR ObjectStorageClass = "GLACIER_IR"
+	ObjectStorageClassSNOW ObjectStorageClass = "SNOW"
 
 	ObjectStorageClassEXPRESS_ONEZONE ObjectStorageClass = "EXPRESS_ONEZONE"
 
 	ObjectStorageClassSTANDARD ObjectStorageClass = "STANDARD"
 
+	ObjectStorageClassREDUCED_REDUNDANCY ObjectStorageClass = "REDUCED_REDUNDANCY"
+
+	ObjectStorageClassGLACIER ObjectStorageClass = "GLACIER"
+
 	ObjectStorageClassONEZONE_IA ObjectStorageClass = "ONEZONE_IA"
 
-	ObjectStorageClassSNOW ObjectStorageClass = "SNOW"
+	ObjectStorageClassINTELLIGENT_TIERING ObjectStorageClass = "INTELLIGENT_TIERING"
+
+	ObjectStorageClassDEEP_ARCHIVE ObjectStorageClass = "DEEP_ARCHIVE"
+
+	ObjectStorageClassSTANDARD_IA ObjectStorageClass = "STANDARD_IA"
+
+	ObjectStorageClassOUTPOSTS ObjectStorageClass = "OUTPOSTS"
+
+	ObjectStorageClassGLACIER_IR ObjectStorageClass = "GLACIER_IR"
 )
 
 // ObjectVersion represents the ObjectVersion structure
@@ -3659,9 +3854,9 @@ type PartNumberMarker string
 type PartitionDateSource string
 
 const (
-	PartitionDateSourceDeliveryTime PartitionDateSource = "DeliveryTime"
-
 	PartitionDateSourceEventTime PartitionDateSource = "EventTime"
+
+	PartitionDateSourceDeliveryTime PartitionDateSource = "DeliveryTime"
 )
 
 // PartitionedPrefix represents the PartitionedPrefix structure
@@ -3691,6 +3886,8 @@ const (
 type Permission string
 
 const (
+	PermissionFULL_CONTROL Permission = "FULL_CONTROL"
+
 	PermissionWRITE Permission = "WRITE"
 
 	PermissionWRITE_ACP Permission = "WRITE_ACP"
@@ -3698,8 +3895,6 @@ const (
 	PermissionREAD Permission = "READ"
 
 	PermissionREAD_ACP Permission = "READ_ACP"
-
-	PermissionFULL_CONTROL Permission = "FULL_CONTROL"
 )
 
 // Policy represents the Policy type
@@ -4460,8 +4655,6 @@ type ReplicationRules []ReplicationRule
 type ReplicationStatus string
 
 const (
-	ReplicationStatusCOMPLETED ReplicationStatus = "COMPLETED"
-
 	ReplicationStatusCOMPLETE ReplicationStatus = "COMPLETE"
 
 	ReplicationStatusPENDING ReplicationStatus = "PENDING"
@@ -4469,6 +4662,8 @@ const (
 	ReplicationStatusFAILED ReplicationStatus = "FAILED"
 
 	ReplicationStatusREPLICA ReplicationStatus = "REPLICA"
+
+	ReplicationStatusCOMPLETED ReplicationStatus = "COMPLETED"
 )
 
 // ReplicationTime represents the ReplicationTime structure
@@ -4482,9 +4677,9 @@ type ReplicationTime struct {
 type ReplicationTimeStatus string
 
 const (
-	ReplicationTimeStatusEnabled ReplicationTimeStatus = "Enabled"
-
 	ReplicationTimeStatusDisabled ReplicationTimeStatus = "Disabled"
+
+	ReplicationTimeStatusEnabled ReplicationTimeStatus = "Enabled"
 )
 
 // ReplicationTimeValue represents the ReplicationTimeValue structure
@@ -4852,9 +5047,9 @@ type SseKmsEncryptedObjects struct {
 type SseKmsEncryptedObjectsStatus string
 
 const (
-	SseKmsEncryptedObjectsStatusEnabled SseKmsEncryptedObjectsStatus = "Enabled"
-
 	SseKmsEncryptedObjectsStatusDisabled SseKmsEncryptedObjectsStatus = "Disabled"
+
+	SseKmsEncryptedObjectsStatusEnabled SseKmsEncryptedObjectsStatus = "Enabled"
 )
 
 // Start represents the Start type
@@ -4881,27 +5076,27 @@ type StatsEvent struct {
 type StorageClass string
 
 const (
-	StorageClassONEZONE_IA StorageClass = "ONEZONE_IA"
+	StorageClassSTANDARD_IA StorageClass = "STANDARD_IA"
 
-	StorageClassINTELLIGENT_TIERING StorageClass = "INTELLIGENT_TIERING"
+	StorageClassONEZONE_IA StorageClass = "ONEZONE_IA"
 
 	StorageClassDEEP_ARCHIVE StorageClass = "DEEP_ARCHIVE"
 
-	StorageClassGLACIER_IR StorageClass = "GLACIER_IR"
-
-	StorageClassSNOW StorageClass = "SNOW"
+	StorageClassEXPRESS_ONEZONE StorageClass = "EXPRESS_ONEZONE"
 
 	StorageClassSTANDARD StorageClass = "STANDARD"
 
 	StorageClassREDUCED_REDUNDANCY StorageClass = "REDUCED_REDUNDANCY"
 
-	StorageClassSTANDARD_IA StorageClass = "STANDARD_IA"
+	StorageClassINTELLIGENT_TIERING StorageClass = "INTELLIGENT_TIERING"
 
 	StorageClassGLACIER StorageClass = "GLACIER"
 
 	StorageClassOUTPOSTS StorageClass = "OUTPOSTS"
 
-	StorageClassEXPRESS_ONEZONE StorageClass = "EXPRESS_ONEZONE"
+	StorageClassGLACIER_IR StorageClass = "GLACIER_IR"
+
+	StorageClassSNOW StorageClass = "SNOW"
 )
 
 // StorageClassAnalysis represents the StorageClassAnalysis structure
@@ -5010,6 +5205,21 @@ type Token string
 type TooManyParts struct {
 }
 
+// Error implements the error interface for TooManyParts
+func (e TooManyParts) Error() string {
+	return "TooManyParts: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e TooManyParts) ErrorCode() string {
+	return "TooManyParts"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e TooManyParts) ErrorFault() string {
+	return "client"
+}
+
 // TopicArn represents the TopicArn type
 type TopicArn string
 
@@ -5052,17 +5262,17 @@ type TransitionList []Transition
 type TransitionStorageClass string
 
 const (
-	TransitionStorageClassSTANDARD_IA TransitionStorageClass = "STANDARD_IA"
-
-	TransitionStorageClassONEZONE_IA TransitionStorageClass = "ONEZONE_IA"
-
-	TransitionStorageClassINTELLIGENT_TIERING TransitionStorageClass = "INTELLIGENT_TIERING"
-
 	TransitionStorageClassDEEP_ARCHIVE TransitionStorageClass = "DEEP_ARCHIVE"
 
 	TransitionStorageClassGLACIER_IR TransitionStorageClass = "GLACIER_IR"
 
 	TransitionStorageClassGLACIER TransitionStorageClass = "GLACIER"
+
+	TransitionStorageClassSTANDARD_IA TransitionStorageClass = "STANDARD_IA"
+
+	TransitionStorageClassONEZONE_IA TransitionStorageClass = "ONEZONE_IA"
+
+	TransitionStorageClassINTELLIGENT_TIERING TransitionStorageClass = "INTELLIGENT_TIERING"
 )
 
 // Type represents the Type enum type

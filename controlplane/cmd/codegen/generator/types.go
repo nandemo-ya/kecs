@@ -11,14 +11,17 @@ import (
 
 // TypeInfo holds information about a generated type
 type TypeInfo struct {
-	Name       string
-	GoType     string
-	JSONName   string
-	IsPointer  bool
-	IsRequired bool
-	IsEnum     bool
-	EnumValues []string
-	Fields     []FieldInfo
+	Name         string
+	GoType       string
+	JSONName     string
+	IsPointer    bool
+	IsRequired   bool
+	IsEnum       bool
+	IsError      bool
+	ErrorType    string // "client" or "server"
+	HTTPStatus   int
+	EnumValues   []string
+	Fields       []FieldInfo
 }
 
 // FieldInfo holds information about a struct field
@@ -135,8 +138,15 @@ func (g *Generator) collectTypes(api *parser.SmithyAPI) map[string]*TypeInfo {
 // generateStructType generates type info for a structure
 func (g *Generator) generateStructType(name string, shape *parser.SmithyShape, api *parser.SmithyAPI) *TypeInfo {
 	typeInfo := &TypeInfo{
-		Name:   name,
-		GoType: name,
+		Name:    name,
+		GoType:  name,
+		IsError: shape.IsError(),
+	}
+	
+	// Set error type information
+	if typeInfo.IsError {
+		typeInfo.ErrorType = shape.GetErrorType()
+		typeInfo.HTTPStatus = shape.GetHTTPStatus()
 	}
 	
 	// Check if this is an empty structure
@@ -479,6 +489,23 @@ type {{$type.Name}} struct {
 {{end}}	{{$field.Name}} {{if $field.IsPointer}}*{{end}}{{$field.GoType}} ` + "`" + `json:"{{$field.JSONName}}{{if not $field.IsRequired}},omitempty{{end}}"` + "`" + `
 {{end}}
 }
+{{if $type.IsError}}
+
+// Error implements the error interface for {{$type.Name}}
+func (e {{$type.Name}}) Error() string {
+	return "{{$type.Name}}: AWS {{$type.ErrorType}} error{{if $type.HTTPStatus}} (HTTP {{$type.HTTPStatus}}){{end}}"
+}
+
+// ErrorCode returns the AWS error code
+func (e {{$type.Name}}) ErrorCode() string {
+	return "{{$type.Name}}"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e {{$type.Name}}) ErrorFault() string {
+	return "{{$type.ErrorType}}"
+}
+{{end}}
 {{else}}
 // {{$type.Name}} represents the {{$type.Name}} type
 type {{$type.Name}} {{$type.GoType}}

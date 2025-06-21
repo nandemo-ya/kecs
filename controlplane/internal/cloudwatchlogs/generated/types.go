@@ -10,6 +10,21 @@ type AccessDeniedException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for AccessDeniedException
+func (e AccessDeniedException) Error() string {
+	return "AccessDeniedException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AccessDeniedException) ErrorCode() string {
+	return "AccessDeniedException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AccessDeniedException) ErrorFault() string {
+	return "client"
+}
+
 // AccessPolicy represents the AccessPolicy type
 type AccessPolicy string
 
@@ -259,6 +274,21 @@ type ConflictException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ConflictException
+func (e ConflictException) Error() string {
+	return "ConflictException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ConflictException) ErrorCode() string {
+	return "ConflictException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ConflictException) ErrorFault() string {
+	return "client"
+}
+
 // CopyValue represents the CopyValue structure
 type CopyValue struct {
 	Entries []CopyValueEntry `json:"entries"`
@@ -371,6 +401,21 @@ type DataAlreadyAcceptedException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for DataAlreadyAcceptedException
+func (e DataAlreadyAcceptedException) Error() string {
+	return "DataAlreadyAcceptedException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e DataAlreadyAcceptedException) ErrorCode() string {
+	return "DataAlreadyAcceptedException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DataAlreadyAcceptedException) ErrorFault() string {
+	return "client"
+}
+
 // DataProtectionPolicyDocument represents the DataProtectionPolicyDocument type
 type DataProtectionPolicyDocument string
 
@@ -378,13 +423,13 @@ type DataProtectionPolicyDocument string
 type DataProtectionStatus string
 
 const (
+	DataProtectionStatusDISABLED DataProtectionStatus = "DISABLED"
+
 	DataProtectionStatusACTIVATED DataProtectionStatus = "ACTIVATED"
 
 	DataProtectionStatusDELETED DataProtectionStatus = "DELETED"
 
 	DataProtectionStatusARCHIVED DataProtectionStatus = "ARCHIVED"
-
-	DataProtectionStatusDISABLED DataProtectionStatus = "DISABLED"
 )
 
 // DateTimeConverter represents the DateTimeConverter structure
@@ -588,11 +633,11 @@ type DeliveryDestinationPolicy string
 type DeliveryDestinationType string
 
 const (
-	DeliveryDestinationTypeS3 DeliveryDestinationType = "S3"
-
 	DeliveryDestinationTypeCWL DeliveryDestinationType = "CWL"
 
 	DeliveryDestinationTypeFH DeliveryDestinationType = "FH"
+
+	DeliveryDestinationTypeS3 DeliveryDestinationType = "S3"
 )
 
 // DeliveryDestinationTypes represents the DeliveryDestinationTypes type
@@ -1028,8 +1073,6 @@ type EntityKeyAttributesValue string
 type EntityRejectionErrorType string
 
 const (
-	EntityRejectionErrorTypeUNSUPPORTED_LOG_GROUP_TYPE EntityRejectionErrorType = "UNSUPPORTED_LOG_GROUP_TYPE"
-
 	EntityRejectionErrorTypeMISSING_REQUIRED_FIELDS EntityRejectionErrorType = "MISSING_REQUIRED_FIELDS"
 
 	EntityRejectionErrorTypeINVALID_ENTITY EntityRejectionErrorType = "INVALID_ENTITY"
@@ -1041,6 +1084,8 @@ const (
 	EntityRejectionErrorTypeINVALID_ATTRIBUTES EntityRejectionErrorType = "INVALID_ATTRIBUTES"
 
 	EntityRejectionErrorTypeENTITY_SIZE_TOO_LARGE EntityRejectionErrorType = "ENTITY_SIZE_TOO_LARGE"
+
+	EntityRejectionErrorTypeUNSUPPORTED_LOG_GROUP_TYPE EntityRejectionErrorType = "UNSUPPORTED_LOG_GROUP_TYPE"
 )
 
 // Enumerations represents the Enumerations type
@@ -1079,15 +1124,15 @@ type EventNumber int64
 type EventSource string
 
 const (
+	EventSourceEKS_AUDIT EventSource = "EKS_AUDIT"
+
+	EventSourceAWSWAF EventSource = "AWSWAF"
+
 	EventSourceCLOUD_TRAIL EventSource = "CLOUD_TRAIL"
 
 	EventSourceROUTE53_RESOLVER EventSource = "ROUTE53_RESOLVER"
 
 	EventSourceVPC_FLOW EventSource = "VPC_FLOW"
-
-	EventSourceEKS_AUDIT EventSource = "EKS_AUDIT"
-
-	EventSourceAWSWAF EventSource = "AWSWAF"
 )
 
 // EventsLimit represents the EventsLimit type
@@ -1547,11 +1592,11 @@ type IntegrationNamePrefix string
 type IntegrationStatus string
 
 const (
-	IntegrationStatusPROVISIONING IntegrationStatus = "PROVISIONING"
-
 	IntegrationStatusACTIVE IntegrationStatus = "ACTIVE"
 
 	IntegrationStatusFAILED IntegrationStatus = "FAILED"
+
+	IntegrationStatusPROVISIONING IntegrationStatus = "PROVISIONING"
 )
 
 // IntegrationStatusMessage represents the IntegrationStatusMessage type
@@ -1584,9 +1629,39 @@ type InvalidOperationException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidOperationException
+func (e InvalidOperationException) Error() string {
+	return "InvalidOperationException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidOperationException) ErrorCode() string {
+	return "InvalidOperationException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidOperationException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidParameterException represents the InvalidParameterException structure
 type InvalidParameterException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidParameterException
+func (e InvalidParameterException) Error() string {
+	return "InvalidParameterException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidParameterException) ErrorCode() string {
+	return "InvalidParameterException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidParameterException) ErrorFault() string {
+	return "client"
 }
 
 // InvalidSequenceTokenException represents the InvalidSequenceTokenException structure
@@ -1594,6 +1669,21 @@ type InvalidSequenceTokenException struct {
 	ExpectedSequenceToken *string `json:"expectedSequenceToken,omitempty"`
 
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidSequenceTokenException
+func (e InvalidSequenceTokenException) Error() string {
+	return "InvalidSequenceTokenException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidSequenceTokenException) ErrorCode() string {
+	return "InvalidSequenceTokenException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidSequenceTokenException) ErrorFault() string {
+	return "client"
 }
 
 // IsSampled represents the IsSampled type
@@ -1614,6 +1704,21 @@ type KmsKeyId string
 // LimitExceededException represents the LimitExceededException structure
 type LimitExceededException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for LimitExceededException
+func (e LimitExceededException) Error() string {
+	return "LimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e LimitExceededException) ErrorCode() string {
+	return "LimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e LimitExceededException) ErrorFault() string {
+	return "client"
 }
 
 // ListAnomaliesLimit represents the ListAnomaliesLimit type
@@ -1948,6 +2053,21 @@ type MalformedQueryException struct {
 	QueryCompileError *QueryCompileError `json:"queryCompileError,omitempty"`
 }
 
+// Error implements the error interface for MalformedQueryException
+func (e MalformedQueryException) Error() string {
+	return "MalformedQueryException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e MalformedQueryException) ErrorCode() string {
+	return "MalformedQueryException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e MalformedQueryException) ErrorFault() string {
+	return "client"
+}
+
 // MatchPattern represents the MatchPattern type
 type MatchPattern string
 
@@ -2157,11 +2277,11 @@ type OpenSearchResourceStatus struct {
 type OpenSearchResourceStatusType string
 
 const (
-	OpenSearchResourceStatusTypeERROR OpenSearchResourceStatusType = "ERROR"
-
 	OpenSearchResourceStatusTypeACTIVE OpenSearchResourceStatusType = "ACTIVE"
 
 	OpenSearchResourceStatusTypeNOT_FOUND OpenSearchResourceStatusType = "NOT_FOUND"
+
+	OpenSearchResourceStatusTypeERROR OpenSearchResourceStatusType = "ERROR"
 )
 
 // OpenSearchWorkspace represents the OpenSearchWorkspace structure
@@ -2179,6 +2299,21 @@ type OperationAbortedException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for OperationAbortedException
+func (e OperationAbortedException) Error() string {
+	return "OperationAbortedException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OperationAbortedException) ErrorCode() string {
+	return "OperationAbortedException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OperationAbortedException) ErrorFault() string {
+	return "client"
+}
+
 // OrderBy represents the OrderBy enum type
 type OrderBy string
 
@@ -2192,15 +2327,15 @@ const (
 type OutputFormat string
 
 const (
-	OutputFormatPLAIN OutputFormat = "PLAIN"
-
-	OutputFormatW3C OutputFormat = "W3C"
-
 	OutputFormatRAW OutputFormat = "RAW"
 
 	OutputFormatPARQUET OutputFormat = "PARQUET"
 
 	OutputFormatJSON OutputFormat = "JSON"
+
+	OutputFormatPLAIN OutputFormat = "PLAIN"
+
+	OutputFormatW3C OutputFormat = "W3C"
 )
 
 // OutputFormats represents the OutputFormats type
@@ -2716,6 +2851,10 @@ type QueryStatistics struct {
 type QueryStatus string
 
 const (
+	QueryStatusComplete QueryStatus = "Complete"
+
+	QueryStatusFailed QueryStatus = "Failed"
+
 	QueryStatusCancelled QueryStatus = "Cancelled"
 
 	QueryStatusTimeout QueryStatus = "Timeout"
@@ -2725,10 +2864,6 @@ const (
 	QueryStatusScheduled QueryStatus = "Scheduled"
 
 	QueryStatusRunning QueryStatus = "Running"
-
-	QueryStatusComplete QueryStatus = "Complete"
-
-	QueryStatusFailed QueryStatus = "Failed"
 )
 
 // QueryString represents the QueryString type
@@ -2789,6 +2924,21 @@ type ResourceAlreadyExistsException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ResourceAlreadyExistsException
+func (e ResourceAlreadyExistsException) Error() string {
+	return "ResourceAlreadyExistsException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourceAlreadyExistsException) ErrorCode() string {
+	return "ResourceAlreadyExistsException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourceAlreadyExistsException) ErrorFault() string {
+	return "client"
+}
+
 // ResourceArns represents the ResourceArns type
 type ResourceArns []string
 
@@ -2805,6 +2955,21 @@ type ResourceIdentifier string
 // ResourceNotFoundException represents the ResourceNotFoundException structure
 type ResourceNotFoundException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ResourceNotFoundException
+func (e ResourceNotFoundException) Error() string {
+	return "ResourceNotFoundException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourceNotFoundException) ErrorCode() string {
+	return "ResourceNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourceNotFoundException) ErrorFault() string {
+	return "client"
 }
 
 // ResourcePolicies represents the ResourcePolicies type
@@ -2876,9 +3041,39 @@ type ServiceQuotaExceededException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ServiceQuotaExceededException
+func (e ServiceQuotaExceededException) Error() string {
+	return "ServiceQuotaExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ServiceQuotaExceededException) ErrorCode() string {
+	return "ServiceQuotaExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ServiceQuotaExceededException) ErrorFault() string {
+	return "client"
+}
+
 // ServiceUnavailableException represents the ServiceUnavailableException structure
 type ServiceUnavailableException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ServiceUnavailableException
+func (e ServiceUnavailableException) Error() string {
+	return "ServiceUnavailableException: AWS server error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ServiceUnavailableException) ErrorCode() string {
+	return "ServiceUnavailableException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ServiceUnavailableException) ErrorFault() string {
+	return "server"
 }
 
 // SessionId represents the SessionId type
@@ -2889,9 +3084,39 @@ type SessionStreamingException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for SessionStreamingException
+func (e SessionStreamingException) Error() string {
+	return "SessionStreamingException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e SessionStreamingException) ErrorCode() string {
+	return "SessionStreamingException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e SessionStreamingException) ErrorFault() string {
+	return "client"
+}
+
 // SessionTimeoutException represents the SessionTimeoutException structure
 type SessionTimeoutException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for SessionTimeoutException
+func (e SessionTimeoutException) Error() string {
+	return "SessionTimeoutException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e SessionTimeoutException) ErrorCode() string {
+	return "SessionTimeoutException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e SessionTimeoutException) ErrorFault() string {
+	return "client"
 }
 
 // Source represents the Source type
@@ -2922,23 +3147,49 @@ type SplitStringEntry struct {
 type StandardUnit string
 
 const (
-	StandardUnitBytes StandardUnit = "Bytes"
-
 	StandardUnitTerabytes StandardUnit = "Terabytes"
 
 	StandardUnitBits StandardUnit = "Bits"
 
 	StandardUnitMegabits StandardUnit = "Megabits"
 
+	StandardUnitBytesSecond StandardUnit = "BytesSecond"
+
+	StandardUnitMegabytesSecond StandardUnit = "MegabytesSecond"
+
+	StandardUnitTerabitsSecond StandardUnit = "TerabitsSecond"
+
+	StandardUnitKilobytes StandardUnit = "Kilobytes"
+
+	StandardUnitKilobytesSecond StandardUnit = "KilobytesSecond"
+
 	StandardUnitGigabytesSecond StandardUnit = "GigabytesSecond"
 
 	StandardUnitNone StandardUnit = "None"
 
-	StandardUnitGigabytes StandardUnit = "Gigabytes"
+	StandardUnitSeconds StandardUnit = "Seconds"
+
+	StandardUnitMilliseconds StandardUnit = "Milliseconds"
+
+	StandardUnitKilobits StandardUnit = "Kilobits"
+
+	StandardUnitGigabits StandardUnit = "Gigabits"
+
+	StandardUnitCount StandardUnit = "Count"
+
+	StandardUnitBitsSecond StandardUnit = "BitsSecond"
+
+	StandardUnitCountSecond StandardUnit = "CountSecond"
+
+	StandardUnitMicroseconds StandardUnit = "Microseconds"
+
+	StandardUnitBytes StandardUnit = "Bytes"
+
+	StandardUnitMegabytes StandardUnit = "Megabytes"
 
 	StandardUnitTerabits StandardUnit = "Terabits"
 
-	StandardUnitCount StandardUnit = "Count"
+	StandardUnitTerabytesSecond StandardUnit = "TerabytesSecond"
 
 	StandardUnitKilobitsSecond StandardUnit = "KilobitsSecond"
 
@@ -2946,35 +3197,9 @@ const (
 
 	StandardUnitGigabitsSecond StandardUnit = "GigabitsSecond"
 
-	StandardUnitTerabitsSecond StandardUnit = "TerabitsSecond"
-
-	StandardUnitCountSecond StandardUnit = "CountSecond"
-
-	StandardUnitSeconds StandardUnit = "Seconds"
-
-	StandardUnitKilobytes StandardUnit = "Kilobytes"
-
-	StandardUnitGigabits StandardUnit = "Gigabits"
-
-	StandardUnitBytesSecond StandardUnit = "BytesSecond"
-
-	StandardUnitTerabytesSecond StandardUnit = "TerabytesSecond"
-
-	StandardUnitMegabytes StandardUnit = "Megabytes"
-
-	StandardUnitKilobits StandardUnit = "Kilobits"
-
 	StandardUnitPercent StandardUnit = "Percent"
 
-	StandardUnitKilobytesSecond StandardUnit = "KilobytesSecond"
-
-	StandardUnitMegabytesSecond StandardUnit = "MegabytesSecond"
-
-	StandardUnitBitsSecond StandardUnit = "BitsSecond"
-
-	StandardUnitMicroseconds StandardUnit = "Microseconds"
-
-	StandardUnitMilliseconds StandardUnit = "Milliseconds"
+	StandardUnitGigabytes StandardUnit = "Gigabytes"
 )
 
 // StartFromHead represents the StartFromHead type
@@ -3043,11 +3268,11 @@ type StartQueryResponse struct {
 type State string
 
 const (
-	StateActive State = "Active"
-
 	StateSuppressed State = "Suppressed"
 
 	StateBaseline State = "Baseline"
+
+	StateActive State = "Active"
 )
 
 // StatsValue represents the StatsValue type
@@ -3217,6 +3442,21 @@ type ThrottlingException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ThrottlingException
+func (e ThrottlingException) Error() string {
+	return "ThrottlingException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ThrottlingException) ErrorCode() string {
+	return "ThrottlingException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ThrottlingException) ErrorFault() string {
+	return "client"
+}
+
 // Time represents the Time type
 type Time string
 
@@ -3240,6 +3480,21 @@ type TooManyTagsException struct {
 	Message *string `json:"message,omitempty"`
 
 	ResourceName *string `json:"resourceName,omitempty"`
+}
+
+// Error implements the error interface for TooManyTagsException
+func (e TooManyTagsException) Error() string {
+	return "TooManyTagsException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e TooManyTagsException) ErrorCode() string {
+	return "TooManyTagsException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e TooManyTagsException) ErrorFault() string {
+	return "client"
 }
 
 // TransformedEventMessage represents the TransformedEventMessage type
@@ -3269,13 +3524,13 @@ type TrimStringWithKeys []string
 type Type string
 
 const (
+	TypeSTRING Type = "STRING"
+
 	TypeBOOLEAN Type = "BOOLEAN"
 
 	TypeINTEGER Type = "INTEGER"
 
 	TypeDOUBLE Type = "DOUBLE"
-
-	TypeSTRING Type = "STRING"
 )
 
 // TypeConverter represents the TypeConverter structure
@@ -3299,6 +3554,21 @@ type Unmask bool
 // UnrecognizedClientException represents the UnrecognizedClientException structure
 type UnrecognizedClientException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for UnrecognizedClientException
+func (e UnrecognizedClientException) Error() string {
+	return "UnrecognizedClientException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e UnrecognizedClientException) ErrorCode() string {
+	return "UnrecognizedClientException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e UnrecognizedClientException) ErrorFault() string {
+	return "client"
 }
 
 // UntagLogGroupRequest represents the UntagLogGroupRequest structure
@@ -3369,6 +3639,21 @@ type UpperCaseStringWithKeys []string
 // ValidationException represents the ValidationException structure
 type ValidationException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ValidationException
+func (e ValidationException) Error() string {
+	return "ValidationException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ValidationException) ErrorCode() string {
+	return "ValidationException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ValidationException) ErrorFault() string {
+	return "client"
 }
 
 // Value represents the Value type

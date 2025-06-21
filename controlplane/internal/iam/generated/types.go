@@ -74,6 +74,21 @@ type AccountNotManagementOrDelegatedAdministratorException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for AccountNotManagementOrDelegatedAdministratorException
+func (e AccountNotManagementOrDelegatedAdministratorException) Error() string {
+	return "AccountNotManagementOrDelegatedAdministratorException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e AccountNotManagementOrDelegatedAdministratorException) ErrorCode() string {
+	return "AccountNotManagementOrDelegatedAdministratorException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AccountNotManagementOrDelegatedAdministratorException) ErrorFault() string {
+	return "client"
+}
+
 // ActionNameListType represents the ActionNameListType type
 type ActionNameListType []string
 
@@ -147,6 +162,21 @@ type CallerIsNotManagementAccountException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for CallerIsNotManagementAccountException
+func (e CallerIsNotManagementAccountException) Error() string {
+	return "CallerIsNotManagementAccountException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e CallerIsNotManagementAccountException) ErrorCode() string {
+	return "CallerIsNotManagementAccountException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e CallerIsNotManagementAccountException) ErrorFault() string {
+	return "client"
+}
+
 // CertificationKeyType represents the CertificationKeyType type
 type CertificationKeyType string
 
@@ -169,6 +199,21 @@ type ColumnNumber int32
 // ConcurrentModificationException represents the ConcurrentModificationException structure
 type ConcurrentModificationException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ConcurrentModificationException
+func (e ConcurrentModificationException) Error() string {
+	return "ConcurrentModificationException: AWS client error (HTTP 409)"
+}
+
+// ErrorCode returns the AWS error code
+func (e ConcurrentModificationException) ErrorCode() string {
+	return "ConcurrentModificationException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ConcurrentModificationException) ErrorFault() string {
+	return "client"
 }
 
 // ConcurrentModificationMessage represents the ConcurrentModificationMessage type
@@ -196,29 +241,29 @@ type ContextKeyNamesResultListType []string
 type ContextKeyTypeEnum string
 
 const (
-	ContextKeyTypeEnumDATE_LIST ContextKeyTypeEnum = "DATE_LIST"
-
-	ContextKeyTypeEnumSTRING ContextKeyTypeEnum = "STRING"
+	ContextKeyTypeEnumDATE ContextKeyTypeEnum = "DATE"
 
 	ContextKeyTypeEnumNUMERIC ContextKeyTypeEnum = "NUMERIC"
-
-	ContextKeyTypeEnumBOOLEAN ContextKeyTypeEnum = "BOOLEAN"
-
-	ContextKeyTypeEnumIP ContextKeyTypeEnum = "IP"
 
 	ContextKeyTypeEnumIP_LIST ContextKeyTypeEnum = "IP_LIST"
 
 	ContextKeyTypeEnumBINARY ContextKeyTypeEnum = "BINARY"
 
-	ContextKeyTypeEnumBINARY_LIST ContextKeyTypeEnum = "BINARY_LIST"
+	ContextKeyTypeEnumDATE_LIST ContextKeyTypeEnum = "DATE_LIST"
 
-	ContextKeyTypeEnumDATE ContextKeyTypeEnum = "DATE"
+	ContextKeyTypeEnumSTRING ContextKeyTypeEnum = "STRING"
 
 	ContextKeyTypeEnumSTRING_LIST ContextKeyTypeEnum = "STRING_LIST"
 
 	ContextKeyTypeEnumNUMERIC_LIST ContextKeyTypeEnum = "NUMERIC_LIST"
 
+	ContextKeyTypeEnumBOOLEAN ContextKeyTypeEnum = "BOOLEAN"
+
 	ContextKeyTypeEnumBOOLEAN_LIST ContextKeyTypeEnum = "BOOLEAN_LIST"
+
+	ContextKeyTypeEnumIP ContextKeyTypeEnum = "IP"
+
+	ContextKeyTypeEnumBINARY_LIST ContextKeyTypeEnum = "BINARY_LIST"
 )
 
 // ContextKeyValueListType represents the ContextKeyValueListType type
@@ -435,14 +480,59 @@ type CredentialReportExpiredException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for CredentialReportExpiredException
+func (e CredentialReportExpiredException) Error() string {
+	return "CredentialReportExpiredException: AWS client error (HTTP 410)"
+}
+
+// ErrorCode returns the AWS error code
+func (e CredentialReportExpiredException) ErrorCode() string {
+	return "CredentialReportExpiredException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e CredentialReportExpiredException) ErrorFault() string {
+	return "client"
+}
+
 // CredentialReportNotPresentException represents the CredentialReportNotPresentException structure
 type CredentialReportNotPresentException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for CredentialReportNotPresentException
+func (e CredentialReportNotPresentException) Error() string {
+	return "CredentialReportNotPresentException: AWS client error (HTTP 410)"
+}
+
+// ErrorCode returns the AWS error code
+func (e CredentialReportNotPresentException) ErrorCode() string {
+	return "CredentialReportNotPresentException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e CredentialReportNotPresentException) ErrorFault() string {
+	return "client"
+}
+
 // CredentialReportNotReadyException represents the CredentialReportNotReadyException structure
 type CredentialReportNotReadyException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for CredentialReportNotReadyException
+func (e CredentialReportNotReadyException) Error() string {
+	return "CredentialReportNotReadyException: AWS client error (HTTP 404)"
+}
+
+// ErrorCode returns the AWS error code
+func (e CredentialReportNotReadyException) ErrorCode() string {
+	return "CredentialReportNotReadyException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e CredentialReportNotReadyException) ErrorFault() string {
+	return "client"
 }
 
 // DeactivateMFADeviceRequest represents the DeactivateMFADeviceRequest structure
@@ -467,6 +557,21 @@ type DeleteAccountAliasRequest struct {
 // DeleteConflictException represents the DeleteConflictException structure
 type DeleteConflictException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for DeleteConflictException
+func (e DeleteConflictException) Error() string {
+	return "DeleteConflictException: AWS client error (HTTP 409)"
+}
+
+// ErrorCode returns the AWS error code
+func (e DeleteConflictException) ErrorCode() string {
+	return "DeleteConflictException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DeleteConflictException) ErrorFault() string {
+	return "client"
 }
 
 // DeleteGroupPolicyRequest represents the DeleteGroupPolicyRequest structure
@@ -659,9 +764,39 @@ type DuplicateCertificateException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for DuplicateCertificateException
+func (e DuplicateCertificateException) Error() string {
+	return "DuplicateCertificateException: AWS client error (HTTP 409)"
+}
+
+// ErrorCode returns the AWS error code
+func (e DuplicateCertificateException) ErrorCode() string {
+	return "DuplicateCertificateException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DuplicateCertificateException) ErrorFault() string {
+	return "client"
+}
+
 // DuplicateSSHPublicKeyException represents the DuplicateSSHPublicKeyException structure
 type DuplicateSSHPublicKeyException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for DuplicateSSHPublicKeyException
+func (e DuplicateSSHPublicKeyException) Error() string {
+	return "DuplicateSSHPublicKeyException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e DuplicateSSHPublicKeyException) ErrorCode() string {
+	return "DuplicateSSHPublicKeyException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DuplicateSSHPublicKeyException) ErrorFault() string {
+	return "client"
 }
 
 // EnableMFADeviceRequest represents the EnableMFADeviceRequest structure
@@ -702,6 +837,21 @@ type EntityAlreadyExistsException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for EntityAlreadyExistsException
+func (e EntityAlreadyExistsException) Error() string {
+	return "EntityAlreadyExistsException: AWS client error (HTTP 409)"
+}
+
+// ErrorCode returns the AWS error code
+func (e EntityAlreadyExistsException) ErrorCode() string {
+	return "EntityAlreadyExistsException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e EntityAlreadyExistsException) ErrorFault() string {
+	return "client"
+}
+
 // EntityDetails represents the EntityDetails structure
 type EntityDetails struct {
 	EntityInfo EntityInfo `json:"entityInfo"`
@@ -727,12 +877,25 @@ type EntityTemporarilyUnmodifiableException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for EntityTemporarilyUnmodifiableException
+func (e EntityTemporarilyUnmodifiableException) Error() string {
+	return "EntityTemporarilyUnmodifiableException: AWS client error (HTTP 409)"
+}
+
+// ErrorCode returns the AWS error code
+func (e EntityTemporarilyUnmodifiableException) ErrorCode() string {
+	return "EntityTemporarilyUnmodifiableException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e EntityTemporarilyUnmodifiableException) ErrorFault() string {
+	return "client"
+}
+
 // EntityType represents the EntityType enum type
 type EntityType string
 
 const (
-	EntityTypeUser EntityType = "User"
-
 	EntityTypeRole EntityType = "Role"
 
 	EntityTypeGroup EntityType = "Group"
@@ -740,6 +903,8 @@ const (
 	EntityTypeLocalManagedPolicy EntityType = "LocalManagedPolicy"
 
 	EntityTypeAWSManagedPolicy EntityType = "AWSManagedPolicy"
+
+	EntityTypeUser EntityType = "User"
 )
 
 // ErrorDetails represents the ErrorDetails structure
@@ -1261,9 +1426,39 @@ type InvalidAuthenticationCodeException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidAuthenticationCodeException
+func (e InvalidAuthenticationCodeException) Error() string {
+	return "InvalidAuthenticationCodeException: AWS client error (HTTP 403)"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidAuthenticationCodeException) ErrorCode() string {
+	return "InvalidAuthenticationCodeException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidAuthenticationCodeException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidCertificateException represents the InvalidCertificateException structure
 type InvalidCertificateException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidCertificateException
+func (e InvalidCertificateException) Error() string {
+	return "InvalidCertificateException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidCertificateException) ErrorCode() string {
+	return "InvalidCertificateException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidCertificateException) ErrorFault() string {
+	return "client"
 }
 
 // InvalidInputException represents the InvalidInputException structure
@@ -1271,9 +1466,39 @@ type InvalidInputException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidInputException
+func (e InvalidInputException) Error() string {
+	return "InvalidInputException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidInputException) ErrorCode() string {
+	return "InvalidInputException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidInputException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidPublicKeyException represents the InvalidPublicKeyException structure
 type InvalidPublicKeyException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidPublicKeyException
+func (e InvalidPublicKeyException) Error() string {
+	return "InvalidPublicKeyException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidPublicKeyException) ErrorCode() string {
+	return "InvalidPublicKeyException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidPublicKeyException) ErrorFault() string {
+	return "client"
 }
 
 // InvalidUserTypeException represents the InvalidUserTypeException structure
@@ -1281,14 +1506,59 @@ type InvalidUserTypeException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidUserTypeException
+func (e InvalidUserTypeException) Error() string {
+	return "InvalidUserTypeException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidUserTypeException) ErrorCode() string {
+	return "InvalidUserTypeException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidUserTypeException) ErrorFault() string {
+	return "client"
+}
+
 // KeyPairMismatchException represents the KeyPairMismatchException structure
 type KeyPairMismatchException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for KeyPairMismatchException
+func (e KeyPairMismatchException) Error() string {
+	return "KeyPairMismatchException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e KeyPairMismatchException) ErrorCode() string {
+	return "KeyPairMismatchException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e KeyPairMismatchException) ErrorFault() string {
+	return "client"
+}
+
 // LimitExceededException represents the LimitExceededException structure
 type LimitExceededException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for LimitExceededException
+func (e LimitExceededException) Error() string {
+	return "LimitExceededException: AWS client error (HTTP 409)"
+}
+
+// ErrorCode returns the AWS error code
+func (e LimitExceededException) ErrorCode() string {
+	return "LimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e LimitExceededException) ErrorFault() string {
+	return "client"
 }
 
 // LineNumber represents the LineNumber type
@@ -1943,9 +2213,39 @@ type MalformedCertificateException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for MalformedCertificateException
+func (e MalformedCertificateException) Error() string {
+	return "MalformedCertificateException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e MalformedCertificateException) ErrorCode() string {
+	return "MalformedCertificateException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e MalformedCertificateException) ErrorFault() string {
+	return "client"
+}
+
 // MalformedPolicyDocumentException represents the MalformedPolicyDocumentException structure
 type MalformedPolicyDocumentException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for MalformedPolicyDocumentException
+func (e MalformedPolicyDocumentException) Error() string {
+	return "MalformedPolicyDocumentException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e MalformedPolicyDocumentException) ErrorCode() string {
+	return "MalformedPolicyDocumentException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e MalformedPolicyDocumentException) ErrorFault() string {
+	return "client"
 }
 
 // ManagedPolicyDetail represents the ManagedPolicyDetail structure
@@ -1983,6 +2283,21 @@ type NoSuchEntityException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for NoSuchEntityException
+func (e NoSuchEntityException) Error() string {
+	return "NoSuchEntityException: AWS client error (HTTP 404)"
+}
+
+// ErrorCode returns the AWS error code
+func (e NoSuchEntityException) ErrorCode() string {
+	return "NoSuchEntityException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e NoSuchEntityException) ErrorFault() string {
+	return "client"
+}
+
 // OpenIDConnectProviderListEntry represents the OpenIDConnectProviderListEntry structure
 type OpenIDConnectProviderListEntry struct {
 	Arn *string `json:"arn,omitempty"`
@@ -1999,6 +2314,21 @@ type OpenIdIdpCommunicationErrorException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for OpenIdIdpCommunicationErrorException
+func (e OpenIdIdpCommunicationErrorException) Error() string {
+	return "OpenIdIdpCommunicationErrorException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpenIdIdpCommunicationErrorException) ErrorCode() string {
+	return "OpenIdIdpCommunicationErrorException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpenIdIdpCommunicationErrorException) ErrorFault() string {
+	return "client"
+}
+
 // OrganizationIdType represents the OrganizationIdType type
 type OrganizationIdType string
 
@@ -2007,9 +2337,39 @@ type OrganizationNotFoundException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for OrganizationNotFoundException
+func (e OrganizationNotFoundException) Error() string {
+	return "OrganizationNotFoundException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e OrganizationNotFoundException) ErrorCode() string {
+	return "OrganizationNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OrganizationNotFoundException) ErrorFault() string {
+	return "client"
+}
+
 // OrganizationNotInAllFeaturesModeException represents the OrganizationNotInAllFeaturesModeException structure
 type OrganizationNotInAllFeaturesModeException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for OrganizationNotInAllFeaturesModeException
+func (e OrganizationNotInAllFeaturesModeException) Error() string {
+	return "OrganizationNotInAllFeaturesModeException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e OrganizationNotInAllFeaturesModeException) ErrorCode() string {
+	return "OrganizationNotInAllFeaturesModeException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OrganizationNotInAllFeaturesModeException) ErrorFault() string {
+	return "client"
 }
 
 // OrganizationsDecisionDetail represents the OrganizationsDecisionDetail structure
@@ -2043,6 +2403,21 @@ type PasswordPolicy struct {
 // PasswordPolicyViolationException represents the PasswordPolicyViolationException structure
 type PasswordPolicyViolationException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for PasswordPolicyViolationException
+func (e PasswordPolicyViolationException) Error() string {
+	return "PasswordPolicyViolationException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e PasswordPolicyViolationException) ErrorCode() string {
+	return "PasswordPolicyViolationException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e PasswordPolicyViolationException) ErrorFault() string {
+	return "client"
 }
 
 // PermissionsBoundaryAttachmentType represents the PermissionsBoundaryAttachmentType enum type
@@ -2095,16 +2470,31 @@ type PolicyDetail struct {
 type PolicyEvaluationDecisionType string
 
 const (
+	PolicyEvaluationDecisionTypeALLOWED PolicyEvaluationDecisionType = "ALLOWED"
+
 	PolicyEvaluationDecisionTypeEXPLICIT_DENY PolicyEvaluationDecisionType = "EXPLICIT_DENY"
 
 	PolicyEvaluationDecisionTypeIMPLICIT_DENY PolicyEvaluationDecisionType = "IMPLICIT_DENY"
-
-	PolicyEvaluationDecisionTypeALLOWED PolicyEvaluationDecisionType = "ALLOWED"
 )
 
 // PolicyEvaluationException represents the PolicyEvaluationException structure
 type PolicyEvaluationException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for PolicyEvaluationException
+func (e PolicyEvaluationException) Error() string {
+	return "PolicyEvaluationException: AWS server error (HTTP 500)"
+}
+
+// ErrorCode returns the AWS error code
+func (e PolicyEvaluationException) ErrorCode() string {
+	return "PolicyEvaluationException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e PolicyEvaluationException) ErrorFault() string {
+	return "server"
 }
 
 // PolicyGrantingServiceAccess represents the PolicyGrantingServiceAccess structure
@@ -2138,6 +2528,21 @@ type PolicyNotAttachableException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for PolicyNotAttachableException
+func (e PolicyNotAttachableException) Error() string {
+	return "PolicyNotAttachableException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e PolicyNotAttachableException) ErrorCode() string {
+	return "PolicyNotAttachableException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e PolicyNotAttachableException) ErrorFault() string {
+	return "client"
+}
+
 // PolicyRole represents the PolicyRole structure
 type PolicyRole struct {
 	RoleId *string `json:"roleId,omitempty"`
@@ -2152,6 +2557,10 @@ type PolicyRoleListType []PolicyRole
 type PolicySourceType string
 
 const (
+	PolicySourceTypeROLE PolicySourceType = "ROLE"
+
+	PolicySourceTypeAWS_MANAGED PolicySourceType = "AWS_MANAGED"
+
 	PolicySourceTypeUSER_MANAGED PolicySourceType = "USER_MANAGED"
 
 	PolicySourceTypeRESOURCE PolicySourceType = "RESOURCE"
@@ -2161,19 +2570,15 @@ const (
 	PolicySourceTypeUSER PolicySourceType = "USER"
 
 	PolicySourceTypeGROUP PolicySourceType = "GROUP"
-
-	PolicySourceTypeROLE PolicySourceType = "ROLE"
-
-	PolicySourceTypeAWS_MANAGED PolicySourceType = "AWS_MANAGED"
 )
 
 // PolicyUsageType represents the PolicyUsageType enum type
 type PolicyUsageType string
 
 const (
-	PolicyUsageTypePermissionsPolicy PolicyUsageType = "PermissionsPolicy"
-
 	PolicyUsageTypePermissionsBoundary PolicyUsageType = "PermissionsBoundary"
+
+	PolicyUsageTypePermissionsPolicy PolicyUsageType = "PermissionsPolicy"
 )
 
 // PolicyUser represents the PolicyUser structure
@@ -2287,6 +2692,21 @@ type ReportGenerationLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ReportGenerationLimitExceededException
+func (e ReportGenerationLimitExceededException) Error() string {
+	return "ReportGenerationLimitExceededException: AWS client error (HTTP 409)"
+}
+
+// ErrorCode returns the AWS error code
+func (e ReportGenerationLimitExceededException) ErrorCode() string {
+	return "ReportGenerationLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ReportGenerationLimitExceededException) ErrorFault() string {
+	return "client"
+}
+
 // ReportStateDescriptionType represents the ReportStateDescriptionType type
 type ReportStateDescriptionType string
 
@@ -2294,11 +2714,11 @@ type ReportStateDescriptionType string
 type ReportStateType string
 
 const (
+	ReportStateTypeSTARTED ReportStateType = "STARTED"
+
 	ReportStateTypeINPROGRESS ReportStateType = "INPROGRESS"
 
 	ReportStateTypeCOMPLETE ReportStateType = "COMPLETE"
-
-	ReportStateTypeSTARTED ReportStateType = "STARTED"
 )
 
 // ResetServiceSpecificCredentialRequest represents the ResetServiceSpecificCredentialRequest structure
@@ -2505,9 +2925,39 @@ type ServiceAccessNotEnabledException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ServiceAccessNotEnabledException
+func (e ServiceAccessNotEnabledException) Error() string {
+	return "ServiceAccessNotEnabledException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e ServiceAccessNotEnabledException) ErrorCode() string {
+	return "ServiceAccessNotEnabledException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ServiceAccessNotEnabledException) ErrorFault() string {
+	return "client"
+}
+
 // ServiceFailureException represents the ServiceFailureException structure
 type ServiceFailureException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ServiceFailureException
+func (e ServiceFailureException) Error() string {
+	return "ServiceFailureException: AWS server error (HTTP 500)"
+}
+
+// ErrorCode returns the AWS error code
+func (e ServiceFailureException) ErrorCode() string {
+	return "ServiceFailureException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ServiceFailureException) ErrorFault() string {
+	return "server"
 }
 
 // ServiceLastAccessed represents the ServiceLastAccessed structure
@@ -2530,6 +2980,21 @@ type ServiceLastAccessed struct {
 // ServiceNotSupportedException represents the ServiceNotSupportedException structure
 type ServiceNotSupportedException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ServiceNotSupportedException
+func (e ServiceNotSupportedException) Error() string {
+	return "ServiceNotSupportedException: AWS client error (HTTP 404)"
+}
+
+// ErrorCode returns the AWS error code
+func (e ServiceNotSupportedException) ErrorCode() string {
+	return "ServiceNotSupportedException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ServiceNotSupportedException) ErrorFault() string {
+	return "client"
 }
 
 // ServiceSpecificCredential represents the ServiceSpecificCredential structure
@@ -2755,9 +3220,39 @@ type UnmodifiableEntityException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for UnmodifiableEntityException
+func (e UnmodifiableEntityException) Error() string {
+	return "UnmodifiableEntityException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e UnmodifiableEntityException) ErrorCode() string {
+	return "UnmodifiableEntityException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e UnmodifiableEntityException) ErrorFault() string {
+	return "client"
+}
+
 // UnrecognizedPublicKeyEncodingException represents the UnrecognizedPublicKeyEncodingException structure
 type UnrecognizedPublicKeyEncodingException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for UnrecognizedPublicKeyEncodingException
+func (e UnrecognizedPublicKeyEncodingException) Error() string {
+	return "UnrecognizedPublicKeyEncodingException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e UnrecognizedPublicKeyEncodingException) ErrorCode() string {
+	return "UnrecognizedPublicKeyEncodingException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e UnrecognizedPublicKeyEncodingException) ErrorFault() string {
+	return "client"
 }
 
 // UntagInstanceProfileRequest represents the UntagInstanceProfileRequest structure
@@ -3100,11 +3595,11 @@ const (
 type assignmentStatusType string
 
 const (
-	assignmentStatusTypeAny assignmentStatusType = "Any"
-
 	assignmentStatusTypeAssigned assignmentStatusType = "Assigned"
 
 	assignmentStatusTypeUnassigned assignmentStatusType = "Unassigned"
+
+	assignmentStatusTypeAny assignmentStatusType = "Any"
 )
 
 // attachedPoliciesListType represents the attachedPoliciesListType type
@@ -3168,9 +3663,9 @@ type duplicateSSHPublicKeyMessage string
 type encodingType string
 
 const (
-	encodingTypePEM encodingType = "PEM"
-
 	encodingTypeSSH encodingType = "SSH"
+
+	encodingTypePEM encodingType = "PEM"
 )
 
 // entityAlreadyExistsMessage represents the entityAlreadyExistsMessage type
@@ -3195,9 +3690,9 @@ type existingUserNameType string
 type globalEndpointTokenVersion string
 
 const (
-	globalEndpointTokenVersionv1Token globalEndpointTokenVersion = "v1Token"
-
 	globalEndpointTokenVersionv2Token globalEndpointTokenVersion = "v2Token"
+
+	globalEndpointTokenVersionv1Token globalEndpointTokenVersion = "v1Token"
 )
 
 // groupDetailListType represents the groupDetailListType type
@@ -3344,11 +3839,11 @@ type policyNotAttachableMessage string
 type policyOwnerEntityType string
 
 const (
-	policyOwnerEntityTypeUSER policyOwnerEntityType = "USER"
-
 	policyOwnerEntityTypeROLE policyOwnerEntityType = "ROLE"
 
 	policyOwnerEntityTypeGROUP policyOwnerEntityType = "GROUP"
+
+	policyOwnerEntityTypeUSER policyOwnerEntityType = "USER"
 )
 
 // policyPathType represents the policyPathType type
@@ -3456,13 +3951,13 @@ type serviceUserName string
 type sortKeyType string
 
 const (
-	sortKeyTypeSERVICE_NAMESPACE_ASCENDING sortKeyType = "SERVICE_NAMESPACE_ASCENDING"
-
-	sortKeyTypeSERVICE_NAMESPACE_DESCENDING sortKeyType = "SERVICE_NAMESPACE_DESCENDING"
-
 	sortKeyTypeLAST_AUTHENTICATED_TIME_ASCENDING sortKeyType = "LAST_AUTHENTICATED_TIME_ASCENDING"
 
 	sortKeyTypeLAST_AUTHENTICATED_TIME_DESCENDING sortKeyType = "LAST_AUTHENTICATED_TIME_DESCENDING"
+
+	sortKeyTypeSERVICE_NAMESPACE_ASCENDING sortKeyType = "SERVICE_NAMESPACE_ASCENDING"
+
+	sortKeyTypeSERVICE_NAMESPACE_DESCENDING sortKeyType = "SERVICE_NAMESPACE_DESCENDING"
 )
 
 // statusType represents the statusType enum type
@@ -3481,59 +3976,59 @@ type stringType string
 type summaryKeyType string
 
 const (
-	summaryKeyTypePolicyVersionsInUseQuota summaryKeyType = "PolicyVersionsInUseQuota"
-
-	summaryKeyTypeUsers summaryKeyType = "Users"
-
-	summaryKeyTypeServerCertificates summaryKeyType = "ServerCertificates"
+	summaryKeyTypeGroups summaryKeyType = "Groups"
 
 	summaryKeyTypeServerCertificatesQuota summaryKeyType = "ServerCertificatesQuota"
 
-	summaryKeyTypeSigningCertificatesPerUserQuota summaryKeyType = "SigningCertificatesPerUserQuota"
-
-	summaryKeyTypeAccessKeysPerUserQuota summaryKeyType = "AccessKeysPerUserQuota"
-
-	summaryKeyTypeMFADevices summaryKeyType = "MFADevices"
-
-	summaryKeyTypeMFADevicesInUse summaryKeyType = "MFADevicesInUse"
-
-	summaryKeyTypeAccountAccessKeysPresent summaryKeyType = "AccountAccessKeysPresent"
-
-	summaryKeyTypeGroupsQuota summaryKeyType = "GroupsQuota"
-
-	summaryKeyTypeAccountSigningCertificatesPresent summaryKeyType = "AccountSigningCertificatesPresent"
-
-	summaryKeyTypeAttachedPoliciesPerGroupQuota summaryKeyType = "AttachedPoliciesPerGroupQuota"
-
-	summaryKeyTypeAttachedPoliciesPerRoleQuota summaryKeyType = "AttachedPoliciesPerRoleQuota"
-
-	summaryKeyTypePolicies summaryKeyType = "Policies"
-
-	summaryKeyTypePolicySizeQuota summaryKeyType = "PolicySizeQuota"
-
-	summaryKeyTypeVersionsPerPolicyQuota summaryKeyType = "VersionsPerPolicyQuota"
-
-	summaryKeyTypeUsersQuota summaryKeyType = "UsersQuota"
-
-	summaryKeyTypeGroups summaryKeyType = "Groups"
-
-	summaryKeyTypePolicyVersionsInUse summaryKeyType = "PolicyVersionsInUse"
-
-	summaryKeyTypeGlobalEndpointTokenVersion summaryKeyType = "GlobalEndpointTokenVersion"
-
 	summaryKeyTypeUserPolicySizeQuota summaryKeyType = "UserPolicySizeQuota"
-
-	summaryKeyTypeGroupPolicySizeQuota summaryKeyType = "GroupPolicySizeQuota"
 
 	summaryKeyTypeGroupsPerUserQuota summaryKeyType = "GroupsPerUserQuota"
 
-	summaryKeyTypeAccountMFAEnabled summaryKeyType = "AccountMFAEnabled"
+	summaryKeyTypeMFADevices summaryKeyType = "MFADevices"
 
 	summaryKeyTypeAccountPasswordPresent summaryKeyType = "AccountPasswordPresent"
 
-	summaryKeyTypeAttachedPoliciesPerUserQuota summaryKeyType = "AttachedPoliciesPerUserQuota"
+	summaryKeyTypeAttachedPoliciesPerRoleQuota summaryKeyType = "AttachedPoliciesPerRoleQuota"
 
 	summaryKeyTypePoliciesQuota summaryKeyType = "PoliciesQuota"
+
+	summaryKeyTypeUsersQuota summaryKeyType = "UsersQuota"
+
+	summaryKeyTypeGroupsQuota summaryKeyType = "GroupsQuota"
+
+	summaryKeyTypeServerCertificates summaryKeyType = "ServerCertificates"
+
+	summaryKeyTypeAccountMFAEnabled summaryKeyType = "AccountMFAEnabled"
+
+	summaryKeyTypeAccountAccessKeysPresent summaryKeyType = "AccountAccessKeysPresent"
+
+	summaryKeyTypePolicySizeQuota summaryKeyType = "PolicySizeQuota"
+
+	summaryKeyTypePolicyVersionsInUse summaryKeyType = "PolicyVersionsInUse"
+
+	summaryKeyTypeVersionsPerPolicyQuota summaryKeyType = "VersionsPerPolicyQuota"
+
+	summaryKeyTypeUsers summaryKeyType = "Users"
+
+	summaryKeyTypeGroupPolicySizeQuota summaryKeyType = "GroupPolicySizeQuota"
+
+	summaryKeyTypeAccessKeysPerUserQuota summaryKeyType = "AccessKeysPerUserQuota"
+
+	summaryKeyTypeAttachedPoliciesPerGroupQuota summaryKeyType = "AttachedPoliciesPerGroupQuota"
+
+	summaryKeyTypeAttachedPoliciesPerUserQuota summaryKeyType = "AttachedPoliciesPerUserQuota"
+
+	summaryKeyTypePolicies summaryKeyType = "Policies"
+
+	summaryKeyTypePolicyVersionsInUseQuota summaryKeyType = "PolicyVersionsInUseQuota"
+
+	summaryKeyTypeGlobalEndpointTokenVersion summaryKeyType = "GlobalEndpointTokenVersion"
+
+	summaryKeyTypeSigningCertificatesPerUserQuota summaryKeyType = "SigningCertificatesPerUserQuota"
+
+	summaryKeyTypeMFADevicesInUse summaryKeyType = "MFADevicesInUse"
+
+	summaryKeyTypeAccountSigningCertificatesPresent summaryKeyType = "AccountSigningCertificatesPresent"
 )
 
 // summaryMapType represents the summaryMapType type

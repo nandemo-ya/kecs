@@ -218,3 +218,38 @@ func (s *SmithyShape) IsMap() bool {
 func (s *SmithyShape) IsUnion() bool {
 	return s.Type == "union"
 }
+
+// IsError checks if a shape is an error type
+func (s *SmithyShape) IsError() bool {
+	if s.Traits == nil {
+		return false
+	}
+	_, hasError := s.Traits["smithy.api#error"]
+	return hasError
+}
+
+// GetErrorType returns the error type (client or server)
+func (s *SmithyShape) GetErrorType() string {
+	if s.Traits == nil {
+		return ""
+	}
+	if errorType, ok := s.Traits["smithy.api#error"]; ok {
+		if errStr, ok := errorType.(string); ok {
+			return errStr
+		}
+	}
+	return "client" // default
+}
+
+// GetHTTPStatus returns the HTTP status code for error types
+func (s *SmithyShape) GetHTTPStatus() int {
+	if s.Traits == nil {
+		return 0
+	}
+	if httpError, ok := s.Traits["smithy.api#httpError"]; ok {
+		if status, ok := httpError.(float64); ok {
+			return int(status)
+		}
+	}
+	return 0
+}

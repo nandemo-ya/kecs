@@ -169,6 +169,21 @@ type ExpiredTokenException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ExpiredTokenException
+func (e ExpiredTokenException) Error() string {
+	return "ExpiredTokenException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e ExpiredTokenException) ErrorCode() string {
+	return "ExpiredTokenException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ExpiredTokenException) ErrorFault() string {
+	return "client"
+}
+
 // FederatedUser represents the FederatedUser structure
 type FederatedUser struct {
 	Arn string `json:"arn"`
@@ -240,9 +255,39 @@ type IDPCommunicationErrorException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for IDPCommunicationErrorException
+func (e IDPCommunicationErrorException) Error() string {
+	return "IDPCommunicationErrorException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e IDPCommunicationErrorException) ErrorCode() string {
+	return "IDPCommunicationErrorException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e IDPCommunicationErrorException) ErrorFault() string {
+	return "client"
+}
+
 // IDPRejectedClaimException represents the IDPRejectedClaimException structure
 type IDPRejectedClaimException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for IDPRejectedClaimException
+func (e IDPRejectedClaimException) Error() string {
+	return "IDPRejectedClaimException: AWS client error (HTTP 403)"
+}
+
+// ErrorCode returns the AWS error code
+func (e IDPRejectedClaimException) ErrorCode() string {
+	return "IDPRejectedClaimException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e IDPRejectedClaimException) ErrorFault() string {
+	return "client"
 }
 
 // InvalidAuthorizationMessageException represents the InvalidAuthorizationMessageException structure
@@ -250,9 +295,39 @@ type InvalidAuthorizationMessageException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidAuthorizationMessageException
+func (e InvalidAuthorizationMessageException) Error() string {
+	return "InvalidAuthorizationMessageException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidAuthorizationMessageException) ErrorCode() string {
+	return "InvalidAuthorizationMessageException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidAuthorizationMessageException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidIdentityTokenException represents the InvalidIdentityTokenException structure
 type InvalidIdentityTokenException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidIdentityTokenException
+func (e InvalidIdentityTokenException) Error() string {
+	return "InvalidIdentityTokenException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidIdentityTokenException) ErrorCode() string {
+	return "InvalidIdentityTokenException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidIdentityTokenException) ErrorFault() string {
+	return "client"
 }
 
 // Issuer represents the Issuer type
@@ -263,12 +338,42 @@ type MalformedPolicyDocumentException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for MalformedPolicyDocumentException
+func (e MalformedPolicyDocumentException) Error() string {
+	return "MalformedPolicyDocumentException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e MalformedPolicyDocumentException) ErrorCode() string {
+	return "MalformedPolicyDocumentException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e MalformedPolicyDocumentException) ErrorFault() string {
+	return "client"
+}
+
 // NameQualifier represents the NameQualifier type
 type NameQualifier string
 
 // PackedPolicyTooLargeException represents the PackedPolicyTooLargeException structure
 type PackedPolicyTooLargeException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for PackedPolicyTooLargeException
+func (e PackedPolicyTooLargeException) Error() string {
+	return "PackedPolicyTooLargeException: AWS client error (HTTP 400)"
+}
+
+// ErrorCode returns the AWS error code
+func (e PackedPolicyTooLargeException) ErrorCode() string {
+	return "PackedPolicyTooLargeException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e PackedPolicyTooLargeException) ErrorFault() string {
+	return "client"
 }
 
 // PolicyDescriptorType represents the PolicyDescriptorType structure
@@ -289,6 +394,21 @@ type ProvidedContextsListType []ProvidedContext
 // RegionDisabledException represents the RegionDisabledException structure
 type RegionDisabledException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for RegionDisabledException
+func (e RegionDisabledException) Error() string {
+	return "RegionDisabledException: AWS client error (HTTP 403)"
+}
+
+// ErrorCode returns the AWS error code
+func (e RegionDisabledException) ErrorCode() string {
+	return "RegionDisabledException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e RegionDisabledException) ErrorFault() string {
+	return "client"
 }
 
 // RootDurationSecondsType represents the RootDurationSecondsType type
