@@ -221,6 +221,9 @@ drainLoop:
 	// Check each connection
 	now := time.Now()
 	for _, conn := range conns {
+		if conn == nil {
+			continue
+		}
 		if now.Sub(conn.lastUsed) > p.maxIdleTime || now.Sub(conn.createdAt) > p.maxLifetime {
 			toClose = append(toClose, conn)
 		} else {
@@ -235,10 +238,12 @@ drainLoop:
 	
 	// Close expired connections
 	for _, conn := range toClose {
-		conn.conn.Close()
-		p.mu.Lock()
-		p.totalConns--
-		p.mu.Unlock()
+		if conn != nil && conn.conn != nil {
+			conn.conn.Close()
+			p.mu.Lock()
+			p.totalConns--
+			p.mu.Unlock()
+		}
 	}
 }
 
@@ -263,8 +268,10 @@ func (p *ConnectionPool) Close() error {
 	
 	var lastErr error
 	for conn := range p.connections {
-		if err := conn.conn.Close(); err != nil {
-			lastErr = err
+		if conn != nil && conn.conn != nil {
+			if err := conn.conn.Close(); err != nil {
+				lastErr = err
+			}
 		}
 	}
 	
