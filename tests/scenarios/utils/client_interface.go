@@ -8,6 +8,8 @@ const (
 	CurlMode ClientMode = "curl"
 	// AWSCLIMode uses AWS CLI for API calls
 	AWSCLIMode ClientMode = "awscli"
+	// GeneratedMode uses generated types and custom AWS client
+	GeneratedMode ClientMode = "generated"
 )
 
 // ECSClientInterface defines the interface for ECS operations
