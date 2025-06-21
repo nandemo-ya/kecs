@@ -148,6 +148,8 @@ type AnomalyDetectorArn string
 type AnomalyDetectorStatus string
 
 const (
+	AnomalyDetectorStatusINITIALIZING AnomalyDetectorStatus = "INITIALIZING"
+
 	AnomalyDetectorStatusTRAINING AnomalyDetectorStatus = "TRAINING"
 
 	AnomalyDetectorStatusANALYZING AnomalyDetectorStatus = "ANALYZING"
@@ -157,8 +159,6 @@ const (
 	AnomalyDetectorStatusDELETED AnomalyDetectorStatus = "DELETED"
 
 	AnomalyDetectorStatusPAUSED AnomalyDetectorStatus = "PAUSED"
-
-	AnomalyDetectorStatusINITIALIZING AnomalyDetectorStatus = "INITIALIZING"
 )
 
 // AnomalyDetectors represents the AnomalyDetectors type
@@ -378,13 +378,13 @@ type DataProtectionPolicyDocument string
 type DataProtectionStatus string
 
 const (
-	DataProtectionStatusDISABLED DataProtectionStatus = "DISABLED"
-
 	DataProtectionStatusACTIVATED DataProtectionStatus = "ACTIVATED"
 
 	DataProtectionStatusDELETED DataProtectionStatus = "DELETED"
 
 	DataProtectionStatusARCHIVED DataProtectionStatus = "ARCHIVED"
+
+	DataProtectionStatusDISABLED DataProtectionStatus = "DISABLED"
 )
 
 // DateTimeConverter represents the DateTimeConverter structure
@@ -1028,8 +1028,6 @@ type EntityKeyAttributesValue string
 type EntityRejectionErrorType string
 
 const (
-	EntityRejectionErrorTypeENTITY_SIZE_TOO_LARGE EntityRejectionErrorType = "ENTITY_SIZE_TOO_LARGE"
-
 	EntityRejectionErrorTypeUNSUPPORTED_LOG_GROUP_TYPE EntityRejectionErrorType = "UNSUPPORTED_LOG_GROUP_TYPE"
 
 	EntityRejectionErrorTypeMISSING_REQUIRED_FIELDS EntityRejectionErrorType = "MISSING_REQUIRED_FIELDS"
@@ -1041,6 +1039,8 @@ const (
 	EntityRejectionErrorTypeINVALID_KEY_ATTRIBUTE EntityRejectionErrorType = "INVALID_KEY_ATTRIBUTE"
 
 	EntityRejectionErrorTypeINVALID_ATTRIBUTES EntityRejectionErrorType = "INVALID_ATTRIBUTES"
+
+	EntityRejectionErrorTypeENTITY_SIZE_TOO_LARGE EntityRejectionErrorType = "ENTITY_SIZE_TOO_LARGE"
 )
 
 // Enumerations represents the Enumerations type
@@ -1053,10 +1053,6 @@ type EpochMillis int64
 type EvaluationFrequency string
 
 const (
-	EvaluationFrequencyTHIRTY_MIN EvaluationFrequency = "THIRTY_MIN"
-
-	EvaluationFrequencyONE_HOUR EvaluationFrequency = "ONE_HOUR"
-
 	EvaluationFrequencyONE_MIN EvaluationFrequency = "ONE_MIN"
 
 	EvaluationFrequencyFIVE_MIN EvaluationFrequency = "FIVE_MIN"
@@ -1064,6 +1060,10 @@ const (
 	EvaluationFrequencyTEN_MIN EvaluationFrequency = "TEN_MIN"
 
 	EvaluationFrequencyFIFTEEN_MIN EvaluationFrequency = "FIFTEEN_MIN"
+
+	EvaluationFrequencyTHIRTY_MIN EvaluationFrequency = "THIRTY_MIN"
+
+	EvaluationFrequencyONE_HOUR EvaluationFrequency = "ONE_HOUR"
 )
 
 // EventId represents the EventId type
@@ -1144,10 +1144,6 @@ type ExportTaskStatus struct {
 type ExportTaskStatusCode string
 
 const (
-	ExportTaskStatusCodePENDING_CANCEL ExportTaskStatusCode = "PENDING_CANCEL"
-
-	ExportTaskStatusCodeRUNNING ExportTaskStatusCode = "RUNNING"
-
 	ExportTaskStatusCodeCANCELLED ExportTaskStatusCode = "CANCELLED"
 
 	ExportTaskStatusCodeCOMPLETED ExportTaskStatusCode = "COMPLETED"
@@ -1155,6 +1151,10 @@ const (
 	ExportTaskStatusCodeFAILED ExportTaskStatusCode = "FAILED"
 
 	ExportTaskStatusCodePENDING ExportTaskStatusCode = "PENDING"
+
+	ExportTaskStatusCodePENDING_CANCEL ExportTaskStatusCode = "PENDING_CANCEL"
+
+	ExportTaskStatusCodeRUNNING ExportTaskStatusCode = "RUNNING"
 )
 
 // ExportTaskStatusMessage represents the ExportTaskStatusMessage type
@@ -1529,6 +1529,13 @@ type InputLogStreamNames []string
 
 // Integer represents the Integer type
 type Integer int32
+
+// IntegrationDetails represents the IntegrationDetails structure
+type IntegrationDetails struct {
+
+	// <p>This structure contains complete information about one integration between CloudWatch Logs and        OpenSearch Service.</p>
+	OpenSearchIntegrationDetails *OpenSearchIntegrationDetails `json:"openSearchIntegrationDetails,omitempty"`
+}
 
 // IntegrationName represents the IntegrationName type
 type IntegrationName string
@@ -2150,11 +2157,11 @@ type OpenSearchResourceStatus struct {
 type OpenSearchResourceStatusType string
 
 const (
+	OpenSearchResourceStatusTypeERROR OpenSearchResourceStatusType = "ERROR"
+
 	OpenSearchResourceStatusTypeACTIVE OpenSearchResourceStatusType = "ACTIVE"
 
 	OpenSearchResourceStatusTypeNOT_FOUND OpenSearchResourceStatusType = "NOT_FOUND"
-
-	OpenSearchResourceStatusTypeERROR OpenSearchResourceStatusType = "ERROR"
 )
 
 // OpenSearchWorkspace represents the OpenSearchWorkspace structure
@@ -2185,8 +2192,6 @@ const (
 type OutputFormat string
 
 const (
-	OutputFormatJSON OutputFormat = "JSON"
-
 	OutputFormatPLAIN OutputFormat = "PLAIN"
 
 	OutputFormatW3C OutputFormat = "W3C"
@@ -2194,6 +2199,8 @@ const (
 	OutputFormatRAW OutputFormat = "RAW"
 
 	OutputFormatPARQUET OutputFormat = "PARQUET"
+
+	OutputFormatJSON OutputFormat = "JSON"
 )
 
 // OutputFormats represents the OutputFormats type
@@ -2785,6 +2792,13 @@ type ResourceAlreadyExistsException struct {
 // ResourceArns represents the ResourceArns type
 type ResourceArns []string
 
+// ResourceConfig represents the ResourceConfig structure
+type ResourceConfig struct {
+
+	// <p>This structure contains configuration details about an integration between CloudWatch Logs and OpenSearch Service.</p>
+	OpenSearchResourceConfig *OpenSearchResourceConfig `json:"openSearchResourceConfig,omitempty"`
+}
+
 // ResourceIdentifier represents the ResourceIdentifier type
 type ResourceIdentifier string
 
@@ -2908,59 +2922,59 @@ type SplitStringEntry struct {
 type StandardUnit string
 
 const (
-	StandardUnitMilliseconds StandardUnit = "Milliseconds"
-
 	StandardUnitBytes StandardUnit = "Bytes"
 
 	StandardUnitTerabytes StandardUnit = "Terabytes"
 
-	StandardUnitKilobits StandardUnit = "Kilobits"
+	StandardUnitBits StandardUnit = "Bits"
 
 	StandardUnitMegabits StandardUnit = "Megabits"
 
-	StandardUnitCount StandardUnit = "Count"
-
-	StandardUnitBytesSecond StandardUnit = "BytesSecond"
-
-	StandardUnitKilobytes StandardUnit = "Kilobytes"
-
-	StandardUnitKilobytesSecond StandardUnit = "KilobytesSecond"
-
 	StandardUnitGigabytesSecond StandardUnit = "GigabytesSecond"
 
-	StandardUnitBitsSecond StandardUnit = "BitsSecond"
+	StandardUnitNone StandardUnit = "None"
+
+	StandardUnitGigabytes StandardUnit = "Gigabytes"
+
+	StandardUnitTerabits StandardUnit = "Terabits"
+
+	StandardUnitCount StandardUnit = "Count"
 
 	StandardUnitKilobitsSecond StandardUnit = "KilobitsSecond"
 
 	StandardUnitMegabitsSecond StandardUnit = "MegabitsSecond"
 
-	StandardUnitCountSecond StandardUnit = "CountSecond"
-
-	StandardUnitMegabytes StandardUnit = "Megabytes"
-
-	StandardUnitGigabytes StandardUnit = "Gigabytes"
-
-	StandardUnitBits StandardUnit = "Bits"
-
-	StandardUnitGigabits StandardUnit = "Gigabits"
-
-	StandardUnitTerabits StandardUnit = "Terabits"
-
-	StandardUnitPercent StandardUnit = "Percent"
-
-	StandardUnitTerabytesSecond StandardUnit = "TerabytesSecond"
-
 	StandardUnitGigabitsSecond StandardUnit = "GigabitsSecond"
-
-	StandardUnitMicroseconds StandardUnit = "Microseconds"
-
-	StandardUnitMegabytesSecond StandardUnit = "MegabytesSecond"
 
 	StandardUnitTerabitsSecond StandardUnit = "TerabitsSecond"
 
-	StandardUnitNone StandardUnit = "None"
+	StandardUnitCountSecond StandardUnit = "CountSecond"
 
 	StandardUnitSeconds StandardUnit = "Seconds"
+
+	StandardUnitKilobytes StandardUnit = "Kilobytes"
+
+	StandardUnitGigabits StandardUnit = "Gigabits"
+
+	StandardUnitBytesSecond StandardUnit = "BytesSecond"
+
+	StandardUnitTerabytesSecond StandardUnit = "TerabytesSecond"
+
+	StandardUnitMegabytes StandardUnit = "Megabytes"
+
+	StandardUnitKilobits StandardUnit = "Kilobits"
+
+	StandardUnitPercent StandardUnit = "Percent"
+
+	StandardUnitKilobytesSecond StandardUnit = "KilobytesSecond"
+
+	StandardUnitMegabytesSecond StandardUnit = "MegabytesSecond"
+
+	StandardUnitBitsSecond StandardUnit = "BitsSecond"
+
+	StandardUnitMicroseconds StandardUnit = "Microseconds"
+
+	StandardUnitMilliseconds StandardUnit = "Milliseconds"
 )
 
 // StartFromHead represents the StartFromHead type
@@ -2983,6 +2997,22 @@ type StartLiveTailRequest struct {
 // StartLiveTailResponse represents the StartLiveTailResponse structure
 type StartLiveTailResponse struct {
 	ResponseStream *StartLiveTailResponseStream `json:"responseStream,omitempty"`
+}
+
+// StartLiveTailResponseStream represents the StartLiveTailResponseStream structure
+type StartLiveTailResponseStream struct {
+
+	// <p>This exception is returned if an unknown error occurs.</p>
+	SessionStreamingException *SessionStreamingException `json:"sessionStreamingException,omitempty"`
+
+	// <p>This exception is returned in the stream when the Live Tail session times out. Live Tail sessions time     out after three hours.</p>
+	SessionTimeoutException *SessionTimeoutException `json:"sessionTimeoutException,omitempty"`
+
+	// <p>This object contains information about this Live Tail session, including the log groups included and the      log stream filters, if any.</p>
+	SessionStart *LiveTailSessionStart `json:"sessionStart,omitempty"`
+
+	// <p>This object contains the log events and session metadata.</p>
+	SessionUpdate *LiveTailSessionUpdate `json:"sessionUpdate,omitempty"`
 }
 
 // StartQueryRequest represents the StartQueryRequest structure
@@ -3013,11 +3043,11 @@ type StartQueryResponse struct {
 type State string
 
 const (
+	StateActive State = "Active"
+
 	StateSuppressed State = "Suppressed"
 
 	StateBaseline State = "Baseline"
-
-	StateActive State = "Active"
 )
 
 // StatsValue represents the StatsValue type
@@ -3107,11 +3137,11 @@ const (
 type SuppressionUnit string
 
 const (
-	SuppressionUnitHOURS SuppressionUnit = "HOURS"
-
 	SuppressionUnitSECONDS SuppressionUnit = "SECONDS"
 
 	SuppressionUnitMINUTES SuppressionUnit = "MINUTES"
+
+	SuppressionUnitHOURS SuppressionUnit = "HOURS"
 )
 
 // TagKey represents the TagKey type
@@ -3239,13 +3269,13 @@ type TrimStringWithKeys []string
 type Type string
 
 const (
+	TypeBOOLEAN Type = "BOOLEAN"
+
 	TypeINTEGER Type = "INTEGER"
 
 	TypeDOUBLE Type = "DOUBLE"
 
 	TypeSTRING Type = "STRING"
-
-	TypeBOOLEAN Type = "BOOLEAN"
 )
 
 // TypeConverter represents the TypeConverter structure

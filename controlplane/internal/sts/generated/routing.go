@@ -9,12 +9,12 @@ import (
 	"strings"
 )
 
-// Router handles HTTP routing for ecs API
+// Router handles HTTP routing for sts API
 type Router struct {
 	api AWSSecurityTokenServiceV20110615API
 }
 
-// NewRouter creates a new router for ecs API
+// NewRouter creates a new router for sts API
 func NewRouter(api AWSSecurityTokenServiceV20110615API) *Router {
 	return &Router{api: api}
 }

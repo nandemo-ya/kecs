@@ -9,12 +9,12 @@ import (
 	"strings"
 )
 
-// Router handles HTTP routing for ecs API
+// Router handles HTTP routing for secretsmanager API
 type Router struct {
 	api secretsmanagerAPI
 }
 
-// NewRouter creates a new router for ecs API
+// NewRouter creates a new router for secretsmanager API
 func NewRouter(api secretsmanagerAPI) *Router {
 	return &Router{api: api}
 }

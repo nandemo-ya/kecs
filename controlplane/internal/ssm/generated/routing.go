@@ -9,12 +9,12 @@ import (
 	"strings"
 )
 
-// Router handles HTTP routing for ecs API
+// Router handles HTTP routing for ssm API
 type Router struct {
 	api AmazonSSMAPI
 }
 
-// NewRouter creates a new router for ecs API
+// NewRouter creates a new router for ssm API
 func NewRouter(api AmazonSSMAPI) *Router {
 	return &Router{api: api}
 }

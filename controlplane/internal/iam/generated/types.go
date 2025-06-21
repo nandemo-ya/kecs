@@ -196,29 +196,29 @@ type ContextKeyNamesResultListType []string
 type ContextKeyTypeEnum string
 
 const (
-	ContextKeyTypeEnumBINARY_LIST ContextKeyTypeEnum = "BINARY_LIST"
-
-	ContextKeyTypeEnumDATE ContextKeyTypeEnum = "DATE"
+	ContextKeyTypeEnumDATE_LIST ContextKeyTypeEnum = "DATE_LIST"
 
 	ContextKeyTypeEnumSTRING ContextKeyTypeEnum = "STRING"
 
-	ContextKeyTypeEnumBOOLEAN ContextKeyTypeEnum = "BOOLEAN"
+	ContextKeyTypeEnumNUMERIC ContextKeyTypeEnum = "NUMERIC"
 
-	ContextKeyTypeEnumBOOLEAN_LIST ContextKeyTypeEnum = "BOOLEAN_LIST"
+	ContextKeyTypeEnumBOOLEAN ContextKeyTypeEnum = "BOOLEAN"
 
 	ContextKeyTypeEnumIP ContextKeyTypeEnum = "IP"
 
 	ContextKeyTypeEnumIP_LIST ContextKeyTypeEnum = "IP_LIST"
 
-	ContextKeyTypeEnumDATE_LIST ContextKeyTypeEnum = "DATE_LIST"
+	ContextKeyTypeEnumBINARY ContextKeyTypeEnum = "BINARY"
+
+	ContextKeyTypeEnumBINARY_LIST ContextKeyTypeEnum = "BINARY_LIST"
+
+	ContextKeyTypeEnumDATE ContextKeyTypeEnum = "DATE"
 
 	ContextKeyTypeEnumSTRING_LIST ContextKeyTypeEnum = "STRING_LIST"
 
-	ContextKeyTypeEnumNUMERIC ContextKeyTypeEnum = "NUMERIC"
-
 	ContextKeyTypeEnumNUMERIC_LIST ContextKeyTypeEnum = "NUMERIC_LIST"
 
-	ContextKeyTypeEnumBINARY ContextKeyTypeEnum = "BINARY"
+	ContextKeyTypeEnumBOOLEAN_LIST ContextKeyTypeEnum = "BOOLEAN_LIST"
 )
 
 // ContextKeyValueListType represents the ContextKeyValueListType type
@@ -731,15 +731,15 @@ type EntityTemporarilyUnmodifiableException struct {
 type EntityType string
 
 const (
+	EntityTypeUser EntityType = "User"
+
+	EntityTypeRole EntityType = "Role"
+
 	EntityTypeGroup EntityType = "Group"
 
 	EntityTypeLocalManagedPolicy EntityType = "LocalManagedPolicy"
 
 	EntityTypeAWSManagedPolicy EntityType = "AWSManagedPolicy"
-
-	EntityTypeUser EntityType = "User"
-
-	EntityTypeRole EntityType = "Role"
 )
 
 // ErrorDetails represents the ErrorDetails structure
@@ -2095,11 +2095,11 @@ type PolicyDetail struct {
 type PolicyEvaluationDecisionType string
 
 const (
+	PolicyEvaluationDecisionTypeEXPLICIT_DENY PolicyEvaluationDecisionType = "EXPLICIT_DENY"
+
 	PolicyEvaluationDecisionTypeIMPLICIT_DENY PolicyEvaluationDecisionType = "IMPLICIT_DENY"
 
 	PolicyEvaluationDecisionTypeALLOWED PolicyEvaluationDecisionType = "ALLOWED"
-
-	PolicyEvaluationDecisionTypeEXPLICIT_DENY PolicyEvaluationDecisionType = "EXPLICIT_DENY"
 )
 
 // PolicyEvaluationException represents the PolicyEvaluationException structure
@@ -2152,12 +2152,6 @@ type PolicyRoleListType []PolicyRole
 type PolicySourceType string
 
 const (
-	PolicySourceTypeGROUP PolicySourceType = "GROUP"
-
-	PolicySourceTypeROLE PolicySourceType = "ROLE"
-
-	PolicySourceTypeAWS_MANAGED PolicySourceType = "AWS_MANAGED"
-
 	PolicySourceTypeUSER_MANAGED PolicySourceType = "USER_MANAGED"
 
 	PolicySourceTypeRESOURCE PolicySourceType = "RESOURCE"
@@ -2165,6 +2159,12 @@ const (
 	PolicySourceTypeNONE PolicySourceType = "NONE"
 
 	PolicySourceTypeUSER PolicySourceType = "USER"
+
+	PolicySourceTypeGROUP PolicySourceType = "GROUP"
+
+	PolicySourceTypeROLE PolicySourceType = "ROLE"
+
+	PolicySourceTypeAWS_MANAGED PolicySourceType = "AWS_MANAGED"
 )
 
 // PolicyUsageType represents the PolicyUsageType enum type
@@ -2294,11 +2294,11 @@ type ReportStateDescriptionType string
 type ReportStateType string
 
 const (
-	ReportStateTypeSTARTED ReportStateType = "STARTED"
-
 	ReportStateTypeINPROGRESS ReportStateType = "INPROGRESS"
 
 	ReportStateTypeCOMPLETE ReportStateType = "COMPLETE"
+
+	ReportStateTypeSTARTED ReportStateType = "STARTED"
 )
 
 // ResetServiceSpecificCredentialRequest represents the ResetServiceSpecificCredentialRequest structure
@@ -3100,11 +3100,11 @@ const (
 type assignmentStatusType string
 
 const (
+	assignmentStatusTypeAny assignmentStatusType = "Any"
+
 	assignmentStatusTypeAssigned assignmentStatusType = "Assigned"
 
 	assignmentStatusTypeUnassigned assignmentStatusType = "Unassigned"
-
-	assignmentStatusTypeAny assignmentStatusType = "Any"
 )
 
 // attachedPoliciesListType represents the attachedPoliciesListType type
@@ -3168,9 +3168,9 @@ type duplicateSSHPublicKeyMessage string
 type encodingType string
 
 const (
-	encodingTypeSSH encodingType = "SSH"
-
 	encodingTypePEM encodingType = "PEM"
+
+	encodingTypeSSH encodingType = "SSH"
 )
 
 // entityAlreadyExistsMessage represents the entityAlreadyExistsMessage type
@@ -3344,11 +3344,11 @@ type policyNotAttachableMessage string
 type policyOwnerEntityType string
 
 const (
+	policyOwnerEntityTypeUSER policyOwnerEntityType = "USER"
+
 	policyOwnerEntityTypeROLE policyOwnerEntityType = "ROLE"
 
 	policyOwnerEntityTypeGROUP policyOwnerEntityType = "GROUP"
-
-	policyOwnerEntityTypeUSER policyOwnerEntityType = "USER"
 )
 
 // policyPathType represents the policyPathType type
@@ -3456,13 +3456,13 @@ type serviceUserName string
 type sortKeyType string
 
 const (
-	sortKeyTypeLAST_AUTHENTICATED_TIME_ASCENDING sortKeyType = "LAST_AUTHENTICATED_TIME_ASCENDING"
-
-	sortKeyTypeLAST_AUTHENTICATED_TIME_DESCENDING sortKeyType = "LAST_AUTHENTICATED_TIME_DESCENDING"
-
 	sortKeyTypeSERVICE_NAMESPACE_ASCENDING sortKeyType = "SERVICE_NAMESPACE_ASCENDING"
 
 	sortKeyTypeSERVICE_NAMESPACE_DESCENDING sortKeyType = "SERVICE_NAMESPACE_DESCENDING"
+
+	sortKeyTypeLAST_AUTHENTICATED_TIME_ASCENDING sortKeyType = "LAST_AUTHENTICATED_TIME_ASCENDING"
+
+	sortKeyTypeLAST_AUTHENTICATED_TIME_DESCENDING sortKeyType = "LAST_AUTHENTICATED_TIME_DESCENDING"
 )
 
 // statusType represents the statusType enum type
@@ -3481,59 +3481,59 @@ type stringType string
 type summaryKeyType string
 
 const (
-	summaryKeyTypeAccountAccessKeysPresent summaryKeyType = "AccountAccessKeysPresent"
+	summaryKeyTypePolicyVersionsInUseQuota summaryKeyType = "PolicyVersionsInUseQuota"
 
-	summaryKeyTypeAccountPasswordPresent summaryKeyType = "AccountPasswordPresent"
+	summaryKeyTypeUsers summaryKeyType = "Users"
 
-	summaryKeyTypeAttachedPoliciesPerUserQuota summaryKeyType = "AttachedPoliciesPerUserQuota"
+	summaryKeyTypeServerCertificates summaryKeyType = "ServerCertificates"
+
+	summaryKeyTypeServerCertificatesQuota summaryKeyType = "ServerCertificatesQuota"
+
+	summaryKeyTypeSigningCertificatesPerUserQuota summaryKeyType = "SigningCertificatesPerUserQuota"
+
+	summaryKeyTypeAccessKeysPerUserQuota summaryKeyType = "AccessKeysPerUserQuota"
 
 	summaryKeyTypeMFADevices summaryKeyType = "MFADevices"
 
 	summaryKeyTypeMFADevicesInUse summaryKeyType = "MFADevicesInUse"
 
-	summaryKeyTypeAccountMFAEnabled summaryKeyType = "AccountMFAEnabled"
-
-	summaryKeyTypeAttachedPoliciesPerGroupQuota summaryKeyType = "AttachedPoliciesPerGroupQuota"
-
-	summaryKeyTypePolicyVersionsInUse summaryKeyType = "PolicyVersionsInUse"
-
-	summaryKeyTypePolicyVersionsInUseQuota summaryKeyType = "PolicyVersionsInUseQuota"
-
-	summaryKeyTypeVersionsPerPolicyQuota summaryKeyType = "VersionsPerPolicyQuota"
-
-	summaryKeyTypeUserPolicySizeQuota summaryKeyType = "UserPolicySizeQuota"
-
-	summaryKeyTypeGroupsPerUserQuota summaryKeyType = "GroupsPerUserQuota"
-
-	summaryKeyTypeAccessKeysPerUserQuota summaryKeyType = "AccessKeysPerUserQuota"
-
-	summaryKeyTypePolicySizeQuota summaryKeyType = "PolicySizeQuota"
+	summaryKeyTypeAccountAccessKeysPresent summaryKeyType = "AccountAccessKeysPresent"
 
 	summaryKeyTypeGroupsQuota summaryKeyType = "GroupsQuota"
 
-	summaryKeyTypeServerCertificates summaryKeyType = "ServerCertificates"
-
-	summaryKeyTypeSigningCertificatesPerUserQuota summaryKeyType = "SigningCertificatesPerUserQuota"
-
 	summaryKeyTypeAccountSigningCertificatesPresent summaryKeyType = "AccountSigningCertificatesPresent"
+
+	summaryKeyTypeAttachedPoliciesPerGroupQuota summaryKeyType = "AttachedPoliciesPerGroupQuota"
 
 	summaryKeyTypeAttachedPoliciesPerRoleQuota summaryKeyType = "AttachedPoliciesPerRoleQuota"
 
 	summaryKeyTypePolicies summaryKeyType = "Policies"
 
-	summaryKeyTypePoliciesQuota summaryKeyType = "PoliciesQuota"
+	summaryKeyTypePolicySizeQuota summaryKeyType = "PolicySizeQuota"
 
-	summaryKeyTypeGlobalEndpointTokenVersion summaryKeyType = "GlobalEndpointTokenVersion"
-
-	summaryKeyTypeUsers summaryKeyType = "Users"
+	summaryKeyTypeVersionsPerPolicyQuota summaryKeyType = "VersionsPerPolicyQuota"
 
 	summaryKeyTypeUsersQuota summaryKeyType = "UsersQuota"
 
 	summaryKeyTypeGroups summaryKeyType = "Groups"
 
-	summaryKeyTypeServerCertificatesQuota summaryKeyType = "ServerCertificatesQuota"
+	summaryKeyTypePolicyVersionsInUse summaryKeyType = "PolicyVersionsInUse"
+
+	summaryKeyTypeGlobalEndpointTokenVersion summaryKeyType = "GlobalEndpointTokenVersion"
+
+	summaryKeyTypeUserPolicySizeQuota summaryKeyType = "UserPolicySizeQuota"
 
 	summaryKeyTypeGroupPolicySizeQuota summaryKeyType = "GroupPolicySizeQuota"
+
+	summaryKeyTypeGroupsPerUserQuota summaryKeyType = "GroupsPerUserQuota"
+
+	summaryKeyTypeAccountMFAEnabled summaryKeyType = "AccountMFAEnabled"
+
+	summaryKeyTypeAccountPasswordPresent summaryKeyType = "AccountPasswordPresent"
+
+	summaryKeyTypeAttachedPoliciesPerUserQuota summaryKeyType = "AttachedPoliciesPerUserQuota"
+
+	summaryKeyTypePoliciesQuota summaryKeyType = "PoliciesQuota"
 )
 
 // summaryMapType represents the summaryMapType type

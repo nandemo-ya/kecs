@@ -9,12 +9,12 @@ import (
 	"strings"
 )
 
-// Router handles HTTP routing for ecs API
+// Router handles HTTP routing for iam API
 type Router struct {
 	api AWSIdentityManagementV20100508API
 }
 
-// NewRouter creates a new router for ecs API
+// NewRouter creates a new router for iam API
 func NewRouter(api AWSIdentityManagementV20100508API) *Router {
 	return &Router{api: api}
 }

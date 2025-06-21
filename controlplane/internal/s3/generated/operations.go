@@ -6,7 +6,7 @@ import (
 	"context"
 )
 
-// AmazonS3API defines the interface for ecs operations
+// AmazonS3API defines the interface for s3 operations
 type AmazonS3API interface {
 
 	// AbortMultipartUpload performs the AbortMultipartUpload operation

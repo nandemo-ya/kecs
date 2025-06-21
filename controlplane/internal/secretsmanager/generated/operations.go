@@ -6,7 +6,7 @@ import (
 	"context"
 )
 
-// secretsmanagerAPI defines the interface for ecs operations
+// secretsmanagerAPI defines the interface for secretsmanager operations
 type secretsmanagerAPI interface {
 
 	// BatchGetSecretValue performs the BatchGetSecretValue operation

@@ -6,7 +6,7 @@ import (
 	"context"
 )
 
-// AmazonSSMAPI defines the interface for ecs operations
+// AmazonSSMAPI defines the interface for ssm operations
 type AmazonSSMAPI interface {
 
 	// AddTagsToResource performs the AddTagsToResource operation

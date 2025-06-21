@@ -213,3 +213,8 @@ func (s *SmithyShape) IsCollection() bool {
 func (s *SmithyShape) IsMap() bool {
 	return s.Type == "map"
 }
+
+// IsUnion checks if a shape is a union type
+func (s *SmithyShape) IsUnion() bool {
+	return s.Type == "union"
+}
