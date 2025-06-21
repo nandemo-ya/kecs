@@ -141,7 +141,7 @@ func (m *mockLocalStackManager) CheckServiceHealth(service string) error {
 	return nil
 }
 
-var _ = PDescribe("IAM Integration (Pending: Migration to generated types)", func() {
+var _ = Describe("IAM Integration", func() {
 	var (
 		integration       kecsIAM.Integration
 		kubeClient        *fake.Clientset
