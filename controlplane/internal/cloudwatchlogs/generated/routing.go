@@ -9,12 +9,12 @@ import (
 	"strings"
 )
 
-// Router handles HTTP routing for ecs API
+// Router handles HTTP routing for cloudwatchlogs API
 type Router struct {
 	api Logs_20140328API
 }
 
-// NewRouter creates a new router for ecs API
+// NewRouter creates a new router for cloudwatchlogs API
 func NewRouter(api Logs_20140328API) *Router {
 	return &Router{api: api}
 }

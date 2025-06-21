@@ -6,7 +6,7 @@ import (
 	"context"
 )
 
-// AWSSecurityTokenServiceV20110615API defines the interface for ecs operations
+// AWSSecurityTokenServiceV20110615API defines the interface for sts operations
 type AWSSecurityTokenServiceV20110615API interface {
 
 	// AssumeRole performs the AssumeRole operation

@@ -117,6 +117,19 @@ type AnalyticsExportDestination struct {
 	S3BucketDestination AnalyticsS3BucketDestination `json:"s3BucketDestination"`
 }
 
+// AnalyticsFilter represents the AnalyticsFilter structure
+type AnalyticsFilter struct {
+
+	// <p>A conjunction (logical AND) of predicates, which is used in evaluating an analytics          filter. The operator must have at least two predicates.</p>
+	And *AnalyticsAndOperator `json:"and,omitempty"`
+
+	// <p>The prefix to use when evaluating an analytics filter.</p>
+	Prefix *string `json:"prefix,omitempty"`
+
+	// <p>The tag to use when evaluating an analytics filter.</p>
+	Tag *Tag `json:"tag,omitempty"`
+}
+
 // AnalyticsId represents the AnalyticsId type
 type AnalyticsId string
 
@@ -142,9 +155,9 @@ const (
 type ArchiveStatus string
 
 const (
-	ArchiveStatusARCHIVE_ACCESS ArchiveStatus = "ARCHIVE_ACCESS"
-
 	ArchiveStatusDEEP_ARCHIVE_ACCESS ArchiveStatus = "DEEP_ARCHIVE_ACCESS"
+
+	ArchiveStatusARCHIVE_ACCESS ArchiveStatus = "ARCHIVE_ACCESS"
 )
 
 // Body represents the Body type
@@ -180,13 +193,13 @@ type BucketAlreadyOwnedByYou struct {
 type BucketCannedACL string
 
 const (
+	BucketCannedACLauthenticated_read BucketCannedACL = "authenticated_read"
+
 	BucketCannedACLprivate BucketCannedACL = "private"
 
 	BucketCannedACLpublic_read BucketCannedACL = "public_read"
 
 	BucketCannedACLpublic_read_write BucketCannedACL = "public_read_write"
-
-	BucketCannedACLauthenticated_read BucketCannedACL = "authenticated_read"
 )
 
 // BucketInfo represents the BucketInfo structure
@@ -208,71 +221,71 @@ type BucketLifecycleConfiguration struct {
 type BucketLocationConstraint string
 
 const (
-	BucketLocationConstrainteu_north_1 BucketLocationConstraint = "eu_north_1"
+	BucketLocationConstraintap_southeast_3 BucketLocationConstraint = "ap_southeast_3"
 
-	BucketLocationConstrainteu_west_3 BucketLocationConstraint = "eu_west_3"
+	BucketLocationConstraintcn_northwest_1 BucketLocationConstraint = "cn_northwest_1"
 
-	BucketLocationConstraintcn_north_1 BucketLocationConstraint = "cn_north_1"
+	BucketLocationConstrainteu_central_1 BucketLocationConstraint = "eu_central_1"
 
-	BucketLocationConstrainteu_south_2 BucketLocationConstraint = "eu_south_2"
+	BucketLocationConstraintca_central_1 BucketLocationConstraint = "ca_central_1"
+
+	BucketLocationConstrainteu_south_1 BucketLocationConstraint = "eu_south_1"
+
+	BucketLocationConstraintus_east_2 BucketLocationConstraint = "us_east_2"
 
 	BucketLocationConstraintus_gov_east_1 BucketLocationConstraint = "us_gov_east_1"
 
-	BucketLocationConstraintap_south_2 BucketLocationConstraint = "ap_south_2"
+	BucketLocationConstraintus_gov_west_1 BucketLocationConstraint = "us_gov_west_1"
+
+	BucketLocationConstraintus_west_1 BucketLocationConstraint = "us_west_1"
+
+	BucketLocationConstraintus_west_2 BucketLocationConstraint = "us_west_2"
+
+	BucketLocationConstraintap_northeast_1 BucketLocationConstraint = "ap_northeast_1"
+
+	BucketLocationConstraintap_southeast_1 BucketLocationConstraint = "ap_southeast_1"
+
+	BucketLocationConstraintme_central_1 BucketLocationConstraint = "me_central_1"
+
+	BucketLocationConstraintap_southeast_2 BucketLocationConstraint = "ap_southeast_2"
 
 	BucketLocationConstraintap_southeast_5 BucketLocationConstraint = "ap_southeast_5"
 
+	BucketLocationConstraintcn_north_1 BucketLocationConstraint = "cn_north_1"
+
+	BucketLocationConstraintme_south_1 BucketLocationConstraint = "me_south_1"
+
+	BucketLocationConstraintsa_east_1 BucketLocationConstraint = "sa_east_1"
+
 	BucketLocationConstrainteu_central_2 BucketLocationConstraint = "eu_central_2"
+
+	BucketLocationConstrainteu_north_1 BucketLocationConstraint = "eu_north_1"
 
 	BucketLocationConstrainteu_west_1 BucketLocationConstraint = "eu_west_1"
 
-	BucketLocationConstraintap_east_1 BucketLocationConstraint = "ap_east_1"
+	BucketLocationConstrainteu_west_3 BucketLocationConstraint = "eu_west_3"
 
-	BucketLocationConstraintap_northeast_1 BucketLocationConstraint = "ap_northeast_1"
+	BucketLocationConstraintap_south_2 BucketLocationConstraint = "ap_south_2"
 
 	BucketLocationConstraintap_southeast_4 BucketLocationConstraint = "ap_southeast_4"
 
 	BucketLocationConstraintEU BucketLocationConstraint = "EU"
 
-	BucketLocationConstraintme_central_1 BucketLocationConstraint = "me_central_1"
-
-	BucketLocationConstraintus_west_2 BucketLocationConstraint = "us_west_2"
-
 	BucketLocationConstraintaf_south_1 BucketLocationConstraint = "af_south_1"
 
-	BucketLocationConstraintap_south_1 BucketLocationConstraint = "ap_south_1"
-
-	BucketLocationConstraintap_southeast_1 BucketLocationConstraint = "ap_southeast_1"
-
-	BucketLocationConstraintcn_northwest_1 BucketLocationConstraint = "cn_northwest_1"
-
-	BucketLocationConstraintca_central_1 BucketLocationConstraint = "ca_central_1"
-
-	BucketLocationConstraintus_east_2 BucketLocationConstraint = "us_east_2"
-
-	BucketLocationConstraintsa_east_1 BucketLocationConstraint = "sa_east_1"
-
-	BucketLocationConstraintap_northeast_2 BucketLocationConstraint = "ap_northeast_2"
-
-	BucketLocationConstraintap_southeast_2 BucketLocationConstraint = "ap_southeast_2"
-
-	BucketLocationConstrainteu_south_1 BucketLocationConstraint = "eu_south_1"
-
-	BucketLocationConstraintil_central_1 BucketLocationConstraint = "il_central_1"
-
-	BucketLocationConstraintme_south_1 BucketLocationConstraint = "me_south_1"
-
-	BucketLocationConstraintus_gov_west_1 BucketLocationConstraint = "us_gov_west_1"
-
-	BucketLocationConstrainteu_central_1 BucketLocationConstraint = "eu_central_1"
+	BucketLocationConstraintap_east_1 BucketLocationConstraint = "ap_east_1"
 
 	BucketLocationConstrainteu_west_2 BucketLocationConstraint = "eu_west_2"
 
-	BucketLocationConstraintus_west_1 BucketLocationConstraint = "us_west_1"
+	BucketLocationConstrainteu_south_2 BucketLocationConstraint = "eu_south_2"
+
+	BucketLocationConstraintil_central_1 BucketLocationConstraint = "il_central_1"
+
+	BucketLocationConstraintap_northeast_2 BucketLocationConstraint = "ap_northeast_2"
 
 	BucketLocationConstraintap_northeast_3 BucketLocationConstraint = "ap_northeast_3"
 
-	BucketLocationConstraintap_southeast_3 BucketLocationConstraint = "ap_southeast_3"
+	BucketLocationConstraintap_south_1 BucketLocationConstraint = "ap_south_1"
 )
 
 // BucketLocationName represents the BucketLocationName type
@@ -406,8 +419,6 @@ type Checksum struct {
 type ChecksumAlgorithm string
 
 const (
-	ChecksumAlgorithmCRC64NVME ChecksumAlgorithm = "CRC64NVME"
-
 	ChecksumAlgorithmCRC32 ChecksumAlgorithm = "CRC32"
 
 	ChecksumAlgorithmCRC32C ChecksumAlgorithm = "CRC32C"
@@ -415,6 +426,8 @@ const (
 	ChecksumAlgorithmSHA1 ChecksumAlgorithm = "SHA1"
 
 	ChecksumAlgorithmSHA256 ChecksumAlgorithm = "SHA256"
+
+	ChecksumAlgorithmCRC64NVME ChecksumAlgorithm = "CRC64NVME"
 )
 
 // ChecksumAlgorithmList represents the ChecksumAlgorithmList type
@@ -1343,59 +1356,59 @@ type Errors []Error
 type Event string
 
 const (
+	Events3_Replication_OperationMissedThreshold Event = "s3_Replication_OperationMissedThreshold"
+
+	Events3_LifecycleTransition Event = "s3_LifecycleTransition"
+
 	Events3_ObjectRestore_Completed Event = "s3_ObjectRestore_Completed"
 
 	Events3_Replication_ Event = "s3_Replication_"
 
-	Events3_LifecycleExpiration_Delete Event = "s3_LifecycleExpiration_Delete"
-
-	Events3_ObjectTagging_ Event = "s3_ObjectTagging_"
-
-	Events3_ObjectCreated_ Event = "s3_ObjectCreated_"
-
-	Events3_ObjectCreated_Copy Event = "s3_ObjectCreated_Copy"
-
-	Events3_ObjectRestore_ Event = "s3_ObjectRestore_"
-
-	Events3_Replication_OperationFailedReplication Event = "s3_Replication_OperationFailedReplication"
-
-	Events3_Replication_OperationNotTracked Event = "s3_Replication_OperationNotTracked"
-
-	Events3_Replication_OperationMissedThreshold Event = "s3_Replication_OperationMissedThreshold"
+	Events3_Replication_OperationReplicatedAfterThreshold Event = "s3_Replication_OperationReplicatedAfterThreshold"
 
 	Events3_ObjectRestore_Delete Event = "s3_ObjectRestore_Delete"
-
-	Events3_LifecycleExpiration_DeleteMarkerCreated Event = "s3_LifecycleExpiration_DeleteMarkerCreated"
-
-	Events3_ObjectCreated_Put Event = "s3_ObjectCreated_Put"
-
-	Events3_ObjectRemoved_DeleteMarkerCreated Event = "s3_ObjectRemoved_DeleteMarkerCreated"
-
-	Events3_Replication_OperationReplicatedAfterThreshold Event = "s3_Replication_OperationReplicatedAfterThreshold"
 
 	Events3_IntelligentTiering Event = "s3_IntelligentTiering"
 
 	Events3_LifecycleExpiration_ Event = "s3_LifecycleExpiration_"
 
-	Events3_ObjectTagging_Delete Event = "s3_ObjectTagging_Delete"
+	Events3_ObjectTagging_Put Event = "s3_ObjectTagging_Put"
 
 	Events3_ObjectCreated_CompleteMultipartUpload Event = "s3_ObjectCreated_CompleteMultipartUpload"
 
 	Events3_ObjectRemoved_ Event = "s3_ObjectRemoved_"
 
-	Events3_LifecycleTransition Event = "s3_LifecycleTransition"
+	Events3_ObjectRemoved_DeleteMarkerCreated Event = "s3_ObjectRemoved_DeleteMarkerCreated"
+
+	Events3_Replication_OperationFailedReplication Event = "s3_Replication_OperationFailedReplication"
+
+	Events3_Replication_OperationNotTracked Event = "s3_Replication_OperationNotTracked"
+
+	Events3_LifecycleExpiration_DeleteMarkerCreated Event = "s3_LifecycleExpiration_DeleteMarkerCreated"
+
+	Events3_ReducedRedundancyLostObject Event = "s3_ReducedRedundancyLostObject"
+
+	Events3_ObjectCreated_ Event = "s3_ObjectCreated_"
+
+	Events3_ObjectCreated_Copy Event = "s3_ObjectCreated_Copy"
+
+	Events3_ObjectRestore_Post Event = "s3_ObjectRestore_Post"
 
 	Events3_ObjectAcl_Put Event = "s3_ObjectAcl_Put"
 
-	Events3_ObjectTagging_Put Event = "s3_ObjectTagging_Put"
+	Events3_LifecycleExpiration_Delete Event = "s3_LifecycleExpiration_Delete"
 
-	Events3_ReducedRedundancyLostObject Event = "s3_ReducedRedundancyLostObject"
+	Events3_ObjectTagging_ Event = "s3_ObjectTagging_"
+
+	Events3_ObjectTagging_Delete Event = "s3_ObjectTagging_Delete"
+
+	Events3_ObjectCreated_Put Event = "s3_ObjectCreated_Put"
 
 	Events3_ObjectCreated_Post Event = "s3_ObjectCreated_Post"
 
 	Events3_ObjectRemoved_Delete Event = "s3_ObjectRemoved_Delete"
 
-	Events3_ObjectRestore_Post Event = "s3_ObjectRestore_Post"
+	Events3_ObjectRestore_ Event = "s3_ObjectRestore_"
 )
 
 // EventBridgeConfiguration represents the EventBridgeConfiguration structure
@@ -2332,9 +2345,9 @@ type InputSerialization struct {
 type IntelligentTieringAccessTier string
 
 const (
-	IntelligentTieringAccessTierARCHIVE_ACCESS IntelligentTieringAccessTier = "ARCHIVE_ACCESS"
-
 	IntelligentTieringAccessTierDEEP_ARCHIVE_ACCESS IntelligentTieringAccessTier = "DEEP_ARCHIVE_ACCESS"
+
+	IntelligentTieringAccessTierARCHIVE_ACCESS IntelligentTieringAccessTier = "ARCHIVE_ACCESS"
 )
 
 // IntelligentTieringAndOperator represents the IntelligentTieringAndOperator structure
@@ -2377,9 +2390,9 @@ type IntelligentTieringId string
 type IntelligentTieringStatus string
 
 const (
-	IntelligentTieringStatusDisabled IntelligentTieringStatus = "Disabled"
-
 	IntelligentTieringStatusEnabled IntelligentTieringStatus = "Enabled"
+
+	IntelligentTieringStatusDisabled IntelligentTieringStatus = "Disabled"
 )
 
 // InvalidObjectState represents the InvalidObjectState structure
@@ -2438,20 +2451,20 @@ type InventoryFilter struct {
 type InventoryFormat string
 
 const (
-	InventoryFormatCSV InventoryFormat = "CSV"
-
 	InventoryFormatORC InventoryFormat = "ORC"
 
 	InventoryFormatParquet InventoryFormat = "Parquet"
+
+	InventoryFormatCSV InventoryFormat = "CSV"
 )
 
 // InventoryFrequency represents the InventoryFrequency enum type
 type InventoryFrequency string
 
 const (
-	InventoryFrequencyDaily InventoryFrequency = "Daily"
-
 	InventoryFrequencyWeekly InventoryFrequency = "Weekly"
+
+	InventoryFrequencyDaily InventoryFrequency = "Daily"
 )
 
 // InventoryId represents the InventoryId type
@@ -2472,33 +2485,33 @@ type InventoryOptionalField string
 const (
 	InventoryOptionalFieldObjectOwner InventoryOptionalField = "ObjectOwner"
 
-	InventoryOptionalFieldLastModifiedDate InventoryOptionalField = "LastModifiedDate"
-
-	InventoryOptionalFieldStorageClass InventoryOptionalField = "StorageClass"
+	InventoryOptionalFieldReplicationStatus InventoryOptionalField = "ReplicationStatus"
 
 	InventoryOptionalFieldObjectLockRetainUntilDate InventoryOptionalField = "ObjectLockRetainUntilDate"
 
-	InventoryOptionalFieldIsMultipartUploaded InventoryOptionalField = "IsMultipartUploaded"
-
 	InventoryOptionalFieldObjectLockLegalHoldStatus InventoryOptionalField = "ObjectLockLegalHoldStatus"
-
-	InventoryOptionalFieldETag InventoryOptionalField = "ETag"
 
 	InventoryOptionalFieldIntelligentTieringAccessTier InventoryOptionalField = "IntelligentTieringAccessTier"
 
-	InventoryOptionalFieldBucketKeyStatus InventoryOptionalField = "BucketKeyStatus"
-
-	InventoryOptionalFieldObjectAccessControlList InventoryOptionalField = "ObjectAccessControlList"
-
 	InventoryOptionalFieldSize InventoryOptionalField = "Size"
 
-	InventoryOptionalFieldReplicationStatus InventoryOptionalField = "ReplicationStatus"
+	InventoryOptionalFieldLastModifiedDate InventoryOptionalField = "LastModifiedDate"
+
+	InventoryOptionalFieldStorageClass InventoryOptionalField = "StorageClass"
 
 	InventoryOptionalFieldEncryptionStatus InventoryOptionalField = "EncryptionStatus"
 
 	InventoryOptionalFieldObjectLockMode InventoryOptionalField = "ObjectLockMode"
 
+	InventoryOptionalFieldIsMultipartUploaded InventoryOptionalField = "IsMultipartUploaded"
+
+	InventoryOptionalFieldETag InventoryOptionalField = "ETag"
+
+	InventoryOptionalFieldBucketKeyStatus InventoryOptionalField = "BucketKeyStatus"
+
 	InventoryOptionalFieldChecksumAlgorithm InventoryOptionalField = "ChecksumAlgorithm"
+
+	InventoryOptionalFieldObjectAccessControlList InventoryOptionalField = "ObjectAccessControlList"
 )
 
 // InventoryOptionalFields represents the InventoryOptionalFields type
@@ -2551,9 +2564,9 @@ type JSONOutput struct {
 type JSONType string
 
 const (
-	JSONTypeLINES JSONType = "LINES"
-
 	JSONTypeDOCUMENT JSONType = "DOCUMENT"
+
+	JSONTypeLINES JSONType = "LINES"
 )
 
 // KMSContext represents the KMSContext type
@@ -3046,9 +3059,9 @@ type LocationPrefix string
 type LocationType string
 
 const (
-	LocationTypeLocalZone LocationType = "LocalZone"
-
 	LocationTypeAvailabilityZone LocationType = "AvailabilityZone"
+
+	LocationTypeLocalZone LocationType = "LocalZone"
 )
 
 // LoggingEnabled represents the LoggingEnabled structure
@@ -3114,9 +3127,9 @@ type Metadata map[string]string
 type MetadataDirective string
 
 const (
-	MetadataDirectiveCOPY MetadataDirective = "COPY"
-
 	MetadataDirectiveREPLACE MetadataDirective = "REPLACE"
+
+	MetadataDirectiveCOPY MetadataDirective = "COPY"
 )
 
 // MetadataEntry represents the MetadataEntry structure
@@ -3170,6 +3183,22 @@ type MetricsConfiguration struct {
 
 // MetricsConfigurationList represents the MetricsConfigurationList type
 type MetricsConfigurationList []MetricsConfiguration
+
+// MetricsFilter represents the MetricsFilter structure
+type MetricsFilter struct {
+
+	// <p>The access point ARN used when evaluating a metrics filter.</p>
+	AccessPointArn *string `json:"accessPointArn,omitempty"`
+
+	// <p>A conjunction (logical AND) of predicates, which is used in evaluating a metrics filter.          The operator must have at least two predicates, and an object must match all of the          predicates in order for the filter to apply.</p>
+	And *MetricsAndOperator `json:"and,omitempty"`
+
+	// <p>The prefix used when evaluating a metrics filter.</p>
+	Prefix *string `json:"prefix,omitempty"`
+
+	// <p>The tag used when evaluating a metrics filter.</p>
+	Tag *Tag `json:"tag,omitempty"`
+}
 
 // MetricsId represents the MetricsId type
 type MetricsId string
@@ -3318,15 +3347,15 @@ type ObjectAlreadyInActiveTierError struct {
 type ObjectAttributes string
 
 const (
-	ObjectAttributesETAG ObjectAttributes = "ETAG"
-
-	ObjectAttributesCHECKSUM ObjectAttributes = "CHECKSUM"
-
 	ObjectAttributesOBJECT_PARTS ObjectAttributes = "OBJECT_PARTS"
 
 	ObjectAttributesSTORAGE_CLASS ObjectAttributes = "STORAGE_CLASS"
 
 	ObjectAttributesOBJECT_SIZE ObjectAttributes = "OBJECT_SIZE"
+
+	ObjectAttributesETAG ObjectAttributes = "ETAG"
+
+	ObjectAttributesCHECKSUM ObjectAttributes = "CHECKSUM"
 )
 
 // ObjectAttributesList represents the ObjectAttributesList type
@@ -3336,6 +3365,8 @@ type ObjectAttributesList []interface{}
 type ObjectCannedACL string
 
 const (
+	ObjectCannedACLprivate ObjectCannedACL = "private"
+
 	ObjectCannedACLpublic_read ObjectCannedACL = "public_read"
 
 	ObjectCannedACLpublic_read_write ObjectCannedACL = "public_read_write"
@@ -3347,8 +3378,6 @@ const (
 	ObjectCannedACLbucket_owner_read ObjectCannedACL = "bucket_owner_read"
 
 	ObjectCannedACLbucket_owner_full_control ObjectCannedACL = "bucket_owner_full_control"
-
-	ObjectCannedACLprivate ObjectCannedACL = "private"
 )
 
 // ObjectIdentifier represents the ObjectIdentifier structure
@@ -3399,18 +3428,18 @@ type ObjectLockLegalHold struct {
 type ObjectLockLegalHoldStatus string
 
 const (
-	ObjectLockLegalHoldStatusOFF ObjectLockLegalHoldStatus = "OFF"
-
 	ObjectLockLegalHoldStatusON ObjectLockLegalHoldStatus = "ON"
+
+	ObjectLockLegalHoldStatusOFF ObjectLockLegalHoldStatus = "OFF"
 )
 
 // ObjectLockMode represents the ObjectLockMode enum type
 type ObjectLockMode string
 
 const (
-	ObjectLockModeCOMPLIANCE ObjectLockMode = "COMPLIANCE"
-
 	ObjectLockModeGOVERNANCE ObjectLockMode = "GOVERNANCE"
+
+	ObjectLockModeCOMPLIANCE ObjectLockMode = "COMPLIANCE"
 )
 
 // ObjectLockRetainUntilDate represents the ObjectLockRetainUntilDate type
@@ -3485,6 +3514,16 @@ type ObjectSizeLessThanBytes int64
 type ObjectStorageClass string
 
 const (
+	ObjectStorageClassREDUCED_REDUNDANCY ObjectStorageClass = "REDUCED_REDUNDANCY"
+
+	ObjectStorageClassGLACIER ObjectStorageClass = "GLACIER"
+
+	ObjectStorageClassSTANDARD_IA ObjectStorageClass = "STANDARD_IA"
+
+	ObjectStorageClassINTELLIGENT_TIERING ObjectStorageClass = "INTELLIGENT_TIERING"
+
+	ObjectStorageClassDEEP_ARCHIVE ObjectStorageClass = "DEEP_ARCHIVE"
+
 	ObjectStorageClassOUTPOSTS ObjectStorageClass = "OUTPOSTS"
 
 	ObjectStorageClassGLACIER_IR ObjectStorageClass = "GLACIER_IR"
@@ -3493,19 +3532,9 @@ const (
 
 	ObjectStorageClassSTANDARD ObjectStorageClass = "STANDARD"
 
-	ObjectStorageClassREDUCED_REDUNDANCY ObjectStorageClass = "REDUCED_REDUNDANCY"
-
-	ObjectStorageClassSTANDARD_IA ObjectStorageClass = "STANDARD_IA"
-
 	ObjectStorageClassONEZONE_IA ObjectStorageClass = "ONEZONE_IA"
 
-	ObjectStorageClassINTELLIGENT_TIERING ObjectStorageClass = "INTELLIGENT_TIERING"
-
 	ObjectStorageClassSNOW ObjectStorageClass = "SNOW"
-
-	ObjectStorageClassGLACIER ObjectStorageClass = "GLACIER"
-
-	ObjectStorageClassDEEP_ARCHIVE ObjectStorageClass = "DEEP_ARCHIVE"
 )
 
 // ObjectVersion represents the ObjectVersion structure
@@ -3630,9 +3659,9 @@ type PartNumberMarker string
 type PartitionDateSource string
 
 const (
-	PartitionDateSourceEventTime PartitionDateSource = "EventTime"
-
 	PartitionDateSourceDeliveryTime PartitionDateSource = "DeliveryTime"
+
+	PartitionDateSourceEventTime PartitionDateSource = "EventTime"
 )
 
 // PartitionedPrefix represents the PartitionedPrefix structure
@@ -3653,9 +3682,9 @@ type PartsList []ObjectPart
 type Payer string
 
 const (
-	PayerBucketOwner Payer = "BucketOwner"
-
 	PayerRequester Payer = "Requester"
+
+	PayerBucketOwner Payer = "BucketOwner"
 )
 
 // Permission represents the Permission enum type
@@ -4263,9 +4292,9 @@ type QuoteEscapeCharacter string
 type QuoteFields string
 
 const (
-	QuoteFieldsASNEEDED QuoteFields = "ASNEEDED"
-
 	QuoteFieldsALWAYS QuoteFields = "ALWAYS"
+
+	QuoteFieldsASNEEDED QuoteFields = "ASNEEDED"
 )
 
 // Range represents the Range type
@@ -4419,9 +4448,9 @@ type ReplicationRuleFilter struct {
 type ReplicationRuleStatus string
 
 const (
-	ReplicationRuleStatusEnabled ReplicationRuleStatus = "Enabled"
-
 	ReplicationRuleStatusDisabled ReplicationRuleStatus = "Disabled"
+
+	ReplicationRuleStatusEnabled ReplicationRuleStatus = "Enabled"
 )
 
 // ReplicationRules represents the ReplicationRules type
@@ -4431,15 +4460,15 @@ type ReplicationRules []ReplicationRule
 type ReplicationStatus string
 
 const (
+	ReplicationStatusCOMPLETED ReplicationStatus = "COMPLETED"
+
+	ReplicationStatusCOMPLETE ReplicationStatus = "COMPLETE"
+
 	ReplicationStatusPENDING ReplicationStatus = "PENDING"
 
 	ReplicationStatusFAILED ReplicationStatus = "FAILED"
 
 	ReplicationStatusREPLICA ReplicationStatus = "REPLICA"
-
-	ReplicationStatusCOMPLETED ReplicationStatus = "COMPLETED"
-
-	ReplicationStatusCOMPLETE ReplicationStatus = "COMPLETE"
 )
 
 // ReplicationTime represents the ReplicationTime structure
@@ -4453,9 +4482,9 @@ type ReplicationTime struct {
 type ReplicationTimeStatus string
 
 const (
-	ReplicationTimeStatusDisabled ReplicationTimeStatus = "Disabled"
-
 	ReplicationTimeStatusEnabled ReplicationTimeStatus = "Enabled"
+
+	ReplicationTimeStatusDisabled ReplicationTimeStatus = "Disabled"
 )
 
 // ReplicationTimeValue represents the ReplicationTimeValue structure
@@ -4673,6 +4702,25 @@ type ScanRange struct {
 	Start *int64 `json:"start,omitempty"`
 }
 
+// SelectObjectContentEventStream represents the SelectObjectContentEventStream structure
+type SelectObjectContentEventStream struct {
+
+	// <p>The Continuation Event.</p>
+	Cont *ContinuationEvent `json:"cont,omitempty"`
+
+	// <p>The End Event.</p>
+	End *EndEvent `json:"end,omitempty"`
+
+	// <p>The Progress Event.</p>
+	Progress *ProgressEvent `json:"progress,omitempty"`
+
+	// <p>The Records Event.</p>
+	Records *RecordsEvent `json:"records,omitempty"`
+
+	// <p>The Stats Event.</p>
+	Stats *StatsEvent `json:"stats,omitempty"`
+}
+
 // SelectObjectContentOutput represents the SelectObjectContentOutput structure
 type SelectObjectContentOutput struct {
 	Payload *SelectObjectContentEventStream `json:"payload,omitempty"`
@@ -4833,25 +4881,25 @@ type StatsEvent struct {
 type StorageClass string
 
 const (
+	StorageClassONEZONE_IA StorageClass = "ONEZONE_IA"
+
+	StorageClassINTELLIGENT_TIERING StorageClass = "INTELLIGENT_TIERING"
+
+	StorageClassDEEP_ARCHIVE StorageClass = "DEEP_ARCHIVE"
+
+	StorageClassGLACIER_IR StorageClass = "GLACIER_IR"
+
+	StorageClassSNOW StorageClass = "SNOW"
+
 	StorageClassSTANDARD StorageClass = "STANDARD"
 
 	StorageClassREDUCED_REDUNDANCY StorageClass = "REDUCED_REDUNDANCY"
 
 	StorageClassSTANDARD_IA StorageClass = "STANDARD_IA"
 
-	StorageClassONEZONE_IA StorageClass = "ONEZONE_IA"
-
-	StorageClassOUTPOSTS StorageClass = "OUTPOSTS"
-
-	StorageClassGLACIER_IR StorageClass = "GLACIER_IR"
-
-	StorageClassSNOW StorageClass = "SNOW"
-
-	StorageClassINTELLIGENT_TIERING StorageClass = "INTELLIGENT_TIERING"
-
 	StorageClassGLACIER StorageClass = "GLACIER"
 
-	StorageClassDEEP_ARCHIVE StorageClass = "DEEP_ARCHIVE"
+	StorageClassOUTPOSTS StorageClass = "OUTPOSTS"
 
 	StorageClassEXPRESS_ONEZONE StorageClass = "EXPRESS_ONEZONE"
 )
@@ -5004,8 +5052,6 @@ type TransitionList []Transition
 type TransitionStorageClass string
 
 const (
-	TransitionStorageClassGLACIER TransitionStorageClass = "GLACIER"
-
 	TransitionStorageClassSTANDARD_IA TransitionStorageClass = "STANDARD_IA"
 
 	TransitionStorageClassONEZONE_IA TransitionStorageClass = "ONEZONE_IA"
@@ -5015,6 +5061,8 @@ const (
 	TransitionStorageClassDEEP_ARCHIVE TransitionStorageClass = "DEEP_ARCHIVE"
 
 	TransitionStorageClassGLACIER_IR TransitionStorageClass = "GLACIER_IR"
+
+	TransitionStorageClassGLACIER TransitionStorageClass = "GLACIER"
 )
 
 // Type represents the Type enum type

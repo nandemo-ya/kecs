@@ -222,15 +222,15 @@ type AssociationAlreadyExists struct {
 type AssociationComplianceSeverity string
 
 const (
+	AssociationComplianceSeverityLow AssociationComplianceSeverity = "Low"
+
+	AssociationComplianceSeverityUnspecified AssociationComplianceSeverity = "Unspecified"
+
 	AssociationComplianceSeverityCritical AssociationComplianceSeverity = "Critical"
 
 	AssociationComplianceSeverityHigh AssociationComplianceSeverity = "High"
 
 	AssociationComplianceSeverityMedium AssociationComplianceSeverity = "Medium"
-
-	AssociationComplianceSeverityLow AssociationComplianceSeverity = "Low"
-
-	AssociationComplianceSeverityUnspecified AssociationComplianceSeverity = "Unspecified"
 )
 
 // AssociationDescription represents the AssociationDescription structure
@@ -391,11 +391,11 @@ type AssociationExecutionTargetsFilter struct {
 type AssociationExecutionTargetsFilterKey string
 
 const (
+	AssociationExecutionTargetsFilterKeyResourceType AssociationExecutionTargetsFilterKey = "ResourceType"
+
 	AssociationExecutionTargetsFilterKeyStatus AssociationExecutionTargetsFilterKey = "Status"
 
 	AssociationExecutionTargetsFilterKeyResourceId AssociationExecutionTargetsFilterKey = "ResourceId"
-
-	AssociationExecutionTargetsFilterKeyResourceType AssociationExecutionTargetsFilterKey = "ResourceType"
 )
 
 // AssociationExecutionTargetsFilterList represents the AssociationExecutionTargetsFilterList type
@@ -421,6 +421,10 @@ type AssociationFilter struct {
 type AssociationFilterKey string
 
 const (
+	AssociationFilterKeyName AssociationFilterKey = "Name"
+
+	AssociationFilterKeyAssociationId AssociationFilterKey = "AssociationId"
+
 	AssociationFilterKeyStatus AssociationFilterKey = "Status"
 
 	AssociationFilterKeyLastExecutedBefore AssociationFilterKey = "LastExecutedBefore"
@@ -432,10 +436,6 @@ const (
 	AssociationFilterKeyResourceGroupName AssociationFilterKey = "ResourceGroupName"
 
 	AssociationFilterKeyInstanceId AssociationFilterKey = "InstanceId"
-
-	AssociationFilterKeyName AssociationFilterKey = "Name"
-
-	AssociationFilterKeyAssociationId AssociationFilterKey = "AssociationId"
 )
 
 // AssociationFilterList represents the AssociationFilterList type
@@ -504,11 +504,11 @@ type AssociationStatusAggregatedCount map[string]int32
 type AssociationStatusName string
 
 const (
-	AssociationStatusNamePending AssociationStatusName = "Pending"
-
 	AssociationStatusNameSuccess AssociationStatusName = "Success"
 
 	AssociationStatusNameFailed AssociationStatusName = "Failed"
+
+	AssociationStatusNamePending AssociationStatusName = "Pending"
 )
 
 // AssociationSyncCompliance represents the AssociationSyncCompliance enum type
@@ -630,11 +630,11 @@ type AttachmentsSource struct {
 type AttachmentsSourceKey string
 
 const (
-	AttachmentsSourceKeySourceUrl AttachmentsSourceKey = "SourceUrl"
-
 	AttachmentsSourceKeyS3FileUrl AttachmentsSourceKey = "S3FileUrl"
 
 	AttachmentsSourceKeyAttachmentReference AttachmentsSourceKey = "AttachmentReference"
+
+	AttachmentsSourceKeySourceUrl AttachmentsSourceKey = "SourceUrl"
 )
 
 // AttachmentsSourceList represents the AttachmentsSourceList type
@@ -754,29 +754,29 @@ type AutomationExecutionFilter struct {
 type AutomationExecutionFilterKey string
 
 const (
-	AutomationExecutionFilterKeySTART_TIME_BEFORE AutomationExecutionFilterKey = "START_TIME_BEFORE"
+	AutomationExecutionFilterKeyTARGET_RESOURCE_GROUP AutomationExecutionFilterKey = "TARGET_RESOURCE_GROUP"
 
-	AutomationExecutionFilterKeyAUTOMATION_TYPE AutomationExecutionFilterKey = "AUTOMATION_TYPE"
-
-	AutomationExecutionFilterKeyTAG_KEY AutomationExecutionFilterKey = "TAG_KEY"
+	AutomationExecutionFilterKeyAUTOMATION_SUBTYPE AutomationExecutionFilterKey = "AUTOMATION_SUBTYPE"
 
 	AutomationExecutionFilterKeyEXECUTION_STATUS AutomationExecutionFilterKey = "EXECUTION_STATUS"
 
 	AutomationExecutionFilterKeyEXECUTION_ID AutomationExecutionFilterKey = "EXECUTION_ID"
 
-	AutomationExecutionFilterKeyCURRENT_ACTION AutomationExecutionFilterKey = "CURRENT_ACTION"
+	AutomationExecutionFilterKeyPARENT_EXECUTION_ID AutomationExecutionFilterKey = "PARENT_EXECUTION_ID"
+
+	AutomationExecutionFilterKeySTART_TIME_BEFORE AutomationExecutionFilterKey = "START_TIME_BEFORE"
 
 	AutomationExecutionFilterKeySTART_TIME_AFTER AutomationExecutionFilterKey = "START_TIME_AFTER"
-
-	AutomationExecutionFilterKeyTARGET_RESOURCE_GROUP AutomationExecutionFilterKey = "TARGET_RESOURCE_GROUP"
-
-	AutomationExecutionFilterKeyAUTOMATION_SUBTYPE AutomationExecutionFilterKey = "AUTOMATION_SUBTYPE"
 
 	AutomationExecutionFilterKeyOPS_ITEM_ID AutomationExecutionFilterKey = "OPS_ITEM_ID"
 
 	AutomationExecutionFilterKeyDOCUMENT_NAME_PREFIX AutomationExecutionFilterKey = "DOCUMENT_NAME_PREFIX"
 
-	AutomationExecutionFilterKeyPARENT_EXECUTION_ID AutomationExecutionFilterKey = "PARENT_EXECUTION_ID"
+	AutomationExecutionFilterKeyCURRENT_ACTION AutomationExecutionFilterKey = "CURRENT_ACTION"
+
+	AutomationExecutionFilterKeyAUTOMATION_TYPE AutomationExecutionFilterKey = "AUTOMATION_TYPE"
+
+	AutomationExecutionFilterKeyTAG_KEY AutomationExecutionFilterKey = "TAG_KEY"
 )
 
 // AutomationExecutionFilterList represents the AutomationExecutionFilterList type
@@ -899,43 +899,43 @@ type AutomationExecutionPreview struct {
 type AutomationExecutionStatus string
 
 const (
-	AutomationExecutionStatusPENDING AutomationExecutionStatus = "PENDING"
+	AutomationExecutionStatusCOMPLETED_WITH_SUCCESS AutomationExecutionStatus = "COMPLETED_WITH_SUCCESS"
 
 	AutomationExecutionStatusSUCCESS AutomationExecutionStatus = "SUCCESS"
 
-	AutomationExecutionStatusCANCELLED AutomationExecutionStatus = "CANCELLED"
+	AutomationExecutionStatusPENDING_CHANGE_CALENDAR_OVERRIDE AutomationExecutionStatus = "PENDING_CHANGE_CALENDAR_OVERRIDE"
 
-	AutomationExecutionStatusSCHEDULED AutomationExecutionStatus = "SCHEDULED"
-
-	AutomationExecutionStatusTIMEDOUT AutomationExecutionStatus = "TIMEDOUT"
+	AutomationExecutionStatusCHANGE_CALENDAR_OVERRIDE_REJECTED AutomationExecutionStatus = "CHANGE_CALENDAR_OVERRIDE_REJECTED"
 
 	AutomationExecutionStatusPENDING_APPROVAL AutomationExecutionStatus = "PENDING_APPROVAL"
 
-	AutomationExecutionStatusREJECTED AutomationExecutionStatus = "REJECTED"
-
 	AutomationExecutionStatusRUNBOOK_INPROGRESS AutomationExecutionStatus = "RUNBOOK_INPROGRESS"
+
+	AutomationExecutionStatusCOMPLETED_WITH_FAILURE AutomationExecutionStatus = "COMPLETED_WITH_FAILURE"
 
 	AutomationExecutionStatusEXITED AutomationExecutionStatus = "EXITED"
 
-	AutomationExecutionStatusPENDING_CHANGE_CALENDAR_OVERRIDE AutomationExecutionStatus = "PENDING_CHANGE_CALENDAR_OVERRIDE"
+	AutomationExecutionStatusPENDING AutomationExecutionStatus = "PENDING"
 
 	AutomationExecutionStatusWAITING AutomationExecutionStatus = "WAITING"
 
 	AutomationExecutionStatusCANCELLING AutomationExecutionStatus = "CANCELLING"
 
+	AutomationExecutionStatusCANCELLED AutomationExecutionStatus = "CANCELLED"
+
 	AutomationExecutionStatusFAILED AutomationExecutionStatus = "FAILED"
 
-	AutomationExecutionStatusAPPROVED AutomationExecutionStatus = "APPROVED"
-
-	AutomationExecutionStatusCOMPLETED_WITH_SUCCESS AutomationExecutionStatus = "COMPLETED_WITH_SUCCESS"
-
-	AutomationExecutionStatusCOMPLETED_WITH_FAILURE AutomationExecutionStatus = "COMPLETED_WITH_FAILURE"
+	AutomationExecutionStatusREJECTED AutomationExecutionStatus = "REJECTED"
 
 	AutomationExecutionStatusINPROGRESS AutomationExecutionStatus = "INPROGRESS"
 
-	AutomationExecutionStatusCHANGE_CALENDAR_OVERRIDE_APPROVED AutomationExecutionStatus = "CHANGE_CALENDAR_OVERRIDE_APPROVED"
+	AutomationExecutionStatusTIMEDOUT AutomationExecutionStatus = "TIMEDOUT"
 
-	AutomationExecutionStatusCHANGE_CALENDAR_OVERRIDE_REJECTED AutomationExecutionStatus = "CHANGE_CALENDAR_OVERRIDE_REJECTED"
+	AutomationExecutionStatusAPPROVED AutomationExecutionStatus = "APPROVED"
+
+	AutomationExecutionStatusSCHEDULED AutomationExecutionStatus = "SCHEDULED"
+
+	AutomationExecutionStatusCHANGE_CALENDAR_OVERRIDE_APPROVED AutomationExecutionStatus = "CHANGE_CALENDAR_OVERRIDE_APPROVED"
 )
 
 // AutomationParameterKey represents the AutomationParameterKey type
@@ -1147,6 +1147,8 @@ type CommandFilter struct {
 type CommandFilterKey string
 
 const (
+	CommandFilterKeyINVOKED_AFTER CommandFilterKey = "INVOKED_AFTER"
+
 	CommandFilterKeyINVOKED_BEFORE CommandFilterKey = "INVOKED_BEFORE"
 
 	CommandFilterKeySTATUS CommandFilterKey = "STATUS"
@@ -1154,8 +1156,6 @@ const (
 	CommandFilterKeyEXECUTION_STAGE CommandFilterKey = "EXECUTION_STAGE"
 
 	CommandFilterKeyDOCUMENT_NAME CommandFilterKey = "DOCUMENT_NAME"
-
-	CommandFilterKeyINVOKED_AFTER CommandFilterKey = "INVOKED_AFTER"
 )
 
 // CommandFilterList represents the CommandFilterList type
@@ -1209,12 +1209,6 @@ type CommandInvocationList []CommandInvocation
 type CommandInvocationStatus string
 
 const (
-	CommandInvocationStatusDELAYED CommandInvocationStatus = "DELAYED"
-
-	CommandInvocationStatusSUCCESS CommandInvocationStatus = "SUCCESS"
-
-	CommandInvocationStatusCANCELLED CommandInvocationStatus = "CANCELLED"
-
 	CommandInvocationStatusTIMED_OUT CommandInvocationStatus = "TIMED_OUT"
 
 	CommandInvocationStatusFAILED CommandInvocationStatus = "FAILED"
@@ -1224,6 +1218,12 @@ const (
 	CommandInvocationStatusPENDING CommandInvocationStatus = "PENDING"
 
 	CommandInvocationStatusIN_PROGRESS CommandInvocationStatus = "IN_PROGRESS"
+
+	CommandInvocationStatusDELAYED CommandInvocationStatus = "DELAYED"
+
+	CommandInvocationStatusSUCCESS CommandInvocationStatus = "SUCCESS"
+
+	CommandInvocationStatusCANCELLED CommandInvocationStatus = "CANCELLED"
 )
 
 // CommandList represents the CommandList type
@@ -1272,6 +1272,8 @@ type CommandPluginOutput string
 type CommandPluginStatus string
 
 const (
+	CommandPluginStatusFAILED CommandPluginStatus = "FAILED"
+
 	CommandPluginStatusPENDING CommandPluginStatus = "PENDING"
 
 	CommandPluginStatusIN_PROGRESS CommandPluginStatus = "IN_PROGRESS"
@@ -1281,14 +1283,16 @@ const (
 	CommandPluginStatusTIMED_OUT CommandPluginStatus = "TIMED_OUT"
 
 	CommandPluginStatusCANCELLED CommandPluginStatus = "CANCELLED"
-
-	CommandPluginStatusFAILED CommandPluginStatus = "FAILED"
 )
 
 // CommandStatus represents the CommandStatus enum type
 type CommandStatus string
 
 const (
+	CommandStatusFAILED CommandStatus = "FAILED"
+
+	CommandStatusTIMED_OUT CommandStatus = "TIMED_OUT"
+
 	CommandStatusCANCELLING CommandStatus = "CANCELLING"
 
 	CommandStatusPENDING CommandStatus = "PENDING"
@@ -1298,10 +1302,6 @@ const (
 	CommandStatusSUCCESS CommandStatus = "SUCCESS"
 
 	CommandStatusCANCELLED CommandStatus = "CANCELLED"
-
-	CommandStatusFAILED CommandStatus = "FAILED"
-
-	CommandStatusTIMED_OUT CommandStatus = "TIMED_OUT"
 )
 
 // Comment represents the Comment type
@@ -1384,8 +1384,6 @@ type ComplianceItemTitle string
 type ComplianceQueryOperatorType string
 
 const (
-	ComplianceQueryOperatorTypeGreaterThan ComplianceQueryOperatorType = "GreaterThan"
-
 	ComplianceQueryOperatorTypeEqual ComplianceQueryOperatorType = "Equal"
 
 	ComplianceQueryOperatorTypeNotEqual ComplianceQueryOperatorType = "NotEqual"
@@ -1393,6 +1391,8 @@ const (
 	ComplianceQueryOperatorTypeBeginWith ComplianceQueryOperatorType = "BeginWith"
 
 	ComplianceQueryOperatorTypeLessThan ComplianceQueryOperatorType = "LessThan"
+
+	ComplianceQueryOperatorTypeGreaterThan ComplianceQueryOperatorType = "GreaterThan"
 )
 
 // ComplianceResourceId represents the ComplianceResourceId type
@@ -1428,9 +1428,9 @@ const (
 type ComplianceStatus string
 
 const (
-	ComplianceStatusCompliant ComplianceStatus = "Compliant"
-
 	ComplianceStatusNonCompliant ComplianceStatus = "NonCompliant"
+
+	ComplianceStatusCompliant ComplianceStatus = "Compliant"
 )
 
 // ComplianceStringFilter represents the ComplianceStringFilter structure
@@ -2781,11 +2781,11 @@ type DocumentFilterValue string
 type DocumentFormat string
 
 const (
+	DocumentFormatTEXT DocumentFormat = "TEXT"
+
 	DocumentFormatYAML DocumentFormat = "YAML"
 
 	DocumentFormatJSON DocumentFormat = "JSON"
-
-	DocumentFormatTEXT DocumentFormat = "TEXT"
 )
 
 // DocumentHash represents the DocumentHash type
@@ -2943,13 +2943,13 @@ type DocumentRequiresList []DocumentRequires
 type DocumentReviewAction string
 
 const (
-	DocumentReviewActionSendForReview DocumentReviewAction = "SendForReview"
-
 	DocumentReviewActionUpdateReview DocumentReviewAction = "UpdateReview"
 
 	DocumentReviewActionApprove DocumentReviewAction = "Approve"
 
 	DocumentReviewActionReject DocumentReviewAction = "Reject"
+
+	DocumentReviewActionSendForReview DocumentReviewAction = "SendForReview"
 )
 
 // DocumentReviewComment represents the DocumentReviewComment type
@@ -3005,8 +3005,6 @@ type DocumentSha1 string
 type DocumentStatus string
 
 const (
-	DocumentStatusCreating DocumentStatus = "Creating"
-
 	DocumentStatusActive DocumentStatus = "Active"
 
 	DocumentStatusUpdating DocumentStatus = "Updating"
@@ -3014,6 +3012,8 @@ const (
 	DocumentStatusDeleting DocumentStatus = "Deleting"
 
 	DocumentStatusFailed DocumentStatus = "Failed"
+
+	DocumentStatusCreating DocumentStatus = "Creating"
 )
 
 // DocumentStatusInformation represents the DocumentStatusInformation type
@@ -3023,39 +3023,39 @@ type DocumentStatusInformation string
 type DocumentType string
 
 const (
-	DocumentTypeCommand DocumentType = "Command"
-
-	DocumentTypeApplicationConfigurationSchema DocumentType = "ApplicationConfigurationSchema"
-
-	DocumentTypeChangeCalendar DocumentType = "ChangeCalendar"
+	DocumentTypeProblemAnalysisTemplate DocumentType = "ProblemAnalysisTemplate"
 
 	DocumentTypeProblemAnalysis DocumentType = "ProblemAnalysis"
 
-	DocumentTypeCloudFormation DocumentType = "CloudFormation"
-
-	DocumentTypeConformancePackTemplate DocumentType = "ConformancePackTemplate"
-
-	DocumentTypePolicy DocumentType = "Policy"
-
-	DocumentTypeAutomation DocumentType = "Automation"
+	DocumentTypeQuickSetup DocumentType = "QuickSetup"
 
 	DocumentTypeSession DocumentType = "Session"
-
-	DocumentTypeProblemAnalysisTemplate DocumentType = "ProblemAnalysisTemplate"
-
-	DocumentTypeAutoApprovalPolicy DocumentType = "AutoApprovalPolicy"
 
 	DocumentTypeDeploymentStrategy DocumentType = "DeploymentStrategy"
 
 	DocumentTypeChangeTemplate DocumentType = "ChangeTemplate"
 
-	DocumentTypeQuickSetup DocumentType = "QuickSetup"
+	DocumentTypeAutoApprovalPolicy DocumentType = "AutoApprovalPolicy"
+
+	DocumentTypeApplicationConfigurationSchema DocumentType = "ApplicationConfigurationSchema"
+
+	DocumentTypeCloudFormation DocumentType = "CloudFormation"
+
+	DocumentTypeConformancePackTemplate DocumentType = "ConformancePackTemplate"
+
+	DocumentTypeManualApprovalPolicy DocumentType = "ManualApprovalPolicy"
+
+	DocumentTypeCommand DocumentType = "Command"
+
+	DocumentTypePolicy DocumentType = "Policy"
+
+	DocumentTypeAutomation DocumentType = "Automation"
 
 	DocumentTypePackage DocumentType = "Package"
 
 	DocumentTypeApplicationConfiguration DocumentType = "ApplicationConfiguration"
 
-	DocumentTypeManualApprovalPolicy DocumentType = "ManualApprovalPolicy"
+	DocumentTypeChangeCalendar DocumentType = "ChangeCalendar"
 )
 
 // DocumentVersion represents the DocumentVersion type
@@ -3145,6 +3145,13 @@ type ExcludeAccount string
 // ExcludeAccounts represents the ExcludeAccounts type
 type ExcludeAccounts []string
 
+// ExecutionInputs represents the ExecutionInputs structure
+type ExecutionInputs struct {
+
+	// <p>Information about the optional inputs that can be specified for an automation execution    preview.</p>
+	Automation *AutomationExecutionInputs `json:"automation,omitempty"`
+}
+
 // ExecutionMode represents the ExecutionMode enum type
 type ExecutionMode string
 
@@ -3154,6 +3161,13 @@ const (
 	ExecutionModeInteractive ExecutionMode = "Interactive"
 )
 
+// ExecutionPreview represents the ExecutionPreview structure
+type ExecutionPreview struct {
+
+	// <p>Information about the changes that would be made if an Automation workflow were run.</p>
+	Automation *AutomationExecutionPreview `json:"automation,omitempty"`
+}
+
 // ExecutionPreviewId represents the ExecutionPreviewId type
 type ExecutionPreviewId string
 
@@ -3161,13 +3175,13 @@ type ExecutionPreviewId string
 type ExecutionPreviewStatus string
 
 const (
+	ExecutionPreviewStatusFAILED ExecutionPreviewStatus = "FAILED"
+
 	ExecutionPreviewStatusPENDING ExecutionPreviewStatus = "PENDING"
 
 	ExecutionPreviewStatusIN_PROGRESS ExecutionPreviewStatus = "IN_PROGRESS"
 
 	ExecutionPreviewStatusSUCCESS ExecutionPreviewStatus = "SUCCESS"
-
-	ExecutionPreviewStatusFAILED ExecutionPreviewStatus = "FAILED"
 )
 
 // ExecutionRoleName represents the ExecutionRoleName type
@@ -3876,11 +3890,11 @@ type IdempotentParameterMismatch struct {
 type ImpactType string
 
 const (
+	ImpactTypeUNDETERMINED ImpactType = "UNDETERMINED"
+
 	ImpactTypeMUTATING ImpactType = "MUTATING"
 
 	ImpactTypeNON_MUTATING ImpactType = "NON_MUTATING"
-
-	ImpactTypeUNDETERMINED ImpactType = "UNDETERMINED"
 )
 
 // IncompatiblePolicyException represents the IncompatiblePolicyException structure
@@ -4046,10 +4060,6 @@ type InstanceInformationFilter struct {
 type InstanceInformationFilterKey string
 
 const (
-	InstanceInformationFilterKeyPING_STATUS InstanceInformationFilterKey = "PING_STATUS"
-
-	InstanceInformationFilterKeyPLATFORM_TYPES InstanceInformationFilterKey = "PLATFORM_TYPES"
-
 	InstanceInformationFilterKeyACTIVATION_IDS InstanceInformationFilterKey = "ACTIVATION_IDS"
 
 	InstanceInformationFilterKeyIAM_ROLE InstanceInformationFilterKey = "IAM_ROLE"
@@ -4061,6 +4071,10 @@ const (
 	InstanceInformationFilterKeyINSTANCE_IDS InstanceInformationFilterKey = "INSTANCE_IDS"
 
 	InstanceInformationFilterKeyAGENT_VERSION InstanceInformationFilterKey = "AGENT_VERSION"
+
+	InstanceInformationFilterKeyPING_STATUS InstanceInformationFilterKey = "PING_STATUS"
+
+	InstanceInformationFilterKeyPLATFORM_TYPES InstanceInformationFilterKey = "PLATFORM_TYPES"
 )
 
 // InstanceInformationFilterList represents the InstanceInformationFilterList type
@@ -4249,21 +4263,21 @@ type InstancePropertyFilter struct {
 type InstancePropertyFilterKey string
 
 const (
-	InstancePropertyFilterKeyINSTANCE_IDS InstancePropertyFilterKey = "INSTANCE_IDS"
+	InstancePropertyFilterKeyAGENT_VERSION InstancePropertyFilterKey = "AGENT_VERSION"
+
+	InstancePropertyFilterKeyPING_STATUS InstancePropertyFilterKey = "PING_STATUS"
+
+	InstancePropertyFilterKeyDOCUMENT_NAME InstancePropertyFilterKey = "DOCUMENT_NAME"
+
+	InstancePropertyFilterKeyACTIVATION_IDS InstancePropertyFilterKey = "ACTIVATION_IDS"
 
 	InstancePropertyFilterKeyIAM_ROLE InstancePropertyFilterKey = "IAM_ROLE"
 
 	InstancePropertyFilterKeyRESOURCE_TYPE InstancePropertyFilterKey = "RESOURCE_TYPE"
 
-	InstancePropertyFilterKeyAGENT_VERSION InstancePropertyFilterKey = "AGENT_VERSION"
-
-	InstancePropertyFilterKeyPING_STATUS InstancePropertyFilterKey = "PING_STATUS"
+	InstancePropertyFilterKeyINSTANCE_IDS InstancePropertyFilterKey = "INSTANCE_IDS"
 
 	InstancePropertyFilterKeyPLATFORM_TYPES InstancePropertyFilterKey = "PLATFORM_TYPES"
-
-	InstancePropertyFilterKeyDOCUMENT_NAME InstancePropertyFilterKey = "DOCUMENT_NAME"
-
-	InstancePropertyFilterKeyACTIVATION_IDS InstancePropertyFilterKey = "ACTIVATION_IDS"
 
 	InstancePropertyFilterKeyASSOCIATION_STATUS InstancePropertyFilterKey = "ASSOCIATION_STATUS"
 )
@@ -4817,9 +4831,9 @@ type InventoryResultItemMap map[string]InventoryResultItem
 type InventorySchemaDeleteOption string
 
 const (
-	InventorySchemaDeleteOptionDELETE_SCHEMA InventorySchemaDeleteOption = "DELETE_SCHEMA"
-
 	InventorySchemaDeleteOptionDISABLE_SCHEMA InventorySchemaDeleteOption = "DISABLE_SCHEMA"
+
+	InventorySchemaDeleteOptionDELETE_SCHEMA InventorySchemaDeleteOption = "DELETE_SCHEMA"
 )
 
 // InventoryTypeDisplayName represents the InventoryTypeDisplayName type
@@ -4878,11 +4892,11 @@ type LastResourceDataSyncMessage string
 type LastResourceDataSyncStatus string
 
 const (
-	LastResourceDataSyncStatusSUCCESSFUL LastResourceDataSyncStatus = "SUCCESSFUL"
-
 	LastResourceDataSyncStatusFAILED LastResourceDataSyncStatus = "FAILED"
 
 	LastResourceDataSyncStatusINPROGRESS LastResourceDataSyncStatus = "INPROGRESS"
+
+	LastResourceDataSyncStatusSUCCESSFUL LastResourceDataSyncStatus = "SUCCESSFUL"
 )
 
 // LastResourceDataSyncTime represents the LastResourceDataSyncTime type
@@ -5283,12 +5297,6 @@ type MaintenanceWindowExecutionList []MaintenanceWindowExecution
 type MaintenanceWindowExecutionStatus string
 
 const (
-	MaintenanceWindowExecutionStatusCancelling MaintenanceWindowExecutionStatus = "Cancelling"
-
-	MaintenanceWindowExecutionStatusCancelled MaintenanceWindowExecutionStatus = "Cancelled"
-
-	MaintenanceWindowExecutionStatusSkippedOverlapping MaintenanceWindowExecutionStatus = "SkippedOverlapping"
-
 	MaintenanceWindowExecutionStatusPending MaintenanceWindowExecutionStatus = "Pending"
 
 	MaintenanceWindowExecutionStatusInProgress MaintenanceWindowExecutionStatus = "InProgress"
@@ -5298,6 +5306,12 @@ const (
 	MaintenanceWindowExecutionStatusFailed MaintenanceWindowExecutionStatus = "Failed"
 
 	MaintenanceWindowExecutionStatusTimedOut MaintenanceWindowExecutionStatus = "TimedOut"
+
+	MaintenanceWindowExecutionStatusCancelling MaintenanceWindowExecutionStatus = "Cancelling"
+
+	MaintenanceWindowExecutionStatusCancelled MaintenanceWindowExecutionStatus = "Cancelled"
+
+	MaintenanceWindowExecutionStatusSkippedOverlapping MaintenanceWindowExecutionStatus = "SkippedOverlapping"
 )
 
 // MaintenanceWindowExecutionStatusDetails represents the MaintenanceWindowExecutionStatusDetails type
@@ -5631,13 +5645,13 @@ type MaintenanceWindowTaskTargetId string
 type MaintenanceWindowTaskType string
 
 const (
-	MaintenanceWindowTaskTypeRunCommand MaintenanceWindowTaskType = "RunCommand"
-
 	MaintenanceWindowTaskTypeAutomation MaintenanceWindowTaskType = "Automation"
 
 	MaintenanceWindowTaskTypeStepFunctions MaintenanceWindowTaskType = "StepFunctions"
 
 	MaintenanceWindowTaskTypeLambda MaintenanceWindowTaskType = "Lambda"
+
+	MaintenanceWindowTaskTypeRunCommand MaintenanceWindowTaskType = "RunCommand"
 )
 
 // MaintenanceWindowTimezone represents the MaintenanceWindowTimezone type
@@ -5763,10 +5777,6 @@ const (
 type NodeAttributeName string
 
 const (
-	NodeAttributeNameREGION NodeAttributeName = "REGION"
-
-	NodeAttributeNameRESOURCE_TYPE NodeAttributeName = "RESOURCE_TYPE"
-
 	NodeAttributeNameAGENT_VERSION NodeAttributeName = "AGENT_VERSION"
 
 	NodeAttributeNamePLATFORM_NAME NodeAttributeName = "PLATFORM_NAME"
@@ -5774,6 +5784,10 @@ const (
 	NodeAttributeNamePLATFORM_TYPE NodeAttributeName = "PLATFORM_TYPE"
 
 	NodeAttributeNamePLATFORM_VERSION NodeAttributeName = "PLATFORM_VERSION"
+
+	NodeAttributeNameREGION NodeAttributeName = "REGION"
+
+	NodeAttributeNameRESOURCE_TYPE NodeAttributeName = "RESOURCE_TYPE"
 )
 
 // NodeCaptureTime represents the NodeCaptureTime type
@@ -5792,7 +5806,13 @@ type NodeFilter struct {
 type NodeFilterKey string
 
 const (
-	NodeFilterKeyREGION NodeFilterKey = "REGION"
+	NodeFilterKeyCOMPUTER_NAME NodeFilterKey = "COMPUTER_NAME"
+
+	NodeFilterKeyORGANIZATIONAL_UNIT_PATH NodeFilterKey = "ORGANIZATIONAL_UNIT_PATH"
+
+	NodeFilterKeyACCOUNT_ID NodeFilterKey = "ACCOUNT_ID"
+
+	NodeFilterKeyINSTANCE_STATUS NodeFilterKey = "INSTANCE_STATUS"
 
 	NodeFilterKeyAGENT_TYPE NodeFilterKey = "AGENT_TYPE"
 
@@ -5800,27 +5820,21 @@ const (
 
 	NodeFilterKeyPLATFORM_NAME NodeFilterKey = "PLATFORM_NAME"
 
-	NodeFilterKeyPLATFORM_VERSION NodeFilterKey = "PLATFORM_VERSION"
+	NodeFilterKeyRESOURCE_TYPE NodeFilterKey = "RESOURCE_TYPE"
 
-	NodeFilterKeyORGANIZATIONAL_UNIT_PATH NodeFilterKey = "ORGANIZATIONAL_UNIT_PATH"
+	NodeFilterKeyORGANIZATIONAL_UNIT_ID NodeFilterKey = "ORGANIZATIONAL_UNIT_ID"
 
-	NodeFilterKeyINSTANCE_STATUS NodeFilterKey = "INSTANCE_STATUS"
+	NodeFilterKeyREGION NodeFilterKey = "REGION"
+
+	NodeFilterKeyAGENT_VERSION NodeFilterKey = "AGENT_VERSION"
+
+	NodeFilterKeyIP_ADDRESS NodeFilterKey = "IP_ADDRESS"
 
 	NodeFilterKeyMANAGED_STATUS NodeFilterKey = "MANAGED_STATUS"
 
 	NodeFilterKeyPLATFORM_TYPE NodeFilterKey = "PLATFORM_TYPE"
 
-	NodeFilterKeyAGENT_VERSION NodeFilterKey = "AGENT_VERSION"
-
-	NodeFilterKeyRESOURCE_TYPE NodeFilterKey = "RESOURCE_TYPE"
-
-	NodeFilterKeyORGANIZATIONAL_UNIT_ID NodeFilterKey = "ORGANIZATIONAL_UNIT_ID"
-
-	NodeFilterKeyACCOUNT_ID NodeFilterKey = "ACCOUNT_ID"
-
-	NodeFilterKeyCOMPUTER_NAME NodeFilterKey = "COMPUTER_NAME"
-
-	NodeFilterKeyIP_ADDRESS NodeFilterKey = "IP_ADDRESS"
+	NodeFilterKeyPLATFORM_VERSION NodeFilterKey = "PLATFORM_VERSION"
 )
 
 // NodeFilterList represents the NodeFilterList type
@@ -5873,6 +5887,13 @@ type NodeSummary map[string]string
 // NodeSummaryList represents the NodeSummaryList type
 type NodeSummaryList []map[string]string
 
+// NodeType represents the NodeType structure
+type NodeType struct {
+
+	// <p>Information about a specific managed node.</p>
+	Instance *InstanceInfo `json:"instance,omitempty"`
+}
+
 // NodeTypeName represents the NodeTypeName enum type
 type NodeTypeName string
 
@@ -5906,17 +5927,17 @@ type NotificationConfig struct {
 type NotificationEvent string
 
 const (
-	NotificationEventCANCELLED NotificationEvent = "CANCELLED"
-
-	NotificationEventFAILED NotificationEvent = "FAILED"
-
-	NotificationEventALL NotificationEvent = "ALL"
-
 	NotificationEventIN_PROGRESS NotificationEvent = "IN_PROGRESS"
 
 	NotificationEventSUCCESS NotificationEvent = "SUCCESS"
 
 	NotificationEventTIMED_OUT NotificationEvent = "TIMED_OUT"
+
+	NotificationEventCANCELLED NotificationEvent = "CANCELLED"
+
+	NotificationEventFAILED NotificationEvent = "FAILED"
+
+	NotificationEventALL NotificationEvent = "ALL"
 )
 
 // NotificationEventList represents the NotificationEventList type
@@ -5935,35 +5956,35 @@ const (
 type OperatingSystem string
 
 const (
-	OperatingSystemAmazonLinux OperatingSystem = "AmazonLinux"
-
-	OperatingSystemRedhatEnterpriseLinux OperatingSystem = "RedhatEnterpriseLinux"
-
-	OperatingSystemCentOS OperatingSystem = "CentOS"
+	OperatingSystemRaspbian OperatingSystem = "Raspbian"
 
 	OperatingSystemAmazonLinux2 OperatingSystem = "AmazonLinux2"
 
 	OperatingSystemAmazonLinux2022 OperatingSystem = "AmazonLinux2022"
 
-	OperatingSystemOracleLinux OperatingSystem = "OracleLinux"
+	OperatingSystemRedhatEnterpriseLinux OperatingSystem = "RedhatEnterpriseLinux"
 
-	OperatingSystemDebian OperatingSystem = "Debian"
+	OperatingSystemCentOS OperatingSystem = "CentOS"
 
-	OperatingSystemMacOS OperatingSystem = "MacOS"
+	OperatingSystemRocky_Linux OperatingSystem = "Rocky_Linux"
 
 	OperatingSystemAlmaLinux OperatingSystem = "AlmaLinux"
 
+	OperatingSystemAmazonLinux2023 OperatingSystem = "AmazonLinux2023"
+
 	OperatingSystemWindows OperatingSystem = "Windows"
+
+	OperatingSystemAmazonLinux OperatingSystem = "AmazonLinux"
 
 	OperatingSystemUbuntu OperatingSystem = "Ubuntu"
 
-	OperatingSystemRaspbian OperatingSystem = "Raspbian"
+	OperatingSystemOracleLinux OperatingSystem = "OracleLinux"
 
-	OperatingSystemAmazonLinux2023 OperatingSystem = "AmazonLinux2023"
+	OperatingSystemMacOS OperatingSystem = "MacOS"
 
 	OperatingSystemSuse OperatingSystem = "Suse"
 
-	OperatingSystemRocky_Linux OperatingSystem = "Rocky_Linux"
+	OperatingSystemDebian OperatingSystem = "Debian"
 )
 
 // OpsAggregator represents the OpsAggregator structure
@@ -6056,8 +6077,6 @@ type OpsFilterList []OpsFilter
 type OpsFilterOperatorType string
 
 const (
-	OpsFilterOperatorTypeEQUAL OpsFilterOperatorType = "EQUAL"
-
 	OpsFilterOperatorTypeNOT_EQUAL OpsFilterOperatorType = "NOT_EQUAL"
 
 	OpsFilterOperatorTypeBEGIN_WITH OpsFilterOperatorType = "BEGIN_WITH"
@@ -6067,6 +6086,8 @@ const (
 	OpsFilterOperatorTypeGREATER_THAN OpsFilterOperatorType = "GREATER_THAN"
 
 	OpsFilterOperatorTypeEXISTS OpsFilterOperatorType = "EXISTS"
+
+	OpsFilterOperatorTypeEQUAL OpsFilterOperatorType = "EQUAL"
 )
 
 // OpsFilterValue represents the OpsFilterValue type
@@ -6241,92 +6262,92 @@ type OpsItemFilter struct {
 type OpsItemFilterKey string
 
 const (
-	OpsItemFilterKeyCREATED_TIME OpsItemFilterKey = "CREATED_TIME"
-
-	OpsItemFilterKeyOPERATIONAL_DATA_VALUE OpsItemFilterKey = "OPERATIONAL_DATA_VALUE"
-
-	OpsItemFilterKeyAUTOMATION_ID OpsItemFilterKey = "AUTOMATION_ID"
-
-	OpsItemFilterKeyCHANGE_REQUEST_TEMPLATE OpsItemFilterKey = "CHANGE_REQUEST_TEMPLATE"
-
-	OpsItemFilterKeySTATUS OpsItemFilterKey = "STATUS"
-
-	OpsItemFilterKeyCHANGE_REQUEST_TARGETS_RESOURCE_GROUP OpsItemFilterKey = "CHANGE_REQUEST_TARGETS_RESOURCE_GROUP"
-
-	OpsItemFilterKeyINSIGHT_TYPE OpsItemFilterKey = "INSIGHT_TYPE"
-
-	OpsItemFilterKeyACCOUNT_ID OpsItemFilterKey = "ACCOUNT_ID"
-
-	OpsItemFilterKeySOURCE OpsItemFilterKey = "SOURCE"
-
-	OpsItemFilterKeyOPERATIONAL_DATA OpsItemFilterKey = "OPERATIONAL_DATA"
-
 	OpsItemFilterKeyCHANGE_REQUEST_REQUESTER_ARN OpsItemFilterKey = "CHANGE_REQUEST_REQUESTER_ARN"
 
 	OpsItemFilterKeyCHANGE_REQUEST_APPROVER_NAME OpsItemFilterKey = "CHANGE_REQUEST_APPROVER_NAME"
 
-	OpsItemFilterKeyTITLE OpsItemFilterKey = "TITLE"
-
-	OpsItemFilterKeyLAST_MODIFIED_TIME OpsItemFilterKey = "LAST_MODIFIED_TIME"
-
-	OpsItemFilterKeyACTUAL_START_TIME OpsItemFilterKey = "ACTUAL_START_TIME"
+	OpsItemFilterKeyCREATED_BY OpsItemFilterKey = "CREATED_BY"
 
 	OpsItemFilterKeyPLANNED_START_TIME OpsItemFilterKey = "PLANNED_START_TIME"
 
-	OpsItemFilterKeyOPERATIONAL_DATA_KEY OpsItemFilterKey = "OPERATIONAL_DATA_KEY"
-
-	OpsItemFilterKeyACCESS_REQUEST_IS_REPLICA OpsItemFilterKey = "ACCESS_REQUEST_IS_REPLICA"
-
-	OpsItemFilterKeyCHANGE_REQUEST_REQUESTER_NAME OpsItemFilterKey = "CHANGE_REQUEST_REQUESTER_NAME"
-
-	OpsItemFilterKeyCHANGE_REQUEST_APPROVER_ARN OpsItemFilterKey = "CHANGE_REQUEST_APPROVER_ARN"
-
-	OpsItemFilterKeyCREATED_BY OpsItemFilterKey = "CREATED_BY"
-
-	OpsItemFilterKeyPRIORITY OpsItemFilterKey = "PRIORITY"
-
-	OpsItemFilterKeyACTUAL_END_TIME OpsItemFilterKey = "ACTUAL_END_TIME"
-
-	OpsItemFilterKeySEVERITY OpsItemFilterKey = "SEVERITY"
-
-	OpsItemFilterKeyPLANNED_END_TIME OpsItemFilterKey = "PLANNED_END_TIME"
-
-	OpsItemFilterKeyACCESS_REQUEST_REQUESTER_ID OpsItemFilterKey = "ACCESS_REQUEST_REQUESTER_ID"
-
-	OpsItemFilterKeyACCESS_REQUEST_SOURCE_ACCOUNT_ID OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_ACCOUNT_ID"
-
-	OpsItemFilterKeyRESOURCE_ID OpsItemFilterKey = "RESOURCE_ID"
-
-	OpsItemFilterKeyCATEGORY OpsItemFilterKey = "CATEGORY"
-
-	OpsItemFilterKeyOPSITEM_TYPE OpsItemFilterKey = "OPSITEM_TYPE"
-
-	OpsItemFilterKeyACCESS_REQUEST_SOURCE_OPS_ITEM_ID OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_OPS_ITEM_ID"
-
-	OpsItemFilterKeyACCESS_REQUEST_TARGET_RESOURCE_ID OpsItemFilterKey = "ACCESS_REQUEST_TARGET_RESOURCE_ID"
-
-	OpsItemFilterKeyACCESS_REQUEST_APPROVER_ARN OpsItemFilterKey = "ACCESS_REQUEST_APPROVER_ARN"
+	OpsItemFilterKeyAUTOMATION_ID OpsItemFilterKey = "AUTOMATION_ID"
 
 	OpsItemFilterKeyACCESS_REQUEST_REQUESTER_ARN OpsItemFilterKey = "ACCESS_REQUEST_REQUESTER_ARN"
 
-	OpsItemFilterKeyACCESS_REQUEST_APPROVER_ID OpsItemFilterKey = "ACCESS_REQUEST_APPROVER_ID"
+	OpsItemFilterKeyACCESS_REQUEST_SOURCE_OPS_ITEM_ID OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_OPS_ITEM_ID"
+
+	OpsItemFilterKeyCHANGE_REQUEST_REQUESTER_NAME OpsItemFilterKey = "CHANGE_REQUEST_REQUESTER_NAME"
+
+	OpsItemFilterKeySTATUS OpsItemFilterKey = "STATUS"
+
+	OpsItemFilterKeyPLANNED_END_TIME OpsItemFilterKey = "PLANNED_END_TIME"
+
+	OpsItemFilterKeySEVERITY OpsItemFilterKey = "SEVERITY"
+
+	OpsItemFilterKeyACCESS_REQUEST_APPROVER_ARN OpsItemFilterKey = "ACCESS_REQUEST_APPROVER_ARN"
+
+	OpsItemFilterKeyACCESS_REQUEST_SOURCE_ACCOUNT_ID OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_ACCOUNT_ID"
+
+	OpsItemFilterKeyCHANGE_REQUEST_APPROVER_ARN OpsItemFilterKey = "CHANGE_REQUEST_APPROVER_ARN"
+
+	OpsItemFilterKeyOPERATIONAL_DATA_KEY OpsItemFilterKey = "OPERATIONAL_DATA_KEY"
+
+	OpsItemFilterKeyOPERATIONAL_DATA_VALUE OpsItemFilterKey = "OPERATIONAL_DATA_VALUE"
+
+	OpsItemFilterKeyOPSITEM_TYPE OpsItemFilterKey = "OPSITEM_TYPE"
 
 	OpsItemFilterKeyACCESS_REQUEST_SOURCE_REGION OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_REGION"
 
+	OpsItemFilterKeyCATEGORY OpsItemFilterKey = "CATEGORY"
+
+	OpsItemFilterKeyRESOURCE_ID OpsItemFilterKey = "RESOURCE_ID"
+
+	OpsItemFilterKeyACCESS_REQUEST_APPROVER_ID OpsItemFilterKey = "ACCESS_REQUEST_APPROVER_ID"
+
+	OpsItemFilterKeyINSIGHT_TYPE OpsItemFilterKey = "INSIGHT_TYPE"
+
+	OpsItemFilterKeyACCESS_REQUEST_IS_REPLICA OpsItemFilterKey = "ACCESS_REQUEST_IS_REPLICA"
+
+	OpsItemFilterKeySOURCE OpsItemFilterKey = "SOURCE"
+
+	OpsItemFilterKeyPRIORITY OpsItemFilterKey = "PRIORITY"
+
 	OpsItemFilterKeyOPSITEM_ID OpsItemFilterKey = "OPSITEM_ID"
+
+	OpsItemFilterKeyACTUAL_START_TIME OpsItemFilterKey = "ACTUAL_START_TIME"
+
+	OpsItemFilterKeyCHANGE_REQUEST_TEMPLATE OpsItemFilterKey = "CHANGE_REQUEST_TEMPLATE"
+
+	OpsItemFilterKeyTITLE OpsItemFilterKey = "TITLE"
+
+	OpsItemFilterKeyACTUAL_END_TIME OpsItemFilterKey = "ACTUAL_END_TIME"
+
+	OpsItemFilterKeyACCESS_REQUEST_REQUESTER_ID OpsItemFilterKey = "ACCESS_REQUEST_REQUESTER_ID"
+
+	OpsItemFilterKeyCHANGE_REQUEST_TARGETS_RESOURCE_GROUP OpsItemFilterKey = "CHANGE_REQUEST_TARGETS_RESOURCE_GROUP"
+
+	OpsItemFilterKeyACCOUNT_ID OpsItemFilterKey = "ACCOUNT_ID"
+
+	OpsItemFilterKeyOPERATIONAL_DATA OpsItemFilterKey = "OPERATIONAL_DATA"
+
+	OpsItemFilterKeyCREATED_TIME OpsItemFilterKey = "CREATED_TIME"
+
+	OpsItemFilterKeyLAST_MODIFIED_TIME OpsItemFilterKey = "LAST_MODIFIED_TIME"
+
+	OpsItemFilterKeyACCESS_REQUEST_TARGET_RESOURCE_ID OpsItemFilterKey = "ACCESS_REQUEST_TARGET_RESOURCE_ID"
 )
 
 // OpsItemFilterOperator represents the OpsItemFilterOperator enum type
 type OpsItemFilterOperator string
 
 const (
-	OpsItemFilterOperatorLESS_THAN OpsItemFilterOperator = "LESS_THAN"
-
 	OpsItemFilterOperatorEQUAL OpsItemFilterOperator = "EQUAL"
 
 	OpsItemFilterOperatorCONTAINS OpsItemFilterOperator = "CONTAINS"
 
 	OpsItemFilterOperatorGREATER_THAN OpsItemFilterOperator = "GREATER_THAN"
+
+	OpsItemFilterOperatorLESS_THAN OpsItemFilterOperator = "LESS_THAN"
 )
 
 // OpsItemFilterValue represents the OpsItemFilterValue type
@@ -6455,11 +6476,11 @@ type OpsItemRelatedItemsFilter struct {
 type OpsItemRelatedItemsFilterKey string
 
 const (
+	OpsItemRelatedItemsFilterKeyRESOURCE_TYPE OpsItemRelatedItemsFilterKey = "RESOURCE_TYPE"
+
 	OpsItemRelatedItemsFilterKeyASSOCIATION_ID OpsItemRelatedItemsFilterKey = "ASSOCIATION_ID"
 
 	OpsItemRelatedItemsFilterKeyRESOURCE_URI OpsItemRelatedItemsFilterKey = "RESOURCE_URI"
-
-	OpsItemRelatedItemsFilterKeyRESOURCE_TYPE OpsItemRelatedItemsFilterKey = "RESOURCE_TYPE"
 )
 
 // OpsItemRelatedItemsFilterOperator represents the OpsItemRelatedItemsFilterOperator enum type
@@ -6491,9 +6512,19 @@ type OpsItemSource string
 type OpsItemStatus string
 
 const (
-	OpsItemStatusCANCELLING OpsItemStatus = "CANCELLING"
+	OpsItemStatusPENDING OpsItemStatus = "PENDING"
 
-	OpsItemStatusRUNBOOK_IN_PROGRESS OpsItemStatus = "RUNBOOK_IN_PROGRESS"
+	OpsItemStatusCOMPLETED_WITH_SUCCESS OpsItemStatus = "COMPLETED_WITH_SUCCESS"
+
+	OpsItemStatusCOMPLETED_WITH_FAILURE OpsItemStatus = "COMPLETED_WITH_FAILURE"
+
+	OpsItemStatusSCHEDULED OpsItemStatus = "SCHEDULED"
+
+	OpsItemStatusPENDING_APPROVAL OpsItemStatus = "PENDING_APPROVAL"
+
+	OpsItemStatusAPPROVED OpsItemStatus = "APPROVED"
+
+	OpsItemStatusREVOKED OpsItemStatus = "REVOKED"
 
 	OpsItemStatusREJECTED OpsItemStatus = "REJECTED"
 
@@ -6501,35 +6532,25 @@ const (
 
 	OpsItemStatusOPEN OpsItemStatus = "OPEN"
 
-	OpsItemStatusTIMED_OUT OpsItemStatus = "TIMED_OUT"
-
-	OpsItemStatusCOMPLETED_WITH_SUCCESS OpsItemStatus = "COMPLETED_WITH_SUCCESS"
-
-	OpsItemStatusPENDING_APPROVAL OpsItemStatus = "PENDING_APPROVAL"
-
 	OpsItemStatusIN_PROGRESS OpsItemStatus = "IN_PROGRESS"
-
-	OpsItemStatusPENDING OpsItemStatus = "PENDING"
-
-	OpsItemStatusCOMPLETED_WITH_FAILURE OpsItemStatus = "COMPLETED_WITH_FAILURE"
-
-	OpsItemStatusCHANGE_CALENDAR_OVERRIDE_APPROVED OpsItemStatus = "CHANGE_CALENDAR_OVERRIDE_APPROVED"
-
-	OpsItemStatusAPPROVED OpsItemStatus = "APPROVED"
 
 	OpsItemStatusRESOLVED OpsItemStatus = "RESOLVED"
 
-	OpsItemStatusCANCELLED OpsItemStatus = "CANCELLED"
+	OpsItemStatusTIMED_OUT OpsItemStatus = "TIMED_OUT"
+
+	OpsItemStatusCANCELLING OpsItemStatus = "CANCELLING"
 
 	OpsItemStatusFAILED OpsItemStatus = "FAILED"
 
-	OpsItemStatusSCHEDULED OpsItemStatus = "SCHEDULED"
+	OpsItemStatusRUNBOOK_IN_PROGRESS OpsItemStatus = "RUNBOOK_IN_PROGRESS"
+
+	OpsItemStatusCHANGE_CALENDAR_OVERRIDE_APPROVED OpsItemStatus = "CHANGE_CALENDAR_OVERRIDE_APPROVED"
+
+	OpsItemStatusCANCELLED OpsItemStatus = "CANCELLED"
 
 	OpsItemStatusPENDING_CHANGE_CALENDAR_OVERRIDE OpsItemStatus = "PENDING_CHANGE_CALENDAR_OVERRIDE"
 
 	OpsItemStatusCHANGE_CALENDAR_OVERRIDE_REJECTED OpsItemStatus = "CHANGE_CALENDAR_OVERRIDE_REJECTED"
-
-	OpsItemStatusREVOKED OpsItemStatus = "REVOKED"
 )
 
 // OpsItemSummaries represents the OpsItemSummaries type
@@ -6871,11 +6892,11 @@ const (
 type ParameterType string
 
 const (
+	ParameterTypeSECURE_STRING ParameterType = "SECURE_STRING"
+
 	ParameterTypeSTRING ParameterType = "STRING"
 
 	ParameterTypeSTRING_LIST ParameterType = "STRING_LIST"
-
-	ParameterTypeSECURE_STRING ParameterType = "SECURE_STRING"
 )
 
 // ParameterValue represents the ParameterValue type
@@ -6908,11 +6929,11 @@ type ParametersFilter struct {
 type ParametersFilterKey string
 
 const (
-	ParametersFilterKeyNAME ParametersFilterKey = "NAME"
-
 	ParametersFilterKeyTYPE ParametersFilterKey = "TYPE"
 
 	ParametersFilterKeyKEY_ID ParametersFilterKey = "KEY_ID"
+
+	ParametersFilterKeyNAME ParametersFilterKey = "NAME"
 )
 
 // ParametersFilterList represents the ParametersFilterList type
@@ -7068,14 +7089,6 @@ type PatchComplianceDataList []PatchComplianceData
 type PatchComplianceDataState string
 
 const (
-	PatchComplianceDataStateInstalledOther PatchComplianceDataState = "InstalledOther"
-
-	PatchComplianceDataStateInstalledPendingReboot PatchComplianceDataState = "InstalledPendingReboot"
-
-	PatchComplianceDataStateInstalledRejected PatchComplianceDataState = "InstalledRejected"
-
-	PatchComplianceDataStateMissing PatchComplianceDataState = "Missing"
-
 	PatchComplianceDataStateNotApplicable PatchComplianceDataState = "NotApplicable"
 
 	PatchComplianceDataStateFailed PatchComplianceDataState = "Failed"
@@ -7083,6 +7096,14 @@ const (
 	PatchComplianceDataStateAvailableSecurityUpdate PatchComplianceDataState = "AvailableSecurityUpdate"
 
 	PatchComplianceDataStateInstalled PatchComplianceDataState = "Installed"
+
+	PatchComplianceDataStateInstalledOther PatchComplianceDataState = "InstalledOther"
+
+	PatchComplianceDataStateInstalledPendingReboot PatchComplianceDataState = "InstalledPendingReboot"
+
+	PatchComplianceDataStateInstalledRejected PatchComplianceDataState = "InstalledRejected"
+
+	PatchComplianceDataStateMissing PatchComplianceDataState = "Missing"
 )
 
 // PatchComplianceLevel represents the PatchComplianceLevel enum type
@@ -7109,9 +7130,9 @@ type PatchComplianceMaxResults int32
 type PatchComplianceStatus string
 
 const (
-	PatchComplianceStatusNonCompliant PatchComplianceStatus = "NonCompliant"
-
 	PatchComplianceStatusCompliant PatchComplianceStatus = "Compliant"
+
+	PatchComplianceStatusNonCompliant PatchComplianceStatus = "NonCompliant"
 )
 
 // PatchContentUrl represents the PatchContentUrl type
@@ -7124,13 +7145,13 @@ type PatchCriticalNonCompliantCount int32
 type PatchDeploymentStatus string
 
 const (
-	PatchDeploymentStatusApproved PatchDeploymentStatus = "Approved"
-
 	PatchDeploymentStatusPendingApproval PatchDeploymentStatus = "PendingApproval"
 
 	PatchDeploymentStatusExplicitApproved PatchDeploymentStatus = "ExplicitApproved"
 
 	PatchDeploymentStatusExplicitRejected PatchDeploymentStatus = "ExplicitRejected"
+
+	PatchDeploymentStatusApproved PatchDeploymentStatus = "Approved"
 )
 
 // PatchDescription represents the PatchDescription type
@@ -7158,43 +7179,43 @@ type PatchFilterGroup struct {
 type PatchFilterKey string
 
 const (
-	PatchFilterKeyClassification PatchFilterKey = "Classification"
-
 	PatchFilterKeyPatchId PatchFilterKey = "PatchId"
 
-	PatchFilterKeyRepository PatchFilterKey = "Repository"
+	PatchFilterKeyPriority PatchFilterKey = "Priority"
 
-	PatchFilterKeySecurity PatchFilterKey = "Security"
+	PatchFilterKeyArch PatchFilterKey = "Arch"
+
+	PatchFilterKeyClassification PatchFilterKey = "Classification"
+
+	PatchFilterKeyEpoch PatchFilterKey = "Epoch"
+
+	PatchFilterKeyName PatchFilterKey = "Name"
 
 	PatchFilterKeyVersion PatchFilterKey = "Version"
-
-	PatchFilterKeyAdvisoryId PatchFilterKey = "AdvisoryId"
 
 	PatchFilterKeyPatchSet PatchFilterKey = "PatchSet"
 
 	PatchFilterKeyProduct PatchFilterKey = "Product"
 
-	PatchFilterKeyEpoch PatchFilterKey = "Epoch"
-
-	PatchFilterKeyRelease PatchFilterKey = "Release"
-
-	PatchFilterKeySeverity PatchFilterKey = "Severity"
-
-	PatchFilterKeyBugzillaId PatchFilterKey = "BugzillaId"
-
-	PatchFilterKeyMsrcSeverity PatchFilterKey = "MsrcSeverity"
-
-	PatchFilterKeyName PatchFilterKey = "Name"
-
-	PatchFilterKeyProductFamily PatchFilterKey = "ProductFamily"
-
 	PatchFilterKeyCVEId PatchFilterKey = "CVEId"
 
 	PatchFilterKeySection PatchFilterKey = "Section"
 
-	PatchFilterKeyPriority PatchFilterKey = "Priority"
+	PatchFilterKeySeverity PatchFilterKey = "Severity"
 
-	PatchFilterKeyArch PatchFilterKey = "Arch"
+	PatchFilterKeySecurity PatchFilterKey = "Security"
+
+	PatchFilterKeyAdvisoryId PatchFilterKey = "AdvisoryId"
+
+	PatchFilterKeyBugzillaId PatchFilterKey = "BugzillaId"
+
+	PatchFilterKeyProductFamily PatchFilterKey = "ProductFamily"
+
+	PatchFilterKeyMsrcSeverity PatchFilterKey = "MsrcSeverity"
+
+	PatchFilterKeyRepository PatchFilterKey = "Repository"
+
+	PatchFilterKeyRelease PatchFilterKey = "Release"
 )
 
 // PatchFilterList represents the PatchFilterList type
@@ -7308,8 +7329,6 @@ type PatchPropertiesList []map[string]string
 type PatchProperty string
 
 const (
-	PatchPropertyProduct PatchProperty = "Product"
-
 	PatchPropertyPatchProductFamily PatchProperty = "PatchProductFamily"
 
 	PatchPropertyPatchClassification PatchProperty = "PatchClassification"
@@ -7319,6 +7338,8 @@ const (
 	PatchPropertyPatchPriority PatchProperty = "PatchPriority"
 
 	PatchPropertyPatchSeverity PatchProperty = "PatchSeverity"
+
+	PatchPropertyProduct PatchProperty = "Product"
 )
 
 // PatchPropertyEntry represents the PatchPropertyEntry type
@@ -7358,9 +7379,9 @@ type PatchSecurityNonCompliantCount int32
 type PatchSet string
 
 const (
-	PatchSetApplication PatchSet = "Application"
-
 	PatchSetOs PatchSet = "Os"
+
+	PatchSetApplication PatchSet = "Application"
 )
 
 // PatchSeverity represents the PatchSeverity type
@@ -8001,23 +8022,23 @@ const (
 type ResourceTypeForTagging string
 
 const (
-	ResourceTypeForTaggingDOCUMENT ResourceTypeForTagging = "DOCUMENT"
-
 	ResourceTypeForTaggingMANAGED_INSTANCE ResourceTypeForTagging = "MANAGED_INSTANCE"
 
-	ResourceTypeForTaggingMAINTENANCE_WINDOW ResourceTypeForTagging = "MAINTENANCE_WINDOW"
-
-	ResourceTypeForTaggingPATCH_BASELINE ResourceTypeForTagging = "PATCH_BASELINE"
+	ResourceTypeForTaggingPARAMETER ResourceTypeForTagging = "PARAMETER"
 
 	ResourceTypeForTaggingOPS_ITEM ResourceTypeForTagging = "OPS_ITEM"
 
 	ResourceTypeForTaggingOPSMETADATA ResourceTypeForTagging = "OPSMETADATA"
 
-	ResourceTypeForTaggingAUTOMATION ResourceTypeForTagging = "AUTOMATION"
-
 	ResourceTypeForTaggingASSOCIATION ResourceTypeForTagging = "ASSOCIATION"
 
-	ResourceTypeForTaggingPARAMETER ResourceTypeForTagging = "PARAMETER"
+	ResourceTypeForTaggingDOCUMENT ResourceTypeForTagging = "DOCUMENT"
+
+	ResourceTypeForTaggingMAINTENANCE_WINDOW ResourceTypeForTagging = "MAINTENANCE_WINDOW"
+
+	ResourceTypeForTaggingPATCH_BASELINE ResourceTypeForTagging = "PATCH_BASELINE"
+
+	ResourceTypeForTaggingAUTOMATION ResourceTypeForTagging = "AUTOMATION"
 )
 
 // ResponseCode represents the ResponseCode type
@@ -8276,6 +8297,8 @@ type SessionFilter struct {
 type SessionFilterKey string
 
 const (
+	SessionFilterKeyOWNER SessionFilterKey = "OWNER"
+
 	SessionFilterKeySTATUS SessionFilterKey = "STATUS"
 
 	SessionFilterKeySESSION_ID SessionFilterKey = "SESSION_ID"
@@ -8285,8 +8308,6 @@ const (
 	SessionFilterKeyINVOKED_BEFORE SessionFilterKey = "INVOKED_BEFORE"
 
 	SessionFilterKeyTARGET_ID SessionFilterKey = "TARGET_ID"
-
-	SessionFilterKeyOWNER SessionFilterKey = "OWNER"
 )
 
 // SessionFilterList represents the SessionFilterList type
@@ -8348,17 +8369,17 @@ const (
 type SessionStatus string
 
 const (
-	SessionStatusTERMINATED SessionStatus = "TERMINATED"
-
-	SessionStatusTERMINATING SessionStatus = "TERMINATING"
-
-	SessionStatusFAILED SessionStatus = "FAILED"
-
 	SessionStatusCONNECTED SessionStatus = "CONNECTED"
 
 	SessionStatusCONNECTING SessionStatus = "CONNECTING"
 
 	SessionStatusDISCONNECTED SessionStatus = "DISCONNECTED"
+
+	SessionStatusTERMINATED SessionStatus = "TERMINATED"
+
+	SessionStatusTERMINATING SessionStatus = "TERMINATING"
+
+	SessionStatusFAILED SessionStatus = "FAILED"
 )
 
 // SessionTarget represents the SessionTarget type
@@ -8629,23 +8650,23 @@ type StepExecutionFilter struct {
 type StepExecutionFilterKey string
 
 const (
-	StepExecutionFilterKeySTART_TIME_BEFORE StepExecutionFilterKey = "START_TIME_BEFORE"
+	StepExecutionFilterKeyPARENT_STEP_ITERATION StepExecutionFilterKey = "PARENT_STEP_ITERATION"
 
-	StepExecutionFilterKeySTEP_EXECUTION_STATUS StepExecutionFilterKey = "STEP_EXECUTION_STATUS"
+	StepExecutionFilterKeySTART_TIME_BEFORE StepExecutionFilterKey = "START_TIME_BEFORE"
 
 	StepExecutionFilterKeySTEP_EXECUTION_ID StepExecutionFilterKey = "STEP_EXECUTION_ID"
 
-	StepExecutionFilterKeySTEP_NAME StepExecutionFilterKey = "STEP_NAME"
-
 	StepExecutionFilterKeyACTION StepExecutionFilterKey = "ACTION"
 
-	StepExecutionFilterKeyPARENT_STEP_EXECUTION_ID StepExecutionFilterKey = "PARENT_STEP_EXECUTION_ID"
-
-	StepExecutionFilterKeyPARENT_STEP_ITERATION StepExecutionFilterKey = "PARENT_STEP_ITERATION"
+	StepExecutionFilterKeyPARENT_STEP_ITERATOR_VALUE StepExecutionFilterKey = "PARENT_STEP_ITERATOR_VALUE"
 
 	StepExecutionFilterKeySTART_TIME_AFTER StepExecutionFilterKey = "START_TIME_AFTER"
 
-	StepExecutionFilterKeyPARENT_STEP_ITERATOR_VALUE StepExecutionFilterKey = "PARENT_STEP_ITERATOR_VALUE"
+	StepExecutionFilterKeySTEP_EXECUTION_STATUS StepExecutionFilterKey = "STEP_EXECUTION_STATUS"
+
+	StepExecutionFilterKeySTEP_NAME StepExecutionFilterKey = "STEP_NAME"
+
+	StepExecutionFilterKeyPARENT_STEP_EXECUTION_ID StepExecutionFilterKey = "PARENT_STEP_EXECUTION_ID"
 )
 
 // StepExecutionFilterList represents the StepExecutionFilterList type

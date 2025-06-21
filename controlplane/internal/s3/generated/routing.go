@@ -9,12 +9,12 @@ import (
 	"strings"
 )
 
-// Router handles HTTP routing for ecs API
+// Router handles HTTP routing for s3 API
 type Router struct {
 	api AmazonS3API
 }
 
-// NewRouter creates a new router for ecs API
+// NewRouter creates a new router for s3 API
 func NewRouter(api AmazonS3API) *Router {
 	return &Router{api: api}
 }

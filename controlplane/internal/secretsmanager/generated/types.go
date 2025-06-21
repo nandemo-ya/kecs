@@ -230,6 +230,8 @@ type Filter struct {
 type FilterNameStringType string
 
 const (
+	FilterNameStringTypeprimary_region FilterNameStringType = "primary_region"
+
 	FilterNameStringTypeowning_service FilterNameStringType = "owning_service"
 
 	FilterNameStringTypeall FilterNameStringType = "all"
@@ -241,8 +243,6 @@ const (
 	FilterNameStringTypetag_key FilterNameStringType = "tag_key"
 
 	FilterNameStringTypetag_value FilterNameStringType = "tag_value"
-
-	FilterNameStringTypeprimary_region FilterNameStringType = "primary_region"
 )
 
 // FilterValueStringType represents the FilterValueStringType type

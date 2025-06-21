@@ -6,7 +6,7 @@ import (
 	"context"
 )
 
-// AWSIdentityManagementV20100508API defines the interface for ecs operations
+// AWSIdentityManagementV20100508API defines the interface for iam operations
 type AWSIdentityManagementV20100508API interface {
 
 	// AddClientIDToOpenIDConnectProvider performs the AddClientIDToOpenIDConnectProvider operation

@@ -6,7 +6,7 @@ import (
 	"context"
 )
 
-// Logs_20140328API defines the interface for ecs operations
+// Logs_20140328API defines the interface for cloudwatchlogs operations
 type Logs_20140328API interface {
 
 	// AssociateKmsKey performs the AssociateKmsKey operation
