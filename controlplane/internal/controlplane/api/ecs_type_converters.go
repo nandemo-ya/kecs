@@ -1034,43 +1034,178 @@ func GetInt64Value(p *int64) int64 {
 // Stub converters for service-related types - TODO: Implement these properly
 
 func ConvertToGeneratedLoadBalancers(lbs []ecstypes.LoadBalancer) []generated.LoadBalancer {
-	// TODO: Implement this converter
-	return nil
+	if len(lbs) == 0 {
+		return nil
+	}
+	
+	result := make([]generated.LoadBalancer, 0, len(lbs))
+	for _, lb := range lbs {
+		genLB := generated.LoadBalancer{
+			ContainerName:    lb.ContainerName,
+			ContainerPort:    lb.ContainerPort,
+			LoadBalancerName: lb.LoadBalancerName,
+			TargetGroupArn:   lb.TargetGroupArn,
+		}
+		result = append(result, genLB)
+	}
+	
+	return result
 }
 
 func ConvertFromGeneratedLoadBalancers(lbs []generated.LoadBalancer) []ecstypes.LoadBalancer {
-	// TODO: Implement this converter
-	return nil
+	if len(lbs) == 0 {
+		return nil
+	}
+	
+	result := make([]ecstypes.LoadBalancer, 0, len(lbs))
+	for _, lb := range lbs {
+		sdkLB := ecstypes.LoadBalancer{
+			ContainerName:    lb.ContainerName,
+			ContainerPort:    lb.ContainerPort,
+			LoadBalancerName: lb.LoadBalancerName,
+			TargetGroupArn:   lb.TargetGroupArn,
+		}
+		result = append(result, sdkLB)
+	}
+	
+	return result
 }
 
 func ConvertToGeneratedNetworkConfiguration(config *ecstypes.NetworkConfiguration) *generated.NetworkConfiguration {
-	// TODO: Implement this converter
-	return nil
+	if config == nil {
+		return nil
+	}
+	
+	result := &generated.NetworkConfiguration{}
+	
+	// Convert AwsVpc configuration
+	if config.AwsvpcConfiguration != nil {
+		result.AwsvpcConfiguration = &generated.AwsVpcConfiguration{
+			Subnets:        config.AwsvpcConfiguration.Subnets,
+			SecurityGroups: config.AwsvpcConfiguration.SecurityGroups,
+		}
+		
+		// Convert AssignPublicIp
+		if config.AwsvpcConfiguration.AssignPublicIp != "" {
+			assignPublicIp := generated.AssignPublicIp(config.AwsvpcConfiguration.AssignPublicIp)
+			result.AwsvpcConfiguration.AssignPublicIp = &assignPublicIp
+		}
+	}
+	
+	return result
 }
 
 func ConvertFromGeneratedNetworkConfiguration(config *generated.NetworkConfiguration) *ecstypes.NetworkConfiguration {
-	// TODO: Implement this converter
-	return nil
+	if config == nil {
+		return nil
+	}
+	
+	result := &ecstypes.NetworkConfiguration{}
+	
+	// Convert AwsVpc configuration
+	if config.AwsvpcConfiguration != nil {
+		result.AwsvpcConfiguration = &ecstypes.AwsVpcConfiguration{
+			Subnets:        config.AwsvpcConfiguration.Subnets,
+			SecurityGroups: config.AwsvpcConfiguration.SecurityGroups,
+		}
+		
+		// Convert AssignPublicIp
+		if config.AwsvpcConfiguration.AssignPublicIp != nil {
+			result.AwsvpcConfiguration.AssignPublicIp = ecstypes.AssignPublicIp(*config.AwsvpcConfiguration.AssignPublicIp)
+		}
+	}
+	
+	return result
 }
 
 func ConvertToGeneratedPlacementConstraints(constraints []ecstypes.PlacementConstraint) []generated.PlacementConstraint {
-	// TODO: Implement this converter
-	return nil
+	if len(constraints) == 0 {
+		return nil
+	}
+	
+	result := make([]generated.PlacementConstraint, 0, len(constraints))
+	for _, constraint := range constraints {
+		genConstraint := generated.PlacementConstraint{
+			Expression: constraint.Expression,
+		}
+		
+		// Convert type
+		if constraint.Type != "" {
+			constraintType := generated.PlacementConstraintType(constraint.Type)
+			genConstraint.Type = &constraintType
+		}
+		
+		result = append(result, genConstraint)
+	}
+	
+	return result
 }
 
 func ConvertFromGeneratedPlacementConstraints(constraints []generated.PlacementConstraint) []ecstypes.PlacementConstraint {
-	// TODO: Implement this converter
-	return nil
+	if len(constraints) == 0 {
+		return nil
+	}
+	
+	result := make([]ecstypes.PlacementConstraint, 0, len(constraints))
+	for _, constraint := range constraints {
+		sdkConstraint := ecstypes.PlacementConstraint{
+			Expression: constraint.Expression,
+		}
+		
+		// Convert type
+		if constraint.Type != nil {
+			sdkConstraint.Type = ecstypes.PlacementConstraintType(*constraint.Type)
+		}
+		
+		result = append(result, sdkConstraint)
+	}
+	
+	return result
 }
 
 func ConvertToGeneratedPlacementStrategy(strategy []ecstypes.PlacementStrategy) []generated.PlacementStrategy {
-	// TODO: Implement this converter
-	return nil
+	if len(strategy) == 0 {
+		return nil
+	}
+	
+	result := make([]generated.PlacementStrategy, 0, len(strategy))
+	for _, strat := range strategy {
+		genStrategy := generated.PlacementStrategy{
+			Field: strat.Field,
+		}
+		
+		// Convert type
+		if strat.Type != "" {
+			strategyType := generated.PlacementStrategyType(strat.Type)
+			genStrategy.Type = &strategyType
+		}
+		
+		result = append(result, genStrategy)
+	}
+	
+	return result
 }
 
 func ConvertFromGeneratedPlacementStrategy(strategy []generated.PlacementStrategy) []ecstypes.PlacementStrategy {
-	// TODO: Implement this converter
-	return nil
+	if len(strategy) == 0 {
+		return nil
+	}
+	
+	result := make([]ecstypes.PlacementStrategy, 0, len(strategy))
+	for _, strat := range strategy {
+		sdkStrategy := ecstypes.PlacementStrategy{
+			Field: strat.Field,
+		}
+		
+		// Convert type
+		if strat.Type != nil {
+			sdkStrategy.Type = ecstypes.PlacementStrategyType(*strat.Type)
+		}
+		
+		result = append(result, sdkStrategy)
+	}
+	
+	return result
 }
 
 func ConvertToGeneratedServiceRegistries(registries []ecstypes.ServiceRegistry) []generated.ServiceRegistry {
