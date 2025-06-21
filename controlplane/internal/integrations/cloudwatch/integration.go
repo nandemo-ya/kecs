@@ -29,9 +29,20 @@ func NewIntegration(kubeClient kubernetes.Interface, localstackManager localstac
 		}
 	}
 
-	// TODO: Create CloudWatch Logs client using generated types
-	// For now, return an error indicating migration is in progress
-	return nil, fmt.Errorf("CloudWatch integration migration to generated types in progress")
+	// Create CloudWatch Logs client configured for LocalStack
+	endpoint := config.LocalStackEndpoint
+	if endpoint == "" {
+		endpoint = "http://localhost:4566"
+	}
+	
+	logsClient := newCloudWatchLogsClient(endpoint)
+
+	return &integration{
+		logsClient:        logsClient,
+		kubeClient:        kubeClient,
+		localstackManager: localstackManager,
+		config:            config,
+	}, nil
 }
 
 // NewIntegrationWithClient creates a new CloudWatch integration with custom client (for testing)
