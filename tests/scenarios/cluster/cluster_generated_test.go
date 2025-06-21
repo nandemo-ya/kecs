@@ -19,8 +19,8 @@ var _ = Describe("Cluster Operations with Generated Types", func() {
 		kecs = utils.StartKECS(GinkgoT())
 		DeferCleanup(kecs.Cleanup)
 
-		// Create ECS client using generated types
-		client = utils.NewECSClientInterface(kecs.Endpoint(), utils.GeneratedMode)
+		// Create ECS client using AWS CLI mode (generated mode was removed)
+		client = utils.NewECSClientInterface(kecs.Endpoint(), utils.AWSCLIMode)
 		logger = utils.NewTestLogger(GinkgoT())
 	})
 

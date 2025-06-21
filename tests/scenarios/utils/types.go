@@ -2,13 +2,14 @@ package utils
 
 // Cluster represents an ECS cluster
 type Cluster struct {
-	ClusterArn                        string `json:"clusterArn"`
-	ClusterName                       string `json:"clusterName"`
-	Status                            string `json:"status"`
-	RegisteredContainerInstancesCount int    `json:"registeredContainerInstancesCount"`
-	RunningTasksCount                 int    `json:"runningTasksCount"`
-	PendingTasksCount                 int    `json:"pendingTasksCount"`
-	ActiveServicesCount               int    `json:"activeServicesCount"`
+	ClusterArn                        string        `json:"clusterArn"`
+	ClusterName                       string        `json:"clusterName"`
+	Status                            string        `json:"status"`
+	RegisteredContainerInstancesCount int           `json:"registeredContainerInstancesCount"`
+	RunningTasksCount                 int           `json:"runningTasksCount"`
+	PendingTasksCount                 int           `json:"pendingTasksCount"`
+	ActiveServicesCount               int           `json:"activeServicesCount"`
+	Settings                          []interface{} `json:"settings,omitempty"`
 }
 
 // TaskDefinition represents an ECS task definition

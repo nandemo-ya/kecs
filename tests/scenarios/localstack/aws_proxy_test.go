@@ -15,17 +15,73 @@ import (
 	"github.com/nandemo-ya/kecs/tests/scenarios/utils"
 )
 
+// GinkgoWrapper wraps GinkgoT to implement utils.TestingT interface
+type GinkgoWrapper struct {
+	GinkgoTInterface
+}
+
+// Logf implements TestingT interface
+func (g GinkgoWrapper) Logf(format string, args ...interface{}) {
+	GinkgoWriter.Printf(format+"\n", args...)
+}
+
+// Fatalf implements TestingT interface
+func (g GinkgoWrapper) Fatalf(format string, args ...interface{}) {
+	Fail(fmt.Sprintf(format, args...))
+}
+
+// TestingTWrapper wraps GinkgoT to implement testify's TestingT interface
+type TestingTWrapper struct {
+	GinkgoTInterface
+}
+
+// Errorf implements TestingT interface for testify/require
+func (t *TestingTWrapper) Errorf(format string, args ...interface{}) {
+	AddReportEntry("error", fmt.Sprintf(format, args...))
+	Fail(fmt.Sprintf(format, args...))
+}
+
+// FailNow implements TestingT interface for testify/require
+func (t *TestingTWrapper) FailNow() {
+	Fail("Test failed")
+}
+
+// Logf implements the logging method
+func (t *TestingTWrapper) Logf(format string, args ...interface{}) {
+	GinkgoWriter.Printf(format+"\n", args...)
+}
+
+// Log implements the logging method
+func (t *TestingTWrapper) Log(args ...interface{}) {
+	GinkgoWriter.Println(args...)
+}
+
+// Fatalf implements the fatal error method
+func (t *TestingTWrapper) Fatalf(format string, args ...interface{}) {
+	Fail(fmt.Sprintf(format, args...))
+}
+
+// Fatal implements the fatal error method
+func (t *TestingTWrapper) Fatal(args ...interface{}) {
+	Fail(fmt.Sprint(args...))
+}
+
+// Error implements the error method  
+func (t *TestingTWrapper) Error(args ...interface{}) {
+	Fail(fmt.Sprint(args...))
+}
+
 var _ = Describe("AWS API Proxy", func() {
 	var (
 		kecs            *utils.KECSContainer
-		client          utils.ECSClientInterface
+		client          *utils.ECSClient
 		localstackClient *helpers.LocalStackTestClient
 		testClusterName string
 	)
 
 	BeforeEach(func() {
 		// Start KECS with LocalStack enabled
-		kecs = utils.StartKECS(GinkgoT())
+		kecs = utils.StartKECS(GinkgoWrapper{GinkgoT()})
 		DeferCleanup(func() {
 			if kecs != nil {
 				kecs.Cleanup()
@@ -41,8 +97,8 @@ var _ = Describe("AWS API Proxy", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// Start LocalStack with required services
-		helpers.StartLocalStack(GinkgoT(), kecs, []string{"iam", "s3", "cloudwatchlogs", "secretsmanager"})
-		helpers.WaitForLocalStackReady(GinkgoT(), client, testClusterName, 30*time.Second)
+		helpers.StartLocalStack(&TestingTWrapper{GinkgoT()}, kecs, []string{"iam", "s3", "cloudwatchlogs", "secretsmanager"})
+		helpers.WaitForLocalStackReady(&TestingTWrapper{GinkgoT()}, client, testClusterName, 30*time.Second)
 
 		// Create LocalStack test client
 		// Note: In a real test, we'd need to get the actual LocalStack endpoint from KECS
@@ -56,7 +112,7 @@ var _ = Describe("AWS API Proxy", func() {
 			client.DeleteCluster(testClusterName)
 		}
 		if kecs != nil {
-			helpers.StopLocalStack(GinkgoT(), kecs)
+			helpers.StopLocalStack(&TestingTWrapper{GinkgoT()}, kecs)
 		}
 	})
 
@@ -65,7 +121,7 @@ var _ = Describe("AWS API Proxy", func() {
 			bucketName := fmt.Sprintf("test-bucket-%d", time.Now().Unix())
 
 			// Create S3 bucket via LocalStack
-			helpers.CreateS3BucketViaLocalStack(GinkgoT(), localstackClient, bucketName)
+			helpers.CreateS3BucketViaLocalStack(&TestingTWrapper{GinkgoT()}, localstackClient, bucketName)
 
 			// List buckets to verify
 			ctx := context.Background()
@@ -106,7 +162,7 @@ var _ = Describe("AWS API Proxy", func() {
 			roleName := fmt.Sprintf("test-role-%d", time.Now().Unix())
 
 			// Create IAM role via LocalStack
-			helpers.CreateIAMRoleViaLocalStack(GinkgoT(), localstackClient, roleName)
+			helpers.CreateIAMRoleViaLocalStack(&TestingTWrapper{GinkgoT()}, localstackClient, roleName)
 
 			// List roles to verify
 			ctx := context.Background()
@@ -135,7 +191,7 @@ var _ = Describe("AWS API Proxy", func() {
 			policyName := "test-policy"
 
 			// Create role first
-			helpers.CreateIAMRoleViaLocalStack(GinkgoT(), localstackClient, roleName)
+			helpers.CreateIAMRoleViaLocalStack(&TestingTWrapper{GinkgoT()}, localstackClient, roleName)
 
 			// Attach inline policy
 			ctx := context.Background()
@@ -175,8 +231,8 @@ var _ = Describe("AWS API Proxy", func() {
 
 	Describe("Service Isolation", func() {
 		It("should route ECS calls to KECS, not LocalStack", func() {
-			// Create a service via ECS API
-			taskDefArn, err := client.RegisterTaskDefinition("test-task", `{
+			// Create a task definition via ECS API
+			taskDef, err := client.CurlClient.RegisterTaskDefinition("test-task", `{
 				"containerDefinitions": [{
 					"name": "test-container",
 					"image": "nginx:latest",
@@ -184,19 +240,19 @@ var _ = Describe("AWS API Proxy", func() {
 				}]
 			}`)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(taskDefArn).NotTo(BeNil())
+			Expect(taskDef).NotTo(BeNil())
 
 			// This should go to KECS, not LocalStack
 			// Verify by checking the task definition format
-			Expect(taskDefArn.Family).To(Equal("test-task"))
-			Expect(taskDefArn.Revision).To(Equal("1"))
+			Expect(taskDef.Family).To(Equal("test-task"))
+			Expect(taskDef.Revision).To(Equal("1"))
 		})
 
 		It("should reject calls to non-enabled LocalStack services", func() {
 			// Ensure DynamoDB is not enabled
-			status := helpers.GetLocalStackStatus(GinkgoT(), kecs)
+			status := helpers.GetLocalStackStatus(&TestingTWrapper{GinkgoT()}, kecs)
 			if strings.Contains(status, "dynamodb") {
-				helpers.DisableLocalStackService(GinkgoT(), kecs, "dynamodb")
+				helpers.DisableLocalStackService(&TestingTWrapper{GinkgoT()}, kecs, "dynamodb")
 				time.Sleep(2 * time.Second)
 			}
 

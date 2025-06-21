@@ -14,13 +14,13 @@ import (
 var _ = Describe("LocalStack Lifecycle", func() {
 	var (
 		kecs   *utils.KECSContainer
-		client utils.ECSClientInterface
+		client *utils.ECSClient
 		testClusterName string
 	)
 
 	BeforeEach(func() {
 		// Start KECS with LocalStack enabled
-		kecs = utils.StartKECS(GinkgoT())
+		kecs = utils.StartKECS(GinkgoWrapper{GinkgoT()})
 		DeferCleanup(func() {
 			if kecs != nil {
 				kecs.Cleanup()
@@ -46,50 +46,50 @@ var _ = Describe("LocalStack Lifecycle", func() {
 	Describe("Starting and Stopping LocalStack", func() {
 		It("should start LocalStack successfully", func() {
 			// Start LocalStack with default services
-			helpers.StartLocalStack(GinkgoT(), kecs, nil)
+			helpers.StartLocalStack(&TestingTWrapper{GinkgoT()}, kecs, nil)
 
 			// Wait for LocalStack to be ready
-			helpers.WaitForLocalStackReady(GinkgoT(), client, testClusterName, 30*time.Second)
+			helpers.WaitForLocalStackReady(&TestingTWrapper{GinkgoT()}, client, testClusterName, 30*time.Second)
 
 			// Check status
-			status := helpers.GetLocalStackStatus(GinkgoT(), kecs)
+			status := helpers.GetLocalStackStatus(&TestingTWrapper{GinkgoT()}, kecs)
 			Expect(status).To(ContainSubstring("Running: true"))
 			Expect(status).To(ContainSubstring("Healthy: true"))
 		})
 
 		It("should stop LocalStack successfully", func() {
 			// Start LocalStack first
-			helpers.StartLocalStack(GinkgoT(), kecs, nil)
-			helpers.WaitForLocalStackReady(GinkgoT(), client, testClusterName, 30*time.Second)
+			helpers.StartLocalStack(&TestingTWrapper{GinkgoT()}, kecs, nil)
+			helpers.WaitForLocalStackReady(&TestingTWrapper{GinkgoT()}, client, testClusterName, 30*time.Second)
 
 			// Stop LocalStack
-			helpers.StopLocalStack(GinkgoT(), kecs)
+			helpers.StopLocalStack(&TestingTWrapper{GinkgoT()}, kecs)
 
 			// Give it a moment to stop
 			time.Sleep(2 * time.Second)
 
 			// Check status
-			status := helpers.GetLocalStackStatus(GinkgoT(), kecs)
+			status := helpers.GetLocalStackStatus(&TestingTWrapper{GinkgoT()}, kecs)
 			Expect(status).To(ContainSubstring("Running: false"))
 		})
 
 		It("should restart LocalStack successfully", func() {
 			// Start LocalStack
-			helpers.StartLocalStack(GinkgoT(), kecs, nil)
-			helpers.WaitForLocalStackReady(GinkgoT(), client, testClusterName, 30*time.Second)
+			helpers.StartLocalStack(&TestingTWrapper{GinkgoT()}, kecs, nil)
+			helpers.WaitForLocalStackReady(&TestingTWrapper{GinkgoT()}, client, testClusterName, 30*time.Second)
 
 			// Get initial status
-			initialStatus := helpers.GetLocalStackStatus(GinkgoT(), kecs)
+			initialStatus := helpers.GetLocalStackStatus(&TestingTWrapper{GinkgoT()}, kecs)
 			Expect(initialStatus).To(ContainSubstring("Running: true"))
 
 			// Restart LocalStack
-			helpers.RestartLocalStack(GinkgoT(), kecs)
+			helpers.RestartLocalStack(&TestingTWrapper{GinkgoT()}, kecs)
 
 			// Wait for it to be ready again
-			helpers.WaitForLocalStackReady(GinkgoT(), client, testClusterName, 30*time.Second)
+			helpers.WaitForLocalStackReady(&TestingTWrapper{GinkgoT()}, client, testClusterName, 30*time.Second)
 
 			// Check status after restart
-			status := helpers.GetLocalStackStatus(GinkgoT(), kecs)
+			status := helpers.GetLocalStackStatus(&TestingTWrapper{GinkgoT()}, kecs)
 			Expect(status).To(ContainSubstring("Running: true"))
 			Expect(status).To(ContainSubstring("Healthy: true"))
 		})
@@ -98,33 +98,33 @@ var _ = Describe("LocalStack Lifecycle", func() {
 	Describe("Service Management", func() {
 		BeforeEach(func() {
 			// Start LocalStack with minimal services
-			helpers.StartLocalStack(GinkgoT(), kecs, []string{"iam"})
-			helpers.WaitForLocalStackReady(GinkgoT(), client, testClusterName, 30*time.Second)
+			helpers.StartLocalStack(&TestingTWrapper{GinkgoT()}, kecs, []string{"iam"})
+			helpers.WaitForLocalStackReady(&TestingTWrapper{GinkgoT()}, client, testClusterName, 30*time.Second)
 		})
 
 		It("should enable additional services", func() {
 			// Enable S3 service
-			helpers.EnableLocalStackService(GinkgoT(), kecs, "s3")
+			helpers.EnableLocalStackService(&TestingTWrapper{GinkgoT()}, kecs, "s3")
 
 			// Give it a moment to initialize
 			time.Sleep(5 * time.Second)
 
 			// Check that S3 is now enabled
-			status := helpers.GetLocalStackStatus(GinkgoT(), kecs)
+			status := helpers.GetLocalStackStatus(&TestingTWrapper{GinkgoT()}, kecs)
 			Expect(status).To(ContainSubstring("s3"))
 		})
 
 		It("should disable services", func() {
 			// First enable S3
-			helpers.EnableLocalStackService(GinkgoT(), kecs, "s3")
+			helpers.EnableLocalStackService(&TestingTWrapper{GinkgoT()}, kecs, "s3")
 			time.Sleep(5 * time.Second)
 
 			// Now disable it
-			helpers.DisableLocalStackService(GinkgoT(), kecs, "s3")
+			helpers.DisableLocalStackService(&TestingTWrapper{GinkgoT()}, kecs, "s3")
 			time.Sleep(2 * time.Second)
 
 			// Check that S3 is no longer in the enabled services
-			status := helpers.GetLocalStackStatus(GinkgoT(), kecs)
+			status := helpers.GetLocalStackStatus(&TestingTWrapper{GinkgoT()}, kecs)
 			lines := strings.Split(status, "\n")
 			
 			// Find the enabled services section
@@ -174,17 +174,17 @@ var _ = Describe("LocalStack Lifecycle", func() {
 	Describe("Health Monitoring", func() {
 		It("should report unhealthy state when LocalStack is not running", func() {
 			// Don't start LocalStack
-			status := helpers.GetLocalStackStatus(GinkgoT(), kecs)
+			status := helpers.GetLocalStackStatus(&TestingTWrapper{GinkgoT()}, kecs)
 			Expect(status).To(ContainSubstring("Running: false"))
 		})
 
 		It("should report service-level health", func() {
 			// Start LocalStack with multiple services
-			helpers.StartLocalStack(GinkgoT(), kecs, []string{"iam", "s3", "dynamodb"})
-			helpers.WaitForLocalStackReady(GinkgoT(), client, testClusterName, 30*time.Second)
+			helpers.StartLocalStack(&TestingTWrapper{GinkgoT()}, kecs, []string{"iam", "s3", "dynamodb"})
+			helpers.WaitForLocalStackReady(&TestingTWrapper{GinkgoT()}, client, testClusterName, 30*time.Second)
 
 			// Get detailed status
-			status := helpers.GetLocalStackStatus(GinkgoT(), kecs)
+			status := helpers.GetLocalStackStatus(&TestingTWrapper{GinkgoT()}, kecs)
 			
 			// Check for service health section
 			Expect(status).To(ContainSubstring("Service Health:"))

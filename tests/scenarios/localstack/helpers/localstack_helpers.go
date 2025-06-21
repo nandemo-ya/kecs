@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -15,6 +14,14 @@ import (
 	"github.com/nandemo-ya/kecs/tests/scenarios/utils"
 	"github.com/stretchr/testify/require"
 )
+
+// TestingT interface that matches what testify/require expects
+type TestingT interface {
+	Errorf(format string, args ...interface{})
+	FailNow()
+	Logf(format string, args ...interface{})
+	Fatal(args ...interface{})
+}
 
 // LocalStackTestClient wraps AWS clients configured for LocalStack
 type LocalStackTestClient struct {
@@ -55,7 +62,7 @@ func NewLocalStackTestClient(kecsEndpoint string, localstackEndpoint string) *Lo
 }
 
 // WaitForLocalStackReady waits for LocalStack to be ready
-func WaitForLocalStackReady(t *testing.T, client *utils.ECSClient, clusterName string, timeout time.Duration) {
+func WaitForLocalStackReady(t TestingT, client *utils.ECSClient, clusterName string, timeout time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -77,7 +84,7 @@ func WaitForLocalStackReady(t *testing.T, client *utils.ECSClient, clusterName s
 }
 
 // StartLocalStack starts LocalStack via KECS CLI
-func StartLocalStack(t *testing.T, kecs *utils.KECSContainer, services []string) {
+func StartLocalStack(t TestingT, kecs *utils.KECSContainer, services []string) {
 	args := []string{"localstack", "start"}
 	if len(services) > 0 {
 		args = append(args, "--services", fmt.Sprintf("%v", services))
@@ -88,38 +95,38 @@ func StartLocalStack(t *testing.T, kecs *utils.KECSContainer, services []string)
 }
 
 // StopLocalStack stops LocalStack via KECS CLI
-func StopLocalStack(t *testing.T, kecs *utils.KECSContainer) {
+func StopLocalStack(t TestingT, kecs *utils.KECSContainer) {
 	output, err := kecs.ExecuteCommand("localstack", "stop")
 	require.NoError(t, err, "Failed to stop LocalStack: %s", output)
 }
 
 // EnableLocalStackService enables a LocalStack service
-func EnableLocalStackService(t *testing.T, kecs *utils.KECSContainer, service string) {
+func EnableLocalStackService(t TestingT, kecs *utils.KECSContainer, service string) {
 	output, err := kecs.ExecuteCommand("localstack", "enable", service)
 	require.NoError(t, err, "Failed to enable LocalStack service %s: %s", service, output)
 }
 
 // DisableLocalStackService disables a LocalStack service
-func DisableLocalStackService(t *testing.T, kecs *utils.KECSContainer, service string) {
+func DisableLocalStackService(t TestingT, kecs *utils.KECSContainer, service string) {
 	output, err := kecs.ExecuteCommand("localstack", "disable", service)
 	require.NoError(t, err, "Failed to disable LocalStack service %s: %s", service, output)
 }
 
 // GetLocalStackStatus gets LocalStack status
-func GetLocalStackStatus(t *testing.T, kecs *utils.KECSContainer) string {
+func GetLocalStackStatus(t TestingT, kecs *utils.KECSContainer) string {
 	output, err := kecs.ExecuteCommand("localstack", "status")
 	require.NoError(t, err, "Failed to get LocalStack status: %s", output)
 	return output
 }
 
 // RestartLocalStack restarts LocalStack
-func RestartLocalStack(t *testing.T, kecs *utils.KECSContainer) {
+func RestartLocalStack(t TestingT, kecs *utils.KECSContainer) {
 	output, err := kecs.ExecuteCommand("localstack", "restart")
 	require.NoError(t, err, "Failed to restart LocalStack: %s", output)
 }
 
 // CheckAWSServiceAccessible checks if an AWS service is accessible via LocalStack
-func CheckAWSServiceAccessible(t *testing.T, endpoint string, service string) bool {
+func CheckAWSServiceAccessible(t TestingT, endpoint string, service string) bool {
 	client := &http.Client{Timeout: 5 * time.Second}
 	
 	// LocalStack health endpoint
@@ -134,7 +141,7 @@ func CheckAWSServiceAccessible(t *testing.T, endpoint string, service string) bo
 }
 
 // CreateS3BucketViaLocalStack creates an S3 bucket using LocalStack
-func CreateS3BucketViaLocalStack(t *testing.T, client *LocalStackTestClient, bucketName string) {
+func CreateS3BucketViaLocalStack(t TestingT, client *LocalStackTestClient, bucketName string) {
 	ctx := context.Background()
 	_, err := client.S3Client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String(bucketName),
@@ -143,7 +150,7 @@ func CreateS3BucketViaLocalStack(t *testing.T, client *LocalStackTestClient, buc
 }
 
 // CreateIAMRoleViaLocalStack creates an IAM role using LocalStack
-func CreateIAMRoleViaLocalStack(t *testing.T, client *LocalStackTestClient, roleName string) {
+func CreateIAMRoleViaLocalStack(t TestingT, client *LocalStackTestClient, roleName string) {
 	ctx := context.Background()
 	trustPolicy := `{
 		"Version": "2012-10-17",
