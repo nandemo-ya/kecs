@@ -9,7 +9,7 @@ import (
 	"net/http"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/awsclient"
-	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 )
 
 const (
@@ -37,88 +37,88 @@ func NewClient(config awsclient.Config) *Client {
 }
 
 // ListClusters lists ECS clusters
-func (c *Client) ListClusters(ctx context.Context, input *api.ListClustersRequest) (*api.ListClustersResponse, error) {
-	return doRequest[api.ListClustersRequest, api.ListClustersResponse](ctx, c, "ListClusters", input)
+func (c *Client) ListClusters(ctx context.Context, input *generated.ListClustersRequest) (*generated.ListClustersResponse, error) {
+	return doRequest[generated.ListClustersRequest, generated.ListClustersResponse](ctx, c, "ListClusters", input)
 }
 
 // CreateCluster creates a new ECS cluster
-func (c *Client) CreateCluster(ctx context.Context, input *api.CreateClusterRequest) (*api.CreateClusterResponse, error) {
-	return doRequest[api.CreateClusterRequest, api.CreateClusterResponse](ctx, c, "CreateCluster", input)
+func (c *Client) CreateCluster(ctx context.Context, input *generated.CreateClusterRequest) (*generated.CreateClusterResponse, error) {
+	return doRequest[generated.CreateClusterRequest, generated.CreateClusterResponse](ctx, c, "CreateCluster", input)
 }
 
 // DeleteCluster deletes an ECS cluster
-func (c *Client) DeleteCluster(ctx context.Context, input *api.DeleteClusterRequest) (*api.DeleteClusterResponse, error) {
-	return doRequest[api.DeleteClusterRequest, api.DeleteClusterResponse](ctx, c, "DeleteCluster", input)
+func (c *Client) DeleteCluster(ctx context.Context, input *generated.DeleteClusterRequest) (*generated.DeleteClusterResponse, error) {
+	return doRequest[generated.DeleteClusterRequest, generated.DeleteClusterResponse](ctx, c, "DeleteCluster", input)
 }
 
 // DescribeClusters describes ECS clusters
-func (c *Client) DescribeClusters(ctx context.Context, input *api.DescribeClustersRequest) (*api.DescribeClustersResponse, error) {
-	return doRequest[api.DescribeClustersRequest, api.DescribeClustersResponse](ctx, c, "DescribeClusters", input)
+func (c *Client) DescribeClusters(ctx context.Context, input *generated.DescribeClustersRequest) (*generated.DescribeClustersResponse, error) {
+	return doRequest[generated.DescribeClustersRequest, generated.DescribeClustersResponse](ctx, c, "DescribeClusters", input)
 }
 
 // RegisterTaskDefinition registers a new task definition
-func (c *Client) RegisterTaskDefinition(ctx context.Context, input *api.RegisterTaskDefinitionRequest) (*api.RegisterTaskDefinitionResponse, error) {
-	return doRequest[api.RegisterTaskDefinitionRequest, api.RegisterTaskDefinitionResponse](ctx, c, "RegisterTaskDefinition", input)
+func (c *Client) RegisterTaskDefinition(ctx context.Context, input *generated.RegisterTaskDefinitionRequest) (*generated.RegisterTaskDefinitionResponse, error) {
+	return doRequest[generated.RegisterTaskDefinitionRequest, generated.RegisterTaskDefinitionResponse](ctx, c, "RegisterTaskDefinition", input)
 }
 
 // DeregisterTaskDefinition deregisters a task definition
-func (c *Client) DeregisterTaskDefinition(ctx context.Context, input *api.DeregisterTaskDefinitionRequest) (*api.DeregisterTaskDefinitionResponse, error) {
-	return doRequest[api.DeregisterTaskDefinitionRequest, api.DeregisterTaskDefinitionResponse](ctx, c, "DeregisterTaskDefinition", input)
+func (c *Client) DeregisterTaskDefinition(ctx context.Context, input *generated.DeregisterTaskDefinitionRequest) (*generated.DeregisterTaskDefinitionResponse, error) {
+	return doRequest[generated.DeregisterTaskDefinitionRequest, generated.DeregisterTaskDefinitionResponse](ctx, c, "DeregisterTaskDefinition", input)
 }
 
 // DescribeTaskDefinition describes a task definition
-func (c *Client) DescribeTaskDefinition(ctx context.Context, input *api.DescribeTaskDefinitionRequest) (*api.DescribeTaskDefinitionResponse, error) {
-	return doRequest[api.DescribeTaskDefinitionRequest, api.DescribeTaskDefinitionResponse](ctx, c, "DescribeTaskDefinition", input)
+func (c *Client) DescribeTaskDefinition(ctx context.Context, input *generated.DescribeTaskDefinitionRequest) (*generated.DescribeTaskDefinitionResponse, error) {
+	return doRequest[generated.DescribeTaskDefinitionRequest, generated.DescribeTaskDefinitionResponse](ctx, c, "DescribeTaskDefinition", input)
 }
 
 // ListTaskDefinitions lists task definitions
-func (c *Client) ListTaskDefinitions(ctx context.Context, input *api.ListTaskDefinitionsRequest) (*api.ListTaskDefinitionsResponse, error) {
-	return doRequest[api.ListTaskDefinitionsRequest, api.ListTaskDefinitionsResponse](ctx, c, "ListTaskDefinitions", input)
+func (c *Client) ListTaskDefinitions(ctx context.Context, input *generated.ListTaskDefinitionsRequest) (*generated.ListTaskDefinitionsResponse, error) {
+	return doRequest[generated.ListTaskDefinitionsRequest, generated.ListTaskDefinitionsResponse](ctx, c, "ListTaskDefinitions", input)
 }
 
 // CreateService creates a new service
-func (c *Client) CreateService(ctx context.Context, input *api.CreateServiceRequest) (*api.CreateServiceResponse, error) {
-	return doRequest[api.CreateServiceRequest, api.CreateServiceResponse](ctx, c, "CreateService", input)
+func (c *Client) CreateService(ctx context.Context, input *generated.CreateServiceRequest) (*generated.CreateServiceResponse, error) {
+	return doRequest[generated.CreateServiceRequest, generated.CreateServiceResponse](ctx, c, "CreateService", input)
 }
 
 // UpdateService updates a service
-func (c *Client) UpdateService(ctx context.Context, input *api.UpdateServiceRequest) (*api.UpdateServiceResponse, error) {
-	return doRequest[api.UpdateServiceRequest, api.UpdateServiceResponse](ctx, c, "UpdateService", input)
+func (c *Client) UpdateService(ctx context.Context, input *generated.UpdateServiceRequest) (*generated.UpdateServiceResponse, error) {
+	return doRequest[generated.UpdateServiceRequest, generated.UpdateServiceResponse](ctx, c, "UpdateService", input)
 }
 
 // DeleteService deletes a service
-func (c *Client) DeleteService(ctx context.Context, input *api.DeleteServiceRequest) (*api.DeleteServiceResponse, error) {
-	return doRequest[api.DeleteServiceRequest, api.DeleteServiceResponse](ctx, c, "DeleteService", input)
+func (c *Client) DeleteService(ctx context.Context, input *generated.DeleteServiceRequest) (*generated.DeleteServiceResponse, error) {
+	return doRequest[generated.DeleteServiceRequest, generated.DeleteServiceResponse](ctx, c, "DeleteService", input)
 }
 
 // DescribeServices describes services
-func (c *Client) DescribeServices(ctx context.Context, input *api.DescribeServicesRequest) (*api.DescribeServicesResponse, error) {
-	return doRequest[api.DescribeServicesRequest, api.DescribeServicesResponse](ctx, c, "DescribeServices", input)
+func (c *Client) DescribeServices(ctx context.Context, input *generated.DescribeServicesRequest) (*generated.DescribeServicesResponse, error) {
+	return doRequest[generated.DescribeServicesRequest, generated.DescribeServicesResponse](ctx, c, "DescribeServices", input)
 }
 
 // ListServices lists services
-func (c *Client) ListServices(ctx context.Context, input *api.ListServicesRequest) (*api.ListServicesResponse, error) {
-	return doRequest[api.ListServicesRequest, api.ListServicesResponse](ctx, c, "ListServices", input)
+func (c *Client) ListServices(ctx context.Context, input *generated.ListServicesRequest) (*generated.ListServicesResponse, error) {
+	return doRequest[generated.ListServicesRequest, generated.ListServicesResponse](ctx, c, "ListServices", input)
 }
 
 // RunTask runs a task
-func (c *Client) RunTask(ctx context.Context, input *api.RunTaskRequest) (*api.RunTaskResponse, error) {
-	return doRequest[api.RunTaskRequest, api.RunTaskResponse](ctx, c, "RunTask", input)
+func (c *Client) RunTask(ctx context.Context, input *generated.RunTaskRequest) (*generated.RunTaskResponse, error) {
+	return doRequest[generated.RunTaskRequest, generated.RunTaskResponse](ctx, c, "RunTask", input)
 }
 
 // StopTask stops a task
-func (c *Client) StopTask(ctx context.Context, input *api.StopTaskRequest) (*api.StopTaskResponse, error) {
-	return doRequest[api.StopTaskRequest, api.StopTaskResponse](ctx, c, "StopTask", input)
+func (c *Client) StopTask(ctx context.Context, input *generated.StopTaskRequest) (*generated.StopTaskResponse, error) {
+	return doRequest[generated.StopTaskRequest, generated.StopTaskResponse](ctx, c, "StopTask", input)
 }
 
 // DescribeTasks describes tasks
-func (c *Client) DescribeTasks(ctx context.Context, input *api.DescribeTasksRequest) (*api.DescribeTasksResponse, error) {
-	return doRequest[api.DescribeTasksRequest, api.DescribeTasksResponse](ctx, c, "DescribeTasks", input)
+func (c *Client) DescribeTasks(ctx context.Context, input *generated.DescribeTasksRequest) (*generated.DescribeTasksResponse, error) {
+	return doRequest[generated.DescribeTasksRequest, generated.DescribeTasksResponse](ctx, c, "DescribeTasks", input)
 }
 
 // ListTasks lists tasks
-func (c *Client) ListTasks(ctx context.Context, input *api.ListTasksRequest) (*api.ListTasksResponse, error) {
-	return doRequest[api.ListTasksRequest, api.ListTasksResponse](ctx, c, "ListTasks", input)
+func (c *Client) ListTasks(ctx context.Context, input *generated.ListTasksRequest) (*generated.ListTasksResponse, error) {
+	return doRequest[generated.ListTasksRequest, generated.ListTasksResponse](ctx, c, "ListTasks", input)
 }
 
 // doRequest performs a generic AWS API request

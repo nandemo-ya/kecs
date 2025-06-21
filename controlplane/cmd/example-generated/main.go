@@ -6,7 +6,9 @@ import (
 	"log"
 	"os"
 
-	generated_v2 "github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/awsclient"
+	"github.com/nandemo-ya/kecs/controlplane/internal/awsclient/services/ecs"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 )
 
 // This example demonstrates using the generated types with our custom AWS client
@@ -18,16 +20,21 @@ func main() {
 		endpoint = "http://localhost:8080"
 	}
 
-	// Create ECS client using generated client
-	ecsClient := generated_v2.NewClient(generated_v2.ClientOptions{
+	// Create ECS client using our custom AWS client
+	ecsClient := ecs.NewClient(awsclient.Config{
 		Endpoint: endpoint,
+		Region:   "ap-northeast-1",
+		Credentials: awsclient.Credentials{
+			AccessKeyID:     "test",
+			SecretAccessKey: "test",
+		},
 	})
 
 	ctx := context.Background()
 
 	// Example 1: List clusters
 	fmt.Println("=== Listing Clusters ===")
-	listReq := &generated_v2.ListClustersRequest{}
+	listReq := &generated.ListClustersRequest{}
 	
 	listResp, err := ecsClient.ListClusters(ctx, listReq)
 	if err != nil {
@@ -42,18 +49,21 @@ func main() {
 	// Example 2: Create a cluster
 	fmt.Println("\n=== Creating Cluster ===")
 	clusterName := "test-cluster"
-	createReq := &generated_v2.CreateClusterRequest{
+	settingName := generated.ClusterSettingName("containerInsights")
+	tagKey := generated.TagKey("Environment")
+	tagValue := generated.TagValue("test")
+	createReq := &generated.CreateClusterRequest{
 		ClusterName: &clusterName,
-		Settings: []generated_v2.ClusterSetting{
+		Settings: []generated.ClusterSetting{
 			{
-				Name:  interfacePtr("containerInsights"),
+				Name:  &settingName,
 				Value: stringPtr("enabled"),
 			},
 		},
-		Tags: []generated_v2.Tag{
+		Tags: []generated.Tag{
 			{
-				Key:   stringPtr("Environment"),
-				Value: stringPtr("test"),
+				Key:   &tagKey,
+				Value: &tagValue,
 			},
 		},
 	}
@@ -71,7 +81,7 @@ func main() {
 
 	// Example 3: Describe the cluster
 	fmt.Println("\n=== Describing Cluster ===")
-	describeReq := &generated_v2.DescribeClustersRequest{
+	describeReq := &generated.DescribeClustersRequest{
 		Clusters: []string{clusterName},
 	}
 	
@@ -86,13 +96,17 @@ func main() {
 		if cluster.Settings != nil {
 			fmt.Println("  Settings:")
 			for _, setting := range cluster.Settings {
-				fmt.Printf("    - %v: %s\n", *setting.Name, *setting.Value)
+				if setting.Name != nil && setting.Value != nil {
+					fmt.Printf("    - %s: %s\n", string(*setting.Name), *setting.Value)
+				}
 			}
 		}
 		if cluster.Tags != nil {
 			fmt.Println("  Tags:")
 			for _, tag := range cluster.Tags {
-				fmt.Printf("    - %s: %s\n", *tag.Key, *tag.Value)
+				if tag.Key != nil && tag.Value != nil {
+					fmt.Printf("    - %s: %s\n", string(*tag.Key), string(*tag.Value))
+				}
 			}
 		}
 	}
@@ -105,6 +119,3 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-func interfacePtr(v interface{}) *interface{} {
-	return &v
-}

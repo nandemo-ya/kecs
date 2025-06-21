@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
-	generated_v2 "github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 	"github.com/stretchr/testify/assert"
@@ -30,11 +30,11 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 	kindManager := kubernetes.NewKindManager()
 
 	// Create ECS API with generated types
-	ecsAPI := api.NewDefaultECSAPIGenerated(storage, kindManager)
+	ecsAPI := api.NewDefaultECSAPI(storage, kindManager)
 
 	// Create mux and register routes
 	mux := http.NewServeMux()
-	api.RegisterECSRoutesGenerated(mux, ecsAPI)
+	mux.HandleFunc("/", generated.HandleECSRequest(ecsAPI))
 
 	// Create test server
 	server := httptest.NewServer(mux)
@@ -42,18 +42,21 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 
 	t.Run("CreateCluster", func(t *testing.T) {
 		// Create request using generated types
-		req := &generated_v2.CreateClusterRequest{
+		settingName := generated.ClusterSettingName("containerInsights")
+		tagKey := generated.TagKey("Environment")
+		tagValue := generated.TagValue("test")
+		req := &generated.CreateClusterRequest{
 			ClusterName: stringPtr("test-cluster"),
-			Settings: []generated_v2.ClusterSetting{
+			Settings: []generated.ClusterSetting{
 				{
-					Name:  interfacePtr("containerInsights"),
+					Name:  &settingName,
 					Value: stringPtr("enabled"),
 				},
 			},
-			Tags: []generated_v2.Tag{
+			Tags: []generated.Tag{
 				{
-					Key:   stringPtr("Environment"),
-					Value: stringPtr("test"),
+					Key:   &tagKey,
+					Value: &tagValue,
 				},
 			},
 		}
@@ -64,7 +67,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// Parse response
-		var createResp generated_v2.CreateClusterResponse
+		var createResp generated.CreateClusterResponse
 		err = json.NewDecoder(resp.Body).Decode(&createResp)
 		require.NoError(t, err)
 
@@ -77,7 +80,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 
 	t.Run("ListClusters", func(t *testing.T) {
 		// Create request
-		req := &generated_v2.ListClustersRequest{}
+		req := &generated.ListClustersRequest{}
 
 		// Make HTTP request
 		resp, err := makeRequest(server.URL, "ListClusters", req)
@@ -85,7 +88,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// Parse response
-		var listResp generated_v2.ListClustersResponse
+		var listResp generated.ListClustersResponse
 		err = json.NewDecoder(resp.Body).Decode(&listResp)
 		require.NoError(t, err)
 
@@ -96,8 +99,12 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 
 	t.Run("DescribeClusters", func(t *testing.T) {
 		// Create request
-		req := &generated_v2.DescribeClustersRequest{
+		req := &generated.DescribeClustersRequest{
 			Clusters: []string{"test-cluster"},
+			Include: []generated.ClusterField{
+				generated.ClusterFieldSettings,
+				generated.ClusterFieldTags,
+			},
 		}
 
 		// Make HTTP request
@@ -106,7 +113,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// Parse response
-		var describeResp generated_v2.DescribeClustersResponse
+		var describeResp generated.DescribeClustersResponse
 		err = json.NewDecoder(resp.Body).Decode(&describeResp)
 		require.NoError(t, err)
 
@@ -119,24 +126,24 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 		// Verify settings were saved
 		assert.NotNil(t, cluster.Settings)
 		assert.Len(t, cluster.Settings, 1)
-		// Name is *interface{}, so we need to dereference and cast
+		// Name is *ClusterSettingName, so we need to dereference and convert to string
 		if cluster.Settings[0].Name != nil {
-			nameInterface := *cluster.Settings[0].Name
-			assert.Equal(t, "containerInsights", nameInterface)
+			assert.Equal(t, "containerInsights", string(*cluster.Settings[0].Name))
 		}
 		assert.Equal(t, "enabled", *cluster.Settings[0].Value)
 
 		// Verify tags were saved
 		assert.NotNil(t, cluster.Tags)
 		assert.Len(t, cluster.Tags, 1)
-		assert.Equal(t, "Environment", *cluster.Tags[0].Key)
-		assert.Equal(t, "test", *cluster.Tags[0].Value)
+		assert.Equal(t, "Environment", string(*cluster.Tags[0].Key))
+		assert.Equal(t, "test", string(*cluster.Tags[0].Value))
 	})
 
 	t.Run("DeleteCluster", func(t *testing.T) {
 		// Create request
-		req := &generated_v2.DeleteClusterRequest{
-			Cluster: "test-cluster",
+		cluster := "test-cluster"
+		req := &generated.DeleteClusterRequest{
+			Cluster: &cluster,
 		}
 
 		// Make HTTP request
@@ -145,7 +152,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// Parse response
-		var deleteResp generated_v2.DeleteClusterResponse
+		var deleteResp generated.DeleteClusterResponse
 		err = json.NewDecoder(resp.Body).Decode(&deleteResp)
 		require.NoError(t, err)
 
@@ -159,11 +166,12 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 // TestGeneratedTypesJSONCompatibility tests JSON marshaling/unmarshaling
 func TestGeneratedTypesJSONCompatibility(t *testing.T) {
 	t.Run("CreateClusterRequest", func(t *testing.T) {
-		req := &generated_v2.CreateClusterRequest{
+		settingName := generated.ClusterSettingName("containerInsights")
+		req := &generated.CreateClusterRequest{
 			ClusterName: stringPtr("test-cluster"),
-			Settings: []generated_v2.ClusterSetting{
+			Settings: []generated.ClusterSetting{
 				{
-					Name:  interfacePtr("containerInsights"),
+					Name:  &settingName,
 					Value: stringPtr("enabled"),
 				},
 			},
@@ -187,7 +195,7 @@ func TestGeneratedTypesJSONCompatibility(t *testing.T) {
 	})
 
 	t.Run("ClusterResponse", func(t *testing.T) {
-		cluster := &generated_v2.Cluster{
+		cluster := &generated.Cluster{
 			ClusterArn:  stringPtr("arn:aws:ecs:us-east-1:123456789012:cluster/test"),
 			ClusterName: stringPtr("test"),
 			Status:      stringPtr("ACTIVE"),

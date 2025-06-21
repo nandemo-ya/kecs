@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/awsclient"
-	generated_v2 "github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 )
 
 // This example demonstrates using the generated types with our custom AWS client
@@ -31,7 +31,7 @@ func main() {
 	fmt.Println("=== Using Generated Types ===")
 
 	// List clusters using generated request type
-	listReq := &generated_v2.ListClustersRequest{}
+	listReq := &generated.ListClustersRequest{}
 	fmt.Printf("Request type: %T\n", listReq)
 
 	// This demonstrates how the generated types would be used
@@ -40,7 +40,7 @@ func main() {
 
 	// Create cluster request with generated types
 	clusterName := "test-cluster"
-	createReq := &generated_v2.CreateClusterRequest{
+	createReq := &generated.CreateClusterRequest{
 		ClusterName: &clusterName,
 	}
 	fmt.Printf("Create request type: %T\n", createReq)
