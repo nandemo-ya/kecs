@@ -99,50 +99,131 @@ func (a *ECSAPIv2Adapter) UpdateClusterV2(ctx context.Context, req *ecs.UpdateCl
 // Service operations - TODO: Implement these once converters are ready
 
 func (a *ECSAPIv2Adapter) CreateServiceV2(ctx context.Context, req *ecs.CreateServiceInput) (*ecs.CreateServiceOutput, error) {
-	// TODO: Implement service converters
-	return &ecs.CreateServiceOutput{}, nil
+	// Convert to generated request
+	genReq := ConvertToGeneratedCreateServiceRequest(req)
+	
+	// Call generated API
+	genResp, err := a.generatedAPI.CreateService(ctx, genReq)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert to AWS SDK response
+	return ConvertFromGeneratedCreateServiceResponse(genResp), nil
 }
 
 func (a *ECSAPIv2Adapter) ListServicesV2(ctx context.Context, req *ecs.ListServicesInput) (*ecs.ListServicesOutput, error) {
-	// TODO: Implement service converters
-	return &ecs.ListServicesOutput{}, nil
+	// Convert to generated request
+	genReq := ConvertToGeneratedListServicesRequest(req)
+	
+	// Call generated API
+	genResp, err := a.generatedAPI.ListServices(ctx, genReq)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert to AWS SDK response
+	return ConvertFromGeneratedListServicesResponse(genResp), nil
 }
 
 func (a *ECSAPIv2Adapter) DescribeServicesV2(ctx context.Context, req *ecs.DescribeServicesInput) (*ecs.DescribeServicesOutput, error) {
-	// TODO: Implement service converters
-	return &ecs.DescribeServicesOutput{}, nil
+	// Convert to generated request
+	genReq := ConvertToGeneratedDescribeServicesRequest(req)
+	
+	// Call generated API
+	genResp, err := a.generatedAPI.DescribeServices(ctx, genReq)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert to AWS SDK response
+	return ConvertFromGeneratedDescribeServicesResponse(genResp), nil
 }
 
 func (a *ECSAPIv2Adapter) UpdateServiceV2(ctx context.Context, req *ecs.UpdateServiceInput) (*ecs.UpdateServiceOutput, error) {
-	// TODO: Implement service converters
-	return &ecs.UpdateServiceOutput{}, nil
+	// Convert to generated request
+	genReq := ConvertToGeneratedUpdateServiceRequest(req)
+	
+	// Call generated API
+	genResp, err := a.generatedAPI.UpdateService(ctx, genReq)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert to AWS SDK response
+	return ConvertFromGeneratedUpdateServiceResponse(genResp), nil
 }
 
 func (a *ECSAPIv2Adapter) DeleteServiceV2(ctx context.Context, req *ecs.DeleteServiceInput) (*ecs.DeleteServiceOutput, error) {
-	// TODO: Implement service converters
-	return &ecs.DeleteServiceOutput{}, nil
+	// Convert to generated request
+	genReq := ConvertToGeneratedDeleteServiceRequest(req)
+	
+	// Call generated API
+	genResp, err := a.generatedAPI.DeleteService(ctx, genReq)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert to AWS SDK response
+	return ConvertFromGeneratedDeleteServiceResponse(genResp), nil
 }
 
 // Task operations - TODO: Implement these once converters are ready
 
 func (a *ECSAPIv2Adapter) RunTaskV2(ctx context.Context, req *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
-	// TODO: Implement task converters
-	return &ecs.RunTaskOutput{}, nil
+	// Convert to generated request
+	genReq := ConvertToGeneratedRunTaskRequest(req)
+	
+	// Call generated API
+	genResp, err := a.generatedAPI.RunTask(ctx, genReq)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert to AWS SDK response
+	return ConvertFromGeneratedRunTaskResponse(genResp), nil
 }
 
 func (a *ECSAPIv2Adapter) StopTaskV2(ctx context.Context, req *ecs.StopTaskInput) (*ecs.StopTaskOutput, error) {
-	// TODO: Implement task converters
-	return &ecs.StopTaskOutput{}, nil
+	// Convert to generated request
+	genReq := ConvertToGeneratedStopTaskRequest(req)
+	
+	// Call generated API
+	genResp, err := a.generatedAPI.StopTask(ctx, genReq)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert to AWS SDK response
+	return ConvertFromGeneratedStopTaskResponse(genResp), nil
 }
 
 func (a *ECSAPIv2Adapter) DescribeTasksV2(ctx context.Context, req *ecs.DescribeTasksInput) (*ecs.DescribeTasksOutput, error) {
-	// TODO: Implement task converters
-	return &ecs.DescribeTasksOutput{}, nil
+	// Convert to generated request
+	genReq := ConvertToGeneratedDescribeTasksRequest(req)
+	
+	// Call generated API
+	genResp, err := a.generatedAPI.DescribeTasks(ctx, genReq)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert to AWS SDK response
+	return ConvertFromGeneratedDescribeTasksResponse(genResp), nil
 }
 
 func (a *ECSAPIv2Adapter) ListTasksV2(ctx context.Context, req *ecs.ListTasksInput) (*ecs.ListTasksOutput, error) {
-	// TODO: Implement task converters
-	return &ecs.ListTasksOutput{}, nil
+	// Convert to generated request
+	genReq := ConvertToGeneratedListTasksRequest(req)
+	
+	// Call generated API
+	genResp, err := a.generatedAPI.ListTasks(ctx, genReq)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert to AWS SDK response
+	return ConvertFromGeneratedListTasksResponse(genResp), nil
 }
 
 // TaskDefinition operations - TODO: Implement these once converters are ready
