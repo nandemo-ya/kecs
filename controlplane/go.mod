@@ -3,8 +3,6 @@ module github.com/nandemo-ya/kecs/controlplane
 go 1.24.3
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.36.5
-	github.com/aws/aws-sdk-go-v2/service/ecs v1.58.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/marcboeker/go-duckdb/v2 v2.1.0
@@ -27,9 +25,6 @@ require (
 	al.essio.dev/pkg/shellescape v1.5.1 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/apache/arrow-go/v18 v18.1.0 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.36 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.36 // indirect
-	github.com/aws/smithy-go v1.22.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/duckdb/duckdb-go-bindings v0.1.13 // indirect
 	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.8 // indirect

@@ -1,13 +1,10 @@
 package microservices_test
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -184,13 +181,13 @@ func buildDockerImages() {
 	baseDir := filepath.Join("..")
 
 	// Build API Gateway image
-	cmd := exec.Command("docker", "build", "-t", "microservices-api-gateway:latest", 
+	cmd := exec.Command("docker", "build", "-t", "microservices-api-gateway:latest",
 		filepath.Join(baseDir, "services/api-gateway"))
 	output, err := cmd.CombinedOutput()
 	Expect(err).NotTo(HaveOccurred(), "Failed to build API Gateway image: %s", string(output))
 
 	// Build User Service image
-	cmd = exec.Command("docker", "build", "-t", "microservices-user-service:latest", 
+	cmd = exec.Command("docker", "build", "-t", "microservices-user-service:latest",
 		filepath.Join(baseDir, "services/user-service"))
 	output, err = cmd.CombinedOutput()
 	Expect(err).NotTo(HaveOccurred(), "Failed to build User Service image: %s", string(output))
