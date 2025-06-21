@@ -52,7 +52,10 @@ func (c *secretsManagerClient) GetSecretValue(ctx context.Context, params *secre
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read error response: %w", err)
+		}
 		// Check for specific error types
 		if strings.Contains(string(body), "ResourceNotFoundException") {
 			return nil, fmt.Errorf("secret not found: %s", params.SecretId)
@@ -90,7 +93,10 @@ func (c *secretsManagerClient) CreateSecret(ctx context.Context, params *secrets
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read error response: %w", err)
+		}
 		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -124,7 +130,10 @@ func (c *secretsManagerClient) UpdateSecret(ctx context.Context, params *secrets
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read error response: %w", err)
+		}
 		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -158,7 +167,10 @@ func (c *secretsManagerClient) DeleteSecret(ctx context.Context, params *secrets
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read error response: %w", err)
+		}
 		// Check for specific error types
 		if strings.Contains(string(body), "ResourceNotFoundException") {
 			return nil, fmt.Errorf("secret not found")
