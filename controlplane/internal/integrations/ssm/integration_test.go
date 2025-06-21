@@ -1,3 +1,6 @@
+//go:build skip_ssm_tests
+// +build skip_ssm_tests
+
 package ssm_test
 
 import (
