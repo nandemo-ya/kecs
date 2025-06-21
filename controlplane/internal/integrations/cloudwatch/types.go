@@ -2,7 +2,7 @@ package cloudwatch
 
 import (
 	"context"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cloudwatchlogsapi "github.com/nandemo-ya/kecs/controlplane/internal/cloudwatchlogs/generated"
 )
 
 // Integration represents the CloudWatch-Kubernetes integration
@@ -59,8 +59,8 @@ var LogAnnotations = struct {
 
 // CloudWatchLogsClient interface for CloudWatch Logs operations (for testing)
 type CloudWatchLogsClient interface {
-	CreateLogGroup(ctx context.Context, params *cloudwatchlogs.CreateLogGroupInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.CreateLogGroupOutput, error)
-	DeleteLogGroup(ctx context.Context, params *cloudwatchlogs.DeleteLogGroupInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DeleteLogGroupOutput, error)
-	CreateLogStream(ctx context.Context, params *cloudwatchlogs.CreateLogStreamInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.CreateLogStreamOutput, error)
-	PutRetentionPolicy(ctx context.Context, params *cloudwatchlogs.PutRetentionPolicyInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.PutRetentionPolicyOutput, error)
+	CreateLogGroup(ctx context.Context, params *cloudwatchlogsapi.CreateLogGroupRequest) (*cloudwatchlogsapi.Unit, error)
+	DeleteLogGroup(ctx context.Context, params *cloudwatchlogsapi.DeleteLogGroupRequest) (*cloudwatchlogsapi.Unit, error)
+	CreateLogStream(ctx context.Context, params *cloudwatchlogsapi.CreateLogStreamRequest) (*cloudwatchlogsapi.Unit, error)
+	PutRetentionPolicy(ctx context.Context, params *cloudwatchlogsapi.PutRetentionPolicyRequest) (*cloudwatchlogsapi.Unit, error)
 }

@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cloudwatchlogsapi "github.com/nandemo-ya/kecs/controlplane/internal/cloudwatchlogs/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -31,20 +29,9 @@ func NewIntegration(kubeClient kubernetes.Interface, localstackManager localstac
 		}
 	}
 
-	// Create CloudWatch Logs client configured for LocalStack
-	cfg, err := createLocalStackConfig(config.LocalStackEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create LocalStack config: %w", err)
-	}
-
-	logsClient := cloudwatchlogs.NewFromConfig(cfg)
-
-	return &integration{
-		logsClient:        logsClient,
-		kubeClient:        kubeClient,
-		localstackManager: localstackManager,
-		config:            config,
-	}, nil
+	// TODO: Create CloudWatch Logs client using generated types
+	// For now, return an error indicating migration is in progress
+	return nil, fmt.Errorf("CloudWatch integration migration to generated types in progress")
 }
 
 // NewIntegrationWithClient creates a new CloudWatch integration with custom client (for testing)
@@ -75,8 +62,8 @@ func (i *integration) CreateLogGroup(groupName string) error {
 	}
 
 	// Create log group
-	_, err := i.logsClient.CreateLogGroup(ctx, &cloudwatchlogs.CreateLogGroupInput{
-		LogGroupName: aws.String(groupName),
+	_, err := i.logsClient.CreateLogGroup(ctx, &cloudwatchlogsapi.CreateLogGroupRequest{
+		LogGroupName: groupName,
 	})
 	if err != nil {
 		// Check if already exists
@@ -89,9 +76,9 @@ func (i *integration) CreateLogGroup(groupName string) error {
 
 	// Set retention policy
 	if i.config.RetentionDays > 0 {
-		_, err = i.logsClient.PutRetentionPolicy(ctx, &cloudwatchlogs.PutRetentionPolicyInput{
-			LogGroupName:    aws.String(groupName),
-			RetentionInDays: aws.Int32(i.config.RetentionDays),
+		_, err = i.logsClient.PutRetentionPolicy(ctx, &cloudwatchlogsapi.PutRetentionPolicyRequest{
+			LogGroupName:    groupName,
+			RetentionInDays: i.config.RetentionDays,
 		})
 		if err != nil {
 			klog.Warningf("Failed to set retention policy for log group %s: %v", groupName, err)
@@ -111,9 +98,9 @@ func (i *integration) CreateLogStream(groupName, streamName string) error {
 		groupName = i.config.LogGroupPrefix + groupName
 	}
 
-	_, err := i.logsClient.CreateLogStream(ctx, &cloudwatchlogs.CreateLogStreamInput{
-		LogGroupName:  aws.String(groupName),
-		LogStreamName: aws.String(streamName),
+	_, err := i.logsClient.CreateLogStream(ctx, &cloudwatchlogsapi.CreateLogStreamRequest{
+		LogGroupName:  groupName,
+		LogStreamName: streamName,
 	})
 	if err != nil {
 		// Check if already exists
@@ -137,8 +124,8 @@ func (i *integration) DeleteLogGroup(groupName string) error {
 		groupName = i.config.LogGroupPrefix + groupName
 	}
 
-	_, err := i.logsClient.DeleteLogGroup(ctx, &cloudwatchlogs.DeleteLogGroupInput{
-		LogGroupName: aws.String(groupName),
+	_, err := i.logsClient.DeleteLogGroup(ctx, &cloudwatchlogsapi.DeleteLogGroupRequest{
+		LogGroupName: groupName,
 	})
 	if err != nil {
 		// Ignore if not found
@@ -265,16 +252,3 @@ func (i *integration) generateFluentBitConfig(logGroupName, logStreamPrefix stri
 `, region, logGroupName, logStreamPrefix, endpoint)
 }
 
-// Helper functions
-
-func createLocalStackConfig(endpoint string) (aws.Config, error) {
-	if endpoint == "" {
-		return aws.Config{}, fmt.Errorf("no endpoint configured")
-	}
-	
-	return config.LoadDefaultConfig(context.Background(),
-		config.WithRegion("us-east-1"),
-		config.WithBaseEndpoint(endpoint),
-		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
-	)
-}
