@@ -107,6 +107,21 @@ type DecryptionFailure struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for DecryptionFailure
+func (e DecryptionFailure) Error() string {
+	return "DecryptionFailure: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e DecryptionFailure) ErrorCode() string {
+	return "DecryptionFailure"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DecryptionFailure) ErrorFault() string {
+	return "client"
+}
+
 // DeleteResourcePolicyRequest represents the DeleteResourcePolicyRequest structure
 type DeleteResourcePolicyRequest struct {
 	SecretId string `json:"secretId"`
@@ -198,6 +213,21 @@ type EncryptionFailure struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for EncryptionFailure
+func (e EncryptionFailure) Error() string {
+	return "EncryptionFailure: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e EncryptionFailure) ErrorCode() string {
+	return "EncryptionFailure"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e EncryptionFailure) ErrorFault() string {
+	return "client"
+}
+
 // ErrorCode represents the ErrorCode type
 type ErrorCode string
 
@@ -230,12 +260,6 @@ type Filter struct {
 type FilterNameStringType string
 
 const (
-	FilterNameStringTypeprimary_region FilterNameStringType = "primary_region"
-
-	FilterNameStringTypeowning_service FilterNameStringType = "owning_service"
-
-	FilterNameStringTypeall FilterNameStringType = "all"
-
 	FilterNameStringTypedescription FilterNameStringType = "description"
 
 	FilterNameStringTypename FilterNameStringType = "name"
@@ -243,6 +267,12 @@ const (
 	FilterNameStringTypetag_key FilterNameStringType = "tag_key"
 
 	FilterNameStringTypetag_value FilterNameStringType = "tag_value"
+
+	FilterNameStringTypeprimary_region FilterNameStringType = "primary_region"
+
+	FilterNameStringTypeowning_service FilterNameStringType = "owning_service"
+
+	FilterNameStringTypeall FilterNameStringType = "all"
 )
 
 // FilterValueStringType represents the FilterValueStringType type
@@ -326,9 +356,39 @@ type InternalServiceError struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InternalServiceError
+func (e InternalServiceError) Error() string {
+	return "InternalServiceError: AWS server error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InternalServiceError) ErrorCode() string {
+	return "InternalServiceError"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InternalServiceError) ErrorFault() string {
+	return "server"
+}
+
 // InvalidNextTokenException represents the InvalidNextTokenException structure
 type InvalidNextTokenException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidNextTokenException
+func (e InvalidNextTokenException) Error() string {
+	return "InvalidNextTokenException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidNextTokenException) ErrorCode() string {
+	return "InvalidNextTokenException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidNextTokenException) ErrorFault() string {
+	return "client"
 }
 
 // InvalidParameterException represents the InvalidParameterException structure
@@ -336,9 +396,39 @@ type InvalidParameterException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidParameterException
+func (e InvalidParameterException) Error() string {
+	return "InvalidParameterException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidParameterException) ErrorCode() string {
+	return "InvalidParameterException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidParameterException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidRequestException represents the InvalidRequestException structure
 type InvalidRequestException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidRequestException
+func (e InvalidRequestException) Error() string {
+	return "InvalidRequestException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidRequestException) ErrorCode() string {
+	return "InvalidRequestException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidRequestException) ErrorFault() string {
+	return "client"
 }
 
 // KmsKeyIdListType represents the KmsKeyIdListType type
@@ -359,6 +449,21 @@ type LastRotatedDateType time.Time
 // LimitExceededException represents the LimitExceededException structure
 type LimitExceededException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for LimitExceededException
+func (e LimitExceededException) Error() string {
+	return "LimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e LimitExceededException) ErrorCode() string {
+	return "LimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e LimitExceededException) ErrorFault() string {
+	return "client"
 }
 
 // ListSecretVersionIdsRequest represents the ListSecretVersionIdsRequest structure
@@ -408,6 +513,21 @@ type MalformedPolicyDocumentException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for MalformedPolicyDocumentException
+func (e MalformedPolicyDocumentException) Error() string {
+	return "MalformedPolicyDocumentException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e MalformedPolicyDocumentException) ErrorCode() string {
+	return "MalformedPolicyDocumentException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e MalformedPolicyDocumentException) ErrorFault() string {
+	return "client"
+}
+
 // MaxResultsBatchType represents the MaxResultsBatchType type
 type MaxResultsBatchType int32
 
@@ -437,9 +557,39 @@ type PreconditionNotMetException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for PreconditionNotMetException
+func (e PreconditionNotMetException) Error() string {
+	return "PreconditionNotMetException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e PreconditionNotMetException) ErrorCode() string {
+	return "PreconditionNotMetException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e PreconditionNotMetException) ErrorFault() string {
+	return "client"
+}
+
 // PublicPolicyException represents the PublicPolicyException structure
 type PublicPolicyException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for PublicPolicyException
+func (e PublicPolicyException) Error() string {
+	return "PublicPolicyException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e PublicPolicyException) ErrorCode() string {
+	return "PublicPolicyException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e PublicPolicyException) ErrorFault() string {
+	return "client"
 }
 
 // PutResourcePolicyRequest represents the PutResourcePolicyRequest structure
@@ -557,9 +707,39 @@ type ResourceExistsException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ResourceExistsException
+func (e ResourceExistsException) Error() string {
+	return "ResourceExistsException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourceExistsException) ErrorCode() string {
+	return "ResourceExistsException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourceExistsException) ErrorFault() string {
+	return "client"
+}
+
 // ResourceNotFoundException represents the ResourceNotFoundException structure
 type ResourceNotFoundException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ResourceNotFoundException
+func (e ResourceNotFoundException) Error() string {
+	return "ResourceNotFoundException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourceNotFoundException) ErrorCode() string {
+	return "ResourceNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourceNotFoundException) ErrorFault() string {
+	return "client"
 }
 
 // RestoreSecretRequest represents the RestoreSecretRequest structure
@@ -739,11 +919,11 @@ type StatusMessageType string
 type StatusType string
 
 const (
-	StatusTypeInProgress StatusType = "InProgress"
-
 	StatusTypeInSync StatusType = "InSync"
 
 	StatusTypeFailed StatusType = "Failed"
+
+	StatusTypeInProgress StatusType = "InProgress"
 )
 
 // StopReplicationToReplicaRequest represents the StopReplicationToReplicaRequest structure

@@ -14,6 +14,21 @@ type AccessDeniedException struct {
 	Message string `json:"message"`
 }
 
+// Error implements the error interface for AccessDeniedException
+func (e AccessDeniedException) Error() string {
+	return "AccessDeniedException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AccessDeniedException) ErrorCode() string {
+	return "AccessDeniedException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AccessDeniedException) ErrorFault() string {
+	return "client"
+}
+
 // AccessKeyIdType represents the AccessKeyIdType type
 type AccessKeyIdType string
 
@@ -27,8 +42,6 @@ type AccessRequestId string
 type AccessRequestStatus string
 
 const (
-	AccessRequestStatusAPPROVED AccessRequestStatus = "APPROVED"
-
 	AccessRequestStatusREJECTED AccessRequestStatus = "REJECTED"
 
 	AccessRequestStatusREVOKED AccessRequestStatus = "REVOKED"
@@ -36,6 +49,8 @@ const (
 	AccessRequestStatusEXPIRED AccessRequestStatus = "EXPIRED"
 
 	AccessRequestStatusPENDING AccessRequestStatus = "PENDING"
+
+	AccessRequestStatusAPPROVED AccessRequestStatus = "APPROVED"
 )
 
 // Account represents the Account type
@@ -156,6 +171,21 @@ type AlreadyExistsException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for AlreadyExistsException
+func (e AlreadyExistsException) Error() string {
+	return "AlreadyExistsException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AlreadyExistsException) ErrorCode() string {
+	return "AlreadyExistsException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AlreadyExistsException) ErrorFault() string {
+	return "client"
+}
+
 // ApplyOnlyAtCronInterval represents the ApplyOnlyAtCronInterval type
 type ApplyOnlyAtCronInterval bool
 
@@ -183,6 +213,21 @@ type AssociateOpsItemRelatedItemResponse struct {
 
 // AssociatedInstances represents the AssociatedInstances structure
 type AssociatedInstances struct {
+}
+
+// Error implements the error interface for AssociatedInstances
+func (e AssociatedInstances) Error() string {
+	return "AssociatedInstances: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AssociatedInstances) ErrorCode() string {
+	return "AssociatedInstances"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AssociatedInstances) ErrorFault() string {
+	return "client"
 }
 
 // Association represents the Association structure
@@ -218,10 +263,27 @@ type Association struct {
 type AssociationAlreadyExists struct {
 }
 
+// Error implements the error interface for AssociationAlreadyExists
+func (e AssociationAlreadyExists) Error() string {
+	return "AssociationAlreadyExists: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AssociationAlreadyExists) ErrorCode() string {
+	return "AssociationAlreadyExists"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AssociationAlreadyExists) ErrorFault() string {
+	return "client"
+}
+
 // AssociationComplianceSeverity represents the AssociationComplianceSeverity enum type
 type AssociationComplianceSeverity string
 
 const (
+	AssociationComplianceSeverityMedium AssociationComplianceSeverity = "Medium"
+
 	AssociationComplianceSeverityLow AssociationComplianceSeverity = "Low"
 
 	AssociationComplianceSeverityUnspecified AssociationComplianceSeverity = "Unspecified"
@@ -229,8 +291,6 @@ const (
 	AssociationComplianceSeverityCritical AssociationComplianceSeverity = "Critical"
 
 	AssociationComplianceSeverityHigh AssociationComplianceSeverity = "High"
-
-	AssociationComplianceSeverityMedium AssociationComplianceSeverity = "Medium"
 )
 
 // AssociationDescription represents the AssociationDescription structure
@@ -302,6 +362,21 @@ type AssociationDoesNotExist struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for AssociationDoesNotExist
+func (e AssociationDoesNotExist) Error() string {
+	return "AssociationDoesNotExist: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AssociationDoesNotExist) ErrorCode() string {
+	return "AssociationDoesNotExist"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AssociationDoesNotExist) ErrorFault() string {
+	return "client"
+}
+
 // AssociationExecution represents the AssociationExecution structure
 type AssociationExecution struct {
 	AlarmConfiguration *AlarmConfiguration `json:"alarmConfiguration,omitempty"`
@@ -328,6 +403,21 @@ type AssociationExecution struct {
 // AssociationExecutionDoesNotExist represents the AssociationExecutionDoesNotExist structure
 type AssociationExecutionDoesNotExist struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for AssociationExecutionDoesNotExist
+func (e AssociationExecutionDoesNotExist) Error() string {
+	return "AssociationExecutionDoesNotExist: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AssociationExecutionDoesNotExist) ErrorCode() string {
+	return "AssociationExecutionDoesNotExist"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AssociationExecutionDoesNotExist) ErrorFault() string {
+	return "client"
 }
 
 // AssociationExecutionFilter represents the AssociationExecutionFilter structure
@@ -391,11 +481,11 @@ type AssociationExecutionTargetsFilter struct {
 type AssociationExecutionTargetsFilterKey string
 
 const (
-	AssociationExecutionTargetsFilterKeyResourceType AssociationExecutionTargetsFilterKey = "ResourceType"
-
 	AssociationExecutionTargetsFilterKeyStatus AssociationExecutionTargetsFilterKey = "Status"
 
 	AssociationExecutionTargetsFilterKeyResourceId AssociationExecutionTargetsFilterKey = "ResourceId"
+
+	AssociationExecutionTargetsFilterKeyResourceType AssociationExecutionTargetsFilterKey = "ResourceType"
 )
 
 // AssociationExecutionTargetsFilterList represents the AssociationExecutionTargetsFilterList type
@@ -421,6 +511,8 @@ type AssociationFilter struct {
 type AssociationFilterKey string
 
 const (
+	AssociationFilterKeyInstanceId AssociationFilterKey = "InstanceId"
+
 	AssociationFilterKeyName AssociationFilterKey = "Name"
 
 	AssociationFilterKeyAssociationId AssociationFilterKey = "AssociationId"
@@ -434,8 +526,6 @@ const (
 	AssociationFilterKeyAssociationName AssociationFilterKey = "AssociationName"
 
 	AssociationFilterKeyResourceGroupName AssociationFilterKey = "ResourceGroupName"
-
-	AssociationFilterKeyInstanceId AssociationFilterKey = "InstanceId"
 )
 
 // AssociationFilterList represents the AssociationFilterList type
@@ -463,6 +553,21 @@ type AssociationIdList []string
 
 // AssociationLimitExceeded represents the AssociationLimitExceeded structure
 type AssociationLimitExceeded struct {
+}
+
+// Error implements the error interface for AssociationLimitExceeded
+func (e AssociationLimitExceeded) Error() string {
+	return "AssociationLimitExceeded: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AssociationLimitExceeded) ErrorCode() string {
+	return "AssociationLimitExceeded"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AssociationLimitExceeded) ErrorFault() string {
+	return "client"
 }
 
 // AssociationList represents the AssociationList type
@@ -504,11 +609,11 @@ type AssociationStatusAggregatedCount map[string]int32
 type AssociationStatusName string
 
 const (
+	AssociationStatusNamePending AssociationStatusName = "Pending"
+
 	AssociationStatusNameSuccess AssociationStatusName = "Success"
 
 	AssociationStatusNameFailed AssociationStatusName = "Failed"
-
-	AssociationStatusNamePending AssociationStatusName = "Pending"
 )
 
 // AssociationSyncCompliance represents the AssociationSyncCompliance enum type
@@ -571,6 +676,21 @@ type AssociationVersionLimitExceeded struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for AssociationVersionLimitExceeded
+func (e AssociationVersionLimitExceeded) Error() string {
+	return "AssociationVersionLimitExceeded: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AssociationVersionLimitExceeded) ErrorCode() string {
+	return "AssociationVersionLimitExceeded"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AssociationVersionLimitExceeded) ErrorFault() string {
+	return "client"
+}
+
 // AssociationVersionList represents the AssociationVersionList type
 type AssociationVersionList []AssociationVersionInfo
 
@@ -630,11 +750,11 @@ type AttachmentsSource struct {
 type AttachmentsSourceKey string
 
 const (
+	AttachmentsSourceKeySourceUrl AttachmentsSourceKey = "SourceUrl"
+
 	AttachmentsSourceKeyS3FileUrl AttachmentsSourceKey = "S3FileUrl"
 
 	AttachmentsSourceKeyAttachmentReference AttachmentsSourceKey = "AttachmentReference"
-
-	AttachmentsSourceKeySourceUrl AttachmentsSourceKey = "SourceUrl"
 )
 
 // AttachmentsSourceList represents the AttachmentsSourceList type
@@ -660,14 +780,59 @@ type AutomationDefinitionNotApprovedException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for AutomationDefinitionNotApprovedException
+func (e AutomationDefinitionNotApprovedException) Error() string {
+	return "AutomationDefinitionNotApprovedException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AutomationDefinitionNotApprovedException) ErrorCode() string {
+	return "AutomationDefinitionNotApprovedException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AutomationDefinitionNotApprovedException) ErrorFault() string {
+	return "client"
+}
+
 // AutomationDefinitionNotFoundException represents the AutomationDefinitionNotFoundException structure
 type AutomationDefinitionNotFoundException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for AutomationDefinitionNotFoundException
+func (e AutomationDefinitionNotFoundException) Error() string {
+	return "AutomationDefinitionNotFoundException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AutomationDefinitionNotFoundException) ErrorCode() string {
+	return "AutomationDefinitionNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AutomationDefinitionNotFoundException) ErrorFault() string {
+	return "client"
+}
+
 // AutomationDefinitionVersionNotFoundException represents the AutomationDefinitionVersionNotFoundException structure
 type AutomationDefinitionVersionNotFoundException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for AutomationDefinitionVersionNotFoundException
+func (e AutomationDefinitionVersionNotFoundException) Error() string {
+	return "AutomationDefinitionVersionNotFoundException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AutomationDefinitionVersionNotFoundException) ErrorCode() string {
+	return "AutomationDefinitionVersionNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AutomationDefinitionVersionNotFoundException) ErrorFault() string {
+	return "client"
 }
 
 // AutomationExecution represents the AutomationExecution structure
@@ -754,29 +919,29 @@ type AutomationExecutionFilter struct {
 type AutomationExecutionFilterKey string
 
 const (
+	AutomationExecutionFilterKeyCURRENT_ACTION AutomationExecutionFilterKey = "CURRENT_ACTION"
+
+	AutomationExecutionFilterKeySTART_TIME_AFTER AutomationExecutionFilterKey = "START_TIME_AFTER"
+
+	AutomationExecutionFilterKeyAUTOMATION_TYPE AutomationExecutionFilterKey = "AUTOMATION_TYPE"
+
 	AutomationExecutionFilterKeyTARGET_RESOURCE_GROUP AutomationExecutionFilterKey = "TARGET_RESOURCE_GROUP"
 
 	AutomationExecutionFilterKeyAUTOMATION_SUBTYPE AutomationExecutionFilterKey = "AUTOMATION_SUBTYPE"
-
-	AutomationExecutionFilterKeyEXECUTION_STATUS AutomationExecutionFilterKey = "EXECUTION_STATUS"
-
-	AutomationExecutionFilterKeyEXECUTION_ID AutomationExecutionFilterKey = "EXECUTION_ID"
-
-	AutomationExecutionFilterKeyPARENT_EXECUTION_ID AutomationExecutionFilterKey = "PARENT_EXECUTION_ID"
-
-	AutomationExecutionFilterKeySTART_TIME_BEFORE AutomationExecutionFilterKey = "START_TIME_BEFORE"
-
-	AutomationExecutionFilterKeySTART_TIME_AFTER AutomationExecutionFilterKey = "START_TIME_AFTER"
 
 	AutomationExecutionFilterKeyOPS_ITEM_ID AutomationExecutionFilterKey = "OPS_ITEM_ID"
 
 	AutomationExecutionFilterKeyDOCUMENT_NAME_PREFIX AutomationExecutionFilterKey = "DOCUMENT_NAME_PREFIX"
 
-	AutomationExecutionFilterKeyCURRENT_ACTION AutomationExecutionFilterKey = "CURRENT_ACTION"
+	AutomationExecutionFilterKeyEXECUTION_STATUS AutomationExecutionFilterKey = "EXECUTION_STATUS"
 
-	AutomationExecutionFilterKeyAUTOMATION_TYPE AutomationExecutionFilterKey = "AUTOMATION_TYPE"
+	AutomationExecutionFilterKeyEXECUTION_ID AutomationExecutionFilterKey = "EXECUTION_ID"
+
+	AutomationExecutionFilterKeySTART_TIME_BEFORE AutomationExecutionFilterKey = "START_TIME_BEFORE"
 
 	AutomationExecutionFilterKeyTAG_KEY AutomationExecutionFilterKey = "TAG_KEY"
+
+	AutomationExecutionFilterKeyPARENT_EXECUTION_ID AutomationExecutionFilterKey = "PARENT_EXECUTION_ID"
 )
 
 // AutomationExecutionFilterList represents the AutomationExecutionFilterList type
@@ -809,6 +974,21 @@ type AutomationExecutionInputs struct {
 // AutomationExecutionLimitExceededException represents the AutomationExecutionLimitExceededException structure
 type AutomationExecutionLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for AutomationExecutionLimitExceededException
+func (e AutomationExecutionLimitExceededException) Error() string {
+	return "AutomationExecutionLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AutomationExecutionLimitExceededException) ErrorCode() string {
+	return "AutomationExecutionLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AutomationExecutionLimitExceededException) ErrorFault() string {
+	return "client"
 }
 
 // AutomationExecutionMetadata represents the AutomationExecutionMetadata structure
@@ -884,6 +1064,21 @@ type AutomationExecutionNotFoundException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for AutomationExecutionNotFoundException
+func (e AutomationExecutionNotFoundException) Error() string {
+	return "AutomationExecutionNotFoundException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AutomationExecutionNotFoundException) ErrorCode() string {
+	return "AutomationExecutionNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AutomationExecutionNotFoundException) ErrorFault() string {
+	return "client"
+}
+
 // AutomationExecutionPreview represents the AutomationExecutionPreview structure
 type AutomationExecutionPreview struct {
 	Regions []string `json:"regions,omitempty"`
@@ -899,17 +1094,23 @@ type AutomationExecutionPreview struct {
 type AutomationExecutionStatus string
 
 const (
+	AutomationExecutionStatusFAILED AutomationExecutionStatus = "FAILED"
+
 	AutomationExecutionStatusCOMPLETED_WITH_SUCCESS AutomationExecutionStatus = "COMPLETED_WITH_SUCCESS"
 
-	AutomationExecutionStatusSUCCESS AutomationExecutionStatus = "SUCCESS"
+	AutomationExecutionStatusINPROGRESS AutomationExecutionStatus = "INPROGRESS"
 
-	AutomationExecutionStatusPENDING_CHANGE_CALENDAR_OVERRIDE AutomationExecutionStatus = "PENDING_CHANGE_CALENDAR_OVERRIDE"
+	AutomationExecutionStatusTIMEDOUT AutomationExecutionStatus = "TIMEDOUT"
 
-	AutomationExecutionStatusCHANGE_CALENDAR_OVERRIDE_REJECTED AutomationExecutionStatus = "CHANGE_CALENDAR_OVERRIDE_REJECTED"
+	AutomationExecutionStatusCANCELLED AutomationExecutionStatus = "CANCELLED"
 
 	AutomationExecutionStatusPENDING_APPROVAL AutomationExecutionStatus = "PENDING_APPROVAL"
 
+	AutomationExecutionStatusSCHEDULED AutomationExecutionStatus = "SCHEDULED"
+
 	AutomationExecutionStatusRUNBOOK_INPROGRESS AutomationExecutionStatus = "RUNBOOK_INPROGRESS"
+
+	AutomationExecutionStatusCHANGE_CALENDAR_OVERRIDE_REJECTED AutomationExecutionStatus = "CHANGE_CALENDAR_OVERRIDE_REJECTED"
 
 	AutomationExecutionStatusCOMPLETED_WITH_FAILURE AutomationExecutionStatus = "COMPLETED_WITH_FAILURE"
 
@@ -917,25 +1118,19 @@ const (
 
 	AutomationExecutionStatusPENDING AutomationExecutionStatus = "PENDING"
 
-	AutomationExecutionStatusWAITING AutomationExecutionStatus = "WAITING"
-
 	AutomationExecutionStatusCANCELLING AutomationExecutionStatus = "CANCELLING"
-
-	AutomationExecutionStatusCANCELLED AutomationExecutionStatus = "CANCELLED"
-
-	AutomationExecutionStatusFAILED AutomationExecutionStatus = "FAILED"
-
-	AutomationExecutionStatusREJECTED AutomationExecutionStatus = "REJECTED"
-
-	AutomationExecutionStatusINPROGRESS AutomationExecutionStatus = "INPROGRESS"
-
-	AutomationExecutionStatusTIMEDOUT AutomationExecutionStatus = "TIMEDOUT"
 
 	AutomationExecutionStatusAPPROVED AutomationExecutionStatus = "APPROVED"
 
-	AutomationExecutionStatusSCHEDULED AutomationExecutionStatus = "SCHEDULED"
+	AutomationExecutionStatusREJECTED AutomationExecutionStatus = "REJECTED"
+
+	AutomationExecutionStatusPENDING_CHANGE_CALENDAR_OVERRIDE AutomationExecutionStatus = "PENDING_CHANGE_CALENDAR_OVERRIDE"
 
 	AutomationExecutionStatusCHANGE_CALENDAR_OVERRIDE_APPROVED AutomationExecutionStatus = "CHANGE_CALENDAR_OVERRIDE_APPROVED"
+
+	AutomationExecutionStatusWAITING AutomationExecutionStatus = "WAITING"
+
+	AutomationExecutionStatusSUCCESS AutomationExecutionStatus = "SUCCESS"
 )
 
 // AutomationParameterKey represents the AutomationParameterKey type
@@ -953,6 +1148,21 @@ type AutomationParameterValueList []string
 // AutomationStepNotFoundException represents the AutomationStepNotFoundException structure
 type AutomationStepNotFoundException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for AutomationStepNotFoundException
+func (e AutomationStepNotFoundException) Error() string {
+	return "AutomationStepNotFoundException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e AutomationStepNotFoundException) ErrorCode() string {
+	return "AutomationStepNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e AutomationStepNotFoundException) ErrorFault() string {
+	return "client"
 }
 
 // AutomationSubtype represents the AutomationSubtype enum type
@@ -1209,6 +1419,12 @@ type CommandInvocationList []CommandInvocation
 type CommandInvocationStatus string
 
 const (
+	CommandInvocationStatusDELAYED CommandInvocationStatus = "DELAYED"
+
+	CommandInvocationStatusSUCCESS CommandInvocationStatus = "SUCCESS"
+
+	CommandInvocationStatusCANCELLED CommandInvocationStatus = "CANCELLED"
+
 	CommandInvocationStatusTIMED_OUT CommandInvocationStatus = "TIMED_OUT"
 
 	CommandInvocationStatusFAILED CommandInvocationStatus = "FAILED"
@@ -1218,12 +1434,6 @@ const (
 	CommandInvocationStatusPENDING CommandInvocationStatus = "PENDING"
 
 	CommandInvocationStatusIN_PROGRESS CommandInvocationStatus = "IN_PROGRESS"
-
-	CommandInvocationStatusDELAYED CommandInvocationStatus = "DELAYED"
-
-	CommandInvocationStatusSUCCESS CommandInvocationStatus = "SUCCESS"
-
-	CommandInvocationStatusCANCELLED CommandInvocationStatus = "CANCELLED"
 )
 
 // CommandList represents the CommandList type
@@ -1272,6 +1482,10 @@ type CommandPluginOutput string
 type CommandPluginStatus string
 
 const (
+	CommandPluginStatusTIMED_OUT CommandPluginStatus = "TIMED_OUT"
+
+	CommandPluginStatusCANCELLED CommandPluginStatus = "CANCELLED"
+
 	CommandPluginStatusFAILED CommandPluginStatus = "FAILED"
 
 	CommandPluginStatusPENDING CommandPluginStatus = "PENDING"
@@ -1279,16 +1493,14 @@ const (
 	CommandPluginStatusIN_PROGRESS CommandPluginStatus = "IN_PROGRESS"
 
 	CommandPluginStatusSUCCESS CommandPluginStatus = "SUCCESS"
-
-	CommandPluginStatusTIMED_OUT CommandPluginStatus = "TIMED_OUT"
-
-	CommandPluginStatusCANCELLED CommandPluginStatus = "CANCELLED"
 )
 
 // CommandStatus represents the CommandStatus enum type
 type CommandStatus string
 
 const (
+	CommandStatusCANCELLED CommandStatus = "CANCELLED"
+
 	CommandStatusFAILED CommandStatus = "FAILED"
 
 	CommandStatusTIMED_OUT CommandStatus = "TIMED_OUT"
@@ -1300,8 +1512,6 @@ const (
 	CommandStatusIN_PROGRESS CommandStatus = "IN_PROGRESS"
 
 	CommandStatusSUCCESS CommandStatus = "SUCCESS"
-
-	CommandStatusCANCELLED CommandStatus = "CANCELLED"
 )
 
 // Comment represents the Comment type
@@ -1384,15 +1594,15 @@ type ComplianceItemTitle string
 type ComplianceQueryOperatorType string
 
 const (
+	ComplianceQueryOperatorTypeLessThan ComplianceQueryOperatorType = "LessThan"
+
+	ComplianceQueryOperatorTypeGreaterThan ComplianceQueryOperatorType = "GreaterThan"
+
 	ComplianceQueryOperatorTypeEqual ComplianceQueryOperatorType = "Equal"
 
 	ComplianceQueryOperatorTypeNotEqual ComplianceQueryOperatorType = "NotEqual"
 
 	ComplianceQueryOperatorTypeBeginWith ComplianceQueryOperatorType = "BeginWith"
-
-	ComplianceQueryOperatorTypeLessThan ComplianceQueryOperatorType = "LessThan"
-
-	ComplianceQueryOperatorTypeGreaterThan ComplianceQueryOperatorType = "GreaterThan"
 )
 
 // ComplianceResourceId represents the ComplianceResourceId type
@@ -1428,9 +1638,9 @@ const (
 type ComplianceStatus string
 
 const (
-	ComplianceStatusNonCompliant ComplianceStatus = "NonCompliant"
-
 	ComplianceStatusCompliant ComplianceStatus = "Compliant"
+
+	ComplianceStatusNonCompliant ComplianceStatus = "NonCompliant"
 )
 
 // ComplianceStringFilter represents the ComplianceStringFilter structure
@@ -1469,6 +1679,21 @@ type ComplianceSummaryItemList []ComplianceSummaryItem
 // ComplianceTypeCountLimitExceededException represents the ComplianceTypeCountLimitExceededException structure
 type ComplianceTypeCountLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ComplianceTypeCountLimitExceededException
+func (e ComplianceTypeCountLimitExceededException) Error() string {
+	return "ComplianceTypeCountLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ComplianceTypeCountLimitExceededException) ErrorCode() string {
+	return "ComplianceTypeCountLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ComplianceTypeCountLimitExceededException) ErrorFault() string {
+	return "client"
 }
 
 // ComplianceTypeName represents the ComplianceTypeName type
@@ -1821,6 +2046,21 @@ type Credentials struct {
 // CustomSchemaCountLimitExceededException represents the CustomSchemaCountLimitExceededException structure
 type CustomSchemaCountLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for CustomSchemaCountLimitExceededException
+func (e CustomSchemaCountLimitExceededException) Error() string {
+	return "CustomSchemaCountLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e CustomSchemaCountLimitExceededException) ErrorCode() string {
+	return "CustomSchemaCountLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e CustomSchemaCountLimitExceededException) ErrorFault() string {
+	return "client"
 }
 
 // DateTime represents the DateTime type
@@ -2670,6 +2910,21 @@ type DocumentAlreadyExists struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for DocumentAlreadyExists
+func (e DocumentAlreadyExists) Error() string {
+	return "DocumentAlreadyExists: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e DocumentAlreadyExists) ErrorCode() string {
+	return "DocumentAlreadyExists"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DocumentAlreadyExists) ErrorFault() string {
+	return "client"
+}
+
 // DocumentAuthor represents the DocumentAuthor type
 type DocumentAuthor string
 
@@ -2762,13 +3017,13 @@ type DocumentFilter struct {
 type DocumentFilterKey string
 
 const (
-	DocumentFilterKeyDocumentType DocumentFilterKey = "DocumentType"
-
-	DocumentFilterKeyName DocumentFilterKey = "Name"
-
 	DocumentFilterKeyOwner DocumentFilterKey = "Owner"
 
 	DocumentFilterKeyPlatformTypes DocumentFilterKey = "PlatformTypes"
+
+	DocumentFilterKeyDocumentType DocumentFilterKey = "DocumentType"
+
+	DocumentFilterKeyName DocumentFilterKey = "Name"
 )
 
 // DocumentFilterList represents the DocumentFilterList type
@@ -2781,11 +3036,11 @@ type DocumentFilterValue string
 type DocumentFormat string
 
 const (
-	DocumentFormatTEXT DocumentFormat = "TEXT"
-
 	DocumentFormatYAML DocumentFormat = "YAML"
 
 	DocumentFormatJSON DocumentFormat = "JSON"
+
+	DocumentFormatTEXT DocumentFormat = "TEXT"
 )
 
 // DocumentHash represents the DocumentHash type
@@ -2795,9 +3050,9 @@ type DocumentHash string
 type DocumentHashType string
 
 const (
-	DocumentHashTypeSHA256 DocumentHashType = "SHA256"
-
 	DocumentHashTypeSHA1 DocumentHashType = "SHA1"
+
+	DocumentHashTypeSHA256 DocumentHashType = "SHA256"
 )
 
 // DocumentIdentifier represents the DocumentIdentifier structure
@@ -2860,6 +3115,21 @@ type DocumentLimitExceeded struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for DocumentLimitExceeded
+func (e DocumentLimitExceeded) Error() string {
+	return "DocumentLimitExceeded: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e DocumentLimitExceeded) ErrorCode() string {
+	return "DocumentLimitExceeded"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DocumentLimitExceeded) ErrorFault() string {
+	return "client"
+}
+
 // DocumentMetadataEnum represents the DocumentMetadataEnum enum type
 type DocumentMetadataEnum string
 
@@ -2915,6 +3185,21 @@ type DocumentPermissionLimit struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for DocumentPermissionLimit
+func (e DocumentPermissionLimit) Error() string {
+	return "DocumentPermissionLimit: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e DocumentPermissionLimit) ErrorCode() string {
+	return "DocumentPermissionLimit"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DocumentPermissionLimit) ErrorFault() string {
+	return "client"
+}
+
 // DocumentPermissionMaxResults represents the DocumentPermissionMaxResults type
 type DocumentPermissionMaxResults int32
 
@@ -2943,13 +3228,13 @@ type DocumentRequiresList []DocumentRequires
 type DocumentReviewAction string
 
 const (
+	DocumentReviewActionSendForReview DocumentReviewAction = "SendForReview"
+
 	DocumentReviewActionUpdateReview DocumentReviewAction = "UpdateReview"
 
 	DocumentReviewActionApprove DocumentReviewAction = "Approve"
 
 	DocumentReviewActionReject DocumentReviewAction = "Reject"
-
-	DocumentReviewActionSendForReview DocumentReviewAction = "SendForReview"
 )
 
 // DocumentReviewComment represents the DocumentReviewComment type
@@ -3005,15 +3290,15 @@ type DocumentSha1 string
 type DocumentStatus string
 
 const (
-	DocumentStatusActive DocumentStatus = "Active"
-
-	DocumentStatusUpdating DocumentStatus = "Updating"
-
 	DocumentStatusDeleting DocumentStatus = "Deleting"
 
 	DocumentStatusFailed DocumentStatus = "Failed"
 
 	DocumentStatusCreating DocumentStatus = "Creating"
+
+	DocumentStatusActive DocumentStatus = "Active"
+
+	DocumentStatusUpdating DocumentStatus = "Updating"
 )
 
 // DocumentStatusInformation represents the DocumentStatusInformation type
@@ -3023,39 +3308,39 @@ type DocumentStatusInformation string
 type DocumentType string
 
 const (
-	DocumentTypeProblemAnalysisTemplate DocumentType = "ProblemAnalysisTemplate"
-
-	DocumentTypeProblemAnalysis DocumentType = "ProblemAnalysis"
-
-	DocumentTypeQuickSetup DocumentType = "QuickSetup"
-
-	DocumentTypeSession DocumentType = "Session"
-
-	DocumentTypeDeploymentStrategy DocumentType = "DeploymentStrategy"
-
-	DocumentTypeChangeTemplate DocumentType = "ChangeTemplate"
-
-	DocumentTypeAutoApprovalPolicy DocumentType = "AutoApprovalPolicy"
-
-	DocumentTypeApplicationConfigurationSchema DocumentType = "ApplicationConfigurationSchema"
+	DocumentTypePackage DocumentType = "Package"
 
 	DocumentTypeCloudFormation DocumentType = "CloudFormation"
 
 	DocumentTypeConformancePackTemplate DocumentType = "ConformancePackTemplate"
 
-	DocumentTypeManualApprovalPolicy DocumentType = "ManualApprovalPolicy"
-
-	DocumentTypeCommand DocumentType = "Command"
+	DocumentTypeAutoApprovalPolicy DocumentType = "AutoApprovalPolicy"
 
 	DocumentTypePolicy DocumentType = "Policy"
 
-	DocumentTypeAutomation DocumentType = "Automation"
+	DocumentTypeSession DocumentType = "Session"
 
-	DocumentTypePackage DocumentType = "Package"
+	DocumentTypeProblemAnalysis DocumentType = "ProblemAnalysis"
+
+	DocumentTypeProblemAnalysisTemplate DocumentType = "ProblemAnalysisTemplate"
+
+	DocumentTypeManualApprovalPolicy DocumentType = "ManualApprovalPolicy"
+
+	DocumentTypeApplicationConfigurationSchema DocumentType = "ApplicationConfigurationSchema"
+
+	DocumentTypeChangeCalendar DocumentType = "ChangeCalendar"
+
+	DocumentTypeQuickSetup DocumentType = "QuickSetup"
+
+	DocumentTypeCommand DocumentType = "Command"
 
 	DocumentTypeApplicationConfiguration DocumentType = "ApplicationConfiguration"
 
-	DocumentTypeChangeCalendar DocumentType = "ChangeCalendar"
+	DocumentTypeDeploymentStrategy DocumentType = "DeploymentStrategy"
+
+	DocumentTypeChangeTemplate DocumentType = "ChangeTemplate"
+
+	DocumentTypeAutomation DocumentType = "Automation"
 )
 
 // DocumentVersion represents the DocumentVersion type
@@ -3089,6 +3374,21 @@ type DocumentVersionLimitExceeded struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for DocumentVersionLimitExceeded
+func (e DocumentVersionLimitExceeded) Error() string {
+	return "DocumentVersionLimitExceeded: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e DocumentVersionLimitExceeded) ErrorCode() string {
+	return "DocumentVersionLimitExceeded"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DocumentVersionLimitExceeded) ErrorFault() string {
+	return "client"
+}
+
 // DocumentVersionList represents the DocumentVersionList type
 type DocumentVersionList []DocumentVersionInfo
 
@@ -3103,6 +3403,21 @@ type DoesNotExistException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for DoesNotExistException
+func (e DoesNotExistException) Error() string {
+	return "DoesNotExistException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e DoesNotExistException) ErrorCode() string {
+	return "DoesNotExistException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DoesNotExistException) ErrorFault() string {
+	return "client"
+}
+
 // DryRun represents the DryRun type
 type DryRun bool
 
@@ -3111,13 +3426,58 @@ type DuplicateDocumentContent struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for DuplicateDocumentContent
+func (e DuplicateDocumentContent) Error() string {
+	return "DuplicateDocumentContent: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e DuplicateDocumentContent) ErrorCode() string {
+	return "DuplicateDocumentContent"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DuplicateDocumentContent) ErrorFault() string {
+	return "client"
+}
+
 // DuplicateDocumentVersionName represents the DuplicateDocumentVersionName structure
 type DuplicateDocumentVersionName struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for DuplicateDocumentVersionName
+func (e DuplicateDocumentVersionName) Error() string {
+	return "DuplicateDocumentVersionName: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e DuplicateDocumentVersionName) ErrorCode() string {
+	return "DuplicateDocumentVersionName"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DuplicateDocumentVersionName) ErrorFault() string {
+	return "client"
+}
+
 // DuplicateInstanceId represents the DuplicateInstanceId structure
 type DuplicateInstanceId struct {
+}
+
+// Error implements the error interface for DuplicateInstanceId
+func (e DuplicateInstanceId) Error() string {
+	return "DuplicateInstanceId: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e DuplicateInstanceId) ErrorCode() string {
+	return "DuplicateInstanceId"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e DuplicateInstanceId) ErrorFault() string {
+	return "client"
 }
 
 // Duration represents the Duration type
@@ -3175,13 +3535,13 @@ type ExecutionPreviewId string
 type ExecutionPreviewStatus string
 
 const (
-	ExecutionPreviewStatusFAILED ExecutionPreviewStatus = "FAILED"
-
 	ExecutionPreviewStatusPENDING ExecutionPreviewStatus = "PENDING"
 
 	ExecutionPreviewStatusIN_PROGRESS ExecutionPreviewStatus = "IN_PROGRESS"
 
 	ExecutionPreviewStatusSUCCESS ExecutionPreviewStatus = "SUCCESS"
+
+	ExecutionPreviewStatusFAILED ExecutionPreviewStatus = "FAILED"
 )
 
 // ExecutionRoleName represents the ExecutionRoleName type
@@ -3234,6 +3594,21 @@ const (
 // FeatureNotAvailableException represents the FeatureNotAvailableException structure
 type FeatureNotAvailableException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for FeatureNotAvailableException
+func (e FeatureNotAvailableException) Error() string {
+	return "FeatureNotAvailableException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e FeatureNotAvailableException) ErrorCode() string {
+	return "FeatureNotAvailableException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e FeatureNotAvailableException) ErrorFault() string {
+	return "client"
 }
 
 // GetAccessTokenRequest represents the GetAccessTokenRequest structure
@@ -3864,9 +4239,39 @@ type HierarchyLevelLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for HierarchyLevelLimitExceededException
+func (e HierarchyLevelLimitExceededException) Error() string {
+	return "HierarchyLevelLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e HierarchyLevelLimitExceededException) ErrorCode() string {
+	return "HierarchyLevelLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e HierarchyLevelLimitExceededException) ErrorFault() string {
+	return "client"
+}
+
 // HierarchyTypeMismatchException represents the HierarchyTypeMismatchException structure
 type HierarchyTypeMismatchException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for HierarchyTypeMismatchException
+func (e HierarchyTypeMismatchException) Error() string {
+	return "HierarchyTypeMismatchException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e HierarchyTypeMismatchException) ErrorCode() string {
+	return "HierarchyTypeMismatchException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e HierarchyTypeMismatchException) ErrorFault() string {
+	return "client"
 }
 
 // IPAddress represents the IPAddress type
@@ -3886,20 +4291,50 @@ type IdempotentParameterMismatch struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for IdempotentParameterMismatch
+func (e IdempotentParameterMismatch) Error() string {
+	return "IdempotentParameterMismatch: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e IdempotentParameterMismatch) ErrorCode() string {
+	return "IdempotentParameterMismatch"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e IdempotentParameterMismatch) ErrorFault() string {
+	return "client"
+}
+
 // ImpactType represents the ImpactType enum type
 type ImpactType string
 
 const (
-	ImpactTypeUNDETERMINED ImpactType = "UNDETERMINED"
-
 	ImpactTypeMUTATING ImpactType = "MUTATING"
 
 	ImpactTypeNON_MUTATING ImpactType = "NON_MUTATING"
+
+	ImpactTypeUNDETERMINED ImpactType = "UNDETERMINED"
 )
 
 // IncompatiblePolicyException represents the IncompatiblePolicyException structure
 type IncompatiblePolicyException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for IncompatiblePolicyException
+func (e IncompatiblePolicyException) Error() string {
+	return "IncompatiblePolicyException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e IncompatiblePolicyException) ErrorCode() string {
+	return "IncompatiblePolicyException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e IncompatiblePolicyException) ErrorFault() string {
+	return "client"
 }
 
 // InstallOverrideList represents the InstallOverrideList type
@@ -4060,6 +4495,8 @@ type InstanceInformationFilter struct {
 type InstanceInformationFilterKey string
 
 const (
+	InstanceInformationFilterKeyPLATFORM_TYPES InstanceInformationFilterKey = "PLATFORM_TYPES"
+
 	InstanceInformationFilterKeyACTIVATION_IDS InstanceInformationFilterKey = "ACTIVATION_IDS"
 
 	InstanceInformationFilterKeyIAM_ROLE InstanceInformationFilterKey = "IAM_ROLE"
@@ -4073,8 +4510,6 @@ const (
 	InstanceInformationFilterKeyAGENT_VERSION InstanceInformationFilterKey = "AGENT_VERSION"
 
 	InstanceInformationFilterKeyPING_STATUS InstanceInformationFilterKey = "PING_STATUS"
-
-	InstanceInformationFilterKeyPLATFORM_TYPES InstanceInformationFilterKey = "PLATFORM_TYPES"
 )
 
 // InstanceInformationFilterList represents the InstanceInformationFilterList type
@@ -4182,13 +4617,13 @@ type InstancePatchStateList []InstancePatchState
 type InstancePatchStateOperatorType string
 
 const (
+	InstancePatchStateOperatorTypeEQUAL InstancePatchStateOperatorType = "EQUAL"
+
 	InstancePatchStateOperatorTypeNOT_EQUAL InstancePatchStateOperatorType = "NOT_EQUAL"
 
 	InstancePatchStateOperatorTypeLESS_THAN InstancePatchStateOperatorType = "LESS_THAN"
 
 	InstancePatchStateOperatorTypeGREATER_THAN InstancePatchStateOperatorType = "GREATER_THAN"
-
-	InstancePatchStateOperatorTypeEQUAL InstancePatchStateOperatorType = "EQUAL"
 )
 
 // InstancePatchStatesList represents the InstancePatchStatesList type
@@ -4267,17 +4702,17 @@ const (
 
 	InstancePropertyFilterKeyPING_STATUS InstancePropertyFilterKey = "PING_STATUS"
 
+	InstancePropertyFilterKeyPLATFORM_TYPES InstancePropertyFilterKey = "PLATFORM_TYPES"
+
 	InstancePropertyFilterKeyDOCUMENT_NAME InstancePropertyFilterKey = "DOCUMENT_NAME"
 
 	InstancePropertyFilterKeyACTIVATION_IDS InstancePropertyFilterKey = "ACTIVATION_IDS"
 
 	InstancePropertyFilterKeyIAM_ROLE InstancePropertyFilterKey = "IAM_ROLE"
 
-	InstancePropertyFilterKeyRESOURCE_TYPE InstancePropertyFilterKey = "RESOURCE_TYPE"
-
 	InstancePropertyFilterKeyINSTANCE_IDS InstancePropertyFilterKey = "INSTANCE_IDS"
 
-	InstancePropertyFilterKeyPLATFORM_TYPES InstancePropertyFilterKey = "PLATFORM_TYPES"
+	InstancePropertyFilterKeyRESOURCE_TYPE InstancePropertyFilterKey = "RESOURCE_TYPE"
 
 	InstancePropertyFilterKeyASSOCIATION_STATUS InstancePropertyFilterKey = "ASSOCIATION_STATUS"
 )
@@ -4347,9 +4782,39 @@ type InternalServerError struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InternalServerError
+func (e InternalServerError) Error() string {
+	return "InternalServerError: AWS server error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InternalServerError) ErrorCode() string {
+	return "InternalServerError"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InternalServerError) ErrorFault() string {
+	return "server"
+}
+
 // InvalidActivation represents the InvalidActivation structure
 type InvalidActivation struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidActivation
+func (e InvalidActivation) Error() string {
+	return "InvalidActivation: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidActivation) ErrorCode() string {
+	return "InvalidActivation"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidActivation) ErrorFault() string {
+	return "client"
 }
 
 // InvalidActivationId represents the InvalidActivationId structure
@@ -4357,9 +4822,39 @@ type InvalidActivationId struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidActivationId
+func (e InvalidActivationId) Error() string {
+	return "InvalidActivationId: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidActivationId) ErrorCode() string {
+	return "InvalidActivationId"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidActivationId) ErrorFault() string {
+	return "client"
+}
+
 // InvalidAggregatorException represents the InvalidAggregatorException structure
 type InvalidAggregatorException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidAggregatorException
+func (e InvalidAggregatorException) Error() string {
+	return "InvalidAggregatorException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidAggregatorException) ErrorCode() string {
+	return "InvalidAggregatorException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidAggregatorException) ErrorFault() string {
+	return "client"
 }
 
 // InvalidAllowedPatternException represents the InvalidAllowedPatternException structure
@@ -4367,9 +4862,39 @@ type InvalidAllowedPatternException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidAllowedPatternException
+func (e InvalidAllowedPatternException) Error() string {
+	return "InvalidAllowedPatternException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidAllowedPatternException) ErrorCode() string {
+	return "InvalidAllowedPatternException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidAllowedPatternException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidAssociation represents the InvalidAssociation structure
 type InvalidAssociation struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidAssociation
+func (e InvalidAssociation) Error() string {
+	return "InvalidAssociation: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidAssociation) ErrorCode() string {
+	return "InvalidAssociation"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidAssociation) ErrorFault() string {
+	return "client"
 }
 
 // InvalidAssociationVersion represents the InvalidAssociationVersion structure
@@ -4377,9 +4902,39 @@ type InvalidAssociationVersion struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidAssociationVersion
+func (e InvalidAssociationVersion) Error() string {
+	return "InvalidAssociationVersion: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidAssociationVersion) ErrorCode() string {
+	return "InvalidAssociationVersion"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidAssociationVersion) ErrorFault() string {
+	return "client"
+}
+
 // InvalidAutomationExecutionParametersException represents the InvalidAutomationExecutionParametersException structure
 type InvalidAutomationExecutionParametersException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidAutomationExecutionParametersException
+func (e InvalidAutomationExecutionParametersException) Error() string {
+	return "InvalidAutomationExecutionParametersException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidAutomationExecutionParametersException) ErrorCode() string {
+	return "InvalidAutomationExecutionParametersException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidAutomationExecutionParametersException) ErrorFault() string {
+	return "client"
 }
 
 // InvalidAutomationSignalException represents the InvalidAutomationSignalException structure
@@ -4387,13 +4942,58 @@ type InvalidAutomationSignalException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidAutomationSignalException
+func (e InvalidAutomationSignalException) Error() string {
+	return "InvalidAutomationSignalException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidAutomationSignalException) ErrorCode() string {
+	return "InvalidAutomationSignalException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidAutomationSignalException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidAutomationStatusUpdateException represents the InvalidAutomationStatusUpdateException structure
 type InvalidAutomationStatusUpdateException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidAutomationStatusUpdateException
+func (e InvalidAutomationStatusUpdateException) Error() string {
+	return "InvalidAutomationStatusUpdateException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidAutomationStatusUpdateException) ErrorCode() string {
+	return "InvalidAutomationStatusUpdateException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidAutomationStatusUpdateException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidCommandId represents the InvalidCommandId structure
 type InvalidCommandId struct {
+}
+
+// Error implements the error interface for InvalidCommandId
+func (e InvalidCommandId) Error() string {
+	return "InvalidCommandId: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidCommandId) ErrorCode() string {
+	return "InvalidCommandId"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidCommandId) ErrorFault() string {
+	return "client"
 }
 
 // InvalidDeleteInventoryParametersException represents the InvalidDeleteInventoryParametersException structure
@@ -4401,9 +5001,39 @@ type InvalidDeleteInventoryParametersException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidDeleteInventoryParametersException
+func (e InvalidDeleteInventoryParametersException) Error() string {
+	return "InvalidDeleteInventoryParametersException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidDeleteInventoryParametersException) ErrorCode() string {
+	return "InvalidDeleteInventoryParametersException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidDeleteInventoryParametersException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidDeletionIdException represents the InvalidDeletionIdException structure
 type InvalidDeletionIdException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidDeletionIdException
+func (e InvalidDeletionIdException) Error() string {
+	return "InvalidDeletionIdException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidDeletionIdException) ErrorCode() string {
+	return "InvalidDeletionIdException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidDeletionIdException) ErrorFault() string {
+	return "client"
 }
 
 // InvalidDocument represents the InvalidDocument structure
@@ -4411,9 +5041,39 @@ type InvalidDocument struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidDocument
+func (e InvalidDocument) Error() string {
+	return "InvalidDocument: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidDocument) ErrorCode() string {
+	return "InvalidDocument"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidDocument) ErrorFault() string {
+	return "client"
+}
+
 // InvalidDocumentContent represents the InvalidDocumentContent structure
 type InvalidDocumentContent struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidDocumentContent
+func (e InvalidDocumentContent) Error() string {
+	return "InvalidDocumentContent: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidDocumentContent) ErrorCode() string {
+	return "InvalidDocumentContent"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidDocumentContent) ErrorFault() string {
+	return "client"
 }
 
 // InvalidDocumentOperation represents the InvalidDocumentOperation structure
@@ -4421,9 +5081,39 @@ type InvalidDocumentOperation struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidDocumentOperation
+func (e InvalidDocumentOperation) Error() string {
+	return "InvalidDocumentOperation: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidDocumentOperation) ErrorCode() string {
+	return "InvalidDocumentOperation"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidDocumentOperation) ErrorFault() string {
+	return "client"
+}
+
 // InvalidDocumentSchemaVersion represents the InvalidDocumentSchemaVersion structure
 type InvalidDocumentSchemaVersion struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidDocumentSchemaVersion
+func (e InvalidDocumentSchemaVersion) Error() string {
+	return "InvalidDocumentSchemaVersion: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidDocumentSchemaVersion) ErrorCode() string {
+	return "InvalidDocumentSchemaVersion"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidDocumentSchemaVersion) ErrorFault() string {
+	return "client"
 }
 
 // InvalidDocumentType represents the InvalidDocumentType structure
@@ -4431,9 +5121,39 @@ type InvalidDocumentType struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidDocumentType
+func (e InvalidDocumentType) Error() string {
+	return "InvalidDocumentType: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidDocumentType) ErrorCode() string {
+	return "InvalidDocumentType"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidDocumentType) ErrorFault() string {
+	return "client"
+}
+
 // InvalidDocumentVersion represents the InvalidDocumentVersion structure
 type InvalidDocumentVersion struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidDocumentVersion
+func (e InvalidDocumentVersion) Error() string {
+	return "InvalidDocumentVersion: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidDocumentVersion) ErrorCode() string {
+	return "InvalidDocumentVersion"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidDocumentVersion) ErrorFault() string {
+	return "client"
 }
 
 // InvalidFilter represents the InvalidFilter structure
@@ -4441,8 +5161,38 @@ type InvalidFilter struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidFilter
+func (e InvalidFilter) Error() string {
+	return "InvalidFilter: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidFilter) ErrorCode() string {
+	return "InvalidFilter"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidFilter) ErrorFault() string {
+	return "client"
+}
+
 // InvalidFilterKey represents the InvalidFilterKey structure
 type InvalidFilterKey struct {
+}
+
+// Error implements the error interface for InvalidFilterKey
+func (e InvalidFilterKey) Error() string {
+	return "InvalidFilterKey: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidFilterKey) ErrorCode() string {
+	return "InvalidFilterKey"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidFilterKey) ErrorFault() string {
+	return "client"
 }
 
 // InvalidFilterOption represents the InvalidFilterOption structure
@@ -4450,9 +5200,39 @@ type InvalidFilterOption struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidFilterOption
+func (e InvalidFilterOption) Error() string {
+	return "InvalidFilterOption: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidFilterOption) ErrorCode() string {
+	return "InvalidFilterOption"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidFilterOption) ErrorFault() string {
+	return "client"
+}
+
 // InvalidFilterValue represents the InvalidFilterValue structure
 type InvalidFilterValue struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidFilterValue
+func (e InvalidFilterValue) Error() string {
+	return "InvalidFilterValue: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidFilterValue) ErrorCode() string {
+	return "InvalidFilterValue"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidFilterValue) ErrorFault() string {
+	return "client"
 }
 
 // InvalidInstanceId represents the InvalidInstanceId structure
@@ -4460,9 +5240,39 @@ type InvalidInstanceId struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidInstanceId
+func (e InvalidInstanceId) Error() string {
+	return "InvalidInstanceId: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidInstanceId) ErrorCode() string {
+	return "InvalidInstanceId"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidInstanceId) ErrorFault() string {
+	return "client"
+}
+
 // InvalidInstanceInformationFilterValue represents the InvalidInstanceInformationFilterValue structure
 type InvalidInstanceInformationFilterValue struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidInstanceInformationFilterValue
+func (e InvalidInstanceInformationFilterValue) Error() string {
+	return "InvalidInstanceInformationFilterValue: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidInstanceInformationFilterValue) ErrorCode() string {
+	return "InvalidInstanceInformationFilterValue"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidInstanceInformationFilterValue) ErrorFault() string {
+	return "client"
 }
 
 // InvalidInstancePropertyFilterValue represents the InvalidInstancePropertyFilterValue structure
@@ -4470,9 +5280,39 @@ type InvalidInstancePropertyFilterValue struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidInstancePropertyFilterValue
+func (e InvalidInstancePropertyFilterValue) Error() string {
+	return "InvalidInstancePropertyFilterValue: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidInstancePropertyFilterValue) ErrorCode() string {
+	return "InvalidInstancePropertyFilterValue"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidInstancePropertyFilterValue) ErrorFault() string {
+	return "client"
+}
+
 // InvalidInventoryGroupException represents the InvalidInventoryGroupException structure
 type InvalidInventoryGroupException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidInventoryGroupException
+func (e InvalidInventoryGroupException) Error() string {
+	return "InvalidInventoryGroupException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidInventoryGroupException) ErrorCode() string {
+	return "InvalidInventoryGroupException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidInventoryGroupException) ErrorFault() string {
+	return "client"
 }
 
 // InvalidInventoryItemContextException represents the InvalidInventoryItemContextException structure
@@ -4480,9 +5320,39 @@ type InvalidInventoryItemContextException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidInventoryItemContextException
+func (e InvalidInventoryItemContextException) Error() string {
+	return "InvalidInventoryItemContextException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidInventoryItemContextException) ErrorCode() string {
+	return "InvalidInventoryItemContextException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidInventoryItemContextException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidInventoryRequestException represents the InvalidInventoryRequestException structure
 type InvalidInventoryRequestException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidInventoryRequestException
+func (e InvalidInventoryRequestException) Error() string {
+	return "InvalidInventoryRequestException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidInventoryRequestException) ErrorCode() string {
+	return "InvalidInventoryRequestException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidInventoryRequestException) ErrorFault() string {
+	return "client"
 }
 
 // InvalidItemContentException represents the InvalidItemContentException structure
@@ -4492,9 +5362,39 @@ type InvalidItemContentException struct {
 	TypeName *string `json:"typeName,omitempty"`
 }
 
+// Error implements the error interface for InvalidItemContentException
+func (e InvalidItemContentException) Error() string {
+	return "InvalidItemContentException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidItemContentException) ErrorCode() string {
+	return "InvalidItemContentException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidItemContentException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidKeyId represents the InvalidKeyId structure
 type InvalidKeyId struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidKeyId
+func (e InvalidKeyId) Error() string {
+	return "InvalidKeyId: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidKeyId) ErrorCode() string {
+	return "InvalidKeyId"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidKeyId) ErrorFault() string {
+	return "client"
 }
 
 // InvalidNextToken represents the InvalidNextToken structure
@@ -4502,9 +5402,39 @@ type InvalidNextToken struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidNextToken
+func (e InvalidNextToken) Error() string {
+	return "InvalidNextToken: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidNextToken) ErrorCode() string {
+	return "InvalidNextToken"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidNextToken) ErrorFault() string {
+	return "client"
+}
+
 // InvalidNotificationConfig represents the InvalidNotificationConfig structure
 type InvalidNotificationConfig struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidNotificationConfig
+func (e InvalidNotificationConfig) Error() string {
+	return "InvalidNotificationConfig: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidNotificationConfig) ErrorCode() string {
+	return "InvalidNotificationConfig"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidNotificationConfig) ErrorFault() string {
+	return "client"
 }
 
 // InvalidOptionException represents the InvalidOptionException structure
@@ -4512,12 +5442,57 @@ type InvalidOptionException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidOptionException
+func (e InvalidOptionException) Error() string {
+	return "InvalidOptionException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidOptionException) ErrorCode() string {
+	return "InvalidOptionException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidOptionException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidOutputFolder represents the InvalidOutputFolder structure
 type InvalidOutputFolder struct {
 }
 
+// Error implements the error interface for InvalidOutputFolder
+func (e InvalidOutputFolder) Error() string {
+	return "InvalidOutputFolder: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidOutputFolder) ErrorCode() string {
+	return "InvalidOutputFolder"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidOutputFolder) ErrorFault() string {
+	return "client"
+}
+
 // InvalidOutputLocation represents the InvalidOutputLocation structure
 type InvalidOutputLocation struct {
+}
+
+// Error implements the error interface for InvalidOutputLocation
+func (e InvalidOutputLocation) Error() string {
+	return "InvalidOutputLocation: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidOutputLocation) ErrorCode() string {
+	return "InvalidOutputLocation"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidOutputLocation) ErrorFault() string {
+	return "client"
 }
 
 // InvalidParameters represents the InvalidParameters structure
@@ -4525,13 +5500,58 @@ type InvalidParameters struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidParameters
+func (e InvalidParameters) Error() string {
+	return "InvalidParameters: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidParameters) ErrorCode() string {
+	return "InvalidParameters"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidParameters) ErrorFault() string {
+	return "client"
+}
+
 // InvalidPermissionType represents the InvalidPermissionType structure
 type InvalidPermissionType struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidPermissionType
+func (e InvalidPermissionType) Error() string {
+	return "InvalidPermissionType: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidPermissionType) ErrorCode() string {
+	return "InvalidPermissionType"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidPermissionType) ErrorFault() string {
+	return "client"
+}
+
 // InvalidPluginName represents the InvalidPluginName structure
 type InvalidPluginName struct {
+}
+
+// Error implements the error interface for InvalidPluginName
+func (e InvalidPluginName) Error() string {
+	return "InvalidPluginName: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidPluginName) ErrorCode() string {
+	return "InvalidPluginName"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidPluginName) ErrorFault() string {
+	return "client"
 }
 
 // InvalidPolicyAttributeException represents the InvalidPolicyAttributeException structure
@@ -4539,17 +5559,77 @@ type InvalidPolicyAttributeException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidPolicyAttributeException
+func (e InvalidPolicyAttributeException) Error() string {
+	return "InvalidPolicyAttributeException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidPolicyAttributeException) ErrorCode() string {
+	return "InvalidPolicyAttributeException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidPolicyAttributeException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidPolicyTypeException represents the InvalidPolicyTypeException structure
 type InvalidPolicyTypeException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidPolicyTypeException
+func (e InvalidPolicyTypeException) Error() string {
+	return "InvalidPolicyTypeException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidPolicyTypeException) ErrorCode() string {
+	return "InvalidPolicyTypeException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidPolicyTypeException) ErrorFault() string {
+	return "client"
 }
 
 // InvalidResourceId represents the InvalidResourceId structure
 type InvalidResourceId struct {
 }
 
+// Error implements the error interface for InvalidResourceId
+func (e InvalidResourceId) Error() string {
+	return "InvalidResourceId: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidResourceId) ErrorCode() string {
+	return "InvalidResourceId"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidResourceId) ErrorFault() string {
+	return "client"
+}
+
 // InvalidResourceType represents the InvalidResourceType structure
 type InvalidResourceType struct {
+}
+
+// Error implements the error interface for InvalidResourceType
+func (e InvalidResourceType) Error() string {
+	return "InvalidResourceType: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidResourceType) ErrorCode() string {
+	return "InvalidResourceType"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidResourceType) ErrorFault() string {
+	return "client"
 }
 
 // InvalidResultAttributeException represents the InvalidResultAttributeException structure
@@ -4557,9 +5637,39 @@ type InvalidResultAttributeException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidResultAttributeException
+func (e InvalidResultAttributeException) Error() string {
+	return "InvalidResultAttributeException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidResultAttributeException) ErrorCode() string {
+	return "InvalidResultAttributeException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidResultAttributeException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidRole represents the InvalidRole structure
 type InvalidRole struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidRole
+func (e InvalidRole) Error() string {
+	return "InvalidRole: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidRole) ErrorCode() string {
+	return "InvalidRole"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidRole) ErrorFault() string {
+	return "client"
 }
 
 // InvalidSchedule represents the InvalidSchedule structure
@@ -4567,9 +5677,39 @@ type InvalidSchedule struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidSchedule
+func (e InvalidSchedule) Error() string {
+	return "InvalidSchedule: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidSchedule) ErrorCode() string {
+	return "InvalidSchedule"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidSchedule) ErrorFault() string {
+	return "client"
+}
+
 // InvalidTag represents the InvalidTag structure
 type InvalidTag struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidTag
+func (e InvalidTag) Error() string {
+	return "InvalidTag: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidTag) ErrorCode() string {
+	return "InvalidTag"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidTag) ErrorFault() string {
+	return "client"
 }
 
 // InvalidTarget represents the InvalidTarget structure
@@ -4577,9 +5717,39 @@ type InvalidTarget struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidTarget
+func (e InvalidTarget) Error() string {
+	return "InvalidTarget: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidTarget) ErrorCode() string {
+	return "InvalidTarget"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidTarget) ErrorFault() string {
+	return "client"
+}
+
 // InvalidTargetMaps represents the InvalidTargetMaps structure
 type InvalidTargetMaps struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidTargetMaps
+func (e InvalidTargetMaps) Error() string {
+	return "InvalidTargetMaps: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidTargetMaps) ErrorCode() string {
+	return "InvalidTargetMaps"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidTargetMaps) ErrorFault() string {
+	return "client"
 }
 
 // InvalidTypeNameException represents the InvalidTypeNameException structure
@@ -4587,9 +5757,39 @@ type InvalidTypeNameException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for InvalidTypeNameException
+func (e InvalidTypeNameException) Error() string {
+	return "InvalidTypeNameException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidTypeNameException) ErrorCode() string {
+	return "InvalidTypeNameException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidTypeNameException) ErrorFault() string {
+	return "client"
+}
+
 // InvalidUpdate represents the InvalidUpdate structure
 type InvalidUpdate struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for InvalidUpdate
+func (e InvalidUpdate) Error() string {
+	return "InvalidUpdate: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvalidUpdate) ErrorCode() string {
+	return "InvalidUpdate"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvalidUpdate) ErrorFault() string {
+	return "client"
 }
 
 // InventoryAggregator represents the InventoryAggregator structure
@@ -4782,17 +5982,17 @@ type InventoryItemTypeNameFilter string
 type InventoryQueryOperatorType string
 
 const (
-	InventoryQueryOperatorTypeLESS_THAN InventoryQueryOperatorType = "LESS_THAN"
-
-	InventoryQueryOperatorTypeGREATER_THAN InventoryQueryOperatorType = "GREATER_THAN"
-
-	InventoryQueryOperatorTypeEXISTS InventoryQueryOperatorType = "EXISTS"
-
 	InventoryQueryOperatorTypeEQUAL InventoryQueryOperatorType = "EQUAL"
 
 	InventoryQueryOperatorTypeNOT_EQUAL InventoryQueryOperatorType = "NOT_EQUAL"
 
 	InventoryQueryOperatorTypeBEGIN_WITH InventoryQueryOperatorType = "BEGIN_WITH"
+
+	InventoryQueryOperatorTypeLESS_THAN InventoryQueryOperatorType = "LESS_THAN"
+
+	InventoryQueryOperatorTypeGREATER_THAN InventoryQueryOperatorType = "GREATER_THAN"
+
+	InventoryQueryOperatorTypeEXISTS InventoryQueryOperatorType = "EXISTS"
 )
 
 // InventoryResultEntity represents the InventoryResultEntity structure
@@ -4843,6 +6043,21 @@ type InventoryTypeDisplayName string
 type InvocationDoesNotExist struct {
 }
 
+// Error implements the error interface for InvocationDoesNotExist
+func (e InvocationDoesNotExist) Error() string {
+	return "InvocationDoesNotExist: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e InvocationDoesNotExist) ErrorCode() string {
+	return "InvocationDoesNotExist"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e InvocationDoesNotExist) ErrorFault() string {
+	return "client"
+}
+
 // InvocationTraceOutput represents the InvocationTraceOutput type
 type InvocationTraceOutput string
 
@@ -4856,11 +6071,41 @@ type ItemContentMismatchException struct {
 	TypeName *string `json:"typeName,omitempty"`
 }
 
+// Error implements the error interface for ItemContentMismatchException
+func (e ItemContentMismatchException) Error() string {
+	return "ItemContentMismatchException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ItemContentMismatchException) ErrorCode() string {
+	return "ItemContentMismatchException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ItemContentMismatchException) ErrorFault() string {
+	return "client"
+}
+
 // ItemSizeLimitExceededException represents the ItemSizeLimitExceededException structure
 type ItemSizeLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
 
 	TypeName *string `json:"typeName,omitempty"`
+}
+
+// Error implements the error interface for ItemSizeLimitExceededException
+func (e ItemSizeLimitExceededException) Error() string {
+	return "ItemSizeLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ItemSizeLimitExceededException) ErrorCode() string {
+	return "ItemSizeLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ItemSizeLimitExceededException) ErrorFault() string {
+	return "client"
 }
 
 // KeyList represents the KeyList type
@@ -4892,11 +6137,11 @@ type LastResourceDataSyncMessage string
 type LastResourceDataSyncStatus string
 
 const (
+	LastResourceDataSyncStatusSUCCESSFUL LastResourceDataSyncStatus = "SUCCESSFUL"
+
 	LastResourceDataSyncStatusFAILED LastResourceDataSyncStatus = "FAILED"
 
 	LastResourceDataSyncStatusINPROGRESS LastResourceDataSyncStatus = "INPROGRESS"
-
-	LastResourceDataSyncStatusSUCCESSFUL LastResourceDataSyncStatus = "SUCCESSFUL"
 )
 
 // LastResourceDataSyncTime represents the LastResourceDataSyncTime type
@@ -5297,6 +6542,8 @@ type MaintenanceWindowExecutionList []MaintenanceWindowExecution
 type MaintenanceWindowExecutionStatus string
 
 const (
+	MaintenanceWindowExecutionStatusSkippedOverlapping MaintenanceWindowExecutionStatus = "SkippedOverlapping"
+
 	MaintenanceWindowExecutionStatusPending MaintenanceWindowExecutionStatus = "Pending"
 
 	MaintenanceWindowExecutionStatusInProgress MaintenanceWindowExecutionStatus = "InProgress"
@@ -5310,8 +6557,6 @@ const (
 	MaintenanceWindowExecutionStatusCancelling MaintenanceWindowExecutionStatus = "Cancelling"
 
 	MaintenanceWindowExecutionStatusCancelled MaintenanceWindowExecutionStatus = "Cancelled"
-
-	MaintenanceWindowExecutionStatusSkippedOverlapping MaintenanceWindowExecutionStatus = "SkippedOverlapping"
 )
 
 // MaintenanceWindowExecutionStatusDetails represents the MaintenanceWindowExecutionStatusDetails type
@@ -5593,9 +6838,9 @@ type MaintenanceWindowTaskArn string
 type MaintenanceWindowTaskCutoffBehavior string
 
 const (
-	MaintenanceWindowTaskCutoffBehaviorContinueTask MaintenanceWindowTaskCutoffBehavior = "ContinueTask"
-
 	MaintenanceWindowTaskCutoffBehaviorCancelTask MaintenanceWindowTaskCutoffBehavior = "CancelTask"
+
+	MaintenanceWindowTaskCutoffBehaviorContinueTask MaintenanceWindowTaskCutoffBehavior = "ContinueTask"
 )
 
 // MaintenanceWindowTaskId represents the MaintenanceWindowTaskId type
@@ -5645,13 +6890,13 @@ type MaintenanceWindowTaskTargetId string
 type MaintenanceWindowTaskType string
 
 const (
+	MaintenanceWindowTaskTypeRunCommand MaintenanceWindowTaskType = "RunCommand"
+
 	MaintenanceWindowTaskTypeAutomation MaintenanceWindowTaskType = "Automation"
 
 	MaintenanceWindowTaskTypeStepFunctions MaintenanceWindowTaskType = "StepFunctions"
 
 	MaintenanceWindowTaskTypeLambda MaintenanceWindowTaskType = "Lambda"
-
-	MaintenanceWindowTaskTypeRunCommand MaintenanceWindowTaskType = "RunCommand"
 )
 
 // MaintenanceWindowTimezone represents the MaintenanceWindowTimezone type
@@ -5663,6 +6908,21 @@ type MaintenanceWindowsForTargetList []MaintenanceWindowIdentityForTarget
 // MalformedResourcePolicyDocumentException represents the MalformedResourcePolicyDocumentException structure
 type MalformedResourcePolicyDocumentException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for MalformedResourcePolicyDocumentException
+func (e MalformedResourcePolicyDocumentException) Error() string {
+	return "MalformedResourcePolicyDocumentException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e MalformedResourcePolicyDocumentException) ErrorCode() string {
+	return "MalformedResourcePolicyDocumentException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e MalformedResourcePolicyDocumentException) ErrorFault() string {
+	return "client"
 }
 
 // ManagedInstanceId represents the ManagedInstanceId type
@@ -5685,6 +6945,21 @@ type MaxConcurrency string
 // MaxDocumentSizeExceeded represents the MaxDocumentSizeExceeded structure
 type MaxDocumentSizeExceeded struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for MaxDocumentSizeExceeded
+func (e MaxDocumentSizeExceeded) Error() string {
+	return "MaxDocumentSizeExceeded: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e MaxDocumentSizeExceeded) ErrorCode() string {
+	return "MaxDocumentSizeExceeded"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e MaxDocumentSizeExceeded) ErrorFault() string {
+	return "client"
 }
 
 // MaxErrors represents the MaxErrors type
@@ -5806,35 +7081,35 @@ type NodeFilter struct {
 type NodeFilterKey string
 
 const (
-	NodeFilterKeyCOMPUTER_NAME NodeFilterKey = "COMPUTER_NAME"
+	NodeFilterKeyIP_ADDRESS NodeFilterKey = "IP_ADDRESS"
 
-	NodeFilterKeyORGANIZATIONAL_UNIT_PATH NodeFilterKey = "ORGANIZATIONAL_UNIT_PATH"
-
-	NodeFilterKeyACCOUNT_ID NodeFilterKey = "ACCOUNT_ID"
+	NodeFilterKeyPLATFORM_VERSION NodeFilterKey = "PLATFORM_VERSION"
 
 	NodeFilterKeyINSTANCE_STATUS NodeFilterKey = "INSTANCE_STATUS"
 
-	NodeFilterKeyAGENT_TYPE NodeFilterKey = "AGENT_TYPE"
+	NodeFilterKeyPLATFORM_TYPE NodeFilterKey = "PLATFORM_TYPE"
+
+	NodeFilterKeyREGION NodeFilterKey = "REGION"
+
+	NodeFilterKeyACCOUNT_ID NodeFilterKey = "ACCOUNT_ID"
+
+	NodeFilterKeyCOMPUTER_NAME NodeFilterKey = "COMPUTER_NAME"
 
 	NodeFilterKeyINSTANCE_ID NodeFilterKey = "INSTANCE_ID"
 
-	NodeFilterKeyPLATFORM_NAME NodeFilterKey = "PLATFORM_NAME"
+	NodeFilterKeyMANAGED_STATUS NodeFilterKey = "MANAGED_STATUS"
 
 	NodeFilterKeyRESOURCE_TYPE NodeFilterKey = "RESOURCE_TYPE"
 
 	NodeFilterKeyORGANIZATIONAL_UNIT_ID NodeFilterKey = "ORGANIZATIONAL_UNIT_ID"
 
-	NodeFilterKeyREGION NodeFilterKey = "REGION"
+	NodeFilterKeyAGENT_TYPE NodeFilterKey = "AGENT_TYPE"
 
 	NodeFilterKeyAGENT_VERSION NodeFilterKey = "AGENT_VERSION"
 
-	NodeFilterKeyIP_ADDRESS NodeFilterKey = "IP_ADDRESS"
+	NodeFilterKeyPLATFORM_NAME NodeFilterKey = "PLATFORM_NAME"
 
-	NodeFilterKeyMANAGED_STATUS NodeFilterKey = "MANAGED_STATUS"
-
-	NodeFilterKeyPLATFORM_TYPE NodeFilterKey = "PLATFORM_TYPE"
-
-	NodeFilterKeyPLATFORM_VERSION NodeFilterKey = "PLATFORM_VERSION"
+	NodeFilterKeyORGANIZATIONAL_UNIT_PATH NodeFilterKey = "ORGANIZATIONAL_UNIT_PATH"
 )
 
 // NodeFilterList represents the NodeFilterList type
@@ -5844,11 +7119,11 @@ type NodeFilterList []NodeFilter
 type NodeFilterOperatorType string
 
 const (
-	NodeFilterOperatorTypeEQUAL NodeFilterOperatorType = "EQUAL"
-
 	NodeFilterOperatorTypeNOT_EQUAL NodeFilterOperatorType = "NOT_EQUAL"
 
 	NodeFilterOperatorTypeBEGIN_WITH NodeFilterOperatorType = "BEGIN_WITH"
+
+	NodeFilterOperatorTypeEQUAL NodeFilterOperatorType = "EQUAL"
 )
 
 // NodeFilterValue represents the NodeFilterValue type
@@ -5927,8 +7202,6 @@ type NotificationConfig struct {
 type NotificationEvent string
 
 const (
-	NotificationEventIN_PROGRESS NotificationEvent = "IN_PROGRESS"
-
 	NotificationEventSUCCESS NotificationEvent = "SUCCESS"
 
 	NotificationEventTIMED_OUT NotificationEvent = "TIMED_OUT"
@@ -5938,6 +7211,8 @@ const (
 	NotificationEventFAILED NotificationEvent = "FAILED"
 
 	NotificationEventALL NotificationEvent = "ALL"
+
+	NotificationEventIN_PROGRESS NotificationEvent = "IN_PROGRESS"
 )
 
 // NotificationEventList represents the NotificationEventList type
@@ -5947,44 +7222,44 @@ type NotificationEventList []interface{}
 type NotificationType string
 
 const (
-	NotificationTypeCommand NotificationType = "Command"
-
 	NotificationTypeInvocation NotificationType = "Invocation"
+
+	NotificationTypeCommand NotificationType = "Command"
 )
 
 // OperatingSystem represents the OperatingSystem enum type
 type OperatingSystem string
 
 const (
-	OperatingSystemRaspbian OperatingSystem = "Raspbian"
+	OperatingSystemAmazonLinux OperatingSystem = "AmazonLinux"
 
-	OperatingSystemAmazonLinux2 OperatingSystem = "AmazonLinux2"
-
-	OperatingSystemAmazonLinux2022 OperatingSystem = "AmazonLinux2022"
+	OperatingSystemUbuntu OperatingSystem = "Ubuntu"
 
 	OperatingSystemRedhatEnterpriseLinux OperatingSystem = "RedhatEnterpriseLinux"
 
+	OperatingSystemSuse OperatingSystem = "Suse"
+
 	OperatingSystemCentOS OperatingSystem = "CentOS"
 
-	OperatingSystemRocky_Linux OperatingSystem = "Rocky_Linux"
+	OperatingSystemDebian OperatingSystem = "Debian"
 
 	OperatingSystemAlmaLinux OperatingSystem = "AlmaLinux"
 
 	OperatingSystemAmazonLinux2023 OperatingSystem = "AmazonLinux2023"
 
-	OperatingSystemWindows OperatingSystem = "Windows"
+	OperatingSystemMacOS OperatingSystem = "MacOS"
 
-	OperatingSystemAmazonLinux OperatingSystem = "AmazonLinux"
+	OperatingSystemRaspbian OperatingSystem = "Raspbian"
 
-	OperatingSystemUbuntu OperatingSystem = "Ubuntu"
+	OperatingSystemAmazonLinux2 OperatingSystem = "AmazonLinux2"
 
 	OperatingSystemOracleLinux OperatingSystem = "OracleLinux"
 
-	OperatingSystemMacOS OperatingSystem = "MacOS"
+	OperatingSystemWindows OperatingSystem = "Windows"
 
-	OperatingSystemSuse OperatingSystem = "Suse"
+	OperatingSystemAmazonLinux2022 OperatingSystem = "AmazonLinux2022"
 
-	OperatingSystemDebian OperatingSystem = "Debian"
+	OperatingSystemRocky_Linux OperatingSystem = "Rocky_Linux"
 )
 
 // OpsAggregator represents the OpsAggregator structure
@@ -6148,6 +7423,21 @@ type OpsItemAccessDeniedException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for OpsItemAccessDeniedException
+func (e OpsItemAccessDeniedException) Error() string {
+	return "OpsItemAccessDeniedException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsItemAccessDeniedException) ErrorCode() string {
+	return "OpsItemAccessDeniedException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsItemAccessDeniedException) ErrorFault() string {
+	return "client"
+}
+
 // OpsItemAccountId represents the OpsItemAccountId type
 type OpsItemAccountId string
 
@@ -6156,6 +7446,21 @@ type OpsItemAlreadyExistsException struct {
 	Message *string `json:"message,omitempty"`
 
 	OpsItemId *string `json:"opsItemId,omitempty"`
+}
+
+// Error implements the error interface for OpsItemAlreadyExistsException
+func (e OpsItemAlreadyExistsException) Error() string {
+	return "OpsItemAlreadyExistsException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsItemAlreadyExistsException) ErrorCode() string {
+	return "OpsItemAlreadyExistsException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsItemAlreadyExistsException) ErrorFault() string {
+	return "client"
 }
 
 // OpsItemArn represents the OpsItemArn type
@@ -6167,6 +7472,21 @@ type OpsItemCategory string
 // OpsItemConflictException represents the OpsItemConflictException structure
 type OpsItemConflictException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for OpsItemConflictException
+func (e OpsItemConflictException) Error() string {
+	return "OpsItemConflictException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsItemConflictException) ErrorCode() string {
+	return "OpsItemConflictException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsItemConflictException) ErrorFault() string {
+	return "client"
 }
 
 // OpsItemDataKey represents the OpsItemDataKey type
@@ -6262,79 +7582,79 @@ type OpsItemFilter struct {
 type OpsItemFilterKey string
 
 const (
-	OpsItemFilterKeyCHANGE_REQUEST_REQUESTER_ARN OpsItemFilterKey = "CHANGE_REQUEST_REQUESTER_ARN"
+	OpsItemFilterKeyPLANNED_END_TIME OpsItemFilterKey = "PLANNED_END_TIME"
 
-	OpsItemFilterKeyCHANGE_REQUEST_APPROVER_NAME OpsItemFilterKey = "CHANGE_REQUEST_APPROVER_NAME"
+	OpsItemFilterKeyINSIGHT_TYPE OpsItemFilterKey = "INSIGHT_TYPE"
+
+	OpsItemFilterKeyACTUAL_END_TIME OpsItemFilterKey = "ACTUAL_END_TIME"
+
+	OpsItemFilterKeyOPERATIONAL_DATA_KEY OpsItemFilterKey = "OPERATIONAL_DATA_KEY"
+
+	OpsItemFilterKeyOPSITEM_TYPE OpsItemFilterKey = "OPSITEM_TYPE"
+
+	OpsItemFilterKeyCHANGE_REQUEST_APPROVER_ARN OpsItemFilterKey = "CHANGE_REQUEST_APPROVER_ARN"
+
+	OpsItemFilterKeyCHANGE_REQUEST_TEMPLATE OpsItemFilterKey = "CHANGE_REQUEST_TEMPLATE"
 
 	OpsItemFilterKeyCREATED_BY OpsItemFilterKey = "CREATED_BY"
 
-	OpsItemFilterKeyPLANNED_START_TIME OpsItemFilterKey = "PLANNED_START_TIME"
+	OpsItemFilterKeyCATEGORY OpsItemFilterKey = "CATEGORY"
 
-	OpsItemFilterKeyAUTOMATION_ID OpsItemFilterKey = "AUTOMATION_ID"
+	OpsItemFilterKeyACCESS_REQUEST_APPROVER_ID OpsItemFilterKey = "ACCESS_REQUEST_APPROVER_ID"
+
+	OpsItemFilterKeyACCESS_REQUEST_SOURCE_ACCOUNT_ID OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_ACCOUNT_ID"
+
+	OpsItemFilterKeyACCESS_REQUEST_TARGET_RESOURCE_ID OpsItemFilterKey = "ACCESS_REQUEST_TARGET_RESOURCE_ID"
+
+	OpsItemFilterKeyOPERATIONAL_DATA_VALUE OpsItemFilterKey = "OPERATIONAL_DATA_VALUE"
 
 	OpsItemFilterKeyACCESS_REQUEST_REQUESTER_ARN OpsItemFilterKey = "ACCESS_REQUEST_REQUESTER_ARN"
 
 	OpsItemFilterKeyACCESS_REQUEST_SOURCE_OPS_ITEM_ID OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_OPS_ITEM_ID"
 
-	OpsItemFilterKeyCHANGE_REQUEST_REQUESTER_NAME OpsItemFilterKey = "CHANGE_REQUEST_REQUESTER_NAME"
-
-	OpsItemFilterKeySTATUS OpsItemFilterKey = "STATUS"
-
-	OpsItemFilterKeyPLANNED_END_TIME OpsItemFilterKey = "PLANNED_END_TIME"
-
-	OpsItemFilterKeySEVERITY OpsItemFilterKey = "SEVERITY"
-
-	OpsItemFilterKeyACCESS_REQUEST_APPROVER_ARN OpsItemFilterKey = "ACCESS_REQUEST_APPROVER_ARN"
-
-	OpsItemFilterKeyACCESS_REQUEST_SOURCE_ACCOUNT_ID OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_ACCOUNT_ID"
-
-	OpsItemFilterKeyCHANGE_REQUEST_APPROVER_ARN OpsItemFilterKey = "CHANGE_REQUEST_APPROVER_ARN"
-
-	OpsItemFilterKeyOPERATIONAL_DATA_KEY OpsItemFilterKey = "OPERATIONAL_DATA_KEY"
-
-	OpsItemFilterKeyOPERATIONAL_DATA_VALUE OpsItemFilterKey = "OPERATIONAL_DATA_VALUE"
-
-	OpsItemFilterKeyOPSITEM_TYPE OpsItemFilterKey = "OPSITEM_TYPE"
-
 	OpsItemFilterKeyACCESS_REQUEST_SOURCE_REGION OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_REGION"
 
-	OpsItemFilterKeyCATEGORY OpsItemFilterKey = "CATEGORY"
+	OpsItemFilterKeyCHANGE_REQUEST_REQUESTER_ARN OpsItemFilterKey = "CHANGE_REQUEST_REQUESTER_ARN"
+
+	OpsItemFilterKeyCHANGE_REQUEST_REQUESTER_NAME OpsItemFilterKey = "CHANGE_REQUEST_REQUESTER_NAME"
+
+	OpsItemFilterKeyCREATED_TIME OpsItemFilterKey = "CREATED_TIME"
 
 	OpsItemFilterKeyRESOURCE_ID OpsItemFilterKey = "RESOURCE_ID"
 
-	OpsItemFilterKeyACCESS_REQUEST_APPROVER_ID OpsItemFilterKey = "ACCESS_REQUEST_APPROVER_ID"
-
-	OpsItemFilterKeyINSIGHT_TYPE OpsItemFilterKey = "INSIGHT_TYPE"
-
-	OpsItemFilterKeyACCESS_REQUEST_IS_REPLICA OpsItemFilterKey = "ACCESS_REQUEST_IS_REPLICA"
+	OpsItemFilterKeyACCESS_REQUEST_APPROVER_ARN OpsItemFilterKey = "ACCESS_REQUEST_APPROVER_ARN"
 
 	OpsItemFilterKeySOURCE OpsItemFilterKey = "SOURCE"
 
 	OpsItemFilterKeyPRIORITY OpsItemFilterKey = "PRIORITY"
 
-	OpsItemFilterKeyOPSITEM_ID OpsItemFilterKey = "OPSITEM_ID"
-
-	OpsItemFilterKeyACTUAL_START_TIME OpsItemFilterKey = "ACTUAL_START_TIME"
-
-	OpsItemFilterKeyCHANGE_REQUEST_TEMPLATE OpsItemFilterKey = "CHANGE_REQUEST_TEMPLATE"
-
 	OpsItemFilterKeyTITLE OpsItemFilterKey = "TITLE"
 
-	OpsItemFilterKeyACTUAL_END_TIME OpsItemFilterKey = "ACTUAL_END_TIME"
-
-	OpsItemFilterKeyACCESS_REQUEST_REQUESTER_ID OpsItemFilterKey = "ACCESS_REQUEST_REQUESTER_ID"
+	OpsItemFilterKeyPLANNED_START_TIME OpsItemFilterKey = "PLANNED_START_TIME"
 
 	OpsItemFilterKeyCHANGE_REQUEST_TARGETS_RESOURCE_GROUP OpsItemFilterKey = "CHANGE_REQUEST_TARGETS_RESOURCE_GROUP"
 
 	OpsItemFilterKeyACCOUNT_ID OpsItemFilterKey = "ACCOUNT_ID"
 
+	OpsItemFilterKeyACCESS_REQUEST_IS_REPLICA OpsItemFilterKey = "ACCESS_REQUEST_IS_REPLICA"
+
+	OpsItemFilterKeyACTUAL_START_TIME OpsItemFilterKey = "ACTUAL_START_TIME"
+
 	OpsItemFilterKeyOPERATIONAL_DATA OpsItemFilterKey = "OPERATIONAL_DATA"
 
-	OpsItemFilterKeyCREATED_TIME OpsItemFilterKey = "CREATED_TIME"
+	OpsItemFilterKeyAUTOMATION_ID OpsItemFilterKey = "AUTOMATION_ID"
+
+	OpsItemFilterKeySEVERITY OpsItemFilterKey = "SEVERITY"
+
+	OpsItemFilterKeyACCESS_REQUEST_REQUESTER_ID OpsItemFilterKey = "ACCESS_REQUEST_REQUESTER_ID"
+
+	OpsItemFilterKeyCHANGE_REQUEST_APPROVER_NAME OpsItemFilterKey = "CHANGE_REQUEST_APPROVER_NAME"
+
+	OpsItemFilterKeySTATUS OpsItemFilterKey = "STATUS"
+
+	OpsItemFilterKeyOPSITEM_ID OpsItemFilterKey = "OPSITEM_ID"
 
 	OpsItemFilterKeyLAST_MODIFIED_TIME OpsItemFilterKey = "LAST_MODIFIED_TIME"
-
-	OpsItemFilterKeyACCESS_REQUEST_TARGET_RESOURCE_ID OpsItemFilterKey = "ACCESS_REQUEST_TARGET_RESOURCE_ID"
 )
 
 // OpsItemFilterOperator represents the OpsItemFilterOperator enum type
@@ -6374,6 +7694,21 @@ type OpsItemInvalidParameterException struct {
 	ParameterNames []string `json:"parameterNames,omitempty"`
 }
 
+// Error implements the error interface for OpsItemInvalidParameterException
+func (e OpsItemInvalidParameterException) Error() string {
+	return "OpsItemInvalidParameterException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsItemInvalidParameterException) ErrorCode() string {
+	return "OpsItemInvalidParameterException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsItemInvalidParameterException) ErrorFault() string {
+	return "client"
+}
+
 // OpsItemLimitExceededException represents the OpsItemLimitExceededException structure
 type OpsItemLimitExceededException struct {
 	Limit *int32 `json:"limit,omitempty"`
@@ -6385,12 +7720,42 @@ type OpsItemLimitExceededException struct {
 	ResourceTypes []string `json:"resourceTypes,omitempty"`
 }
 
+// Error implements the error interface for OpsItemLimitExceededException
+func (e OpsItemLimitExceededException) Error() string {
+	return "OpsItemLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsItemLimitExceededException) ErrorCode() string {
+	return "OpsItemLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsItemLimitExceededException) ErrorFault() string {
+	return "client"
+}
+
 // OpsItemMaxResults represents the OpsItemMaxResults type
 type OpsItemMaxResults int32
 
 // OpsItemNotFoundException represents the OpsItemNotFoundException structure
 type OpsItemNotFoundException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for OpsItemNotFoundException
+func (e OpsItemNotFoundException) Error() string {
+	return "OpsItemNotFoundException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsItemNotFoundException) ErrorCode() string {
+	return "OpsItemNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsItemNotFoundException) ErrorFault() string {
+	return "client"
 }
 
 // OpsItemNotification represents the OpsItemNotification structure
@@ -6422,12 +7787,42 @@ type OpsItemRelatedItemAlreadyExistsException struct {
 	ResourceUri *string `json:"resourceUri,omitempty"`
 }
 
+// Error implements the error interface for OpsItemRelatedItemAlreadyExistsException
+func (e OpsItemRelatedItemAlreadyExistsException) Error() string {
+	return "OpsItemRelatedItemAlreadyExistsException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsItemRelatedItemAlreadyExistsException) ErrorCode() string {
+	return "OpsItemRelatedItemAlreadyExistsException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsItemRelatedItemAlreadyExistsException) ErrorFault() string {
+	return "client"
+}
+
 // OpsItemRelatedItemAssociationId represents the OpsItemRelatedItemAssociationId type
 type OpsItemRelatedItemAssociationId string
 
 // OpsItemRelatedItemAssociationNotFoundException represents the OpsItemRelatedItemAssociationNotFoundException structure
 type OpsItemRelatedItemAssociationNotFoundException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for OpsItemRelatedItemAssociationNotFoundException
+func (e OpsItemRelatedItemAssociationNotFoundException) Error() string {
+	return "OpsItemRelatedItemAssociationNotFoundException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsItemRelatedItemAssociationNotFoundException) ErrorCode() string {
+	return "OpsItemRelatedItemAssociationNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsItemRelatedItemAssociationNotFoundException) ErrorFault() string {
+	return "client"
 }
 
 // OpsItemRelatedItemAssociationResourceType represents the OpsItemRelatedItemAssociationResourceType type
@@ -6476,11 +7871,11 @@ type OpsItemRelatedItemsFilter struct {
 type OpsItemRelatedItemsFilterKey string
 
 const (
+	OpsItemRelatedItemsFilterKeyRESOURCE_URI OpsItemRelatedItemsFilterKey = "RESOURCE_URI"
+
 	OpsItemRelatedItemsFilterKeyRESOURCE_TYPE OpsItemRelatedItemsFilterKey = "RESOURCE_TYPE"
 
 	OpsItemRelatedItemsFilterKeyASSOCIATION_ID OpsItemRelatedItemsFilterKey = "ASSOCIATION_ID"
-
-	OpsItemRelatedItemsFilterKeyRESOURCE_URI OpsItemRelatedItemsFilterKey = "RESOURCE_URI"
 )
 
 // OpsItemRelatedItemsFilterOperator represents the OpsItemRelatedItemsFilterOperator enum type
@@ -6512,45 +7907,45 @@ type OpsItemSource string
 type OpsItemStatus string
 
 const (
-	OpsItemStatusPENDING OpsItemStatus = "PENDING"
+	OpsItemStatusRESOLVED OpsItemStatus = "RESOLVED"
+
+	OpsItemStatusTIMED_OUT OpsItemStatus = "TIMED_OUT"
+
+	OpsItemStatusFAILED OpsItemStatus = "FAILED"
 
 	OpsItemStatusCOMPLETED_WITH_SUCCESS OpsItemStatus = "COMPLETED_WITH_SUCCESS"
 
 	OpsItemStatusCOMPLETED_WITH_FAILURE OpsItemStatus = "COMPLETED_WITH_FAILURE"
 
-	OpsItemStatusSCHEDULED OpsItemStatus = "SCHEDULED"
+	OpsItemStatusPENDING_CHANGE_CALENDAR_OVERRIDE OpsItemStatus = "PENDING_CHANGE_CALENDAR_OVERRIDE"
 
 	OpsItemStatusPENDING_APPROVAL OpsItemStatus = "PENDING_APPROVAL"
 
-	OpsItemStatusAPPROVED OpsItemStatus = "APPROVED"
-
-	OpsItemStatusREVOKED OpsItemStatus = "REVOKED"
-
-	OpsItemStatusREJECTED OpsItemStatus = "REJECTED"
-
-	OpsItemStatusCLOSED OpsItemStatus = "CLOSED"
-
-	OpsItemStatusOPEN OpsItemStatus = "OPEN"
-
-	OpsItemStatusIN_PROGRESS OpsItemStatus = "IN_PROGRESS"
-
-	OpsItemStatusRESOLVED OpsItemStatus = "RESOLVED"
-
-	OpsItemStatusTIMED_OUT OpsItemStatus = "TIMED_OUT"
-
-	OpsItemStatusCANCELLING OpsItemStatus = "CANCELLING"
-
-	OpsItemStatusFAILED OpsItemStatus = "FAILED"
-
-	OpsItemStatusRUNBOOK_IN_PROGRESS OpsItemStatus = "RUNBOOK_IN_PROGRESS"
+	OpsItemStatusSCHEDULED OpsItemStatus = "SCHEDULED"
 
 	OpsItemStatusCHANGE_CALENDAR_OVERRIDE_APPROVED OpsItemStatus = "CHANGE_CALENDAR_OVERRIDE_APPROVED"
 
-	OpsItemStatusCANCELLED OpsItemStatus = "CANCELLED"
+	OpsItemStatusREVOKED OpsItemStatus = "REVOKED"
 
-	OpsItemStatusPENDING_CHANGE_CALENDAR_OVERRIDE OpsItemStatus = "PENDING_CHANGE_CALENDAR_OVERRIDE"
+	OpsItemStatusCLOSED OpsItemStatus = "CLOSED"
+
+	OpsItemStatusRUNBOOK_IN_PROGRESS OpsItemStatus = "RUNBOOK_IN_PROGRESS"
 
 	OpsItemStatusCHANGE_CALENDAR_OVERRIDE_REJECTED OpsItemStatus = "CHANGE_CALENDAR_OVERRIDE_REJECTED"
+
+	OpsItemStatusREJECTED OpsItemStatus = "REJECTED"
+
+	OpsItemStatusIN_PROGRESS OpsItemStatus = "IN_PROGRESS"
+
+	OpsItemStatusPENDING OpsItemStatus = "PENDING"
+
+	OpsItemStatusCANCELLING OpsItemStatus = "CANCELLING"
+
+	OpsItemStatusCANCELLED OpsItemStatus = "CANCELLED"
+
+	OpsItemStatusAPPROVED OpsItemStatus = "APPROVED"
+
+	OpsItemStatusOPEN OpsItemStatus = "OPEN"
 )
 
 // OpsItemSummaries represents the OpsItemSummaries type
@@ -6617,6 +8012,21 @@ type OpsMetadataAlreadyExistsException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for OpsMetadataAlreadyExistsException
+func (e OpsMetadataAlreadyExistsException) Error() string {
+	return "OpsMetadataAlreadyExistsException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsMetadataAlreadyExistsException) ErrorCode() string {
+	return "OpsMetadataAlreadyExistsException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsMetadataAlreadyExistsException) ErrorFault() string {
+	return "client"
+}
+
 // OpsMetadataArn represents the OpsMetadataArn type
 type OpsMetadataArn string
 
@@ -6644,14 +8054,59 @@ type OpsMetadataInvalidArgumentException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for OpsMetadataInvalidArgumentException
+func (e OpsMetadataInvalidArgumentException) Error() string {
+	return "OpsMetadataInvalidArgumentException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsMetadataInvalidArgumentException) ErrorCode() string {
+	return "OpsMetadataInvalidArgumentException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsMetadataInvalidArgumentException) ErrorFault() string {
+	return "client"
+}
+
 // OpsMetadataKeyLimitExceededException represents the OpsMetadataKeyLimitExceededException structure
 type OpsMetadataKeyLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for OpsMetadataKeyLimitExceededException
+func (e OpsMetadataKeyLimitExceededException) Error() string {
+	return "OpsMetadataKeyLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsMetadataKeyLimitExceededException) ErrorCode() string {
+	return "OpsMetadataKeyLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsMetadataKeyLimitExceededException) ErrorFault() string {
+	return "client"
+}
+
 // OpsMetadataLimitExceededException represents the OpsMetadataLimitExceededException structure
 type OpsMetadataLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for OpsMetadataLimitExceededException
+func (e OpsMetadataLimitExceededException) Error() string {
+	return "OpsMetadataLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsMetadataLimitExceededException) ErrorCode() string {
+	return "OpsMetadataLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsMetadataLimitExceededException) ErrorFault() string {
+	return "client"
 }
 
 // OpsMetadataList represents the OpsMetadataList type
@@ -6662,12 +8117,42 @@ type OpsMetadataNotFoundException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for OpsMetadataNotFoundException
+func (e OpsMetadataNotFoundException) Error() string {
+	return "OpsMetadataNotFoundException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsMetadataNotFoundException) ErrorCode() string {
+	return "OpsMetadataNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsMetadataNotFoundException) ErrorFault() string {
+	return "client"
+}
+
 // OpsMetadataResourceId represents the OpsMetadataResourceId type
 type OpsMetadataResourceId string
 
 // OpsMetadataTooManyUpdatesException represents the OpsMetadataTooManyUpdatesException structure
 type OpsMetadataTooManyUpdatesException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for OpsMetadataTooManyUpdatesException
+func (e OpsMetadataTooManyUpdatesException) Error() string {
+	return "OpsMetadataTooManyUpdatesException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e OpsMetadataTooManyUpdatesException) ErrorCode() string {
+	return "OpsMetadataTooManyUpdatesException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e OpsMetadataTooManyUpdatesException) ErrorFault() string {
+	return "client"
 }
 
 // OpsResultAttribute represents the OpsResultAttribute structure
@@ -6732,6 +8217,21 @@ type ParameterAlreadyExists struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ParameterAlreadyExists
+func (e ParameterAlreadyExists) Error() string {
+	return "ParameterAlreadyExists: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ParameterAlreadyExists) ErrorCode() string {
+	return "ParameterAlreadyExists"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ParameterAlreadyExists) ErrorFault() string {
+	return "client"
+}
+
 // ParameterDataType represents the ParameterDataType type
 type ParameterDataType string
 
@@ -6793,12 +8293,42 @@ type ParameterLimitExceeded struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ParameterLimitExceeded
+func (e ParameterLimitExceeded) Error() string {
+	return "ParameterLimitExceeded: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ParameterLimitExceeded) ErrorCode() string {
+	return "ParameterLimitExceeded"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ParameterLimitExceeded) ErrorFault() string {
+	return "client"
+}
+
 // ParameterList represents the ParameterList type
 type ParameterList []Parameter
 
 // ParameterMaxVersionLimitExceeded represents the ParameterMaxVersionLimitExceeded structure
 type ParameterMaxVersionLimitExceeded struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ParameterMaxVersionLimitExceeded
+func (e ParameterMaxVersionLimitExceeded) Error() string {
+	return "ParameterMaxVersionLimitExceeded: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ParameterMaxVersionLimitExceeded) ErrorCode() string {
+	return "ParameterMaxVersionLimitExceeded"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ParameterMaxVersionLimitExceeded) ErrorFault() string {
+	return "client"
 }
 
 // ParameterMetadata represents the ParameterMetadata structure
@@ -6842,9 +8372,39 @@ type ParameterNotFound struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ParameterNotFound
+func (e ParameterNotFound) Error() string {
+	return "ParameterNotFound: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ParameterNotFound) ErrorCode() string {
+	return "ParameterNotFound"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ParameterNotFound) ErrorFault() string {
+	return "client"
+}
+
 // ParameterPatternMismatchException represents the ParameterPatternMismatchException structure
 type ParameterPatternMismatchException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ParameterPatternMismatchException
+func (e ParameterPatternMismatchException) Error() string {
+	return "ParameterPatternMismatchException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ParameterPatternMismatchException) ErrorCode() string {
+	return "ParameterPatternMismatchException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ParameterPatternMismatchException) ErrorFault() string {
+	return "client"
 }
 
 // ParameterPolicies represents the ParameterPolicies type
@@ -6881,22 +8441,22 @@ type ParameterStringQueryOption string
 type ParameterTier string
 
 const (
-	ParameterTierINTELLIGENT_TIERING ParameterTier = "INTELLIGENT_TIERING"
-
 	ParameterTierSTANDARD ParameterTier = "STANDARD"
 
 	ParameterTierADVANCED ParameterTier = "ADVANCED"
+
+	ParameterTierINTELLIGENT_TIERING ParameterTier = "INTELLIGENT_TIERING"
 )
 
 // ParameterType represents the ParameterType enum type
 type ParameterType string
 
 const (
-	ParameterTypeSECURE_STRING ParameterType = "SECURE_STRING"
-
 	ParameterTypeSTRING ParameterType = "STRING"
 
 	ParameterTypeSTRING_LIST ParameterType = "STRING_LIST"
+
+	ParameterTypeSECURE_STRING ParameterType = "SECURE_STRING"
 )
 
 // ParameterValue represents the ParameterValue type
@@ -6910,9 +8470,39 @@ type ParameterVersionLabelLimitExceeded struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ParameterVersionLabelLimitExceeded
+func (e ParameterVersionLabelLimitExceeded) Error() string {
+	return "ParameterVersionLabelLimitExceeded: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ParameterVersionLabelLimitExceeded) ErrorCode() string {
+	return "ParameterVersionLabelLimitExceeded"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ParameterVersionLabelLimitExceeded) ErrorFault() string {
+	return "client"
+}
+
 // ParameterVersionNotFound represents the ParameterVersionNotFound structure
 type ParameterVersionNotFound struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ParameterVersionNotFound
+func (e ParameterVersionNotFound) Error() string {
+	return "ParameterVersionNotFound: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ParameterVersionNotFound) ErrorCode() string {
+	return "ParameterVersionNotFound"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ParameterVersionNotFound) ErrorFault() string {
+	return "client"
 }
 
 // Parameters represents the Parameters type
@@ -6929,11 +8519,11 @@ type ParametersFilter struct {
 type ParametersFilterKey string
 
 const (
+	ParametersFilterKeyNAME ParametersFilterKey = "NAME"
+
 	ParametersFilterKeyTYPE ParametersFilterKey = "TYPE"
 
 	ParametersFilterKeyKEY_ID ParametersFilterKey = "KEY_ID"
-
-	ParametersFilterKeyNAME ParametersFilterKey = "NAME"
 )
 
 // ParametersFilterList represents the ParametersFilterList type
@@ -7110,10 +8700,6 @@ const (
 type PatchComplianceLevel string
 
 const (
-	PatchComplianceLevelCritical PatchComplianceLevel = "Critical"
-
-	PatchComplianceLevelHigh PatchComplianceLevel = "High"
-
 	PatchComplianceLevelMedium PatchComplianceLevel = "Medium"
 
 	PatchComplianceLevelLow PatchComplianceLevel = "Low"
@@ -7121,6 +8707,10 @@ const (
 	PatchComplianceLevelInformational PatchComplianceLevel = "Informational"
 
 	PatchComplianceLevelUnspecified PatchComplianceLevel = "Unspecified"
+
+	PatchComplianceLevelCritical PatchComplianceLevel = "Critical"
+
+	PatchComplianceLevelHigh PatchComplianceLevel = "High"
 )
 
 // PatchComplianceMaxResults represents the PatchComplianceMaxResults type
@@ -7145,13 +8735,13 @@ type PatchCriticalNonCompliantCount int32
 type PatchDeploymentStatus string
 
 const (
+	PatchDeploymentStatusApproved PatchDeploymentStatus = "Approved"
+
 	PatchDeploymentStatusPendingApproval PatchDeploymentStatus = "PendingApproval"
 
 	PatchDeploymentStatusExplicitApproved PatchDeploymentStatus = "ExplicitApproved"
 
 	PatchDeploymentStatusExplicitRejected PatchDeploymentStatus = "ExplicitRejected"
-
-	PatchDeploymentStatusApproved PatchDeploymentStatus = "Approved"
 )
 
 // PatchDescription represents the PatchDescription type
@@ -7179,43 +8769,43 @@ type PatchFilterGroup struct {
 type PatchFilterKey string
 
 const (
-	PatchFilterKeyPatchId PatchFilterKey = "PatchId"
+	PatchFilterKeyAdvisoryId PatchFilterKey = "AdvisoryId"
 
-	PatchFilterKeyPriority PatchFilterKey = "Priority"
-
-	PatchFilterKeyArch PatchFilterKey = "Arch"
+	PatchFilterKeyProduct PatchFilterKey = "Product"
 
 	PatchFilterKeyClassification PatchFilterKey = "Classification"
 
-	PatchFilterKeyEpoch PatchFilterKey = "Epoch"
-
-	PatchFilterKeyName PatchFilterKey = "Name"
-
-	PatchFilterKeyVersion PatchFilterKey = "Version"
+	PatchFilterKeyMsrcSeverity PatchFilterKey = "MsrcSeverity"
 
 	PatchFilterKeyPatchSet PatchFilterKey = "PatchSet"
-
-	PatchFilterKeyProduct PatchFilterKey = "Product"
 
 	PatchFilterKeyCVEId PatchFilterKey = "CVEId"
 
 	PatchFilterKeySection PatchFilterKey = "Section"
 
+	PatchFilterKeyRelease PatchFilterKey = "Release"
+
 	PatchFilterKeySeverity PatchFilterKey = "Severity"
-
-	PatchFilterKeySecurity PatchFilterKey = "Security"
-
-	PatchFilterKeyAdvisoryId PatchFilterKey = "AdvisoryId"
 
 	PatchFilterKeyBugzillaId PatchFilterKey = "BugzillaId"
 
-	PatchFilterKeyProductFamily PatchFilterKey = "ProductFamily"
+	PatchFilterKeyEpoch PatchFilterKey = "Epoch"
 
-	PatchFilterKeyMsrcSeverity PatchFilterKey = "MsrcSeverity"
+	PatchFilterKeyName PatchFilterKey = "Name"
+
+	PatchFilterKeyPatchId PatchFilterKey = "PatchId"
 
 	PatchFilterKeyRepository PatchFilterKey = "Repository"
 
-	PatchFilterKeyRelease PatchFilterKey = "Release"
+	PatchFilterKeyArch PatchFilterKey = "Arch"
+
+	PatchFilterKeyProductFamily PatchFilterKey = "ProductFamily"
+
+	PatchFilterKeyPriority PatchFilterKey = "Priority"
+
+	PatchFilterKeySecurity PatchFilterKey = "Security"
+
+	PatchFilterKeyVersion PatchFilterKey = "Version"
 )
 
 // PatchFilterList represents the PatchFilterList type
@@ -7329,17 +8919,17 @@ type PatchPropertiesList []map[string]string
 type PatchProperty string
 
 const (
-	PatchPropertyPatchProductFamily PatchProperty = "PatchProductFamily"
-
-	PatchPropertyPatchClassification PatchProperty = "PatchClassification"
-
-	PatchPropertyPatchMsrcSeverity PatchProperty = "PatchMsrcSeverity"
-
 	PatchPropertyPatchPriority PatchProperty = "PatchPriority"
 
 	PatchPropertyPatchSeverity PatchProperty = "PatchSeverity"
 
 	PatchPropertyProduct PatchProperty = "Product"
+
+	PatchPropertyPatchProductFamily PatchProperty = "PatchProductFamily"
+
+	PatchPropertyPatchClassification PatchProperty = "PatchClassification"
+
+	PatchPropertyPatchMsrcSeverity PatchProperty = "PatchMsrcSeverity"
 )
 
 // PatchPropertyEntry represents the PatchPropertyEntry type
@@ -7469,6 +9059,21 @@ type PlatformVersion string
 // PoliciesLimitExceededException represents the PoliciesLimitExceededException structure
 type PoliciesLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for PoliciesLimitExceededException
+func (e PoliciesLimitExceededException) Error() string {
+	return "PoliciesLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e PoliciesLimitExceededException) ErrorCode() string {
+	return "PoliciesLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e PoliciesLimitExceededException) ErrorFault() string {
+	return "client"
 }
 
 // Policy represents the Policy type
@@ -7791,6 +9396,21 @@ type ResourceDataSyncAlreadyExistsException struct {
 	SyncName *string `json:"syncName,omitempty"`
 }
 
+// Error implements the error interface for ResourceDataSyncAlreadyExistsException
+func (e ResourceDataSyncAlreadyExistsException) Error() string {
+	return "ResourceDataSyncAlreadyExistsException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourceDataSyncAlreadyExistsException) ErrorCode() string {
+	return "ResourceDataSyncAlreadyExistsException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourceDataSyncAlreadyExistsException) ErrorFault() string {
+	return "client"
+}
+
 // ResourceDataSyncAwsOrganizationsSource represents the ResourceDataSyncAwsOrganizationsSource structure
 type ResourceDataSyncAwsOrganizationsSource struct {
 	OrganizationSourceType string `json:"organizationSourceType"`
@@ -7803,9 +9423,39 @@ type ResourceDataSyncConflictException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ResourceDataSyncConflictException
+func (e ResourceDataSyncConflictException) Error() string {
+	return "ResourceDataSyncConflictException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourceDataSyncConflictException) ErrorCode() string {
+	return "ResourceDataSyncConflictException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourceDataSyncConflictException) ErrorFault() string {
+	return "client"
+}
+
 // ResourceDataSyncCountExceededException represents the ResourceDataSyncCountExceededException structure
 type ResourceDataSyncCountExceededException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ResourceDataSyncCountExceededException
+func (e ResourceDataSyncCountExceededException) Error() string {
+	return "ResourceDataSyncCountExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourceDataSyncCountExceededException) ErrorCode() string {
+	return "ResourceDataSyncCountExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourceDataSyncCountExceededException) ErrorFault() string {
+	return "client"
 }
 
 // ResourceDataSyncCreatedTime represents the ResourceDataSyncCreatedTime type
@@ -7828,6 +9478,21 @@ type ResourceDataSyncIncludeFutureRegions bool
 // ResourceDataSyncInvalidConfigurationException represents the ResourceDataSyncInvalidConfigurationException structure
 type ResourceDataSyncInvalidConfigurationException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ResourceDataSyncInvalidConfigurationException
+func (e ResourceDataSyncInvalidConfigurationException) Error() string {
+	return "ResourceDataSyncInvalidConfigurationException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourceDataSyncInvalidConfigurationException) ErrorCode() string {
+	return "ResourceDataSyncInvalidConfigurationException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourceDataSyncInvalidConfigurationException) ErrorFault() string {
+	return "client"
 }
 
 // ResourceDataSyncItem represents the ResourceDataSyncItem structure
@@ -7869,6 +9534,21 @@ type ResourceDataSyncNotFoundException struct {
 	SyncName *string `json:"syncName,omitempty"`
 
 	SyncType *string `json:"syncType,omitempty"`
+}
+
+// Error implements the error interface for ResourceDataSyncNotFoundException
+func (e ResourceDataSyncNotFoundException) Error() string {
+	return "ResourceDataSyncNotFoundException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourceDataSyncNotFoundException) ErrorCode() string {
+	return "ResourceDataSyncNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourceDataSyncNotFoundException) ErrorFault() string {
+	return "client"
 }
 
 // ResourceDataSyncOrganizationSourceType represents the ResourceDataSyncOrganizationSourceType type
@@ -7967,9 +9647,39 @@ type ResourceInUseException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ResourceInUseException
+func (e ResourceInUseException) Error() string {
+	return "ResourceInUseException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourceInUseException) ErrorCode() string {
+	return "ResourceInUseException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourceInUseException) ErrorFault() string {
+	return "client"
+}
+
 // ResourceLimitExceededException represents the ResourceLimitExceededException structure
 type ResourceLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ResourceLimitExceededException
+func (e ResourceLimitExceededException) Error() string {
+	return "ResourceLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourceLimitExceededException) ErrorCode() string {
+	return "ResourceLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourceLimitExceededException) ErrorFault() string {
+	return "client"
 }
 
 // ResourceNotFoundException represents the ResourceNotFoundException structure
@@ -7977,9 +9687,39 @@ type ResourceNotFoundException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ResourceNotFoundException
+func (e ResourceNotFoundException) Error() string {
+	return "ResourceNotFoundException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourceNotFoundException) ErrorCode() string {
+	return "ResourceNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourceNotFoundException) ErrorFault() string {
+	return "client"
+}
+
 // ResourcePolicyConflictException represents the ResourcePolicyConflictException structure
 type ResourcePolicyConflictException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ResourcePolicyConflictException
+func (e ResourcePolicyConflictException) Error() string {
+	return "ResourcePolicyConflictException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourcePolicyConflictException) ErrorCode() string {
+	return "ResourcePolicyConflictException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourcePolicyConflictException) ErrorFault() string {
+	return "client"
 }
 
 // ResourcePolicyInvalidParameterException represents the ResourcePolicyInvalidParameterException structure
@@ -7987,6 +9727,21 @@ type ResourcePolicyInvalidParameterException struct {
 	Message *string `json:"message,omitempty"`
 
 	ParameterNames []string `json:"parameterNames,omitempty"`
+}
+
+// Error implements the error interface for ResourcePolicyInvalidParameterException
+func (e ResourcePolicyInvalidParameterException) Error() string {
+	return "ResourcePolicyInvalidParameterException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourcePolicyInvalidParameterException) ErrorCode() string {
+	return "ResourcePolicyInvalidParameterException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourcePolicyInvalidParameterException) ErrorFault() string {
+	return "client"
 }
 
 // ResourcePolicyLimitExceededException represents the ResourcePolicyLimitExceededException structure
@@ -7998,12 +9753,42 @@ type ResourcePolicyLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for ResourcePolicyLimitExceededException
+func (e ResourcePolicyLimitExceededException) Error() string {
+	return "ResourcePolicyLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourcePolicyLimitExceededException) ErrorCode() string {
+	return "ResourcePolicyLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourcePolicyLimitExceededException) ErrorFault() string {
+	return "client"
+}
+
 // ResourcePolicyMaxResults represents the ResourcePolicyMaxResults type
 type ResourcePolicyMaxResults int32
 
 // ResourcePolicyNotFoundException represents the ResourcePolicyNotFoundException structure
 type ResourcePolicyNotFoundException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ResourcePolicyNotFoundException
+func (e ResourcePolicyNotFoundException) Error() string {
+	return "ResourcePolicyNotFoundException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ResourcePolicyNotFoundException) ErrorCode() string {
+	return "ResourcePolicyNotFoundException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ResourcePolicyNotFoundException) ErrorFault() string {
+	return "client"
 }
 
 // ResourcePolicyParameterNamesList represents the ResourcePolicyParameterNamesList type
@@ -8013,32 +9798,32 @@ type ResourcePolicyParameterNamesList []string
 type ResourceType string
 
 const (
-	ResourceTypeMANAGED_INSTANCE ResourceType = "MANAGED_INSTANCE"
-
 	ResourceTypeEC2_INSTANCE ResourceType = "EC2_INSTANCE"
+
+	ResourceTypeMANAGED_INSTANCE ResourceType = "MANAGED_INSTANCE"
 )
 
 // ResourceTypeForTagging represents the ResourceTypeForTagging enum type
 type ResourceTypeForTagging string
 
 const (
-	ResourceTypeForTaggingMANAGED_INSTANCE ResourceTypeForTagging = "MANAGED_INSTANCE"
+	ResourceTypeForTaggingMAINTENANCE_WINDOW ResourceTypeForTagging = "MAINTENANCE_WINDOW"
 
 	ResourceTypeForTaggingPARAMETER ResourceTypeForTagging = "PARAMETER"
 
-	ResourceTypeForTaggingOPS_ITEM ResourceTypeForTagging = "OPS_ITEM"
-
 	ResourceTypeForTaggingOPSMETADATA ResourceTypeForTagging = "OPSMETADATA"
-
-	ResourceTypeForTaggingASSOCIATION ResourceTypeForTagging = "ASSOCIATION"
 
 	ResourceTypeForTaggingDOCUMENT ResourceTypeForTagging = "DOCUMENT"
 
-	ResourceTypeForTaggingMAINTENANCE_WINDOW ResourceTypeForTagging = "MAINTENANCE_WINDOW"
+	ResourceTypeForTaggingMANAGED_INSTANCE ResourceTypeForTagging = "MANAGED_INSTANCE"
 
 	ResourceTypeForTaggingPATCH_BASELINE ResourceTypeForTagging = "PATCH_BASELINE"
 
+	ResourceTypeForTaggingOPS_ITEM ResourceTypeForTagging = "OPS_ITEM"
+
 	ResourceTypeForTaggingAUTOMATION ResourceTypeForTagging = "AUTOMATION"
+
+	ResourceTypeForTaggingASSOCIATION ResourceTypeForTagging = "ASSOCIATION"
 )
 
 // ResponseCode represents the ResponseCode type
@@ -8229,6 +10014,21 @@ type ServiceQuotaExceededException struct {
 	ServiceCode string `json:"serviceCode"`
 }
 
+// Error implements the error interface for ServiceQuotaExceededException
+func (e ServiceQuotaExceededException) Error() string {
+	return "ServiceQuotaExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ServiceQuotaExceededException) ErrorCode() string {
+	return "ServiceQuotaExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ServiceQuotaExceededException) ErrorFault() string {
+	return "client"
+}
+
 // ServiceRole represents the ServiceRole type
 type ServiceRole string
 
@@ -8253,6 +10053,21 @@ type ServiceSettingId string
 // ServiceSettingNotFound represents the ServiceSettingNotFound structure
 type ServiceSettingNotFound struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for ServiceSettingNotFound
+func (e ServiceSettingNotFound) Error() string {
+	return "ServiceSettingNotFound: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ServiceSettingNotFound) ErrorCode() string {
+	return "ServiceSettingNotFound"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ServiceSettingNotFound) ErrorFault() string {
+	return "client"
 }
 
 // ServiceSettingValue represents the ServiceSettingValue type
@@ -8297,17 +10112,17 @@ type SessionFilter struct {
 type SessionFilterKey string
 
 const (
-	SessionFilterKeyOWNER SessionFilterKey = "OWNER"
-
-	SessionFilterKeySTATUS SessionFilterKey = "STATUS"
-
-	SessionFilterKeySESSION_ID SessionFilterKey = "SESSION_ID"
-
 	SessionFilterKeyINVOKED_AFTER SessionFilterKey = "INVOKED_AFTER"
 
 	SessionFilterKeyINVOKED_BEFORE SessionFilterKey = "INVOKED_BEFORE"
 
 	SessionFilterKeyTARGET_ID SessionFilterKey = "TARGET_ID"
+
+	SessionFilterKeyOWNER SessionFilterKey = "OWNER"
+
+	SessionFilterKeySTATUS SessionFilterKey = "STATUS"
+
+	SessionFilterKeySESSION_ID SessionFilterKey = "SESSION_ID"
 )
 
 // SessionFilterList represents the SessionFilterList type
@@ -8369,10 +10184,6 @@ const (
 type SessionStatus string
 
 const (
-	SessionStatusCONNECTED SessionStatus = "CONNECTED"
-
-	SessionStatusCONNECTING SessionStatus = "CONNECTING"
-
 	SessionStatusDISCONNECTED SessionStatus = "DISCONNECTED"
 
 	SessionStatusTERMINATED SessionStatus = "TERMINATED"
@@ -8380,6 +10191,10 @@ const (
 	SessionStatusTERMINATING SessionStatus = "TERMINATING"
 
 	SessionStatusFAILED SessionStatus = "FAILED"
+
+	SessionStatusCONNECTED SessionStatus = "CONNECTED"
+
+	SessionStatusCONNECTING SessionStatus = "CONNECTING"
 )
 
 // SessionTarget represents the SessionTarget type
@@ -8410,6 +10225,10 @@ type SharedDocumentVersion string
 type SignalType string
 
 const (
+	SignalTypeAPPROVE SignalType = "APPROVE"
+
+	SignalTypeREJECT SignalType = "REJECT"
+
 	SignalTypeSTART_STEP SignalType = "START_STEP"
 
 	SignalTypeSTOP_STEP SignalType = "STOP_STEP"
@@ -8417,10 +10236,6 @@ const (
 	SignalTypeRESUME SignalType = "RESUME"
 
 	SignalTypeREVOKE SignalType = "REVOKE"
-
-	SignalTypeAPPROVE SignalType = "APPROVE"
-
-	SignalTypeREJECT SignalType = "REJECT"
 )
 
 // SnapshotDownloadUrl represents the SnapshotDownloadUrl type
@@ -8436,11 +10251,11 @@ type SourceId string
 type SourceType string
 
 const (
-	SourceTypeAWS_EC2_INSTANCE SourceType = "AWS_EC2_INSTANCE"
-
 	SourceTypeAWS_IOT_THING SourceType = "AWS_IOT_THING"
 
 	SourceTypeAWS_SSM_MANAGEDINSTANCE SourceType = "AWS_SSM_MANAGEDINSTANCE"
+
+	SourceTypeAWS_EC2_INSTANCE SourceType = "AWS_EC2_INSTANCE"
 )
 
 // StandardErrorContent represents the StandardErrorContent type
@@ -8588,6 +10403,21 @@ type StatusName string
 type StatusUnchanged struct {
 }
 
+// Error implements the error interface for StatusUnchanged
+func (e StatusUnchanged) Error() string {
+	return "StatusUnchanged: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e StatusUnchanged) ErrorCode() string {
+	return "StatusUnchanged"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e StatusUnchanged) ErrorFault() string {
+	return "client"
+}
+
 // StepExecution represents the StepExecution structure
 type StepExecution struct {
 	Action *string `json:"action,omitempty"`
@@ -8650,19 +10480,19 @@ type StepExecutionFilter struct {
 type StepExecutionFilterKey string
 
 const (
-	StepExecutionFilterKeyPARENT_STEP_ITERATION StepExecutionFilterKey = "PARENT_STEP_ITERATION"
+	StepExecutionFilterKeyPARENT_STEP_ITERATOR_VALUE StepExecutionFilterKey = "PARENT_STEP_ITERATOR_VALUE"
 
 	StepExecutionFilterKeySTART_TIME_BEFORE StepExecutionFilterKey = "START_TIME_BEFORE"
+
+	StepExecutionFilterKeySTEP_EXECUTION_STATUS StepExecutionFilterKey = "STEP_EXECUTION_STATUS"
 
 	StepExecutionFilterKeySTEP_EXECUTION_ID StepExecutionFilterKey = "STEP_EXECUTION_ID"
 
 	StepExecutionFilterKeyACTION StepExecutionFilterKey = "ACTION"
 
-	StepExecutionFilterKeyPARENT_STEP_ITERATOR_VALUE StepExecutionFilterKey = "PARENT_STEP_ITERATOR_VALUE"
+	StepExecutionFilterKeyPARENT_STEP_ITERATION StepExecutionFilterKey = "PARENT_STEP_ITERATION"
 
 	StepExecutionFilterKeySTART_TIME_AFTER StepExecutionFilterKey = "START_TIME_AFTER"
-
-	StepExecutionFilterKeySTEP_EXECUTION_STATUS StepExecutionFilterKey = "STEP_EXECUTION_STATUS"
 
 	StepExecutionFilterKeySTEP_NAME StepExecutionFilterKey = "STEP_NAME"
 
@@ -8699,9 +10529,9 @@ type StopAutomationExecutionResult struct {
 type StopType string
 
 const (
-	StopTypeCOMPLETE StopType = "COMPLETE"
-
 	StopTypeCANCEL StopType = "CANCEL"
+
+	StopTypeCOMPLETE StopType = "COMPLETE"
 )
 
 // StreamUrl represents the StreamUrl type
@@ -8722,6 +10552,21 @@ type StringList []string
 // SubTypeCountLimitExceededException represents the SubTypeCountLimitExceededException structure
 type SubTypeCountLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for SubTypeCountLimitExceededException
+func (e SubTypeCountLimitExceededException) Error() string {
+	return "SubTypeCountLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e SubTypeCountLimitExceededException) ErrorCode() string {
+	return "SubTypeCountLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e SubTypeCountLimitExceededException) ErrorFault() string {
+	return "client"
 }
 
 // Tag represents the Tag structure
@@ -8753,6 +10598,21 @@ type TargetCount int32
 // TargetInUseException represents the TargetInUseException structure
 type TargetInUseException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for TargetInUseException
+func (e TargetInUseException) Error() string {
+	return "TargetInUseException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e TargetInUseException) ErrorCode() string {
+	return "TargetInUseException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e TargetInUseException) ErrorFault() string {
+	return "client"
 }
 
 // TargetKey represents the TargetKey type
@@ -8809,6 +10669,21 @@ type TargetNotConnected struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for TargetNotConnected
+func (e TargetNotConnected) Error() string {
+	return "TargetNotConnected: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e TargetNotConnected) ErrorCode() string {
+	return "TargetNotConnected"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e TargetNotConnected) ErrorFault() string {
+	return "client"
+}
+
 // TargetParameterList represents the TargetParameterList type
 type TargetParameterList []string
 
@@ -8853,6 +10728,21 @@ type ThrottlingException struct {
 	ServiceCode *string `json:"serviceCode,omitempty"`
 }
 
+// Error implements the error interface for ThrottlingException
+func (e ThrottlingException) Error() string {
+	return "ThrottlingException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ThrottlingException) ErrorCode() string {
+	return "ThrottlingException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ThrottlingException) ErrorFault() string {
+	return "client"
+}
+
 // TimeoutSeconds represents the TimeoutSeconds type
 type TimeoutSeconds int32
 
@@ -8863,9 +10753,39 @@ type TokenValue string
 type TooManyTagsError struct {
 }
 
+// Error implements the error interface for TooManyTagsError
+func (e TooManyTagsError) Error() string {
+	return "TooManyTagsError: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e TooManyTagsError) ErrorCode() string {
+	return "TooManyTagsError"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e TooManyTagsError) ErrorFault() string {
+	return "client"
+}
+
 // TooManyUpdates represents the TooManyUpdates structure
 type TooManyUpdates struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for TooManyUpdates
+func (e TooManyUpdates) Error() string {
+	return "TooManyUpdates: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e TooManyUpdates) ErrorCode() string {
+	return "TooManyUpdates"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e TooManyUpdates) ErrorFault() string {
+	return "client"
 }
 
 // TotalCount represents the TotalCount type
@@ -8874,6 +10794,21 @@ type TotalCount int32
 // TotalSizeLimitExceededException represents the TotalSizeLimitExceededException structure
 type TotalSizeLimitExceededException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for TotalSizeLimitExceededException
+func (e TotalSizeLimitExceededException) Error() string {
+	return "TotalSizeLimitExceededException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e TotalSizeLimitExceededException) ErrorCode() string {
+	return "TotalSizeLimitExceededException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e TotalSizeLimitExceededException) ErrorFault() string {
+	return "client"
 }
 
 // UUID represents the UUID type
@@ -8900,9 +10835,39 @@ type UnsupportedCalendarException struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for UnsupportedCalendarException
+func (e UnsupportedCalendarException) Error() string {
+	return "UnsupportedCalendarException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e UnsupportedCalendarException) ErrorCode() string {
+	return "UnsupportedCalendarException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e UnsupportedCalendarException) ErrorFault() string {
+	return "client"
+}
+
 // UnsupportedFeatureRequiredException represents the UnsupportedFeatureRequiredException structure
 type UnsupportedFeatureRequiredException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for UnsupportedFeatureRequiredException
+func (e UnsupportedFeatureRequiredException) Error() string {
+	return "UnsupportedFeatureRequiredException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e UnsupportedFeatureRequiredException) ErrorCode() string {
+	return "UnsupportedFeatureRequiredException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e UnsupportedFeatureRequiredException) ErrorFault() string {
+	return "client"
 }
 
 // UnsupportedInventoryItemContextException represents the UnsupportedInventoryItemContextException structure
@@ -8912,9 +10877,39 @@ type UnsupportedInventoryItemContextException struct {
 	TypeName *string `json:"typeName,omitempty"`
 }
 
+// Error implements the error interface for UnsupportedInventoryItemContextException
+func (e UnsupportedInventoryItemContextException) Error() string {
+	return "UnsupportedInventoryItemContextException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e UnsupportedInventoryItemContextException) ErrorCode() string {
+	return "UnsupportedInventoryItemContextException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e UnsupportedInventoryItemContextException) ErrorFault() string {
+	return "client"
+}
+
 // UnsupportedInventorySchemaVersionException represents the UnsupportedInventorySchemaVersionException structure
 type UnsupportedInventorySchemaVersionException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for UnsupportedInventorySchemaVersionException
+func (e UnsupportedInventorySchemaVersionException) Error() string {
+	return "UnsupportedInventorySchemaVersionException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e UnsupportedInventorySchemaVersionException) ErrorCode() string {
+	return "UnsupportedInventorySchemaVersionException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e UnsupportedInventorySchemaVersionException) ErrorFault() string {
+	return "client"
 }
 
 // UnsupportedOperatingSystem represents the UnsupportedOperatingSystem structure
@@ -8922,9 +10917,39 @@ type UnsupportedOperatingSystem struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for UnsupportedOperatingSystem
+func (e UnsupportedOperatingSystem) Error() string {
+	return "UnsupportedOperatingSystem: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e UnsupportedOperatingSystem) ErrorCode() string {
+	return "UnsupportedOperatingSystem"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e UnsupportedOperatingSystem) ErrorFault() string {
+	return "client"
+}
+
 // UnsupportedOperationException represents the UnsupportedOperationException structure
 type UnsupportedOperationException struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for UnsupportedOperationException
+func (e UnsupportedOperationException) Error() string {
+	return "UnsupportedOperationException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e UnsupportedOperationException) ErrorCode() string {
+	return "UnsupportedOperationException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e UnsupportedOperationException) ErrorFault() string {
+	return "client"
 }
 
 // UnsupportedParameterType represents the UnsupportedParameterType structure
@@ -8932,9 +10957,39 @@ type UnsupportedParameterType struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Error implements the error interface for UnsupportedParameterType
+func (e UnsupportedParameterType) Error() string {
+	return "UnsupportedParameterType: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e UnsupportedParameterType) ErrorCode() string {
+	return "UnsupportedParameterType"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e UnsupportedParameterType) ErrorFault() string {
+	return "client"
+}
+
 // UnsupportedPlatformType represents the UnsupportedPlatformType structure
 type UnsupportedPlatformType struct {
 	Message *string `json:"message,omitempty"`
+}
+
+// Error implements the error interface for UnsupportedPlatformType
+func (e UnsupportedPlatformType) Error() string {
+	return "UnsupportedPlatformType: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e UnsupportedPlatformType) ErrorCode() string {
+	return "UnsupportedPlatformType"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e UnsupportedPlatformType) ErrorFault() string {
+	return "client"
 }
 
 // UpdateAssociationRequest represents the UpdateAssociationRequest structure
@@ -9370,6 +11425,21 @@ type ValidationException struct {
 	Message *string `json:"message,omitempty"`
 
 	ReasonCode *string `json:"reasonCode,omitempty"`
+}
+
+// Error implements the error interface for ValidationException
+func (e ValidationException) Error() string {
+	return "ValidationException: AWS client error"
+}
+
+// ErrorCode returns the AWS error code
+func (e ValidationException) ErrorCode() string {
+	return "ValidationException"
+}
+
+// ErrorFault indicates whether this is a client or server error
+func (e ValidationException) ErrorFault() string {
+	return "client"
 }
 
 // Version represents the Version type
