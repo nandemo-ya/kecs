@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/awsclient"
 	generated_v2 "github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_v2"
 )
 
@@ -20,18 +18,10 @@ func main() {
 		endpoint = "http://localhost:8080"
 	}
 
-	// Create AWS client with our custom implementation
-	client := awsclient.NewClient(awsclient.Config{
+	// Create ECS client using generated client
+	ecsClient := generated_v2.NewClient(generated_v2.ClientOptions{
 		Endpoint: endpoint,
-		Region:   "ap-northeast-1",
-		Credentials: awsclient.Credentials{
-			AccessKeyID:     "test",
-			SecretAccessKey: "test",
-		},
 	})
-
-	// Create ECS-specific client
-	ecsClient := awsclient.NewECSClient(client)
 
 	ctx := context.Background()
 
@@ -56,14 +46,14 @@ func main() {
 		ClusterName: &clusterName,
 		Settings: []generated_v2.ClusterSetting{
 			{
-				Name:  "containerInsights",
-				Value: "enabled",
+				Name:  interfacePtr("containerInsights"),
+				Value: stringPtr("enabled"),
 			},
 		},
 		Tags: []generated_v2.Tag{
 			{
-				Key:   "Environment",
-				Value: "test",
+				Key:   stringPtr("Environment"),
+				Value: stringPtr("test"),
 			},
 		},
 	}
@@ -96,13 +86,13 @@ func main() {
 		if cluster.Settings != nil {
 			fmt.Println("  Settings:")
 			for _, setting := range cluster.Settings {
-				fmt.Printf("    - %s: %s\n", setting.Name, setting.Value)
+				fmt.Printf("    - %v: %s\n", *setting.Name, *setting.Value)
 			}
 		}
 		if cluster.Tags != nil {
 			fmt.Println("  Tags:")
 			for _, tag := range cluster.Tags {
-				fmt.Printf("    - %s: %s\n", tag.Key, tag.Value)
+				fmt.Printf("    - %s: %s\n", *tag.Key, *tag.Value)
 			}
 		}
 	}
@@ -113,4 +103,8 @@ func main() {
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+func interfacePtr(v interface{}) *interface{} {
+	return &v
 }

@@ -2,10 +2,6 @@
 
 package api
 
-import (
-	"time"
-)
-
 // Unit represents an empty response
 type Unit = struct{}
 
