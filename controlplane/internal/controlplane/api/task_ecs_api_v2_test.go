@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -418,8 +417,3 @@ var _ = Describe("Task ECS API V2", func() {
 		})
 	})
 })
-
-func TestTaskECSAPIV2(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Task ECS API V2 Suite")
-}
