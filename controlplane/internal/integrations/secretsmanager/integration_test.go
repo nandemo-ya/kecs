@@ -8,8 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	smapi "github.com/nandemo-ya/kecs/controlplane/internal/secretsmanager/generated"
 	sm "github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +27,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 	BeforeEach(func() {
 		kubeClient = fake.NewSimpleClientset()
 		mockSM = &mockSecretsManagerClient{
-			secrets: make(map[string]*secretsmanager.GetSecretValueOutput),
+			secrets: make(map[string]*smapi.GetSecretValueResponse),
 		}
 		config = &sm.Config{
 			LocalStackEndpoint: "http://localhost:4566",
@@ -45,12 +44,16 @@ var _ = Describe("Secrets Manager Integration", func() {
 			// Setup mock secret
 			secretName := "my-app/database/password"
 			secretValue := "super-secret-password"
-			mockSM.secrets[secretName] = &secretsmanager.GetSecretValueOutput{
-				Name:          aws.String(secretName),
-				SecretString:  aws.String(secretValue),
-				VersionId:     aws.String("version-123"),
+			namePtr := secretName
+			secretValuePtr := secretValue
+			versionIdPtr := "version-123"
+			createdDatePtr := time.Now()
+			mockSM.secrets[secretName] = &smapi.GetSecretValueResponse{
+				Name:          &namePtr,
+				SecretString:  &secretValuePtr,
+				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   aws.Time(time.Now()),
+				CreatedDate:   &createdDatePtr,
 			}
 
 			// Get secret
@@ -68,12 +71,15 @@ var _ = Describe("Secrets Manager Integration", func() {
 			// Setup mock binary secret
 			secretName := "my-app/certificate"
 			binaryData := []byte("binary-certificate-data")
-			mockSM.secrets[secretName] = &secretsmanager.GetSecretValueOutput{
-				Name:          aws.String(secretName),
+			namePtr := secretName
+			versionIdPtr := "version-456"
+			createdDatePtr := time.Now()
+			mockSM.secrets[secretName] = &smapi.GetSecretValueResponse{
+				Name:          &namePtr,
 				SecretBinary:  binaryData,
-				VersionId:     aws.String("version-456"),
+				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   aws.Time(time.Now()),
+				CreatedDate:   &createdDatePtr,
 			}
 
 			// Get secret
@@ -95,12 +101,16 @@ var _ = Describe("Secrets Manager Integration", func() {
 			// Setup mock secret
 			secretName := "my-app/cache/test"
 			secretValue := "cached-value"
-			mockSM.secrets[secretName] = &secretsmanager.GetSecretValueOutput{
-				Name:          aws.String(secretName),
-				SecretString:  aws.String(secretValue),
-				VersionId:     aws.String("v1"),
+			namePtr := secretName
+			secretValuePtr := secretValue
+			versionIdPtr := "v1"
+			createdDatePtr := time.Now()
+			mockSM.secrets[secretName] = &smapi.GetSecretValueResponse{
+				Name:          &namePtr,
+				SecretString:  &secretValuePtr,
+				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   aws.Time(time.Now()),
+				CreatedDate:   &createdDatePtr,
 			}
 
 			// First call
@@ -110,12 +120,16 @@ var _ = Describe("Secrets Manager Integration", func() {
 			Expect(secret1.VersionId).To(Equal("v1"))
 
 			// Update mock to return different value
-			mockSM.secrets[secretName] = &secretsmanager.GetSecretValueOutput{
-				Name:          aws.String(secretName),
-				SecretString:  aws.String("new-value"),
-				VersionId:     aws.String("v2"),
+			namePtr2 := secretName
+			newValuePtr := "new-value"
+			versionIdPtr2 := "v2"
+			createdDatePtr2 := time.Now()
+			mockSM.secrets[secretName] = &smapi.GetSecretValueResponse{
+				Name:          &namePtr2,
+				SecretString:  &newValuePtr,
+				VersionId:     &versionIdPtr2,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   aws.Time(time.Now()),
+				CreatedDate:   &createdDatePtr2,
 			}
 
 			// Second call should return cached value
@@ -131,12 +145,16 @@ var _ = Describe("Secrets Manager Integration", func() {
 			// Setup mock JSON secret
 			secretName := "my-app/config"
 			jsonValue := `{"username": "admin", "password": "secret123", "host": "localhost"}`
-			mockSM.secrets[secretName] = &secretsmanager.GetSecretValueOutput{
-				Name:          aws.String(secretName),
-				SecretString:  aws.String(jsonValue),
-				VersionId:     aws.String("v1"),
+			namePtr := secretName
+			jsonValuePtr := jsonValue
+			versionIdPtr := "v1"
+			createdDatePtr := time.Now()
+			mockSM.secrets[secretName] = &smapi.GetSecretValueResponse{
+				Name:          &namePtr,
+				SecretString:  &jsonValuePtr,
+				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   aws.Time(time.Now()),
+				CreatedDate:   &createdDatePtr,
 			}
 
 			// Get specific key
@@ -149,12 +167,16 @@ var _ = Describe("Secrets Manager Integration", func() {
 			// Setup mock secret
 			secretName := "my-app/simple"
 			secretValue := "simple-value"
-			mockSM.secrets[secretName] = &secretsmanager.GetSecretValueOutput{
-				Name:          aws.String(secretName),
-				SecretString:  aws.String(secretValue),
-				VersionId:     aws.String("v1"),
+			namePtr := secretName
+			secretValuePtr := secretValue
+			versionIdPtr := "v1"
+			createdDatePtr := time.Now()
+			mockSM.secrets[secretName] = &smapi.GetSecretValueResponse{
+				Name:          &namePtr,
+				SecretString:  &secretValuePtr,
+				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   aws.Time(time.Now()),
+				CreatedDate:   &createdDatePtr,
 			}
 
 			// Get without key
@@ -167,12 +189,16 @@ var _ = Describe("Secrets Manager Integration", func() {
 			// Setup mock JSON secret
 			secretName := "my-app/config"
 			jsonValue := `{"username": "admin"}`
-			mockSM.secrets[secretName] = &secretsmanager.GetSecretValueOutput{
-				Name:          aws.String(secretName),
-				SecretString:  aws.String(jsonValue),
-				VersionId:     aws.String("v1"),
+			namePtr := secretName
+			jsonValuePtr := jsonValue
+			versionIdPtr := "v1"
+			createdDatePtr := time.Now()
+			mockSM.secrets[secretName] = &smapi.GetSecretValueResponse{
+				Name:          &namePtr,
+				SecretString:  &jsonValuePtr,
+				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   aws.Time(time.Now()),
+				CreatedDate:   &createdDatePtr,
 			}
 
 			// Try to get non-existent key
@@ -294,12 +320,16 @@ var _ = Describe("Secrets Manager Integration", func() {
 			// Setup mock secret
 			secretName := "my-app/sync/test"
 			secretValue := "sync-test-value"
-			mockSM.secrets[secretName] = &secretsmanager.GetSecretValueOutput{
-				Name:          aws.String(secretName),
-				SecretString:  aws.String(secretValue),
-				VersionId:     aws.String("v1"),
+			namePtr := secretName
+			secretValuePtr := secretValue
+			versionIdPtr := "v1"
+			createdDatePtr := time.Now()
+			mockSM.secrets[secretName] = &smapi.GetSecretValueResponse{
+				Name:          &namePtr,
+				SecretString:  &secretValuePtr,
+				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   aws.Time(time.Now()),
+				CreatedDate:   &createdDatePtr,
 			}
 
 			// Sync secret
@@ -364,26 +394,38 @@ var _ = Describe("Secrets Manager Integration", func() {
 			}
 			
 			// Add mock data
-			mockSM.secrets["my-app/batch/secret1"] = &secretsmanager.GetSecretValueOutput{
-				Name:          aws.String("my-app/batch/secret1"),
-				SecretString:  aws.String("value-1"),
-				VersionId:     aws.String("v1"),
+			name1 := "my-app/batch/secret1"
+			value1 := "value-1"
+			version1 := "v1"
+			date1 := time.Now()
+			mockSM.secrets["my-app/batch/secret1"] = &smapi.GetSecretValueResponse{
+				Name:          &name1,
+				SecretString:  &value1,
+				VersionId:     &version1,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   aws.Time(time.Now()),
+				CreatedDate:   &date1,
 			}
-			mockSM.secrets["my-app/batch/secret2"] = &secretsmanager.GetSecretValueOutput{
-				Name:          aws.String("my-app/batch/secret2"),
-				SecretString:  aws.String(`{"username": "admin", "password": "secret123"}`),
-				VersionId:     aws.String("v1"),
+			name2 := "my-app/batch/secret2"
+			value2 := `{"username": "admin", "password": "secret123"}`
+			version2 := "v1"
+			date2 := time.Now()
+			mockSM.secrets["my-app/batch/secret2"] = &smapi.GetSecretValueResponse{
+				Name:          &name2,
+				SecretString:  &value2,
+				VersionId:     &version2,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   aws.Time(time.Now()),
+				CreatedDate:   &date2,
 			}
-			mockSM.secrets["my-app/batch/secret3"] = &secretsmanager.GetSecretValueOutput{
-				Name:          aws.String("my-app/batch/secret3"),
-				SecretString:  aws.String("value-3"),
-				VersionId:     aws.String("v1"),
+			name3 := "my-app/batch/secret3"
+			value3 := "value-3"
+			version3 := "v1"
+			date3 := time.Now()
+			mockSM.secrets["my-app/batch/secret3"] = &smapi.GetSecretValueResponse{
+				Name:          &name3,
+				SecretString:  &value3,
+				VersionId:     &version3,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   aws.Time(time.Now()),
+				CreatedDate:   &date3,
 			}
 
 			// Sync all secrets
@@ -414,12 +456,16 @@ var _ = Describe("Secrets Manager Integration", func() {
 			}
 			
 			// Only setup one secret
-			mockSM.secrets["my-app/batch/exists"] = &secretsmanager.GetSecretValueOutput{
-				Name:          aws.String("my-app/batch/exists"),
-				SecretString:  aws.String("exists-value"),
-				VersionId:     aws.String("v1"),
+			nameExists := "my-app/batch/exists"
+			valueExists := "exists-value"
+			versionExists := "v1"
+			dateExists := time.Now()
+			mockSM.secrets["my-app/batch/exists"] = &smapi.GetSecretValueResponse{
+				Name:          &nameExists,
+				SecretString:  &valueExists,
+				VersionId:     &versionExists,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   aws.Time(time.Now()),
+				CreatedDate:   &dateExists,
 			}
 
 			// Sync secrets
@@ -438,30 +484,30 @@ var _ = Describe("Secrets Manager Integration", func() {
 
 // mockSecretsManagerClient is a mock implementation of SecretsManagerClient for testing
 type mockSecretsManagerClient struct {
-	secrets map[string]*secretsmanager.GetSecretValueOutput
+	secrets map[string]*smapi.GetSecretValueResponse
 }
 
-func (m *mockSecretsManagerClient) GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
-	if params.SecretId == nil {
+func (m *mockSecretsManagerClient) GetSecretValue(ctx context.Context, params *smapi.GetSecretValueRequest) (*smapi.GetSecretValueResponse, error) {
+	if params.SecretId == "" {
 		return nil, fmt.Errorf("secret ID is required")
 	}
 	
-	output, exists := m.secrets[*params.SecretId]
+	output, exists := m.secrets[params.SecretId]
 	if !exists {
-		return nil, fmt.Errorf("secret not found: %s", *params.SecretId)
+		return nil, fmt.Errorf("secret not found: %s", params.SecretId)
 	}
 	
 	return output, nil
 }
 
-func (m *mockSecretsManagerClient) CreateSecret(ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error) {
+func (m *mockSecretsManagerClient) CreateSecret(ctx context.Context, params *smapi.CreateSecretRequest) (*smapi.CreateSecretResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *mockSecretsManagerClient) UpdateSecret(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error) {
+func (m *mockSecretsManagerClient) UpdateSecret(ctx context.Context, params *smapi.UpdateSecretRequest) (*smapi.UpdateSecretResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *mockSecretsManagerClient) DeleteSecret(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error) {
+func (m *mockSecretsManagerClient) DeleteSecret(ctx context.Context, params *smapi.DeleteSecretRequest) (*smapi.DeleteSecretResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }

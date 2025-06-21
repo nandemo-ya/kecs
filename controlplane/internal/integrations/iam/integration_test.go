@@ -4,12 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
-	iamTypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	iamapi "github.com/nandemo-ya/kecs/controlplane/internal/iam/generated"
+	stsapi "github.com/nandemo-ya/kecs/controlplane/internal/sts/generated"
 	kecsIAM "github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,43 +17,47 @@ import (
 // mockIAMClient is a mock implementation of IAMClient
 type mockIAMClient struct{}
 
-func (m *mockIAMClient) CreateRole(ctx context.Context, params *iam.CreateRoleInput, optFns ...func(*iam.Options)) (*iam.CreateRoleOutput, error) {
-	return &iam.CreateRoleOutput{
-		Role: &iamTypes.Role{
+func (m *mockIAMClient) CreateRole(ctx context.Context, params *iamapi.CreateRoleRequest) (*iamapi.CreateRoleResponse, error) {
+	arn := "arn:aws:iam::123456789012:role/" + params.RoleName
+	return &iamapi.CreateRoleResponse{
+		Role: iamapi.Role{
 			RoleName: params.RoleName,
-			Arn:      aws.String("arn:aws:iam::123456789012:role/" + *params.RoleName),
+			Arn:      arn,
+			Path:     "/",
+			RoleId:   "AIDAQ3EGKSO2V4EXAMPLE",
+			CreateDate: time.Now(),
 		},
 	}, nil
 }
 
-func (m *mockIAMClient) DeleteRole(ctx context.Context, params *iam.DeleteRoleInput, optFns ...func(*iam.Options)) (*iam.DeleteRoleOutput, error) {
-	return &iam.DeleteRoleOutput{}, nil
+func (m *mockIAMClient) DeleteRole(ctx context.Context, params *iamapi.DeleteRoleRequest) (*iamapi.Unit, error) {
+	return &iamapi.Unit{}, nil
 }
 
-func (m *mockIAMClient) AttachRolePolicy(ctx context.Context, params *iam.AttachRolePolicyInput, optFns ...func(*iam.Options)) (*iam.AttachRolePolicyOutput, error) {
-	return &iam.AttachRolePolicyOutput{}, nil
+func (m *mockIAMClient) AttachRolePolicy(ctx context.Context, params *iamapi.AttachRolePolicyRequest) (*iamapi.Unit, error) {
+	return &iamapi.Unit{}, nil
 }
 
-func (m *mockIAMClient) DetachRolePolicy(ctx context.Context, params *iam.DetachRolePolicyInput, optFns ...func(*iam.Options)) (*iam.DetachRolePolicyOutput, error) {
-	return &iam.DetachRolePolicyOutput{}, nil
+func (m *mockIAMClient) DetachRolePolicy(ctx context.Context, params *iamapi.DetachRolePolicyRequest) (*iamapi.Unit, error) {
+	return &iamapi.Unit{}, nil
 }
 
-func (m *mockIAMClient) PutRolePolicy(ctx context.Context, params *iam.PutRolePolicyInput, optFns ...func(*iam.Options)) (*iam.PutRolePolicyOutput, error) {
-	return &iam.PutRolePolicyOutput{}, nil
+func (m *mockIAMClient) PutRolePolicy(ctx context.Context, params *iamapi.PutRolePolicyRequest) (*iamapi.Unit, error) {
+	return &iamapi.Unit{}, nil
 }
 
-func (m *mockIAMClient) DeleteRolePolicy(ctx context.Context, params *iam.DeleteRolePolicyInput, optFns ...func(*iam.Options)) (*iam.DeleteRolePolicyOutput, error) {
-	return &iam.DeleteRolePolicyOutput{}, nil
+func (m *mockIAMClient) DeleteRolePolicy(ctx context.Context, params *iamapi.DeleteRolePolicyRequest) (*iamapi.Unit, error) {
+	return &iamapi.Unit{}, nil
 }
 
-func (m *mockIAMClient) ListAttachedRolePolicies(ctx context.Context, params *iam.ListAttachedRolePoliciesInput, optFns ...func(*iam.Options)) (*iam.ListAttachedRolePoliciesOutput, error) {
-	return &iam.ListAttachedRolePoliciesOutput{
-		AttachedPolicies: []iamTypes.AttachedPolicy{},
+func (m *mockIAMClient) ListAttachedRolePolicies(ctx context.Context, params *iamapi.ListAttachedRolePoliciesRequest) (*iamapi.ListAttachedRolePoliciesResponse, error) {
+	return &iamapi.ListAttachedRolePoliciesResponse{
+		AttachedPolicies: []iamapi.AttachedPolicy{},
 	}, nil
 }
 
-func (m *mockIAMClient) ListRolePolicies(ctx context.Context, params *iam.ListRolePoliciesInput, optFns ...func(*iam.Options)) (*iam.ListRolePoliciesOutput, error) {
-	return &iam.ListRolePoliciesOutput{
+func (m *mockIAMClient) ListRolePolicies(ctx context.Context, params *iamapi.ListRolePoliciesRequest) (*iamapi.ListRolePoliciesResponse, error) {
+	return &iamapi.ListRolePoliciesResponse{
 		PolicyNames: []string{},
 	}, nil
 }
@@ -63,8 +65,8 @@ func (m *mockIAMClient) ListRolePolicies(ctx context.Context, params *iam.ListRo
 // mockSTSClient is a mock implementation of STSClient
 type mockSTSClient struct{}
 
-func (m *mockSTSClient) AssumeRole(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
-	return &sts.AssumeRoleOutput{}, nil
+func (m *mockSTSClient) AssumeRole(ctx context.Context, params *stsapi.AssumeRoleRequest) (*stsapi.AssumeRoleResponse, error) {
+	return &stsapi.AssumeRoleResponse{}, nil
 }
 
 // mockLocalStackManager is a mock implementation of localstack.Manager
@@ -143,7 +145,7 @@ var _ = Describe("IAM Integration", func() {
 	var (
 		integration       kecsIAM.Integration
 		kubeClient        *fake.Clientset
-		localstackManager localstack.Manager
+		// localstackManager localstack.Manager // unused in temp implementation
 		config            *kecsIAM.Config
 		iamClient         kecsIAM.IAMClient
 		stsClient         kecsIAM.STSClient
@@ -151,7 +153,7 @@ var _ = Describe("IAM Integration", func() {
 
 	BeforeEach(func() {
 		kubeClient = fake.NewSimpleClientset()
-		localstackManager = &mockLocalStackManager{}
+		// localstackManager = &mockLocalStackManager{} // unused in temp implementation
 		config = &kecsIAM.Config{
 			LocalStackEndpoint: "http://localhost:4566",
 			KubeNamespace:      "default",
@@ -162,12 +164,11 @@ var _ = Describe("IAM Integration", func() {
 		stsClient = &mockSTSClient{}
 		
 		// Use the test constructor with mocked clients
-		integration = kecsIAM.NewIntegrationWithClients(
+		integration = kecsIAM.NewIntegrationWithClient(
 			kubeClient,
-			localstackManager,
-			config,
 			iamClient,
 			stsClient,
+			config,
 		)
 	})
 

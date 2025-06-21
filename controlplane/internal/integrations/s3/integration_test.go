@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3api "github.com/nandemo-ya/kecs/controlplane/internal/s3/generated"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/fake"
@@ -18,44 +18,44 @@ import (
 
 // Mock S3 client
 type mockS3Client struct {
-	getObjectFunc    func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
-	putObjectFunc    func(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
-	headObjectFunc   func(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
-	createBucketFunc func(ctx context.Context, params *s3.CreateBucketInput, optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error)
-	deleteObjectFunc func(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
+	getObjectFunc    func(ctx context.Context, params *s3api.GetObjectRequest) (*s3api.GetObjectOutput, error)
+	putObjectFunc    func(ctx context.Context, params *s3api.PutObjectRequest) (*s3api.PutObjectOutput, error)
+	headObjectFunc   func(ctx context.Context, params *s3api.HeadObjectRequest) (*s3api.HeadObjectOutput, error)
+	createBucketFunc func(ctx context.Context, params *s3api.CreateBucketRequest) (*s3api.CreateBucketOutput, error)
+	deleteObjectFunc func(ctx context.Context, params *s3api.DeleteObjectRequest) (*s3api.DeleteObjectOutput, error)
 }
 
-func (m *mockS3Client) GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+func (m *mockS3Client) GetObject(ctx context.Context, params *s3api.GetObjectRequest) (*s3api.GetObjectOutput, error) {
 	if m.getObjectFunc != nil {
-		return m.getObjectFunc(ctx, params, optFns...)
+		return m.getObjectFunc(ctx, params)
 	}
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockS3Client) PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
+func (m *mockS3Client) PutObject(ctx context.Context, params *s3api.PutObjectRequest) (*s3api.PutObjectOutput, error) {
 	if m.putObjectFunc != nil {
-		return m.putObjectFunc(ctx, params, optFns...)
+		return m.putObjectFunc(ctx, params)
 	}
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockS3Client) HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
+func (m *mockS3Client) HeadObject(ctx context.Context, params *s3api.HeadObjectRequest) (*s3api.HeadObjectOutput, error) {
 	if m.headObjectFunc != nil {
-		return m.headObjectFunc(ctx, params, optFns...)
+		return m.headObjectFunc(ctx, params)
 	}
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockS3Client) CreateBucket(ctx context.Context, params *s3.CreateBucketInput, optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error) {
+func (m *mockS3Client) CreateBucket(ctx context.Context, params *s3api.CreateBucketRequest) (*s3api.CreateBucketOutput, error) {
 	if m.createBucketFunc != nil {
-		return m.createBucketFunc(ctx, params, optFns...)
+		return m.createBucketFunc(ctx, params)
 	}
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockS3Client) DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error) {
+func (m *mockS3Client) DeleteObject(ctx context.Context, params *s3api.DeleteObjectRequest) (*s3api.DeleteObjectOutput, error) {
 	if m.deleteObjectFunc != nil {
-		return m.deleteObjectFunc(ctx, params, optFns...)
+		return m.deleteObjectFunc(ctx, params)
 	}
 	return nil, errors.New("not implemented")
 }
@@ -217,8 +217,8 @@ var _ = Describe("S3 Integration", func() {
 			contentLength := int64(100)
 			
 			mockClient.headObjectFunc = func(ctx context.Context, params *s3api.HeadObjectRequest) (*s3api.HeadObjectOutput, error) {
-				Expect(*params.Bucket).To(Equal("test-bucket"))
-				Expect(*params.Key).To(Equal("test-key"))
+				Expect(params.Bucket).To(Equal("test-bucket"))
+				Expect(params.Key).To(Equal("test-key"))
 				return &s3api.HeadObjectOutput{
 					ContentLength: &contentLength,
 					ContentType:   &contentType,
@@ -276,7 +276,8 @@ var _ = Describe("S3 Integration", func() {
 			mockClient.createBucketFunc = func(ctx context.Context, params *s3api.CreateBucketRequest) (*s3api.CreateBucketOutput, error) {
 				Expect(params.CreateBucketConfiguration).NotTo(BeNil())
 				Expect(params.CreateBucketConfiguration.LocationConstraint).NotTo(BeNil())
-				constraint := *params.CreateBucketConfiguration.LocationConstraint
+				constraint, ok := (*params.CreateBucketConfiguration.LocationConstraint).(string)
+				Expect(ok).To(BeTrue())
 				Expect(constraint).To(Equal("eu-west-1"))
 				return &s3api.CreateBucketOutput{}, nil
 			}
