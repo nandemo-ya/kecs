@@ -16,9 +16,9 @@ import (
 
 var _ = Describe("Cluster ECS API V2", func() {
 	var (
-		ecsAPIV2 *api.DefaultECSAPIV2
-		testStorage  storage.Storage
-		ctx      context.Context
+		ecsAPIV2    api.ECSAPIV2
+		testStorage storage.Storage
+		ctx         context.Context
 	)
 
 	BeforeEach(func() {
@@ -33,8 +33,9 @@ var _ = Describe("Cluster ECS API V2", func() {
 		
 		ctx = context.Background()
 		
-		// Initialize V2 API
-		ecsAPIV2 = api.NewDefaultECSAPIV2(testStorage, nil)
+		// Initialize generated API and V2 adapter
+		generatedAPI := api.NewDefaultECSAPI(testStorage, nil)
+		ecsAPIV2 = api.NewECSAPIv2Adapter(generatedAPI)
 	})
 
 	AfterEach(func() {
@@ -173,7 +174,7 @@ var _ = Describe("Cluster ECS API V2", func() {
 						ActiveServicesCount: 2,
 						RunningTasksCount:   5,
 						Settings:            `[{"name":"containerInsights","value":"enabled"}]`,
-						Tags:                `{"Environment":"test","Team":"platform"}`,
+						Tags:                `[{"key":"Environment","value":"test"},{"key":"Team","value":"platform"}]`,
 					},
 					{
 						Name:   "test-cluster-2",

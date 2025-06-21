@@ -291,8 +291,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	}
 	s.ecsAPI = ecsAPI
 	
-	// Initialize V2 API using AWS SDK types
-	s.ecsAPIV2 = NewDefaultECSAPIV2(storage, kindManager)
+	// Initialize V2 API adapter that wraps the generated API
+	s.ecsAPIV2 = NewECSAPIv2Adapter(s.ecsAPI)
 
 	return s, nil
 }
