@@ -7,9 +7,10 @@ tool github.com/onsi/ginkgo/v2/ginkgo
 require (
 	github.com/aws/aws-sdk-go-v2 v1.36.5
 	github.com/aws/aws-sdk-go-v2/config v1.29.17
-	github.com/aws/aws-sdk-go-v2/service/ecs v1.57.6
+	github.com/aws/aws-sdk-go-v2/service/ecs v1.58.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.42.2
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.81.0
+	github.com/nandemo-ya/kecs/controlplane v0.0.0-00010101000000-000000000000
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/stretchr/testify v1.10.0
@@ -85,3 +86,5 @@ require (
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/nandemo-ya/kecs/controlplane => ../../controlplane

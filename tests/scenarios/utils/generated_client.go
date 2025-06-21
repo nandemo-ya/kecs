@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	generated_v2 "github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_v2"
+	generated_v2 "github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 )
 
 // GeneratedClient uses generated types for ECS operations
