@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3api "github.com/nandemo-ya/kecs/controlplane/internal/s3/generated"
 )
 
 // Integration defines the interface for S3 integration
@@ -42,9 +42,9 @@ type ObjectMetadata struct {
 
 // S3Client interface for S3 operations (for testing)
 type S3Client interface {
-	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
-	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
-	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
-	CreateBucket(ctx context.Context, params *s3.CreateBucketInput, optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error)
-	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
+	GetObject(ctx context.Context, params *s3api.GetObjectRequest) (*s3api.GetObjectOutput, error)
+	PutObject(ctx context.Context, params *s3api.PutObjectRequest) (*s3api.PutObjectOutput, error)
+	HeadObject(ctx context.Context, params *s3api.HeadObjectRequest) (*s3api.HeadObjectOutput, error)
+	CreateBucket(ctx context.Context, params *s3api.CreateBucketRequest) (*s3api.CreateBucketOutput, error)
+	DeleteObject(ctx context.Context, params *s3api.DeleteObjectRequest) (*s3api.DeleteObjectOutput, error)
 }

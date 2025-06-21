@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	secretsmanagerapi "github.com/nandemo-ya/kecs/controlplane/internal/secretsmanager/generated"
 )
 
 // Integration represents the Secrets Manager integration
@@ -95,8 +95,8 @@ const (
 
 // SecretsManagerClient interface for Secrets Manager operations (for testing)
 type SecretsManagerClient interface {
-	GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
-	CreateSecret(ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.CreateSecretOutput, error)
-	UpdateSecret(ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.UpdateSecretOutput, error)
-	DeleteSecret(ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.DeleteSecretOutput, error)
+	GetSecretValue(ctx context.Context, params *secretsmanagerapi.GetSecretValueRequest) (*secretsmanagerapi.GetSecretValueResponse, error)
+	CreateSecret(ctx context.Context, params *secretsmanagerapi.CreateSecretRequest) (*secretsmanagerapi.CreateSecretResponse, error)
+	UpdateSecret(ctx context.Context, params *secretsmanagerapi.UpdateSecretRequest) (*secretsmanagerapi.UpdateSecretResponse, error)
+	DeleteSecret(ctx context.Context, params *secretsmanagerapi.DeleteSecretRequest) (*secretsmanagerapi.DeleteSecretResponse, error)
 }

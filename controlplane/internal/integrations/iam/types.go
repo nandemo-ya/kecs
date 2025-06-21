@@ -2,8 +2,8 @@ package iam
 
 import (
 	"context"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
+	iamapi "github.com/nandemo-ya/kecs/controlplane/internal/iam/generated"
+	stsapi "github.com/nandemo-ya/kecs/controlplane/internal/sts/generated"
 )
 
 // Integration represents the IAM-Kubernetes integration
@@ -74,17 +74,17 @@ var DefaultLocalStackCredentials = Credentials{
 
 // IAMClient interface for IAM operations (for testing)
 type IAMClient interface {
-	CreateRole(ctx context.Context, params *iam.CreateRoleInput, optFns ...func(*iam.Options)) (*iam.CreateRoleOutput, error)
-	DeleteRole(ctx context.Context, params *iam.DeleteRoleInput, optFns ...func(*iam.Options)) (*iam.DeleteRoleOutput, error)
-	AttachRolePolicy(ctx context.Context, params *iam.AttachRolePolicyInput, optFns ...func(*iam.Options)) (*iam.AttachRolePolicyOutput, error)
-	DetachRolePolicy(ctx context.Context, params *iam.DetachRolePolicyInput, optFns ...func(*iam.Options)) (*iam.DetachRolePolicyOutput, error)
-	PutRolePolicy(ctx context.Context, params *iam.PutRolePolicyInput, optFns ...func(*iam.Options)) (*iam.PutRolePolicyOutput, error)
-	DeleteRolePolicy(ctx context.Context, params *iam.DeleteRolePolicyInput, optFns ...func(*iam.Options)) (*iam.DeleteRolePolicyOutput, error)
-	ListAttachedRolePolicies(ctx context.Context, params *iam.ListAttachedRolePoliciesInput, optFns ...func(*iam.Options)) (*iam.ListAttachedRolePoliciesOutput, error)
-	ListRolePolicies(ctx context.Context, params *iam.ListRolePoliciesInput, optFns ...func(*iam.Options)) (*iam.ListRolePoliciesOutput, error)
+	CreateRole(ctx context.Context, params *iamapi.CreateRoleRequest) (*iamapi.CreateRoleResponse, error)
+	DeleteRole(ctx context.Context, params *iamapi.DeleteRoleRequest) (*iamapi.Unit, error)
+	AttachRolePolicy(ctx context.Context, params *iamapi.AttachRolePolicyRequest) (*iamapi.Unit, error)
+	DetachRolePolicy(ctx context.Context, params *iamapi.DetachRolePolicyRequest) (*iamapi.Unit, error)
+	PutRolePolicy(ctx context.Context, params *iamapi.PutRolePolicyRequest) (*iamapi.Unit, error)
+	DeleteRolePolicy(ctx context.Context, params *iamapi.DeleteRolePolicyRequest) (*iamapi.Unit, error)
+	ListAttachedRolePolicies(ctx context.Context, params *iamapi.ListAttachedRolePoliciesRequest) (*iamapi.ListAttachedRolePoliciesResponse, error)
+	ListRolePolicies(ctx context.Context, params *iamapi.ListRolePoliciesRequest) (*iamapi.ListRolePoliciesResponse, error)
 }
 
 // STSClient interface for STS operations (for testing)
 type STSClient interface {
-	AssumeRole(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error)
+	AssumeRole(ctx context.Context, params *stsapi.AssumeRoleRequest) (*stsapi.AssumeRoleResponse, error)
 }
