@@ -107,8 +107,18 @@ func (g *Generator) collectTypes(api *parser.SmithyAPI) map[string]*TypeInfo {
 		case "union":
 			// TODO: Handle union types
 		default:
-			// Handle other primitive types
-			if shape.IsPrimitive() {
+			// Handle empty shapes and type aliases
+			if shape.Type == "" && shape.Target != "" {
+				// This is a type alias
+				targetShape, _ := api.ResolveShape(shape.Target)
+				if targetShape != nil && targetShape.Type == "structure" {
+					// For structure aliases, generate a proper struct
+					types[name] = g.generateStructType(name, targetShape, api)
+				} else {
+					// For other aliases, skip to avoid self-referential types
+					continue
+				}
+			} else if shape.IsPrimitive() {
 				types[name] = g.generatePrimitiveType(name, shape)
 			}
 		}
@@ -122,6 +132,13 @@ func (g *Generator) generateStructType(name string, shape *parser.SmithyShape, a
 	typeInfo := &TypeInfo{
 		Name:   name,
 		GoType: name,
+	}
+	
+	// Check if this is an empty structure
+	if shape.Members == nil || len(shape.Members) == 0 {
+		// Empty structures should have at least one field to be valid
+		// We'll handle this in the template
+		return typeInfo
 	}
 	
 	// Process members
@@ -365,7 +382,7 @@ const (
 	{{$type.Name}}{{$value}} {{$type.Name}} = "{{$value}}"
 {{end}}
 )
-{{else if $type.Fields}}
+{{else if eq $type.GoType $type.Name}}
 // {{$type.Name}} represents the {{$type.Name}} structure
 type {{$type.Name}} struct {
 {{range $field := $type.Fields}}

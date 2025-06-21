@@ -15,6 +15,10 @@ type AccessDeniedException struct {
 type AgentUpdateStatus string
 
 const (
+	AgentUpdateStatusFAILED AgentUpdateStatus = "FAILED"
+
+	AgentUpdateStatusPENDING AgentUpdateStatus = "PENDING"
+
 	AgentUpdateStatusSTAGING AgentUpdateStatus = "STAGING"
 
 	AgentUpdateStatusSTAGED AgentUpdateStatus = "STAGED"
@@ -22,10 +26,6 @@ const (
 	AgentUpdateStatusUPDATING AgentUpdateStatus = "UPDATING"
 
 	AgentUpdateStatusUPDATED AgentUpdateStatus = "UPDATED"
-
-	AgentUpdateStatusFAILED AgentUpdateStatus = "FAILED"
-
-	AgentUpdateStatusPENDING AgentUpdateStatus = "PENDING"
 )
 
 // ApplicationProtocol represents the ApplicationProtocol enum type
@@ -150,9 +150,9 @@ type BoxedInteger int32
 type CPUArchitecture string
 
 const (
-	CPUArchitectureX86_64 CPUArchitecture = "X86_64"
-
 	CPUArchitectureARM64 CPUArchitecture = "ARM64"
+
+	CPUArchitectureX86_64 CPUArchitecture = "X86_64"
 )
 
 // CapacityProvider represents the CapacityProvider structure
@@ -213,10 +213,6 @@ type CapacityProviderStrategyItemWeight int32
 type CapacityProviderUpdateStatus string
 
 const (
-	CapacityProviderUpdateStatusUPDATE_IN_PROGRESS CapacityProviderUpdateStatus = "UPDATE_IN_PROGRESS"
-
-	CapacityProviderUpdateStatusUPDATE_COMPLETE CapacityProviderUpdateStatus = "UPDATE_COMPLETE"
-
 	CapacityProviderUpdateStatusUPDATE_FAILED CapacityProviderUpdateStatus = "UPDATE_FAILED"
 
 	CapacityProviderUpdateStatusDELETE_IN_PROGRESS CapacityProviderUpdateStatus = "DELETE_IN_PROGRESS"
@@ -224,6 +220,10 @@ const (
 	CapacityProviderUpdateStatusDELETE_COMPLETE CapacityProviderUpdateStatus = "DELETE_COMPLETE"
 
 	CapacityProviderUpdateStatusDELETE_FAILED CapacityProviderUpdateStatus = "DELETE_FAILED"
+
+	CapacityProviderUpdateStatusUPDATE_IN_PROGRESS CapacityProviderUpdateStatus = "UPDATE_IN_PROGRESS"
+
+	CapacityProviderUpdateStatusUPDATE_COMPLETE CapacityProviderUpdateStatus = "UPDATE_COMPLETE"
 )
 
 // CapacityProviders represents the CapacityProviders type
@@ -295,8 +295,6 @@ type ClusterContainsTasksException struct {
 type ClusterField string
 
 const (
-	ClusterFieldCONFIGURATIONS ClusterField = "CONFIGURATIONS"
-
 	ClusterFieldSETTINGS ClusterField = "SETTINGS"
 
 	ClusterFieldSTATISTICS ClusterField = "STATISTICS"
@@ -304,6 +302,8 @@ const (
 	ClusterFieldTAGS ClusterField = "TAGS"
 
 	ClusterFieldATTACHMENTS ClusterField = "ATTACHMENTS"
+
+	ClusterFieldCONFIGURATIONS ClusterField = "CONFIGURATIONS"
 )
 
 // ClusterFieldList represents the ClusterFieldList type
@@ -348,11 +348,11 @@ type Clusters []Cluster
 type Compatibility string
 
 const (
-	CompatibilityEC2 Compatibility = "EC2"
-
 	CompatibilityFARGATE Compatibility = "FARGATE"
 
 	CompatibilityEXTERNAL Compatibility = "EXTERNAL"
+
+	CompatibilityEC2 Compatibility = "EC2"
 )
 
 // CompatibilityList represents the CompatibilityList type
@@ -579,9 +579,9 @@ type ContainerInstance struct {
 type ContainerInstanceField string
 
 const (
-	ContainerInstanceFieldTAGS ContainerInstanceField = "TAGS"
-
 	ContainerInstanceFieldCONTAINER_INSTANCE_HEALTH ContainerInstanceField = "CONTAINER_INSTANCE_HEALTH"
+
+	ContainerInstanceFieldTAGS ContainerInstanceField = "TAGS"
 )
 
 // ContainerInstanceFieldList represents the ContainerInstanceFieldList type
@@ -598,15 +598,15 @@ type ContainerInstanceHealthStatus struct {
 type ContainerInstanceStatus string
 
 const (
-	ContainerInstanceStatusREGISTRATION_FAILED ContainerInstanceStatus = "REGISTRATION_FAILED"
-
-	ContainerInstanceStatusACTIVE ContainerInstanceStatus = "ACTIVE"
-
 	ContainerInstanceStatusDRAINING ContainerInstanceStatus = "DRAINING"
 
 	ContainerInstanceStatusREGISTERING ContainerInstanceStatus = "REGISTERING"
 
 	ContainerInstanceStatusDEREGISTERING ContainerInstanceStatus = "DEREGISTERING"
+
+	ContainerInstanceStatusREGISTRATION_FAILED ContainerInstanceStatus = "REGISTRATION_FAILED"
+
+	ContainerInstanceStatusACTIVE ContainerInstanceStatus = "ACTIVE"
 )
 
 // ContainerInstances represents the ContainerInstances type
@@ -970,11 +970,11 @@ type DeploymentController struct {
 type DeploymentControllerType string
 
 const (
+	DeploymentControllerTypeEXTERNAL DeploymentControllerType = "EXTERNAL"
+
 	DeploymentControllerTypeECS DeploymentControllerType = "ECS"
 
 	DeploymentControllerTypeCODE_DEPLOY DeploymentControllerType = "CODE_DEPLOY"
-
-	DeploymentControllerTypeEXTERNAL DeploymentControllerType = "EXTERNAL"
 )
 
 // DeploymentEphemeralStorage represents the DeploymentEphemeralStorage structure
@@ -1353,11 +1353,11 @@ type ExecuteCommandLogConfiguration struct {
 type ExecuteCommandLogging string
 
 const (
+	ExecuteCommandLoggingNONE ExecuteCommandLogging = "NONE"
+
 	ExecuteCommandLoggingDEFAULT ExecuteCommandLogging = "DEFAULT"
 
 	ExecuteCommandLoggingOVERRIDE ExecuteCommandLogging = "OVERRIDE"
-
-	ExecuteCommandLoggingNONE ExecuteCommandLogging = "NONE"
 )
 
 // ExecuteCommandRequest represents the ExecuteCommandRequest structure
@@ -1588,11 +1588,11 @@ type KeyValuePair struct {
 type LaunchType string
 
 const (
-	LaunchTypeEXTERNAL LaunchType = "EXTERNAL"
-
 	LaunchTypeEC2 LaunchType = "EC2"
 
 	LaunchTypeFARGATE LaunchType = "FARGATE"
+
+	LaunchTypeEXTERNAL LaunchType = "EXTERNAL"
 )
 
 // LimitExceededException represents the LimitExceededException structure
@@ -2049,12 +2049,6 @@ type NoUpdateAvailableException struct {
 type OSFamily string
 
 const (
-	OSFamilyWINDOWS_SERVER_20H2_CORE OSFamily = "WINDOWS_SERVER_20H2_CORE"
-
-	OSFamilyLINUX OSFamily = "LINUX"
-
-	OSFamilyWINDOWS_SERVER_2019_FULL OSFamily = "WINDOWS_SERVER_2019_FULL"
-
 	OSFamilyWINDOWS_SERVER_2019_CORE OSFamily = "WINDOWS_SERVER_2019_CORE"
 
 	OSFamilyWINDOWS_SERVER_2016_FULL OSFamily = "WINDOWS_SERVER_2016_FULL"
@@ -2064,6 +2058,12 @@ const (
 	OSFamilyWINDOWS_SERVER_2022_CORE OSFamily = "WINDOWS_SERVER_2022_CORE"
 
 	OSFamilyWINDOWS_SERVER_2022_FULL OSFamily = "WINDOWS_SERVER_2022_FULL"
+
+	OSFamilyWINDOWS_SERVER_20H2_CORE OSFamily = "WINDOWS_SERVER_20H2_CORE"
+
+	OSFamilyLINUX OSFamily = "LINUX"
+
+	OSFamilyWINDOWS_SERVER_2019_FULL OSFamily = "WINDOWS_SERVER_2019_FULL"
 )
 
 // PidMode represents the PidMode enum type
@@ -2469,18 +2469,18 @@ const (
 type SchedulingStrategy string
 
 const (
-	SchedulingStrategyREPLICA SchedulingStrategy = "REPLICA"
-
 	SchedulingStrategyDAEMON SchedulingStrategy = "DAEMON"
+
+	SchedulingStrategyREPLICA SchedulingStrategy = "REPLICA"
 )
 
 // Scope represents the Scope enum type
 type Scope string
 
 const (
-	ScopeSHARED Scope = "SHARED"
-
 	ScopeTASK Scope = "TASK"
+
+	ScopeSHARED Scope = "SHARED"
 )
 
 // Secret represents the Secret structure
@@ -2714,36 +2714,36 @@ type ServiceDeploymentNotFoundException struct {
 type ServiceDeploymentRollbackMonitorsStatus string
 
 const (
+	ServiceDeploymentRollbackMonitorsStatusTRIGGERED ServiceDeploymentRollbackMonitorsStatus = "TRIGGERED"
+
 	ServiceDeploymentRollbackMonitorsStatusMONITORING ServiceDeploymentRollbackMonitorsStatus = "MONITORING"
 
 	ServiceDeploymentRollbackMonitorsStatusMONITORING_COMPLETE ServiceDeploymentRollbackMonitorsStatus = "MONITORING_COMPLETE"
 
 	ServiceDeploymentRollbackMonitorsStatusDISABLED ServiceDeploymentRollbackMonitorsStatus = "DISABLED"
-
-	ServiceDeploymentRollbackMonitorsStatusTRIGGERED ServiceDeploymentRollbackMonitorsStatus = "TRIGGERED"
 )
 
 // ServiceDeploymentStatus represents the ServiceDeploymentStatus enum type
 type ServiceDeploymentStatus string
 
 const (
-	ServiceDeploymentStatusPENDING ServiceDeploymentStatus = "PENDING"
-
-	ServiceDeploymentStatusSUCCESSFUL ServiceDeploymentStatus = "SUCCESSFUL"
-
 	ServiceDeploymentStatusSTOPPED ServiceDeploymentStatus = "STOPPED"
 
 	ServiceDeploymentStatusSTOP_REQUESTED ServiceDeploymentStatus = "STOP_REQUESTED"
 
-	ServiceDeploymentStatusROLLBACK_REQUESTED ServiceDeploymentStatus = "ROLLBACK_REQUESTED"
+	ServiceDeploymentStatusIN_PROGRESS ServiceDeploymentStatus = "IN_PROGRESS"
 
 	ServiceDeploymentStatusROLLBACK_SUCCESSFUL ServiceDeploymentStatus = "ROLLBACK_SUCCESSFUL"
 
-	ServiceDeploymentStatusROLLBACK_FAILED ServiceDeploymentStatus = "ROLLBACK_FAILED"
+	ServiceDeploymentStatusPENDING ServiceDeploymentStatus = "PENDING"
 
-	ServiceDeploymentStatusIN_PROGRESS ServiceDeploymentStatus = "IN_PROGRESS"
+	ServiceDeploymentStatusSUCCESSFUL ServiceDeploymentStatus = "SUCCESSFUL"
+
+	ServiceDeploymentStatusROLLBACK_REQUESTED ServiceDeploymentStatus = "ROLLBACK_REQUESTED"
 
 	ServiceDeploymentStatusROLLBACK_IN_PROGRESS ServiceDeploymentStatus = "ROLLBACK_IN_PROGRESS"
+
+	ServiceDeploymentStatusROLLBACK_FAILED ServiceDeploymentStatus = "ROLLBACK_FAILED"
 )
 
 // ServiceDeploymentStatusList represents the ServiceDeploymentStatusList type
@@ -2921,9 +2921,9 @@ type SettingName string
 const (
 	SettingNameSERVICE_LONG_ARN_FORMAT SettingName = "SERVICE_LONG_ARN_FORMAT"
 
-	SettingNameCONTAINER_INSTANCE_LONG_ARN_FORMAT SettingName = "CONTAINER_INSTANCE_LONG_ARN_FORMAT"
+	SettingNameTASK_LONG_ARN_FORMAT SettingName = "TASK_LONG_ARN_FORMAT"
 
-	SettingNameAWSVPC_TRUNKING SettingName = "AWSVPC_TRUNKING"
+	SettingNameCONTAINER_INSTANCE_LONG_ARN_FORMAT SettingName = "CONTAINER_INSTANCE_LONG_ARN_FORMAT"
 
 	SettingNameCONTAINER_INSIGHTS SettingName = "CONTAINER_INSIGHTS"
 
@@ -2931,22 +2931,22 @@ const (
 
 	SettingNameFARGATE_TASK_RETIREMENT_WAIT_PERIOD SettingName = "FARGATE_TASK_RETIREMENT_WAIT_PERIOD"
 
-	SettingNameTASK_LONG_ARN_FORMAT SettingName = "TASK_LONG_ARN_FORMAT"
+	SettingNameDEFAULT_LOG_DRIVER_MODE SettingName = "DEFAULT_LOG_DRIVER_MODE"
+
+	SettingNameAWSVPC_TRUNKING SettingName = "AWSVPC_TRUNKING"
 
 	SettingNameFARGATE_FIPS_MODE SettingName = "FARGATE_FIPS_MODE"
 
 	SettingNameGUARD_DUTY_ACTIVATE SettingName = "GUARD_DUTY_ACTIVATE"
-
-	SettingNameDEFAULT_LOG_DRIVER_MODE SettingName = "DEFAULT_LOG_DRIVER_MODE"
 )
 
 // SettingType represents the SettingType enum type
 type SettingType string
 
 const (
-	SettingTypeUSER SettingType = "USER"
-
 	SettingTypeAWS_MANAGED SettingType = "AWS_MANAGED"
+
+	SettingTypeUSER SettingType = "USER"
 )
 
 // Settings represents the Settings type
@@ -3025,9 +3025,9 @@ type StopServiceDeploymentResponse struct {
 type StopServiceDeploymentStopType string
 
 const (
-	StopServiceDeploymentStopTypeABORT StopServiceDeploymentStopType = "ABORT"
-
 	StopServiceDeploymentStopTypeROLLBACK StopServiceDeploymentStopType = "ROLLBACK"
+
+	StopServiceDeploymentStopTypeABORT StopServiceDeploymentStopType = "ABORT"
 )
 
 // StopTaskRequest represents the StopTaskRequest structure
@@ -3147,8 +3147,9 @@ type TagResourceRequest struct {
 	Tags []Tag `json:"tags"`
 }
 
-// TagResourceResponse represents the TagResourceResponse type
-type TagResourceResponse TagResourceResponse
+// TagResourceResponse represents the TagResourceResponse structure
+type TagResourceResponse struct {
+}
 
 // TagValue represents the TagValue type
 type TagValue string
@@ -3376,13 +3377,13 @@ type TaskFieldList []interface{}
 type TaskFilesystemType string
 
 const (
+	TaskFilesystemTypeEXT3 TaskFilesystemType = "EXT3"
+
 	TaskFilesystemTypeEXT4 TaskFilesystemType = "EXT4"
 
 	TaskFilesystemTypeXFS TaskFilesystemType = "XFS"
 
 	TaskFilesystemTypeNTFS TaskFilesystemType = "NTFS"
-
-	TaskFilesystemTypeEXT3 TaskFilesystemType = "EXT3"
 )
 
 // TaskManagedEBSVolumeConfiguration represents the TaskManagedEBSVolumeConfiguration structure
@@ -3509,17 +3510,17 @@ type TaskSets []TaskSet
 type TaskStopCode string
 
 const (
-	TaskStopCodeUSER_INITIATED TaskStopCode = "USER_INITIATED"
-
-	TaskStopCodeSERVICE_SCHEDULER_INITIATED TaskStopCode = "SERVICE_SCHEDULER_INITIATED"
-
-	TaskStopCodeSPOT_INTERRUPTION TaskStopCode = "SPOT_INTERRUPTION"
-
 	TaskStopCodeTERMINATION_NOTICE TaskStopCode = "TERMINATION_NOTICE"
 
 	TaskStopCodeTASK_FAILED_TO_START TaskStopCode = "TASK_FAILED_TO_START"
 
 	TaskStopCodeESSENTIAL_CONTAINER_EXITED TaskStopCode = "ESSENTIAL_CONTAINER_EXITED"
+
+	TaskStopCodeUSER_INITIATED TaskStopCode = "USER_INITIATED"
+
+	TaskStopCodeSERVICE_SCHEDULER_INITIATED TaskStopCode = "SERVICE_SCHEDULER_INITIATED"
+
+	TaskStopCodeSPOT_INTERRUPTION TaskStopCode = "SPOT_INTERRUPTION"
 )
 
 // TaskVolumeConfiguration represents the TaskVolumeConfiguration structure
@@ -3582,35 +3583,35 @@ type UlimitList []Ulimit
 type UlimitName string
 
 const (
-	UlimitNameMSGQUEUE UlimitName = "MSGQUEUE"
-
-	UlimitNameRSS UlimitName = "RSS"
-
-	UlimitNameNOFILE UlimitName = "NOFILE"
-
-	UlimitNameRTTIME UlimitName = "RTTIME"
-
-	UlimitNameLOCKS UlimitName = "LOCKS"
-
-	UlimitNameNPROC UlimitName = "NPROC"
-
-	UlimitNameSIGPENDING UlimitName = "SIGPENDING"
-
-	UlimitNameMEMLOCK UlimitName = "MEMLOCK"
-
-	UlimitNameNICE UlimitName = "NICE"
-
-	UlimitNameRTPRIO UlimitName = "RTPRIO"
-
-	UlimitNameSTACK UlimitName = "STACK"
-
-	UlimitNameCORE UlimitName = "CORE"
-
 	UlimitNameCPU UlimitName = "CPU"
 
 	UlimitNameDATA UlimitName = "DATA"
 
+	UlimitNameMEMLOCK UlimitName = "MEMLOCK"
+
+	UlimitNameMSGQUEUE UlimitName = "MSGQUEUE"
+
+	UlimitNameRTPRIO UlimitName = "RTPRIO"
+
+	UlimitNameRTTIME UlimitName = "RTTIME"
+
+	UlimitNameSTACK UlimitName = "STACK"
+
 	UlimitNameFSIZE UlimitName = "FSIZE"
+
+	UlimitNameNICE UlimitName = "NICE"
+
+	UlimitNameSIGPENDING UlimitName = "SIGPENDING"
+
+	UlimitNameNPROC UlimitName = "NPROC"
+
+	UlimitNameRSS UlimitName = "RSS"
+
+	UlimitNameCORE UlimitName = "CORE"
+
+	UlimitNameLOCKS UlimitName = "LOCKS"
+
+	UlimitNameNOFILE UlimitName = "NOFILE"
 )
 
 // UnsupportedFeatureException represents the UnsupportedFeatureException structure
@@ -3625,8 +3626,9 @@ type UntagResourceRequest struct {
 	TagKeys []string `json:"tagKeys"`
 }
 
-// UntagResourceResponse represents the UntagResourceResponse type
-type UntagResourceResponse UntagResourceResponse
+// UntagResourceResponse represents the UntagResourceResponse structure
+type UntagResourceResponse struct {
+}
 
 // UpdateCapacityProviderRequest represents the UpdateCapacityProviderRequest structure
 type UpdateCapacityProviderRequest struct {

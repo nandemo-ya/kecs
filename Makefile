@@ -25,6 +25,13 @@ build:
 	@echo "Building $(BINARY_NAME)..."
 	cd $(CONTROLPLANE_DIR) && $(GO) build $(LDFLAGS) -o ../bin/$(BINARY_NAME) ./cmd/controlplane
 
+# Generate code from AWS API definitions
+.PHONY: generate
+generate:
+	@echo "Generating code from AWS API definitions..."
+	cd $(CONTROLPLANE_DIR) && $(GO) build -o ../bin/codegen ./cmd/codegen
+	cd $(CONTROLPLANE_DIR) && ../bin/codegen -service ecs -input api-models/ecs.json -output internal/controlplane/api/generated_v2 -package api
+
 # Build with Web UI embedded
 .PHONY: build-with-ui
 build-with-ui: build-webui
