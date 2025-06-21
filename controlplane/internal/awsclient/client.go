@@ -184,6 +184,11 @@ func shouldRetry(statusCode int) bool {
 	}
 }
 
+// GetCredentials returns the client's credentials
+func (c *Client) GetCredentials() Credentials {
+	return c.config.Credentials
+}
+
 // getEnvOrDefault returns environment variable value or default
 func getEnvOrDefault(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
