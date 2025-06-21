@@ -11,7 +11,7 @@ env:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, medium]
     permissions:
       contents: read
       packages: write
@@ -72,7 +72,7 @@ jobs:
 
   create-release:
     needs: build-and-push
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, small]
     permissions:
       contents: write
       
