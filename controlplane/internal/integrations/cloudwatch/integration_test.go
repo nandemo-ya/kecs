@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cloudwatchlogsapi "github.com/nandemo-ya/kecs/controlplane/internal/cloudwatchlogs/generated"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	kecsCloudWatch "github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
@@ -27,29 +26,29 @@ func newMockCloudWatchLogsClient() *mockCloudWatchLogsClient {
 	}
 }
 
-func (m *mockCloudWatchLogsClient) CreateLogGroup(ctx context.Context, params *cloudwatchlogs.CreateLogGroupInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.CreateLogGroupOutput, error) {
-	groupName := aws.ToString(params.LogGroupName)
+func (m *mockCloudWatchLogsClient) CreateLogGroup(ctx context.Context, params *cloudwatchlogsapi.CreateLogGroupRequest) (*cloudwatchlogsapi.Unit, error) {
+	groupName := params.LogGroupName
 	if m.logGroups[groupName] {
 		return nil, fmt.Errorf("ResourceAlreadyExistsException: log group already exists")
 	}
 	m.logGroups[groupName] = true
 	m.logStreams[groupName] = make(map[string]bool)
-	return &cloudwatchlogs.CreateLogGroupOutput{}, nil
+	return &cloudwatchlogsapi.Unit{}, nil
 }
 
-func (m *mockCloudWatchLogsClient) DeleteLogGroup(ctx context.Context, params *cloudwatchlogs.DeleteLogGroupInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DeleteLogGroupOutput, error) {
-	groupName := aws.ToString(params.LogGroupName)
+func (m *mockCloudWatchLogsClient) DeleteLogGroup(ctx context.Context, params *cloudwatchlogsapi.DeleteLogGroupRequest) (*cloudwatchlogsapi.Unit, error) {
+	groupName := params.LogGroupName
 	if !m.logGroups[groupName] {
 		return nil, fmt.Errorf("ResourceNotFoundException: log group not found")
 	}
 	delete(m.logGroups, groupName)
 	delete(m.logStreams, groupName)
-	return &cloudwatchlogs.DeleteLogGroupOutput{}, nil
+	return &cloudwatchlogsapi.Unit{}, nil
 }
 
-func (m *mockCloudWatchLogsClient) CreateLogStream(ctx context.Context, params *cloudwatchlogs.CreateLogStreamInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.CreateLogStreamOutput, error) {
-	groupName := aws.ToString(params.LogGroupName)
-	streamName := aws.ToString(params.LogStreamName)
+func (m *mockCloudWatchLogsClient) CreateLogStream(ctx context.Context, params *cloudwatchlogsapi.CreateLogStreamRequest) (*cloudwatchlogsapi.Unit, error) {
+	groupName := params.LogGroupName
+	streamName := params.LogStreamName
 	
 	if !m.logGroups[groupName] {
 		return nil, fmt.Errorf("ResourceNotFoundException: log group not found")
@@ -60,15 +59,15 @@ func (m *mockCloudWatchLogsClient) CreateLogStream(ctx context.Context, params *
 	}
 	
 	m.logStreams[groupName][streamName] = true
-	return &cloudwatchlogs.CreateLogStreamOutput{}, nil
+	return &cloudwatchlogsapi.Unit{}, nil
 }
 
-func (m *mockCloudWatchLogsClient) PutRetentionPolicy(ctx context.Context, params *cloudwatchlogs.PutRetentionPolicyInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.PutRetentionPolicyOutput, error) {
-	groupName := aws.ToString(params.LogGroupName)
+func (m *mockCloudWatchLogsClient) PutRetentionPolicy(ctx context.Context, params *cloudwatchlogsapi.PutRetentionPolicyRequest) (*cloudwatchlogsapi.Unit, error) {
+	groupName := params.LogGroupName
 	if !m.logGroups[groupName] {
 		return nil, fmt.Errorf("ResourceNotFoundException: log group not found")
 	}
-	return &cloudwatchlogs.PutRetentionPolicyOutput{}, nil
+	return &cloudwatchlogsapi.Unit{}, nil
 }
 
 // mockLocalStackManager is a mock implementation of localstack.Manager

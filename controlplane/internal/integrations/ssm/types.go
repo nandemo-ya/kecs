@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmapi "github.com/nandemo-ya/kecs/controlplane/internal/ssm/generated"
 )
 
 // Integration represents the SSM Parameter Store integration
@@ -79,8 +79,8 @@ const (
 
 // SSMClient interface for SSM operations (for testing)
 type SSMClient interface {
-	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
-	GetParameters(ctx context.Context, params *ssm.GetParametersInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersOutput, error)
-	PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
-	DeleteParameter(ctx context.Context, params *ssm.DeleteParameterInput, optFns ...func(*ssm.Options)) (*ssm.DeleteParameterOutput, error)
+	GetParameter(ctx context.Context, params *ssmapi.GetParameterRequest) (*ssmapi.GetParameterResult, error)
+	GetParameters(ctx context.Context, params *ssmapi.GetParametersRequest) (*ssmapi.GetParametersResult, error)
+	PutParameter(ctx context.Context, params *ssmapi.PutParameterRequest) (*ssmapi.PutParameterResult, error)
+	DeleteParameter(ctx context.Context, params *ssmapi.DeleteParameterRequest) (*ssmapi.DeleteParameterResult, error)
 }

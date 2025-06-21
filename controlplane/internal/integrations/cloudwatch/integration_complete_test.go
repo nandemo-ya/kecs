@@ -6,7 +6,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cloudwatchlogsapi "github.com/nandemo-ya/kecs/controlplane/internal/cloudwatchlogs/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 )
 
@@ -18,8 +18,8 @@ var _ = Describe("CloudWatch Integration Complete", func() {
 
 	BeforeEach(func() {
 		mockClient = &mockCloudWatchLogsTestClient{
-			createLogGroupCalls:  []*cloudwatchlogs.CreateLogGroupInput{},
-			createLogStreamCalls: []*cloudwatchlogs.CreateLogStreamInput{},
+			createLogGroupCalls:  []*cloudwatchlogsapi.CreateLogGroupRequest{},
+			createLogStreamCalls: []*cloudwatchlogsapi.CreateLogStreamRequest{},
 		}
 		
 		integration = cloudwatch.NewIntegrationWithClient(
@@ -75,7 +75,7 @@ var _ = Describe("CloudWatch Integration Complete", func() {
 			
 			// Verify log group creation was called
 			Expect(mockClient.createLogGroupCalls).To(HaveLen(1))
-			Expect(*mockClient.createLogGroupCalls[0].LogGroupName).To(Equal("/ecs/kecs-tasks"))
+			Expect(mockClient.createLogGroupCalls[0].LogGroupName).To(Equal("/ecs/kecs-tasks"))
 		})
 
 		It("should reject non-awslogs drivers", func() {
@@ -112,12 +112,12 @@ var _ = Describe("CloudWatch Integration Complete", func() {
 			
 			// Verify calls
 			Expect(mockClient.createLogGroupCalls).To(HaveLen(1))
-			Expect(*mockClient.createLogGroupCalls[0].LogGroupName).To(Equal("/ecs/test-group"))
+			Expect(mockClient.createLogGroupCalls[0].LogGroupName).To(Equal("/ecs/test-group"))
 			
 			// Verify retention policy was set
 			Expect(mockClient.putRetentionPolicyCalls).To(HaveLen(1))
-			Expect(*mockClient.putRetentionPolicyCalls[0].LogGroupName).To(Equal("/ecs/test-group"))
-			Expect(*mockClient.putRetentionPolicyCalls[0].RetentionInDays).To(Equal(int32(7)))
+			Expect(mockClient.putRetentionPolicyCalls[0].LogGroupName).To(Equal("/ecs/test-group"))
+			Expect(mockClient.putRetentionPolicyCalls[0].RetentionInDays).To(Equal(int32(7)))
 		})
 	})
 
@@ -150,26 +150,26 @@ var _ = Describe("CloudWatch Integration Complete", func() {
 
 // mockCloudWatchLogsTestClient for testing
 type mockCloudWatchLogsTestClient struct {
-	createLogGroupCalls      []*cloudwatchlogs.CreateLogGroupInput
-	createLogStreamCalls     []*cloudwatchlogs.CreateLogStreamInput
-	putRetentionPolicyCalls  []*cloudwatchlogs.PutRetentionPolicyInput
+	createLogGroupCalls      []*cloudwatchlogsapi.CreateLogGroupRequest
+	createLogStreamCalls     []*cloudwatchlogsapi.CreateLogStreamRequest
+	putRetentionPolicyCalls  []*cloudwatchlogsapi.PutRetentionPolicyRequest
 }
 
-func (m *mockCloudWatchLogsTestClient) CreateLogGroup(ctx context.Context, params *cloudwatchlogs.CreateLogGroupInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.CreateLogGroupOutput, error) {
+func (m *mockCloudWatchLogsTestClient) CreateLogGroup(ctx context.Context, params *cloudwatchlogsapi.CreateLogGroupRequest) (*cloudwatchlogsapi.Unit, error) {
 	m.createLogGroupCalls = append(m.createLogGroupCalls, params)
-	return &cloudwatchlogs.CreateLogGroupOutput{}, nil
+	return &cloudwatchlogsapi.Unit{}, nil
 }
 
-func (m *mockCloudWatchLogsTestClient) DeleteLogGroup(ctx context.Context, params *cloudwatchlogs.DeleteLogGroupInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DeleteLogGroupOutput, error) {
-	return &cloudwatchlogs.DeleteLogGroupOutput{}, nil
+func (m *mockCloudWatchLogsTestClient) DeleteLogGroup(ctx context.Context, params *cloudwatchlogsapi.DeleteLogGroupRequest) (*cloudwatchlogsapi.Unit, error) {
+	return &cloudwatchlogsapi.Unit{}, nil
 }
 
-func (m *mockCloudWatchLogsTestClient) CreateLogStream(ctx context.Context, params *cloudwatchlogs.CreateLogStreamInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.CreateLogStreamOutput, error) {
+func (m *mockCloudWatchLogsTestClient) CreateLogStream(ctx context.Context, params *cloudwatchlogsapi.CreateLogStreamRequest) (*cloudwatchlogsapi.Unit, error) {
 	m.createLogStreamCalls = append(m.createLogStreamCalls, params)
-	return &cloudwatchlogs.CreateLogStreamOutput{}, nil
+	return &cloudwatchlogsapi.Unit{}, nil
 }
 
-func (m *mockCloudWatchLogsTestClient) PutRetentionPolicy(ctx context.Context, params *cloudwatchlogs.PutRetentionPolicyInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.PutRetentionPolicyOutput, error) {
+func (m *mockCloudWatchLogsTestClient) PutRetentionPolicy(ctx context.Context, params *cloudwatchlogsapi.PutRetentionPolicyRequest) (*cloudwatchlogsapi.Unit, error) {
 	m.putRetentionPolicyCalls = append(m.putRetentionPolicyCalls, params)
-	return &cloudwatchlogs.PutRetentionPolicyOutput{}, nil
+	return &cloudwatchlogsapi.Unit{}, nil
 }
