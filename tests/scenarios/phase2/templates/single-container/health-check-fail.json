@@ -1,0 +1,36 @@
+{
+  "family": "health-check-fail",
+  "networkMode": "bridge",
+  "requiresCompatibilities": ["EC2"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "unhealthy-app",
+      "image": "nginx:alpine",
+      "cpu": 256,
+      "memory": 512,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "exit 1"],
+        "interval": 10,
+        "timeout": 5,
+        "retries": 2,
+        "startPeriod": 30
+      },
+      "logConfiguration": {
+        "logDriver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    }
+  ]
+}
