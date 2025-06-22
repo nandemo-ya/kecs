@@ -23,8 +23,8 @@ func (api *DefaultECSAPI) DeleteAttributes(ctx context.Context, req *generated.D
 // ListAttributes implements the ListAttributes operation
 func (api *DefaultECSAPI) ListAttributes(ctx context.Context, req *generated.ListAttributesRequest) (*generated.ListAttributesResponse, error) {
 	// Get target type
-	targetType := "container-instance" // Default
-	if req.TargetType != "" {
+	targetType := "CONTAINER_INSTANCE" // Default
+	if req.TargetType != generated.TargetType("") {
 		targetType = string(req.TargetType)
 	}
 

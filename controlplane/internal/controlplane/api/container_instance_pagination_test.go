@@ -179,7 +179,7 @@ var _ = Describe("ContainerInstance Pagination", func() {
 					ID:         fmt.Sprintf("attr-%02d", i),
 					Name:       fmt.Sprintf("attribute-%02d", i),
 					Value:      fmt.Sprintf("value-%02d", i),
-					TargetType: "container-instance",
+					TargetType: "CONTAINER_INSTANCE",
 					TargetID:   fmt.Sprintf("instance-%02d", i%5),
 					Cluster:    cluster.Name,
 					CreatedAt:  time.Now(),
