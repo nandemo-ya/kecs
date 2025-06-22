@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"k8s.io/client-go/kubernetes"
@@ -61,6 +62,28 @@ type ClusterManagerConfig struct {
 
 // NewClusterManager creates a new cluster manager based on the configuration
 func NewClusterManager(config *ClusterManagerConfig) (ClusterManager, error) {
+	if config == nil {
+		config = &ClusterManagerConfig{}
+	}
+	
+	// Set provider from environment variable if not specified
+	if config.Provider == "" {
+		config.Provider = os.Getenv("KECS_CLUSTER_PROVIDER")
+		if config.Provider == "" {
+			config.Provider = "k3d" // Default to k3d
+		}
+	}
+	
+	// Set container mode from environment variable if not explicitly set
+	if !config.ContainerMode && os.Getenv("KECS_CONTAINER_MODE") == "true" {
+		config.ContainerMode = true
+	}
+	
+	// Set kubeconfig path from environment variable if not specified
+	if config.KubeconfigPath == "" {
+		config.KubeconfigPath = os.Getenv("KECS_KUBECONFIG_PATH")
+	}
+	
 	switch config.Provider {
 	case "kind":
 		return NewKindClusterManager(config)
@@ -68,6 +91,7 @@ func NewClusterManager(config *ClusterManagerConfig) (ClusterManager, error) {
 		return NewK3dClusterManager(config)
 	default:
 		// Default to k3d for new installations
+		config.Provider = "k3d"
 		return NewK3dClusterManager(config)
 	}
 }

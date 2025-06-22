@@ -15,7 +15,8 @@ import (
 // DefaultECSAPI provides the default implementation of ECS API operations
 type DefaultECSAPI struct {
 	storage                    storage.Storage
-	kindManager                *kubernetes.KindManager
+	clusterManager             kubernetes.ClusterManager
+	kindManager                *kubernetes.KindManager // Deprecated: use clusterManager
 	asyncKindOperations        *kubernetes.AsyncKindOperations
 	region                     string
 	accountID                  string
@@ -31,7 +32,7 @@ type DefaultECSAPI struct {
 func NewDefaultECSAPI(storage storage.Storage, kindManager *kubernetes.KindManager) generated.ECSAPIInterface {
 	return &DefaultECSAPI{
 		storage:     storage,
-		kindManager: kindManager,
+		kindManager: kindManager, // Deprecated: kept for backward compatibility
 		region:      "ap-northeast-1", // Default region
 		accountID:   "123456789012",   // Default account ID
 	}
@@ -81,8 +82,28 @@ func (api *DefaultECSAPI) getAsyncKindOperations() *kubernetes.AsyncKindOperatio
 func NewDefaultECSAPIWithConfig(storage storage.Storage, kindManager *kubernetes.KindManager, region, accountID string) generated.ECSAPIInterface {
 	return &DefaultECSAPI{
 		storage:     storage,
-		kindManager: kindManager,
+		kindManager: kindManager, // Deprecated: kept for backward compatibility
 		region:      region,
 		accountID:   accountID,
 	}
+}
+
+// NewDefaultECSAPIWithClusterManager creates a new default ECS API implementation with ClusterManager
+func NewDefaultECSAPIWithClusterManager(storage storage.Storage, clusterManager kubernetes.ClusterManager, region, accountID string) generated.ECSAPIInterface {
+	return &DefaultECSAPI{
+		storage:        storage,
+		clusterManager: clusterManager,
+		region:         region,
+		accountID:      accountID,
+	}
+}
+
+// getClusterManager returns the cluster manager, falling back to kindManager if clusterManager is not set
+func (api *DefaultECSAPI) getClusterManager() kubernetes.ClusterManager {
+	if api.clusterManager != nil {
+		return api.clusterManager
+	}
+	// For backward compatibility, return nil if only old kindManager is available
+	// The caller should handle this case
+	return nil
 }

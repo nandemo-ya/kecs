@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -14,6 +15,32 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
+
+// getServiceManager returns a ServiceManager using the appropriate cluster manager
+func (api *DefaultECSAPI) getServiceManager() (*kubernetes.ServiceManager, error) {
+	// In test mode, we can return a ServiceManager with nil cluster manager
+	// as the ServiceManager handles test mode internally
+	if os.Getenv("KECS_TEST_MODE") == "true" {
+		return kubernetes.NewServiceManager(api.storage, nil), nil
+	}
+	
+	// Get cluster manager (new interface) or fall back to kind manager
+	if clusterManager := api.getClusterManager(); clusterManager != nil {
+		return kubernetes.NewServiceManager(api.storage, clusterManager), nil
+	} else {
+		// Fallback to old KindManager for backward compatibility
+		// Convert KindManager to ClusterManager using the wrapper
+		if api.kindManager != nil {
+			kindClusterManager, err := kubernetes.NewKindClusterManager(&kubernetes.ClusterManagerConfig{Provider: "kind"})
+			if err != nil {
+				return nil, fmt.Errorf("failed to create kind cluster manager: %w", err)
+			}
+			return kubernetes.NewServiceManager(api.storage, kindClusterManager), nil
+		} else {
+			return nil, fmt.Errorf("no cluster manager available")
+		}
+	}
+}
 
 // CreateService implements the CreateService operation
 func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.CreateServiceRequest) (*generated.CreateServiceResponse, error) {
@@ -143,7 +170,10 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 
 	// Create service converter and manager
 	serviceConverter := converters.NewServiceConverter(api.region, api.accountID)
-	serviceManager := kubernetes.NewServiceManager(api.storage, api.kindManager)
+	serviceManager, err := api.getServiceManager()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service manager: %w", err)
+	}
 
 	// Convert ECS service to Kubernetes Deployment
 	storageServiceTemp := &storage.Service{
@@ -308,8 +338,11 @@ func (api *DefaultECSAPI) DeleteService(ctx context.Context, req *generated.Dele
 	}
 
 	// Delete Kubernetes resources
-	serviceManager := kubernetes.NewServiceManager(api.storage, api.kindManager)
-	if err := serviceManager.DeleteService(ctx, cluster, existingService); err != nil {
+	serviceManager, err := api.getServiceManager()
+	if err != nil {
+		log.Printf("Warning: failed to create service manager for deletion: %v", err)
+		// Continue with deletion even if service manager creation fails
+	} else if err := serviceManager.DeleteService(ctx, cluster, existingService); err != nil {
 		log.Printf("Warning: failed to delete Kubernetes resources for service %s: %v",
 			existingService.ServiceName, err)
 		// Continue with deletion even if Kubernetes deletion fails
@@ -648,7 +681,11 @@ func (api *DefaultECSAPI) UpdateService(ctx context.Context, req *generated.Upda
 		}
 
 		// Create service manager and update Kubernetes resources
-		serviceManager := kubernetes.NewServiceManager(api.storage, api.kindManager)
+		serviceManager, err := api.getServiceManager()
+		if err != nil {
+			log.Printf("Failed to create service manager: %v", err)
+			return nil, fmt.Errorf("failed to create service manager: %w", err)
+		}
 		if err := serviceManager.UpdateService(ctx, deployment, kubeService, cluster, existingService); err != nil {
 			log.Printf("Failed to update kubernetes deployment: %v", err)
 			return nil, fmt.Errorf("failed to update kubernetes deployment: %w", err)
