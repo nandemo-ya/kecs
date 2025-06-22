@@ -60,28 +60,29 @@ func (k *K3dClusterManager) CreateCluster(ctx context.Context, clusterName strin
 		return nil
 	}
 
-	// Create cluster configuration
-	cluster := &k3d.Cluster{
-		Name: normalizedName,
-		Network: k3d.ClusterNetwork{
-			Name: fmt.Sprintf("k3d-%s", normalizedName),
-		},
-		Token: fmt.Sprintf("kecs-%s-token", normalizedName),
-	}
-	
-	// Add server node to cluster
+	// Create server node
 	serverNode := &k3d.Node{
 		Name:    fmt.Sprintf("k3d-%s-server-0", normalizedName),
 		Role:    k3d.ServerRole,
 		Image:   "rancher/k3s:v1.31.4-k3s1",
 		Restart: true,
 	}
-	cluster.Nodes = append(cluster.Nodes, serverNode)
 
-	// Create cluster creation options with minimal configuration
+	// Create cluster configuration with minimal required fields
+	cluster := &k3d.Cluster{
+		Name:  normalizedName,
+		Nodes: []*k3d.Node{serverNode},
+		Network: k3d.ClusterNetwork{
+			Name: fmt.Sprintf("k3d-%s", normalizedName),
+		},
+		Token: fmt.Sprintf("kecs-%s-token", normalizedName),
+	}
+
+	// Create cluster creation options
 	clusterCreateOpts := &k3d.ClusterCreateOpts{
-		WaitForServer: true,
-		Timeout:       2 * time.Minute,
+		WaitForServer:       true,
+		Timeout:             2 * time.Minute,
+		DisableLoadBalancer: false,
 	}
 
 	// Create the cluster
