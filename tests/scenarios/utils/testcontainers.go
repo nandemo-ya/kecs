@@ -23,9 +23,10 @@ type KECSContainer struct {
 func StartKECS(t TestingT) *KECSContainer {
 	ctx := context.Background()
 
-	// Check if running in test mode (default to true for tests)
+	// Check if running in test mode (default to true for container testing)
 	testMode := getEnvOrDefault("KECS_TEST_MODE", "true")
-	disableKind := "true" // Always disable Kind cluster in test containers
+	// Disable Kind cluster in container tests
+	disableKind := getEnvOrDefault("KECS_DISABLE_KIND_CLUSTER", "true")
 	
 	// Debug: Print environment variable
 	fmt.Printf("DEBUG: KECS_TEST_MODE from environment: %s\n", testMode)
@@ -85,6 +86,7 @@ func StartKECS(t TestingT) *KECSContainer {
 		// Shorter wait in test mode
 		time.Sleep(2 * time.Second)
 	}
+	
 
 	return &KECSContainer{
 		container: container,

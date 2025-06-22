@@ -9,7 +9,7 @@ test-phase1:
 
 # Test Phase 2: Core Operations
 test-phase2:
-	go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout $(TIMEOUT) ./task_definition/... ./service/...
+	go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout $(TIMEOUT) ./phase2/...
 
 # Test Phase 3: Task Lifecycle & Status
 test-phase3:
