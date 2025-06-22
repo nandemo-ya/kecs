@@ -292,7 +292,7 @@ var _ = Describe("Cluster Basic Operations", Serial, func() {
 				})
 			})
 
-			PIt("should list all clusters including our test clusters", func() { // FLAKY: Passes individually but fails in full suite - likely timing issue with shared container
+			PIt("should list all clusters including our test clusters", func() { // FLAKY: Passes individually but fails in full suite - timing issue with shared container
 				logger.Info("Listing all clusters")
 
 				clusters, err := client.ListClusters()
