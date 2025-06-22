@@ -318,7 +318,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 				_, err = server.ecsAPI.DeleteCluster(ctx, req)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("active services"))
+				Expect(err.Error()).To(Equal("The cluster cannot be deleted while services are active"))
 			})
 
 			It("should fail when cluster does not exist", func() {

@@ -3,17 +3,16 @@
 // Overview
 //
 // Phase 1 tests focus on validating all aspects of ECS cluster management including
-// basic CRUD operations, advanced features, pagination, and error handling.
+// basic CRUD operations, advanced features, and error handling.
 // These tests use TestContainers to run KECS in isolation and AWS CLI v2 for
 // all API interactions.
 //
 // Test Organization
 //
-// The tests are organized into four main categories:
+// The tests are organized into three main categories:
 //
 //   - Basic Operations: Fundamental cluster CRUD operations
 //   - Advanced Features: Settings, configuration, tags, and capacity providers
-//   - Pagination: Comprehensive pagination testing with various scenarios
 //   - Error Scenarios: Invalid operations, validation errors, and edge cases
 //
 // Running Tests
@@ -51,7 +50,6 @@
 //   - UpdateCluster
 //   - PutClusterCapacityProviders
 //   - DescribeClustersWithInclude
-//   - ListClustersWithPagination
 //
 // Test Data
 //

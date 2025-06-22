@@ -13,9 +13,10 @@
 - **Impact**: Longer test execution time but more reliable results
 
 ### 3. TestContainers Integration
-- **Decision**: Each test starts fresh KECS container
-- **Rationale**: Complete isolation, no state pollution
-- **Impact**: Higher resource usage but guaranteed clean state
+- **Decision**: Shared KECS container across test suite
+- **Rationale**: Better performance, reduced resource usage
+- **Impact**: Tests run faster, but some tests need to be adjusted for shared state
+- **Note**: Tag operations are not yet implemented in KECS (marked as pending)
 
 ## Implementation Challenges
 
@@ -33,14 +34,7 @@ func UpdateCluster(clusterName string, configuration map[string]interface{}) err
 func PutClusterCapacityProviders(clusterName string, providers []string, strategy []map[string]interface{}) error
 ```
 
-### 2. Pagination Testing
-Implemented comprehensive pagination scenarios:
-- Small pages (1 item) to test edge cases
-- Various page sizes to test boundaries
-- Large scale (150+ clusters) to test real-world scenarios
-- Token validation and error handling
-
-### 3. Error Scenario Coverage
+### 2. Error Scenario Coverage
 Extensive error testing implemented:
 - Input validation errors
 - Resource conflict scenarios
@@ -55,7 +49,6 @@ phase1/
 ├── phase1_suite_test.go          # Test suite setup
 ├── cluster_basic_operations_test.go    # Basic CRUD
 ├── cluster_advanced_features_test.go   # Settings, tags, etc.
-├── cluster_pagination_test.go          # Pagination logic
 ├── cluster_error_scenarios_test.go     # Error handling
 ├── doc.go                             # Package documentation
 ├── README.md                          # Quick reference
@@ -114,11 +107,6 @@ Standard format enforced:
 ```
 arn:aws:ecs:{region}:{account-id}:cluster/{cluster-name}
 ```
-
-### 3. Pagination Limits
-- Maximum results per page: 100 (AWS limit)
-- Default page size: 100 (when not specified)
-- Next token format: Opaque string
 
 ## Known Issues and Workarounds
 

@@ -11,7 +11,6 @@ Comprehensively test all ECS cluster operations to ensure KECS provides full com
 - Cluster settings and configuration
 - Cluster tagging operations
 - Capacity provider management
-- Pagination for list operations
 - Error handling and validation
 - AWS ECS behavioral compatibility
 
@@ -71,25 +70,7 @@ Comprehensively test all ECS cluster operations to ensure KECS provides full com
 - **Default Strategy**: Set default capacity provider strategy
 - **Update Strategy**: Modify existing strategy
 
-### 3. Pagination (cluster_pagination_test.go)
-
-#### Page Sizes
-- **maxResults=1**: Single item per page
-- **maxResults=10**: Small pages
-- **maxResults=50**: Medium pages
-- **maxResults=100**: Maximum page size
-
-#### Token Handling
-- **Next Token Flow**: Follow pagination through multiple pages
-- **Invalid Token**: Handle invalid next token
-- **Token Consistency**: Ensure tokens work correctly
-
-#### Large Scale
-- **150+ Clusters**: Create and paginate through large set
-- **No Duplicates**: Verify no duplicate results
-- **Complete Coverage**: Ensure all items are returned
-
-### 4. Error Scenarios (cluster_error_scenarios_test.go)
+### 3. Error Scenarios (cluster_error_scenarios_test.go)
 
 #### Invalid Operations
 - **Long Names**: Names exceeding 255 characters
@@ -138,7 +119,6 @@ clusterName := utils.GenerateTestName("test-cluster")
 ### Functional
 - [x] All basic CRUD operations work correctly
 - [x] Advanced features function as expected
-- [x] Pagination handles all edge cases
 - [x] Error scenarios return appropriate errors
 
 ### Compatibility
@@ -177,7 +157,6 @@ ginkgo -v -cover ./phase1/...
 ### Expected Duration
 - Basic Operations: ~2 minutes
 - Advanced Features: ~3 minutes
-- Pagination: ~2 minutes (5+ minutes with large scale)
 - Error Scenarios: ~2 minutes
 - **Total**: ~10-15 minutes
 

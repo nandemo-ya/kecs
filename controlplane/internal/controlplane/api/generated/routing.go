@@ -34,8 +34,32 @@ func handleRequest[TReq any, TResp any](
 
 	resp, err := serviceFunc(r.Context(), &req)
 	if err != nil {
-		// TODO: Handle specific error types
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// Return AWS-style error response
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		
+		// Determine error code and status
+		errorCode := "InternalServerError"
+		statusCode := http.StatusInternalServerError
+		
+		// Check for validation errors
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "Invalid parameter:") {
+			errorCode = "InvalidParameterException"
+			statusCode = http.StatusBadRequest
+		} else if strings.Contains(errMsg, "does not exist") || strings.Contains(errMsg, "not found") {
+			errorCode = "ResourceNotFoundException"
+			statusCode = http.StatusNotFound
+		} else if strings.Contains(errMsg, "cannot be deleted while") {
+			errorCode = "InvalidParameterException"
+			statusCode = http.StatusBadRequest
+		}
+		
+		w.WriteHeader(statusCode)
+		errorResp := map[string]interface{}{
+			"__type": errorCode,
+			"message": errMsg,
+		}
+		json.NewEncoder(w).Encode(errorResp)
 		return
 	}
 

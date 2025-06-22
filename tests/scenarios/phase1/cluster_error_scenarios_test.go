@@ -12,19 +12,14 @@ import (
 
 var _ = Describe("Cluster Error Scenarios", Serial, func() {
 	var (
-		kecs   *utils.KECSContainer
 		client utils.ECSClientInterface
 		logger *utils.TestLogger
 	)
 
 	BeforeEach(func() {
-		// Start KECS container
-		kecs = utils.StartKECS(GinkgoT())
-		DeferCleanup(kecs.Cleanup)
-
-		// Create ECS client using AWS CLI
-		client = utils.NewECSClientInterface(kecs.Endpoint(), utils.AWSCLIMode)
-		logger = utils.NewTestLogger(GinkgoT())
+		// Use shared resources from suite
+		client = sharedClient
+		logger = sharedLogger
 	})
 
 	Describe("Invalid Operations", func() {

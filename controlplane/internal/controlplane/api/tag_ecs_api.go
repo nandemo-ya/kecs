@@ -11,22 +11,41 @@ import (
 
 // TagResource implements the TagResource operation
 func (api *DefaultECSAPI) TagResource(ctx context.Context, req *generated.TagResourceRequest) (*generated.TagResourceResponse, error) {
-	// Validate resource ARN format
-	if req.ResourceArn == nil || !strings.HasPrefix(*req.ResourceArn, "arn:aws:ecs:") {
-		return nil, fmt.Errorf("invalid resource ARN format")
+	// Validate resource ARN
+	if req.ResourceArn == nil {
+		return nil, fmt.Errorf("Invalid parameter: Resource ARN is required")
+	}
+	if err := ValidateResourceARN(*req.ResourceArn); err != nil {
+		return nil, err
 	}
 
 	// Validate tags
 	if len(req.Tags) == 0 {
-		return nil, fmt.Errorf("at least one tag must be specified")
+		return nil, fmt.Errorf("Invalid parameter: At least one tag must be specified")
 	}
 
-	// TODO: Implement actual resource tagging logic
-	// In a real implementation, we would:
-	// 1. Parse the resource ARN to determine resource type
-	// 2. Validate the resource exists
-	// 3. Store the tags in the database
-	// 4. Apply AWS tag limits (50 tags per resource, key/value length limits)
+	// Parse resource ARN to determine resource type
+	resourceArn := *req.ResourceArn
+	if strings.Contains(resourceArn, ":cluster/") {
+		// Extract cluster name from ARN
+		parts := strings.Split(resourceArn, "/")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("Invalid parameter: Invalid cluster ARN format")
+		}
+		clusterName := parts[1]
+
+		// Check if cluster exists
+		cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
+		if err != nil {
+			return nil, fmt.Errorf("The cluster '%s' does not exist", clusterName)
+		}
+
+		// TODO: Actually update cluster tags in storage
+		_ = cluster
+	} else {
+		// For other resource types, just validate they could exist
+		// In a full implementation, we'd check each resource type
+	}
 
 	// For now, return an empty successful response
 	resp := &generated.TagResourceResponse{}
@@ -36,14 +55,17 @@ func (api *DefaultECSAPI) TagResource(ctx context.Context, req *generated.TagRes
 
 // UntagResource implements the UntagResource operation
 func (api *DefaultECSAPI) UntagResource(ctx context.Context, req *generated.UntagResourceRequest) (*generated.UntagResourceResponse, error) {
-	// Validate resource ARN format
-	if req.ResourceArn == nil || !strings.HasPrefix(*req.ResourceArn, "arn:aws:ecs:") {
-		return nil, fmt.Errorf("invalid resource ARN format")
+	// Validate resource ARN
+	if req.ResourceArn == nil {
+		return nil, fmt.Errorf("Invalid parameter: Resource ARN is required")
+	}
+	if err := ValidateResourceARN(*req.ResourceArn); err != nil {
+		return nil, err
 	}
 
 	// Validate tag keys
 	if len(req.TagKeys) == 0 {
-		return nil, fmt.Errorf("at least one tag key must be specified")
+		return nil, fmt.Errorf("Invalid parameter: At least one tag key must be specified")
 	}
 
 	// TODO: Implement actual resource untagging logic
@@ -61,9 +83,12 @@ func (api *DefaultECSAPI) UntagResource(ctx context.Context, req *generated.Unta
 
 // ListTagsForResource implements the ListTagsForResource operation
 func (api *DefaultECSAPI) ListTagsForResource(ctx context.Context, req *generated.ListTagsForResourceRequest) (*generated.ListTagsForResourceResponse, error) {
-	// Validate resource ARN format
-	if req.ResourceArn == nil || !strings.HasPrefix(*req.ResourceArn, "arn:aws:ecs:") {
-		return nil, fmt.Errorf("invalid resource ARN format")
+	// Validate resource ARN
+	if req.ResourceArn == nil {
+		return nil, fmt.Errorf("Invalid parameter: Resource ARN is required")
+	}
+	if err := ValidateResourceARN(*req.ResourceArn); err != nil {
+		return nil, err
 	}
 
 	// TODO: Implement actual tag listing logic
