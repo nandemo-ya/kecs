@@ -2,14 +2,18 @@ package utils
 
 // Cluster represents an ECS cluster
 type Cluster struct {
-	ClusterArn                        string        `json:"clusterArn"`
-	ClusterName                       string        `json:"clusterName"`
-	Status                            string        `json:"status"`
-	RegisteredContainerInstancesCount int           `json:"registeredContainerInstancesCount"`
-	RunningTasksCount                 int           `json:"runningTasksCount"`
-	PendingTasksCount                 int           `json:"pendingTasksCount"`
-	ActiveServicesCount               int           `json:"activeServicesCount"`
-	Settings                          []interface{} `json:"settings,omitempty"`
+	ClusterArn                        string                   `json:"clusterArn"`
+	ClusterName                       string                   `json:"clusterName"`
+	Status                            string                   `json:"status"`
+	RegisteredContainerInstancesCount int                      `json:"registeredContainerInstancesCount"`
+	RunningTasksCount                 int                      `json:"runningTasksCount"`
+	PendingTasksCount                 int                      `json:"pendingTasksCount"`
+	ActiveServicesCount               int                      `json:"activeServicesCount"`
+	Settings                          []map[string]string      `json:"settings,omitempty"`
+	Configuration                     map[string]interface{}   `json:"configuration,omitempty"`
+	CapacityProviders                 []string                 `json:"capacityProviders,omitempty"`
+	DefaultCapacityProviderStrategy   []map[string]interface{} `json:"defaultCapacityProviderStrategy,omitempty"`
+	Tags                              []map[string]string      `json:"tags,omitempty"`
 }
 
 // TaskDefinition represents an ECS task definition

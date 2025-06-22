@@ -60,7 +60,11 @@ func (c *AWSCLIClient) runCommand(args ...string) ([]byte, error) {
 
 // CreateCluster creates a new ECS cluster
 func (c *AWSCLIClient) CreateCluster(name string) error {
-	_, err := c.runCommand("create-cluster", "--cluster-name", name)
+	args := []string{"create-cluster"}
+	if name != "" {
+		args = append(args, "--cluster-name", name)
+	}
+	_, err := c.runCommand(args...)
 	return err
 }
 
@@ -450,4 +454,124 @@ func (c *AWSCLIClient) GetLocalStackStatus(clusterName string) (string, error) {
 	// Note: This is a KECS-specific extension, not part of standard ECS API
 	// For now, we'll return "unknown" as AWS CLI doesn't support this
 	return "unknown", nil
+}
+
+// UpdateClusterSettings updates cluster settings
+func (c *AWSCLIClient) UpdateClusterSettings(clusterName string, settings []map[string]string) error {
+	args := []string{"update-cluster-settings", "--cluster", clusterName, "--settings"}
+	for _, setting := range settings {
+		args = append(args, fmt.Sprintf("name=%s,value=%s", setting["name"], setting["value"]))
+	}
+	_, err := c.runCommand(args...)
+	return err
+}
+
+// UpdateCluster updates a cluster configuration
+func (c *AWSCLIClient) UpdateCluster(clusterName string, configuration map[string]interface{}) error {
+	args := []string{"update-cluster", "--cluster", clusterName}
+	
+	if config, ok := configuration["configuration"]; ok {
+		configJSON, err := json.Marshal(config)
+		if err != nil {
+			return fmt.Errorf("failed to marshal configuration: %w", err)
+		}
+		args = append(args, "--configuration", string(configJSON))
+	}
+	
+	_, err := c.runCommand(args...)
+	return err
+}
+
+// PutClusterCapacityProviders sets capacity providers on a cluster
+func (c *AWSCLIClient) PutClusterCapacityProviders(clusterName string, providers []string, strategy []map[string]interface{}) error {
+	args := []string{"put-cluster-capacity-providers", "--cluster", clusterName}
+	
+	if len(providers) > 0 {
+		args = append(args, "--capacity-providers")
+		args = append(args, providers...)
+	}
+	
+	if len(strategy) > 0 {
+		// Convert strategy to CLI format
+		for _, s := range strategy {
+			strategyStr := fmt.Sprintf("capacityProvider=%s", s["capacityProvider"])
+			if weight, ok := s["weight"]; ok {
+				strategyStr += fmt.Sprintf(",weight=%v", weight)
+			}
+			if base, ok := s["base"]; ok {
+				strategyStr += fmt.Sprintf(",base=%v", base)
+			}
+			args = append(args, "--default-capacity-provider-strategy", strategyStr)
+		}
+	}
+	
+	_, err := c.runCommand(args...)
+	return err
+}
+
+// DescribeClustersWithInclude describes clusters with additional information
+func (c *AWSCLIClient) DescribeClustersWithInclude(clusters []string, include []string) ([]Cluster, error) {
+	args := []string{"describe-clusters"}
+	
+	if len(clusters) > 0 {
+		args = append(args, "--clusters")
+		args = append(args, clusters...)
+	}
+	
+	if len(include) > 0 {
+		args = append(args, "--include")
+		args = append(args, include...)
+	}
+	
+	output, err := c.runCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	
+	var result struct {
+		Clusters []Cluster `json:"clusters"`
+		Failures []struct {
+			Arn    string `json:"arn"`
+			Reason string `json:"reason"`
+		} `json:"failures"`
+	}
+	
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+	
+	if len(result.Failures) > 0 {
+		return nil, fmt.Errorf("describe clusters failed: %s", result.Failures[0].Reason)
+	}
+	
+	return result.Clusters, nil
+}
+
+// ListClustersWithPagination lists clusters with pagination support
+func (c *AWSCLIClient) ListClustersWithPagination(maxResults int, nextToken string) (clusters []string, newNextToken string, err error) {
+	args := []string{"list-clusters"}
+	
+	if maxResults > 0 {
+		args = append(args, "--max-results", fmt.Sprintf("%d", maxResults))
+	}
+	
+	if nextToken != "" {
+		args = append(args, "--next-token", nextToken)
+	}
+	
+	output, err := c.runCommand(args...)
+	if err != nil {
+		return nil, "", err
+	}
+	
+	var result struct {
+		ClusterArns []string `json:"clusterArns"`
+		NextToken   string   `json:"nextToken"`
+	}
+	
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, "", fmt.Errorf("failed to parse response: %w", err)
+	}
+	
+	return result.ClusterArns, result.NextToken, nil
 }

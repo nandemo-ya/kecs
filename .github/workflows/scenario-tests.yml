@@ -42,16 +42,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Run Phase 1 tests (Foundation)
+      - name: Run Phase 1 tests (Cluster Operations)
         id: test-phase1
         run: |
           cd tests/scenarios
-          echo "## Running Phase 1: Foundation tests ##"
+          echo "## Running Phase 1: Cluster Operations tests ##"
           ginkgo -v -timeout 30m \
             --no-color \
             --junit-report=junit-phase1.xml \
             --output-dir=. \
-            ./cluster/... | tee test-output-phase1.log
+            ./phase1/... | tee test-output-phase1.log
           
           # Capture exit code
           echo "exit_code=$?" >> $GITHUB_OUTPUT
@@ -125,7 +125,7 @@ jobs:
         uses: dorny/test-reporter@v1
         if: always() && github.event_name == 'pull_request'
         with:
-          name: Phase 1 - Foundation Tests
+          name: Phase 1 - Cluster Operations Tests
           path: tests/scenarios/junit-phase1.xml
           reporter: java-junit
           fail-on-error: false
@@ -200,7 +200,7 @@ jobs:
             }
             
             // Parse outputs from all phases
-            const phase1 = parseTestOutput('tests/scenarios/test-output-phase1.log', 'Phase 1: Foundation');
+            const phase1 = parseTestOutput('tests/scenarios/test-output-phase1.log', 'Phase 1: Cluster Operations');
             const phase2 = parseTestOutput('tests/scenarios/test-output-phase2.log', 'Phase 2: Core Operations');
             const phase3 = parseTestOutput('tests/scenarios/test-output-phase3.log', 'Phase 3: Task Lifecycle & Status');
             const phase4 = parseTestOutput('tests/scenarios/test-output-phase4.log', 'Phase 4: Advanced Service Operations');
