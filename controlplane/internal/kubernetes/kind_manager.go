@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -133,6 +135,60 @@ func (k *KindManager) GetKubeClient(clusterName string) (*kubernetes.Clientset, 
 	}
 
 	return clientset, nil
+}
+
+// WaitForClusterReady waits for a Kind cluster to be ready with kubeconfig available
+func (k *KindManager) WaitForClusterReady(clusterName string, timeout time.Duration) error {
+	// If the cluster name already has the kecs- prefix, use it as is
+	kecsClusterName := clusterName
+	if !strings.HasPrefix(clusterName, "kecs-") {
+		kecsClusterName = fmt.Sprintf("kecs-%s", clusterName)
+	}
+	
+	kubeconfigPath := k.getKubeconfigPath(kecsClusterName)
+	startTime := time.Now()
+	
+	log.Printf("Waiting for cluster %s to be ready (kubeconfig: %s)", kecsClusterName, kubeconfigPath)
+	
+	for {
+		// Check if timeout exceeded
+		if time.Since(startTime) > timeout {
+			return fmt.Errorf("timeout waiting for cluster %s to be ready after %v", kecsClusterName, timeout)
+		}
+		
+		// Check if kubeconfig file exists
+		if _, err := os.Stat(kubeconfigPath); err != nil {
+			if os.IsNotExist(err) {
+				log.Printf("Kubeconfig not found yet for cluster %s, retrying...", kecsClusterName)
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			return fmt.Errorf("error checking kubeconfig: %w", err)
+		}
+		
+		// Try to create a client and check connectivity
+		client, err := k.GetKubeClient(clusterName)
+		if err != nil {
+			log.Printf("Failed to create client for cluster %s: %v, retrying...", kecsClusterName, err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		
+		// Try to list nodes to verify connectivity
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, err = client.CoreV1().Nodes().List(ctx, metav1.ListOptions{Limit: 1})
+		cancel()
+		
+		if err != nil {
+			log.Printf("Failed to connect to cluster %s API: %v, retrying...", kecsClusterName, err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		
+		// Cluster is ready
+		log.Printf("Cluster %s is ready", kecsClusterName)
+		return nil
+	}
 }
 
 func (k *KindManager) GetClusterNodes(clusterName string) ([]nodes.Node, error) {
