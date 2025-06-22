@@ -101,13 +101,28 @@ jobs:
                 return null;
               }
               
-              const summaryMatch = testOutput.match(/Ran (\d+) of (\d+) Specs in .*/);
-              const passedMatch = testOutput.match(/(\d+) Passed/);
-              const failedMatch = testOutput.match(/(\d+) Failed/);
-              const pendingMatch = testOutput.match(/(\d+) Pending/);
-              const skippedMatch = testOutput.match(/(\d+) Skipped/);
+              // Remove ANSI color codes before parsing
+              const cleanOutput = testOutput.replace(/\x1b\[[0-9;]*m/g, '');
               
-              return {
+              const summaryMatch = cleanOutput.match(/Ran (\d+) of (\d+) Specs in .*/);
+              // Look for the summary line pattern: "X Passed | Y Failed | Z Pending | W Skipped"
+              const summaryLine = cleanOutput.match(/(\d+) Passed.*?(\d+) Failed.*?(\d+) Pending.*?(\d+) Skipped/);
+              
+              let passedMatch, failedMatch, pendingMatch, skippedMatch;
+              if (summaryLine) {
+                passedMatch = [summaryLine[0], summaryLine[1]];
+                failedMatch = [summaryLine[0], summaryLine[2]];
+                pendingMatch = [summaryLine[0], summaryLine[3]];
+                skippedMatch = [summaryLine[0], summaryLine[4]];
+              } else {
+                // Fallback to individual matches
+                passedMatch = cleanOutput.match(/(\d+) Passed/);
+                failedMatch = cleanOutput.match(/(\d+) Failed/);
+                pendingMatch = cleanOutput.match(/(\d+) Pending/);
+                skippedMatch = cleanOutput.match(/(\d+) Skipped/);
+              }
+              
+              const result = {
                 phase: phaseName,
                 total: summaryMatch ? parseInt(summaryMatch[2]) : 0,
                 ran: summaryMatch ? parseInt(summaryMatch[1]) : 0,
@@ -117,6 +132,15 @@ jobs:
                 skipped: skippedMatch ? parseInt(skippedMatch[1]) : 0,
                 output: testOutput
               };
+              
+              // Debug logging
+              console.log(`Parsed ${phaseName}:`);
+              console.log(`  summaryMatch: ${summaryMatch}`);
+              console.log(`  passedMatch: ${passedMatch}`);
+              console.log(`  failedMatch: ${failedMatch}`);
+              console.log(`  Result:`, result);
+              
+              return result;
             }
             
             // Parse outputs from phase 1
