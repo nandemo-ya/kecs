@@ -46,7 +46,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 
 	t.Run("CreateCluster", func(t *testing.T) {
 		// Create request using generated types
-		settingName := generated.ClusterSettingName("containerInsights")
+		settingName := generated.ClusterSettingNameCONTAINER_INSIGHTS
 		req := &generated.CreateClusterRequest{
 			ClusterName: stringPtr("test-cluster"),
 			Settings: []generated.ClusterSetting{
@@ -66,6 +66,16 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 		// Make HTTP request
 		resp, err := makeRequest(server.URL, "CreateCluster", req)
 		require.NoError(t, err)
+		
+		// If not OK, print the response body for debugging
+		if resp.StatusCode != http.StatusOK {
+			var errResp map[string]interface{}
+			err = json.NewDecoder(resp.Body).Decode(&errResp)
+			if err == nil {
+				t.Logf("Error response: %v", errResp)
+			}
+		}
+		
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// Parse response
@@ -130,7 +140,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 		assert.Len(t, cluster.Settings, 1)
 		// Name is *ClusterSettingName, so we need to dereference and convert to string
 		if cluster.Settings[0].Name != nil {
-			assert.Equal(t, "containerInsights", string(*cluster.Settings[0].Name))
+			assert.Equal(t, "CONTAINER_INSIGHTS", string(*cluster.Settings[0].Name))
 		}
 		assert.Equal(t, "enabled", *cluster.Settings[0].Value)
 
@@ -168,7 +178,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 // TestGeneratedTypesJSONCompatibility tests JSON marshaling/unmarshaling
 func TestGeneratedTypesJSONCompatibility(t *testing.T) {
 	t.Run("CreateClusterRequest", func(t *testing.T) {
-		settingName := generated.ClusterSettingName("containerInsights")
+		settingName := generated.ClusterSettingNameCONTAINER_INSIGHTS
 		req := &generated.CreateClusterRequest{
 			ClusterName: stringPtr("test-cluster"),
 			Settings: []generated.ClusterSetting{
@@ -192,7 +202,7 @@ func TestGeneratedTypesJSONCompatibility(t *testing.T) {
 		settings := jsonMap["settings"].([]interface{})
 		assert.Len(t, settings, 1)
 		setting := settings[0].(map[string]interface{})
-		assert.Equal(t, "containerInsights", setting["name"])
+		assert.Equal(t, "CONTAINER_INSIGHTS", setting["name"])
 		assert.Equal(t, "enabled", setting["value"])
 	})
 
