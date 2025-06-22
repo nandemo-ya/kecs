@@ -31,7 +31,11 @@ func New(service, packageName, outputDir string) *Generator {
 
 // GenerateTypes generates type definitions from the API definition
 func (g *Generator) GenerateTypes(api *parser.SmithyAPI) error {
-	return g.generateTypesFile(api)
+	// Generate both types.go and enums.go
+	if err := g.generateTypesFile(api); err != nil {
+		return err
+	}
+	return g.generateEnumsFile(api)
 }
 
 // GenerateOperations generates operation interfaces from the API definition

@@ -23,9 +23,9 @@ func (api *DefaultECSAPI) DeleteAttributes(ctx context.Context, req *generated.D
 // ListAttributes implements the ListAttributes operation
 func (api *DefaultECSAPI) ListAttributes(ctx context.Context, req *generated.ListAttributesRequest) (*generated.ListAttributesResponse, error) {
 	// Get target type
-	targetType := "container-instance" // Default
-	if req.TargetType != nil {
-		targetType = string(*req.TargetType)
+	targetType := "CONTAINER_INSTANCE" // Default
+	if req.TargetType != generated.TargetType("") {
+		targetType = string(req.TargetType)
 	}
 
 	// Get cluster
@@ -61,7 +61,7 @@ func (api *DefaultECSAPI) ListAttributes(ctx context.Context, req *generated.Lis
 	apiAttributes := make([]generated.Attribute, 0)
 	for _, attr := range attributes {
 		apiAttr := generated.Attribute{
-			Name:       ptr.String(attr.Name),
+			Name:       attr.Name,
 			TargetType: (*generated.TargetType)(ptr.String(attr.TargetType)),
 			TargetId:   ptr.String(attr.TargetID),
 		}

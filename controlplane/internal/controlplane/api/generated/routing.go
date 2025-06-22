@@ -3,226 +3,1586 @@
 package generated
 
 import (
-	"context"
 	"encoding/json"
-	"io"
+	"fmt"
 	"net/http"
 	"strings"
 )
 
-// handleRequest is a generic handler for all ECS operations
-func handleRequest[TReq any, TResp any](
-	serviceFunc func(context.Context, *TReq) (*TResp, error),
-	w http.ResponseWriter,
-	r *http.Request,
-) {
-	var req TReq
-	if r.Body != nil {
-		defer r.Body.Close()
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, "Failed to read request body", http.StatusBadRequest)
-			return
-		}
-		if len(body) > 0 {
-			if err := json.Unmarshal(body, &req); err != nil {
-				http.Error(w, "Invalid request format", http.StatusBadRequest)
-				return
-			}
-		}
-	}
+// Router handles HTTP routing for ecs API
+type Router struct {
+	api AmazonEC2ContainerServiceV20141113API
+}
 
-	resp, err := serviceFunc(r.Context(), &req)
-	if err != nil {
-		// Return AWS-style error response
-		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
-		
-		// Determine error code and status
-		errorCode := "InternalServerError"
-		statusCode := http.StatusInternalServerError
-		
-		// Check for validation errors
-		errMsg := err.Error()
-		if strings.Contains(errMsg, "Invalid parameter:") {
-			errorCode = "InvalidParameterException"
-			statusCode = http.StatusBadRequest
-		} else if strings.Contains(errMsg, "does not exist") || strings.Contains(errMsg, "not found") {
-			errorCode = "ResourceNotFoundException"
-			statusCode = http.StatusNotFound
-		} else if strings.Contains(errMsg, "cannot be deleted while") {
-			errorCode = "InvalidParameterException"
-			statusCode = http.StatusBadRequest
-		}
-		
-		w.WriteHeader(statusCode)
-		errorResp := map[string]interface{}{
-			"__type": errorCode,
-			"message": errMsg,
-		}
-		json.NewEncoder(w).Encode(errorResp)
+// NewRouter creates a new router for ecs API
+func NewRouter(api AmazonEC2ContainerServiceV20141113API) *Router {
+	return &Router{api: api}
+}
+
+// Route routes an HTTP request to the appropriate handler
+func (r *Router) Route(w http.ResponseWriter, req *http.Request) {
+	// Extract action from request
+	action := r.extractAction(req)
+	if action == "" {
+		writeError(w, http.StatusBadRequest, "MissingAction", "Could not determine action from request")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
+	// Route to appropriate handler
+	switch action {
+
+	case "CreateCapacityProvider":
+		r.handleCreateCapacityProvider(w, req)
+
+	case "CreateCluster":
+		r.handleCreateCluster(w, req)
+
+	case "CreateService":
+		r.handleCreateService(w, req)
+
+	case "CreateTaskSet":
+		r.handleCreateTaskSet(w, req)
+
+	case "DeleteAccountSetting":
+		r.handleDeleteAccountSetting(w, req)
+
+	case "DeleteAttributes":
+		r.handleDeleteAttributes(w, req)
+
+	case "DeleteCapacityProvider":
+		r.handleDeleteCapacityProvider(w, req)
+
+	case "DeleteCluster":
+		r.handleDeleteCluster(w, req)
+
+	case "DeleteService":
+		r.handleDeleteService(w, req)
+
+	case "DeleteTaskDefinitions":
+		r.handleDeleteTaskDefinitions(w, req)
+
+	case "DeleteTaskSet":
+		r.handleDeleteTaskSet(w, req)
+
+	case "DeregisterContainerInstance":
+		r.handleDeregisterContainerInstance(w, req)
+
+	case "DeregisterTaskDefinition":
+		r.handleDeregisterTaskDefinition(w, req)
+
+	case "DescribeCapacityProviders":
+		r.handleDescribeCapacityProviders(w, req)
+
+	case "DescribeClusters":
+		r.handleDescribeClusters(w, req)
+
+	case "DescribeContainerInstances":
+		r.handleDescribeContainerInstances(w, req)
+
+	case "DescribeServiceDeployments":
+		r.handleDescribeServiceDeployments(w, req)
+
+	case "DescribeServiceRevisions":
+		r.handleDescribeServiceRevisions(w, req)
+
+	case "DescribeServices":
+		r.handleDescribeServices(w, req)
+
+	case "DescribeTaskDefinition":
+		r.handleDescribeTaskDefinition(w, req)
+
+	case "DescribeTaskSets":
+		r.handleDescribeTaskSets(w, req)
+
+	case "DescribeTasks":
+		r.handleDescribeTasks(w, req)
+
+	case "DiscoverPollEndpoint":
+		r.handleDiscoverPollEndpoint(w, req)
+
+	case "ExecuteCommand":
+		r.handleExecuteCommand(w, req)
+
+	case "GetTaskProtection":
+		r.handleGetTaskProtection(w, req)
+
+	case "ListAccountSettings":
+		r.handleListAccountSettings(w, req)
+
+	case "ListAttributes":
+		r.handleListAttributes(w, req)
+
+	case "ListClusters":
+		r.handleListClusters(w, req)
+
+	case "ListContainerInstances":
+		r.handleListContainerInstances(w, req)
+
+	case "ListServiceDeployments":
+		r.handleListServiceDeployments(w, req)
+
+	case "ListServices":
+		r.handleListServices(w, req)
+
+	case "ListServicesByNamespace":
+		r.handleListServicesByNamespace(w, req)
+
+	case "ListTagsForResource":
+		r.handleListTagsForResource(w, req)
+
+	case "ListTaskDefinitionFamilies":
+		r.handleListTaskDefinitionFamilies(w, req)
+
+	case "ListTaskDefinitions":
+		r.handleListTaskDefinitions(w, req)
+
+	case "ListTasks":
+		r.handleListTasks(w, req)
+
+	case "PutAccountSetting":
+		r.handlePutAccountSetting(w, req)
+
+	case "PutAccountSettingDefault":
+		r.handlePutAccountSettingDefault(w, req)
+
+	case "PutAttributes":
+		r.handlePutAttributes(w, req)
+
+	case "PutClusterCapacityProviders":
+		r.handlePutClusterCapacityProviders(w, req)
+
+	case "RegisterContainerInstance":
+		r.handleRegisterContainerInstance(w, req)
+
+	case "RegisterTaskDefinition":
+		r.handleRegisterTaskDefinition(w, req)
+
+	case "RunTask":
+		r.handleRunTask(w, req)
+
+	case "StartTask":
+		r.handleStartTask(w, req)
+
+	case "StopServiceDeployment":
+		r.handleStopServiceDeployment(w, req)
+
+	case "StopTask":
+		r.handleStopTask(w, req)
+
+	case "SubmitAttachmentStateChanges":
+		r.handleSubmitAttachmentStateChanges(w, req)
+
+	case "SubmitContainerStateChange":
+		r.handleSubmitContainerStateChange(w, req)
+
+	case "SubmitTaskStateChange":
+		r.handleSubmitTaskStateChange(w, req)
+
+	case "TagResource":
+		r.handleTagResource(w, req)
+
+	case "UntagResource":
+		r.handleUntagResource(w, req)
+
+	case "UpdateCapacityProvider":
+		r.handleUpdateCapacityProvider(w, req)
+
+	case "UpdateCluster":
+		r.handleUpdateCluster(w, req)
+
+	case "UpdateClusterSettings":
+		r.handleUpdateClusterSettings(w, req)
+
+	case "UpdateContainerAgent":
+		r.handleUpdateContainerAgent(w, req)
+
+	case "UpdateContainerInstancesState":
+		r.handleUpdateContainerInstancesState(w, req)
+
+	case "UpdateService":
+		r.handleUpdateService(w, req)
+
+	case "UpdateServicePrimaryTaskSet":
+		r.handleUpdateServicePrimaryTaskSet(w, req)
+
+	case "UpdateTaskProtection":
+		r.handleUpdateTaskProtection(w, req)
+
+	case "UpdateTaskSet":
+		r.handleUpdateTaskSet(w, req)
+
+	default:
+		writeError(w, http.StatusBadRequest, "InvalidAction", fmt.Sprintf("Unknown action: %s", action))
 	}
 }
 
-// HandleECSRequest routes ECS API requests based on X-Amz-Target header
-func HandleECSRequest(api ECSAPIInterface) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Only accept POST requests
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		// Extract the target operation from X-Amz-Target header
-		target := r.Header.Get("X-Amz-Target")
-		if target == "" {
-			http.Error(w, "Missing X-Amz-Target header", http.StatusBadRequest)
-			return
-		}
-
-		// Parse the operation name from the target header
-		// Format: "AmazonEC2ContainerServiceV20141113.OperationName"
+// extractAction extracts the action from the request
+func (r *Router) extractAction(req *http.Request) string {
+	// Check X-Amz-Target header
+	if target := req.Header.Get("X-Amz-Target"); target != "" {
 		parts := strings.Split(target, ".")
-		if len(parts) != 2 {
-			http.Error(w, "Invalid X-Amz-Target format", http.StatusBadRequest)
-			return
-		}
-		operation := parts[1]
-
-		// Route to appropriate handler based on operation
-		switch operation {
-		case "CreateCapacityProvider":
-			handleRequest(api.CreateCapacityProvider, w, r)
-		case "CreateCluster":
-			handleRequest(api.CreateCluster, w, r)
-		case "CreateService":
-			handleRequest(api.CreateService, w, r)
-		case "CreateTaskSet":
-			handleRequest(api.CreateTaskSet, w, r)
-		case "DeleteAccountSetting":
-			handleRequest(api.DeleteAccountSetting, w, r)
-		case "DeleteAttributes":
-			handleRequest(api.DeleteAttributes, w, r)
-		case "DeleteCapacityProvider":
-			handleRequest(api.DeleteCapacityProvider, w, r)
-		case "DeleteCluster":
-			handleRequest(api.DeleteCluster, w, r)
-		case "DeleteService":
-			handleRequest(api.DeleteService, w, r)
-		case "DeleteTaskDefinitions":
-			handleRequest(api.DeleteTaskDefinitions, w, r)
-		case "DeleteTaskSet":
-			handleRequest(api.DeleteTaskSet, w, r)
-		case "DeregisterContainerInstance":
-			handleRequest(api.DeregisterContainerInstance, w, r)
-		case "DeregisterTaskDefinition":
-			handleRequest(api.DeregisterTaskDefinition, w, r)
-		case "DescribeCapacityProviders":
-			handleRequest(api.DescribeCapacityProviders, w, r)
-		case "DescribeClusters":
-			handleRequest(api.DescribeClusters, w, r)
-		case "DescribeContainerInstances":
-			handleRequest(api.DescribeContainerInstances, w, r)
-		case "DescribeServiceDeployments":
-			handleRequest(api.DescribeServiceDeployments, w, r)
-		case "DescribeServiceRevisions":
-			handleRequest(api.DescribeServiceRevisions, w, r)
-		case "DescribeServices":
-			handleRequest(api.DescribeServices, w, r)
-		case "DescribeTaskDefinition":
-			handleRequest(api.DescribeTaskDefinition, w, r)
-		case "DescribeTaskSets":
-			handleRequest(api.DescribeTaskSets, w, r)
-		case "DescribeTasks":
-			handleRequest(api.DescribeTasks, w, r)
-		case "DiscoverPollEndpoint":
-			handleRequest(api.DiscoverPollEndpoint, w, r)
-		case "ExecuteCommand":
-			handleRequest(api.ExecuteCommand, w, r)
-		case "GetTaskProtection":
-			handleRequest(api.GetTaskProtection, w, r)
-		case "ListAccountSettings":
-			handleRequest(api.ListAccountSettings, w, r)
-		case "ListAttributes":
-			handleRequest(api.ListAttributes, w, r)
-		case "ListClusters":
-			handleRequest(api.ListClusters, w, r)
-		case "ListContainerInstances":
-			handleRequest(api.ListContainerInstances, w, r)
-		case "ListServiceDeployments":
-			handleRequest(api.ListServiceDeployments, w, r)
-		case "ListServices":
-			handleRequest(api.ListServices, w, r)
-		case "ListServicesByNamespace":
-			handleRequest(api.ListServicesByNamespace, w, r)
-		case "ListTagsForResource":
-			handleRequest(api.ListTagsForResource, w, r)
-		case "ListTaskDefinitionFamilies":
-			handleRequest(api.ListTaskDefinitionFamilies, w, r)
-		case "ListTaskDefinitions":
-			handleRequest(api.ListTaskDefinitions, w, r)
-		case "ListTasks":
-			handleRequest(api.ListTasks, w, r)
-		case "PutAccountSetting":
-			handleRequest(api.PutAccountSetting, w, r)
-		case "PutAccountSettingDefault":
-			handleRequest(api.PutAccountSettingDefault, w, r)
-		case "PutAttributes":
-			handleRequest(api.PutAttributes, w, r)
-		case "PutClusterCapacityProviders":
-			handleRequest(api.PutClusterCapacityProviders, w, r)
-		case "RegisterContainerInstance":
-			handleRequest(api.RegisterContainerInstance, w, r)
-		case "RegisterTaskDefinition":
-			handleRequest(api.RegisterTaskDefinition, w, r)
-		case "RunTask":
-			handleRequest(api.RunTask, w, r)
-		case "StartTask":
-			handleRequest(api.StartTask, w, r)
-		case "StopServiceDeployment":
-			handleRequest(api.StopServiceDeployment, w, r)
-		case "StopTask":
-			handleRequest(api.StopTask, w, r)
-		case "SubmitAttachmentStateChanges":
-			handleRequest(api.SubmitAttachmentStateChanges, w, r)
-		case "SubmitContainerStateChange":
-			handleRequest(api.SubmitContainerStateChange, w, r)
-		case "SubmitTaskStateChange":
-			handleRequest(api.SubmitTaskStateChange, w, r)
-		case "TagResource":
-			handleRequest(api.TagResource, w, r)
-		case "UntagResource":
-			handleRequest(api.UntagResource, w, r)
-		case "UpdateCapacityProvider":
-			handleRequest(api.UpdateCapacityProvider, w, r)
-		case "UpdateCluster":
-			handleRequest(api.UpdateCluster, w, r)
-		case "UpdateClusterSettings":
-			handleRequest(api.UpdateClusterSettings, w, r)
-		case "UpdateContainerAgent":
-			handleRequest(api.UpdateContainerAgent, w, r)
-		case "UpdateContainerInstancesState":
-			handleRequest(api.UpdateContainerInstancesState, w, r)
-		case "UpdateService":
-			handleRequest(api.UpdateService, w, r)
-		case "UpdateServicePrimaryTaskSet":
-			handleRequest(api.UpdateServicePrimaryTaskSet, w, r)
-		case "UpdateTaskProtection":
-			handleRequest(api.UpdateTaskProtection, w, r)
-		case "UpdateTaskSet":
-			handleRequest(api.UpdateTaskSet, w, r)
-		default:
-			// Return a basic empty response for unsupported operations
-			w.Header().Set("Content-Type", "application/x-amz-json-1.1")
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("{}"))
+		if len(parts) > 1 {
+			return parts[1]
 		}
 	}
+
+	// Check URL path
+	if strings.HasPrefix(req.URL.Path, "/v1/") {
+		parts := strings.Split(strings.TrimPrefix(req.URL.Path, "/v1/"), "/")
+		if len(parts) > 0 {
+			return parts[0]
+		}
+	}
+
+	// Check query parameter
+	return req.URL.Query().Get("Action")
+}
+
+// handleCreateCapacityProvider handles the CreateCapacityProvider operation
+func (r *Router) handleCreateCapacityProvider(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input CreateCapacityProviderRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.CreateCapacityProvider(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleCreateCluster handles the CreateCluster operation
+func (r *Router) handleCreateCluster(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input CreateClusterRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.CreateCluster(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleCreateService handles the CreateService operation
+func (r *Router) handleCreateService(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input CreateServiceRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.CreateService(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleCreateTaskSet handles the CreateTaskSet operation
+func (r *Router) handleCreateTaskSet(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input CreateTaskSetRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.CreateTaskSet(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDeleteAccountSetting handles the DeleteAccountSetting operation
+func (r *Router) handleDeleteAccountSetting(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DeleteAccountSettingRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DeleteAccountSetting(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDeleteAttributes handles the DeleteAttributes operation
+func (r *Router) handleDeleteAttributes(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DeleteAttributesRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DeleteAttributes(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDeleteCapacityProvider handles the DeleteCapacityProvider operation
+func (r *Router) handleDeleteCapacityProvider(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DeleteCapacityProviderRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DeleteCapacityProvider(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDeleteCluster handles the DeleteCluster operation
+func (r *Router) handleDeleteCluster(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DeleteClusterRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DeleteCluster(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDeleteService handles the DeleteService operation
+func (r *Router) handleDeleteService(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DeleteServiceRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DeleteService(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDeleteTaskDefinitions handles the DeleteTaskDefinitions operation
+func (r *Router) handleDeleteTaskDefinitions(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DeleteTaskDefinitionsRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DeleteTaskDefinitions(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDeleteTaskSet handles the DeleteTaskSet operation
+func (r *Router) handleDeleteTaskSet(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DeleteTaskSetRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DeleteTaskSet(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDeregisterContainerInstance handles the DeregisterContainerInstance operation
+func (r *Router) handleDeregisterContainerInstance(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DeregisterContainerInstanceRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DeregisterContainerInstance(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDeregisterTaskDefinition handles the DeregisterTaskDefinition operation
+func (r *Router) handleDeregisterTaskDefinition(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DeregisterTaskDefinitionRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DeregisterTaskDefinition(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDescribeCapacityProviders handles the DescribeCapacityProviders operation
+func (r *Router) handleDescribeCapacityProviders(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DescribeCapacityProvidersRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DescribeCapacityProviders(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDescribeClusters handles the DescribeClusters operation
+func (r *Router) handleDescribeClusters(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DescribeClustersRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DescribeClusters(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDescribeContainerInstances handles the DescribeContainerInstances operation
+func (r *Router) handleDescribeContainerInstances(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DescribeContainerInstancesRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DescribeContainerInstances(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDescribeServiceDeployments handles the DescribeServiceDeployments operation
+func (r *Router) handleDescribeServiceDeployments(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DescribeServiceDeploymentsRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DescribeServiceDeployments(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDescribeServiceRevisions handles the DescribeServiceRevisions operation
+func (r *Router) handleDescribeServiceRevisions(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DescribeServiceRevisionsRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DescribeServiceRevisions(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDescribeServices handles the DescribeServices operation
+func (r *Router) handleDescribeServices(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DescribeServicesRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DescribeServices(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDescribeTaskDefinition handles the DescribeTaskDefinition operation
+func (r *Router) handleDescribeTaskDefinition(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DescribeTaskDefinitionRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DescribeTaskDefinition(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDescribeTaskSets handles the DescribeTaskSets operation
+func (r *Router) handleDescribeTaskSets(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DescribeTaskSetsRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DescribeTaskSets(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDescribeTasks handles the DescribeTasks operation
+func (r *Router) handleDescribeTasks(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DescribeTasksRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DescribeTasks(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleDiscoverPollEndpoint handles the DiscoverPollEndpoint operation
+func (r *Router) handleDiscoverPollEndpoint(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input DiscoverPollEndpointRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.DiscoverPollEndpoint(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleExecuteCommand handles the ExecuteCommand operation
+func (r *Router) handleExecuteCommand(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input ExecuteCommandRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.ExecuteCommand(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleGetTaskProtection handles the GetTaskProtection operation
+func (r *Router) handleGetTaskProtection(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input GetTaskProtectionRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.GetTaskProtection(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleListAccountSettings handles the ListAccountSettings operation
+func (r *Router) handleListAccountSettings(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input ListAccountSettingsRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.ListAccountSettings(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleListAttributes handles the ListAttributes operation
+func (r *Router) handleListAttributes(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input ListAttributesRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.ListAttributes(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleListClusters handles the ListClusters operation
+func (r *Router) handleListClusters(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input ListClustersRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.ListClusters(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleListContainerInstances handles the ListContainerInstances operation
+func (r *Router) handleListContainerInstances(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input ListContainerInstancesRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.ListContainerInstances(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleListServiceDeployments handles the ListServiceDeployments operation
+func (r *Router) handleListServiceDeployments(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input ListServiceDeploymentsRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.ListServiceDeployments(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleListServices handles the ListServices operation
+func (r *Router) handleListServices(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input ListServicesRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.ListServices(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleListServicesByNamespace handles the ListServicesByNamespace operation
+func (r *Router) handleListServicesByNamespace(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input ListServicesByNamespaceRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.ListServicesByNamespace(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleListTagsForResource handles the ListTagsForResource operation
+func (r *Router) handleListTagsForResource(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input ListTagsForResourceRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.ListTagsForResource(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleListTaskDefinitionFamilies handles the ListTaskDefinitionFamilies operation
+func (r *Router) handleListTaskDefinitionFamilies(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input ListTaskDefinitionFamiliesRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.ListTaskDefinitionFamilies(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleListTaskDefinitions handles the ListTaskDefinitions operation
+func (r *Router) handleListTaskDefinitions(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input ListTaskDefinitionsRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.ListTaskDefinitions(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleListTasks handles the ListTasks operation
+func (r *Router) handleListTasks(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input ListTasksRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.ListTasks(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handlePutAccountSetting handles the PutAccountSetting operation
+func (r *Router) handlePutAccountSetting(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input PutAccountSettingRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.PutAccountSetting(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handlePutAccountSettingDefault handles the PutAccountSettingDefault operation
+func (r *Router) handlePutAccountSettingDefault(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input PutAccountSettingDefaultRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.PutAccountSettingDefault(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handlePutAttributes handles the PutAttributes operation
+func (r *Router) handlePutAttributes(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input PutAttributesRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.PutAttributes(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handlePutClusterCapacityProviders handles the PutClusterCapacityProviders operation
+func (r *Router) handlePutClusterCapacityProviders(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input PutClusterCapacityProvidersRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.PutClusterCapacityProviders(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleRegisterContainerInstance handles the RegisterContainerInstance operation
+func (r *Router) handleRegisterContainerInstance(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input RegisterContainerInstanceRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.RegisterContainerInstance(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleRegisterTaskDefinition handles the RegisterTaskDefinition operation
+func (r *Router) handleRegisterTaskDefinition(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input RegisterTaskDefinitionRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.RegisterTaskDefinition(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleRunTask handles the RunTask operation
+func (r *Router) handleRunTask(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input RunTaskRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.RunTask(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleStartTask handles the StartTask operation
+func (r *Router) handleStartTask(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input StartTaskRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.StartTask(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleStopServiceDeployment handles the StopServiceDeployment operation
+func (r *Router) handleStopServiceDeployment(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input StopServiceDeploymentRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.StopServiceDeployment(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleStopTask handles the StopTask operation
+func (r *Router) handleStopTask(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input StopTaskRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.StopTask(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleSubmitAttachmentStateChanges handles the SubmitAttachmentStateChanges operation
+func (r *Router) handleSubmitAttachmentStateChanges(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input SubmitAttachmentStateChangesRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.SubmitAttachmentStateChanges(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleSubmitContainerStateChange handles the SubmitContainerStateChange operation
+func (r *Router) handleSubmitContainerStateChange(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input SubmitContainerStateChangeRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.SubmitContainerStateChange(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleSubmitTaskStateChange handles the SubmitTaskStateChange operation
+func (r *Router) handleSubmitTaskStateChange(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input SubmitTaskStateChangeRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.SubmitTaskStateChange(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleTagResource handles the TagResource operation
+func (r *Router) handleTagResource(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input TagResourceRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.TagResource(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleUntagResource handles the UntagResource operation
+func (r *Router) handleUntagResource(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input UntagResourceRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.UntagResource(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleUpdateCapacityProvider handles the UpdateCapacityProvider operation
+func (r *Router) handleUpdateCapacityProvider(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input UpdateCapacityProviderRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.UpdateCapacityProvider(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleUpdateCluster handles the UpdateCluster operation
+func (r *Router) handleUpdateCluster(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input UpdateClusterRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.UpdateCluster(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleUpdateClusterSettings handles the UpdateClusterSettings operation
+func (r *Router) handleUpdateClusterSettings(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input UpdateClusterSettingsRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.UpdateClusterSettings(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleUpdateContainerAgent handles the UpdateContainerAgent operation
+func (r *Router) handleUpdateContainerAgent(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input UpdateContainerAgentRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.UpdateContainerAgent(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleUpdateContainerInstancesState handles the UpdateContainerInstancesState operation
+func (r *Router) handleUpdateContainerInstancesState(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input UpdateContainerInstancesStateRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.UpdateContainerInstancesState(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleUpdateService handles the UpdateService operation
+func (r *Router) handleUpdateService(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input UpdateServiceRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.UpdateService(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleUpdateServicePrimaryTaskSet handles the UpdateServicePrimaryTaskSet operation
+func (r *Router) handleUpdateServicePrimaryTaskSet(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input UpdateServicePrimaryTaskSetRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.UpdateServicePrimaryTaskSet(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleUpdateTaskProtection handles the UpdateTaskProtection operation
+func (r *Router) handleUpdateTaskProtection(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input UpdateTaskProtectionRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.UpdateTaskProtection(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// handleUpdateTaskSet handles the UpdateTaskSet operation
+func (r *Router) handleUpdateTaskSet(w http.ResponseWriter, req *http.Request) {
+	// Parse input
+	var input UpdateTaskSetRequest
+	if req.ContentLength > 0 {
+		if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+			writeError(w, http.StatusBadRequest, "InvalidParameterValue", fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+	}
+
+	// Call API
+	output, err := r.api.UpdateTaskSet(req.Context(), &input)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+
+	// Write response
+	writeJSON(w, http.StatusOK, output)
+}
+
+// writeJSON writes a JSON response
+func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
+	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+	w.WriteHeader(statusCode)
+
+	if data != nil {
+		encoder := json.NewEncoder(w)
+		encoder.SetEscapeHTML(false)
+		_ = encoder.Encode(data)
+	}
+}
+
+// writeError writes an error response
+func writeError(w http.ResponseWriter, statusCode int, code, message string) {
+	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+	w.WriteHeader(statusCode)
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"__type":  code,
+		"message": message,
+	})
+}
+
+// writeAPIError writes an API error response
+func writeAPIError(w http.ResponseWriter, err error) {
+	// TODO: Handle specific error types
+	writeError(w, http.StatusInternalServerError, "InternalError", err.Error())
 }

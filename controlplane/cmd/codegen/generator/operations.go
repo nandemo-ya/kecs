@@ -122,14 +122,17 @@ import (
 	"context"
 )
 
-// {{.ServiceName}}API defines the interface for {{.Service}} operations
-type {{.ServiceName}}API interface {
+// ECSAPIInterface defines the interface for {{.Service}} operations
+type ECSAPIInterface interface {
 {{range $name := .OperationNames}}
 {{$op := index $.Operations $name}}
 	// {{$op.Name}} performs the {{$op.Name}} operation
 	{{$op.Name}}(ctx context.Context, input *{{$op.InputType}}) (*{{$op.OutputType}}, error)
 {{end}}
 }
+
+// {{.ServiceName}}API is an alias for ECSAPIInterface for backward compatibility
+type {{.ServiceName}}API = ECSAPIInterface
 
 // Operation names
 const (

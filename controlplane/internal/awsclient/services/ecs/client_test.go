@@ -89,7 +89,7 @@ var _ = Describe("ECS Client", func() {
 					clusterName := "test-cluster"
 					clusterArn := "arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster"
 					status := "ACTIVE"
-					
+
 					response := generated.CreateClusterResponse{
 						Cluster: &generated.Cluster{
 							ClusterName: &clusterName,
@@ -135,7 +135,7 @@ var _ = Describe("ECS Client", func() {
 				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					// Send error response
 					errorResponse := map[string]string{
-						"__type": "ClusterNotFoundException",
+						"__type":  "ClusterNotFoundException",
 						"message": "The referenced cluster was not found",
 					}
 
@@ -157,7 +157,7 @@ var _ = Describe("ECS Client", func() {
 			It("should return an appropriate error", func() {
 				clusterName := "non-existent-cluster"
 				input := &generated.DeleteClusterRequest{
-					Cluster: &clusterName,
+					Cluster: clusterName,
 				}
 				_, err := client.DeleteCluster(context.Background(), input)
 

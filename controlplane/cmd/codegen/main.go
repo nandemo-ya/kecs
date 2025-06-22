@@ -15,7 +15,7 @@ var (
 	service    = flag.String("service", "ecs", "AWS service name")
 	input      = flag.String("input", "", "Path to AWS API definition JSON file")
 	output     = flag.String("output", "", "Output directory for generated code")
-	pkgName    = flag.String("package", "api", "Go package name for generated code")
+	pkgName    = flag.String("package", "generated", "Go package name for generated code")
 	genTypes   = flag.Bool("types", true, "Generate type definitions")
 	genOps     = flag.Bool("operations", true, "Generate operation interfaces")
 	genRouting = flag.Bool("routing", true, "Generate HTTP routing")

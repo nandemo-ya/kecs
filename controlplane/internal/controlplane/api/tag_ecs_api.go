@@ -12,10 +12,10 @@ import (
 // TagResource implements the TagResource operation
 func (api *DefaultECSAPI) TagResource(ctx context.Context, req *generated.TagResourceRequest) (*generated.TagResourceResponse, error) {
 	// Validate resource ARN
-	if req.ResourceArn == nil {
+	if req.ResourceArn == "" {
 		return nil, fmt.Errorf("Invalid parameter: Resource ARN is required")
 	}
-	if err := ValidateResourceARN(*req.ResourceArn); err != nil {
+	if err := ValidateResourceARN(req.ResourceArn); err != nil {
 		return nil, err
 	}
 
@@ -25,7 +25,7 @@ func (api *DefaultECSAPI) TagResource(ctx context.Context, req *generated.TagRes
 	}
 
 	// Parse resource ARN to determine resource type
-	resourceArn := *req.ResourceArn
+	resourceArn := req.ResourceArn
 	if strings.Contains(resourceArn, ":cluster/") {
 		// Extract cluster name from ARN
 		parts := strings.Split(resourceArn, "/")
@@ -50,14 +50,14 @@ func (api *DefaultECSAPI) TagResource(ctx context.Context, req *generated.TagRes
 		tagMap := make(map[string]string)
 		for _, tag := range existingTags {
 			if tag.Key != nil && tag.Value != nil {
-				tagMap[string(*tag.Key)] = string(*tag.Value)
+				tagMap[*tag.Key] = *tag.Value
 			}
 		}
 
 		// Add/update new tags
 		for _, tag := range req.Tags {
 			if tag.Key != nil && tag.Value != nil {
-				tagMap[string(*tag.Key)] = string(*tag.Value)
+				tagMap[*tag.Key] = *tag.Value
 			}
 		}
 
@@ -67,8 +67,8 @@ func (api *DefaultECSAPI) TagResource(ctx context.Context, req *generated.TagRes
 			key := k
 			value := v
 			updatedTags = append(updatedTags, generated.Tag{
-				Key:   (*generated.TagKey)(&key),
-				Value: (*generated.TagValue)(&value),
+				Key:   &key,
+				Value: &value,
 			})
 		}
 
@@ -101,10 +101,10 @@ func (api *DefaultECSAPI) TagResource(ctx context.Context, req *generated.TagRes
 // UntagResource implements the UntagResource operation
 func (api *DefaultECSAPI) UntagResource(ctx context.Context, req *generated.UntagResourceRequest) (*generated.UntagResourceResponse, error) {
 	// Validate resource ARN
-	if req.ResourceArn == nil {
+	if req.ResourceArn == "" {
 		return nil, fmt.Errorf("Invalid parameter: Resource ARN is required")
 	}
-	if err := ValidateResourceARN(*req.ResourceArn); err != nil {
+	if err := ValidateResourceARN(req.ResourceArn); err != nil {
 		return nil, err
 	}
 
@@ -114,7 +114,7 @@ func (api *DefaultECSAPI) UntagResource(ctx context.Context, req *generated.Unta
 	}
 
 	// Parse resource ARN to determine resource type
-	resourceArn := *req.ResourceArn
+	resourceArn := req.ResourceArn
 	if strings.Contains(resourceArn, ":cluster/") {
 		// Extract cluster name from ARN
 		parts := strings.Split(resourceArn, "/")
@@ -139,13 +139,13 @@ func (api *DefaultECSAPI) UntagResource(ctx context.Context, req *generated.Unta
 		tagMap := make(map[string]string)
 		for _, tag := range existingTags {
 			if tag.Key != nil && tag.Value != nil {
-				tagMap[string(*tag.Key)] = string(*tag.Value)
+				tagMap[*tag.Key] = *tag.Value
 			}
 		}
 
 		// Remove specified tag keys
 		for _, tagKey := range req.TagKeys {
-			delete(tagMap, string(tagKey))
+			delete(tagMap, tagKey)
 		}
 
 		// Convert back to tag array
@@ -154,8 +154,8 @@ func (api *DefaultECSAPI) UntagResource(ctx context.Context, req *generated.Unta
 			key := k
 			value := v
 			updatedTags = append(updatedTags, generated.Tag{
-				Key:   (*generated.TagKey)(&key),
-				Value: (*generated.TagValue)(&value),
+				Key:   &key,
+				Value: &value,
 			})
 		}
 
@@ -192,17 +192,17 @@ func (api *DefaultECSAPI) UntagResource(ctx context.Context, req *generated.Unta
 // ListTagsForResource implements the ListTagsForResource operation
 func (api *DefaultECSAPI) ListTagsForResource(ctx context.Context, req *generated.ListTagsForResourceRequest) (*generated.ListTagsForResourceResponse, error) {
 	// Validate resource ARN
-	if req.ResourceArn == nil {
+	if req.ResourceArn == "" {
 		return nil, fmt.Errorf("Invalid parameter: Resource ARN is required")
 	}
-	if err := ValidateResourceARN(*req.ResourceArn); err != nil {
+	if err := ValidateResourceARN(req.ResourceArn); err != nil {
 		return nil, err
 	}
 
 	tags := []generated.Tag{}
 
 	// Parse resource ARN to determine resource type
-	resourceArn := *req.ResourceArn
+	resourceArn := req.ResourceArn
 	if strings.Contains(resourceArn, ":cluster/") {
 		// Extract cluster name from ARN
 		parts := strings.Split(resourceArn, "/")

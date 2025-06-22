@@ -54,7 +54,6 @@ var _ = Describe("Task ECS API", func() {
 		var mockTaskDefStore *mocks.MockTaskDefinitionStore
 
 		BeforeEach(func() {
-
 			mockTaskDefStore = mocks.NewMockTaskDefinitionStore()
 			mockStorage.SetTaskDefinitionStore(mockTaskDefStore)
 
@@ -76,7 +75,7 @@ var _ = Describe("Task ECS API", func() {
 			It("should create a new task successfully", func() {
 				taskDef := "nginx:1"
 				req := &generated.RunTaskRequest{
-					TaskDefinition: &taskDef,
+					TaskDefinition: taskDef,
 				}
 
 				resp, err := server.ecsAPI.RunTask(ctx, req)
@@ -96,7 +95,7 @@ var _ = Describe("Task ECS API", func() {
 				taskDef := "nginx"
 				count := int32(3)
 				req := &generated.RunTaskRequest{
-					TaskDefinition: &taskDef,
+					TaskDefinition: taskDef,
 					Count:          &count,
 				}
 
@@ -111,7 +110,7 @@ var _ = Describe("Task ECS API", func() {
 			It("should fail when task definition not found", func() {
 				taskDef := "non-existent:1"
 				req := &generated.RunTaskRequest{
-					TaskDefinition: &taskDef,
+					TaskDefinition: taskDef,
 				}
 
 				_, err := server.ecsAPI.RunTask(ctx, req)
@@ -154,7 +153,7 @@ var _ = Describe("Task ECS API", func() {
 				taskID := "task-123"
 				reason := "User requested stop"
 				req := &generated.StopTaskRequest{
-					Task:   &taskID,
+					Task:   taskID,
 					Reason: &reason,
 				}
 
@@ -176,7 +175,7 @@ var _ = Describe("Task ECS API", func() {
 
 				taskID := "task-123"
 				req := &generated.StopTaskRequest{
-					Task: &taskID,
+					Task: taskID,
 				}
 
 				resp, err := server.ecsAPI.StopTask(ctx, req)
@@ -187,7 +186,7 @@ var _ = Describe("Task ECS API", func() {
 			It("should fail when task not found", func() {
 				taskID := "non-existent"
 				req := &generated.StopTaskRequest{
-					Task: &taskID,
+					Task: taskID,
 				}
 
 				_, err := server.ecsAPI.StopTask(ctx, req)
@@ -237,7 +236,7 @@ var _ = Describe("Task ECS API", func() {
 			It("should include tags when requested", func() {
 				req := &generated.DescribeTasksRequest{
 					Tasks:   []string{"task-1"},
-					Include: []generated.TaskField{generated.TaskFieldTags},
+					Include: []generated.TaskField{generated.TaskFieldTAGS},
 				}
 
 				resp, err := server.ecsAPI.DescribeTasks(ctx, req)
@@ -356,7 +355,7 @@ var _ = Describe("Task ECS API", func() {
 			})
 
 			It("should filter by launch type", func() {
-				launchType := generated.LaunchTypeFargate
+				launchType := generated.LaunchTypeFARGATE
 				req := &generated.ListTasksRequest{
 					LaunchType: &launchType,
 				}
@@ -369,7 +368,7 @@ var _ = Describe("Task ECS API", func() {
 			})
 
 			It("should filter by desired status", func() {
-				status := generated.DesiredStatusRunning
+				status := generated.DesiredStatusRUNNING
 				req := &generated.ListTasksRequest{
 					DesiredStatus: &status,
 				}

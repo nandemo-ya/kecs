@@ -23,7 +23,7 @@ import (
 // RunTask implements the RunTask operation
 func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskRequest) (*generated.RunTaskResponse, error) {
 	// Validate required fields
-	if req.TaskDefinition == nil || *req.TaskDefinition == "" {
+	if req.TaskDefinition == "" {
 		return nil, fmt.Errorf("taskDefinition is required")
 	}
 
@@ -40,7 +40,7 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 	}
 
 	// Get task definition
-	taskDefIdentifier := *req.TaskDefinition
+	taskDefIdentifier := req.TaskDefinition
 	var taskDef *storage.TaskDefinition
 
 	if strings.Contains(taskDefIdentifier, ":") {
@@ -82,7 +82,7 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 
 	// Create task converter with CloudWatch integration
 	taskConverter := converters.NewTaskConverterWithCloudWatch(api.region, api.accountID, api.cloudWatchIntegration)
-	
+
 	// Set artifact manager if S3 integration is available
 	if api.s3Integration != nil {
 		artifactManager := artifacts.NewManager(api.s3Integration)
@@ -117,8 +117,8 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 			CreatedAt:         now,
 			Region:            api.region,
 			AccountID:         api.accountID,
-			CPU:               taskDef.CPU,       // Set from task definition
-			Memory:            taskDef.Memory,    // Set from task definition
+			CPU:               taskDef.CPU,    // Set from task definition
+			Memory:            taskDef.Memory, // Set from task definition
 		}
 
 		// Apply overrides if any
@@ -170,7 +170,7 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 				}
 			}
 		}
-		
+
 		// Sync Secrets Manager secrets if integration is available
 		if api.secretsManagerIntegration != nil {
 			// Extract Secrets Manager secrets from task definition
@@ -241,7 +241,7 @@ func (api *DefaultECSAPI) StartTask(ctx context.Context, req *generated.StartTas
 // StopTask implements the StopTask operation
 func (api *DefaultECSAPI) StopTask(ctx context.Context, req *generated.StopTaskRequest) (*generated.StopTaskResponse, error) {
 	// Validate required fields
-	if req.Task == nil || *req.Task == "" {
+	if req.Task == "" {
 		return nil, fmt.Errorf("task is required")
 	}
 
@@ -258,7 +258,7 @@ func (api *DefaultECSAPI) StopTask(ctx context.Context, req *generated.StopTaskR
 	}
 
 	// Get the task
-	taskIdentifier := *req.Task
+	taskIdentifier := req.Task
 	task, err := api.storage.TaskStore().Get(ctx, cluster.ARN, taskIdentifier)
 	if err != nil || task == nil {
 		return nil, fmt.Errorf("task not found: %s", taskIdentifier)
@@ -365,7 +365,7 @@ func (api *DefaultECSAPI) DescribeTasks(ctx context.Context, req *generated.Desc
 			// Include tags if requested
 			if req.Include != nil {
 				for _, include := range req.Include {
-					if include == generated.TaskFieldTags && task.Tags != "" {
+					if include == generated.TaskFieldTAGS && task.Tags != "" {
 						var tags []generated.Tag
 						if err := json.Unmarshal([]byte(task.Tags), &tags); err == nil {
 							genTask.Tags = tags
@@ -598,13 +598,13 @@ func parseRevision(revisionStr string) (int, error) {
 func extractSecretsFromPod(pod interface{}) map[string]*converters.SecretInfo {
 	// Extract secrets from pod spec
 	result := make(map[string]*converters.SecretInfo)
-	
+
 	// Type assert to *corev1.Pod
 	p, ok := pod.(*corev1.Pod)
 	if !ok {
 		return result
 	}
-	
+
 	// Check annotations for secret ARNs
 	for _, container := range p.Spec.Containers {
 		for _, env := range container.Env {
@@ -622,7 +622,7 @@ func extractSecretsFromPod(pod interface{}) map[string]*converters.SecretInfo {
 							} else if strings.Contains(annValue, ":ssm:") {
 								source = "ssm"
 							}
-							
+
 							if source != "" {
 								result[annValue] = &converters.SecretInfo{
 									SecretName: secretName,
@@ -637,20 +637,20 @@ func extractSecretsFromPod(pod interface{}) map[string]*converters.SecretInfo {
 			}
 		}
 	}
-	
+
 	return result
 }
 
 // Helper function to extract SSM parameters from task definition
 func extractSSMParameters(taskDef *storage.TaskDefinition) []string {
 	var ssmParams []string
-	
+
 	// Parse container definitions
 	var containerDefs []types.ContainerDefinition
 	if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
 		return ssmParams
 	}
-	
+
 	// Extract SSM parameter ARNs from each container's secrets
 	for _, container := range containerDefs {
 		if container.Secrets != nil {
@@ -672,20 +672,20 @@ func extractSSMParameters(taskDef *storage.TaskDefinition) []string {
 			}
 		}
 	}
-	
+
 	return ssmParams
 }
 
 // Helper function to extract Secrets Manager secrets from task definition
 func extractSecretsManagerSecrets(taskDef *storage.TaskDefinition) []secretsmanager.SecretReference {
 	var secretRefs []secretsmanager.SecretReference
-	
+
 	// Parse container definitions
 	var containerDefs []types.ContainerDefinition
 	if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
 		return secretRefs
 	}
-	
+
 	// Extract Secrets Manager ARNs from each container's secrets
 	for _, container := range containerDefs {
 		if container.Secrets != nil {
@@ -700,7 +700,7 @@ func extractSecretsManagerSecrets(taskDef *storage.TaskDefinition) []secretsmana
 			}
 		}
 	}
-	
+
 	return secretRefs
 }
 
@@ -709,27 +709,27 @@ func parseSecretsManagerARN(arn string) secretsmanager.SecretReference {
 	// Format: arn:aws:secretsmanager:region:account:secret:name-XXXXXX:json-key:version-stage:version-id
 	parts := strings.Split(arn, ":")
 	ref := secretsmanager.SecretReference{}
-	
+
 	if len(parts) >= 7 && parts[2] == "secretsmanager" {
 		// Extract secret name (6th part)
 		ref.SecretName = parts[6]
-		
+
 		// Check for JSON key (7th part)
 		if len(parts) >= 8 && parts[7] != "" {
 			ref.JSONKey = parts[7]
 		}
-		
+
 		// Check for version stage (8th part)
 		if len(parts) >= 9 && parts[8] != "" {
 			ref.VersionStage = parts[8]
 		}
-		
+
 		// Check for version ID (9th part)
 		if len(parts) >= 10 && parts[9] != "" {
 			ref.VersionId = parts[9]
 		}
 	}
-	
+
 	return ref
 }
 
@@ -756,7 +756,7 @@ func (m *mockTaskManager) CreateTask(ctx context.Context, pod interface{}, task 
 				task.Containers = string(containersJSON)
 			}
 		}
-		
+
 		// Check for awsvpc network mode and create attachments
 		if networkMode, ok := podObj.Annotations["ecs.amazonaws.com/network-mode"]; ok && networkMode == "awsvpc" {
 			attachments := m.createNetworkAttachments(podObj)
@@ -768,7 +768,7 @@ func (m *mockTaskManager) CreateTask(ctx context.Context, pod interface{}, task 
 			}
 		}
 	}
-	
+
 	// Keep the LastStatus that was set by RunTask (PROVISIONING)
 	task.Connectivity = "CONNECTED"
 	now := time.Now()
@@ -791,22 +791,22 @@ func (m *mockTaskManager) StopTask(ctx context.Context, cluster, taskID, reason 
 // createContainersFromPod creates container information from a Kubernetes pod
 func (m *mockTaskManager) createContainersFromPod(pod *corev1.Pod, task *storage.Task) []generated.Container {
 	var containers []generated.Container
-	
+
 	// Get pod IP for network interface
 	podIP := pod.Status.PodIP
 	if podIP == "" {
 		// Use a placeholder IP for newly created pods
 		podIP = "10.0.0.1"
 	}
-	
+
 	for _, container := range pod.Spec.Containers {
 		genContainer := generated.Container{
-			Name:   ptr.String(container.Name),
-			Image:  ptr.String(container.Image),
-			TaskArn: ptr.String(task.ARN),
+			Name:       ptr.String(container.Name),
+			Image:      ptr.String(container.Image),
+			TaskArn:    ptr.String(task.ARN),
 			LastStatus: ptr.String("PENDING"),
 		}
-		
+
 		// Add network interfaces for awsvpc mode
 		if networkMode := pod.Annotations["ecs.amazonaws.com/network-mode"]; networkMode == "awsvpc" {
 			genContainer.NetworkInterfaces = []generated.NetworkInterface{
@@ -816,7 +816,7 @@ func (m *mockTaskManager) createContainersFromPod(pod *corev1.Pod, task *storage
 				},
 			}
 		}
-		
+
 		// Add network bindings from container ports
 		for _, port := range container.Ports {
 			protocol := generated.TransportProtocol(port.Protocol)
@@ -826,24 +826,24 @@ func (m *mockTaskManager) createContainersFromPod(pod *corev1.Pod, task *storage
 				BindIP:        ptr.String(podIP),
 			})
 		}
-		
+
 		containers = append(containers, genContainer)
 	}
-	
+
 	return containers
 }
 
 // createNetworkAttachments creates network attachments for awsvpc mode
 func (m *mockTaskManager) createNetworkAttachments(pod *corev1.Pod) []generated.Attachment {
 	var attachments []generated.Attachment
-	
+
 	// Get network configuration from annotations
 	subnets := pod.Annotations["ecs.amazonaws.com/subnets"]
 	privateIP := pod.Status.PodIP
 	if privateIP == "" {
 		privateIP = "10.0.0.1"
 	}
-	
+
 	// Create elastic network interface attachment
 	var details []generated.KeyValuePair
 	if subnets != "" {
@@ -870,14 +870,14 @@ func (m *mockTaskManager) createNetworkAttachments(pod *corev1.Pod) []generated.
 			Value: ptr.String(privateIP),
 		},
 	)
-	
+
 	attachment := generated.Attachment{
 		Id:      ptr.String(fmt.Sprintf("eni-attach-%s", pod.UID)),
 		Type:    ptr.String("ElasticNetworkInterface"),
 		Status:  ptr.String("ATTACHED"),
 		Details: details,
 	}
-	
+
 	attachments = append(attachments, attachment)
 	return attachments
 }

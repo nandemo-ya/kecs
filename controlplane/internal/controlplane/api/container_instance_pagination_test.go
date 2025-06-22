@@ -143,7 +143,7 @@ var _ = Describe("ContainerInstance Pagination", func() {
 			})
 
 			It("should filter by status", func() {
-				status := generated.ContainerInstanceStatusDraining
+				status := generated.ContainerInstanceStatusDRAINING
 				req := &generated.ListContainerInstancesRequest{
 					Cluster:    ptr.String("test-cluster"),
 					Status:     &status,
@@ -179,7 +179,7 @@ var _ = Describe("ContainerInstance Pagination", func() {
 					ID:         fmt.Sprintf("attr-%02d", i),
 					Name:       fmt.Sprintf("attribute-%02d", i),
 					Value:      fmt.Sprintf("value-%02d", i),
-					TargetType: "container-instance",
+					TargetType: "CONTAINER_INSTANCE",
 					TargetID:   fmt.Sprintf("instance-%02d", i%5),
 					Cluster:    cluster.Name,
 					CreatedAt:  time.Now(),
@@ -192,10 +192,10 @@ var _ = Describe("ContainerInstance Pagination", func() {
 
 		Context("with pagination", func() {
 			It("should return first page of results", func() {
-				targetType := generated.TargetTypeContainerInstance
+				targetType := generated.TargetTypeCONTAINER_INSTANCE
 				req := &generated.ListAttributesRequest{
 					Cluster:    ptr.String("test-cluster"),
-					TargetType: &targetType,
+					TargetType: targetType,
 					MaxResults: ptr.Int32(5),
 				}
 
@@ -207,12 +207,12 @@ var _ = Describe("ContainerInstance Pagination", func() {
 			})
 
 			It("should return second page using next token", func() {
-				targetType := generated.TargetTypeContainerInstance
+				targetType := generated.TargetTypeCONTAINER_INSTANCE
 
 				// First page
 				req1 := &generated.ListAttributesRequest{
 					Cluster:    ptr.String("test-cluster"),
-					TargetType: &targetType,
+					TargetType: targetType,
 					MaxResults: ptr.Int32(5),
 				}
 				resp1, err := ecsAPI.ListAttributes(ctx, req1)
@@ -222,7 +222,7 @@ var _ = Describe("ContainerInstance Pagination", func() {
 				// Second page
 				req2 := &generated.ListAttributesRequest{
 					Cluster:    ptr.String("test-cluster"),
-					TargetType: &targetType,
+					TargetType: targetType,
 					MaxResults: ptr.Int32(5),
 					NextToken:  resp1.NextToken,
 				}
@@ -237,9 +237,9 @@ var _ = Describe("ContainerInstance Pagination", func() {
 			})
 
 			It("should filter by target type", func() {
-				targetType := generated.TargetTypeContainerInstance
+				targetType := generated.TargetTypeCONTAINER_INSTANCE
 				req := &generated.ListAttributesRequest{
-					TargetType: &targetType,
+					TargetType: targetType,
 					MaxResults: ptr.Int32(20),
 				}
 

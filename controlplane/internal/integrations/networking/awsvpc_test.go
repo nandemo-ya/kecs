@@ -26,7 +26,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		
+
 		// Set test mode to avoid requiring actual Kubernetes cluster
 		os.Setenv("KECS_TEST_MODE", "true")
 
@@ -34,7 +34,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 		var err error
 		store, err = duckdb.NewDuckDBStorage(":memory:")
 		Expect(err).NotTo(HaveOccurred())
-		
+
 		// Initialize the database schema
 		err = store.Initialize(ctx)
 		Expect(err).NotTo(HaveOccurred())
@@ -73,10 +73,10 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 			}
 
 			registerResp, err := ecsAPI.RegisterTaskDefinition(ctx, &generated.RegisterTaskDefinitionRequest{
-				Family:      ptr.String("test-awsvpc"),
+				Family:      "test-awsvpc",
 				NetworkMode: (*generated.NetworkMode)(ptr.String("awsvpc")),
 				RequiresCompatibilities: []generated.Compatibility{
-					generated.CompatibilityEc2,
+					generated.CompatibilityEC2,
 				},
 				Cpu:    ptr.String("256"),
 				Memory: ptr.String("512"),
@@ -92,7 +92,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 		It("should run task with network configuration", func() {
 			// Run task with network configuration
 			runTaskResp, err := ecsAPI.RunTask(ctx, &generated.RunTaskRequest{
-				TaskDefinition: ptr.String(taskDefArn),
+				TaskDefinition: taskDefArn,
 				NetworkConfiguration: &generated.NetworkConfiguration{
 					AwsvpcConfiguration: &generated.AwsVpcConfiguration{
 						Subnets:        []string{"subnet-12345", "subnet-67890"},
@@ -126,7 +126,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 		It("should describe task with network details", func() {
 			// Run task first
 			runTaskResp, err := ecsAPI.RunTask(ctx, &generated.RunTaskRequest{
-				TaskDefinition: ptr.String(taskDefArn),
+				TaskDefinition: taskDefArn,
 				NetworkConfiguration: &generated.NetworkConfiguration{
 					AwsvpcConfiguration: &generated.AwsVpcConfiguration{
 						Subnets:        []string{"subnet-12345"},
@@ -149,7 +149,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 
 			task := describeResp.Tasks[0]
 			Expect(task.Containers).NotTo(BeEmpty())
-			
+
 			// Verify network interfaces are preserved
 			container := task.Containers[0]
 			Expect(container.NetworkInterfaces).NotTo(BeEmpty())
@@ -176,10 +176,10 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 			}
 
 			registerResp, err := ecsAPI.RegisterTaskDefinition(ctx, &generated.RegisterTaskDefinitionRequest{
-				Family:      ptr.String("test-service-awsvpc"),
+				Family:      "test-service-awsvpc",
 				NetworkMode: (*generated.NetworkMode)(ptr.String("awsvpc")),
 				RequiresCompatibilities: []generated.Compatibility{
-					generated.CompatibilityEc2,
+					generated.CompatibilityEC2,
 				},
 				Cpu:    ptr.String("256"),
 				Memory: ptr.String("512"),
@@ -194,7 +194,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 		It("should create service with network configuration", func() {
 			// Create service with network configuration
 			createServiceResp, err := ecsAPI.CreateService(ctx, &generated.CreateServiceRequest{
-				ServiceName:    ptr.String("test-awsvpc-service"),
+				ServiceName:    "test-awsvpc-service",
 				TaskDefinition: ptr.String(taskDefArn),
 				DesiredCount:   ptr.Int32(2),
 				LaunchType:     (*generated.LaunchType)(ptr.String("EC2")),
@@ -223,7 +223,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 			targetGroupArn := fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:targetgroup/test-targets/1234567890123456", region, accountID)
 
 			createServiceResp, err := ecsAPI.CreateService(ctx, &generated.CreateServiceRequest{
-				ServiceName:    ptr.String("test-lb-service"),
+				ServiceName:    "test-lb-service",
 				TaskDefinition: ptr.String(taskDefArn),
 				DesiredCount:   ptr.Int32(2),
 				LaunchType:     (*generated.LaunchType)(ptr.String("EC2")),
@@ -253,7 +253,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 			serviceRegistryArn := fmt.Sprintf("arn:aws:servicediscovery:%s:%s:service/srv-12345678", region, accountID)
 
 			createServiceResp, err := ecsAPI.CreateService(ctx, &generated.CreateServiceRequest{
-				ServiceName:    ptr.String("test-sd-service"),
+				ServiceName:    "test-sd-service",
 				TaskDefinition: ptr.String(taskDefArn),
 				DesiredCount:   ptr.Int32(1),
 				LaunchType:     (*generated.LaunchType)(ptr.String("EC2")),
@@ -295,7 +295,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 			}
 
 			registerResp, err := ecsAPI.RegisterTaskDefinition(ctx, &generated.RegisterTaskDefinitionRequest{
-				Family:      ptr.String("test-bridge"),
+				Family:      "test-bridge",
 				NetworkMode: (*generated.NetworkMode)(ptr.String("bridge")),
 				ContainerDefinitions: []generated.ContainerDefinition{
 					containerDef,
@@ -305,7 +305,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 
 			// Run task without network configuration
 			runTaskResp, err := ecsAPI.RunTask(ctx, &generated.RunTaskRequest{
-				TaskDefinition: ptr.String(*registerResp.TaskDefinition.TaskDefinitionArn),
+				TaskDefinition: *registerResp.TaskDefinition.TaskDefinitionArn,
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(runTaskResp.Tasks).To(HaveLen(1))
@@ -333,7 +333,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 			}
 
 			registerResp, err := ecsAPI.RegisterTaskDefinition(ctx, &generated.RegisterTaskDefinitionRequest{
-				Family:      ptr.String("test-host"),
+				Family:      "test-host",
 				NetworkMode: (*generated.NetworkMode)(ptr.String("host")),
 				ContainerDefinitions: []generated.ContainerDefinition{
 					containerDef,
@@ -343,7 +343,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 
 			// Run task
 			runTaskResp, err := ecsAPI.RunTask(ctx, &generated.RunTaskRequest{
-				TaskDefinition: ptr.String(*registerResp.TaskDefinition.TaskDefinitionArn),
+				TaskDefinition: *registerResp.TaskDefinition.TaskDefinitionArn,
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(runTaskResp.Tasks).To(HaveLen(1))

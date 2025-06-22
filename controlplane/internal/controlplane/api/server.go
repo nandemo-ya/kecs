@@ -379,8 +379,9 @@ func (s *Server) SetupRoutes() http.Handler {
 			return
 		}
 		// Otherwise handle as ECS request
-		// Use generated ECS request handler
-		generated.HandleECSRequest(s.ecsAPI)(w, r)
+		// Create router and handle request
+		router := generated.NewRouter(s.ecsAPI)
+		router.Route(w, r)
 	})
 
 	// Health check endpoint

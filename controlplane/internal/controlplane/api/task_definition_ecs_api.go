@@ -20,7 +20,7 @@ func extractRoleNameFromARN(arn string) string {
 	if arn == "" {
 		return ""
 	}
-	
+
 	// ARN format: arn:aws:iam::account-id:role/role-name
 	parts := strings.Split(arn, ":")
 	if len(parts) >= 6 && parts[2] == "iam" {
@@ -30,19 +30,19 @@ func extractRoleNameFromARN(arn string) string {
 			return strings.TrimPrefix(resourcePart, "role/")
 		}
 	}
-	
+
 	// If it's not a valid ARN, assume it's already a role name
 	if !strings.HasPrefix(arn, "arn:") {
 		return arn
 	}
-	
+
 	return ""
 }
 
 // RegisterTaskDefinition implements the RegisterTaskDefinition operation
 func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *generated.RegisterTaskDefinitionRequest) (*generated.RegisterTaskDefinitionResponse, error) {
 	// Validate required fields
-	if req.Family == nil || *req.Family == "" {
+	if req.Family == "" {
 		return nil, fmt.Errorf("family is required")
 	}
 	if req.ContainerDefinitions == nil || len(req.ContainerDefinitions) == 0 {
@@ -50,7 +50,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	}
 
 	// Set default values
-	networkMode := generated.NetworkModeBridge
+	networkMode := generated.NetworkModeBRIDGE
 	if req.NetworkMode != nil {
 		networkMode = *req.NetworkMode
 	}
@@ -148,7 +148,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	// Create storage task definition
 	storageTaskDef := &storage.TaskDefinition{
 		ID:                      uuid.New().String(),
-		Family:                  *req.Family,
+		Family:                  req.Family,
 		TaskRoleARN:             taskRoleARN,
 		ExecutionRoleARN:        executionRoleARN,
 		NetworkMode:             string(networkMode),
@@ -223,27 +223,26 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 
 // DeregisterTaskDefinition implements the DeregisterTaskDefinition operation
 func (api *DefaultECSAPI) DeregisterTaskDefinition(ctx context.Context, req *generated.DeregisterTaskDefinitionRequest) (*generated.DeregisterTaskDefinitionResponse, error) {
-	if req.TaskDefinition == nil || *req.TaskDefinition == "" {
+	if req.TaskDefinition == "" {
 		return nil, fmt.Errorf("taskDefinition is required")
 	}
 
-	taskDefIdentifier := *req.TaskDefinition
 	var family string
 	var revision int
 	var err error
 
 	// Check if it's an ARN or family:revision format
-	if strings.HasPrefix(taskDefIdentifier, "arn:aws:ecs:") {
+	if strings.HasPrefix(req.TaskDefinition, "arn:aws:ecs:") {
 		// Parse ARN to get family and revision
-		taskDef, err := api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefIdentifier)
+		taskDef, err := api.storage.TaskDefinitionStore().GetByARN(ctx, req.TaskDefinition)
 		if err != nil {
-			return nil, fmt.Errorf("task definition not found: %s", taskDefIdentifier)
+			return nil, fmt.Errorf("task definition not found: %s", req.TaskDefinition)
 		}
 		family = taskDef.Family
 		revision = taskDef.Revision
-	} else if strings.Contains(taskDefIdentifier, ":") {
+	} else if strings.Contains(req.TaskDefinition, ":") {
 		// family:revision format
-		parts := strings.SplitN(taskDefIdentifier, ":", 2)
+		parts := strings.SplitN(req.TaskDefinition, ":", 2)
 		family = parts[0]
 		revision, err = strconv.Atoi(parts[1])
 		if err != nil {
@@ -284,22 +283,21 @@ func (api *DefaultECSAPI) DeregisterTaskDefinition(ctx context.Context, req *gen
 
 // DescribeTaskDefinition implements the DescribeTaskDefinition operation
 func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *generated.DescribeTaskDefinitionRequest) (*generated.DescribeTaskDefinitionResponse, error) {
-	if req.TaskDefinition == nil || *req.TaskDefinition == "" {
+	if req.TaskDefinition == "" {
 		return nil, fmt.Errorf("taskDefinition is required")
 	}
 
-	taskDefIdentifier := *req.TaskDefinition
-	log.Printf("DEBUG: DescribeTaskDefinition called for: %s", taskDefIdentifier)
+	log.Printf("DEBUG: DescribeTaskDefinition called for: %s", req.TaskDefinition)
 	var taskDef *storage.TaskDefinition
 	var err error
 
 	// Check if it's an ARN or family:revision format
-	if strings.HasPrefix(taskDefIdentifier, "arn:aws:ecs:") {
+	if strings.HasPrefix(req.TaskDefinition, "arn:aws:ecs:") {
 		// ARN format
-		taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefIdentifier)
-	} else if strings.Contains(taskDefIdentifier, ":") {
+		taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, req.TaskDefinition)
+	} else if strings.Contains(req.TaskDefinition, ":") {
 		// family:revision format
-		parts := strings.SplitN(taskDefIdentifier, ":", 2)
+		parts := strings.SplitN(req.TaskDefinition, ":", 2)
 		family := parts[0]
 		revision, parseErr := strconv.Atoi(parts[1])
 		if parseErr != nil {
@@ -308,11 +306,11 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 		taskDef, err = api.storage.TaskDefinitionStore().Get(ctx, family, revision)
 	} else {
 		// Just family name - get latest
-		taskDef, err = api.storage.TaskDefinitionStore().GetLatest(ctx, taskDefIdentifier)
+		taskDef, err = api.storage.TaskDefinitionStore().GetLatest(ctx, req.TaskDefinition)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("task definition not found: %s", taskDefIdentifier)
+		return nil, fmt.Errorf("task definition not found: %s", req.TaskDefinition)
 	}
 
 	log.Printf("DEBUG: Found task definition: family=%s, revision=%d, containerDefs=%s",

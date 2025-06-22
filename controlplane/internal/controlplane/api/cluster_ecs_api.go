@@ -248,21 +248,21 @@ func (api *DefaultECSAPI) DescribeClusters(ctx context.Context, req *generated.D
 		if req.Include != nil {
 			for _, include := range req.Include {
 				switch include {
-				case generated.ClusterFieldSettings:
+				case generated.ClusterFieldSETTINGS:
 					if cluster.Settings != "" {
 						var settings []generated.ClusterSetting
 						if err := json.Unmarshal([]byte(cluster.Settings), &settings); err == nil {
 							clusterResp.Settings = settings
 						}
 					}
-				case generated.ClusterFieldConfigurations:
+				case generated.ClusterFieldCONFIGURATIONS:
 					if cluster.Configuration != "" {
 						var config generated.ClusterConfiguration
 						if err := json.Unmarshal([]byte(cluster.Configuration), &config); err == nil {
 							clusterResp.Configuration = &config
 						}
 					}
-				case generated.ClusterFieldTags:
+				case generated.ClusterFieldTAGS:
 					if cluster.Tags != "" {
 						var tags []generated.Tag
 						if err := json.Unmarshal([]byte(cluster.Tags), &tags); err == nil {
@@ -284,23 +284,23 @@ func (api *DefaultECSAPI) DescribeClusters(ctx context.Context, req *generated.D
 
 // DeleteCluster implements the DeleteCluster operation
 func (api *DefaultECSAPI) DeleteCluster(ctx context.Context, req *generated.DeleteClusterRequest) (*generated.DeleteClusterResponse, error) {
-	if req.Cluster == nil {
+	if req.Cluster == "" {
 		return nil, fmt.Errorf("cluster identifier is required")
 	}
 
 	// Validate cluster identifier
-	if err := ValidateClusterIdentifier(*req.Cluster); err != nil {
+	if err := ValidateClusterIdentifier(req.Cluster); err != nil {
 		return nil, err
 	}
 
 	// Extract cluster name from ARN if necessary
-	clusterName := extractClusterNameFromARN(*req.Cluster)
+	clusterName := extractClusterNameFromARN(req.Cluster)
 
 	// Look up cluster
 	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
 
 	if err != nil {
-		return nil, fmt.Errorf("cluster not found: %s", *req.Cluster)
+		return nil, fmt.Errorf("cluster not found: %s", req.Cluster)
 	}
 
 	// Check if cluster has active resources
@@ -342,22 +342,22 @@ func (api *DefaultECSAPI) DeleteCluster(ctx context.Context, req *generated.Dele
 
 // UpdateCluster implements the UpdateCluster operation
 func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.UpdateClusterRequest) (*generated.UpdateClusterResponse, error) {
-	if req.Cluster == nil {
+	if req.Cluster == "" {
 		return nil, fmt.Errorf("cluster identifier is required")
 	}
 
 	// Validate cluster identifier
-	if err := ValidateClusterIdentifier(*req.Cluster); err != nil {
+	if err := ValidateClusterIdentifier(req.Cluster); err != nil {
 		return nil, err
 	}
 
 	// Extract cluster name from ARN if necessary
-	clusterName := extractClusterNameFromARN(*req.Cluster)
+	clusterName := extractClusterNameFromARN(req.Cluster)
 
 	// Look up cluster
 	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
 	if err != nil {
-		return nil, fmt.Errorf("cluster not found: %s", *req.Cluster)
+		return nil, fmt.Errorf("cluster not found: %s", req.Cluster)
 	}
 
 	// Update settings if provided
@@ -445,7 +445,7 @@ func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.Upda
 
 // UpdateClusterSettings implements the UpdateClusterSettings operation
 func (api *DefaultECSAPI) UpdateClusterSettings(ctx context.Context, req *generated.UpdateClusterSettingsRequest) (*generated.UpdateClusterSettingsResponse, error) {
-	if req.Cluster == nil {
+	if req.Cluster == "" {
 		return nil, fmt.Errorf("cluster identifier is required")
 	}
 	if req.Settings == nil || len(req.Settings) == 0 {
@@ -453,7 +453,7 @@ func (api *DefaultECSAPI) UpdateClusterSettings(ctx context.Context, req *genera
 	}
 
 	// Validate cluster identifier
-	if err := ValidateClusterIdentifier(*req.Cluster); err != nil {
+	if err := ValidateClusterIdentifier(req.Cluster); err != nil {
 		return nil, err
 	}
 
@@ -463,12 +463,12 @@ func (api *DefaultECSAPI) UpdateClusterSettings(ctx context.Context, req *genera
 	}
 
 	// Extract cluster name from ARN if necessary
-	clusterName := extractClusterNameFromARN(*req.Cluster)
+	clusterName := extractClusterNameFromARN(req.Cluster)
 
 	// Look up cluster
 	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
 	if err != nil {
-		return nil, fmt.Errorf("cluster not found: %s", *req.Cluster)
+		return nil, fmt.Errorf("cluster not found: %s", req.Cluster)
 	}
 
 	// Parse existing settings
@@ -556,7 +556,7 @@ func (api *DefaultECSAPI) UpdateClusterSettings(ctx context.Context, req *genera
 
 // PutClusterCapacityProviders implements the PutClusterCapacityProviders operation
 func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *generated.PutClusterCapacityProvidersRequest) (*generated.PutClusterCapacityProvidersResponse, error) {
-	if req.Cluster == nil {
+	if req.Cluster == "" {
 		return nil, fmt.Errorf("cluster identifier is required")
 	}
 	if req.CapacityProviders == nil {
@@ -567,7 +567,7 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 	}
 
 	// Validate cluster identifier
-	if err := ValidateClusterIdentifier(*req.Cluster); err != nil {
+	if err := ValidateClusterIdentifier(req.Cluster); err != nil {
 		return nil, err
 	}
 
@@ -577,12 +577,12 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 	}
 
 	// Extract cluster name from ARN if necessary
-	clusterName := extractClusterNameFromARN(*req.Cluster)
+	clusterName := extractClusterNameFromARN(req.Cluster)
 
 	// Look up cluster
 	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
 	if err != nil {
-		return nil, fmt.Errorf("cluster not found: %s", *req.Cluster)
+		return nil, fmt.Errorf("cluster not found: %s", req.Cluster)
 	}
 
 	// Marshal capacity providers
