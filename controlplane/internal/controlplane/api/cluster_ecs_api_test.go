@@ -280,7 +280,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 				// Delete the cluster
 				req := &generated.DeleteClusterRequest{
-					Cluster: &clusterName,
+					Cluster: clusterName,
 				}
 
 				resp, err := server.ecsAPI.DeleteCluster(ctx, req)
@@ -313,7 +313,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 				// Try to delete the cluster
 				req := &generated.DeleteClusterRequest{
-					Cluster: &clusterName,
+					Cluster: clusterName,
 				}
 
 				_, err = server.ecsAPI.DeleteCluster(ctx, req)
@@ -324,7 +324,7 @@ var _ = Describe("Cluster ECS API", func() {
 			It("should fail when cluster does not exist", func() {
 				clusterName := "non-existent"
 				req := &generated.DeleteClusterRequest{
-					Cluster: &clusterName,
+					Cluster: clusterName,
 				}
 
 				_, err := server.ecsAPI.DeleteCluster(ctx, req)
@@ -345,7 +345,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 				// Delete the cluster using ARN
 				req := &generated.DeleteClusterRequest{
-					Cluster: &clusterArn,
+					Cluster: clusterArn,
 				}
 
 				resp, err := server.ecsAPI.DeleteCluster(ctx, req)
@@ -376,7 +376,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 			It("should update cluster settings", func() {
 				clusterName := "update-test"
-				settingName := generated.ClusterSettingNameContainerInsights
+				settingName := generated.ClusterSettingNameCONTAINER_INSIGHTS
 				settingValue := "enabled"
 				settings := []generated.ClusterSetting{
 					{
@@ -386,7 +386,7 @@ var _ = Describe("Cluster ECS API", func() {
 				}
 
 				req := &generated.UpdateClusterRequest{
-					Cluster:  &clusterName,
+					Cluster:  clusterName,
 					Settings: settings,
 				}
 
@@ -402,7 +402,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 			It("should update cluster configuration", func() {
 				clusterName := "update-test"
-				loggingValue := generated.ExecuteCommandLoggingDefault
+				loggingValue := generated.ExecuteCommandLoggingDEFAULT
 				config := &generated.ClusterConfiguration{
 					ExecuteCommandConfiguration: &generated.ExecuteCommandConfiguration{
 						Logging: &loggingValue,
@@ -410,7 +410,7 @@ var _ = Describe("Cluster ECS API", func() {
 				}
 
 				req := &generated.UpdateClusterRequest{
-					Cluster:       &clusterName,
+					Cluster:       clusterName,
 					Configuration: config,
 				}
 
@@ -421,13 +421,13 @@ var _ = Describe("Cluster ECS API", func() {
 				Expect(resp.Cluster).NotTo(BeNil())
 				Expect(resp.Cluster.Configuration).NotTo(BeNil())
 				Expect(resp.Cluster.Configuration.ExecuteCommandConfiguration).NotTo(BeNil())
-				Expect(*resp.Cluster.Configuration.ExecuteCommandConfiguration.Logging).To(Equal(generated.ExecuteCommandLoggingDefault))
+				Expect(*resp.Cluster.Configuration.ExecuteCommandConfiguration.Logging).To(Equal(generated.ExecuteCommandLoggingDEFAULT))
 			})
 
 			It("should fail when cluster does not exist", func() {
 				clusterName := "non-existent"
 				req := &generated.UpdateClusterRequest{
-					Cluster: &clusterName,
+					Cluster: clusterName,
 				}
 
 				_, err := server.ecsAPI.UpdateCluster(ctx, req)
@@ -442,7 +442,7 @@ var _ = Describe("Cluster ECS API", func() {
 			BeforeEach(func() {
 				// Create a test cluster with initial settings
 				clusterName := "settings-test"
-				settingName := generated.ClusterSettingNameContainerInsights
+				settingName := generated.ClusterSettingNameCONTAINER_INSIGHTS
 				settingValue := "disabled"
 				_, err := server.ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{
 					ClusterName: &clusterName,
@@ -458,7 +458,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 			It("should update existing cluster settings", func() {
 				clusterName := "settings-test"
-				settingName := generated.ClusterSettingNameContainerInsights
+				settingName := generated.ClusterSettingNameCONTAINER_INSIGHTS
 				settingValue := "enabled"
 				settings := []generated.ClusterSetting{
 					{
@@ -468,7 +468,7 @@ var _ = Describe("Cluster ECS API", func() {
 				}
 
 				req := &generated.UpdateClusterSettingsRequest{
-					Cluster:  &clusterName,
+					Cluster:  clusterName,
 					Settings: settings,
 				}
 
@@ -485,7 +485,7 @@ var _ = Describe("Cluster ECS API", func() {
 			It("should fail when settings are not provided", func() {
 				clusterName := "settings-test"
 				req := &generated.UpdateClusterSettingsRequest{
-					Cluster: &clusterName,
+					Cluster: clusterName,
 				}
 
 				_, err := server.ecsAPI.UpdateClusterSettings(ctx, req)
@@ -509,23 +509,20 @@ var _ = Describe("Cluster ECS API", func() {
 			It("should update capacity providers and strategy", func() {
 				clusterName := "capacity-test"
 				capacityProviders := []string{"FARGATE", "FARGATE_SPOT"}
-				weightOne := generated.CapacityProviderStrategyItemWeight(1)
-				baseOne := generated.CapacityProviderStrategyItemBase(1)
-				weightFour := generated.CapacityProviderStrategyItemWeight(4)
 				strategy := []generated.CapacityProviderStrategyItem{
 					{
-						CapacityProvider: ptr.String("FARGATE"),
-						Weight:           &weightOne,
-						Base:             &baseOne,
+						CapacityProvider: "FARGATE",
+						Weight:           ptr.Int32(1),
+						Base:             ptr.Int32(1),
 					},
 					{
-						CapacityProvider: ptr.String("FARGATE_SPOT"),
-						Weight:           &weightFour,
+						CapacityProvider: "FARGATE_SPOT",
+						Weight:           ptr.Int32(4),
 					},
 				}
 
 				req := &generated.PutClusterCapacityProvidersRequest{
-					Cluster:                         &clusterName,
+					Cluster:                         clusterName,
 					CapacityProviders:               capacityProviders,
 					DefaultCapacityProviderStrategy: strategy,
 				}
@@ -542,7 +539,7 @@ var _ = Describe("Cluster ECS API", func() {
 			It("should fail when required fields are missing", func() {
 				clusterName := "capacity-test"
 				req := &generated.PutClusterCapacityProvidersRequest{
-					Cluster: &clusterName,
+					Cluster: clusterName,
 				}
 
 				_, err := server.ecsAPI.PutClusterCapacityProviders(ctx, req)

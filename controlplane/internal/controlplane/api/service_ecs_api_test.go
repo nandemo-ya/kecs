@@ -103,7 +103,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should list services in specified namespace", func() {
 				namespace := "test-namespace"
 				req := &generated.ListServicesByNamespaceRequest{
-					Namespace: &namespace,
+					Namespace: namespace,
 				}
 
 				resp, err := server.ecsAPI.ListServicesByNamespace(ctx, req)
@@ -119,7 +119,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should return empty list for non-existent namespace", func() {
 				namespace := "non-existent"
 				req := &generated.ListServicesByNamespaceRequest{
-					Namespace: &namespace,
+					Namespace: namespace,
 				}
 
 				resp, err := server.ecsAPI.ListServicesByNamespace(ctx, req)
@@ -172,8 +172,8 @@ var _ = Describe("Service ECS API", func() {
 				serviceName := "test-service"
 				taskSetId := "new-task-set"
 				req := &generated.UpdateServicePrimaryTaskSetRequest{
-					Service:        &serviceName,
-					PrimaryTaskSet: &taskSetId,
+					Service:        serviceName,
+					PrimaryTaskSet: taskSetId,
 				}
 
 				resp, err := server.ecsAPI.UpdateServicePrimaryTaskSet(ctx, req)
@@ -188,7 +188,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should fail without service name", func() {
 				taskSetId := "new-task-set"
 				req := &generated.UpdateServicePrimaryTaskSetRequest{
-					PrimaryTaskSet: &taskSetId,
+					PrimaryTaskSet: taskSetId,
 				}
 
 				_, err := server.ecsAPI.UpdateServicePrimaryTaskSet(ctx, req)
@@ -199,7 +199,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should fail without primary task set", func() {
 				serviceName := "test-service"
 				req := &generated.UpdateServicePrimaryTaskSetRequest{
-					Service: &serviceName,
+					Service: serviceName,
 				}
 
 				_, err := server.ecsAPI.UpdateServicePrimaryTaskSet(ctx, req)
@@ -226,7 +226,7 @@ var _ = Describe("Service ECS API", func() {
 
 				deployment := resp.ServiceDeployments[0]
 				Expect(*deployment.ServiceDeploymentArn).To(Equal(deploymentArn))
-				Expect(*deployment.Status).To(Equal(generated.ServiceDeploymentStatusSuccessful))
+				Expect(*deployment.Status).To(Equal(generated.ServiceDeploymentStatusSUCCESSFUL))
 			})
 
 			It("should report failure for invalid ARN format", func() {
@@ -289,7 +289,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should list deployments for a service", func() {
 				serviceName := "test-service"
 				req := &generated.ListServiceDeploymentsRequest{
-					Service: &serviceName,
+					Service: serviceName,
 				}
 
 				resp, err := server.ecsAPI.ListServiceDeployments(ctx, req)
@@ -301,14 +301,14 @@ var _ = Describe("Service ECS API", func() {
 				// Check current deployment
 				current := resp.ServiceDeployments[0]
 				Expect(*current.ServiceDeploymentArn).To(ContainSubstring("current"))
-				Expect(*current.Status).To(Equal(generated.ServiceDeploymentStatusSuccessful))
+				Expect(*current.Status).To(Equal(generated.ServiceDeploymentStatusSUCCESSFUL))
 			})
 
 			It("should filter by status", func() {
 				serviceName := "test-service"
-				status := []generated.ServiceDeploymentStatus{generated.ServiceDeploymentStatusSuccessful}
+				status := []generated.ServiceDeploymentStatus{generated.ServiceDeploymentStatusSUCCESSFUL}
 				req := &generated.ListServiceDeploymentsRequest{
-					Service: &serviceName,
+					Service: serviceName,
 					Status:  status,
 				}
 
@@ -334,7 +334,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should stop deployment successfully", func() {
 				deploymentArn := "arn:aws:ecs:ap-northeast-1:123456789012:service-deployment/default/test-service/deployment-1"
 				req := &generated.StopServiceDeploymentRequest{
-					ServiceDeploymentArn: &deploymentArn,
+					ServiceDeploymentArn: deploymentArn,
 				}
 
 				resp, err := server.ecsAPI.StopServiceDeployment(ctx, req)
@@ -347,7 +347,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should fail with invalid ARN format", func() {
 				deploymentArn := "invalid-arn"
 				req := &generated.StopServiceDeploymentRequest{
-					ServiceDeploymentArn: &deploymentArn,
+					ServiceDeploymentArn: deploymentArn,
 				}
 
 				_, err := server.ecsAPI.StopServiceDeployment(ctx, req)

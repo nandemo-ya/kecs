@@ -9,6 +9,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/awsclient"
 	"github.com/nandemo-ya/kecs/controlplane/internal/awsclient/services/ecs"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 )
 
 // This example demonstrates using the generated types with our custom AWS client
@@ -35,7 +36,7 @@ func main() {
 	// Example 1: List clusters
 	fmt.Println("=== Listing Clusters ===")
 	listReq := &generated.ListClustersRequest{}
-	
+
 	listResp, err := ecsClient.ListClusters(ctx, listReq)
 	if err != nil {
 		log.Fatalf("Failed to list clusters: %v", err)
@@ -50,8 +51,6 @@ func main() {
 	fmt.Println("\n=== Creating Cluster ===")
 	clusterName := "test-cluster"
 	settingName := generated.ClusterSettingName("containerInsights")
-	tagKey := generated.TagKey("Environment")
-	tagValue := generated.TagValue("test")
 	createReq := &generated.CreateClusterRequest{
 		ClusterName: &clusterName,
 		Settings: []generated.ClusterSetting{
@@ -62,12 +61,12 @@ func main() {
 		},
 		Tags: []generated.Tag{
 			{
-				Key:   &tagKey,
-				Value: &tagValue,
+				Key:   ptr.String("Environment"),
+				Value: ptr.String("test"),
 			},
 		},
 	}
-	
+
 	createResp, err := ecsClient.CreateCluster(ctx, createReq)
 	if err != nil {
 		log.Fatalf("Failed to create cluster: %v", err)
@@ -84,7 +83,7 @@ func main() {
 	describeReq := &generated.DescribeClustersRequest{
 		Clusters: []string{clusterName},
 	}
-	
+
 	describeResp, err := ecsClient.DescribeClusters(ctx, describeReq)
 	if err != nil {
 		log.Fatalf("Failed to describe clusters: %v", err)
@@ -118,4 +117,3 @@ func main() {
 func stringPtr(s string) *string {
 	return &s
 }
-

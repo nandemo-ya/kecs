@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
@@ -22,19 +23,19 @@ var _ = Describe("Service Discovery Integration", func() {
 	var (
 		server              *httptest.Server
 		serviceDiscoveryMgr servicediscovery.Manager
-		ecsAPI             *DefaultECSAPI
-		store              storage.Storage
+		ecsAPI              *DefaultECSAPI
+		store               storage.Storage
 	)
 
 	BeforeEach(func() {
 		// Set test mode environment variable
 		os.Setenv("KECS_TEST_MODE", "true")
-		
+
 		// Create storage
 		var err error
 		store, err = duckdb.NewDuckDBStorage(":memory:")
 		Expect(err).NotTo(HaveOccurred())
-		
+
 		// Initialize the database schema
 		ctx := context.Background()
 		err = store.Initialize(ctx)
@@ -58,7 +59,8 @@ var _ = Describe("Service Discovery Integration", func() {
 				serviceDiscoveryAPI := NewServiceDiscoveryAPI(serviceDiscoveryMgr, "us-east-1", "123456789012")
 				serviceDiscoveryAPI.HandleServiceDiscoveryRequest(w, r)
 			} else {
-				generated.HandleECSRequest(ecsAPI)(w, r)
+				router := generated.NewRouter(ecsAPI)
+				router.Route(w, r)
 			}
 		})
 		server = httptest.NewServer(handler)
@@ -88,7 +90,7 @@ var _ = Describe("Service Discovery Integration", func() {
 			// Get namespace ID by listing namespaces and finding the one we just created
 			namespaces, err := serviceDiscoveryMgr.ListNamespaces(context.Background())
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Find the namespace with name "test.local"
 			var foundNamespace *servicediscovery.Namespace
 			for _, ns := range namespaces {
@@ -124,7 +126,7 @@ var _ = Describe("Service Discovery Integration", func() {
 		It("should create an ECS service with service registry", func() {
 			// Create cluster first
 			clusterReq := generated.CreateClusterRequest{
-				ClusterName: strPtr("test-cluster"),
+				ClusterName: ptr.String("test-cluster"),
 			}
 			body, _ := json.Marshal(clusterReq)
 			resp := makeRequest(server.URL, "AmazonEC2ContainerServiceV20141113.CreateCluster", body)
@@ -132,14 +134,14 @@ var _ = Describe("Service Discovery Integration", func() {
 
 			// Register task definition
 			taskDefReq := generated.RegisterTaskDefinitionRequest{
-				Family: strPtr("test-task"),
+				Family: "test-task",
 				ContainerDefinitions: []generated.ContainerDefinition{
 					{
-						Name:  strPtr("web"),
-						Image: strPtr("nginx:latest"),
+						Name:  ptr.String("web"),
+						Image: ptr.String("nginx:latest"),
 						PortMappings: []generated.PortMapping{
 							{
-								ContainerPort: intPtr(80),
+								ContainerPort: ptr.Int32(80),
 							},
 						},
 					},
@@ -152,15 +154,15 @@ var _ = Describe("Service Discovery Integration", func() {
 			// Create service with service registry
 			serviceArn := "arn:aws:servicediscovery:us-east-1:123456789012:service/" + serviceID
 			createServiceReq := generated.CreateServiceRequest{
-				Cluster:        strPtr("test-cluster"),
-				ServiceName:    strPtr("test-service"),
-				TaskDefinition: strPtr("test-task"),
-				DesiredCount:   intPtr(2),
+				Cluster:        ptr.String("test-cluster"),
+				ServiceName:    "test-service",
+				TaskDefinition: ptr.String("test-task"),
+				DesiredCount:   ptr.Int32(2),
 				ServiceRegistries: []generated.ServiceRegistry{
 					{
 						RegistryArn:   &serviceArn,
-						ContainerName: strPtr("web"),
-						ContainerPort: intPtr(80),
+						ContainerName: ptr.String("web"),
+						ContainerPort: ptr.Int32(80),
 					},
 				},
 			}
@@ -173,7 +175,7 @@ var _ = Describe("Service Discovery Integration", func() {
 			err := json.NewDecoder(resp.Body).Decode(&createServiceResp)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(createServiceResp.Service).NotTo(BeNil())
-			Expect(createServiceResp.Service.ServiceName).To(Equal(strPtr("test-service")))
+			Expect(createServiceResp.Service.ServiceName).To(Equal(ptr.String("test-service")))
 			Expect(createServiceResp.Service.ServiceRegistries).To(HaveLen(1))
 		})
 
@@ -219,7 +221,7 @@ func makeRequest(baseURL, target string, body []byte) *http.Response {
 	req, _ := http.NewRequest("POST", baseURL, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
 	req.Header.Set("X-Amz-Target", target)
-	
+
 	client := &http.Client{}
 	resp, _ := client.Do(req)
 	return resp
@@ -227,12 +229,4 @@ func makeRequest(baseURL, target string, body []byte) *http.Response {
 
 func contains(s, substr string) bool {
 	return bytes.Contains([]byte(s), []byte(substr))
-}
-
-func strPtr(s string) *string {
-	return &s
-}
-
-func intPtr(i int32) *int32 {
-	return &i
 }

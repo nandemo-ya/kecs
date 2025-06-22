@@ -10,6 +10,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +35,10 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 
 	// Create mux and register routes
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", generated.HandleECSRequest(ecsAPI))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		router := generated.NewRouter(ecsAPI)
+		router.Route(w, r)
+	})
 
 	// Create test server
 	server := httptest.NewServer(mux)
@@ -43,8 +47,6 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 	t.Run("CreateCluster", func(t *testing.T) {
 		// Create request using generated types
 		settingName := generated.ClusterSettingName("containerInsights")
-		tagKey := generated.TagKey("Environment")
-		tagValue := generated.TagValue("test")
 		req := &generated.CreateClusterRequest{
 			ClusterName: stringPtr("test-cluster"),
 			Settings: []generated.ClusterSetting{
@@ -55,8 +57,8 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 			},
 			Tags: []generated.Tag{
 				{
-					Key:   &tagKey,
-					Value: &tagValue,
+					Key:   ptr.String("Environment"),
+					Value: ptr.String("test"),
 				},
 			},
 		}
@@ -102,8 +104,8 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 		req := &generated.DescribeClustersRequest{
 			Clusters: []string{"test-cluster"},
 			Include: []generated.ClusterField{
-				generated.ClusterFieldSettings,
-				generated.ClusterFieldTags,
+				generated.ClusterFieldSETTINGS,
+				generated.ClusterFieldTAGS,
 			},
 		}
 
@@ -143,7 +145,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 		// Create request
 		cluster := "test-cluster"
 		req := &generated.DeleteClusterRequest{
-			Cluster: &cluster,
+			Cluster: cluster,
 		}
 
 		// Make HTTP request

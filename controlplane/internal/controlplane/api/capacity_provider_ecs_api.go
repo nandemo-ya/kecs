@@ -11,18 +11,15 @@ import (
 func (api *DefaultECSAPI) CreateCapacityProvider(ctx context.Context, req *generated.CreateCapacityProviderRequest) (*generated.CreateCapacityProviderResponse, error) {
 	// TODO: Implement actual capacity provider creation logic
 	// For now, return a mock response
-	name := ""
-	if req.Name != nil {
-		name = *req.Name
-	}
+	name := req.Name
 	arn := "arn:aws:ecs:" + api.region + ":" + api.accountID + ":capacity-provider/" + name
 
 	resp := &generated.CreateCapacityProviderResponse{
 		CapacityProvider: &generated.CapacityProvider{
 			CapacityProviderArn:      ptr.String(arn),
-			Name:                     req.Name,
+			Name:                     ptr.String(req.Name),
 			Status:                   (*generated.CapacityProviderStatus)(ptr.String("ACTIVE")),
-			AutoScalingGroupProvider: req.AutoScalingGroupProvider,
+			AutoScalingGroupProvider: &req.AutoScalingGroupProvider,
 			Tags:                     req.Tags,
 		},
 	}
@@ -34,16 +31,13 @@ func (api *DefaultECSAPI) CreateCapacityProvider(ctx context.Context, req *gener
 func (api *DefaultECSAPI) DeleteCapacityProvider(ctx context.Context, req *generated.DeleteCapacityProviderRequest) (*generated.DeleteCapacityProviderResponse, error) {
 	// TODO: Implement actual capacity provider deletion logic
 	// For now, return a mock response
-	name := ""
-	if req.CapacityProvider != nil {
-		name = *req.CapacityProvider
-	}
+	name := req.CapacityProvider
 	arn := "arn:aws:ecs:" + api.region + ":" + api.accountID + ":capacity-provider/" + name
 
 	resp := &generated.DeleteCapacityProviderResponse{
 		CapacityProvider: &generated.CapacityProvider{
 			CapacityProviderArn: ptr.String(arn),
-			Name:                req.CapacityProvider,
+			Name:                ptr.String(req.CapacityProvider),
 			Status:              (*generated.CapacityProviderStatus)(ptr.String("INACTIVE")),
 		},
 	}
@@ -91,25 +85,19 @@ func (api *DefaultECSAPI) DescribeCapacityProviders(ctx context.Context, req *ge
 func (api *DefaultECSAPI) UpdateCapacityProvider(ctx context.Context, req *generated.UpdateCapacityProviderRequest) (*generated.UpdateCapacityProviderResponse, error) {
 	// TODO: Implement actual capacity provider update logic
 	// For now, return a mock response
-	name := ""
-	if req.Name != nil {
-		name = *req.Name
-	}
+	name := req.Name
 	arn := "arn:aws:ecs:" + api.region + ":" + api.accountID + ":capacity-provider/" + name
 
 	// Convert AutoScalingGroupProviderUpdate to AutoScalingGroupProvider
-	var autoScalingGroupProvider *generated.AutoScalingGroupProvider
-	if req.AutoScalingGroupProvider != nil {
-		autoScalingGroupProvider = &generated.AutoScalingGroupProvider{
-			ManagedScaling:               req.AutoScalingGroupProvider.ManagedScaling,
-			ManagedTerminationProtection: req.AutoScalingGroupProvider.ManagedTerminationProtection,
-		}
+	autoScalingGroupProvider := &generated.AutoScalingGroupProvider{
+		ManagedScaling:               req.AutoScalingGroupProvider.ManagedScaling,
+		ManagedTerminationProtection: req.AutoScalingGroupProvider.ManagedTerminationProtection,
 	}
 
 	resp := &generated.UpdateCapacityProviderResponse{
 		CapacityProvider: &generated.CapacityProvider{
 			CapacityProviderArn:      ptr.String(arn),
-			Name:                     req.Name,
+			Name:                     ptr.String(req.Name),
 			Status:                   (*generated.CapacityProviderStatus)(ptr.String("ACTIVE")),
 			AutoScalingGroupProvider: autoScalingGroupProvider,
 			UpdateStatus:             (*generated.CapacityProviderUpdateStatus)(ptr.String("UPDATE_COMPLETE")),

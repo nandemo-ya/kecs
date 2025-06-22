@@ -2,1342 +2,739 @@
 
 package generated
 
-// AgentUpdateStatus represents an enum type
+// AgentUpdateStatus represents the AgentUpdateStatus enum type
 type AgentUpdateStatus string
 
-// Enum values for AgentUpdateStatus
 const (
-	AgentUpdateStatusFailed   AgentUpdateStatus = "FAILED"
-	AgentUpdateStatusPending  AgentUpdateStatus = "PENDING"
-	AgentUpdateStatusStaged   AgentUpdateStatus = "STAGED"
-	AgentUpdateStatusStaging  AgentUpdateStatus = "STAGING"
-	AgentUpdateStatusUpdated  AgentUpdateStatus = "UPDATED"
-	AgentUpdateStatusUpdating AgentUpdateStatus = "UPDATING"
+	AgentUpdateStatusFAILED AgentUpdateStatus = "FAILED"
+
+	AgentUpdateStatusPENDING AgentUpdateStatus = "PENDING"
+
+	AgentUpdateStatusSTAGING AgentUpdateStatus = "STAGING"
+
+	AgentUpdateStatusSTAGED AgentUpdateStatus = "STAGED"
+
+	AgentUpdateStatusUPDATING AgentUpdateStatus = "UPDATING"
+
+	AgentUpdateStatusUPDATED AgentUpdateStatus = "UPDATED"
 )
 
-// Values returns all known values for AgentUpdateStatus. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (AgentUpdateStatus) Values() []AgentUpdateStatus {
-	return []AgentUpdateStatus{
-		"FAILED",
-		"PENDING",
-		"STAGED",
-		"STAGING",
-		"UPDATED",
-		"UPDATING",
-	}
-}
-
-// ApplicationProtocol represents an enum type
+// ApplicationProtocol represents the ApplicationProtocol enum type
 type ApplicationProtocol string
 
-// Enum values for ApplicationProtocol
 const (
-	ApplicationProtocolGrpc  ApplicationProtocol = "grpc"
-	ApplicationProtocolHttp  ApplicationProtocol = "http"
-	ApplicationProtocolHttp2 ApplicationProtocol = "http2"
+	ApplicationProtocolHTTP ApplicationProtocol = "HTTP"
+
+	ApplicationProtocolHTTP2 ApplicationProtocol = "HTTP2"
+
+	ApplicationProtocolGRPC ApplicationProtocol = "GRPC"
 )
 
-// Values returns all known values for ApplicationProtocol. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ApplicationProtocol) Values() []ApplicationProtocol {
-	return []ApplicationProtocol{
-		"grpc",
-		"http",
-		"http2",
-	}
-}
-
-// AssignPublicIp represents an enum type
+// AssignPublicIp represents the AssignPublicIp enum type
 type AssignPublicIp string
 
-// Enum values for AssignPublicIp
 const (
-	AssignPublicIpDisabled AssignPublicIp = "DISABLED"
-	AssignPublicIpEnabled  AssignPublicIp = "ENABLED"
+	AssignPublicIpENABLED AssignPublicIp = "ENABLED"
+
+	AssignPublicIpDISABLED AssignPublicIp = "DISABLED"
 )
 
-// Values returns all known values for AssignPublicIp. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (AssignPublicIp) Values() []AssignPublicIp {
-	return []AssignPublicIp{
-		"DISABLED",
-		"ENABLED",
-	}
-}
-
-// AvailabilityZoneRebalancing represents an enum type
+// AvailabilityZoneRebalancing represents the AvailabilityZoneRebalancing enum type
 type AvailabilityZoneRebalancing string
 
-// Enum values for AvailabilityZoneRebalancing
 const (
-	AvailabilityZoneRebalancingDisabled AvailabilityZoneRebalancing = "DISABLED"
-	AvailabilityZoneRebalancingEnabled  AvailabilityZoneRebalancing = "ENABLED"
+	AvailabilityZoneRebalancingENABLED AvailabilityZoneRebalancing = "ENABLED"
+
+	AvailabilityZoneRebalancingDISABLED AvailabilityZoneRebalancing = "DISABLED"
 )
 
-// Values returns all known values for AvailabilityZoneRebalancing. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (AvailabilityZoneRebalancing) Values() []AvailabilityZoneRebalancing {
-	return []AvailabilityZoneRebalancing{
-		"DISABLED",
-		"ENABLED",
-	}
-}
-
-// CPUArchitecture represents an enum type
+// CPUArchitecture represents the CPUArchitecture enum type
 type CPUArchitecture string
 
-// Enum values for CPUArchitecture
 const (
-	CPUArchitectureArm64 CPUArchitecture = "ARM64"
-	CPUArchitectureX8664 CPUArchitecture = "X86_64"
+	CPUArchitectureX86_64 CPUArchitecture = "X86_64"
+
+	CPUArchitectureARM64 CPUArchitecture = "ARM64"
 )
 
-// Values returns all known values for CPUArchitecture. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (CPUArchitecture) Values() []CPUArchitecture {
-	return []CPUArchitecture{
-		"ARM64",
-		"X86_64",
-	}
-}
-
-// CapacityProviderField represents an enum type
+// CapacityProviderField represents the CapacityProviderField enum type
 type CapacityProviderField string
 
-// Enum values for CapacityProviderField
 const (
-	CapacityProviderFieldTags CapacityProviderField = "TAGS"
+	CapacityProviderFieldTAGS CapacityProviderField = "TAGS"
 )
 
-// Values returns all known values for CapacityProviderField. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (CapacityProviderField) Values() []CapacityProviderField {
-	return []CapacityProviderField{
-		"TAGS",
-	}
-}
-
-// CapacityProviderStatus represents an enum type
+// CapacityProviderStatus represents the CapacityProviderStatus enum type
 type CapacityProviderStatus string
 
-// Enum values for CapacityProviderStatus
 const (
-	CapacityProviderStatusActive   CapacityProviderStatus = "ACTIVE"
-	CapacityProviderStatusInactive CapacityProviderStatus = "INACTIVE"
+	CapacityProviderStatusACTIVE CapacityProviderStatus = "ACTIVE"
+
+	CapacityProviderStatusINACTIVE CapacityProviderStatus = "INACTIVE"
 )
 
-// Values returns all known values for CapacityProviderStatus. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (CapacityProviderStatus) Values() []CapacityProviderStatus {
-	return []CapacityProviderStatus{
-		"ACTIVE",
-		"INACTIVE",
-	}
-}
-
-// CapacityProviderUpdateStatus represents an enum type
+// CapacityProviderUpdateStatus represents the CapacityProviderUpdateStatus enum type
 type CapacityProviderUpdateStatus string
 
-// Enum values for CapacityProviderUpdateStatus
 const (
-	CapacityProviderUpdateStatusDeleteComplete   CapacityProviderUpdateStatus = "DELETE_COMPLETE"
-	CapacityProviderUpdateStatusDeleteFailed     CapacityProviderUpdateStatus = "DELETE_FAILED"
-	CapacityProviderUpdateStatusDeleteInProgress CapacityProviderUpdateStatus = "DELETE_IN_PROGRESS"
-	CapacityProviderUpdateStatusUpdateComplete   CapacityProviderUpdateStatus = "UPDATE_COMPLETE"
-	CapacityProviderUpdateStatusUpdateFailed     CapacityProviderUpdateStatus = "UPDATE_FAILED"
-	CapacityProviderUpdateStatusUpdateInProgress CapacityProviderUpdateStatus = "UPDATE_IN_PROGRESS"
+	CapacityProviderUpdateStatusUPDATE_COMPLETE CapacityProviderUpdateStatus = "UPDATE_COMPLETE"
+
+	CapacityProviderUpdateStatusUPDATE_FAILED CapacityProviderUpdateStatus = "UPDATE_FAILED"
+
+	CapacityProviderUpdateStatusDELETE_IN_PROGRESS CapacityProviderUpdateStatus = "DELETE_IN_PROGRESS"
+
+	CapacityProviderUpdateStatusDELETE_COMPLETE CapacityProviderUpdateStatus = "DELETE_COMPLETE"
+
+	CapacityProviderUpdateStatusDELETE_FAILED CapacityProviderUpdateStatus = "DELETE_FAILED"
+
+	CapacityProviderUpdateStatusUPDATE_IN_PROGRESS CapacityProviderUpdateStatus = "UPDATE_IN_PROGRESS"
 )
 
-// Values returns all known values for CapacityProviderUpdateStatus. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (CapacityProviderUpdateStatus) Values() []CapacityProviderUpdateStatus {
-	return []CapacityProviderUpdateStatus{
-		"DELETE_COMPLETE",
-		"DELETE_FAILED",
-		"DELETE_IN_PROGRESS",
-		"UPDATE_COMPLETE",
-		"UPDATE_FAILED",
-		"UPDATE_IN_PROGRESS",
-	}
-}
-
-// ClusterField represents an enum type
+// ClusterField represents the ClusterField enum type
 type ClusterField string
 
-// Enum values for ClusterField
 const (
-	ClusterFieldAttachments    ClusterField = "ATTACHMENTS"
-	ClusterFieldConfigurations ClusterField = "CONFIGURATIONS"
-	ClusterFieldSettings       ClusterField = "SETTINGS"
-	ClusterFieldStatistics     ClusterField = "STATISTICS"
-	ClusterFieldTags           ClusterField = "TAGS"
+	ClusterFieldATTACHMENTS ClusterField = "ATTACHMENTS"
+
+	ClusterFieldCONFIGURATIONS ClusterField = "CONFIGURATIONS"
+
+	ClusterFieldSETTINGS ClusterField = "SETTINGS"
+
+	ClusterFieldSTATISTICS ClusterField = "STATISTICS"
+
+	ClusterFieldTAGS ClusterField = "TAGS"
 )
 
-// Values returns all known values for ClusterField. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ClusterField) Values() []ClusterField {
-	return []ClusterField{
-		"ATTACHMENTS",
-		"CONFIGURATIONS",
-		"SETTINGS",
-		"STATISTICS",
-		"TAGS",
-	}
-}
-
-// ClusterSettingName represents an enum type
+// ClusterSettingName represents the ClusterSettingName enum type
 type ClusterSettingName string
 
-// Enum values for ClusterSettingName
 const (
-	ClusterSettingNameContainerInsights ClusterSettingName = "containerInsights"
+	ClusterSettingNameCONTAINER_INSIGHTS ClusterSettingName = "CONTAINER_INSIGHTS"
 )
 
-// Values returns all known values for ClusterSettingName. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ClusterSettingName) Values() []ClusterSettingName {
-	return []ClusterSettingName{
-		"containerInsights",
-	}
-}
-
-// Compatibility represents an enum type
+// Compatibility represents the Compatibility enum type
 type Compatibility string
 
-// Enum values for Compatibility
 const (
-	CompatibilityEc2      Compatibility = "EC2"
-	CompatibilityExternal Compatibility = "EXTERNAL"
-	CompatibilityFargate  Compatibility = "FARGATE"
+	CompatibilityFARGATE Compatibility = "FARGATE"
+
+	CompatibilityEXTERNAL Compatibility = "EXTERNAL"
+
+	CompatibilityEC2 Compatibility = "EC2"
 )
 
-// Values returns all known values for Compatibility. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (Compatibility) Values() []Compatibility {
-	return []Compatibility{
-		"EC2",
-		"EXTERNAL",
-		"FARGATE",
-	}
-}
-
-// Connectivity represents an enum type
+// Connectivity represents the Connectivity enum type
 type Connectivity string
 
-// Enum values for Connectivity
 const (
-	ConnectivityConnected    Connectivity = "CONNECTED"
-	ConnectivityDisconnected Connectivity = "DISCONNECTED"
+	ConnectivityCONNECTED Connectivity = "CONNECTED"
+
+	ConnectivityDISCONNECTED Connectivity = "DISCONNECTED"
 )
 
-// Values returns all known values for Connectivity. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (Connectivity) Values() []Connectivity {
-	return []Connectivity{
-		"CONNECTED",
-		"DISCONNECTED",
-	}
-}
-
-// ContainerCondition represents an enum type
+// ContainerCondition represents the ContainerCondition enum type
 type ContainerCondition string
 
-// Enum values for ContainerCondition
 const (
-	ContainerConditionComplete ContainerCondition = "COMPLETE"
-	ContainerConditionHealthy  ContainerCondition = "HEALTHY"
-	ContainerConditionStart    ContainerCondition = "START"
-	ContainerConditionSuccess  ContainerCondition = "SUCCESS"
+	ContainerConditionSTART ContainerCondition = "START"
+
+	ContainerConditionCOMPLETE ContainerCondition = "COMPLETE"
+
+	ContainerConditionSUCCESS ContainerCondition = "SUCCESS"
+
+	ContainerConditionHEALTHY ContainerCondition = "HEALTHY"
 )
 
-// Values returns all known values for ContainerCondition. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ContainerCondition) Values() []ContainerCondition {
-	return []ContainerCondition{
-		"COMPLETE",
-		"HEALTHY",
-		"START",
-		"SUCCESS",
-	}
-}
-
-// ContainerInstanceField represents an enum type
+// ContainerInstanceField represents the ContainerInstanceField enum type
 type ContainerInstanceField string
 
-// Enum values for ContainerInstanceField
 const (
-	ContainerInstanceFieldContainerInstanceHealth ContainerInstanceField = "CONTAINER_INSTANCE_HEALTH"
-	ContainerInstanceFieldTags                    ContainerInstanceField = "TAGS"
+	ContainerInstanceFieldCONTAINER_INSTANCE_HEALTH ContainerInstanceField = "CONTAINER_INSTANCE_HEALTH"
+
+	ContainerInstanceFieldTAGS ContainerInstanceField = "TAGS"
 )
 
-// Values returns all known values for ContainerInstanceField. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ContainerInstanceField) Values() []ContainerInstanceField {
-	return []ContainerInstanceField{
-		"CONTAINER_INSTANCE_HEALTH",
-		"TAGS",
-	}
-}
-
-// ContainerInstanceStatus represents an enum type
+// ContainerInstanceStatus represents the ContainerInstanceStatus enum type
 type ContainerInstanceStatus string
 
-// Enum values for ContainerInstanceStatus
 const (
-	ContainerInstanceStatusActive             ContainerInstanceStatus = "ACTIVE"
-	ContainerInstanceStatusDeregistering      ContainerInstanceStatus = "DEREGISTERING"
-	ContainerInstanceStatusDraining           ContainerInstanceStatus = "DRAINING"
-	ContainerInstanceStatusRegistering        ContainerInstanceStatus = "REGISTERING"
-	ContainerInstanceStatusRegistrationFailed ContainerInstanceStatus = "REGISTRATION_FAILED"
+	ContainerInstanceStatusACTIVE ContainerInstanceStatus = "ACTIVE"
+
+	ContainerInstanceStatusDRAINING ContainerInstanceStatus = "DRAINING"
+
+	ContainerInstanceStatusREGISTERING ContainerInstanceStatus = "REGISTERING"
+
+	ContainerInstanceStatusDEREGISTERING ContainerInstanceStatus = "DEREGISTERING"
+
+	ContainerInstanceStatusREGISTRATION_FAILED ContainerInstanceStatus = "REGISTRATION_FAILED"
 )
 
-// Values returns all known values for ContainerInstanceStatus. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ContainerInstanceStatus) Values() []ContainerInstanceStatus {
-	return []ContainerInstanceStatus{
-		"ACTIVE",
-		"DEREGISTERING",
-		"DRAINING",
-		"REGISTERING",
-		"REGISTRATION_FAILED",
-	}
-}
-
-// DeploymentControllerType represents an enum type
+// DeploymentControllerType represents the DeploymentControllerType enum type
 type DeploymentControllerType string
 
-// Enum values for DeploymentControllerType
 const (
-	DeploymentControllerTypeCodeDeploy DeploymentControllerType = "CODE_DEPLOY"
-	DeploymentControllerTypeEcs        DeploymentControllerType = "ECS"
-	DeploymentControllerTypeExternal   DeploymentControllerType = "EXTERNAL"
+	DeploymentControllerTypeECS DeploymentControllerType = "ECS"
+
+	DeploymentControllerTypeCODE_DEPLOY DeploymentControllerType = "CODE_DEPLOY"
+
+	DeploymentControllerTypeEXTERNAL DeploymentControllerType = "EXTERNAL"
 )
 
-// Values returns all known values for DeploymentControllerType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (DeploymentControllerType) Values() []DeploymentControllerType {
-	return []DeploymentControllerType{
-		"CODE_DEPLOY",
-		"ECS",
-		"EXTERNAL",
-	}
-}
-
-// DeploymentRolloutState represents an enum type
+// DeploymentRolloutState represents the DeploymentRolloutState enum type
 type DeploymentRolloutState string
 
-// Enum values for DeploymentRolloutState
 const (
-	DeploymentRolloutStateCompleted  DeploymentRolloutState = "COMPLETED"
-	DeploymentRolloutStateFailed     DeploymentRolloutState = "FAILED"
-	DeploymentRolloutStateInProgress DeploymentRolloutState = "IN_PROGRESS"
+	DeploymentRolloutStateCOMPLETED DeploymentRolloutState = "COMPLETED"
+
+	DeploymentRolloutStateFAILED DeploymentRolloutState = "FAILED"
+
+	DeploymentRolloutStateIN_PROGRESS DeploymentRolloutState = "IN_PROGRESS"
 )
 
-// Values returns all known values for DeploymentRolloutState. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (DeploymentRolloutState) Values() []DeploymentRolloutState {
-	return []DeploymentRolloutState{
-		"COMPLETED",
-		"FAILED",
-		"IN_PROGRESS",
-	}
-}
-
-// DesiredStatus represents an enum type
+// DesiredStatus represents the DesiredStatus enum type
 type DesiredStatus string
 
-// Enum values for DesiredStatus
 const (
-	DesiredStatusPending DesiredStatus = "PENDING"
-	DesiredStatusRunning DesiredStatus = "RUNNING"
-	DesiredStatusStopped DesiredStatus = "STOPPED"
+	DesiredStatusRUNNING DesiredStatus = "RUNNING"
+
+	DesiredStatusPENDING DesiredStatus = "PENDING"
+
+	DesiredStatusSTOPPED DesiredStatus = "STOPPED"
 )
 
-// Values returns all known values for DesiredStatus. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (DesiredStatus) Values() []DesiredStatus {
-	return []DesiredStatus{
-		"PENDING",
-		"RUNNING",
-		"STOPPED",
-	}
-}
-
-// DeviceCgroupPermission represents an enum type
+// DeviceCgroupPermission represents the DeviceCgroupPermission enum type
 type DeviceCgroupPermission string
 
-// Enum values for DeviceCgroupPermission
 const (
-	DeviceCgroupPermissionMknod DeviceCgroupPermission = "mknod"
-	DeviceCgroupPermissionRead  DeviceCgroupPermission = "read"
-	DeviceCgroupPermissionWrite DeviceCgroupPermission = "write"
+	DeviceCgroupPermissionWRITE DeviceCgroupPermission = "WRITE"
+
+	DeviceCgroupPermissionMKNOD DeviceCgroupPermission = "MKNOD"
+
+	DeviceCgroupPermissionREAD DeviceCgroupPermission = "READ"
 )
 
-// Values returns all known values for DeviceCgroupPermission. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (DeviceCgroupPermission) Values() []DeviceCgroupPermission {
-	return []DeviceCgroupPermission{
-		"mknod",
-		"read",
-		"write",
-	}
-}
-
-// EBSResourceType represents an enum type
+// EBSResourceType represents the EBSResourceType enum type
 type EBSResourceType string
 
-// Enum values for EBSResourceType
 const (
-	EBSResourceTypeVolume EBSResourceType = "volume"
+	EBSResourceTypeVOLUME EBSResourceType = "VOLUME"
 )
 
-// Values returns all known values for EBSResourceType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (EBSResourceType) Values() []EBSResourceType {
-	return []EBSResourceType{
-		"volume",
-	}
-}
-
-// EFSAuthorizationConfigIAM represents an enum type
+// EFSAuthorizationConfigIAM represents the EFSAuthorizationConfigIAM enum type
 type EFSAuthorizationConfigIAM string
 
-// Enum values for EFSAuthorizationConfigIAM
 const (
-	EFSAuthorizationConfigIAMDisabled EFSAuthorizationConfigIAM = "DISABLED"
-	EFSAuthorizationConfigIAMEnabled  EFSAuthorizationConfigIAM = "ENABLED"
+	EFSAuthorizationConfigIAMENABLED EFSAuthorizationConfigIAM = "ENABLED"
+
+	EFSAuthorizationConfigIAMDISABLED EFSAuthorizationConfigIAM = "DISABLED"
 )
 
-// Values returns all known values for EFSAuthorizationConfigIAM. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (EFSAuthorizationConfigIAM) Values() []EFSAuthorizationConfigIAM {
-	return []EFSAuthorizationConfigIAM{
-		"DISABLED",
-		"ENABLED",
-	}
-}
-
-// EFSTransitEncryption represents an enum type
+// EFSTransitEncryption represents the EFSTransitEncryption enum type
 type EFSTransitEncryption string
 
-// Enum values for EFSTransitEncryption
 const (
-	EFSTransitEncryptionDisabled EFSTransitEncryption = "DISABLED"
-	EFSTransitEncryptionEnabled  EFSTransitEncryption = "ENABLED"
+	EFSTransitEncryptionENABLED EFSTransitEncryption = "ENABLED"
+
+	EFSTransitEncryptionDISABLED EFSTransitEncryption = "DISABLED"
 )
 
-// Values returns all known values for EFSTransitEncryption. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (EFSTransitEncryption) Values() []EFSTransitEncryption {
-	return []EFSTransitEncryption{
-		"DISABLED",
-		"ENABLED",
-	}
-}
-
-// EnvironmentFileType represents an enum type
+// EnvironmentFileType represents the EnvironmentFileType enum type
 type EnvironmentFileType string
 
-// Enum values for EnvironmentFileType
 const (
-	EnvironmentFileTypeS3 EnvironmentFileType = "s3"
+	EnvironmentFileTypeS3 EnvironmentFileType = "S3"
 )
 
-// Values returns all known values for EnvironmentFileType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (EnvironmentFileType) Values() []EnvironmentFileType {
-	return []EnvironmentFileType{
-		"s3",
-	}
-}
-
-// ExecuteCommandLogging represents an enum type
+// ExecuteCommandLogging represents the ExecuteCommandLogging enum type
 type ExecuteCommandLogging string
 
-// Enum values for ExecuteCommandLogging
 const (
-	ExecuteCommandLoggingDefault  ExecuteCommandLogging = "DEFAULT"
-	ExecuteCommandLoggingNone     ExecuteCommandLogging = "NONE"
-	ExecuteCommandLoggingOverride ExecuteCommandLogging = "OVERRIDE"
+	ExecuteCommandLoggingDEFAULT ExecuteCommandLogging = "DEFAULT"
+
+	ExecuteCommandLoggingOVERRIDE ExecuteCommandLogging = "OVERRIDE"
+
+	ExecuteCommandLoggingNONE ExecuteCommandLogging = "NONE"
 )
 
-// Values returns all known values for ExecuteCommandLogging. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ExecuteCommandLogging) Values() []ExecuteCommandLogging {
-	return []ExecuteCommandLogging{
-		"DEFAULT",
-		"NONE",
-		"OVERRIDE",
-	}
-}
-
-// FirelensConfigurationType represents an enum type
+// FirelensConfigurationType represents the FirelensConfigurationType enum type
 type FirelensConfigurationType string
 
-// Enum values for FirelensConfigurationType
 const (
-	FirelensConfigurationTypeFluentbit FirelensConfigurationType = "fluentbit"
-	FirelensConfigurationTypeFluentd   FirelensConfigurationType = "fluentd"
+	FirelensConfigurationTypeFLUENTBIT FirelensConfigurationType = "FLUENTBIT"
+
+	FirelensConfigurationTypeFLUENTD FirelensConfigurationType = "FLUENTD"
 )
 
-// Values returns all known values for FirelensConfigurationType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (FirelensConfigurationType) Values() []FirelensConfigurationType {
-	return []FirelensConfigurationType{
-		"fluentbit",
-		"fluentd",
-	}
-}
-
-// HealthStatus represents an enum type
+// HealthStatus represents the HealthStatus enum type
 type HealthStatus string
 
-// Enum values for HealthStatus
 const (
-	HealthStatusHealthy   HealthStatus = "HEALTHY"
-	HealthStatusUnhealthy HealthStatus = "UNHEALTHY"
-	HealthStatusUnknown   HealthStatus = "UNKNOWN"
+	HealthStatusUNKNOWN HealthStatus = "UNKNOWN"
+
+	HealthStatusHEALTHY HealthStatus = "HEALTHY"
+
+	HealthStatusUNHEALTHY HealthStatus = "UNHEALTHY"
 )
 
-// Values returns all known values for HealthStatus. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (HealthStatus) Values() []HealthStatus {
-	return []HealthStatus{
-		"HEALTHY",
-		"UNHEALTHY",
-		"UNKNOWN",
-	}
-}
-
-// InstanceHealthCheckState represents an enum type
+// InstanceHealthCheckState represents the InstanceHealthCheckState enum type
 type InstanceHealthCheckState string
 
-// Enum values for InstanceHealthCheckState
 const (
-	InstanceHealthCheckStateImpaired         InstanceHealthCheckState = "IMPAIRED"
-	InstanceHealthCheckStateInitializing     InstanceHealthCheckState = "INITIALIZING"
-	InstanceHealthCheckStateInsufficientData InstanceHealthCheckState = "INSUFFICIENT_DATA"
-	InstanceHealthCheckStateOk               InstanceHealthCheckState = "OK"
+	InstanceHealthCheckStateOK InstanceHealthCheckState = "OK"
+
+	InstanceHealthCheckStateIMPAIRED InstanceHealthCheckState = "IMPAIRED"
+
+	InstanceHealthCheckStateINSUFFICIENT_DATA InstanceHealthCheckState = "INSUFFICIENT_DATA"
+
+	InstanceHealthCheckStateINITIALIZING InstanceHealthCheckState = "INITIALIZING"
 )
 
-// Values returns all known values for InstanceHealthCheckState. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (InstanceHealthCheckState) Values() []InstanceHealthCheckState {
-	return []InstanceHealthCheckState{
-		"IMPAIRED",
-		"INITIALIZING",
-		"INSUFFICIENT_DATA",
-		"OK",
-	}
-}
-
-// InstanceHealthCheckType represents an enum type
+// InstanceHealthCheckType represents the InstanceHealthCheckType enum type
 type InstanceHealthCheckType string
 
-// Enum values for InstanceHealthCheckType
 const (
-	InstanceHealthCheckTypeContainerRuntime InstanceHealthCheckType = "CONTAINER_RUNTIME"
+	InstanceHealthCheckTypeCONTAINER_RUNTIME InstanceHealthCheckType = "CONTAINER_RUNTIME"
 )
 
-// Values returns all known values for InstanceHealthCheckType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (InstanceHealthCheckType) Values() []InstanceHealthCheckType {
-	return []InstanceHealthCheckType{
-		"CONTAINER_RUNTIME",
-	}
-}
-
-// IpcMode represents an enum type
+// IpcMode represents the IpcMode enum type
 type IpcMode string
 
-// Enum values for IpcMode
 const (
-	IpcModeHost IpcMode = "host"
-	IpcModeNone IpcMode = "none"
-	IpcModeTask IpcMode = "task"
+	IpcModeHOST IpcMode = "HOST"
+
+	IpcModeTASK IpcMode = "TASK"
+
+	IpcModeNONE IpcMode = "NONE"
 )
 
-// Values returns all known values for IpcMode. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (IpcMode) Values() []IpcMode {
-	return []IpcMode{
-		"host",
-		"none",
-		"task",
-	}
-}
-
-// LaunchType represents an enum type
+// LaunchType represents the LaunchType enum type
 type LaunchType string
 
-// Enum values for LaunchType
 const (
-	LaunchTypeEc2      LaunchType = "EC2"
-	LaunchTypeExternal LaunchType = "EXTERNAL"
-	LaunchTypeFargate  LaunchType = "FARGATE"
+	LaunchTypeEC2 LaunchType = "EC2"
+
+	LaunchTypeFARGATE LaunchType = "FARGATE"
+
+	LaunchTypeEXTERNAL LaunchType = "EXTERNAL"
 )
 
-// Values returns all known values for LaunchType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (LaunchType) Values() []LaunchType {
-	return []LaunchType{
-		"EC2",
-		"EXTERNAL",
-		"FARGATE",
-	}
-}
-
-// LogDriver represents an enum type
+// LogDriver represents the LogDriver enum type
 type LogDriver string
 
-// Enum values for LogDriver
 const (
-	LogDriverAwsfirelens LogDriver = "awsfirelens"
-	LogDriverAwslogs     LogDriver = "awslogs"
-	LogDriverFluentd     LogDriver = "fluentd"
-	LogDriverGelf        LogDriver = "gelf"
-	LogDriverJournald    LogDriver = "journald"
-	LogDriverJsonFile    LogDriver = "json-file"
-	LogDriverSplunk      LogDriver = "splunk"
-	LogDriverSyslog      LogDriver = "syslog"
+	LogDriverAWSFIRELENS LogDriver = "AWSFIRELENS"
+
+	LogDriverJSON_FILE LogDriver = "JSON_FILE"
+
+	LogDriverSYSLOG LogDriver = "SYSLOG"
+
+	LogDriverJOURNALD LogDriver = "JOURNALD"
+
+	LogDriverGELF LogDriver = "GELF"
+
+	LogDriverFLUENTD LogDriver = "FLUENTD"
+
+	LogDriverAWSLOGS LogDriver = "AWSLOGS"
+
+	LogDriverSPLUNK LogDriver = "SPLUNK"
 )
 
-// Values returns all known values for LogDriver. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (LogDriver) Values() []LogDriver {
-	return []LogDriver{
-		"awsfirelens",
-		"awslogs",
-		"fluentd",
-		"gelf",
-		"journald",
-		"json-file",
-		"splunk",
-		"syslog",
-	}
-}
-
-// ManagedAgentName represents an enum type
+// ManagedAgentName represents the ManagedAgentName enum type
 type ManagedAgentName string
 
-// Enum values for ManagedAgentName
 const (
-	ManagedAgentNameExecutecommandagent ManagedAgentName = "ExecuteCommandAgent"
+	ManagedAgentNameExecuteCommandAgent ManagedAgentName = "ExecuteCommandAgent"
 )
 
-// Values returns all known values for ManagedAgentName. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ManagedAgentName) Values() []ManagedAgentName {
-	return []ManagedAgentName{
-		"ExecuteCommandAgent",
-	}
-}
-
-// ManagedDraining represents an enum type
+// ManagedDraining represents the ManagedDraining enum type
 type ManagedDraining string
 
-// Enum values for ManagedDraining
 const (
-	ManagedDrainingDisabled ManagedDraining = "DISABLED"
-	ManagedDrainingEnabled  ManagedDraining = "ENABLED"
+	ManagedDrainingENABLED ManagedDraining = "ENABLED"
+
+	ManagedDrainingDISABLED ManagedDraining = "DISABLED"
 )
 
-// Values returns all known values for ManagedDraining. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ManagedDraining) Values() []ManagedDraining {
-	return []ManagedDraining{
-		"DISABLED",
-		"ENABLED",
-	}
-}
-
-// ManagedScalingStatus represents an enum type
+// ManagedScalingStatus represents the ManagedScalingStatus enum type
 type ManagedScalingStatus string
 
-// Enum values for ManagedScalingStatus
 const (
-	ManagedScalingStatusDisabled ManagedScalingStatus = "DISABLED"
-	ManagedScalingStatusEnabled  ManagedScalingStatus = "ENABLED"
+	ManagedScalingStatusDISABLED ManagedScalingStatus = "DISABLED"
+
+	ManagedScalingStatusENABLED ManagedScalingStatus = "ENABLED"
 )
 
-// Values returns all known values for ManagedScalingStatus. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ManagedScalingStatus) Values() []ManagedScalingStatus {
-	return []ManagedScalingStatus{
-		"DISABLED",
-		"ENABLED",
-	}
-}
-
-// ManagedTerminationProtection represents an enum type
+// ManagedTerminationProtection represents the ManagedTerminationProtection enum type
 type ManagedTerminationProtection string
 
-// Enum values for ManagedTerminationProtection
 const (
-	ManagedTerminationProtectionDisabled ManagedTerminationProtection = "DISABLED"
-	ManagedTerminationProtectionEnabled  ManagedTerminationProtection = "ENABLED"
+	ManagedTerminationProtectionENABLED ManagedTerminationProtection = "ENABLED"
+
+	ManagedTerminationProtectionDISABLED ManagedTerminationProtection = "DISABLED"
 )
 
-// Values returns all known values for ManagedTerminationProtection. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ManagedTerminationProtection) Values() []ManagedTerminationProtection {
-	return []ManagedTerminationProtection{
-		"DISABLED",
-		"ENABLED",
-	}
-}
-
-// NetworkMode represents an enum type
+// NetworkMode represents the NetworkMode enum type
 type NetworkMode string
 
-// Enum values for NetworkMode
 const (
-	NetworkModeAwsvpc NetworkMode = "awsvpc"
-	NetworkModeBridge NetworkMode = "bridge"
-	NetworkModeHost   NetworkMode = "host"
-	NetworkModeNone   NetworkMode = "none"
+	NetworkModeBRIDGE NetworkMode = "BRIDGE"
+
+	NetworkModeHOST NetworkMode = "HOST"
+
+	NetworkModeAWSVPC NetworkMode = "AWSVPC"
+
+	NetworkModeNONE NetworkMode = "NONE"
 )
 
-// Values returns all known values for NetworkMode. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (NetworkMode) Values() []NetworkMode {
-	return []NetworkMode{
-		"awsvpc",
-		"bridge",
-		"host",
-		"none",
-	}
-}
-
-// OSFamily represents an enum type
+// OSFamily represents the OSFamily enum type
 type OSFamily string
 
-// Enum values for OSFamily
 const (
-	OSFamilyLinux                 OSFamily = "LINUX"
-	OSFamilyWindowsServer2004Core OSFamily = "WINDOWS_SERVER_2004_CORE"
-	OSFamilyWindowsServer2016Full OSFamily = "WINDOWS_SERVER_2016_FULL"
-	OSFamilyWindowsServer2019Core OSFamily = "WINDOWS_SERVER_2019_CORE"
-	OSFamilyWindowsServer2019Full OSFamily = "WINDOWS_SERVER_2019_FULL"
-	OSFamilyWindowsServer2022Core OSFamily = "WINDOWS_SERVER_2022_CORE"
-	OSFamilyWindowsServer2022Full OSFamily = "WINDOWS_SERVER_2022_FULL"
-	OSFamilyWindowsServer20h2Core OSFamily = "WINDOWS_SERVER_20H2_CORE"
+	OSFamilyWINDOWS_SERVER_2022_FULL OSFamily = "WINDOWS_SERVER_2022_FULL"
+
+	OSFamilyWINDOWS_SERVER_20H2_CORE OSFamily = "WINDOWS_SERVER_20H2_CORE"
+
+	OSFamilyLINUX OSFamily = "LINUX"
+
+	OSFamilyWINDOWS_SERVER_2019_FULL OSFamily = "WINDOWS_SERVER_2019_FULL"
+
+	OSFamilyWINDOWS_SERVER_2019_CORE OSFamily = "WINDOWS_SERVER_2019_CORE"
+
+	OSFamilyWINDOWS_SERVER_2016_FULL OSFamily = "WINDOWS_SERVER_2016_FULL"
+
+	OSFamilyWINDOWS_SERVER_2004_CORE OSFamily = "WINDOWS_SERVER_2004_CORE"
+
+	OSFamilyWINDOWS_SERVER_2022_CORE OSFamily = "WINDOWS_SERVER_2022_CORE"
 )
 
-// Values returns all known values for OSFamily. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (OSFamily) Values() []OSFamily {
-	return []OSFamily{
-		"LINUX",
-		"WINDOWS_SERVER_2004_CORE",
-		"WINDOWS_SERVER_2016_FULL",
-		"WINDOWS_SERVER_2019_CORE",
-		"WINDOWS_SERVER_2019_FULL",
-		"WINDOWS_SERVER_2022_CORE",
-		"WINDOWS_SERVER_2022_FULL",
-		"WINDOWS_SERVER_20H2_CORE",
-	}
-}
-
-// PidMode represents an enum type
+// PidMode represents the PidMode enum type
 type PidMode string
 
-// Enum values for PidMode
 const (
-	PidModeHost PidMode = "host"
-	PidModeTask PidMode = "task"
+	PidModeHOST PidMode = "HOST"
+
+	PidModeTASK PidMode = "TASK"
 )
 
-// Values returns all known values for PidMode. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (PidMode) Values() []PidMode {
-	return []PidMode{
-		"host",
-		"task",
-	}
-}
-
-// PlacementConstraintType represents an enum type
+// PlacementConstraintType represents the PlacementConstraintType enum type
 type PlacementConstraintType string
 
-// Enum values for PlacementConstraintType
 const (
-	PlacementConstraintTypeDistinctInstance PlacementConstraintType = "distinctInstance"
-	PlacementConstraintTypeMemberOf         PlacementConstraintType = "memberOf"
+	PlacementConstraintTypeMEMBER_OF PlacementConstraintType = "MEMBER_OF"
+
+	PlacementConstraintTypeDISTINCT_INSTANCE PlacementConstraintType = "DISTINCT_INSTANCE"
 )
 
-// Values returns all known values for PlacementConstraintType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (PlacementConstraintType) Values() []PlacementConstraintType {
-	return []PlacementConstraintType{
-		"distinctInstance",
-		"memberOf",
-	}
-}
-
-// PlacementStrategyType represents an enum type
+// PlacementStrategyType represents the PlacementStrategyType enum type
 type PlacementStrategyType string
 
-// Enum values for PlacementStrategyType
 const (
-	PlacementStrategyTypeBinpack PlacementStrategyType = "binpack"
-	PlacementStrategyTypeRandom  PlacementStrategyType = "random"
-	PlacementStrategyTypeSpread  PlacementStrategyType = "spread"
+	PlacementStrategyTypeRANDOM PlacementStrategyType = "RANDOM"
+
+	PlacementStrategyTypeSPREAD PlacementStrategyType = "SPREAD"
+
+	PlacementStrategyTypeBINPACK PlacementStrategyType = "BINPACK"
 )
 
-// Values returns all known values for PlacementStrategyType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (PlacementStrategyType) Values() []PlacementStrategyType {
-	return []PlacementStrategyType{
-		"binpack",
-		"random",
-		"spread",
-	}
-}
-
-// PlatformDeviceType represents an enum type
+// PlatformDeviceType represents the PlatformDeviceType enum type
 type PlatformDeviceType string
 
-// Enum values for PlatformDeviceType
 const (
-	PlatformDeviceTypeGpu PlatformDeviceType = "GPU"
+	PlatformDeviceTypeGPU PlatformDeviceType = "GPU"
 )
 
-// Values returns all known values for PlatformDeviceType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (PlatformDeviceType) Values() []PlatformDeviceType {
-	return []PlatformDeviceType{
-		"GPU",
-	}
-}
-
-// PropagateTags represents an enum type
+// PropagateTags represents the PropagateTags enum type
 type PropagateTags string
 
-// Enum values for PropagateTags
 const (
-	PropagateTagsNone           PropagateTags = "NONE"
-	PropagateTagsService        PropagateTags = "SERVICE"
-	PropagateTagsTaskDefinition PropagateTags = "TASK_DEFINITION"
+	PropagateTagsTASK_DEFINITION PropagateTags = "TASK_DEFINITION"
+
+	PropagateTagsSERVICE PropagateTags = "SERVICE"
+
+	PropagateTagsNONE PropagateTags = "NONE"
 )
 
-// Values returns all known values for PropagateTags. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (PropagateTags) Values() []PropagateTags {
-	return []PropagateTags{
-		"NONE",
-		"SERVICE",
-		"TASK_DEFINITION",
-	}
-}
-
-// ProxyConfigurationType represents an enum type
+// ProxyConfigurationType represents the ProxyConfigurationType enum type
 type ProxyConfigurationType string
 
-// Enum values for ProxyConfigurationType
 const (
-	ProxyConfigurationTypeAppmesh ProxyConfigurationType = "APPMESH"
+	ProxyConfigurationTypeAPPMESH ProxyConfigurationType = "APPMESH"
 )
 
-// Values returns all known values for ProxyConfigurationType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ProxyConfigurationType) Values() []ProxyConfigurationType {
-	return []ProxyConfigurationType{
-		"APPMESH",
-	}
-}
-
-// ResourceType represents an enum type
+// ResourceType represents the ResourceType enum type
 type ResourceType string
 
-// Enum values for ResourceType
 const (
-	ResourceTypeGpu                  ResourceType = "GPU"
-	ResourceTypeInferenceAccelerator ResourceType = "InferenceAccelerator"
+	ResourceTypeGPU ResourceType = "GPU"
+
+	ResourceTypeINFERENCE_ACCELERATOR ResourceType = "INFERENCE_ACCELERATOR"
 )
 
-// Values returns all known values for ResourceType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ResourceType) Values() []ResourceType {
-	return []ResourceType{
-		"GPU",
-		"InferenceAccelerator",
-	}
-}
-
-// ScaleUnit represents an enum type
+// ScaleUnit represents the ScaleUnit enum type
 type ScaleUnit string
 
-// Enum values for ScaleUnit
 const (
-	ScaleUnitPercent ScaleUnit = "PERCENT"
+	ScaleUnitPERCENT ScaleUnit = "PERCENT"
 )
 
-// Values returns all known values for ScaleUnit. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ScaleUnit) Values() []ScaleUnit {
-	return []ScaleUnit{
-		"PERCENT",
-	}
-}
-
-// SchedulingStrategy represents an enum type
+// SchedulingStrategy represents the SchedulingStrategy enum type
 type SchedulingStrategy string
 
-// Enum values for SchedulingStrategy
 const (
-	SchedulingStrategyDaemon  SchedulingStrategy = "DAEMON"
-	SchedulingStrategyReplica SchedulingStrategy = "REPLICA"
+	SchedulingStrategyREPLICA SchedulingStrategy = "REPLICA"
+
+	SchedulingStrategyDAEMON SchedulingStrategy = "DAEMON"
 )
 
-// Values returns all known values for SchedulingStrategy. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (SchedulingStrategy) Values() []SchedulingStrategy {
-	return []SchedulingStrategy{
-		"DAEMON",
-		"REPLICA",
-	}
-}
-
-// Scope represents an enum type
+// Scope represents the Scope enum type
 type Scope string
 
-// Enum values for Scope
 const (
-	ScopeShared Scope = "shared"
-	ScopeTask   Scope = "task"
+	ScopeTASK Scope = "TASK"
+
+	ScopeSHARED Scope = "SHARED"
 )
 
-// Values returns all known values for Scope. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (Scope) Values() []Scope {
-	return []Scope{
-		"shared",
-		"task",
-	}
-}
-
-// ServiceDeploymentRollbackMonitorsStatus represents an enum type
+// ServiceDeploymentRollbackMonitorsStatus represents the ServiceDeploymentRollbackMonitorsStatus enum type
 type ServiceDeploymentRollbackMonitorsStatus string
 
-// Enum values for ServiceDeploymentRollbackMonitorsStatus
 const (
-	ServiceDeploymentRollbackMonitorsStatusDisabled           ServiceDeploymentRollbackMonitorsStatus = "DISABLED"
-	ServiceDeploymentRollbackMonitorsStatusMonitoring         ServiceDeploymentRollbackMonitorsStatus = "MONITORING"
-	ServiceDeploymentRollbackMonitorsStatusMonitoringComplete ServiceDeploymentRollbackMonitorsStatus = "MONITORING_COMPLETE"
-	ServiceDeploymentRollbackMonitorsStatusTriggered          ServiceDeploymentRollbackMonitorsStatus = "TRIGGERED"
+	ServiceDeploymentRollbackMonitorsStatusDISABLED ServiceDeploymentRollbackMonitorsStatus = "DISABLED"
+
+	ServiceDeploymentRollbackMonitorsStatusTRIGGERED ServiceDeploymentRollbackMonitorsStatus = "TRIGGERED"
+
+	ServiceDeploymentRollbackMonitorsStatusMONITORING ServiceDeploymentRollbackMonitorsStatus = "MONITORING"
+
+	ServiceDeploymentRollbackMonitorsStatusMONITORING_COMPLETE ServiceDeploymentRollbackMonitorsStatus = "MONITORING_COMPLETE"
 )
 
-// Values returns all known values for ServiceDeploymentRollbackMonitorsStatus. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ServiceDeploymentRollbackMonitorsStatus) Values() []ServiceDeploymentRollbackMonitorsStatus {
-	return []ServiceDeploymentRollbackMonitorsStatus{
-		"DISABLED",
-		"MONITORING",
-		"MONITORING_COMPLETE",
-		"TRIGGERED",
-	}
-}
-
-// ServiceDeploymentStatus represents an enum type
+// ServiceDeploymentStatus represents the ServiceDeploymentStatus enum type
 type ServiceDeploymentStatus string
 
-// Enum values for ServiceDeploymentStatus
 const (
-	ServiceDeploymentStatusInProgress         ServiceDeploymentStatus = "IN_PROGRESS"
-	ServiceDeploymentStatusPending            ServiceDeploymentStatus = "PENDING"
-	ServiceDeploymentStatusRollbackFailed     ServiceDeploymentStatus = "ROLLBACK_FAILED"
-	ServiceDeploymentStatusRollbackInProgress ServiceDeploymentStatus = "ROLLBACK_IN_PROGRESS"
-	ServiceDeploymentStatusRollbackRequested  ServiceDeploymentStatus = "ROLLBACK_REQUESTED"
-	ServiceDeploymentStatusRollbackSuccessful ServiceDeploymentStatus = "ROLLBACK_SUCCESSFUL"
-	ServiceDeploymentStatusStopped            ServiceDeploymentStatus = "STOPPED"
-	ServiceDeploymentStatusStopRequested      ServiceDeploymentStatus = "STOP_REQUESTED"
-	ServiceDeploymentStatusSuccessful         ServiceDeploymentStatus = "SUCCESSFUL"
+	ServiceDeploymentStatusIN_PROGRESS ServiceDeploymentStatus = "IN_PROGRESS"
+
+	ServiceDeploymentStatusROLLBACK_REQUESTED ServiceDeploymentStatus = "ROLLBACK_REQUESTED"
+
+	ServiceDeploymentStatusROLLBACK_IN_PROGRESS ServiceDeploymentStatus = "ROLLBACK_IN_PROGRESS"
+
+	ServiceDeploymentStatusROLLBACK_FAILED ServiceDeploymentStatus = "ROLLBACK_FAILED"
+
+	ServiceDeploymentStatusSUCCESSFUL ServiceDeploymentStatus = "SUCCESSFUL"
+
+	ServiceDeploymentStatusSTOPPED ServiceDeploymentStatus = "STOPPED"
+
+	ServiceDeploymentStatusROLLBACK_SUCCESSFUL ServiceDeploymentStatus = "ROLLBACK_SUCCESSFUL"
+
+	ServiceDeploymentStatusPENDING ServiceDeploymentStatus = "PENDING"
+
+	ServiceDeploymentStatusSTOP_REQUESTED ServiceDeploymentStatus = "STOP_REQUESTED"
 )
 
-// Values returns all known values for ServiceDeploymentStatus. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ServiceDeploymentStatus) Values() []ServiceDeploymentStatus {
-	return []ServiceDeploymentStatus{
-		"IN_PROGRESS",
-		"PENDING",
-		"ROLLBACK_FAILED",
-		"ROLLBACK_IN_PROGRESS",
-		"ROLLBACK_REQUESTED",
-		"ROLLBACK_SUCCESSFUL",
-		"STOPPED",
-		"STOP_REQUESTED",
-		"SUCCESSFUL",
-	}
-}
-
-// ServiceField represents an enum type
+// ServiceField represents the ServiceField enum type
 type ServiceField string
 
-// Enum values for ServiceField
 const (
-	ServiceFieldTags ServiceField = "TAGS"
+	ServiceFieldTAGS ServiceField = "TAGS"
 )
 
-// Values returns all known values for ServiceField. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (ServiceField) Values() []ServiceField {
-	return []ServiceField{
-		"TAGS",
-	}
-}
-
-// SettingName represents an enum type
+// SettingName represents the SettingName enum type
 type SettingName string
 
-// Enum values for SettingName
 const (
-	SettingNameAwsvpcTrunking                  SettingName = "awsvpcTrunking"
-	SettingNameContainerInsights               SettingName = "containerInsights"
-	SettingNameContainerInstanceLongArnFormat  SettingName = "containerInstanceLongArnFormat"
-	SettingNameDefaultLogDriverMode            SettingName = "defaultLogDriverMode"
-	SettingNameFargateFipsMode                 SettingName = "fargateFIPSMode"
-	SettingNameFargateTaskRetirementWaitPeriod SettingName = "fargateTaskRetirementWaitPeriod"
-	SettingNameGuardDutyActivate               SettingName = "guardDutyActivate"
-	SettingNameServiceLongArnFormat            SettingName = "serviceLongArnFormat"
-	SettingNameTagResourceAuthorization        SettingName = "tagResourceAuthorization"
-	SettingNameTaskLongArnFormat               SettingName = "taskLongArnFormat"
+	SettingNameSERVICE_LONG_ARN_FORMAT SettingName = "SERVICE_LONG_ARN_FORMAT"
+
+	SettingNameTASK_LONG_ARN_FORMAT SettingName = "TASK_LONG_ARN_FORMAT"
+
+	SettingNameCONTAINER_INSTANCE_LONG_ARN_FORMAT SettingName = "CONTAINER_INSTANCE_LONG_ARN_FORMAT"
+
+	SettingNameFARGATE_FIPS_MODE SettingName = "FARGATE_FIPS_MODE"
+
+	SettingNameFARGATE_TASK_RETIREMENT_WAIT_PERIOD SettingName = "FARGATE_TASK_RETIREMENT_WAIT_PERIOD"
+
+	SettingNameGUARD_DUTY_ACTIVATE SettingName = "GUARD_DUTY_ACTIVATE"
+
+	SettingNameDEFAULT_LOG_DRIVER_MODE SettingName = "DEFAULT_LOG_DRIVER_MODE"
+
+	SettingNameAWSVPC_TRUNKING SettingName = "AWSVPC_TRUNKING"
+
+	SettingNameCONTAINER_INSIGHTS SettingName = "CONTAINER_INSIGHTS"
+
+	SettingNameTAG_RESOURCE_AUTHORIZATION SettingName = "TAG_RESOURCE_AUTHORIZATION"
 )
 
-// Values returns all known values for SettingName. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (SettingName) Values() []SettingName {
-	return []SettingName{
-		"awsvpcTrunking",
-		"containerInsights",
-		"containerInstanceLongArnFormat",
-		"defaultLogDriverMode",
-		"fargateFIPSMode",
-		"fargateTaskRetirementWaitPeriod",
-		"guardDutyActivate",
-		"serviceLongArnFormat",
-		"tagResourceAuthorization",
-		"taskLongArnFormat",
-	}
-}
-
-// SettingType represents an enum type
+// SettingType represents the SettingType enum type
 type SettingType string
 
-// Enum values for SettingType
 const (
-	SettingTypeAwsManaged SettingType = "aws_managed"
-	SettingTypeUser       SettingType = "user"
+	SettingTypeUSER SettingType = "USER"
+
+	SettingTypeAWS_MANAGED SettingType = "AWS_MANAGED"
 )
 
-// Values returns all known values for SettingType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (SettingType) Values() []SettingType {
-	return []SettingType{
-		"aws_managed",
-		"user",
-	}
-}
-
-// SortOrder represents an enum type
+// SortOrder represents the SortOrder enum type
 type SortOrder string
 
-// Enum values for SortOrder
 const (
-	SortOrderAsc  SortOrder = "ASC"
-	SortOrderDesc SortOrder = "DESC"
+	SortOrderASC SortOrder = "ASC"
+
+	SortOrderDESC SortOrder = "DESC"
 )
 
-// Values returns all known values for SortOrder. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (SortOrder) Values() []SortOrder {
-	return []SortOrder{
-		"ASC",
-		"DESC",
-	}
-}
-
-// StabilityStatus represents an enum type
+// StabilityStatus represents the StabilityStatus enum type
 type StabilityStatus string
 
-// Enum values for StabilityStatus
 const (
-	StabilityStatusStabilizing StabilityStatus = "STABILIZING"
-	StabilityStatusSteadyState StabilityStatus = "STEADY_STATE"
+	StabilityStatusSTEADY_STATE StabilityStatus = "STEADY_STATE"
+
+	StabilityStatusSTABILIZING StabilityStatus = "STABILIZING"
 )
 
-// Values returns all known values for StabilityStatus. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (StabilityStatus) Values() []StabilityStatus {
-	return []StabilityStatus{
-		"STABILIZING",
-		"STEADY_STATE",
-	}
-}
-
-// StopServiceDeploymentStopType represents an enum type
+// StopServiceDeploymentStopType represents the StopServiceDeploymentStopType enum type
 type StopServiceDeploymentStopType string
 
-// Enum values for StopServiceDeploymentStopType
 const (
-	StopServiceDeploymentStopTypeAbort    StopServiceDeploymentStopType = "ABORT"
-	StopServiceDeploymentStopTypeRollback StopServiceDeploymentStopType = "ROLLBACK"
+	StopServiceDeploymentStopTypeABORT StopServiceDeploymentStopType = "ABORT"
+
+	StopServiceDeploymentStopTypeROLLBACK StopServiceDeploymentStopType = "ROLLBACK"
 )
 
-// Values returns all known values for StopServiceDeploymentStopType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (StopServiceDeploymentStopType) Values() []StopServiceDeploymentStopType {
-	return []StopServiceDeploymentStopType{
-		"ABORT",
-		"ROLLBACK",
-	}
-}
-
-// TargetType represents an enum type
+// TargetType represents the TargetType enum type
 type TargetType string
 
-// Enum values for TargetType
 const (
-	TargetTypeContainerInstance TargetType = "container-instance"
+	TargetTypeCONTAINER_INSTANCE TargetType = "CONTAINER_INSTANCE"
 )
 
-// Values returns all known values for TargetType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (TargetType) Values() []TargetType {
-	return []TargetType{
-		"container-instance",
-	}
-}
-
-// TaskDefinitionFamilyStatus represents an enum type
+// TaskDefinitionFamilyStatus represents the TaskDefinitionFamilyStatus enum type
 type TaskDefinitionFamilyStatus string
 
-// Enum values for TaskDefinitionFamilyStatus
 const (
-	TaskDefinitionFamilyStatusActive   TaskDefinitionFamilyStatus = "ACTIVE"
-	TaskDefinitionFamilyStatusAll      TaskDefinitionFamilyStatus = "ALL"
-	TaskDefinitionFamilyStatusInactive TaskDefinitionFamilyStatus = "INACTIVE"
+	TaskDefinitionFamilyStatusACTIVE TaskDefinitionFamilyStatus = "ACTIVE"
+
+	TaskDefinitionFamilyStatusINACTIVE TaskDefinitionFamilyStatus = "INACTIVE"
+
+	TaskDefinitionFamilyStatusALL TaskDefinitionFamilyStatus = "ALL"
 )
 
-// Values returns all known values for TaskDefinitionFamilyStatus. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (TaskDefinitionFamilyStatus) Values() []TaskDefinitionFamilyStatus {
-	return []TaskDefinitionFamilyStatus{
-		"ACTIVE",
-		"ALL",
-		"INACTIVE",
-	}
-}
-
-// TaskDefinitionField represents an enum type
+// TaskDefinitionField represents the TaskDefinitionField enum type
 type TaskDefinitionField string
 
-// Enum values for TaskDefinitionField
 const (
-	TaskDefinitionFieldTags TaskDefinitionField = "TAGS"
+	TaskDefinitionFieldTAGS TaskDefinitionField = "TAGS"
 )
 
-// Values returns all known values for TaskDefinitionField. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (TaskDefinitionField) Values() []TaskDefinitionField {
-	return []TaskDefinitionField{
-		"TAGS",
-	}
-}
-
-// TaskDefinitionPlacementConstraintType represents an enum type
+// TaskDefinitionPlacementConstraintType represents the TaskDefinitionPlacementConstraintType enum type
 type TaskDefinitionPlacementConstraintType string
 
-// Enum values for TaskDefinitionPlacementConstraintType
 const (
-	TaskDefinitionPlacementConstraintTypeMemberOf TaskDefinitionPlacementConstraintType = "memberOf"
+	TaskDefinitionPlacementConstraintTypeMEMBER_OF TaskDefinitionPlacementConstraintType = "MEMBER_OF"
 )
 
-// Values returns all known values for TaskDefinitionPlacementConstraintType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (TaskDefinitionPlacementConstraintType) Values() []TaskDefinitionPlacementConstraintType {
-	return []TaskDefinitionPlacementConstraintType{
-		"memberOf",
-	}
-}
-
-// TaskDefinitionStatus represents an enum type
+// TaskDefinitionStatus represents the TaskDefinitionStatus enum type
 type TaskDefinitionStatus string
 
-// Enum values for TaskDefinitionStatus
 const (
-	TaskDefinitionStatusActive           TaskDefinitionStatus = "ACTIVE"
-	TaskDefinitionStatusDeleteInProgress TaskDefinitionStatus = "DELETE_IN_PROGRESS"
-	TaskDefinitionStatusInactive         TaskDefinitionStatus = "INACTIVE"
+	TaskDefinitionStatusINACTIVE TaskDefinitionStatus = "INACTIVE"
+
+	TaskDefinitionStatusDELETE_IN_PROGRESS TaskDefinitionStatus = "DELETE_IN_PROGRESS"
+
+	TaskDefinitionStatusACTIVE TaskDefinitionStatus = "ACTIVE"
 )
 
-// Values returns all known values for TaskDefinitionStatus. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (TaskDefinitionStatus) Values() []TaskDefinitionStatus {
-	return []TaskDefinitionStatus{
-		"ACTIVE",
-		"DELETE_IN_PROGRESS",
-		"INACTIVE",
-	}
-}
-
-// TaskField represents an enum type
+// TaskField represents the TaskField enum type
 type TaskField string
 
-// Enum values for TaskField
 const (
-	TaskFieldTags TaskField = "TAGS"
+	TaskFieldTAGS TaskField = "TAGS"
 )
 
-// Values returns all known values for TaskField. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (TaskField) Values() []TaskField {
-	return []TaskField{
-		"TAGS",
-	}
-}
-
-// TaskFilesystemType represents an enum type
+// TaskFilesystemType represents the TaskFilesystemType enum type
 type TaskFilesystemType string
 
-// Enum values for TaskFilesystemType
 const (
-	TaskFilesystemTypeExt3 TaskFilesystemType = "ext3"
-	TaskFilesystemTypeExt4 TaskFilesystemType = "ext4"
-	TaskFilesystemTypeNtfs TaskFilesystemType = "ntfs"
-	TaskFilesystemTypeXfs  TaskFilesystemType = "xfs"
+	TaskFilesystemTypeEXT3 TaskFilesystemType = "EXT3"
+
+	TaskFilesystemTypeEXT4 TaskFilesystemType = "EXT4"
+
+	TaskFilesystemTypeXFS TaskFilesystemType = "XFS"
+
+	TaskFilesystemTypeNTFS TaskFilesystemType = "NTFS"
 )
 
-// Values returns all known values for TaskFilesystemType. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (TaskFilesystemType) Values() []TaskFilesystemType {
-	return []TaskFilesystemType{
-		"ext3",
-		"ext4",
-		"ntfs",
-		"xfs",
-	}
-}
-
-// TaskSetField represents an enum type
+// TaskSetField represents the TaskSetField enum type
 type TaskSetField string
 
-// Enum values for TaskSetField
 const (
-	TaskSetFieldTags TaskSetField = "TAGS"
+	TaskSetFieldTAGS TaskSetField = "TAGS"
 )
 
-// Values returns all known values for TaskSetField. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (TaskSetField) Values() []TaskSetField {
-	return []TaskSetField{
-		"TAGS",
-	}
-}
-
-// TaskStopCode represents an enum type
+// TaskStopCode represents the TaskStopCode enum type
 type TaskStopCode string
 
-// Enum values for TaskStopCode
 const (
-	TaskStopCodeEssentialContainerExited  TaskStopCode = "EssentialContainerExited"
-	TaskStopCodeServiceSchedulerInitiated TaskStopCode = "ServiceSchedulerInitiated"
-	TaskStopCodeSpotInterruption          TaskStopCode = "SpotInterruption"
-	TaskStopCodeTaskFailedToStart         TaskStopCode = "TaskFailedToStart"
-	TaskStopCodeTerminationNotice         TaskStopCode = "TerminationNotice"
-	TaskStopCodeUserInitiated             TaskStopCode = "UserInitiated"
+	TaskStopCodeSERVICE_SCHEDULER_INITIATED TaskStopCode = "SERVICE_SCHEDULER_INITIATED"
+
+	TaskStopCodeSPOT_INTERRUPTION TaskStopCode = "SPOT_INTERRUPTION"
+
+	TaskStopCodeTERMINATION_NOTICE TaskStopCode = "TERMINATION_NOTICE"
+
+	TaskStopCodeTASK_FAILED_TO_START TaskStopCode = "TASK_FAILED_TO_START"
+
+	TaskStopCodeESSENTIAL_CONTAINER_EXITED TaskStopCode = "ESSENTIAL_CONTAINER_EXITED"
+
+	TaskStopCodeUSER_INITIATED TaskStopCode = "USER_INITIATED"
 )
 
-// Values returns all known values for TaskStopCode. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (TaskStopCode) Values() []TaskStopCode {
-	return []TaskStopCode{
-		"EssentialContainerExited",
-		"ServiceSchedulerInitiated",
-		"SpotInterruption",
-		"TaskFailedToStart",
-		"TerminationNotice",
-		"UserInitiated",
-	}
-}
-
-// TransportProtocol represents an enum type
+// TransportProtocol represents the TransportProtocol enum type
 type TransportProtocol string
 
-// Enum values for TransportProtocol
 const (
-	TransportProtocolTcp TransportProtocol = "tcp"
-	TransportProtocolUdp TransportProtocol = "udp"
+	TransportProtocolTCP TransportProtocol = "TCP"
+
+	TransportProtocolUDP TransportProtocol = "UDP"
 )
 
-// Values returns all known values for TransportProtocol. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (TransportProtocol) Values() []TransportProtocol {
-	return []TransportProtocol{
-		"tcp",
-		"udp",
-	}
-}
-
-// UlimitName represents an enum type
+// UlimitName represents the UlimitName enum type
 type UlimitName string
 
-// Enum values for UlimitName
 const (
-	UlimitNameCore       UlimitName = "core"
-	UlimitNameCpu        UlimitName = "cpu"
-	UlimitNameData       UlimitName = "data"
-	UlimitNameFsize      UlimitName = "fsize"
-	UlimitNameLocks      UlimitName = "locks"
-	UlimitNameMemlock    UlimitName = "memlock"
-	UlimitNameMsgqueue   UlimitName = "msgqueue"
-	UlimitNameNice       UlimitName = "nice"
-	UlimitNameNofile     UlimitName = "nofile"
-	UlimitNameNproc      UlimitName = "nproc"
-	UlimitNameRss        UlimitName = "rss"
-	UlimitNameRtprio     UlimitName = "rtprio"
-	UlimitNameRttime     UlimitName = "rttime"
-	UlimitNameSigpending UlimitName = "sigpending"
-	UlimitNameStack      UlimitName = "stack"
+	UlimitNameLOCKS UlimitName = "LOCKS"
+
+	UlimitNameNICE UlimitName = "NICE"
+
+	UlimitNameMEMLOCK UlimitName = "MEMLOCK"
+
+	UlimitNameRSS UlimitName = "RSS"
+
+	UlimitNameRTPRIO UlimitName = "RTPRIO"
+
+	UlimitNameCORE UlimitName = "CORE"
+
+	UlimitNameFSIZE UlimitName = "FSIZE"
+
+	UlimitNameNOFILE UlimitName = "NOFILE"
+
+	UlimitNameNPROC UlimitName = "NPROC"
+
+	UlimitNameSTACK UlimitName = "STACK"
+
+	UlimitNameCPU UlimitName = "CPU"
+
+	UlimitNameMSGQUEUE UlimitName = "MSGQUEUE"
+
+	UlimitNameRTTIME UlimitName = "RTTIME"
+
+	UlimitNameSIGPENDING UlimitName = "SIGPENDING"
+
+	UlimitNameDATA UlimitName = "DATA"
 )
 
-// Values returns all known values for UlimitName. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (UlimitName) Values() []UlimitName {
-	return []UlimitName{
-		"core",
-		"cpu",
-		"data",
-		"fsize",
-		"locks",
-		"memlock",
-		"msgqueue",
-		"nice",
-		"nofile",
-		"nproc",
-		"rss",
-		"rtprio",
-		"rttime",
-		"sigpending",
-		"stack",
-	}
-}
-
-// VersionConsistency represents an enum type
+// VersionConsistency represents the VersionConsistency enum type
 type VersionConsistency string
 
-// Enum values for VersionConsistency
 const (
-	VersionConsistencyDisabled VersionConsistency = "disabled"
-	VersionConsistencyEnabled  VersionConsistency = "enabled"
-)
+	VersionConsistencyENABLED VersionConsistency = "ENABLED"
 
-// Values returns all known values for VersionConsistency. Note that this can be
-// expanded in the future, and so it is only as up to date as the client.
-func (VersionConsistency) Values() []VersionConsistency {
-	return []VersionConsistency{
-		"disabled",
-		"enabled",
-	}
-}
+	VersionConsistencyDISABLED VersionConsistency = "DISABLED"
+)
