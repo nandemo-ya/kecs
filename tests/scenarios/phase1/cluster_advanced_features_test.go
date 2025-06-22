@@ -82,7 +82,7 @@ var _ = Describe("Cluster Advanced Features", Serial, func() {
 		})
 
 		Context("when tagging a cluster", func() {
-			PIt("should add tags to the cluster", func() { // PENDING: Tag operations not yet implemented in KECS
+			It("should add tags to the cluster", func() {
 				logger.Info("Adding tags to cluster: %s", clusterName)
 
 				tags := map[string]string{
@@ -113,7 +113,7 @@ var _ = Describe("Cluster Advanced Features", Serial, func() {
 				Expect(client.TagResource(clusterArn, tags)).To(Succeed())
 			})
 
-			PIt("should remove specific tags", func() { // PENDING: Tag operations not yet implemented in KECS
+			It("should remove specific tags", func() {
 				logger.Info("Removing tags from cluster: %s", clusterName)
 
 				err := client.UntagResource(clusterArn, []string{"ToRemove"})
