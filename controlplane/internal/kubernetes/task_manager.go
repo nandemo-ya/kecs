@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -27,6 +28,15 @@ type TaskManager struct {
 
 // NewTaskManager creates a new task manager
 func NewTaskManager(storage storage.Storage) (*TaskManager, error) {
+	// In container mode, defer kubernetes client creation
+	if os.Getenv("KECS_CONTAINER_MODE") == "true" {
+		log.Println("Container mode enabled - deferring kubernetes client initialization")
+		return &TaskManager{
+			clientset: nil, // Will be initialized later
+			storage:   storage,
+		}, nil
+	}
+
 	// Try in-cluster config first
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -46,6 +56,32 @@ func NewTaskManager(storage storage.Storage) (*TaskManager, error) {
 		clientset: clientset,
 		storage:   storage,
 	}, nil
+}
+
+// InitializeClient initializes the kubernetes client if not already initialized
+func (tm *TaskManager) InitializeClient() error {
+	if tm.clientset != nil {
+		return nil // Already initialized
+	}
+
+	// Try in-cluster config first
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		// Fall back to kubeconfig
+		config, err = GetKubeConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get kubernetes config: %w", err)
+		}
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	tm.clientset = clientset
+	log.Println("TaskManager kubernetes client initialized")
+	return nil
 }
 
 // CreateTask creates a new task by deploying a pod

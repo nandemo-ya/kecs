@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/testcontainers/testcontainers-go"
@@ -23,30 +24,53 @@ type KECSContainer struct {
 func StartKECS(t TestingT) *KECSContainer {
 	ctx := context.Background()
 
-	// Check if running in test mode (default to true for container testing)
-	testMode := getEnvOrDefault("KECS_TEST_MODE", "true")
-	// Disable Kind cluster in container tests
-	disableKind := getEnvOrDefault("KECS_DISABLE_KIND_CLUSTER", "true")
+	// Check if running in test mode
+	testMode := getEnvOrDefault("KECS_TEST_MODE", "false")
+	// Enable container mode for proper Kind cluster management
+	containerMode := getEnvOrDefault("KECS_CONTAINER_MODE", "true")
 	
 	// Debug: Print environment variable
 	fmt.Printf("DEBUG: KECS_TEST_MODE from environment: %s\n", testMode)
+	fmt.Printf("DEBUG: KECS_CONTAINER_MODE from environment: %s\n", containerMode)
+
+	// Create temporary directory for kubeconfig if it doesn't exist
+	kubeconfigHostPath := "/tmp/kecs-kubeconfig"
+	os.MkdirAll(kubeconfigHostPath, 0755)
 
 	// Container request configuration
 	req := testcontainers.ContainerRequest{
 		Image:        getEnvOrDefault("KECS_IMAGE", "kecs:test"),
 		ExposedPorts: []string{"8080/tcp", "8081/tcp"},
 		Env: map[string]string{
-			"LOG_LEVEL":                 getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
-			"KECS_DISABLE_KIND_CLUSTER": disableKind,
-			"KECS_TEST_MODE":            testMode,
+			"LOG_LEVEL":           getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
+			"KECS_TEST_MODE":      testMode,
+			"KECS_CONTAINER_MODE": containerMode,
+			"KECS_KUBECONFIG_PATH": "/kecs/kubeconfig",
+		},
+		Mounts: testcontainers.ContainerMounts{
+			{
+				Source: testcontainers.GenericBindMountSource{
+					HostPath: "/var/run/docker.sock",
+				},
+				Target:   "/var/run/docker.sock",
+				ReadOnly: false,
+			},
+			{
+				Source: testcontainers.GenericBindMountSource{
+					HostPath: kubeconfigHostPath,
+				},
+				Target:   "/kecs/kubeconfig",
+				ReadOnly: false,
+			},
 		},
 		WaitingFor: wait.ForHTTP("/health").
 			WithPort("8081/tcp").
-			WithStartupTimeout(60*time.Second),
+			WithStartupTimeout(120*time.Second),
 	}
 	
 	// Debug: Print environment being set
 	fmt.Printf("DEBUG: Setting container env KECS_TEST_MODE=%s\n", testMode)
+	fmt.Printf("DEBUG: Setting container env KECS_CONTAINER_MODE=%s\n", containerMode)
 
 	// Start container
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -79,8 +103,11 @@ func StartKECS(t TestingT) *KECSContainer {
 	endpoint := fmt.Sprintf("http://%s:%s", apiHost, apiPort.Port())
 
 	// Wait a bit for KECS to be fully ready
-	if testMode != "true" {
-		// Wait for Kind cluster creation
+	if testMode != "true" && containerMode == "true" {
+		// Wait longer for Kind cluster creation in container mode
+		time.Sleep(30 * time.Second)
+	} else if testMode != "true" {
+		// Wait for Kind cluster creation in normal mode
 		time.Sleep(10 * time.Second)
 	} else {
 		// Shorter wait in test mode
@@ -151,10 +178,37 @@ func (k *KECSContainer) ExecuteCommand(args ...string) (string, error) {
 
 // Cleanup terminates the container and cleans up resources
 func (k *KECSContainer) Cleanup() error {
-	if k.container != nil {
-		return k.container.Terminate(k.ctx)
+	var err error
+	
+	// Clean up any Kind clusters created during tests
+	if os.Getenv("KECS_CONTAINER_MODE") == "true" && os.Getenv("KECS_TEST_MODE") != "true" {
+		// List and clean up any kecs-* clusters
+		fmt.Println("Cleaning up Kind clusters created during tests...")
+		cmd := exec.Command("kind", "get", "clusters")
+		output, _ := cmd.Output()
+		clusters := strings.Split(strings.TrimSpace(string(output)), "\n")
+		
+		for _, cluster := range clusters {
+			if strings.HasPrefix(cluster, "kecs-") {
+				fmt.Printf("Deleting Kind cluster: %s\n", cluster)
+				deleteCmd := exec.Command("kind", "delete", "cluster", "--name", cluster)
+				if deleteErr := deleteCmd.Run(); deleteErr != nil {
+					fmt.Printf("Warning: failed to delete Kind cluster %s: %v\n", cluster, deleteErr)
+				}
+			}
+		}
+		
+		// Clean up kubeconfig directory
+		kubeconfigPath := "/tmp/kecs-kubeconfig"
+		if removeErr := os.RemoveAll(kubeconfigPath); removeErr != nil {
+			fmt.Printf("Warning: failed to remove kubeconfig directory: %v\n", removeErr)
+		}
 	}
-	return nil
+	
+	if k.container != nil {
+		err = k.container.Terminate(k.ctx)
+	}
+	return err
 }
 
 // RunCommand executes a command in the container

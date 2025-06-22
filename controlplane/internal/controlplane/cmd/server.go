@@ -55,9 +55,12 @@ func init() {
 }
 
 func runServer() {
-	// Log test mode status for debugging
+	// Log mode status for debugging
 	if os.Getenv("KECS_TEST_MODE") == "true" {
 		fmt.Println("KECS_TEST_MODE is enabled - running in test mode")
+	}
+	if os.Getenv("KECS_CONTAINER_MODE") == "true" {
+		fmt.Println("KECS_CONTAINER_MODE is enabled - running in container mode")
 	}
 
 	// Load configuration
