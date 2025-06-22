@@ -1,4 +1,4 @@
-package cluster_test
+package phase1_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestCluster(t *testing.T) {
+func TestPhase1(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Cluster Suite")
+	RunSpecs(t, "Phase 1 - Cluster Operations Suite")
 }
