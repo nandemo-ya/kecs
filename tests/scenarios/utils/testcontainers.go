@@ -85,6 +85,7 @@ func StartKECS(t TestingT) *KECSContainer {
 		// Shorter wait in test mode
 		time.Sleep(2 * time.Second)
 	}
+	
 
 	return &KECSContainer{
 		container: container,

@@ -9,9 +9,11 @@ func NewECSClientInterface(endpoint string, mode ...ClientMode) ECSClientInterfa
 			return NewAWSCLIClient(endpoint)
 		case CurlMode:
 			return NewCurlClient(endpoint)
+		case HTTPMode:
+			return NewHTTPClient(endpoint)
 		}
 	}
-	// Default to curl mode for backward compatibility
-	return NewCurlClient(endpoint)
+	// Default to HTTP mode for better reliability
+	return NewHTTPClient(endpoint)
 }
 

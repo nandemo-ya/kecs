@@ -292,18 +292,16 @@ func (c *AWSCLIClient) ListServices(clusterName string) ([]string, error) {
 	return result.ServiceArns, nil
 }
 
-// UpdateService updates an ECS service
-func (c *AWSCLIClient) UpdateService(clusterName, serviceName string, desiredCount *int, taskDef string) error {
-	args := []string{"update-service", "--cluster", clusterName, "--service", serviceName}
-	
-	if desiredCount != nil {
-		args = append(args, "--desired-count", fmt.Sprintf("%d", *desiredCount))
-	}
-	
-	if taskDef != "" {
-		args = append(args, "--task-definition", taskDef)
-	}
-	
+// UpdateService updates an ECS service desired count
+func (c *AWSCLIClient) UpdateService(clusterName, serviceName string, desiredCount int) error {
+	args := []string{"update-service", "--cluster", clusterName, "--service", serviceName, "--desired-count", fmt.Sprintf("%d", desiredCount)}
+	_, err := c.runCommand(args...)
+	return err
+}
+
+// UpdateServiceTaskDefinition updates an ECS service task definition
+func (c *AWSCLIClient) UpdateServiceTaskDefinition(clusterName, serviceName, taskDef string) error {
+	args := []string{"update-service", "--cluster", clusterName, "--service", serviceName, "--task-definition", taskDef}
 	_, err := c.runCommand(args...)
 	return err
 }
@@ -311,8 +309,7 @@ func (c *AWSCLIClient) UpdateService(clusterName, serviceName string, desiredCou
 // DeleteService deletes an ECS service
 func (c *AWSCLIClient) DeleteService(clusterName, serviceName string) error {
 	// First, scale down to 0
-	zero := 0
-	if err := c.UpdateService(clusterName, serviceName, &zero, ""); err != nil {
+	if err := c.UpdateService(clusterName, serviceName, 0); err != nil {
 		return fmt.Errorf("failed to scale down service: %w", err)
 	}
 	
@@ -602,4 +599,48 @@ func (c *AWSCLIClient) ListClustersWithPagination(maxResults int, nextToken stri
 	}
 	
 	return result.ClusterArns, result.NextToken, nil
+}
+
+// RegisterTaskDefinitionFromJSON registers a task definition from JSON
+func (c *AWSCLIClient) RegisterTaskDefinitionFromJSON(jsonDefinition string) (*TaskDefinition, error) {
+	// Create temporary file for the JSON definition
+	tmpFile, err := os.CreateTemp("", "taskdef-*.json")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	
+	if _, err := tmpFile.WriteString(jsonDefinition); err != nil {
+		return nil, fmt.Errorf("failed to write task definition: %w", err)
+	}
+	tmpFile.Close()
+	
+	output, err := c.runCommand("register-task-definition", "--cli-input-json", fmt.Sprintf("file://%s", tmpFile.Name()))
+	if err != nil {
+		return nil, err
+	}
+	
+	var result struct {
+		TaskDefinition TaskDefinition `json:"taskDefinition"`
+	}
+	
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+	
+	return &result.TaskDefinition, nil
+}
+
+// DescribeTask describes a single task
+func (c *AWSCLIClient) DescribeTask(clusterName, taskArn string) (*Task, error) {
+	tasks, err := c.DescribeTasks(clusterName, []string{taskArn})
+	if err != nil {
+		return nil, err
+	}
+	
+	if len(tasks) == 0 {
+		return nil, fmt.Errorf("task not found: %s", taskArn)
+	}
+	
+	return &tasks[0], nil
 }
