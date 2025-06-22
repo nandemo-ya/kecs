@@ -229,6 +229,13 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		return nil, fmt.Errorf("failed to create service: %w", err)
 	}
 
+	// Increment cluster's active service count
+	cluster.ActiveServicesCount++
+	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
+		// Log error but don't fail service creation
+		log.Printf("Warning: Failed to update cluster service count: %v", err)
+	}
+
 	// Create Kubernetes Deployment and Service
 	if err := serviceManager.CreateService(ctx, deployment, kubeService, cluster, storageService); err != nil {
 		// Service was created in storage but Kubernetes deployment failed
@@ -313,6 +320,15 @@ func (api *DefaultECSAPI) DeleteService(ctx context.Context, req *generated.Dele
 	// Delete from storage
 	if err := api.storage.ServiceStore().Delete(ctx, cluster.ARN, *req.Service); err != nil {
 		return nil, fmt.Errorf("failed to delete service: %w", err)
+	}
+
+	// Decrement cluster's active service count
+	if cluster.ActiveServicesCount > 0 {
+		cluster.ActiveServicesCount--
+		if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
+			// Log error but don't fail service deletion
+			log.Printf("Warning: Failed to update cluster service count: %v", err)
+		}
 	}
 
 	log.Printf("Successfully deleted service %s from cluster %s",

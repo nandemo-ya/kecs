@@ -24,6 +24,11 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 		clusterName = *req.ClusterName
 	}
 
+	// Validate cluster name
+	if err := ValidateClusterName(clusterName); err != nil {
+		return nil, err
+	}
+
 	// Check if cluster already exists
 	existing, err := api.storage.ClusterStore().Get(ctx, clusterName)
 	if err == nil && existing != nil {
@@ -76,6 +81,10 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 
 	// Extract settings and configuration from request
 	if req.Settings != nil && len(req.Settings) > 0 {
+		// Validate settings
+		if err := ValidateClusterSettings(req.Settings); err != nil {
+			return nil, err
+		}
 		settingsJSON, err := json.Marshal(req.Settings)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal cluster settings: %w", err)
@@ -83,6 +92,12 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 		cluster.Settings = string(settingsJSON)
 	}
 	if req.Configuration != nil {
+		// Validate configuration if execute command config is present
+		if req.Configuration.ExecuteCommandConfiguration != nil {
+			if err := ValidateExecuteCommandConfiguration(req.Configuration.ExecuteCommandConfiguration); err != nil {
+				return nil, err
+			}
+		}
 		configJSON, err := json.Marshal(req.Configuration)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal cluster configuration: %w", err)
@@ -174,6 +189,19 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 
 // DescribeClusters implements the DescribeClusters operation
 func (api *DefaultECSAPI) DescribeClusters(ctx context.Context, req *generated.DescribeClustersRequest) (*generated.DescribeClustersResponse, error) {
+	// Validate cluster identifiers
+	for _, identifier := range req.Clusters {
+		if identifier == "" {
+			return nil, fmt.Errorf("Invalid parameter: Empty cluster identifier")
+		}
+		// Validate if it looks like an ARN
+		if strings.HasPrefix(identifier, "arn:") {
+			if err := ValidateClusterARN(identifier); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	// If no clusters specified, describe all clusters
 	clusterIdentifiers := req.Clusters
 	if len(clusterIdentifiers) == 0 {
@@ -260,6 +288,11 @@ func (api *DefaultECSAPI) DeleteCluster(ctx context.Context, req *generated.Dele
 		return nil, fmt.Errorf("cluster identifier is required")
 	}
 
+	// Validate cluster identifier
+	if err := ValidateClusterIdentifier(*req.Cluster); err != nil {
+		return nil, err
+	}
+
 	// Extract cluster name from ARN if necessary
 	clusterName := extractClusterNameFromARN(*req.Cluster)
 
@@ -271,8 +304,11 @@ func (api *DefaultECSAPI) DeleteCluster(ctx context.Context, req *generated.Dele
 	}
 
 	// Check if cluster has active resources
-	if cluster.ActiveServicesCount > 0 || cluster.RunningTasksCount > 0 {
-		return nil, fmt.Errorf("cluster has active services or tasks")
+	if cluster.ActiveServicesCount > 0 {
+		return nil, fmt.Errorf("The cluster cannot be deleted while services are active")
+	}
+	if cluster.RunningTasksCount > 0 {
+		return nil, fmt.Errorf("The cluster cannot be deleted while tasks are active")
 	}
 
 	// Update status to INACTIVE
@@ -310,6 +346,11 @@ func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.Upda
 		return nil, fmt.Errorf("cluster identifier is required")
 	}
 
+	// Validate cluster identifier
+	if err := ValidateClusterIdentifier(*req.Cluster); err != nil {
+		return nil, err
+	}
+
 	// Extract cluster name from ARN if necessary
 	clusterName := extractClusterNameFromARN(*req.Cluster)
 
@@ -321,6 +362,10 @@ func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.Upda
 
 	// Update settings if provided
 	if req.Settings != nil && len(req.Settings) > 0 {
+		// Validate settings
+		if err := ValidateClusterSettings(req.Settings); err != nil {
+			return nil, err
+		}
 		settingsJSON, err := json.Marshal(req.Settings)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal cluster settings: %w", err)
@@ -330,6 +375,12 @@ func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.Upda
 
 	// Update configuration if provided
 	if req.Configuration != nil {
+		// Validate configuration if execute command config is present
+		if req.Configuration.ExecuteCommandConfiguration != nil {
+			if err := ValidateExecuteCommandConfiguration(req.Configuration.ExecuteCommandConfiguration); err != nil {
+				return nil, err
+			}
+		}
 		configJSON, err := json.Marshal(req.Configuration)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal cluster configuration: %w", err)
@@ -399,6 +450,16 @@ func (api *DefaultECSAPI) UpdateClusterSettings(ctx context.Context, req *genera
 	}
 	if req.Settings == nil || len(req.Settings) == 0 {
 		return nil, fmt.Errorf("settings are required")
+	}
+
+	// Validate cluster identifier
+	if err := ValidateClusterIdentifier(*req.Cluster); err != nil {
+		return nil, err
+	}
+
+	// Validate settings
+	if err := ValidateClusterSettings(req.Settings); err != nil {
+		return nil, err
 	}
 
 	// Extract cluster name from ARN if necessary
@@ -503,6 +564,16 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 	}
 	if req.DefaultCapacityProviderStrategy == nil {
 		return nil, fmt.Errorf("defaultCapacityProviderStrategy is required")
+	}
+
+	// Validate cluster identifier
+	if err := ValidateClusterIdentifier(*req.Cluster); err != nil {
+		return nil, err
+	}
+
+	// Validate capacity providers and strategy
+	if err := ValidateCapacityProviders(req.CapacityProviders, req.DefaultCapacityProviderStrategy); err != nil {
+		return nil, err
 	}
 
 	// Extract cluster name from ARN if necessary

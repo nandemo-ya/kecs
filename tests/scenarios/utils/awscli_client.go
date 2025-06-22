@@ -64,8 +64,36 @@ func (c *AWSCLIClient) CreateCluster(name string) error {
 	if name != "" {
 		args = append(args, "--cluster-name", name)
 	}
-	_, err := c.runCommand(args...)
-	return err
+	output, err := c.runCommand(args...)
+	if err != nil {
+		// AWS CLI returns exit code 255 for validation errors
+		// Parse the output to get the actual error message
+		if len(output) > 0 {
+			// Try AWS error format
+			var awsError struct {
+				Type    string `json:"__type"`
+				Message string `json:"message"`
+			}
+			if jsonErr := json.Unmarshal(output, &awsError); jsonErr == nil && awsError.Message != "" {
+				return fmt.Errorf(awsError.Message)
+			}
+			
+			// Try CLI error format
+			var errorResponse struct {
+				Error struct {
+					Code    string `json:"Code"`
+					Message string `json:"Message"`
+				} `json:"error"`
+			}
+			if jsonErr := json.Unmarshal(output, &errorResponse); jsonErr == nil && errorResponse.Error.Message != "" {
+				return fmt.Errorf(errorResponse.Error.Message)
+			}
+			// If not JSON, return the raw output
+			return fmt.Errorf(string(output))
+		}
+		return err
+	}
+	return nil
 }
 
 // DescribeCluster describes an ECS cluster

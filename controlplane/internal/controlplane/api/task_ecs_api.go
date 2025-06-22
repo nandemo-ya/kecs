@@ -208,10 +208,21 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 			continue
 		}
 
+		// Increment cluster's running tasks count
+		cluster.RunningTasksCount++
+
 		// Convert to generated task
 		genTask := storageTaskToGenerated(task)
 		if genTask != nil {
 			tasks = append(tasks, *genTask)
+		}
+	}
+
+	// Update cluster's running tasks count if any tasks were created successfully
+	if len(tasks) > 0 {
+		if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
+			// Log error but don't fail task creation
+			log.Printf("Warning: Failed to update cluster task count: %v", err)
 		}
 	}
 
@@ -286,6 +297,15 @@ func (api *DefaultECSAPI) StopTask(ctx context.Context, req *generated.StopTaskR
 	// Stop the task
 	if err := taskManager.StopTask(ctx, cluster.ARN, task.ID, reason); err != nil {
 		return nil, fmt.Errorf("failed to stop task: %w", err)
+	}
+
+	// Decrement cluster's running tasks count
+	if cluster.RunningTasksCount > 0 {
+		cluster.RunningTasksCount--
+		if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
+			// Log error but don't fail task stop
+			log.Printf("Warning: Failed to update cluster task count: %v", err)
+		}
 	}
 
 	// Get updated task

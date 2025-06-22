@@ -3,9 +3,9 @@
 # Default test timeout
 TIMEOUT ?= 30m
 
-# Test Phase 1: Foundation (clusters)
-test-cluster:
-	go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout $(TIMEOUT) ./cluster/...
+# Test Phase 1: Cluster Operations
+test-phase1:
+	go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout $(TIMEOUT) ./phase1/...
 
 # Test Phase 2: Core Operations
 test-phase2:

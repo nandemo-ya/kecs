@@ -58,68 +58,16 @@ jobs:
         env:
           KECS_LOG_LEVEL: info
 
-      - name: Run Phase 2 tests (Core Operations)
-        id: test-phase2
-        if: success() || failure()
-        run: |
-          cd tests/scenarios
-          echo "## Running Phase 2: Core Operations tests ##"
-          ginkgo -v -timeout 30m \
-            --no-color \
-            --junit-report=junit-phase2.xml \
-            --output-dir=. \
-            ./task_definition/... ./service/... | tee test-output-phase2.log
-          
-          # Capture exit code
-          echo "exit_code=$?" >> $GITHUB_OUTPUT
-        env:
-          KECS_LOG_LEVEL: info
-
-      - name: Run Phase 3 tests (Task Lifecycle & Status)
-        id: test-phase3
-        if: success() || failure()
-        run: |
-          cd tests/scenarios
-          echo "## Running Phase 3: Task Lifecycle & Status tests ##"
-          ginkgo -v -timeout 30m \
-            --no-color \
-            --junit-report=junit-phase3.xml \
-            --output-dir=. \
-            ./task/... ./service/service_tasks_test.go | tee test-output-phase3.log
-          
-          # Capture exit code
-          echo "exit_code=$?" >> $GITHUB_OUTPUT
-        env:
-          KECS_LOG_LEVEL: info
-
-      - name: Run Phase 4 tests (Advanced Service Operations)
-        id: test-phase4
-        if: success() || failure()
-        run: |
-          cd tests/scenarios
-          echo "## Running Phase 4: Advanced Service Operations tests ##"
-          ginkgo -v -timeout 30m \
-            --no-color \
-            --junit-report=junit-phase4.xml \
-            --output-dir=. \
-            ./service/rolling_update_test.go \
-            ./service/deployment_config_test.go \
-            ./service/scaling_test.go \
-            ./service/health_check_test.go | tee test-output-phase4.log
-          
-          # Capture exit code
-          echo "exit_code=$?" >> $GITHUB_OUTPUT
-        env:
-          KECS_LOG_LEVEL: info
+      # Phase 2-4 tests are not yet implemented
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-all-phases
+          name: test-results-phase1
           path: |
-            tests/scenarios/junit-*.xml
-            tests/scenarios/test-output-*.log
+            tests/scenarios/junit-phase1.xml
+            tests/scenarios/test-output-phase1.log
 
       - name: Test Report - Phase 1
         uses: dorny/test-reporter@v1
@@ -131,35 +79,7 @@ jobs:
           fail-on-error: false
           fail-on-empty: false
 
-      - name: Test Report - Phase 2
-        uses: dorny/test-reporter@v1
-        if: always() && github.event_name == 'pull_request'
-        with:
-          name: Phase 2 - Core Operations Tests
-          path: tests/scenarios/junit-phase2.xml
-          reporter: java-junit
-          fail-on-error: false
-          fail-on-empty: false
-
-      - name: Test Report - Phase 3
-        uses: dorny/test-reporter@v1
-        if: always() && github.event_name == 'pull_request'
-        with:
-          name: Phase 3 - Task Lifecycle & Status Tests
-          path: tests/scenarios/junit-phase3.xml
-          reporter: java-junit
-          fail-on-error: false
-          fail-on-empty: false
-
-      - name: Test Report - Phase 4
-        uses: dorny/test-reporter@v1
-        if: always() && github.event_name == 'pull_request'
-        with:
-          name: Phase 4 - Advanced Service Operations Tests
-          path: tests/scenarios/junit-phase4.xml
-          reporter: java-junit
-          fail-on-error: false
-          fail-on-empty: false
+      # Phase 2-4 test reports are not yet implemented
 
       - name: Comment PR with test results
         uses: actions/github-script@v7
@@ -199,14 +119,11 @@ jobs:
               };
             }
             
-            // Parse outputs from all phases
+            // Parse outputs from phase 1
             const phase1 = parseTestOutput('tests/scenarios/test-output-phase1.log', 'Phase 1: Cluster Operations');
-            const phase2 = parseTestOutput('tests/scenarios/test-output-phase2.log', 'Phase 2: Core Operations');
-            const phase3 = parseTestOutput('tests/scenarios/test-output-phase3.log', 'Phase 3: Task Lifecycle & Status');
-            const phase4 = parseTestOutput('tests/scenarios/test-output-phase4.log', 'Phase 4: Advanced Service Operations');
             
-            // Combine results
-            const phases = [phase1, phase2, phase3, phase4].filter(p => p !== null);
+            // Combine results (only phase 1 for now)
+            const phases = [phase1].filter(p => p !== null);
             
             let summary = '## 🧪 Scenario Test Results\n\n';
             
