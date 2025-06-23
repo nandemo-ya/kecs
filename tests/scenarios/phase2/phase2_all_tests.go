@@ -2,7 +2,9 @@ package phase2_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -39,9 +41,51 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 				workerLogger.Info("Created cluster: %s", workerClusterName)
 				
 				// Wait for k3d cluster to be created and ready
-				// The cluster is created asynchronously, so we need to wait
-				workerLogger.Info("Waiting for k3d cluster to be created and ready (30s)")
-				time.Sleep(30 * time.Second)
+				// The cluster is created asynchronously, so we need to wait for it to be fully ready
+				workerLogger.Info("Waiting for k3d cluster to be created and ready...")
+				
+				// First wait a bit for async cluster creation to start
+				time.Sleep(10 * time.Second)
+				
+				// Then actively check for cluster readiness
+				workerLogger.Info("Checking k3d cluster readiness...")
+				testServiceName := utils.GenerateTestName("worker-readiness")
+				testTaskDefFamily := utils.GenerateTestName("worker-ready-td")
+				
+				// Register a simple task definition for readiness check
+				testTaskDefJSON := `{
+					"family": "` + testTaskDefFamily + `",
+					"containerDefinitions": [{
+						"name": "test",
+						"image": "busybox:latest",
+						"cpu": 128,
+						"memory": 128,
+						"essential": true
+					}]
+				}`
+				
+				// First, try to delete any existing test service from previous runs
+				_ = workerClient.DeleteService(workerClusterName, testServiceName)
+				time.Sleep(2 * time.Second)
+				
+				Eventually(func() error {
+					_, err := workerClient.RegisterTaskDefinitionFromJSON(testTaskDefJSON)
+					if err != nil {
+						return fmt.Errorf("failed to register test task definition: %w", err)
+					}
+					
+					err = workerClient.CreateService(workerClusterName, testServiceName, testTaskDefFamily, 1)
+					if err != nil {
+						return fmt.Errorf("failed to create test service: %w", err)
+					}
+					
+					// Success - clean up
+					_ = workerClient.DeleteService(workerClusterName, testServiceName)
+					_ = workerClient.DeregisterTaskDefinition(testTaskDefFamily + ":1")
+					return nil
+				}, 90*time.Second, 5*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
+				
+				workerLogger.Info("k3d cluster is ready")
 			}
 		})
 
@@ -123,8 +167,11 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 
 				// Create service with 1 worker
 				workerLogger.Info("Creating service: %s with 1 worker", serviceName)
-				err = workerClient.CreateService(workerClusterName, serviceName, taskDefFamily, 1)
-				Expect(err).NotTo(HaveOccurred())
+				
+				// Retry service creation in case k3d cluster is still initializing
+				Eventually(func() error {
+					return workerClient.CreateService(workerClusterName, serviceName, taskDefFamily, 1)
+				}, 60*time.Second, 5*time.Second).Should(Succeed(), "Failed to create service after retries")
 
 				// Wait for task to be running
 				workerLogger.Info("Waiting for worker to reach RUNNING state")
@@ -191,9 +238,51 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 				failureLogger.Info("Created cluster: %s", failureClusterName)
 				
 				// Wait for k3d cluster to be created and ready
-				// The cluster is created asynchronously, so we need to wait
-				failureLogger.Info("Waiting for k3d cluster to be created and ready (30s)")
-				time.Sleep(30 * time.Second)
+				// The cluster is created asynchronously, so we need to wait for it to be fully ready
+				failureLogger.Info("Waiting for k3d cluster to be created and ready...")
+				
+				// First wait a bit for async cluster creation to start
+				time.Sleep(10 * time.Second)
+				
+				// Then actively check for cluster readiness
+				failureLogger.Info("Checking k3d cluster readiness...")
+				testServiceName := utils.GenerateTestName("failure-readiness")
+				testTaskDefFamily := utils.GenerateTestName("failure-ready-td")
+				
+				// Register a simple task definition for readiness check
+				testTaskDefJSON := `{
+					"family": "` + testTaskDefFamily + `",
+					"containerDefinitions": [{
+						"name": "test",
+						"image": "busybox:latest",
+						"cpu": 128,
+						"memory": 128,
+						"essential": true
+					}]
+				}`
+				
+				// First, try to delete any existing test service from previous runs
+				_ = failureClient.DeleteService(failureClusterName, testServiceName)
+				time.Sleep(2 * time.Second)
+				
+				Eventually(func() error {
+					_, err := failureClient.RegisterTaskDefinitionFromJSON(testTaskDefJSON)
+					if err != nil {
+						return fmt.Errorf("failed to register test task definition: %w", err)
+					}
+					
+					err = failureClient.CreateService(failureClusterName, testServiceName, testTaskDefFamily, 1)
+					if err != nil {
+						return fmt.Errorf("failed to create test service: %w", err)
+					}
+					
+					// Success - clean up
+					_ = failureClient.DeleteService(failureClusterName, testServiceName)
+					_ = failureClient.DeregisterTaskDefinition(testTaskDefFamily + ":1")
+					return nil
+				}, 90*time.Second, 5*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
+				
+				failureLogger.Info("k3d cluster is ready")
 			}
 		})
 
@@ -246,8 +335,11 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 
 				// Create service with 1 task
 				failureLogger.Info("Creating service: %s", serviceName)
-				err = failureClient.CreateService(failureClusterName, serviceName, taskDefFamily, 1)
-				Expect(err).NotTo(HaveOccurred())
+				
+				// Retry service creation in case k3d cluster is still initializing
+				Eventually(func() error {
+					return failureClient.CreateService(failureClusterName, serviceName, taskDefFamily, 1)
+				}, 60*time.Second, 5*time.Second).Should(Succeed(), "Failed to create service after retries")
 
 				// Wait for initial task to start
 				failureLogger.Info("Waiting for initial task to start")
@@ -343,6 +435,53 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 
 				utils.AssertClusterActive(GinkgoT(), healthClient, healthClusterName)
 				healthLogger.Info("Created cluster: %s", healthClusterName)
+				
+				// Wait for k3d cluster to be created and ready
+				// The cluster is created asynchronously, so we need to wait for it to be fully ready
+				healthLogger.Info("Waiting for k3d cluster to be created and ready...")
+				
+				// First wait a bit for async cluster creation to start
+				time.Sleep(10 * time.Second)
+				
+				// Then actively check for cluster readiness
+				healthLogger.Info("Checking k3d cluster readiness...")
+				testServiceName := utils.GenerateTestName("health-readiness")
+				testTaskDefFamily := utils.GenerateTestName("health-ready-td")
+				
+				// Register a simple task definition for readiness check
+				testTaskDefJSON := `{
+					"family": "` + testTaskDefFamily + `",
+					"containerDefinitions": [{
+						"name": "test",
+						"image": "busybox:latest",
+						"cpu": 128,
+						"memory": 128,
+						"essential": true
+					}]
+				}`
+				
+				// First, try to delete any existing test service from previous runs
+				_ = healthClient.DeleteService(healthClusterName, testServiceName)
+				time.Sleep(2 * time.Second)
+				
+				Eventually(func() error {
+					_, err := healthClient.RegisterTaskDefinitionFromJSON(testTaskDefJSON)
+					if err != nil {
+						return fmt.Errorf("failed to register test task definition: %w", err)
+					}
+					
+					err = healthClient.CreateService(healthClusterName, testServiceName, testTaskDefFamily, 1)
+					if err != nil {
+						return fmt.Errorf("failed to create test service: %w", err)
+					}
+					
+					// Success - clean up
+					_ = healthClient.DeleteService(healthClusterName, testServiceName)
+					_ = healthClient.DeregisterTaskDefinition(testTaskDefFamily + ":1")
+					return nil
+				}, 90*time.Second, 5*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
+				
+				healthLogger.Info("k3d cluster is ready")
 			}
 		})
 
@@ -395,8 +534,11 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 
 				// Create service with 1 task
 				healthLogger.Info("Creating service: %s", serviceName)
-				err = healthClient.CreateService(healthClusterName, serviceName, taskDefFamily, 1)
-				Expect(err).NotTo(HaveOccurred())
+				
+				// Retry service creation in case k3d cluster is still initializing
+				Eventually(func() error {
+					return healthClient.CreateService(healthClusterName, serviceName, taskDefFamily, 1)
+				}, 60*time.Second, 5*time.Second).Should(Succeed(), "Failed to create service after retries")
 
 				// Wait for task to start
 				healthLogger.Info("Waiting for task to start")
