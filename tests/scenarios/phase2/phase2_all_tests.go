@@ -70,8 +70,9 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 				// Wait for service deletion to complete
 				Eventually(func() bool {
 					services, _ := workerClient.ListServices(workerClusterName)
-					for _, svc := range services {
-						if svc.ServiceName == testServiceName {
+					for _, svcName := range services {
+						// Extract service name from ARN if necessary
+						if strings.Contains(svcName, testServiceName) {
 							return false // Service still exists
 						}
 					}
@@ -283,8 +284,9 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 				// Wait for service deletion to complete
 				Eventually(func() bool {
 					services, _ := failureClient.ListServices(failureClusterName)
-					for _, svc := range services {
-						if svc.ServiceName == testServiceName {
+					for _, svcName := range services {
+						// Extract service name from ARN if necessary
+						if strings.Contains(svcName, testServiceName) {
 							return false // Service still exists
 						}
 					}
@@ -498,8 +500,9 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 				// Wait for service deletion to complete
 				Eventually(func() bool {
 					services, _ := healthClient.ListServices(healthClusterName)
-					for _, svc := range services {
-						if svc.ServiceName == testServiceName {
+					for _, svcName := range services {
+						// Extract service name from ARN if necessary
+						if strings.Contains(svcName, testServiceName) {
 							return false // Service still exists
 						}
 					}

@@ -69,8 +69,9 @@ var _ = BeforeSuite(func() {
 	// Wait for service deletion to complete
 	Eventually(func() bool {
 		services, _ := client.ListServices(clusterName)
-		for _, svc := range services {
-			if svc.ServiceName == testServiceName {
+		for _, svcName := range services {
+			// Extract service name from ARN if necessary
+			if strings.Contains(svcName, testServiceName) {
 				return false // Service still exists
 			}
 		}
