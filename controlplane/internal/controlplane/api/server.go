@@ -376,6 +376,33 @@ func (s *Server) Stop(ctx context.Context) error {
 		}
 	}
 	
+	// Clean up k3d clusters if not in test mode and environment variable allows
+	if os.Getenv("KECS_TEST_MODE") != "true" && os.Getenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN") != "true" {
+		if s.clusterManager != nil && s.storage != nil {
+			log.Println("Cleaning up k3d clusters...")
+			
+			// Get all clusters from storage
+			clusters, err := s.storage.ClusterStore().List(ctx)
+			if err != nil {
+				log.Printf("Error listing clusters for cleanup: %v", err)
+			} else {
+				// Delete each k3d cluster
+				for _, cluster := range clusters {
+					if cluster.K8sClusterName != "" {
+						log.Printf("Deleting k3d cluster %s...", cluster.K8sClusterName)
+						if err := s.clusterManager.DeleteCluster(ctx, cluster.K8sClusterName); err != nil {
+							log.Printf("Error deleting k3d cluster %s: %v", cluster.K8sClusterName, err)
+							// Continue with other clusters even if one fails
+						}
+					}
+				}
+				log.Println("k3d cluster cleanup completed")
+			}
+		}
+	} else if os.Getenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN") == "true" {
+		log.Println("KECS_KEEP_CLUSTERS_ON_SHUTDOWN is set, keeping k3d clusters")
+	}
+	
 	return s.httpServer.Shutdown(ctx)
 }
 
