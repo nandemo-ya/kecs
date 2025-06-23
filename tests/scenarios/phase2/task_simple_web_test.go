@@ -65,7 +65,17 @@ var _ = BeforeSuite(func() {
 	
 	// First, try to delete any existing test service from previous runs
 	_ = client.DeleteService(clusterName, testServiceName)
-	time.Sleep(2 * time.Second)
+	
+	// Wait for service deletion to complete
+	Eventually(func() bool {
+		services, _ := client.ListServices(clusterName)
+		for _, svc := range services {
+			if svc.ServiceName == testServiceName {
+				return false // Service still exists
+			}
+		}
+		return true // Service is gone
+	}, 30*time.Second, 2*time.Second).Should(BeTrue(), "Failed to delete existing test service")
 	
 	Eventually(func() error {
 		// Try to register task definition and create service
@@ -76,6 +86,13 @@ var _ = BeforeSuite(func() {
 		
 		err = client.CreateService(clusterName, testServiceName, testTaskDefFamily, 1)
 		if err != nil {
+			// If it's still a duplicate key error, try deleting again
+			if strings.Contains(err.Error(), "Duplicate key") {
+				_ = client.DeleteService(clusterName, testServiceName)
+				time.Sleep(5 * time.Second)
+				// Don't return error, let it retry in next iteration
+				return fmt.Errorf("service still exists, retrying: %w", err)
+			}
 			return fmt.Errorf("failed to create test service: %w", err)
 		}
 		
@@ -83,7 +100,7 @@ var _ = BeforeSuite(func() {
 		_ = client.DeleteService(clusterName, testServiceName)
 		_ = client.DeregisterTaskDefinition(testTaskDefFamily + ":1")
 		return nil
-	}, 90*time.Second, 5*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
+	}, 120*time.Second, 10*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
 	
 	logger.Info("k3d cluster is ready for service creation")
 })

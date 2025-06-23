@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -65,7 +66,17 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 				
 				// First, try to delete any existing test service from previous runs
 				_ = workerClient.DeleteService(workerClusterName, testServiceName)
-				time.Sleep(2 * time.Second)
+				
+				// Wait for service deletion to complete
+				Eventually(func() bool {
+					services, _ := workerClient.ListServices(workerClusterName)
+					for _, svc := range services {
+						if svc.ServiceName == testServiceName {
+							return false // Service still exists
+						}
+					}
+					return true // Service is gone
+				}, 30*time.Second, 2*time.Second).Should(BeTrue(), "Failed to delete existing test service")
 				
 				Eventually(func() error {
 					_, err := workerClient.RegisterTaskDefinitionFromJSON(testTaskDefJSON)
@@ -75,6 +86,12 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 					
 					err = workerClient.CreateService(workerClusterName, testServiceName, testTaskDefFamily, 1)
 					if err != nil {
+						// If it's still a duplicate key error, try deleting again
+						if strings.Contains(err.Error(), "Duplicate key") {
+							_ = workerClient.DeleteService(workerClusterName, testServiceName)
+							time.Sleep(5 * time.Second)
+							return fmt.Errorf("service still exists, retrying: %w", err)
+						}
 						return fmt.Errorf("failed to create test service: %w", err)
 					}
 					
@@ -82,7 +99,7 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 					_ = workerClient.DeleteService(workerClusterName, testServiceName)
 					_ = workerClient.DeregisterTaskDefinition(testTaskDefFamily + ":1")
 					return nil
-				}, 90*time.Second, 5*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
+				}, 120*time.Second, 10*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
 				
 				workerLogger.Info("k3d cluster is ready")
 			}
@@ -262,7 +279,17 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 				
 				// First, try to delete any existing test service from previous runs
 				_ = failureClient.DeleteService(failureClusterName, testServiceName)
-				time.Sleep(2 * time.Second)
+				
+				// Wait for service deletion to complete
+				Eventually(func() bool {
+					services, _ := failureClient.ListServices(failureClusterName)
+					for _, svc := range services {
+						if svc.ServiceName == testServiceName {
+							return false // Service still exists
+						}
+					}
+					return true // Service is gone
+				}, 30*time.Second, 2*time.Second).Should(BeTrue(), "Failed to delete existing test service")
 				
 				Eventually(func() error {
 					_, err := failureClient.RegisterTaskDefinitionFromJSON(testTaskDefJSON)
@@ -272,6 +299,12 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 					
 					err = failureClient.CreateService(failureClusterName, testServiceName, testTaskDefFamily, 1)
 					if err != nil {
+						// If it's still a duplicate key error, try deleting again
+						if strings.Contains(err.Error(), "Duplicate key") {
+							_ = failureClient.DeleteService(failureClusterName, testServiceName)
+							time.Sleep(5 * time.Second)
+							return fmt.Errorf("service still exists, retrying: %w", err)
+						}
 						return fmt.Errorf("failed to create test service: %w", err)
 					}
 					
@@ -279,7 +312,7 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 					_ = failureClient.DeleteService(failureClusterName, testServiceName)
 					_ = failureClient.DeregisterTaskDefinition(testTaskDefFamily + ":1")
 					return nil
-				}, 90*time.Second, 5*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
+				}, 120*time.Second, 10*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
 				
 				failureLogger.Info("k3d cluster is ready")
 			}
@@ -461,7 +494,17 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 				
 				// First, try to delete any existing test service from previous runs
 				_ = healthClient.DeleteService(healthClusterName, testServiceName)
-				time.Sleep(2 * time.Second)
+				
+				// Wait for service deletion to complete
+				Eventually(func() bool {
+					services, _ := healthClient.ListServices(healthClusterName)
+					for _, svc := range services {
+						if svc.ServiceName == testServiceName {
+							return false // Service still exists
+						}
+					}
+					return true // Service is gone
+				}, 30*time.Second, 2*time.Second).Should(BeTrue(), "Failed to delete existing test service")
 				
 				Eventually(func() error {
 					_, err := healthClient.RegisterTaskDefinitionFromJSON(testTaskDefJSON)
@@ -471,6 +514,12 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 					
 					err = healthClient.CreateService(healthClusterName, testServiceName, testTaskDefFamily, 1)
 					if err != nil {
+						// If it's still a duplicate key error, try deleting again
+						if strings.Contains(err.Error(), "Duplicate key") {
+							_ = healthClient.DeleteService(healthClusterName, testServiceName)
+							time.Sleep(5 * time.Second)
+							return fmt.Errorf("service still exists, retrying: %w", err)
+						}
 						return fmt.Errorf("failed to create test service: %w", err)
 					}
 					
@@ -478,7 +527,7 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 					_ = healthClient.DeleteService(healthClusterName, testServiceName)
 					_ = healthClient.DeregisterTaskDefinition(testTaskDefFamily + ":1")
 					return nil
-				}, 90*time.Second, 5*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
+				}, 120*time.Second, 10*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
 				
 				healthLogger.Info("k3d cluster is ready")
 			}
