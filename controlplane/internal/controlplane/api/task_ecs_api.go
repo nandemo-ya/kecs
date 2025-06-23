@@ -68,17 +68,9 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 		count = int(*req.Count)
 	}
 
-	// Create task manager (skip if kindManager is nil - for tests)
-	var taskManager *mockTaskManager
-
-	if api.kindManager != nil {
-		// For production, we would use the real task manager
-		// but for now we'll use the mock since the real one expects *corev1.Pod
-		taskManager = &mockTaskManager{storage: api.storage}
-	} else {
-		// Use mock for tests
-		taskManager = &mockTaskManager{storage: api.storage}
-	}
+	// Create task manager
+	// For now we'll use the mock since the real one expects *corev1.Pod
+	taskManager := &mockTaskManager{storage: api.storage}
 
 	// Create task converter with CloudWatch integration
 	taskConverter := converters.NewTaskConverterWithCloudWatch(api.region, api.accountID, api.cloudWatchIntegration)
@@ -276,17 +268,9 @@ func (api *DefaultECSAPI) StopTask(ctx context.Context, req *generated.StopTaskR
 		return nil, fmt.Errorf("failed to convert task")
 	}
 
-	// Create task manager (skip if kindManager is nil - for tests)
-	var taskManager *mockTaskManager
-
-	if api.kindManager != nil {
-		// For production, we would use the real task manager
-		// but for now we'll use the mock
-		taskManager = &mockTaskManager{storage: api.storage}
-	} else {
-		// Use mock for tests
-		taskManager = &mockTaskManager{storage: api.storage}
-	}
+	// Create task manager
+	// For now we'll use the mock since the real one expects *corev1.Pod
+	taskManager := &mockTaskManager{storage: api.storage}
 
 	// Set the reason
 	reason := "Task stopped by user"

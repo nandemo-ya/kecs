@@ -24,21 +24,11 @@ func (api *DefaultECSAPI) getServiceManager() (*kubernetes.ServiceManager, error
 		return kubernetes.NewServiceManager(api.storage, nil), nil
 	}
 	
-	// Get cluster manager (new interface) or fall back to kind manager
+	// Get cluster manager
 	if clusterManager := api.getClusterManager(); clusterManager != nil {
 		return kubernetes.NewServiceManager(api.storage, clusterManager), nil
 	} else {
-		// Fallback to old KindManager for backward compatibility
-		// Convert KindManager to ClusterManager using the wrapper
-		if api.kindManager != nil {
-			kindClusterManager, err := kubernetes.NewKindClusterManager(&kubernetes.ClusterManagerConfig{Provider: "kind"})
-			if err != nil {
-				return nil, fmt.Errorf("failed to create kind cluster manager: %w", err)
-			}
-			return kubernetes.NewServiceManager(api.storage, kindClusterManager), nil
-		} else {
-			return nil, fmt.Errorf("no cluster manager available")
-		}
+		return nil, fmt.Errorf("no cluster manager available")
 	}
 }
 

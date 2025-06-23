@@ -81,12 +81,12 @@ func (sm *ServiceManager) CreateService(
 	}
 
 	// Wait for cluster to be ready (with 60 second timeout)
-	if err := sm.clusterManager.WaitForClusterReady(cluster.KindClusterName, 60*time.Second); err != nil {
+	if err := sm.clusterManager.WaitForClusterReady(cluster.K8sClusterName, 60*time.Second); err != nil {
 		return fmt.Errorf("cluster is not ready: %w", err)
 	}
 
 	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.KindClusterName)
+	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.K8sClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
@@ -212,7 +212,7 @@ func (sm *ServiceManager) UpdateService(
 	}
 
 	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.KindClusterName)
+	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.K8sClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
@@ -293,7 +293,7 @@ func (sm *ServiceManager) DeleteService(
 	}
 
 	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.KindClusterName)
+	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.K8sClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
@@ -349,7 +349,7 @@ func (sm *ServiceManager) GetServiceStatus(
 	}
 
 	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.KindClusterName)
+	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.K8sClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes client: %w", err)
 	}

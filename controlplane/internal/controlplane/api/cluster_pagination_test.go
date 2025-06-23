@@ -48,7 +48,7 @@ var _ = Describe("Cluster Pagination", func() {
 		}
 
 		// Create ECS API instance
-		ecsAPI = api.NewDefaultECSAPIWithConfig(mockStorage, nil, "us-east-1", "123456789012")
+		ecsAPI = api.NewDefaultECSAPIWithConfig(mockStorage, "us-east-1", "123456789012")
 	})
 
 	Describe("ListClusters", func() {

@@ -30,7 +30,6 @@ type Server struct {
 	ecsAPI            generated.ECSAPIInterface
 	storage           storage.Storage
 	clusterManager    kubernetes.ClusterManager
-	kindManager       *kubernetes.KindManager // Deprecated: use clusterManager
 	taskManager       *kubernetes.TaskManager
 	region            string
 	accountID         string
@@ -73,13 +72,11 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 
 	// Initialize cluster manager first
 	var clusterManager kubernetes.ClusterManager
-	var kindManager *kubernetes.KindManager // Keep for backward compatibility
 	if os.Getenv("KECS_TEST_MODE") == "true" {
 		log.Println("Running in test mode - Kubernetes operations will be simulated")
 	} else {
-		// Create cluster manager based on provider
+		// Create cluster manager (k3d only)
 		clusterConfig := &kubernetes.ClusterManagerConfig{
-			Provider:      os.Getenv("KECS_CLUSTER_PROVIDER"), // Will default to k3d if empty
 			ContainerMode: os.Getenv("KECS_CONTAINER_MODE") == "true",
 			KubeconfigPath: kubeconfig,
 		}
@@ -90,13 +87,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 		clusterManager = cm
 		
-		log.Printf("Initialized %s cluster manager (container mode: %v)", 
-			clusterConfig.Provider, clusterConfig.ContainerMode)
-		
-		// For backward compatibility, create a KindManager wrapper if using kind
-		if clusterConfig.Provider == "kind" {
-			kindManager = kubernetes.NewKindManager()
-		}
+		log.Printf("Initialized k3d cluster manager (container mode: %v)", 
+			clusterConfig.ContainerMode)
 	}
 
 	s := &Server{
@@ -107,7 +99,6 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		ecsAPI:         nil, // Will be set after IAM integration
 		storage:        storage,
 		clusterManager: clusterManager,
-		kindManager:    kindManager, // Deprecated: kept for backward compatibility
 		webSocketHub:   NewWebSocketHubWithConfig(wsConfig),
 	}
 
@@ -270,7 +261,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		ecsAPI = NewDefaultECSAPIWithClusterManager(storage, clusterManager, s.region, s.accountID)
 	} else {
 		// Fallback for test mode or when no cluster manager is available
-		ecsAPI = NewDefaultECSAPI(storage, kindManager)
+		ecsAPI = NewDefaultECSAPI(storage)
 	}
 	if defaultAPI, ok := ecsAPI.(*DefaultECSAPI); ok {
 		if s.iamIntegration != nil {

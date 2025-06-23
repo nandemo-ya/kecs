@@ -66,13 +66,8 @@ func NewClusterManager(config *ClusterManagerConfig) (ClusterManager, error) {
 		config = &ClusterManagerConfig{}
 	}
 	
-	// Set provider from environment variable if not specified
-	if config.Provider == "" {
-		config.Provider = os.Getenv("KECS_CLUSTER_PROVIDER")
-		if config.Provider == "" {
-			config.Provider = "k3d" // Default to k3d
-		}
-	}
+	// k3d is the only supported provider now
+	config.Provider = "k3d"
 	
 	// Set container mode from environment variable if not explicitly set
 	if !config.ContainerMode && os.Getenv("KECS_CONTAINER_MODE") == "true" {
@@ -84,14 +79,5 @@ func NewClusterManager(config *ClusterManagerConfig) (ClusterManager, error) {
 		config.KubeconfigPath = os.Getenv("KECS_KUBECONFIG_PATH")
 	}
 	
-	switch config.Provider {
-	case "kind":
-		return NewKindClusterManager(config)
-	case "k3d":
-		return NewK3dClusterManager(config)
-	default:
-		// Default to k3d for new installations
-		config.Provider = "k3d"
-		return NewK3dClusterManager(config)
-	}
+	return NewK3dClusterManager(config)
 }

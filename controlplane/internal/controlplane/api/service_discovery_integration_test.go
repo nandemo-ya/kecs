@@ -48,8 +48,7 @@ var _ = Describe("Service Discovery Integration", func() {
 		serviceDiscoveryMgr = servicediscovery.NewManager(fakeClient, "us-east-1", "123456789012")
 
 		// Create ECS API with service discovery
-		// Use nil KindManager for test mode
-		ecsAPI = NewDefaultECSAPIWithConfig(store, nil, "us-east-1", "123456789012").(*DefaultECSAPI)
+		ecsAPI = NewDefaultECSAPIWithConfig(store, "us-east-1", "123456789012").(*DefaultECSAPI)
 		ecsAPI.SetServiceDiscoveryManager(serviceDiscoveryMgr)
 
 		// Create test server

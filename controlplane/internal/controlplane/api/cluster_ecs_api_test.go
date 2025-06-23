@@ -24,9 +24,8 @@ var _ = Describe("Cluster ECS API", func() {
 		mockClusterStore = mocks.NewMockClusterStore()
 		mockStorage.SetClusterStore(mockClusterStore)
 		server = &Server{
-			storage:     mockStorage,
-			kindManager: nil, // Skip actual kind cluster creation in tests
-			ecsAPI:      NewDefaultECSAPI(mockStorage, nil),
+			storage: mockStorage,
+			ecsAPI:  NewDefaultECSAPI(mockStorage),
 		}
 		ctx = context.Background()
 	})
@@ -48,15 +47,15 @@ var _ = Describe("Cluster ECS API", func() {
 				Expect(resp.Cluster.ClusterName).NotTo(BeNil())
 				Expect(*resp.Cluster.ClusterName).To(Equal("test-cluster"))
 
-				// Get the cluster from storage to check the kind cluster name
+				// Get the cluster from storage to check the k8s cluster name
 				cluster, err := mockClusterStore.Get(ctx, "test-cluster")
 				Expect(err).NotTo(HaveOccurred())
 
-				// Verify that the kind cluster name follows the expected pattern
-				Expect(cluster.KindClusterName).To(HavePrefix("kecs-"))
+				// Verify that the k8s cluster name follows the expected pattern
+				Expect(cluster.K8sClusterName).To(HavePrefix("kecs-"))
 
 				// Should be kecs-<cluster-name>
-				Expect(cluster.KindClusterName).To(Equal("kecs-test-cluster"))
+				Expect(cluster.K8sClusterName).To(Equal("kecs-test-cluster"))
 			})
 
 			It("should create different random names for different clusters", func() {
@@ -82,8 +81,8 @@ var _ = Describe("Cluster ECS API", func() {
 				cluster2, err := mockClusterStore.Get(ctx, "test-cluster-2")
 				Expect(err).NotTo(HaveOccurred())
 
-				// Verify the two clusters have different kind cluster names
-				Expect(cluster1.KindClusterName).NotTo(Equal(cluster2.KindClusterName))
+				// Verify the two clusters have different k8s cluster names
+				Expect(cluster1.K8sClusterName).NotTo(Equal(cluster2.K8sClusterName))
 			})
 		})
 
