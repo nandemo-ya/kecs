@@ -117,4 +117,6 @@ With the shared container optimization:
 - Each test cleans up its resources using `DeferCleanup`
 - All tests use unique cluster names with timestamps
 - Shared container approach significantly reduces test execution time
-- 34 active tests, 3 pending tests (2 for unimplemented features, 1 flaky)
+- 35 active tests, 2 pending tests:
+  - "should list all clusters including our test clusters" (flaky - timing issue with shared container)
+  - "should fail to delete cluster with active service" (flaky - duplicate key errors in shared container)
