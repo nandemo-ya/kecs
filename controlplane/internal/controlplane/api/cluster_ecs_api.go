@@ -165,8 +165,11 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 	// Get clusters with pagination
 	clusters, newNextToken, err := api.storage.ClusterStore().ListWithPagination(ctx, limit, nextToken)
 	if err != nil {
+		log.Printf("ListClusters: Error from storage: %v", err)
 		return nil, fmt.Errorf("failed to list clusters: %w", err)
 	}
+
+	log.Printf("ListClusters: Found %d clusters from storage", len(clusters))
 
 	// Build cluster ARNs list
 	clusterArns := make([]string, 0, len(clusters))
@@ -185,6 +188,10 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 	} else {
 		log.Printf("ListClusters: Returning %d clusters with no nextToken", len(clusterArns))
 	}
+
+	// Debug log the response
+	respJSON, _ := json.Marshal(response)
+	log.Printf("ListClusters response: %s", string(respJSON))
 
 	return response, nil
 }
