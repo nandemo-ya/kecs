@@ -65,12 +65,24 @@ var _ = Describe("Server Shutdown", func() {
 		mockStorage    storage.Storage
 		mockClusterMgr *MockClusterManager
 		ctx            context.Context
+		origTestMode   string
+		origKeepClusters string
 	)
 
 	BeforeEach(func() {
+		// Save original environment variables
+		origTestMode = os.Getenv("KECS_TEST_MODE")
+		origKeepClusters = os.Getenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
+
+		// Clear environment variables for tests
+		os.Unsetenv("KECS_TEST_MODE")
+		os.Unsetenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
 		ctx = context.Background()
 		mockStorage = memory.NewMemoryStorage()
 		mockClusterMgr = NewMockClusterManager()
+		
+		// Reset mock state
+		mockClusterMgr.DeletedClusters = []string{}
 
 		// Initialize storage
 		err := mockStorage.Initialize(ctx)
@@ -120,14 +132,31 @@ var _ = Describe("Server Shutdown", func() {
 	})
 
 	AfterEach(func() {
-		// Clean up environment variables
-		os.Unsetenv("KECS_TEST_MODE")
-		os.Unsetenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
+		// Restore original environment variables
+		if origTestMode != "" {
+			os.Setenv("KECS_TEST_MODE", origTestMode)
+		} else {
+			os.Unsetenv("KECS_TEST_MODE")
+		}
+		if origKeepClusters != "" {
+			os.Setenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN", origKeepClusters)
+		} else {
+			os.Unsetenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
+		}
 	})
 
 	Context("when KECS_TEST_MODE is not set", func() {
 		Context("and KECS_KEEP_CLUSTERS_ON_SHUTDOWN is not set", func() {
 			It("should delete all k3d clusters on shutdown", func() {
+				// Ensure environment variables are not set
+				os.Unsetenv("KECS_TEST_MODE")
+				os.Unsetenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
+
+				// Debug: Check environment variables
+				testMode := os.Getenv("KECS_TEST_MODE")
+				keepClusters := os.Getenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
+				GinkgoWriter.Printf("Before test - KECS_TEST_MODE: '%s', KECS_KEEP_CLUSTERS_ON_SHUTDOWN: '%s'\n", testMode, keepClusters)
+
 				// Call Stop
 				shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				defer cancel()
@@ -135,11 +164,13 @@ var _ = Describe("Server Shutdown", func() {
 				err := server.Stop(shutdownCtx)
 				Expect(err).To(BeNil())
 
+				// Debug: Print what was deleted
+				GinkgoWriter.Printf("Deleted clusters: %v\n", mockClusterMgr.DeletedClusters)
+
 				// Verify clusters were deleted
-				Expect(mockClusterMgr.DeletedClusters).To(ConsistOf(
-					"kecs-test-cluster-1",
-					"kecs-test-cluster-2",
-				))
+				Expect(len(mockClusterMgr.DeletedClusters)).To(Equal(2))
+				Expect(mockClusterMgr.DeletedClusters).To(ContainElement("kecs-test-cluster-1"))
+				Expect(mockClusterMgr.DeletedClusters).To(ContainElement("kecs-test-cluster-2"))
 			})
 		})
 
