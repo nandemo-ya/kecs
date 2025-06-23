@@ -18,7 +18,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Copy go mod files for better caching
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download && go mod verify
+    go mod download && go mod verify && \
+    go mod graph > /tmp/mod.graph
 
 # Copy source files
 COPY cmd/ ./cmd/
