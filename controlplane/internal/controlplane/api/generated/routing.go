@@ -1561,12 +1561,30 @@ func (r *Router) handleUpdateTaskSet(w http.ResponseWriter, req *http.Request) {
 // writeJSON writes a JSON response
 func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
-	w.WriteHeader(statusCode)
-
+	
+	// Marshal the data first to get the content length
+	var jsonData []byte
+	var err error
+	
 	if data != nil {
-		encoder := json.NewEncoder(w)
-		encoder.SetEscapeHTML(false)
-		_ = encoder.Encode(data)
+		jsonData, err = json.Marshal(data)
+		if err != nil {
+			// Log encoding error and write error response
+			fmt.Printf("Error encoding JSON response: %v\n", err)
+			writeError(w, http.StatusInternalServerError, "InternalError", "Failed to encode response")
+			return
+		}
+	} else {
+		jsonData = []byte("{}")
+	}
+	
+	// Set content length to ensure proper response handling
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(jsonData)))
+	w.WriteHeader(statusCode)
+	
+	// Write the response
+	if _, err := w.Write(jsonData); err != nil {
+		fmt.Printf("Error writing response: %v\n", err)
 	}
 }
 

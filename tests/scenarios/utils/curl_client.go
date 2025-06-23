@@ -23,11 +23,13 @@ func NewCurlClient(endpoint string) *CurlClient {
 
 // executeCurl executes a curl command with ECS headers
 func (c *CurlClient) executeCurl(action string, payload string) ([]byte, error) {
-	cmd := exec.Command("curl", "-s", "-X", "POST",
+	// Use -v for verbose output to debug empty responses
+	cmd := exec.Command("curl", "-s", "-S", "-X", "POST",
 		c.endpoint, // Remove /v1/{action} path - ECS uses X-Amz-Target header
 		"-H", "Content-Type: application/x-amz-json-1.1",
 		"-H", fmt.Sprintf("X-Amz-Target: AmazonEC2ContainerServiceV20141113.%s", action),
 		"-d", payload,
+		"--fail", // Fail on HTTP errors
 	)
 	
 	output, err := cmd.CombinedOutput()
@@ -35,7 +37,12 @@ func (c *CurlClient) executeCurl(action string, payload string) ([]byte, error) 
 		return nil, fmt.Errorf("curl command failed: %w\nOutput: %s", err, output)
 	}
 	
-	if len(output) > 0 && output[0] != '{' && output[0] != '[' {
+	// Check for empty response
+	if len(output) == 0 {
+		return nil, fmt.Errorf("empty response from server for action %s", action)
+	}
+	
+	if output[0] != '{' && output[0] != '[' {
 		// Not JSON, probably an error page
 		return nil, fmt.Errorf("non-JSON response received: %s", string(output))
 	}
@@ -93,12 +100,17 @@ func (c *CurlClient) ListClusters() ([]string, error) {
 		return nil, err
 	}
 
+	// Check for empty response
+	if len(output) == 0 {
+		return nil, fmt.Errorf("empty response from server")
+	}
+
 	var result struct {
 		ClusterArns []string `json:"clusterArns"`
 	}
 
 	if err := json.Unmarshal(output, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, fmt.Errorf("failed to parse response: %w\nOutput: %s", err, string(output))
 	}
 
 	return result.ClusterArns, nil
