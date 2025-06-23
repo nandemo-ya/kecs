@@ -39,10 +39,10 @@ var _ = BeforeSuite(func() {
 	utils.AssertClusterActive(GinkgoT(), client, clusterName)
 	logger.Info("Created cluster: %s", clusterName)
 	
-	// Wait for k3d cluster to be fully initialized
-	// k3d cluster creation can take 20-30 seconds
-	logger.Info("Waiting for k3d cluster to be fully initialized (30s)")
-	time.Sleep(30 * time.Second)
+	// Wait a bit for k3d cluster to stabilize
+	// The API now waits for cluster ready, so we just need a short delay
+	logger.Info("Waiting for k3d cluster to stabilize (5s)")
+	time.Sleep(5 * time.Second)
 })
 
 var _ = AfterSuite(func() {
