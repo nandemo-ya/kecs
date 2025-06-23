@@ -465,6 +465,9 @@ export KECS_KUBERNETES_CONTEXT=production
 export KECS_AUTH_ENABLED=true
 export KECS_AUTH_TYPE=jwt
 export KECS_AUTH_JWT_SECRET=supersecret
+
+# Cluster management
+export KECS_KEEP_CLUSTERS_ON_SHUTDOWN=true  # Keep k3d clusters when KECS stops
 ```
 
 ### Environment Variable Mapping
@@ -726,6 +729,49 @@ KECS_LOG_LEVEL=debug ./bin/kecs server --config config.yaml 2>&1 | grep config
 3. **Merge conflicts**
    - Later sources override earlier ones
    - Use --print-config to see final configuration
+
+## Cluster Lifecycle Management
+
+KECS manages k3d clusters automatically for running ECS tasks. By default, these clusters are cleaned up when KECS shuts down.
+
+### Graceful Shutdown Behavior
+
+When KECS receives a shutdown signal (SIGTERM/SIGINT):
+
+1. **Default behavior**: All k3d clusters are deleted
+   - Ensures clean system state
+   - Prevents resource leaks
+   - Suitable for development and CI/CD environments
+
+2. **Keep clusters on shutdown**: Set `KECS_KEEP_CLUSTERS_ON_SHUTDOWN=true`
+   - k3d clusters remain after KECS stops
+   - Useful for debugging or when managing clusters manually
+   - Clusters can be reused when KECS restarts
+
+### Configuration Options
+
+```bash
+# Keep k3d clusters when KECS stops (default: false)
+export KECS_KEEP_CLUSTERS_ON_SHUTDOWN=true
+
+# Skip k3d operations in test mode (default: false)
+export KECS_TEST_MODE=true
+```
+
+### Manual Cluster Cleanup
+
+If clusters are retained, you can clean them up manually:
+
+```bash
+# List all KECS k3d clusters
+k3d cluster list | grep kecs-
+
+# Delete specific cluster
+k3d cluster delete kecs-my-cluster
+
+# Delete all KECS clusters
+k3d cluster list | grep kecs- | awk '{print $1}' | xargs -I {} k3d cluster delete {}
+```
 
 ## Next Steps
 
