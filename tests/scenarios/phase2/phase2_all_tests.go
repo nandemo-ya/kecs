@@ -38,10 +38,10 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 				utils.AssertClusterActive(GinkgoT(), workerClient, workerClusterName)
 				workerLogger.Info("Created cluster: %s", workerClusterName)
 				
-				// Wait a bit for k3d cluster to stabilize
-				// The API now waits for cluster ready, so we just need a short delay
-				workerLogger.Info("Waiting for k3d cluster to stabilize (5s)")
-				time.Sleep(5 * time.Second)
+				// Wait for k3d cluster to be created and ready
+				// The cluster is created asynchronously, so we need to wait
+				workerLogger.Info("Waiting for k3d cluster to be created and ready (30s)")
+				time.Sleep(30 * time.Second)
 			}
 		})
 
@@ -190,10 +190,10 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 				utils.AssertClusterActive(GinkgoT(), failureClient, failureClusterName)
 				failureLogger.Info("Created cluster: %s", failureClusterName)
 				
-				// Wait a bit for k3d cluster to stabilize
-				// The API now waits for cluster ready, so we just need a short delay
-				failureLogger.Info("Waiting for k3d cluster to stabilize (5s)")
-				time.Sleep(5 * time.Second)
+				// Wait for k3d cluster to be created and ready
+				// The cluster is created asynchronously, so we need to wait
+				failureLogger.Info("Waiting for k3d cluster to be created and ready (30s)")
+				time.Sleep(30 * time.Second)
 			}
 		})
 
