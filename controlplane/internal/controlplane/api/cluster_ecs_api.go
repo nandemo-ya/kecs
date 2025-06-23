@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
@@ -672,6 +673,13 @@ func (api *DefaultECSAPI) createK8sClusterAndNamespace(cluster *storage.Cluster)
 		if err := clusterManager.CreateCluster(ctx, cluster.K8sClusterName); err != nil {
 			log.Printf("Failed to create k3d cluster %s for ECS cluster %s: %v", cluster.K8sClusterName, cluster.Name, err)
 			return
+		}
+		
+		// Wait for the k3d cluster to be ready before proceeding
+		log.Printf("Waiting for k3d cluster %s to be ready...", cluster.K8sClusterName)
+		if err := clusterManager.WaitForClusterReady(cluster.K8sClusterName, 60*time.Second); err != nil {
+			log.Printf("k3d cluster %s is not ready after 60s: %v", cluster.K8sClusterName, err)
+			// Continue anyway - the namespace creation might fail but can be retried
 		}
 	} else {
 		log.Printf("Reusing existing k3d cluster %s for ECS cluster %s", cluster.K8sClusterName, cluster.Name)
