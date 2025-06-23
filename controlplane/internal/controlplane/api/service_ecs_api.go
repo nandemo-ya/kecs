@@ -158,15 +158,18 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		return nil, fmt.Errorf("failed to marshal service connect configuration: %w", err)
 	}
 
-	// Ensure k3d cluster is ready before proceeding
+	// Check if k3d cluster exists (but don't wait synchronously to avoid API timeout)
 	if os.Getenv("KECS_TEST_MODE") != "true" {
 		clusterManager := api.getClusterManager()
 		if clusterManager != nil {
-			// Wait up to 60 seconds for cluster to be ready
-			log.Printf("Ensuring k3d cluster %s is ready before creating service...", cluster.K8sClusterName)
-			if err := clusterManager.WaitForClusterReady(cluster.K8sClusterName, 60*time.Second); err != nil {
-				return nil, fmt.Errorf("k3d cluster %s is not ready: %w", cluster.K8sClusterName, err)
+			exists, err := clusterManager.ClusterExists(ctx, cluster.K8sClusterName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to check if k3d cluster exists: %w", err)
 			}
+			if !exists {
+				return nil, fmt.Errorf("k3d cluster %s does not exist yet, please wait for cluster creation to complete", cluster.K8sClusterName)
+			}
+			log.Printf("k3d cluster %s exists, proceeding with service creation", cluster.K8sClusterName)
 		}
 	}
 
