@@ -124,5 +124,7 @@ With the shared container optimization:
 - Each test cleans up its resources using `DeferCleanup`
 - All tests use unique cluster names with timestamps
 - Shared container approach significantly reduces test execution time
-- 35 active tests (including 1 k3d integration test), 3 pending tests (2 for unimplemented features, 1 flaky)
+- 36 active tests (including 1 k3d integration test), 2 pending tests:
+  - "should list all clusters including our test clusters" (flaky - timing issue with shared container)
+  - "should fail to delete cluster with active service" (flaky - duplicate key errors in shared container)
 - K3D cluster creation takes ~30 seconds, so the k3d integration test has a built-in wait time

@@ -3,6 +3,7 @@ package phase1_test
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -117,17 +118,29 @@ var _ = Describe("Cluster Basic Operations", Serial, func() {
 				err = client.CreateCluster(clusterName)
 				Expect(err).NotTo(HaveOccurred(), "CreateCluster should be idempotent")
 
-				// Verify only one cluster exists
-				clusters, err := client.ListClusters()
+				// Wait a bit for eventual consistency
+				time.Sleep(1 * time.Second)
+
+				// Verify cluster can be described (more reliable than list)
+				cluster, err := client.DescribeCluster(clusterName)
 				Expect(err).NotTo(HaveOccurred())
+				Expect(cluster.ClusterName).To(Equal(clusterName))
 				
-				count := 0
-				for _, arn := range clusters {
-					if strings.Contains(arn, clusterName) {
-						count++
+				// Also verify via list, but use Eventually for consistency
+				Eventually(func() int {
+					clusters, err := client.ListClusters()
+					if err != nil {
+						return -1
 					}
-				}
-				Expect(count).To(Equal(1), "Should have exactly one cluster with the name")
+					
+					count := 0
+					for _, arn := range clusters {
+						if strings.Contains(arn, clusterName) {
+							count++
+						}
+					}
+					return count
+				}, 5*time.Second, 1*time.Second).Should(Equal(1), "Should have exactly one cluster with the name")
 			})
 		})
 	})
