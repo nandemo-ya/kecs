@@ -204,8 +204,6 @@ func (k *KECSContainer) Cleanup() error {
 		if clusterProvider == "k3d" {
 			// List and clean up any kecs-* k3d clusters
 			fmt.Println("Cleaning up k3d clusters created during tests...")
-			cmd := exec.Command("k3d", "cluster", "list", "-o", "json")
-			output, _ := cmd.Output()
 			// For simplicity, just try to delete any kecs-* clusters
 			// k3d doesn't have a simple "list names only" like kind
 			deleteCmd := exec.Command("bash", "-c", "k3d cluster list -o json | jq -r '.[].name' | grep '^kecs-' | xargs -I {} k3d cluster delete {}")
