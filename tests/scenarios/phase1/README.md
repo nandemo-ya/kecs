@@ -26,6 +26,13 @@ Tests error handling:
 - **Validation Errors**: Invalid settings, capacity providers
 - **Missing Parameters**: Required fields validation
 
+### 4. `cluster_k3d_integration_test.go`
+Tests k3d cluster integration:
+- **Full Lifecycle**: Creates a k3d-backed cluster, verifies it's active, and deletes it
+- **K3D Verification**: Ensures k3d cluster is properly initialized (30s wait time)
+- **Deletion Verification**: Verifies cluster is deleted via DescribeCluster
+- **Note**: Does not check ListClusters after deletion due to eventual consistency issues
+
 ## Running the Tests
 
 ### Run all Phase 1 tests:
@@ -117,4 +124,5 @@ With the shared container optimization:
 - Each test cleans up its resources using `DeferCleanup`
 - All tests use unique cluster names with timestamps
 - Shared container approach significantly reduces test execution time
-- 34 active tests, 3 pending tests (2 for unimplemented features, 1 flaky)
+- 35 active tests (including 1 k3d integration test), 3 pending tests (2 for unimplemented features, 1 flaky)
+- K3D cluster creation takes ~30 seconds, so the k3d integration test has a built-in wait time
