@@ -18,15 +18,15 @@ import (
 
 // ServiceManager manages Kubernetes Deployments and Services for ECS services
 type ServiceManager struct {
-	storage     storage.Storage
-	kindManager *KindManager
+	storage        storage.Storage
+	clusterManager ClusterManager
 }
 
 // NewServiceManager creates a new ServiceManager
-func NewServiceManager(storage storage.Storage, kindManager *KindManager) *ServiceManager {
+func NewServiceManager(storage storage.Storage, clusterManager ClusterManager) *ServiceManager {
 	return &ServiceManager{
-		storage:     storage,
-		kindManager: kindManager,
+		storage:        storage,
+		clusterManager: clusterManager,
 	}
 }
 
@@ -81,12 +81,12 @@ func (sm *ServiceManager) CreateService(
 	}
 
 	// Wait for cluster to be ready (with 60 second timeout)
-	if err := sm.kindManager.WaitForClusterReady(cluster.KindClusterName, 60*time.Second); err != nil {
+	if err := sm.clusterManager.WaitForClusterReady(cluster.KindClusterName, 60*time.Second); err != nil {
 		return fmt.Errorf("cluster is not ready: %w", err)
 	}
 
 	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.kindManager.GetKubeClient(cluster.KindClusterName)
+	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.KindClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
@@ -212,7 +212,7 @@ func (sm *ServiceManager) UpdateService(
 	}
 
 	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.kindManager.GetKubeClient(cluster.KindClusterName)
+	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.KindClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
@@ -293,7 +293,7 @@ func (sm *ServiceManager) DeleteService(
 	}
 
 	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.kindManager.GetKubeClient(cluster.KindClusterName)
+	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.KindClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
@@ -349,7 +349,7 @@ func (sm *ServiceManager) GetServiceStatus(
 	}
 
 	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.kindManager.GetKubeClient(cluster.KindClusterName)
+	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.KindClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
