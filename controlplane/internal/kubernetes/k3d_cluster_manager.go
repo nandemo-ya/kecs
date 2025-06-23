@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/k3d-io/k3d/v5/pkg/client"
+	"github.com/k3d-io/k3d/v5/pkg/config/v1alpha5"
 	"github.com/k3d-io/k3d/v5/pkg/runtimes"
 	k3d "github.com/k3d-io/k3d/v5/pkg/types"
 )
@@ -33,11 +34,8 @@ func NewK3dClusterManager(cfg *ClusterManagerConfig) (*K3dClusterManager, error)
 		}
 	}
 
-	// Initialize k3d runtime (defaults to Docker)
-	runtime, err := runtimes.GetRuntime("docker")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get k3d runtime: %w", err)
-	}
+	// Use the Docker runtime from k3d
+	runtime := runtimes.Docker
 
 	return &K3dClusterManager{
 		runtime: runtime,
@@ -74,8 +72,14 @@ func (k *K3dClusterManager) CreateCluster(ctx context.Context, clusterName strin
 		Nodes: []*k3d.Node{serverNode},
 		Network: k3d.ClusterNetwork{
 			Name: fmt.Sprintf("k3d-%s", normalizedName),
+			IPAM: k3d.IPAM{
+				Managed: false,
+			},
 		},
 		Token: fmt.Sprintf("kecs-%s-token", normalizedName),
+		KubeAPI: &k3d.ExposureOpts{
+			Host: k3d.DefaultAPIHost,
+		},
 	}
 
 	// Create cluster creation options
@@ -83,11 +87,20 @@ func (k *K3dClusterManager) CreateCluster(ctx context.Context, clusterName strin
 		WaitForServer:       true,
 		Timeout:             2 * time.Minute,
 		DisableLoadBalancer: false,
+		GlobalLabels:        make(map[string]string),
+		GlobalEnv:           []string{},
+		NodeHooks:           []k3d.NodeHook{},
 	}
 
-	// Create the cluster
+	// Create cluster config for ClusterRun
+	clusterConfig := &v1alpha5.ClusterConfig{
+		Cluster:           *cluster,
+		ClusterCreateOpts: *clusterCreateOpts,
+	}
+
+	// Use ClusterRun to create and start the cluster
 	log.Printf("Creating k3d cluster %s...", normalizedName)
-	if err := client.ClusterCreate(ctx, k.runtime, cluster, clusterCreateOpts); err != nil {
+	if err := client.ClusterRun(ctx, k.runtime, clusterConfig); err != nil {
 		return fmt.Errorf("failed to create k3d cluster: %w", err)
 	}
 
