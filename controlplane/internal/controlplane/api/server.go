@@ -29,7 +29,8 @@ type Server struct {
 	kubeconfig        string
 	ecsAPI            generated.ECSAPIInterface
 	storage           storage.Storage
-	kindManager       *kubernetes.KindManager
+	clusterManager    kubernetes.ClusterManager
+	kindManager       *kubernetes.KindManager // Deprecated: use clusterManager
 	taskManager       *kubernetes.TaskManager
 	region            string
 	accountID         string
@@ -70,34 +71,44 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 	}
 
-	// Initialize kindManager first
-	var kindManager *kubernetes.KindManager
+	// Initialize cluster manager first
+	var clusterManager kubernetes.ClusterManager
+	var kindManager *kubernetes.KindManager // Keep for backward compatibility
 	if os.Getenv("KECS_TEST_MODE") == "true" {
 		log.Println("Running in test mode - Kubernetes operations will be simulated")
-	} else if os.Getenv("KECS_CONTAINER_MODE") == "true" {
-		log.Println("Running in container mode - Kind cluster will be created on host")
-		// Create KindManager directly without requiring kubeconfig
-		kindManager = kubernetes.NewKindManager()
-		log.Println("Created KindManager for container mode")
 	} else {
-		// Normal mode
-		cachedKindManager, err := kubernetes.NewCachedKindManager(kubeconfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create cached kind manager: %w", err)
+		// Create cluster manager based on provider
+		clusterConfig := &kubernetes.ClusterManagerConfig{
+			Provider:      os.Getenv("KECS_CLUSTER_PROVIDER"), // Will default to k3d if empty
+			ContainerMode: os.Getenv("KECS_CONTAINER_MODE") == "true",
+			KubeconfigPath: kubeconfig,
 		}
-		kindManager = cachedKindManager.KindManager
-		log.Println("Initialized Kubernetes client cache for improved performance")
+		
+		cm, err := kubernetes.NewClusterManager(clusterConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cluster manager: %w", err)
+		}
+		clusterManager = cm
+		
+		log.Printf("Initialized %s cluster manager (container mode: %v)", 
+			clusterConfig.Provider, clusterConfig.ContainerMode)
+		
+		// For backward compatibility, create a KindManager wrapper if using kind
+		if clusterConfig.Provider == "kind" {
+			kindManager = kubernetes.NewKindManager()
+		}
 	}
 
 	s := &Server{
-		port:         port,
-		kubeconfig:   kubeconfig,
-		region:       "ap-northeast-1", // Default region
-		accountID:    "123456789012",   // Default account ID
-		ecsAPI:       nil, // Will be set after IAM integration
-		storage:      storage,
-		kindManager:  kindManager,
-		webSocketHub: NewWebSocketHubWithConfig(wsConfig),
+		port:           port,
+		kubeconfig:     kubeconfig,
+		region:         "ap-northeast-1", // Default region
+		accountID:      "123456789012",   // Default account ID
+		ecsAPI:         nil, // Will be set after IAM integration
+		storage:        storage,
+		clusterManager: clusterManager,
+		kindManager:    kindManager, // Deprecated: kept for backward compatibility
+		webSocketHub:   NewWebSocketHubWithConfig(wsConfig),
 	}
 
 	// Initialize task manager
@@ -254,7 +265,13 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	}
 
 	// Create ECS API with integrations
-	ecsAPI := NewDefaultECSAPI(storage, kindManager)
+	var ecsAPI generated.ECSAPIInterface
+	if clusterManager != nil {
+		ecsAPI = NewDefaultECSAPIWithClusterManager(storage, clusterManager, s.region, s.accountID)
+	} else {
+		// Fallback for test mode or when no cluster manager is available
+		ecsAPI = NewDefaultECSAPI(storage, kindManager)
+	}
 	if defaultAPI, ok := ecsAPI.(*DefaultECSAPI); ok {
 		if s.iamIntegration != nil {
 			defaultAPI.SetIAMIntegration(s.iamIntegration)
