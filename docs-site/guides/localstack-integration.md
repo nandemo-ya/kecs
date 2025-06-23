@@ -113,14 +113,18 @@ Access S3 buckets from your containers:
 ```python
 import boto3
 
-# Automatically uses LocalStack endpoint
-s3 = boto3.client('s3')
+# No endpoint_url parameter needed! 
+# KECS's transparent proxy automatically routes to LocalStack
+s3 = boto3.client('s3')  # Works as-is, no AWS_ENDPOINT_URL required!
 
 # List buckets
 buckets = s3.list_buckets()
 
 # Upload file
 s3.upload_file('local.txt', 'my-bucket', 'remote.txt')
+
+# Compare with typical LocalStack usage (NOT needed with KECS):
+# s3 = boto3.client('s3', endpoint_url='http://localhost:4566')  # Not required!
 ```
 
 ### DynamoDB Integration
@@ -130,7 +134,8 @@ Use DynamoDB tables:
 ```python
 import boto3
 
-dynamodb = boto3.resource('dynamodb')
+# Again, no endpoint configuration needed!
+dynamodb = boto3.resource('dynamodb')  # Automatically uses LocalStack
 table = dynamodb.Table('users')
 
 # Put item
@@ -142,6 +147,9 @@ table.put_item(Item={
 
 # Query
 response = table.get_item(Key={'userId': '123'})
+
+# Without KECS transparent proxy, you would need:
+# dynamodb = boto3.resource('dynamodb', endpoint_url='http://localhost:4566')
 ```
 
 ### Secrets Manager
@@ -228,20 +236,43 @@ aws logs tail /ecs/myapp \
   --endpoint-url http://localhost:4566
 ```
 
-## Automatic Sidecar Injection
+## Automatic Sidecar Injection (Transparent Proxy)
 
-KECS automatically injects a LocalStack proxy sidecar when needed:
+KECS provides a powerful transparent proxy feature that automatically routes AWS API calls to LocalStack **without requiring AWS_ENDPOINT configuration**. This is a significant advantage over typical LocalStack setups.
 
 ### How It Works
 
 1. KECS detects AWS SDK usage in your container
-2. Injects a transparent proxy sidecar
-3. Routes AWS API calls to LocalStack
-4. No code changes required
+2. Automatically injects a transparent proxy sidecar
+3. Routes all AWS API calls to LocalStack transparently
+4. **No code changes or AWS_ENDPOINT settings required**
+
+### Key Benefits
+
+- **Zero Configuration**: Your existing AWS applications work without any modifications
+- **No AWS_ENDPOINT Required**: Unlike standard LocalStack usage, you don't need to set `endpoint_url` or `AWS_ENDPOINT_URL`
+- **Production-Ready Code**: The same code works in both local (with LocalStack) and production (with real AWS) environments
+- **Automatic Detection**: KECS intelligently detects when proxy injection is needed
+
+### How the Transparent Proxy Works
+
+The transparent proxy mechanism works by:
+
+1. **iptables Rules**: KECS configures iptables rules in the pod to intercept outbound HTTPS traffic to AWS domains
+2. **DNS Resolution**: AWS service domains (e.g., `s3.amazonaws.com`) are resolved normally
+3. **Traffic Interception**: The proxy sidecar intercepts connections to AWS endpoints
+4. **Request Routing**: Requests are transparently forwarded to LocalStack while preserving all headers and authentication
+5. **Response Handling**: LocalStack responses are returned to the application as if they came from AWS
+
+This approach is superior to environment variable injection because:
+- Works with any AWS SDK or tool (not just those that respect `AWS_ENDPOINT_URL`)
+- No risk of environment variables being ignored or overridden
+- Supports dynamic endpoint discovery (e.g., S3 virtual-hosted-style URLs)
+- Zero application awareness required
 
 ### Manual Configuration
 
-Disable automatic injection:
+If you prefer to disable automatic injection and configure endpoints manually:
 ```json
 {
   "containerDefinitions": [
