@@ -228,6 +228,28 @@ func (k *K3dClusterManager) GetKubeClient(clusterName string) (kubernetes.Interf
 		}
 	}
 
+	// In container mode, write kubeconfig to file for compatibility
+	if k.config.ContainerMode {
+		kubeconfigPath := k.GetKubeconfigPath(clusterName)
+		log.Printf("Writing kubeconfig to %s", kubeconfigPath)
+		
+		// Ensure directory exists
+		kubeconfigDir := filepath.Dir(kubeconfigPath)
+		if err := os.MkdirAll(kubeconfigDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create kubeconfig directory: %w", err)
+		}
+		
+		// Write kubeconfig to file
+		kubeconfigBytes, err := clientcmd.Write(*kubeconfigObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize kubeconfig: %w", err)
+		}
+		
+		if err := os.WriteFile(kubeconfigPath, kubeconfigBytes, 0600); err != nil {
+			return nil, fmt.Errorf("failed to write kubeconfig file: %w", err)
+		}
+	}
+
 	// Convert the kubeconfig object to REST config
 	config, err := clientcmd.NewDefaultClientConfig(
 		*kubeconfigObj,
