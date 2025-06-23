@@ -16,6 +16,7 @@ import (
 	"github.com/k3d-io/k3d/v5/pkg/client"
 	"github.com/k3d-io/k3d/v5/pkg/config/v1alpha5"
 	"github.com/k3d-io/k3d/v5/pkg/runtimes"
+	"github.com/k3d-io/k3d/v5/pkg/runtimes/docker"
 	k3d "github.com/k3d-io/k3d/v5/pkg/types"
 )
 
@@ -177,17 +178,63 @@ func (k *K3dClusterManager) ClusterExists(ctx context.Context, clusterName strin
 
 // GetKubeClient returns a Kubernetes client for the specified cluster
 func (k *K3dClusterManager) GetKubeClient(clusterName string) (kubernetes.Interface, error) {
-	kubeconfigPath := k.GetKubeconfigPath(clusterName)
+	normalizedName := k.normalizeClusterName(clusterName)
+	ctx := context.Background()
 
-	// Check if kubeconfig file exists
-	if _, err := os.Stat(kubeconfigPath); err != nil {
-		return nil, fmt.Errorf("kubeconfig not found at %s: %w", kubeconfigPath, err)
+	// Get the k3d cluster to retrieve kubeconfig
+	cluster, err := client.ClusterGet(ctx, k.runtime, &k3d.Cluster{Name: normalizedName})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster: %w", err)
 	}
 
-	// Build config from kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	// Get all nodes including the loadbalancer
+	nodes, err := k.runtime.GetNodesByLabel(ctx, map[string]string{k3d.LabelClusterName: normalizedName})
 	if err != nil {
-		return nil, fmt.Errorf("failed to build kubeconfig: %w", err)
+		return nil, fmt.Errorf("failed to get cluster nodes: %w", err)
+	}
+
+	// Find the loadbalancer node
+	var loadbalancerNode *k3d.Node
+	for i := range nodes {
+		if nodes[i].Role == k3d.LoadBalancerRole {
+			loadbalancerNode = nodes[i]
+			cluster.ServerLoadBalancer = &k3d.Loadbalancer{
+				Node: loadbalancerNode,
+			}
+			break
+		}
+	}
+
+	// Get kubeconfig from k3d
+	kubeconfigObj, err := client.KubeconfigGet(ctx, k.runtime, cluster)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	// Fix the server URL by getting the actual port from Docker inspect
+	if loadbalancerNode != nil {
+		// Get the actual port mapping from Docker
+		apiPort, err := k.getLoadBalancerAPIPort(ctx, loadbalancerNode.Name)
+		if err != nil {
+			log.Printf("Failed to get loadbalancer port: %v", err)
+		} else if apiPort != "" {
+			// Update the server URL with the correct port
+			for clusterName, clusterConfig := range kubeconfigObj.Clusters {
+				newServer := fmt.Sprintf("https://127.0.0.1:%s", apiPort)
+				log.Printf("Updating server URL from %s to %s", clusterConfig.Server, newServer)
+				clusterConfig.Server = newServer
+				kubeconfigObj.Clusters[clusterName] = clusterConfig
+			}
+		}
+	}
+
+	// Convert the kubeconfig object to REST config
+	config, err := clientcmd.NewDefaultClientConfig(
+		*kubeconfigObj,
+		&clientcmd.ConfigOverrides{},
+	).ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client config: %w", err)
 	}
 
 	// Create clientset
@@ -201,24 +248,14 @@ func (k *K3dClusterManager) GetKubeClient(clusterName string) (kubernetes.Interf
 
 // WaitForClusterReady waits for a k3d cluster to be ready
 func (k *K3dClusterManager) WaitForClusterReady(clusterName string, timeout time.Duration) error {
-	kubeconfigPath := k.GetKubeconfigPath(clusterName)
 	startTime := time.Now()
+	normalizedName := k.normalizeClusterName(clusterName)
 
-	log.Printf("Waiting for k3d cluster %s to be ready (kubeconfig: %s)", clusterName, kubeconfigPath)
+	log.Printf("Waiting for k3d cluster %s to be ready", normalizedName)
 
 	for {
 		if time.Since(startTime) > timeout {
 			return fmt.Errorf("timeout waiting for cluster %s to be ready after %v", clusterName, timeout)
-		}
-
-		// Check if kubeconfig file exists
-		if _, err := os.Stat(kubeconfigPath); err != nil {
-			if os.IsNotExist(err) {
-				log.Printf("Kubeconfig not found yet for cluster %s, retrying...", clusterName)
-				time.Sleep(2 * time.Second)
-				continue
-			}
-			return fmt.Errorf("error checking kubeconfig: %w", err)
 		}
 
 		// Try to create a client and check connectivity
@@ -331,4 +368,32 @@ func (k *K3dClusterManager) writeKubeconfig(ctx context.Context, cluster *k3d.Cl
 
 	log.Printf("Wrote kubeconfig for cluster %s to %s", cluster.Name, kubeconfigPath)
 	return nil
+}
+
+// getLoadBalancerAPIPort gets the host port for the API from the loadbalancer container
+func (k *K3dClusterManager) getLoadBalancerAPIPort(ctx context.Context, containerName string) (string, error) {
+	// Get Docker client
+	dockerClient, err := docker.GetDockerClient()
+	if err != nil {
+		return "", fmt.Errorf("failed to get docker client: %w", err)
+	}
+
+	// Get the container inspect data
+	containerJSON, err := dockerClient.ContainerInspect(ctx, containerName)
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect container: %w", err)
+	}
+
+	// Look for port 6443/tcp mapping
+	if containerJSON.NetworkSettings != nil && containerJSON.NetworkSettings.Ports != nil {
+		if bindings, ok := containerJSON.NetworkSettings.Ports["6443/tcp"]; ok && len(bindings) > 0 {
+			for _, binding := range bindings {
+				if binding.HostPort != "" {
+					return binding.HostPort, nil
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no port mapping found for 6443/tcp")
 }
