@@ -12,6 +12,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	k8s "k8s.io/client-go/kubernetes"
 )
 
 // CreateCluster implements the CreateCluster operation
@@ -32,8 +33,8 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 	// Check if cluster already exists
 	existing, err := api.storage.ClusterStore().Get(ctx, clusterName)
 	if err == nil && existing != nil {
-		// Ensure the kind cluster exists (it might have been deleted manually)
-		go api.ensureKindClusterExists(existing)
+		// Ensure the k8s cluster exists (it might have been deleted manually)
+		go api.ensureK8sClusterExists(existing)
 
 		// Return existing cluster
 		cluster := &generated.Cluster{
@@ -61,8 +62,8 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 	// Generate ARN
 	arn := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", api.region, api.accountID, clusterName)
 
-	// Generate a deterministic kind cluster name based on ECS cluster name
-	kindClusterName := fmt.Sprintf("kecs-%s", clusterName)
+	// Generate a deterministic k8s cluster name based on ECS cluster name
+	k8sClusterName := fmt.Sprintf("kecs-%s", clusterName)
 
 	// Create cluster object
 	cluster := &storage.Cluster{
@@ -72,7 +73,7 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 		Status:                            "ACTIVE",
 		Region:                            api.region,
 		AccountID:                         api.accountID,
-		KindClusterName:                   kindClusterName,
+		K8sClusterName:                    k8sClusterName,
 		RegisteredContainerInstancesCount: 0,
 		RunningTasksCount:                 0,
 		PendingTasksCount:                 0,
@@ -117,8 +118,8 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 		return nil, fmt.Errorf("failed to create cluster: %w", err)
 	}
 
-	// Create kind cluster and namespace asynchronously
-	go api.createKindClusterAndNamespace(cluster)
+	// Create k8s cluster and namespace asynchronously
+	go api.createK8sClusterAndNamespace(cluster)
 
 	// Build response
 	response := &generated.CreateClusterResponse{
@@ -223,7 +224,6 @@ func (api *DefaultECSAPI) DescribeClusters(ctx context.Context, req *generated.D
 		clusterName := extractClusterNameFromARN(identifier)
 
 		cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
-
 		if err != nil {
 			failures = append(failures, generated.Failure{
 				Arn:    ptr.String(identifier),
@@ -298,7 +298,6 @@ func (api *DefaultECSAPI) DeleteCluster(ctx context.Context, req *generated.Dele
 
 	// Look up cluster
 	cluster, err := api.storage.ClusterStore().Get(ctx, clusterName)
-
 	if err != nil {
 		return nil, fmt.Errorf("cluster not found: %s", req.Cluster)
 	}
@@ -321,12 +320,12 @@ func (api *DefaultECSAPI) DeleteCluster(ctx context.Context, req *generated.Dele
 	if err := api.storage.ClusterStore().Delete(ctx, cluster.Name); err != nil {
 		return nil, fmt.Errorf("failed to delete cluster: %w", err)
 	}
-	
+
 	// Invalidate cache for this cluster
 	invalidateClusterCache(cluster.Name)
 
-	// Delete kind cluster and namespace asynchronously
-	go api.deleteKindClusterAndNamespace(cluster)
+	// Delete k8s cluster and namespace asynchronously
+	go api.deleteK8sClusterAndNamespace(cluster)
 
 	// Build response with the deleted cluster info
 	response := &generated.DeleteClusterResponse{
@@ -399,7 +398,7 @@ func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.Upda
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
 		return nil, fmt.Errorf("failed to update cluster: %w", err)
 	}
-	
+
 	// Invalidate cache for this cluster
 	invalidateClusterCache(cluster.Name)
 
@@ -517,7 +516,7 @@ func (api *DefaultECSAPI) UpdateClusterSettings(ctx context.Context, req *genera
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
 		return nil, fmt.Errorf("failed to update cluster: %w", err)
 	}
-	
+
 	// Invalidate cache for this cluster
 	invalidateClusterCache(cluster.Name)
 
@@ -603,7 +602,7 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
 		return nil, fmt.Errorf("failed to update cluster: %w", err)
 	}
-	
+
 	// Invalidate cache for this cluster
 	invalidateClusterCache(cluster.Name)
 
@@ -649,150 +648,134 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 	}, nil
 }
 
-// createKindClusterAndNamespace creates a Kind cluster and namespace for the ECS cluster
-func (api *DefaultECSAPI) createKindClusterAndNamespace(cluster *storage.Cluster) {
+// createK8sClusterAndNamespace creates a k3d cluster and namespace for the ECS cluster
+func (api *DefaultECSAPI) createK8sClusterAndNamespace(cluster *storage.Cluster) {
 	ctx := context.Background()
 
-	// Skip kind cluster creation if kindManager is nil (test mode)
-	if api.kindManager == nil {
-		log.Printf("Skipping kind cluster creation for %s (kindManager is nil)", cluster.Name)
+	// Skip cluster creation if clusterManager is nil (test mode)
+	clusterManager := api.getClusterManager()
+	if clusterManager == nil {
+		log.Printf("Skipping k3d cluster creation for %s (clusterManager is nil)", cluster.Name)
 		return
 	}
 
-	// Use async operations if available
-	if asyncOps := api.getAsyncKindOperations(); asyncOps != nil {
-		// Create cluster asynchronously
-		operationID := asyncOps.CreateClusterAsync(ctx, cluster.KindClusterName, func(err error) {
-			if err != nil {
-				log.Printf("Async: Failed to create kind cluster %s for ECS cluster %s: %v", 
-					cluster.KindClusterName, cluster.Name, err)
-				return
-			}
-			
-			// Cluster created successfully, now create namespace
-			api.createNamespaceForCluster(cluster)
-		})
-		
-		log.Printf("Queued async creation of kind cluster %s for ECS cluster %s (operation: %s)", 
-			cluster.KindClusterName, cluster.Name, operationID)
+	// Check if cluster already exists
+	exists, err := clusterManager.ClusterExists(ctx, cluster.K8sClusterName)
+	if err != nil {
+		log.Printf("Failed to check if k3d cluster %s exists: %v", cluster.K8sClusterName, err)
 		return
 	}
 
-	// Fallback to synchronous operation
-	// Check if kind cluster already exists
-	if _, err := api.kindManager.GetKubeClient(cluster.KindClusterName); err != nil {
+	if !exists {
 		// Cluster doesn't exist, create it
-		log.Printf("Kind cluster %s doesn't exist, creating...", cluster.KindClusterName)
-		if err := api.kindManager.CreateCluster(ctx, cluster.KindClusterName); err != nil {
-			log.Printf("Failed to create kind cluster %s for ECS cluster %s: %v", cluster.KindClusterName, cluster.Name, err)
+		log.Printf("k3d cluster %s doesn't exist, creating...", cluster.K8sClusterName)
+		if err := clusterManager.CreateCluster(ctx, cluster.K8sClusterName); err != nil {
+			log.Printf("Failed to create k3d cluster %s for ECS cluster %s: %v", cluster.K8sClusterName, cluster.Name, err)
 			return
 		}
 	} else {
-		log.Printf("Reusing existing kind cluster %s for ECS cluster %s", cluster.KindClusterName, cluster.Name)
+		log.Printf("Reusing existing k3d cluster %s for ECS cluster %s", cluster.K8sClusterName, cluster.Name)
 	}
 
 	// Create namespace
 	api.createNamespaceForCluster(cluster)
 }
 
-// createNamespaceForCluster creates a namespace in the Kind cluster
+// createNamespaceForCluster creates a namespace in the k3d cluster
 func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 	ctx := context.Background()
-	
+
+	// Get cluster manager
+	clusterManager := api.getClusterManager()
+	if clusterManager == nil {
+		log.Printf("Cannot create namespace: clusterManager is nil")
+		return
+	}
+
 	// Get Kubernetes client
-	kubeClient, err := api.kindManager.GetKubeClient(cluster.KindClusterName)
+	kubeClient, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
 	if err != nil {
-		log.Printf("Failed to get kubernetes client for %s: %v", cluster.KindClusterName, err)
+		log.Printf("Failed to get kubernetes client for %s: %v", cluster.K8sClusterName, err)
 		return
 	}
 
 	// Create namespace
-	namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
+	namespaceManager := kubernetes.NewNamespaceManager(kubeClient.(*k8s.Clientset))
 	if err := namespaceManager.CreateNamespace(ctx, cluster.Name, cluster.Region); err != nil {
 		log.Printf("Failed to create namespace for %s: %v", cluster.Name, err)
 		return
 	}
 
-	log.Printf("Successfully created namespace for ECS cluster %s in kind cluster %s", cluster.Name, cluster.KindClusterName)
+	log.Printf("Successfully created namespace for ECS cluster %s in k8s cluster %s", cluster.Name, cluster.K8sClusterName)
 }
 
-// ensureKindClusterExists ensures that a Kind cluster exists for an existing ECS cluster
-func (api *DefaultECSAPI) ensureKindClusterExists(cluster *storage.Cluster) {
+// ensureK8sClusterExists ensures that a k3d cluster exists for an existing ECS cluster
+func (api *DefaultECSAPI) ensureK8sClusterExists(cluster *storage.Cluster) {
 	ctx := context.Background()
 
-	// Skip kind cluster creation if kindManager is nil (test mode)
-	if api.kindManager == nil {
+	// Skip cluster creation if clusterManager is nil (test mode)
+	clusterManager := api.getClusterManager()
+	if clusterManager == nil {
 		return
 	}
 
-	// Check if kind cluster exists, create if it doesn't
-	if _, err := api.kindManager.GetKubeClient(cluster.KindClusterName); err != nil {
-		log.Printf("Kind cluster %s for existing ECS cluster %s is missing, recreating...", cluster.KindClusterName, cluster.Name)
-		if err := api.kindManager.CreateCluster(ctx, cluster.KindClusterName); err != nil {
-			log.Printf("Failed to recreate kind cluster %s: %v", cluster.KindClusterName, err)
+	// Check if cluster exists, create if it doesn't
+	exists, err := clusterManager.ClusterExists(ctx, cluster.K8sClusterName)
+	if err != nil {
+		log.Printf("Failed to check if k3d cluster %s exists: %v", cluster.K8sClusterName, err)
+		return
+	}
+
+	if !exists {
+		log.Printf("k3d cluster %s for existing ECS cluster %s is missing, recreating...", cluster.K8sClusterName, cluster.Name)
+		if err := clusterManager.CreateCluster(ctx, cluster.K8sClusterName); err != nil {
+			log.Printf("Failed to recreate k3d cluster %s: %v", cluster.K8sClusterName, err)
 			return
 		}
 
 		// Get Kubernetes client and create namespace
-		kubeClient, err := api.kindManager.GetKubeClient(cluster.KindClusterName)
+		kubeClient, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
 		if err != nil {
-			log.Printf("Failed to get kubernetes client for %s: %v", cluster.KindClusterName, err)
+			log.Printf("Failed to get kubernetes client for %s: %v", cluster.K8sClusterName, err)
 			return
 		}
 
-		namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
+		namespaceManager := kubernetes.NewNamespaceManager(kubeClient.(*k8s.Clientset))
 		if err := namespaceManager.CreateNamespace(ctx, cluster.Name, cluster.Region); err != nil {
 			log.Printf("Failed to create namespace for %s: %v", cluster.Name, err)
 			return
 		}
-		log.Printf("Successfully recreated kind cluster %s for ECS cluster %s", cluster.KindClusterName, cluster.Name)
+		log.Printf("Successfully recreated k3d cluster %s for ECS cluster %s", cluster.K8sClusterName, cluster.Name)
 	}
 }
 
-// deleteKindClusterAndNamespace deletes the Kind cluster and namespace for an ECS cluster
-func (api *DefaultECSAPI) deleteKindClusterAndNamespace(cluster *storage.Cluster) {
+// deleteK8sClusterAndNamespace deletes the k3d cluster and namespace for an ECS cluster
+func (api *DefaultECSAPI) deleteK8sClusterAndNamespace(cluster *storage.Cluster) {
 	ctx := context.Background()
 
-	// Skip kind cluster deletion if kindManager is nil (test mode)
-	if api.kindManager == nil {
-		log.Printf("Skipping kind cluster deletion for %s (kindManager is nil)", cluster.Name)
+	// Skip cluster deletion if clusterManager is nil (test mode)
+	clusterManager := api.getClusterManager()
+	if clusterManager == nil {
+		log.Printf("Skipping k3d cluster deletion for %s (clusterManager is nil)", cluster.Name)
 		return
 	}
 
 	// Delete namespace first (while we still have access to the cluster)
-	kubeClient, err := api.kindManager.GetKubeClient(cluster.KindClusterName)
+	kubeClient, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
 	if err == nil {
-		namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
+		namespaceManager := kubernetes.NewNamespaceManager(kubeClient.(*k8s.Clientset))
 		if err := namespaceManager.DeleteNamespace(ctx, cluster.Name, cluster.Region); err != nil {
 			log.Printf("Failed to delete namespace for %s: %v", cluster.Name, err)
 		}
 	}
 
-	// Use async operations if available
-	if asyncOps := api.getAsyncKindOperations(); asyncOps != nil {
-		// Delete cluster asynchronously
-		operationID := asyncOps.DeleteClusterAsync(ctx, cluster.KindClusterName, func(err error) {
-			if err != nil {
-				log.Printf("Async: Failed to delete kind cluster %s for ECS cluster %s: %v", 
-					cluster.KindClusterName, cluster.Name, err)
-			} else {
-				log.Printf("Async: Successfully deleted kind cluster %s for ECS cluster %s", 
-					cluster.KindClusterName, cluster.Name)
-			}
-		})
-		
-		log.Printf("Queued async deletion of kind cluster %s for ECS cluster %s (operation: %s)", 
-			cluster.KindClusterName, cluster.Name, operationID)
+	// Delete the k3d cluster
+	if err := clusterManager.DeleteCluster(ctx, cluster.K8sClusterName); err != nil {
+		log.Printf("Failed to delete k3d cluster %s for ECS cluster %s: %v", cluster.K8sClusterName, cluster.Name, err)
 		return
 	}
 
-	// Fallback to synchronous operation
-	if err := api.kindManager.DeleteCluster(ctx, cluster.KindClusterName); err != nil {
-		log.Printf("Failed to delete kind cluster %s for ECS cluster %s: %v", cluster.KindClusterName, cluster.Name, err)
-		return
-	}
-
-	log.Printf("Successfully deleted kind cluster %s and namespace for ECS cluster %s", cluster.KindClusterName, cluster.Name)
+	log.Printf("Successfully deleted k3d cluster %s and namespace for ECS cluster %s", cluster.K8sClusterName, cluster.Name)
 }
 
 // extractClusterNameFromARN extracts cluster name from ARN or returns the input if it's not an ARN

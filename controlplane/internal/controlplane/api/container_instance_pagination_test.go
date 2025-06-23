@@ -76,7 +76,7 @@ var _ = Describe("ContainerInstance Pagination", func() {
 		}
 
 		// Create ECS API instance
-		ecsAPI = api.NewDefaultECSAPIWithConfig(mockStorage, nil, "us-east-1", "123456789012")
+		ecsAPI = api.NewDefaultECSAPIWithConfig(mockStorage, "us-east-1", "123456789012")
 	})
 
 	Describe("ListContainerInstances", func() {

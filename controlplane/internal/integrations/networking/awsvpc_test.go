@@ -39,8 +39,8 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 		err = store.Initialize(ctx)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Initialize ECS API with nil KindManager for test mode
-		ecsAPI = api.NewDefaultECSAPIWithConfig(store, nil, region, accountID).(*api.DefaultECSAPI)
+		// Initialize ECS API for test mode
+		ecsAPI = api.NewDefaultECSAPIWithConfig(store, region, accountID).(*api.DefaultECSAPI)
 
 		// Create default cluster
 		_, err = ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{

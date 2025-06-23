@@ -32,8 +32,7 @@ var _ = Describe("Task ECS API", func() {
 
 		server = &Server{
 			storage:     mockStorage,
-			kindManager: nil,
-			ecsAPI:      NewDefaultECSAPI(mockStorage, nil),
+			ecsAPI:      NewDefaultECSAPI(mockStorage),
 		}
 		ctx = context.Background()
 

@@ -26,8 +26,7 @@ var _ = Describe("Task Definition ECS API", func() {
 
 		server = &Server{
 			storage:     mockStorage,
-			kindManager: nil, // Skip actual kind cluster creation in tests
-			ecsAPI:      NewDefaultECSAPI(mockStorage, nil),
+			ecsAPI:      NewDefaultECSAPI(mockStorage),
 		}
 		ctx = context.Background()
 	})

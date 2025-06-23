@@ -16,8 +16,6 @@ import (
 type DefaultECSAPI struct {
 	storage                    storage.Storage
 	clusterManager             kubernetes.ClusterManager
-	kindManager                *kubernetes.KindManager // Deprecated: use clusterManager
-	asyncKindOperations        *kubernetes.AsyncKindOperations
 	region                     string
 	accountID                  string
 	iamIntegration             iam.Integration
@@ -28,13 +26,13 @@ type DefaultECSAPI struct {
 	serviceDiscoveryManager    servicediscovery.Manager
 }
 
-// NewDefaultECSAPI creates a new default ECS API implementation with storage and kubernetes manager
-func NewDefaultECSAPI(storage storage.Storage, kindManager *kubernetes.KindManager) generated.ECSAPIInterface {
+// NewDefaultECSAPI creates a new default ECS API implementation with storage
+// Deprecated: Use NewDefaultECSAPIWithClusterManager instead
+func NewDefaultECSAPI(storage storage.Storage) generated.ECSAPIInterface {
 	return &DefaultECSAPI{
-		storage:     storage,
-		kindManager: kindManager, // Deprecated: kept for backward compatibility
-		region:      "ap-northeast-1", // Default region
-		accountID:   "123456789012",   // Default account ID
+		storage:   storage,
+		region:    "ap-northeast-1", // Default region
+		accountID: "123456789012",   // Default account ID
 	}
 }
 
@@ -68,23 +66,14 @@ func (api *DefaultECSAPI) SetServiceDiscoveryManager(serviceDiscoveryManager ser
 	api.serviceDiscoveryManager = serviceDiscoveryManager
 }
 
-// SetAsyncKindOperations sets the async Kind operations for the ECS API
-func (api *DefaultECSAPI) SetAsyncKindOperations(asyncKindOperations *kubernetes.AsyncKindOperations) {
-	api.asyncKindOperations = asyncKindOperations
-}
-
-// getAsyncKindOperations returns the async Kind operations if available
-func (api *DefaultECSAPI) getAsyncKindOperations() *kubernetes.AsyncKindOperations {
-	return api.asyncKindOperations
-}
 
 // NewDefaultECSAPIWithConfig creates a new default ECS API implementation with custom region and accountID
-func NewDefaultECSAPIWithConfig(storage storage.Storage, kindManager *kubernetes.KindManager, region, accountID string) generated.ECSAPIInterface {
+// Deprecated: Use NewDefaultECSAPIWithClusterManager instead
+func NewDefaultECSAPIWithConfig(storage storage.Storage, region, accountID string) generated.ECSAPIInterface {
 	return &DefaultECSAPI{
-		storage:     storage,
-		kindManager: kindManager, // Deprecated: kept for backward compatibility
-		region:      region,
-		accountID:   accountID,
+		storage:   storage,
+		region:    region,
+		accountID: accountID,
 	}
 }
 
@@ -98,12 +87,7 @@ func NewDefaultECSAPIWithClusterManager(storage storage.Storage, clusterManager 
 	}
 }
 
-// getClusterManager returns the cluster manager, falling back to kindManager if clusterManager is not set
+// getClusterManager returns the cluster manager
 func (api *DefaultECSAPI) getClusterManager() kubernetes.ClusterManager {
-	if api.clusterManager != nil {
-		return api.clusterManager
-	}
-	// For backward compatibility, return nil if only old kindManager is available
-	// The caller should handle this case
-	return nil
+	return api.clusterManager
 }

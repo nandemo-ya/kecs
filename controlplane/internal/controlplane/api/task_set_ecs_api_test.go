@@ -45,8 +45,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 		mockStorage.SetTaskSetStore(mockTaskSetStore)
 		mockStorage.SetServiceStore(mockServiceStore)
 
-		// Use nil for KindManager as it's not needed for TaskSet tests
-		ecsAPI = NewDefaultECSAPI(mockStorage, nil)
+		ecsAPI = NewDefaultECSAPI(mockStorage)
 		// Set region and accountID on the underlying DefaultECSAPI
 		if defaultAPI, ok := ecsAPI.(*DefaultECSAPI); ok {
 			defaultAPI.region = region

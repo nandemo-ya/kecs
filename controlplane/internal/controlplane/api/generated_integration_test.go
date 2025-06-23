@@ -11,7 +11,6 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
-	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,11 +26,8 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 	err = storage.Initialize(context.Background())
 	require.NoError(t, err)
 
-	// Create Kind manager
-	kindManager := kubernetes.NewKindManager()
-
 	// Create ECS API with generated types
-	ecsAPI := api.NewDefaultECSAPI(storage, kindManager)
+	ecsAPI := api.NewDefaultECSAPI(storage)
 
 	// Create mux and register routes
 	mux := http.NewServeMux()
