@@ -146,6 +146,17 @@ utils.AssertTaskStatusTransitions(t, client, cluster, taskArn, []string{
 })
 ```
 
+## Environment Variables
+
+### Cluster Provider Selection
+```bash
+# Use k3d (default)
+KECS_CLUSTER_PROVIDER=k3d go test -v ./...
+
+# Use Kind
+KECS_CLUSTER_PROVIDER=kind go test -v ./...
+```
+
 ## Debugging
 
 ### Enable detailed logging
