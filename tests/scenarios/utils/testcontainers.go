@@ -26,12 +26,15 @@ func StartKECS(t TestingT) *KECSContainer {
 
 	// Check if running in test mode
 	testMode := getEnvOrDefault("KECS_TEST_MODE", "false")
-	// Enable container mode for proper Kind cluster management
+	// Enable container mode for proper cluster management
 	containerMode := getEnvOrDefault("KECS_CONTAINER_MODE", "true")
+	// Get cluster provider (k3d or kind)
+	clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
 	
 	// Debug: Print environment variable
 	fmt.Printf("DEBUG: KECS_TEST_MODE from environment: %s\n", testMode)
 	fmt.Printf("DEBUG: KECS_CONTAINER_MODE from environment: %s\n", containerMode)
+	fmt.Printf("DEBUG: KECS_CLUSTER_PROVIDER from environment: %s\n", clusterProvider)
 
 	// Create temporary directory for kubeconfig if it doesn't exist
 	kubeconfigHostPath := "/tmp/kecs-kubeconfig"
@@ -42,10 +45,11 @@ func StartKECS(t TestingT) *KECSContainer {
 		Image:        getEnvOrDefault("KECS_IMAGE", "kecs:test"),
 		ExposedPorts: []string{"8080/tcp", "8081/tcp"},
 		Env: map[string]string{
-			"LOG_LEVEL":           getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
-			"KECS_TEST_MODE":      testMode,
-			"KECS_CONTAINER_MODE": containerMode,
-			"KECS_KUBECONFIG_PATH": "/kecs/kubeconfig",
+			"LOG_LEVEL":              getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
+			"KECS_TEST_MODE":         testMode,
+			"KECS_CONTAINER_MODE":    containerMode,
+			"KECS_CLUSTER_PROVIDER":  clusterProvider,
+			"KECS_KUBECONFIG_PATH":   "/kecs/kubeconfig",
 		},
 		Mounts: testcontainers.ContainerMounts{
 			{
@@ -71,6 +75,7 @@ func StartKECS(t TestingT) *KECSContainer {
 	// Debug: Print environment being set
 	fmt.Printf("DEBUG: Setting container env KECS_TEST_MODE=%s\n", testMode)
 	fmt.Printf("DEBUG: Setting container env KECS_CONTAINER_MODE=%s\n", containerMode)
+	fmt.Printf("DEBUG: Setting container env KECS_CLUSTER_PROVIDER=%s\n", clusterProvider)
 
 	// Start container
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -104,11 +109,23 @@ func StartKECS(t TestingT) *KECSContainer {
 
 	// Wait a bit for KECS to be fully ready
 	if testMode != "true" && containerMode == "true" {
-		// Wait longer for Kind cluster creation in container mode
-		time.Sleep(30 * time.Second)
+		// Wait for cluster creation in container mode
+		if clusterProvider == "k3d" {
+			// k3d is faster to start
+			time.Sleep(15 * time.Second)
+		} else {
+			// Kind needs more time
+			time.Sleep(30 * time.Second)
+		}
 	} else if testMode != "true" {
-		// Wait for Kind cluster creation in normal mode
-		time.Sleep(10 * time.Second)
+		// Wait for cluster creation in normal mode
+		if clusterProvider == "k3d" {
+			// k3d is faster
+			time.Sleep(5 * time.Second)
+		} else {
+			// Kind needs more time
+			time.Sleep(10 * time.Second)
+		}
 	} else {
 		// Shorter wait in test mode
 		time.Sleep(2 * time.Second)
@@ -180,20 +197,37 @@ func (k *KECSContainer) ExecuteCommand(args ...string) (string, error) {
 func (k *KECSContainer) Cleanup() error {
 	var err error
 	
-	// Clean up any Kind clusters created during tests
+	// Clean up any clusters created during tests
 	if os.Getenv("KECS_CONTAINER_MODE") == "true" && os.Getenv("KECS_TEST_MODE") != "true" {
-		// List and clean up any kecs-* clusters
-		fmt.Println("Cleaning up Kind clusters created during tests...")
-		cmd := exec.Command("kind", "get", "clusters")
-		output, _ := cmd.Output()
-		clusters := strings.Split(strings.TrimSpace(string(output)), "\n")
+		clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
 		
-		for _, cluster := range clusters {
-			if strings.HasPrefix(cluster, "kecs-") {
-				fmt.Printf("Deleting Kind cluster: %s\n", cluster)
-				deleteCmd := exec.Command("kind", "delete", "cluster", "--name", cluster)
-				if deleteErr := deleteCmd.Run(); deleteErr != nil {
-					fmt.Printf("Warning: failed to delete Kind cluster %s: %v\n", cluster, deleteErr)
+		if clusterProvider == "k3d" {
+			// List and clean up any kecs-* k3d clusters
+			fmt.Println("Cleaning up k3d clusters created during tests...")
+			// For simplicity, just try to delete any kecs-* clusters
+			// k3d doesn't have a simple "list names only" like kind
+			deleteCmd := exec.Command("bash", "-c", "k3d cluster list -o json | jq -r '.[].name' | grep '^kecs-' | xargs -I {} k3d cluster delete {}")
+			if err := deleteCmd.Run(); err != nil {
+				// Fallback: try direct deletion of common test cluster names
+				for _, clusterName := range []string{"kecs-default", "kecs-test", "kecs-cluster1", "kecs-cluster2"} {
+					deleteCmd := exec.Command("k3d", "cluster", "delete", clusterName)
+					deleteCmd.Run() // Ignore errors, cluster might not exist
+				}
+			}
+		} else {
+			// List and clean up any kecs-* Kind clusters
+			fmt.Println("Cleaning up Kind clusters created during tests...")
+			cmd := exec.Command("kind", "get", "clusters")
+			output, _ := cmd.Output()
+			clusters := strings.Split(strings.TrimSpace(string(output)), "\n")
+			
+			for _, cluster := range clusters {
+				if strings.HasPrefix(cluster, "kecs-") {
+					fmt.Printf("Deleting Kind cluster: %s\n", cluster)
+					deleteCmd := exec.Command("kind", "delete", "cluster", "--name", cluster)
+					if deleteErr := deleteCmd.Run(); deleteErr != nil {
+						fmt.Printf("Warning: failed to delete Kind cluster %s: %v\n", cluster, deleteErr)
+					}
 				}
 			}
 		}
