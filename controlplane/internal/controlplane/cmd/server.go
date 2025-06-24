@@ -40,20 +40,26 @@ The server connects to a Kubernetes cluster and translates ECS API calls to Kube
 	}
 )
 
+// getDefaultDataDir returns the default data directory path
+func getDefaultDataDir() string {
+	// Check KECS_DATA_DIR env var first
+	if dataDir := os.Getenv("KECS_DATA_DIR"); dataDir != "" {
+		return dataDir
+	}
+	
+	// Fall back to home directory
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".kecs", "data")
+	}
+	
+	return "~/.kecs/data"
+}
+
 func init() {
 	// Add server-specific flags
 	serverCmd.Flags().StringVar(&kubeconfig, "kubeconfig", "", "Path to the kubeconfig file (default is $HOME/.kube/config)")
 	serverCmd.Flags().IntVar(&adminPort, "admin-port", 8081, "Port for the admin server")
-	// Default to user's home directory, but check KECS_DATA_DIR env var first
-	defaultDataDir := os.Getenv("KECS_DATA_DIR")
-	if defaultDataDir == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			defaultDataDir = filepath.Join(home, ".kecs", "data")
-		} else {
-			defaultDataDir = "~/.kecs/data"
-		}
-	}
-	serverCmd.Flags().StringVar(&dataDir, "data-dir", defaultDataDir, "Directory for storing persistent data")
+	serverCmd.Flags().StringVar(&dataDir, "data-dir", getDefaultDataDir(), "Directory for storing persistent data")
 	serverCmd.Flags().BoolVar(&localstackEnabled, "localstack-enabled", false, "Enable LocalStack integration for AWS service emulation")
 	serverCmd.Flags().StringVar(&configFile, "config", "", "Path to configuration file")
 }

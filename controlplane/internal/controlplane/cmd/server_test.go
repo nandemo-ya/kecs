@@ -15,20 +15,12 @@ func TestCmd(t *testing.T) {
 }
 
 var _ = Describe("Server Command", func() {
-	Describe("Data Directory Configuration", func() {
-		var (
-			originalDataDir string
-			tempDir         string
-		)
+	Describe("getDefaultDataDir", func() {
+		var originalDataDir string
 
 		BeforeEach(func() {
 			// Save original env var
 			originalDataDir = os.Getenv("KECS_DATA_DIR")
-			
-			// Create temp directory
-			var err error
-			tempDir, err = os.MkdirTemp("", "kecs-test-*")
-			Expect(err).ToNot(HaveOccurred())
 		})
 
 		AfterEach(func() {
@@ -38,58 +30,56 @@ var _ = Describe("Server Command", func() {
 			} else {
 				os.Unsetenv("KECS_DATA_DIR")
 			}
-			
-			// Clean up temp directory
-			os.RemoveAll(tempDir)
 		})
 
-		It("should use KECS_DATA_DIR environment variable when set", func() {
-			// Set environment variable
-			testDataDir := filepath.Join(tempDir, "custom-data")
-			os.Setenv("KECS_DATA_DIR", testDataDir)
+		It("should use KECS_DATA_DIR when set", func() {
+			testDir := "/custom/data/path"
+			os.Setenv("KECS_DATA_DIR", testDir)
 
-			// Reset server command to pick up new env var
-			serverCmd.ResetFlags()
-			init()
-
-			// Get the default value from the flag
-			dataDirFlag := serverCmd.Flag("data-dir")
-			Expect(dataDirFlag).ToNot(BeNil())
-			Expect(dataDirFlag.DefValue).To(Equal(testDataDir))
+			result := getDefaultDataDir()
+			Expect(result).To(Equal(testDir))
 		})
 
 		It("should use home directory when KECS_DATA_DIR is not set", func() {
-			// Unset environment variable
 			os.Unsetenv("KECS_DATA_DIR")
 
-			// Reset server command
-			serverCmd.ResetFlags()
-			init()
-
-			// Get the default value from the flag
-			dataDirFlag := serverCmd.Flag("data-dir")
-			Expect(dataDirFlag).ToNot(BeNil())
+			result := getDefaultDataDir()
 			
-			// Should contain .kecs/data
-			Expect(dataDirFlag.DefValue).To(ContainSubstring(".kecs"))
-			Expect(dataDirFlag.DefValue).To(ContainSubstring("data"))
+			// Should contain .kecs/data pattern
+			if home, err := os.UserHomeDir(); err == nil {
+				expectedPath := filepath.Join(home, ".kecs", "data")
+				Expect(result).To(Equal(expectedPath))
+			} else {
+				Expect(result).To(Equal("~/.kecs/data"))
+			}
 		})
 
-		It("should handle empty KECS_DATA_DIR", func() {
-			// Set empty environment variable
+		It("should use home directory when KECS_DATA_DIR is empty", func() {
 			os.Setenv("KECS_DATA_DIR", "")
 
-			// Reset server command
-			serverCmd.ResetFlags()
-			init()
-
-			// Get the default value from the flag
-			dataDirFlag := serverCmd.Flag("data-dir")
-			Expect(dataDirFlag).ToNot(BeNil())
+			result := getDefaultDataDir()
 			
-			// Should fall back to home directory
-			Expect(dataDirFlag.DefValue).To(ContainSubstring(".kecs"))
-			Expect(dataDirFlag.DefValue).To(ContainSubstring("data"))
+			// Should contain .kecs/data pattern
+			if home, err := os.UserHomeDir(); err == nil {
+				expectedPath := filepath.Join(home, ".kecs", "data")
+				Expect(result).To(Equal(expectedPath))
+			} else {
+				Expect(result).To(Equal("~/.kecs/data"))
+			}
+		})
+
+		It("should handle absolute paths in KECS_DATA_DIR", func() {
+			os.Setenv("KECS_DATA_DIR", "/absolute/path/to/data")
+
+			result := getDefaultDataDir()
+			Expect(result).To(Equal("/absolute/path/to/data"))
+		})
+
+		It("should handle relative paths in KECS_DATA_DIR", func() {
+			os.Setenv("KECS_DATA_DIR", "./relative/data")
+
+			result := getDefaultDataDir()
+			Expect(result).To(Equal("./relative/data"))
 		})
 	})
 })
