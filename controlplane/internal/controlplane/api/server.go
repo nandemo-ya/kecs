@@ -549,15 +549,13 @@ func (s *Server) recoverServicesForCluster(ctx context.Context, cluster *storage
 		}
 
 		// Create deployment for the service
-		deployment, err := s.taskManager.CreateServiceDeployment(ctx, cluster, service, taskDef)
+		err = s.taskManager.CreateServiceDeployment(ctx, cluster, service, taskDef)
 		if err != nil {
 			log.Printf("Failed to create deployment for service %s: %v", service.ServiceName, err)
 			continue
 		}
 
-		// Update service with deployment info
-		service.DeploymentName = deployment.Name
-		service.Namespace = deployment.Namespace
+		// Update service status after successful deployment
 		service.RunningCount = 0 // Will be updated by deployment controller
 		service.Status = "ACTIVE"
 		service.UpdatedAt = time.Now()

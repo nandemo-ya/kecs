@@ -380,59 +380,43 @@ func (tm *TaskManager) createSecrets(ctx context.Context, namespace string, secr
 }
 
 // CreateServiceDeployment creates a Kubernetes deployment for an ECS service
-func (tm *TaskManager) CreateServiceDeployment(ctx context.Context, cluster *storage.Cluster, service *storage.Service, taskDef *storage.TaskDefinition) (*types.Deployment, error) {
-	// Get or create Kubernetes client for the cluster
-	kubeClient, err := tm.getClusterClient(cluster.K8sClusterName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get kubernetes client: %w", err)
+func (tm *TaskManager) CreateServiceDeployment(ctx context.Context, cluster *storage.Cluster, service *storage.Service, taskDef *storage.TaskDefinition) error {
+	// Ensure namespace exists
+	namespace := fmt.Sprintf("kecs-%s", cluster.Name)
+	if err := EnsureNamespace(ctx, tm.clientset, namespace); err != nil {
+		return fmt.Errorf("failed to ensure namespace: %w", err)
 	}
 
-	// Parse container definitions
+	// Parse container definitions from storage
 	var containerDefs []types.ContainerDefinition
 	if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
-		return nil, fmt.Errorf("failed to parse container definitions: %w", err)
+		return fmt.Errorf("failed to parse container definitions: %w", err)
 	}
 
-	// Create deployment spec
-	namespace := fmt.Sprintf("kecs-%s", cluster.Name)
-	deploymentName := fmt.Sprintf("%s-%s", service.ServiceName, generateShortID())
-	
-	deployment := &types.Deployment{
-		Name:      deploymentName,
-		Namespace: namespace,
-		Replicas:  int32(service.DesiredCount),
-		Labels: map[string]string{
-			"kecs.dev/managed-by":    "kecs",
-			"kecs.dev/cluster":       cluster.Name,
-			"kecs.dev/service":       service.ServiceName,
-			"kecs.dev/task-definition": taskDef.Family,
-		},
-	}
+	// Create deployment info
+	deploymentInfo := converters.ConvertServiceToDeployment(service, taskDef, namespace)
 
 	// Convert to Kubernetes deployment
-	k8sDeployment := converters.ConvertDeploymentToK8s(deployment, containerDefs)
+	k8sDeployment := converters.ConvertDeploymentToK8s(deploymentInfo, containerDefs)
 
 	// Create deployment in Kubernetes
-	createdDeployment, err := kubeClient.AppsV1().Deployments(namespace).Create(ctx, k8sDeployment, metav1.CreateOptions{})
+	_, err := tm.clientset.AppsV1().Deployments(namespace).Create(ctx, k8sDeployment, metav1.CreateOptions{})
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
 			// Update existing deployment
-			createdDeployment, err = kubeClient.AppsV1().Deployments(namespace).Update(ctx, k8sDeployment, metav1.UpdateOptions{})
+			_, err = tm.clientset.AppsV1().Deployments(namespace).Update(ctx, k8sDeployment, metav1.UpdateOptions{})
 			if err != nil {
-				return nil, fmt.Errorf("failed to update existing deployment: %w", err)
+				return fmt.Errorf("failed to update existing deployment: %w", err)
 			}
 		} else {
-			return nil, fmt.Errorf("failed to create deployment: %w", err)
+			return fmt.Errorf("failed to create deployment: %w", err)
 		}
 	}
 
-	deployment.Name = createdDeployment.Name
-	deployment.Namespace = createdDeployment.Namespace
-	
-	log.Printf("Created/updated deployment %s in namespace %s for service %s", 
-		deployment.Name, deployment.Namespace, service.ServiceName)
+	log.Printf("Created/updated deployment for service %s in namespace %s", 
+		service.ServiceName, namespace)
 
-	return deployment, nil
+	return nil
 }
 
 // generateShortID generates a short random ID for resource naming
