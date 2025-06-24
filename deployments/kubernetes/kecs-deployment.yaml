@@ -1,0 +1,148 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kecs-data-pvc
+  namespace: kecs-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kecs-config
+  namespace: kecs-system
+data:
+  KECS_CONTAINER_MODE: "true"
+  KECS_DATA_DIR: "/data"
+  KECS_LOG_LEVEL: "info"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kecs-controlplane
+  namespace: kecs-system
+  labels:
+    app: kecs-controlplane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kecs-controlplane
+  template:
+    metadata:
+      labels:
+        app: kecs-controlplane
+    spec:
+      serviceAccountName: kecs-controlplane
+      containers:
+      - name: kecs
+        image: ghcr.io/nandemo-ya/kecs:latest
+        imagePullPolicy: Always
+        ports:
+        - name: api
+          containerPort: 8080
+          protocol: TCP
+        - name: admin
+          containerPort: 8081
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: kecs-config
+        env:
+        # Add any sensitive environment variables here
+        # - name: KECS_KEEP_CLUSTERS_ON_SHUTDOWN
+        #   value: "true"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: admin
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: admin
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: kecs-data-pvc
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+      # Security context for nonroot user (65532)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kecs-controlplane
+  namespace: kecs-system
+  labels:
+    app: kecs-controlplane
+spec:
+  type: ClusterIP
+  ports:
+  - name: api
+    port: 8080
+    targetPort: api
+  - name: admin
+    port: 8081
+    targetPort: admin
+  selector:
+    app: kecs-controlplane
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kecs-controlplane
+  namespace: kecs-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kecs-controlplane
+rules:
+# Add necessary permissions for KECS to manage k3d clusters
+- apiGroups: [""]
+  resources: ["nodes", "pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kecs-controlplane
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kecs-controlplane
+subjects:
+- kind: ServiceAccount
+  name: kecs-controlplane
+  namespace: kecs-system

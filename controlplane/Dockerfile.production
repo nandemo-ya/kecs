@@ -56,8 +56,22 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # Stage 3: Final production image (distroless)
 FROM gcr.io/distroless/base-debian12:nonroot
 
-# Copy binary
-COPY --from=go-builder /app/controlplane /controlplane
+# Create data directory with proper ownership
+# Note: We need to do this in a separate stage since distroless doesn't have a shell
+USER root
+COPY --from=go-builder --chown=nonroot:nonroot /app/controlplane /controlplane
+
+# Create data directory with nonroot ownership
+# We use a builder stage to create the directory structure
+FROM busybox:latest AS dir-creator
+RUN mkdir -p /data && chown -R 65532:65532 /data
+
+# Final stage
+FROM gcr.io/distroless/base-debian12:nonroot
+
+# Copy binary and data directory
+COPY --from=go-builder --chown=nonroot:nonroot /app/controlplane /controlplane
+COPY --from=dir-creator --chown=nonroot:nonroot /data /data
 
 # Add labels for metadata
 LABEL org.opencontainers.image.title="KECS Control Plane" \

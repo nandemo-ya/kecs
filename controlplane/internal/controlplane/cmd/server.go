@@ -44,10 +44,14 @@ func init() {
 	// Add server-specific flags
 	serverCmd.Flags().StringVar(&kubeconfig, "kubeconfig", "", "Path to the kubeconfig file (default is $HOME/.kube/config)")
 	serverCmd.Flags().IntVar(&adminPort, "admin-port", 8081, "Port for the admin server")
-	// Default to user's home directory
-	defaultDataDir := "~/.kecs/data"
-	if home, err := os.UserHomeDir(); err == nil {
-		defaultDataDir = filepath.Join(home, ".kecs", "data")
+	// Default to user's home directory, but check KECS_DATA_DIR env var first
+	defaultDataDir := os.Getenv("KECS_DATA_DIR")
+	if defaultDataDir == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			defaultDataDir = filepath.Join(home, ".kecs", "data")
+		} else {
+			defaultDataDir = "~/.kecs/data"
+		}
 	}
 	serverCmd.Flags().StringVar(&dataDir, "data-dir", defaultDataDir, "Directory for storing persistent data")
 	serverCmd.Flags().BoolVar(&localstackEnabled, "localstack-enabled", false, "Enable LocalStack integration for AWS service emulation")
