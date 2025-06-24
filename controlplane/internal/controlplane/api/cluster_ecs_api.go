@@ -82,7 +82,7 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 	}
 
 	// Extract settings and configuration from request
-	if req.Settings != nil && len(req.Settings) > 0 {
+	if len(req.Settings) > 0 {
 		// Validate settings
 		if err := ValidateClusterSettings(req.Settings); err != nil {
 			return nil, err
@@ -106,7 +106,7 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 		}
 		cluster.Configuration = string(configJSON)
 	}
-	if req.Tags != nil && len(req.Tags) > 0 {
+	if len(req.Tags) > 0 {
 		tagsJSON, err := json.Marshal(req.Tags)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal cluster tags: %w", err)
@@ -368,7 +368,7 @@ func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.Upda
 	}
 
 	// Update settings if provided
-	if req.Settings != nil && len(req.Settings) > 0 {
+	if len(req.Settings) > 0 {
 		// Validate settings
 		if err := ValidateClusterSettings(req.Settings); err != nil {
 			return nil, err

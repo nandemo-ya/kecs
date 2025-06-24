@@ -45,7 +45,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	if req.Family == "" {
 		return nil, fmt.Errorf("family is required")
 	}
-	if req.ContainerDefinitions == nil || len(req.ContainerDefinitions) == 0 {
+	if len(req.ContainerDefinitions) == 0 {
 		return nil, fmt.Errorf("containerDefinitions is required")
 	}
 
@@ -62,7 +62,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	}
 
 	volumesJSON := "[]"
-	if req.Volumes != nil && len(req.Volumes) > 0 {
+	if len(req.Volumes) > 0 {
 		volumesData, err := json.Marshal(req.Volumes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal volumes: %w", err)
@@ -71,7 +71,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	}
 
 	placementConstraintsJSON := "[]"
-	if req.PlacementConstraints != nil && len(req.PlacementConstraints) > 0 {
+	if len(req.PlacementConstraints) > 0 {
 		placementData, err := json.Marshal(req.PlacementConstraints)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal placement constraints: %w", err)
@@ -80,7 +80,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	}
 
 	requiresCompatibilitiesJSON := "[]"
-	if req.RequiresCompatibilities != nil && len(req.RequiresCompatibilities) > 0 {
+	if len(req.RequiresCompatibilities) > 0 {
 		compatData, err := json.Marshal(req.RequiresCompatibilities)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal requires compatibilities: %w", err)
@@ -89,7 +89,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	}
 
 	tagsJSON := "[]"
-	if req.Tags != nil && len(req.Tags) > 0 {
+	if len(req.Tags) > 0 {
 		tagsData, err := json.Marshal(req.Tags)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal tags: %w", err)
@@ -107,7 +107,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	}
 
 	inferenceAcceleratorsJSON := ""
-	if req.InferenceAccelerators != nil && len(req.InferenceAccelerators) > 0 {
+	if len(req.InferenceAccelerators) > 0 {
 		acceleratorData, err := json.Marshal(req.InferenceAccelerators)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal inference accelerators: %w", err)
@@ -335,7 +335,7 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 
 // DeleteTaskDefinitions implements the DeleteTaskDefinitions operation
 func (api *DefaultECSAPI) DeleteTaskDefinitions(ctx context.Context, req *generated.DeleteTaskDefinitionsRequest) (*generated.DeleteTaskDefinitionsResponse, error) {
-	if req.TaskDefinitions == nil || len(req.TaskDefinitions) == 0 {
+	if len(req.TaskDefinitions) == 0 {
 		return nil, fmt.Errorf("taskDefinitions is required")
 	}
 

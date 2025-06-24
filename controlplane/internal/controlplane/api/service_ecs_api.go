@@ -283,7 +283,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	}
 
 	// Handle Service Discovery registration if ServiceRegistries are specified
-	if req.ServiceRegistries != nil && len(req.ServiceRegistries) > 0 {
+	if len(req.ServiceRegistries) > 0 {
 		if err := api.registerServiceWithDiscovery(ctx, storageService, req.ServiceRegistries); err != nil {
 			// Log error but don't fail service creation
 			log.Printf("Warning: Failed to register service with service discovery: %v", err)
@@ -796,7 +796,7 @@ func (api *DefaultECSAPI) UpdateServicePrimaryTaskSet(ctx context.Context, req *
 // DescribeServiceDeployments implements the DescribeServiceDeployments operation
 func (api *DefaultECSAPI) DescribeServiceDeployments(ctx context.Context, req *generated.DescribeServiceDeploymentsRequest) (*generated.DescribeServiceDeploymentsResponse, error) {
 	// Validate required fields
-	if req.ServiceDeploymentArns == nil || len(req.ServiceDeploymentArns) == 0 {
+	if len(req.ServiceDeploymentArns) == 0 {
 		return nil, fmt.Errorf("serviceDeploymentArns is required")
 	}
 
@@ -896,7 +896,7 @@ func (api *DefaultECSAPI) DescribeServiceDeployments(ctx context.Context, req *g
 // DescribeServiceRevisions implements the DescribeServiceRevisions operation
 func (api *DefaultECSAPI) DescribeServiceRevisions(ctx context.Context, req *generated.DescribeServiceRevisionsRequest) (*generated.DescribeServiceRevisionsResponse, error) {
 	// Validate required fields
-	if req.ServiceRevisionArns == nil || len(req.ServiceRevisionArns) == 0 {
+	if len(req.ServiceRevisionArns) == 0 {
 		return nil, fmt.Errorf("serviceRevisionArns is required")
 	}
 
@@ -1085,7 +1085,7 @@ func (api *DefaultECSAPI) ListServiceDeployments(ctx context.Context, req *gener
 	}
 
 	// Apply status filter if specified
-	if req.Status != nil && len(req.Status) > 0 {
+	if len(req.Status) > 0 {
 		// Filter deployments by status
 		filteredDeployments := []generated.ServiceDeploymentBrief{}
 		for _, deployment := range deployments {
