@@ -7,8 +7,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"k8s.io/klog/v2"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
 // AWSProxyHandler handles proxying AWS API calls to LocalStack
@@ -51,14 +52,14 @@ func (h *AWSProxyHandler) updateProxyTarget(endpoint string) error {
 	originalDirector := h.reverseProxy.Director
 	h.reverseProxy.Director = func(req *http.Request) {
 		originalDirector(req)
-		
+
 		// Preserve the original host header for AWS SDK compatibility
 		req.Host = targetURL.Host
-		
+
 		// Add LocalStack specific headers
 		req.Header.Set("X-Forwarded-Host", req.Header.Get("Host"))
 		req.Header.Set("X-LocalStack-Edge", "1")
-		
+
 		// Log the proxied request
 		klog.V(4).Infof("Proxying AWS request: %s %s to %s", req.Method, req.URL.Path, targetURL.Host)
 	}
@@ -96,7 +97,7 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Extract service name from the request (for logging/debugging)
 	service := h.extractServiceFromRequest(r)
 	klog.V(3).Infof("Proxying request for AWS service: %s", service)
-	
+
 	// Note: We don't check if the service is enabled here anymore.
 	// LocalStack will handle unknown or disabled services appropriately.
 	// This allows for more flexibility and reduces maintenance.
@@ -153,7 +154,7 @@ func (h *AWSProxyHandler) extractServiceFromRequest(r *http.Request) string {
 	if host == "" {
 		host = r.URL.Host
 	}
-	
+
 	// Extract service from AWS endpoint pattern: service.region.amazonaws.com
 	if strings.Contains(host, ".amazonaws.com") {
 		parts := strings.Split(host, ".")
@@ -180,11 +181,10 @@ func (h *AWSProxyHandler) HealthCheck() (bool, error) {
 	return h.localStackManager.IsHealthy(), nil
 }
 
-
 // isAWSAPICall checks if the request is for an AWS API
 func isAWSAPICall(r *http.Request) bool {
 	path := r.URL.Path
-	
+
 	// Check for AWS API path patterns
 	awsAPIPrefixes := []string{
 		"/api/v1/s3/",
@@ -204,8 +204,8 @@ func isAWSAPICall(r *http.Request) bool {
 	}
 
 	// Check for AWS SDK headers
-	if r.Header.Get("X-Amz-Target") != "" || 
-	   strings.Contains(r.Header.Get("Authorization"), "AWS4-HMAC-SHA256") {
+	if r.Header.Get("X-Amz-Target") != "" ||
+		strings.Contains(r.Header.Get("Authorization"), "AWS4-HMAC-SHA256") {
 		return true
 	}
 
@@ -215,6 +215,6 @@ func isAWSAPICall(r *http.Request) bool {
 // isECSAPICall checks if the request is for the ECS API
 func isECSAPICall(r *http.Request) bool {
 	// ECS API calls go through the main KECS API
-	return strings.HasPrefix(r.URL.Path, "/v1/") || 
-	       r.Header.Get("X-Amz-Target") == "AmazonEC2ContainerServiceV20141113"
+	return strings.HasPrefix(r.URL.Path, "/v1/") ||
+		r.Header.Get("X-Amz-Target") == "AmazonEC2ContainerServiceV20141113"
 }

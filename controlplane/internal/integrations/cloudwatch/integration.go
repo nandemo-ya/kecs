@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	cloudwatchlogsapi "github.com/nandemo-ya/kecs/controlplane/internal/cloudwatchlogs/generated"
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
+	cloudwatchlogsapi "github.com/nandemo-ya/kecs/controlplane/internal/cloudwatchlogs/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
 // integration implements the CloudWatch Integration interface
@@ -34,7 +35,7 @@ func NewIntegration(kubeClient kubernetes.Interface, localstackManager localstac
 	if endpoint == "" {
 		endpoint = "http://localhost:4566"
 	}
-	
+
 	logsClient := newCloudWatchLogsClient(endpoint)
 
 	return &integration{
@@ -172,7 +173,7 @@ func (i *integration) GetLogStreamForContainer(taskArn, containerName string) st
 	if len(parts) >= 2 {
 		taskID = parts[len(parts)-1]
 	}
-	
+
 	// Format: <container-name>/<task-id>
 	return fmt.Sprintf("%s/%s", containerName, taskID)
 }
@@ -188,12 +189,12 @@ func (i *integration) ConfigureContainerLogging(taskArn string, containerName st
 	if logGroupName == "" {
 		logGroupName = i.GetLogGroupForTask(taskArn)
 	}
-	
+
 	logStreamName := options["awslogs-stream-prefix"]
 	if logStreamName == "" {
 		logStreamName = containerName
 	}
-	
+
 	// Ensure log group exists
 	if err := i.CreateLogGroup(logGroupName); err != nil {
 		return nil, fmt.Errorf("failed to create log group: %w", err)
@@ -262,4 +263,3 @@ func (i *integration) generateFluentBitConfig(logGroupName, logStreamPrefix stri
     net.keepalive       Off
 `, region, logGroupName, logStreamPrefix, endpoint)
 }
-

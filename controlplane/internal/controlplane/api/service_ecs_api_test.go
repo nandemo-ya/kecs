@@ -31,8 +31,8 @@ var _ = Describe("Service ECS API", func() {
 		mockStorage.SetClusterStore(mockClusterStore)
 
 		server = &Server{
-			storage:     mockStorage,
-			ecsAPI:      NewDefaultECSAPI(mockStorage),
+			storage: mockStorage,
+			ecsAPI:  NewDefaultECSAPI(mockStorage),
 		}
 		ctx = context.Background()
 

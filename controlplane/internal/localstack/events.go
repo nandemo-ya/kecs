@@ -38,17 +38,17 @@ const (
 
 // EventFilter defines filters for LocalStack events
 type EventFilter struct {
-	Services    []string `json:"services,omitempty"`    // Filter by AWS service (e.g., "ecs")
-	EventTypes  []string `json:"eventTypes,omitempty"`  // Filter by event type
-	Resources   []string `json:"resources,omitempty"`   // Filter by resource ARN patterns
-	Regions     []string `json:"regions,omitempty"`     // Filter by region
+	Services   []string `json:"services,omitempty"`   // Filter by AWS service (e.g., "ecs")
+	EventTypes []string `json:"eventTypes,omitempty"` // Filter by event type
+	Resources  []string `json:"resources,omitempty"`  // Filter by resource ARN patterns
+	Regions    []string `json:"regions,omitempty"`    // Filter by region
 }
 
 // EventProcessor processes LocalStack events
 type EventProcessor interface {
 	// ProcessEvent processes a single LocalStack event
 	ProcessEvent(ctx context.Context, event *Event) error
-	
+
 	// GetFilter returns the event filter for this processor
 	GetFilter() EventFilter
 }
@@ -57,23 +57,23 @@ type EventProcessor interface {
 type EventMonitor interface {
 	// Start starts monitoring LocalStack events
 	Start(ctx context.Context) error
-	
+
 	// Stop stops monitoring LocalStack events
 	Stop(ctx context.Context) error
-	
+
 	// Subscribe subscribes an event processor to events
 	Subscribe(processor EventProcessor)
-	
+
 	// Unsubscribe unsubscribes an event processor
 	Unsubscribe(processor EventProcessor)
 }
 
 // eventMonitor implements the EventMonitor interface
 type eventMonitor struct {
-	manager     Manager
-	processors  []EventProcessor
-	stopCh      chan struct{}
-	isRunning   bool
+	manager    Manager
+	processors []EventProcessor
+	stopCh     chan struct{}
+	isRunning  bool
 }
 
 // NewEventMonitor creates a new LocalStack event monitor
@@ -168,9 +168,9 @@ func (em *eventMonitor) simulateECSEvents(ctx context.Context) {
 	// 1. Call LocalStack's CloudWatch Events API
 	// 2. Query for ECS-related events
 	// 3. Parse the events and convert them to our Event struct
-	
+
 	klog.V(5).Info("Simulating LocalStack events (placeholder)")
-	
+
 	// Example: Simulate a task state change event
 	event := &Event{
 		Service:   "ecs",
@@ -179,9 +179,9 @@ func (em *eventMonitor) simulateECSEvents(ctx context.Context) {
 		Account:   "123456789012",
 		Time:      time.Now(),
 		Detail: map[string]interface{}{
-			"clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/default",
-			"taskArn":    "arn:aws:ecs:us-east-1:123456789012:task/default/abc123",
-			"lastStatus": "RUNNING",
+			"clusterArn":    "arn:aws:ecs:us-east-1:123456789012:cluster/default",
+			"taskArn":       "arn:aws:ecs:us-east-1:123456789012:task/default/abc123",
+			"lastStatus":    "RUNNING",
 			"desiredStatus": "RUNNING",
 		},
 	}

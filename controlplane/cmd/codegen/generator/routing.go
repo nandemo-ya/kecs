@@ -20,7 +20,7 @@ func (g *Generator) generateRoutingFile(api *parser.SmithyAPI) error {
 
 	// Collect all operations
 	operations := g.collectOperations(api, serviceShape)
-	
+
 	// Sort operations for consistent output
 	var opNames []string
 	for name := range operations {

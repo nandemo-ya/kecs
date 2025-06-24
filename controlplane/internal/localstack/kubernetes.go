@@ -144,7 +144,7 @@ func (km *kubernetesManager) createConfigMap(ctx context.Context, config *Config
 // createDeployment creates the LocalStack deployment
 func (km *kubernetesManager) createDeployment(ctx context.Context, config *Config) error {
 	replicas := int32(1)
-	
+
 	// Parse resource limits
 	memoryQuantity, _ := resource.ParseQuantity(config.Resources.Memory)
 	cpuQuantity, _ := resource.ParseQuantity(config.Resources.CPU)
@@ -302,7 +302,7 @@ func (km *kubernetesManager) createService(ctx context.Context, config *Config) 
 // WaitForLocalStackReady waits for LocalStack to output "Ready." in its logs
 func (km *kubernetesManager) WaitForLocalStackReady(ctx context.Context, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
-	
+
 	// First, wait for pod to be running
 	for {
 		select {
@@ -312,7 +312,7 @@ func (km *kubernetesManager) WaitForLocalStackReady(ctx context.Context, timeout
 			if time.Now().After(deadline) {
 				return fmt.Errorf("timeout waiting for LocalStack to be ready")
 			}
-			
+
 			pods, err := km.client.CoreV1().Pods(km.namespace).List(ctx, metav1.ListOptions{
 				LabelSelector: "app=localstack",
 			})
@@ -321,19 +321,19 @@ func (km *kubernetesManager) WaitForLocalStackReady(ctx context.Context, timeout
 				time.Sleep(2 * time.Second)
 				continue
 			}
-			
+
 			if len(pods.Items) == 0 {
 				klog.Info("No LocalStack pods found yet")
 				time.Sleep(2 * time.Second)
 				continue
 			}
-			
+
 			pod := &pods.Items[0]
 			if pod.Status.Phase == corev1.PodRunning {
 				// Pod is running, now check logs for "Ready."
 				return km.waitForReadyInLogs(ctx, pod.Name, deadline)
 			}
-			
+
 			klog.Infof("Pod status: %s", pod.Status.Phase)
 			time.Sleep(2 * time.Second)
 		}
@@ -343,16 +343,16 @@ func (km *kubernetesManager) WaitForLocalStackReady(ctx context.Context, timeout
 // waitForReadyInLogs monitors pod logs for the "Ready." message
 func (km *kubernetesManager) waitForReadyInLogs(ctx context.Context, podName string, deadline time.Time) error {
 	req := km.client.CoreV1().Pods(km.namespace).GetLogs(podName, &corev1.PodLogOptions{
-		Follow: true,
+		Follow:    true,
 		Container: "localstack",
 	})
-	
+
 	stream, err := req.Stream(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get log stream: %w", err)
 	}
 	defer stream.Close()
-	
+
 	scanner := bufio.NewScanner(stream)
 	for scanner.Scan() {
 		select {
@@ -362,10 +362,10 @@ func (km *kubernetesManager) waitForReadyInLogs(ctx context.Context, podName str
 			if time.Now().After(deadline) {
 				return fmt.Errorf("timeout waiting for LocalStack Ready message")
 			}
-			
+
 			line := scanner.Text()
 			klog.V(4).Infof("LocalStack log: %s", line)
-			
+
 			// Check for "Ready." in the log line
 			if strings.Contains(line, "Ready.") {
 				klog.Info("LocalStack is ready!")
@@ -373,11 +373,11 @@ func (km *kubernetesManager) waitForReadyInLogs(ctx context.Context, podName str
 			}
 		}
 	}
-	
+
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("error reading logs: %w", err)
 	}
-	
+
 	return fmt.Errorf("log stream ended without Ready message")
 }
 

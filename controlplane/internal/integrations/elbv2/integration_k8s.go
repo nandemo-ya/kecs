@@ -15,7 +15,7 @@ import (
 type k8sIntegration struct {
 	region    string
 	accountID string
-	
+
 	// In-memory storage for load balancers and target groups
 	// In production, this should be persisted
 	mu            sync.RWMutex
@@ -42,20 +42,20 @@ func (i *k8sIntegration) CreateLoadBalancer(ctx context.Context, name string, su
 	klog.V(2).Infof("Creating virtual load balancer: %s", name)
 
 	// Generate ARN
-	arn := fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:loadbalancer/app/%s/%s", 
+	arn := fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:loadbalancer/app/%s/%s",
 		i.region, i.accountID, name, generateID())
 
 	// Create virtual load balancer
 	lb := &LoadBalancer{
-		Arn:            arn,
-		Name:           name,
-		DNSName:        fmt.Sprintf("%s-%s.%s.elb.amazonaws.com", name, generateID(), i.region),
-		State:          "active",
-		Type:           "application",
-		Scheme:         "internet-facing",
-		VpcId:          "vpc-default",
-		SecurityGroups: securityGroups,
-		CreatedTime:    time.Now().Format(time.RFC3339),
+		Arn:               arn,
+		Name:              name,
+		DNSName:           fmt.Sprintf("%s-%s.%s.elb.amazonaws.com", name, generateID(), i.region),
+		State:             "active",
+		Type:              "application",
+		Scheme:            "internet-facing",
+		VpcId:             "vpc-default",
+		SecurityGroups:    securityGroups,
+		CreatedTime:       time.Now().Format(time.RFC3339),
 		AvailabilityZones: []AvailabilityZone{},
 	}
 
@@ -163,7 +163,7 @@ func (i *k8sIntegration) RegisterTargets(ctx context.Context, targetGroupArn str
 			Reason:      "Elb.RegistrationInProgress",
 			Description: "Target registration is in progress",
 		}
-		
+
 		// Simulate health check transition
 		go func(tgArn, targetId string) {
 			time.Sleep(5 * time.Second)

@@ -102,7 +102,7 @@ func TestSigner_CanonicalURI(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req, err := http.NewRequest("GET", "http://example.com"+tt.path, nil)
 			require.NoError(t, err)
-			
+
 			result := signer.canonicalURI(req.URL)
 			assert.Equal(t, tt.expected, result)
 		})

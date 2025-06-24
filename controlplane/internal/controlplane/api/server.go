@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	k8s "k8s.io/client-go/kubernetes"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
@@ -19,32 +21,31 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	k8s "k8s.io/client-go/kubernetes"
 )
 
 // Server represents the HTTP API server for KECS Control Plane
 type Server struct {
-	httpServer        *http.Server
-	port              int
-	kubeconfig        string
-	ecsAPI            generated.ECSAPIInterface
-	storage           storage.Storage
-	clusterManager    kubernetes.ClusterManager
-	taskManager       *kubernetes.TaskManager
-	region            string
-	accountID         string
-	webSocketHub      *WebSocketHub
-	webUIHandler      *WebUIHandler
-	testModeWorker    *TestModeTaskWorker
-	localStackManager       localstack.Manager
-	awsProxyRouter          *AWSProxyRouter
-	localStackEvents        *LocalStackEventIntegration
-	iamIntegration          iam.Integration
-	cloudWatchIntegration   cloudwatch.Integration
-	ssmIntegration          ssm.Integration
+	httpServer                *http.Server
+	port                      int
+	kubeconfig                string
+	ecsAPI                    generated.ECSAPIInterface
+	storage                   storage.Storage
+	clusterManager            kubernetes.ClusterManager
+	taskManager               *kubernetes.TaskManager
+	region                    string
+	accountID                 string
+	webSocketHub              *WebSocketHub
+	webUIHandler              *WebUIHandler
+	testModeWorker            *TestModeTaskWorker
+	localStackManager         localstack.Manager
+	awsProxyRouter            *AWSProxyRouter
+	localStackEvents          *LocalStackEventIntegration
+	iamIntegration            iam.Integration
+	cloudWatchIntegration     cloudwatch.Integration
+	ssmIntegration            ssm.Integration
 	secretsManagerIntegration secretsmanager.Integration
-	s3Integration           s3.Integration
-	serviceDiscoveryAPI     *ServiceDiscoveryAPI
+	s3Integration             s3.Integration
+	serviceDiscoveryAPI       *ServiceDiscoveryAPI
 }
 
 // NewServer creates a new API server instance
@@ -77,17 +78,17 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	} else {
 		// Create cluster manager (k3d only)
 		clusterConfig := &kubernetes.ClusterManagerConfig{
-			ContainerMode: os.Getenv("KECS_CONTAINER_MODE") == "true",
+			ContainerMode:  os.Getenv("KECS_CONTAINER_MODE") == "true",
 			KubeconfigPath: kubeconfig,
 		}
-		
+
 		cm, err := kubernetes.NewClusterManager(clusterConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create cluster manager: %w", err)
 		}
 		clusterManager = cm
-		
-		log.Printf("Initialized k3d cluster manager (container mode: %v)", 
+
+		log.Printf("Initialized k3d cluster manager (container mode: %v)",
 			clusterConfig.ContainerMode)
 	}
 
@@ -96,7 +97,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		kubeconfig:     kubeconfig,
 		region:         "ap-northeast-1", // Default region
 		accountID:      "123456789012",   // Default account ID
-		ecsAPI:         nil, // Will be set after IAM integration
+		ecsAPI:         nil,              // Will be set after IAM integration
 		storage:        storage,
 		clusterManager: clusterManager,
 		webSocketHub:   NewWebSocketHubWithConfig(wsConfig),
@@ -145,7 +146,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				}
 			}
 		}
-		
+
 		if kubeClient != nil {
 			localStackManager, err := localstack.NewManager(localStackConfig, kubeClient)
 			if err != nil {
@@ -159,14 +160,14 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				} else {
 					s.awsProxyRouter = awsProxyRouter
 				}
-				
+
 				// Create LocalStack event integration
 				s.localStackEvents = NewLocalStackEventIntegration(
 					localStackManager,
 					s.webSocketHub,
 					DefaultLocalStackEventConfig(),
 				)
-				
+
 				// Initialize IAM integration if LocalStack is available
 				if kubeClient != nil {
 					iamConfig := &iam.Config{
@@ -182,7 +183,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 						log.Println("IAM integration initialized successfully")
 					}
 				}
-				
+
 				// Initialize CloudWatch integration if LocalStack is available
 				if kubeClient != nil {
 					cwConfig := &cloudwatch.Config{
@@ -199,7 +200,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 						log.Println("CloudWatch integration initialized successfully")
 					}
 				}
-				
+
 				// Initialize SSM integration if LocalStack is available
 				if kubeClient != nil {
 					ssmConfig := &ssm.Config{
@@ -217,7 +218,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 						log.Println("SSM Parameter Store integration initialized successfully")
 					}
 				}
-				
+
 				// Initialize Secrets Manager integration if LocalStack is available
 				if kubeClient != nil {
 					smConfig := &secretsmanager.Config{
@@ -235,7 +236,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 						log.Println("Secrets Manager integration initialized successfully")
 					}
 				}
-				
+
 				// Initialize S3 integration if LocalStack is available
 				if kubeClient != nil {
 					s3Config := &s3.Config{
@@ -279,7 +280,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		if s.s3Integration != nil {
 			defaultAPI.SetS3Integration(s.s3Integration)
 		}
-		
+
 		// Initialize Service Discovery if we have kubernetes client
 		if localStackConfig != nil && localStackConfig.Enabled {
 			var kubeClient k8s.Interface
@@ -289,20 +290,19 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					kubeClient, _ = k8s.NewForConfig(kubeConfig)
 				}
 			}
-			
+
 			if kubeClient != nil {
 				serviceDiscoveryManager := servicediscovery.NewManager(kubeClient, "us-east-1", "123456789012")
 				defaultAPI.SetServiceDiscoveryManager(serviceDiscoveryManager)
-				
+
 				// Create Service Discovery API handler
 				s.serviceDiscoveryAPI = NewServiceDiscoveryAPI(serviceDiscoveryManager, "us-east-1", "123456789012")
-				
+
 				log.Println("Service Discovery integration initialized successfully")
 			}
 		}
 	}
 	s.ecsAPI = ecsAPI
-	
 
 	return s, nil
 }
@@ -367,31 +367,31 @@ func (s *Server) Start() error {
 // Stop gracefully stops the HTTP server
 func (s *Server) Stop(ctx context.Context) error {
 	log.Println("Shutting down API server...")
-	
+
 	// Stop test mode worker if running
 	if s.testModeWorker != nil {
 		s.testModeWorker.Stop()
 	}
-	
+
 	// Stop LocalStack event integration if running
 	if s.localStackEvents != nil {
 		if err := s.localStackEvents.Stop(ctx); err != nil {
 			log.Printf("Error stopping LocalStack event integration: %v", err)
 		}
 	}
-	
+
 	// Stop LocalStack manager if running
 	if s.localStackManager != nil {
 		if err := s.localStackManager.Stop(ctx); err != nil {
 			log.Printf("Error stopping LocalStack manager: %v", err)
 		}
 	}
-	
+
 	// Clean up k3d clusters if not in test mode and environment variable allows
 	if os.Getenv("KECS_TEST_MODE") != "true" && os.Getenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN") != "true" {
 		if s.clusterManager != nil && s.storage != nil {
 			log.Println("Cleaning up k3d clusters...")
-			
+
 			// Get all clusters from storage
 			clusters, err := s.storage.ClusterStore().List(ctx)
 			if err != nil {
@@ -413,7 +413,7 @@ func (s *Server) Stop(ctx context.Context) error {
 	} else if os.Getenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN") == "true" {
 		log.Println("KECS_KEEP_CLUSTERS_ON_SHUTDOWN is set, keeping k3d clusters")
 	}
-	
+
 	return s.httpServer.Shutdown(ctx)
 }
 
@@ -487,7 +487,7 @@ func (s *Server) RecoverState(ctx context.Context) error {
 		log.Printf("Successfully recovered k3d cluster %s", cluster.K8sClusterName)
 	}
 
-	log.Printf("State recovery summary: %d recovered, %d skipped, %d failed", 
+	log.Printf("State recovery summary: %d recovered, %d skipped, %d failed",
 		recoveredCount, skippedCount, failedCount)
 
 	if failedCount > 0 {

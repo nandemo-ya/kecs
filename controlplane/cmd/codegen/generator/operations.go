@@ -30,7 +30,7 @@ func (g *Generator) generateOperationsFile(api *parser.SmithyAPI) error {
 
 	// Collect all operations
 	operations := g.collectOperations(api, serviceShape)
-	
+
 	// Sort operations for consistent output
 	var opNames []string
 	for name := range operations {
@@ -40,16 +40,16 @@ func (g *Generator) generateOperationsFile(api *parser.SmithyAPI) error {
 
 	// Generate content
 	data := struct {
-		Package      string
-		Service      string
-		ServiceName  string
-		Operations   map[string]*OperationInfo
+		Package        string
+		Service        string
+		ServiceName    string
+		Operations     map[string]*OperationInfo
 		OperationNames []string
 	}{
-		Package:      g.packageName,
-		Service:      g.service,
-		ServiceName:  parser.GetShapeName(serviceName),
-		Operations:   operations,
+		Package:        g.packageName,
+		Service:        g.service,
+		ServiceName:    parser.GetShapeName(serviceName),
+		Operations:     operations,
 		OperationNames: opNames,
 	}
 
@@ -64,36 +64,36 @@ func (g *Generator) generateOperationsFile(api *parser.SmithyAPI) error {
 // collectOperations collects all operations from the service
 func (g *Generator) collectOperations(api *parser.SmithyAPI, serviceShape *parser.SmithyShape) map[string]*OperationInfo {
 	operations := make(map[string]*OperationInfo)
-	
+
 	for _, opRef := range serviceShape.Operations {
 		opName := parser.GetShapeName(opRef.Target)
 		opShape, exists := api.Shapes[opRef.Target]
 		if !exists || opShape.Type != "operation" {
 			continue
 		}
-		
+
 		opInfo := &OperationInfo{
 			Name: opName,
 		}
-		
+
 		// Get input type
 		if opShape.Input != nil {
 			inputName := parser.GetShapeName(opShape.Input.Target)
 			opInfo.InputType = inputName
 		}
-		
+
 		// Get output type
 		if opShape.Output != nil {
 			outputName := parser.GetShapeName(opShape.Output.Target)
 			opInfo.OutputType = outputName
 		}
-		
+
 		// Get error types
 		for _, errRef := range opShape.Errors {
 			errName := parser.GetShapeName(errRef.Target)
 			opInfo.Errors = append(opInfo.Errors, errName)
 		}
-		
+
 		// Get HTTP info from traits
 		if opShape.Traits != nil {
 			if httpTrait, ok := opShape.Traits["smithy.api#http"]; ok {
@@ -107,10 +107,10 @@ func (g *Generator) collectOperations(api *parser.SmithyAPI, serviceShape *parse
 				}
 			}
 		}
-		
+
 		operations[opName] = opInfo
 	}
-	
+
 	return operations
 }
 

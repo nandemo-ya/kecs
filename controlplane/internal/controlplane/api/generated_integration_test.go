@@ -8,12 +8,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestGeneratedTypesIntegration tests that generated types work correctly with the API
@@ -62,7 +63,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 		// Make HTTP request
 		resp, err := makeRequest(server.URL, "CreateCluster", req)
 		require.NoError(t, err)
-		
+
 		// If not OK, print the response body for debugging
 		if resp.StatusCode != http.StatusOK {
 			var errResp map[string]interface{}
@@ -71,7 +72,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 				t.Logf("Error response: %v", errResp)
 			}
 		}
-		
+
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// Parse response

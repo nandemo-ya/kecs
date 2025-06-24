@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	sm "github.com/nandemo-ya/kecs/controlplane/internal/secretsmanager/generated"
 )
 
@@ -18,11 +19,11 @@ var _ = Describe("Secrets Manager Generated Types", func() {
 	Describe("GetSecretValueRequest", func() {
 		Context("when marshaling to JSON", func() {
 			It("should use camelCase field names", func() {
-		req := &sm.GetSecretValueRequest{
-			SecretId:     "my-secret",
-			VersionId:    stringPtr("v1"),
-			VersionStage: stringPtr("AWSCURRENT"),
-		}
+				req := &sm.GetSecretValueRequest{
+					SecretId:     "my-secret",
+					VersionId:    stringPtr("v1"),
+					VersionStage: stringPtr("AWSCURRENT"),
+				}
 
 				// Marshal to JSON
 				data, err := json.Marshal(req)
@@ -43,7 +44,7 @@ var _ = Describe("Secrets Manager Generated Types", func() {
 	Describe("GetSecretValueResponse", func() {
 		Context("when unmarshaling from JSON", func() {
 			It("should correctly parse camelCase fields", func() {
-		jsonData := `{
+				jsonData := `{
 			"arn": "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf",
 			"name": "my-secret",
 			"versionId": "12345678-1234-1234-1234-123456789012",
@@ -70,21 +71,21 @@ var _ = Describe("Secrets Manager Generated Types", func() {
 	Describe("CreateSecretRequest", func() {
 		Context("when marshaling with tags", func() {
 			It("should correctly serialize tags with camelCase", func() {
-		req := &sm.CreateSecretRequest{
-			Name:         "new-secret",
-			Description:  stringPtr("My new secret"),
-			SecretString: stringPtr(`{"key":"value"}`),
-			Tags: []sm.Tag{
-				{
-					Key:   stringPtr("Environment"),
-					Value: stringPtr("Production"),
-				},
-				{
-					Key:   stringPtr("Application"),
-					Value: stringPtr("MyApp"),
-				},
-			},
-		}
+				req := &sm.CreateSecretRequest{
+					Name:         "new-secret",
+					Description:  stringPtr("My new secret"),
+					SecretString: stringPtr(`{"key":"value"}`),
+					Tags: []sm.Tag{
+						{
+							Key:   stringPtr("Environment"),
+							Value: stringPtr("Production"),
+						},
+						{
+							Key:   stringPtr("Application"),
+							Value: stringPtr("MyApp"),
+						},
+					},
+				}
 
 				// Marshal to JSON
 				data, err := json.Marshal(req)
@@ -102,11 +103,11 @@ var _ = Describe("Secrets Manager Generated Types", func() {
 				// Verify tags
 				tags := jsonMap["tags"].([]interface{})
 				Expect(tags).To(HaveLen(2))
-				
+
 				tag1 := tags[0].(map[string]interface{})
 				Expect(tag1["key"]).To(Equal("Environment"))
 				Expect(tag1["value"]).To(Equal("Production"))
-				
+
 				tag2 := tags[1].(map[string]interface{})
 				Expect(tag2["key"]).To(Equal("Application"))
 				Expect(tag2["value"]).To(Equal("MyApp"))

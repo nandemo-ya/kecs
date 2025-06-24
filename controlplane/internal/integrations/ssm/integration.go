@@ -10,12 +10,13 @@ import (
 	"sync"
 	"time"
 
-	ssmapi "github.com/nandemo-ya/kecs/controlplane/internal/ssm/generated"
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	ssmapi "github.com/nandemo-ya/kecs/controlplane/internal/ssm/generated"
 )
 
 // integration implements the SSM Parameter Store integration
@@ -56,7 +57,7 @@ func NewIntegration(kubeClient kubernetes.Interface, localStackManager localstac
 	if endpoint == "" {
 		endpoint = "http://localhost:4566"
 	}
-	
+
 	ssmClient := newSSMClient(endpoint)
 
 	return &integration{
@@ -282,21 +283,21 @@ func (i *integration) SyncParameters(ctx context.Context, parameters []string, n
 func (i *integration) GetSecretNameForParameter(parameterName string) string {
 	// Remove leading/trailing slashes
 	cleanName := strings.Trim(parameterName, "/")
-	
+
 	// Replace slashes and other invalid characters with hyphens
 	re := regexp.MustCompile(`[^a-zA-Z0-9\-]`)
 	secretName := re.ReplaceAllString(cleanName, "-")
-	
+
 	// Remove consecutive hyphens
 	re = regexp.MustCompile(`-+`)
 	secretName = re.ReplaceAllString(secretName, "-")
-	
+
 	// Remove leading and trailing hyphens
 	secretName = strings.Trim(secretName, "-")
-	
+
 	// Convert to lowercase
 	secretName = strings.ToLower(secretName)
-	
+
 	// Add prefix
 	return i.config.SecretPrefix + secretName
 }

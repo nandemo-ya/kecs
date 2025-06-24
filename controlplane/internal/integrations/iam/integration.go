@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	iamapi "github.com/nandemo-ya/kecs/controlplane/internal/iam/generated"
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
+	iamapi "github.com/nandemo-ya/kecs/controlplane/internal/iam/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
 // integration implements the IAM Integration interface
@@ -37,7 +38,7 @@ func NewIntegration(kubeClient kubernetes.Interface, localstackManager localstac
 	if endpoint == "" {
 		endpoint = "http://localhost:4566"
 	}
-	
+
 	iamClient := newIAMClient(endpoint)
 	stsClient := newSTSClient(endpoint)
 
@@ -89,7 +90,7 @@ func (i *integration) CreateTaskRole(taskDefArn, roleName string, trustPolicy st
 			Value: "true",
 		},
 	}
-	
+
 	description := fmt.Sprintf("Task role for %s", taskDefArn)
 	createRoleOutput, err := i.iamClient.CreateRole(ctx, &iamapi.CreateRoleRequest{
 		RoleName:                 roleName,
@@ -110,13 +111,13 @@ func (i *integration) CreateTaskRole(taskDefArn, roleName string, trustPolicy st
 			Name:      serviceAccountName,
 			Namespace: i.config.KubeNamespace,
 			Annotations: map[string]string{
-				ServiceAccountAnnotations.RoleArn:          roleArn,
-				ServiceAccountAnnotations.RoleName:         roleName,
+				ServiceAccountAnnotations.RoleArn:           roleArn,
+				ServiceAccountAnnotations.RoleName:          roleName,
 				ServiceAccountAnnotations.TaskDefinitionArn: taskDefArn,
 			},
 			Labels: map[string]string{
 				"app.kubernetes.io/managed-by": "kecs",
-				"kecs.io/iam-role":            roleName,
+				"kecs.io/iam-role":             roleName,
 			},
 		},
 	}
@@ -175,7 +176,7 @@ func (i *integration) CreateTaskExecutionRole(roleName string) error {
 			Value: "true",
 		},
 	}
-	
+
 	description := "ECS task execution role"
 	_, err := i.iamClient.CreateRole(ctx, &iamapi.CreateRoleRequest{
 		RoleName:                 roleName,

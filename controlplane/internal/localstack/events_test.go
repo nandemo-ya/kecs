@@ -35,32 +35,36 @@ func (m *mockLocalStackManager) IsHealthy() bool {
 }
 
 // Implement other Manager interface methods as no-ops for testing
-func (m *mockLocalStackManager) Start(ctx context.Context) error { return nil }
-func (m *mockLocalStackManager) Stop(ctx context.Context) error { return nil }
+func (m *mockLocalStackManager) Start(ctx context.Context) error   { return nil }
+func (m *mockLocalStackManager) Stop(ctx context.Context) error    { return nil }
 func (m *mockLocalStackManager) Restart(ctx context.Context) error { return nil }
-func (m *mockLocalStackManager) GetStatus() (*localstack.Status, error) { 
-	return &localstack.Status{Healthy: m.healthy}, nil 
+func (m *mockLocalStackManager) GetStatus() (*localstack.Status, error) {
+	return &localstack.Status{Healthy: m.healthy}, nil
 }
 func (m *mockLocalStackManager) UpdateServices(services []string) error { return nil }
-func (m *mockLocalStackManager) GetEnabledServices() ([]string, error) { return []string{"ecs"}, nil }
-func (m *mockLocalStackManager) GetEndpoint() (string, error) { return "http://localhost:4566", nil }
-func (m *mockLocalStackManager) GetServiceEndpoint(service string) (string, error) { return "http://localhost:4566", nil }
-func (m *mockLocalStackManager) WaitForReady(ctx context.Context, timeout time.Duration) error { return nil }
-func (m *mockLocalStackManager) IsRunning() bool { return m.healthy }
+func (m *mockLocalStackManager) GetEnabledServices() ([]string, error)  { return []string{"ecs"}, nil }
+func (m *mockLocalStackManager) GetEndpoint() (string, error)           { return "http://localhost:4566", nil }
+func (m *mockLocalStackManager) GetServiceEndpoint(service string) (string, error) {
+	return "http://localhost:4566", nil
+}
+func (m *mockLocalStackManager) WaitForReady(ctx context.Context, timeout time.Duration) error {
+	return nil
+}
+func (m *mockLocalStackManager) IsRunning() bool                         { return m.healthy }
 func (m *mockLocalStackManager) CheckServiceHealth(service string) error { return nil }
-func (m *mockLocalStackManager) GetConfig() *localstack.Config { 
+func (m *mockLocalStackManager) GetConfig() *localstack.Config {
 	return &localstack.Config{
-		Enabled: true,
+		Enabled:  true,
 		Services: []string{"ecs"},
-		Version: "latest",
+		Version:  "latest",
 	}
 }
 
 var _ = Describe("LocalStack Events", func() {
 	var (
-		eventMonitor   localstack.EventMonitor
-		mockManager    *mockLocalStackManager
-		mockProcessor  *mockEventProcessor
+		eventMonitor  localstack.EventMonitor
+		mockManager   *mockLocalStackManager
+		mockProcessor *mockEventProcessor
 		ctx           context.Context
 	)
 
@@ -68,11 +72,11 @@ var _ = Describe("LocalStack Events", func() {
 		ctx = context.Background()
 		mockManager = &mockLocalStackManager{healthy: true}
 		eventMonitor = localstack.NewEventMonitor(mockManager)
-		
+
 		mockProcessor = &mockEventProcessor{
 			processedEvents: make([]localstack.Event, 0),
 			filter: localstack.EventFilter{
-				Services: []string{"ecs"},
+				Services:   []string{"ecs"},
 				EventTypes: []string{localstack.EventTypeTaskStateChange},
 			},
 		}
@@ -179,7 +183,6 @@ var _ = Describe("LocalStack Events", func() {
 			// Marshal to JSON
 			jsonData, err := originalEvent.MarshalJSON()
 			Expect(err).NotTo(HaveOccurred())
-
 
 			// Unmarshal from JSON
 			var unmarshaledEvent localstack.Event

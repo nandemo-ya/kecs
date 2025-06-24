@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	cloudwatchlogsapi "github.com/nandemo-ya/kecs/controlplane/internal/cloudwatchlogs/generated"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes/fake"
+
+	cloudwatchlogsapi "github.com/nandemo-ya/kecs/controlplane/internal/cloudwatchlogs/generated"
 	kecsCloudWatch "github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
-	"k8s.io/client-go/kubernetes/fake"
 )
 
 // mockCloudWatchLogsClient is a mock implementation of CloudWatchLogsClient
@@ -49,15 +50,15 @@ func (m *mockCloudWatchLogsClient) DeleteLogGroup(ctx context.Context, params *c
 func (m *mockCloudWatchLogsClient) CreateLogStream(ctx context.Context, params *cloudwatchlogsapi.CreateLogStreamRequest) (*cloudwatchlogsapi.Unit, error) {
 	groupName := params.LogGroupName
 	streamName := params.LogStreamName
-	
+
 	if !m.logGroups[groupName] {
 		return nil, fmt.Errorf("ResourceNotFoundException: log group not found")
 	}
-	
+
 	if m.logStreams[groupName][streamName] {
 		return nil, fmt.Errorf("ResourceAlreadyExistsException: log stream already exists")
 	}
-	
+
 	m.logStreams[groupName][streamName] = true
 	return &cloudwatchlogsapi.Unit{}, nil
 }
@@ -162,7 +163,7 @@ var _ = Describe("CloudWatch Integration", func() {
 		}
 
 		logsClient = newMockCloudWatchLogsClient()
-		
+
 		// Use the test constructor with mocked client
 		integration = kecsCloudWatch.NewIntegrationWithClient(
 			kubeClient,
@@ -183,7 +184,7 @@ var _ = Describe("CloudWatch Integration", func() {
 			// Create first time
 			err := integration.CreateLogGroup("my-app")
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Create again
 			err = integration.CreateLogGroup("my-app")
 			Expect(err).NotTo(HaveOccurred())
@@ -217,7 +218,7 @@ var _ = Describe("CloudWatch Integration", func() {
 			// Create stream first time
 			err = integration.CreateLogStream("my-app", "container-1/task-123")
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Create again
 			err = integration.CreateLogStream("my-app", "container-1/task-123")
 			Expect(err).NotTo(HaveOccurred())
@@ -229,7 +230,7 @@ var _ = Describe("CloudWatch Integration", func() {
 			// Create log group
 			err := integration.CreateLogGroup("my-app")
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Delete it
 			err = integration.DeleteLogGroup("my-app")
 			Expect(err).NotTo(HaveOccurred())

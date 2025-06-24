@@ -48,14 +48,14 @@ func parseClusterSettings(clusterName, settingsJSON string) ([]generated.Cluster
 	if settingsJSON == "" {
 		return nil, nil
 	}
-	
+
 	var settings []generated.ClusterSetting
-	
+
 	// Parse
 	if err := json.Unmarshal([]byte(settingsJSON), &settings); err != nil {
 		return nil, err
 	}
-	
+
 	return settings, nil
 }
 
@@ -64,14 +64,14 @@ func parseClusterConfiguration(clusterName, configJSON string) (*generated.Clust
 	if configJSON == "" {
 		return nil, nil
 	}
-	
+
 	var config generated.ClusterConfiguration
-	
+
 	// Parse
 	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
 		return nil, err
 	}
-	
+
 	return &config, nil
 }
 
@@ -80,14 +80,14 @@ func parseTags(resourceID, tagsJSON string) ([]generated.Tag, error) {
 	if tagsJSON == "" {
 		return nil, nil
 	}
-	
+
 	var tags []generated.Tag
-	
+
 	// Parse
 	if err := json.Unmarshal([]byte(tagsJSON), &tags); err != nil {
 		return nil, err
 	}
-	
+
 	return tags, nil
 }
 

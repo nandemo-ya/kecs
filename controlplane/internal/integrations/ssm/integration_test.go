@@ -8,12 +8,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	ssmapi "github.com/nandemo-ya/kecs/controlplane/internal/ssm/generated"
-	ssmIntegration "github.com/nandemo-ya/kecs/controlplane/internal/integrations/ssm"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	ssmIntegration "github.com/nandemo-ya/kecs/controlplane/internal/integrations/ssm"
+	ssmapi "github.com/nandemo-ya/kecs/controlplane/internal/ssm/generated"
 )
 
 var _ = Describe("SSM Integration", func() {
@@ -353,7 +354,7 @@ func (m *mockSSMClient) GetParameter(ctx context.Context, params *ssmapi.GetPara
 	if params.Name == "" {
 		return nil, fmt.Errorf("parameter name is required")
 	}
-	
+
 	output, exists := m.parameters[params.Name]
 	if !exists {
 		msg := fmt.Sprintf("parameter not found: %s", params.Name)
@@ -361,7 +362,7 @@ func (m *mockSSMClient) GetParameter(ctx context.Context, params *ssmapi.GetPara
 			Message: &msg,
 		}
 	}
-	
+
 	return output, nil
 }
 

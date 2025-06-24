@@ -12,16 +12,16 @@ import (
 
 // localStackManager implements the Manager interface
 type localStackManager struct {
-	config       *Config
-	proxyConfig  *ProxyConfig
-	kubeClient   kubernetes.Interface
-	kubeManager  KubernetesManager
+	config        *Config
+	proxyConfig   *ProxyConfig
+	kubeClient    kubernetes.Interface
+	kubeManager   KubernetesManager
 	healthChecker HealthChecker
-	container    *LocalStackContainer
-	status       *Status
-	mu           sync.RWMutex
-	stopCh       chan struct{}
-	healthStop   chan struct{}
+	container     *LocalStackContainer
+	status        *Status
+	mu            sync.RWMutex
+	stopCh        chan struct{}
+	healthStop    chan struct{}
 }
 
 // NewManager creates a new LocalStack manager instance
@@ -103,13 +103,13 @@ func (m *localStackManager) Start(ctx context.Context) error {
 	klog.Info("Waiting for LocalStack to be ready...")
 	readyCtx, readyCancel := context.WithTimeout(ctx, DefaultHealthTimeout)
 	defer readyCancel()
-	
+
 	if kubeManager, ok := m.kubeManager.(*kubernetesManager); ok {
 		if err := kubeManager.WaitForLocalStackReady(readyCtx, DefaultHealthTimeout); err != nil {
 			klog.Warningf("Failed to detect Ready message: %v, falling back to health check", err)
 		}
 	}
-	
+
 	// Also wait for health check
 	if err := m.healthChecker.WaitForHealthy(ctx, DefaultHealthTimeout); err != nil {
 		return fmt.Errorf("LocalStack failed to become healthy: %w", err)
@@ -291,11 +291,11 @@ func (m *localStackManager) GetConfig() *Config {
 func (m *localStackManager) CheckServiceHealth(service string) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	if !m.status.Running {
 		return fmt.Errorf("LocalStack is not running")
 	}
-	
+
 	// Check if service is enabled
 	serviceEnabled := false
 	for _, s := range m.config.Services {
@@ -304,25 +304,25 @@ func (m *localStackManager) CheckServiceHealth(service string) error {
 			break
 		}
 	}
-	
+
 	if !serviceEnabled {
 		return fmt.Errorf("service %s is not enabled", service)
 	}
-	
+
 	// Perform health check
 	if m.healthChecker != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		health, err := m.healthChecker.CheckHealth(ctx)
 		if err != nil {
 			return fmt.Errorf("health check failed: %w", err)
 		}
-		
+
 		if !health.Healthy {
 			return fmt.Errorf("LocalStack is not healthy: %s", health.Message)
 		}
-		
+
 		// Check specific service health if available
 		if serviceHealth, ok := health.ServiceHealth[service]; ok {
 			if !serviceHealth.Healthy {
@@ -330,7 +330,7 @@ func (m *localStackManager) CheckServiceHealth(service string) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -404,9 +404,9 @@ func (m *localStackManager) checkHealth() {
 	// Update service status
 	for _, sh := range healthStatus.ServiceHealth {
 		m.status.ServiceStatus[sh.Service] = ServiceInfo{
-			Name:    sh.Service,
-			Enabled: true,
-			Healthy: sh.Healthy,
+			Name:     sh.Service,
+			Enabled:  true,
+			Healthy:  sh.Healthy,
 			Endpoint: GetServiceURL(m.status.Endpoint, sh.Service),
 		}
 	}

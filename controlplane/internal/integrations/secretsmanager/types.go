@@ -60,19 +60,19 @@ type Config struct {
 
 // SecretAnnotations defines annotations added to Kubernetes secrets
 var SecretAnnotations = struct {
-	SecretName    string
-	VersionId     string
-	VersionStage  string
-	LastSynced    string
-	Source        string
-	JSONKey       string
+	SecretName   string
+	VersionId    string
+	VersionStage string
+	LastSynced   string
+	Source       string
+	JSONKey      string
 }{
-	SecretName:    "kecs.io/secretsmanager-secret-name",
-	VersionId:     "kecs.io/secretsmanager-version-id",
-	VersionStage:  "kecs.io/secretsmanager-version-stage",
-	LastSynced:    "kecs.io/secretsmanager-last-synced",
-	Source:        "kecs.io/secret-source",
-	JSONKey:       "kecs.io/secretsmanager-json-key",
+	SecretName:   "kecs.io/secretsmanager-secret-name",
+	VersionId:    "kecs.io/secretsmanager-version-id",
+	VersionStage: "kecs.io/secretsmanager-version-stage",
+	LastSynced:   "kecs.io/secretsmanager-last-synced",
+	Source:       "kecs.io/secret-source",
+	JSONKey:      "kecs.io/secretsmanager-json-key",
 }
 
 // SecretLabels defines labels added to Kubernetes secrets

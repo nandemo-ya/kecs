@@ -11,13 +11,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/admin"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/cache"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -46,12 +47,12 @@ func getDefaultDataDir() string {
 	if dataDir := os.Getenv("KECS_DATA_DIR"); dataDir != "" {
 		return dataDir
 	}
-	
+
 	// Fall back to home directory
 	if home, err := os.UserHomeDir(); err == nil {
 		return filepath.Join(home, ".kecs", "data")
 	}
-	
+
 	return "~/.kecs/data"
 }
 
@@ -135,7 +136,7 @@ func runServer() {
 	cacheTTL := 5 * time.Minute
 	cacheSize := 10000
 	storage := cache.NewCachedStorage(dbStorage, cacheSize, cacheTTL)
-	
+
 	defer func() {
 		if err := storage.Close(); err != nil {
 			log.Printf("Error closing storage: %v", err)
@@ -182,7 +183,7 @@ func runServer() {
 		if err := adminServer.Stop(shutdownCtx); err != nil {
 			fmt.Printf("Error during Admin server shutdown: %v\n", err)
 		}
-		
+
 		// LocalStack will be stopped by the API server during shutdown
 	}()
 

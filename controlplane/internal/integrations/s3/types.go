@@ -11,16 +11,16 @@ import (
 type Integration interface {
 	// DownloadFile downloads a file from S3
 	DownloadFile(ctx context.Context, bucket, key string) (io.ReadCloser, error)
-	
+
 	// UploadFile uploads a file to S3
 	UploadFile(ctx context.Context, bucket, key string, reader io.Reader) error
-	
+
 	// HeadObject gets metadata for an S3 object
 	HeadObject(ctx context.Context, bucket, key string) (*ObjectMetadata, error)
-	
+
 	// CreateBucket creates an S3 bucket if it doesn't exist
 	CreateBucket(ctx context.Context, bucket string) error
-	
+
 	// DeleteObject deletes an object from S3
 	DeleteObject(ctx context.Context, bucket, key string) error
 }
@@ -28,8 +28,8 @@ type Integration interface {
 // Config holds S3 integration configuration
 type Config struct {
 	LocalStackEndpoint string
-	Region            string
-	ForcePathStyle    bool
+	Region             string
+	ForcePathStyle     bool
 }
 
 // ObjectMetadata contains S3 object metadata

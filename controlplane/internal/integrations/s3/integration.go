@@ -8,10 +8,11 @@ import (
 	"strings"
 	"time"
 
-	s3api "github.com/nandemo-ya/kecs/controlplane/internal/s3/generated"
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	s3api "github.com/nandemo-ya/kecs/controlplane/internal/s3/generated"
 )
 
 // integration implements the S3 Integration interface
@@ -103,7 +104,7 @@ func (i *integration) HeadObject(ctx context.Context, bucket, key string) (*Obje
 	}
 
 	metadata := &ObjectMetadata{}
-	
+
 	if result.ContentLength != nil {
 		metadata.Size = *result.ContentLength
 	}
@@ -142,8 +143,8 @@ func (i *integration) CreateBucket(ctx context.Context, bucket string) error {
 	_, err := i.s3Client.CreateBucket(ctx, input)
 	if err != nil {
 		// Check if bucket already exists
-		if strings.Contains(err.Error(), "BucketAlreadyExists") || 
-		   strings.Contains(err.Error(), "BucketAlreadyOwnedByYou") {
+		if strings.Contains(err.Error(), "BucketAlreadyExists") ||
+			strings.Contains(err.Error(), "BucketAlreadyOwnedByYou") {
 			klog.V(2).Infof("S3 bucket already exists: %s", bucket)
 			return nil
 		}

@@ -23,7 +23,7 @@ func newCloudWatchLogsClient(endpoint string) CloudWatchLogsClient {
 	if endpoint == "" {
 		endpoint = "http://localhost:4566"
 	}
-	
+
 	return &cloudWatchLogsClient{
 		endpoint:   endpoint,
 		httpClient: &http.Client{},

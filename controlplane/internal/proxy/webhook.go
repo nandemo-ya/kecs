@@ -28,10 +28,10 @@ type WebhookConfig struct {
 
 // WebhookServer handles admission webhook requests
 type WebhookServer struct {
-	server      *http.Server
-	kubeClient  kubernetes.Interface
-	config      *WebhookConfig
-	envProxy    *EnvironmentVariableProxy
+	server       *http.Server
+	kubeClient   kubernetes.Interface
+	config       *WebhookConfig
+	envProxy     *EnvironmentVariableProxy
 	deserializer runtime.Decoder
 }
 
@@ -40,7 +40,7 @@ func NewWebhookServer(kubeClient kubernetes.Interface, config *WebhookConfig, en
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
 	_ = admissionv1.AddToScheme(scheme)
-	
+
 	return &WebhookServer{
 		kubeClient:   kubeClient,
 		config:       config,

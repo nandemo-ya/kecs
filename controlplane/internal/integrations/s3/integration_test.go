@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
-	s3api "github.com/nandemo-ya/kecs/controlplane/internal/s3/generated"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/fake"
+
+	s3api "github.com/nandemo-ya/kecs/controlplane/internal/s3/generated"
 
 	kecsS3 "github.com/nandemo-ya/kecs/controlplane/internal/integrations/s3"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
@@ -144,10 +145,10 @@ var _ = Describe("S3 Integration", func() {
 		lsManager = &mockLocalStackManager{}
 		config = &kecsS3.Config{
 			LocalStackEndpoint: "http://localstack:4566",
-			Region:            "us-east-1",
-			ForcePathStyle:    true,
+			Region:             "us-east-1",
+			ForcePathStyle:     true,
 		}
-		
+
 		integration = kecsS3.NewIntegrationWithClient(kubeClient, lsManager, config, mockClient)
 	})
 
@@ -188,10 +189,10 @@ var _ = Describe("S3 Integration", func() {
 			mockClient.putObjectFunc = func(ctx context.Context, params *s3api.PutObjectRequest) (*s3api.PutObjectOutput, error) {
 				Expect(params.Bucket).To(Equal("test-bucket"))
 				Expect(params.Key).To(Equal("test-key"))
-				
+
 				// Verify body content
 				Expect(string(params.Body)).To(Equal(content))
-				
+
 				return &s3api.PutObjectOutput{}, nil
 			}
 
@@ -215,7 +216,7 @@ var _ = Describe("S3 Integration", func() {
 			etag := "123456789"
 			contentType := "text/plain"
 			contentLength := int64(100)
-			
+
 			mockClient.headObjectFunc = func(ctx context.Context, params *s3api.HeadObjectRequest) (*s3api.HeadObjectOutput, error) {
 				Expect(params.Bucket).To(Equal("test-bucket"))
 				Expect(params.Key).To(Equal("test-key"))
@@ -268,8 +269,8 @@ var _ = Describe("S3 Integration", func() {
 			// Create integration with different region
 			regionalConfig := &kecsS3.Config{
 				LocalStackEndpoint: "http://localstack:4566",
-				Region:            "eu-west-1",
-				ForcePathStyle:    true,
+				Region:             "eu-west-1",
+				ForcePathStyle:     true,
 			}
 			regionalIntegration := kecsS3.NewIntegrationWithClient(kubeClient, lsManager, regionalConfig, mockClient)
 

@@ -46,16 +46,16 @@ type ClusterInfo struct {
 type ClusterManagerConfig struct {
 	// Provider specifies which cluster manager to use ("kind" or "k3d")
 	Provider string `json:"provider"`
-	
+
 	// ContainerMode indicates if running in container mode
 	ContainerMode bool `json:"containerMode"`
-	
+
 	// KubeconfigPath specifies custom kubeconfig directory
 	KubeconfigPath string `json:"kubeconfigPath,omitempty"`
-	
+
 	// HostAddress for container mode networking
 	HostAddress string `json:"hostAddress,omitempty"`
-	
+
 	// AdditionalOptions for provider-specific configuration
 	AdditionalOptions map[string]interface{} `json:"additionalOptions,omitempty"`
 }
@@ -65,19 +65,19 @@ func NewClusterManager(config *ClusterManagerConfig) (ClusterManager, error) {
 	if config == nil {
 		config = &ClusterManagerConfig{}
 	}
-	
+
 	// k3d is the only supported provider now
 	config.Provider = "k3d"
-	
+
 	// Set container mode from environment variable if not explicitly set
 	if !config.ContainerMode && os.Getenv("KECS_CONTAINER_MODE") == "true" {
 		config.ContainerMode = true
 	}
-	
+
 	// Set kubeconfig path from environment variable if not specified
 	if config.KubeconfigPath == "" {
 		config.KubeconfigPath = os.Getenv("KECS_KUBECONFIG_PATH")
 	}
-	
+
 	return NewK3dClusterManager(config)
 }

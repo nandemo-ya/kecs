@@ -5,6 +5,8 @@ BINARY_NAME=kecs
 MAIN_PKG=./controlplane/cmd/controlplane
 GO=go
 GOFMT=gofmt
+GOIMPORTS=goimports
+GOLANGCI_LINT=golangci-lint
 DOCKER=docker
 DOCKER_IMAGE=ghcr.io/nandemo-ya/kecs
 VERSION=$(shell git describe --tags --always --dirty)
@@ -70,6 +72,12 @@ clean:
 fmt:
 	@echo "Formatting code..."
 	$(GOFMT) -s -w $(CONTROLPLANE_DIR)
+	@echo "Organizing imports..."
+	@if command -v $(GOIMPORTS) > /dev/null; then \
+		$(GOIMPORTS) -w -local "github.com/nandemo-ya/kecs" $(CONTROLPLANE_DIR); \
+	else \
+		echo "goimports not found. Install with: go install golang.org/x/tools/cmd/goimports@latest"; \
+	fi
 
 # Run tests
 .PHONY: test
@@ -88,6 +96,30 @@ test-coverage:
 vet:
 	@echo "Vetting code..."
 	cd $(CONTROLPLANE_DIR) && $(GOVET) ./...
+
+# Lint code
+.PHONY: lint
+lint:
+	@echo "Linting code..."
+	@if command -v $(GOLANGCI_LINT) > /dev/null; then \
+		$(GOLANGCI_LINT) run; \
+	else \
+		echo "golangci-lint not found. Install with:"; \
+		echo "  brew install golangci-lint (macOS)"; \
+		echo "  or download from https://github.com/golangci/golangci-lint/releases"; \
+	fi
+
+# Fix linting issues automatically
+.PHONY: lint-fix
+lint-fix:
+	@echo "Fixing linting issues..."
+	@if command -v $(GOLANGCI_LINT) > /dev/null; then \
+		$(GOLANGCI_LINT) run --fix; \
+	else \
+		echo "golangci-lint not found. Install with:"; \
+		echo "  brew install golangci-lint (macOS)"; \
+		echo "  or download from https://github.com/golangci/golangci-lint/releases"; \
+	fi
 
 # Install dependencies
 .PHONY: deps
@@ -133,10 +165,12 @@ help:
 	@echo "  build          - Build the application"
 	@echo "  run            - Run the application"
 	@echo "  clean          - Clean build artifacts"
-	@echo "  fmt            - Format code"
+	@echo "  fmt            - Format code and organize imports"
 	@echo "  test           - Run tests"
 	@echo "  test-coverage  - Run tests with coverage"
 	@echo "  vet            - Vet code"
+	@echo "  lint           - Run golangci-lint"
+	@echo "  lint-fix       - Run golangci-lint and fix issues automatically"
 	@echo "  deps           - Install dependencies"
 	@echo "  docker-build   - Build Docker image"
 	@echo "  docker-push    - Push Docker image"

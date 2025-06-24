@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
-	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
 
 // NetworkConverter handles conversion between ECS and Kubernetes networking
@@ -30,31 +31,31 @@ func NewNetworkConverter(region, accountID string) *NetworkConverter {
 // ConvertNetworkConfiguration converts ECS NetworkConfiguration to Kubernetes annotations
 func (nc *NetworkConverter) ConvertNetworkConfiguration(config *generated.NetworkConfiguration, networkMode types.NetworkMode) map[string]string {
 	annotations := make(map[string]string)
-	
+
 	// Add network mode annotation
 	annotations["ecs.amazonaws.com/network-mode"] = string(networkMode)
-	
+
 	if config == nil || config.AwsvpcConfiguration == nil {
 		return annotations
 	}
-	
+
 	awsvpc := config.AwsvpcConfiguration
-	
+
 	// Add subnets
 	if len(awsvpc.Subnets) > 0 {
 		annotations["ecs.amazonaws.com/subnets"] = strings.Join(awsvpc.Subnets, ",")
 	}
-	
+
 	// Add security groups
 	if len(awsvpc.SecurityGroups) > 0 {
 		annotations["ecs.amazonaws.com/security-groups"] = strings.Join(awsvpc.SecurityGroups, ",")
 	}
-	
+
 	// Add public IP assignment
 	if awsvpc.AssignPublicIp != nil {
 		annotations["ecs.amazonaws.com/assign-public-ip"] = string(*awsvpc.AssignPublicIp)
 	}
-	
+
 	return annotations
 }
 
@@ -63,7 +64,7 @@ func (nc *NetworkConverter) ConvertToNetworkPolicy(serviceName string, namespace
 	if len(securityGroups) == 0 {
 		return nil, nil
 	}
-	
+
 	// Create a NetworkPolicy that represents the security group rules
 	// In a real implementation, this would fetch security group rules from LocalStack
 	// For now, we'll create a basic policy
@@ -72,7 +73,7 @@ func (nc *NetworkConverter) ConvertToNetworkPolicy(serviceName string, namespace
 			Name:      fmt.Sprintf("%s-network-policy", serviceName),
 			Namespace: namespace,
 			Labels: map[string]string{
-				"app":                   serviceName,
+				"app":                    serviceName,
 				"ecs.amazonaws.com/type": "service",
 			},
 			Annotations: map[string]string{
@@ -105,7 +106,7 @@ func (nc *NetworkConverter) ConvertToNetworkPolicy(serviceName string, namespace
 			},
 		},
 	}
-	
+
 	return policy, nil
 }
 
@@ -114,14 +115,14 @@ func (nc *NetworkConverter) ConvertServiceRegistry(registry *generated.ServiceRe
 	if registry == nil {
 		return nil, nil
 	}
-	
+
 	annotations := make(map[string]string)
-	
+
 	// Add service registry annotations
 	if registry.RegistryArn != nil {
 		annotations["ecs.amazonaws.com/service-registry-arn"] = *registry.RegistryArn
 	}
-	
+
 	// Create service port if specified
 	var servicePort *corev1.ServicePort
 	if registry.Port != nil {
@@ -130,7 +131,7 @@ func (nc *NetworkConverter) ConvertServiceRegistry(registry *generated.ServiceRe
 			Port:     *registry.Port,
 			Protocol: corev1.ProtocolTCP,
 		}
-		
+
 		if registry.ContainerPort != nil {
 			servicePort.TargetPort = intstr.FromInt(int(*registry.ContainerPort))
 		}
@@ -142,7 +143,7 @@ func (nc *NetworkConverter) ConvertServiceRegistry(registry *generated.ServiceRe
 			Protocol:   corev1.ProtocolTCP,
 		}
 	}
-	
+
 	return annotations, servicePort
 }
 
@@ -151,18 +152,18 @@ func (nc *NetworkConverter) ConvertLoadBalancer(loadBalancer *generated.LoadBala
 	if loadBalancer == nil {
 		return nil, nil
 	}
-	
+
 	annotations := make(map[string]string)
-	
+
 	// Add load balancer annotations
 	if loadBalancer.TargetGroupArn != nil {
 		annotations["ecs.amazonaws.com/target-group-arn"] = *loadBalancer.TargetGroupArn
 	}
-	
+
 	if loadBalancer.LoadBalancerName != nil {
 		annotations["ecs.amazonaws.com/load-balancer-name"] = *loadBalancer.LoadBalancerName
 	}
-	
+
 	// Create service port for load balancer
 	var servicePort *corev1.ServicePort
 	if loadBalancer.ContainerPort != nil {
@@ -173,14 +174,14 @@ func (nc *NetworkConverter) ConvertLoadBalancer(loadBalancer *generated.LoadBala
 			Protocol:   corev1.ProtocolTCP,
 		}
 	}
-	
+
 	return annotations, servicePort
 }
 
 // ExtractNetworkInterfaces extracts network interface information from pod status
 func (nc *NetworkConverter) ExtractNetworkInterfaces(pod *corev1.Pod) []types.NetworkInterface {
 	var interfaces []types.NetworkInterface
-	
+
 	// Primary interface from pod IP
 	if pod.Status.PodIP != "" {
 		attachmentID := fmt.Sprintf("eni-attach-%s", pod.UID)
@@ -189,7 +190,7 @@ func (nc *NetworkConverter) ExtractNetworkInterfaces(pod *corev1.Pod) []types.Ne
 			PrivateIpv4Address: pod.Status.PodIP,
 		})
 	}
-	
+
 	// IPv6 if available
 	for _, podIP := range pod.Status.PodIPs {
 		if strings.Contains(podIP.IP, ":") {
@@ -200,37 +201,37 @@ func (nc *NetworkConverter) ExtractNetworkInterfaces(pod *corev1.Pod) []types.Ne
 			break
 		}
 	}
-	
+
 	return interfaces
 }
 
 // GetNetworkBindings extracts network bindings from container ports
 func (nc *NetworkConverter) GetNetworkBindings(container corev1.Container, podIP string) []types.NetworkBinding {
 	var bindings []types.NetworkBinding
-	
+
 	for _, port := range container.Ports {
 		containerPort := int(port.ContainerPort)
 		hostPort := int(port.HostPort)
 		protocol := string(port.Protocol)
-		
+
 		binding := types.NetworkBinding{
 			ContainerPort: containerPort,
 			Protocol:      protocol,
 		}
-		
+
 		// For awsvpc mode, bind IP is the pod IP
 		if podIP != "" {
 			binding.BindIP = podIP
 		}
-		
+
 		// Host port is only relevant for bridge/host modes
 		if hostPort > 0 {
 			binding.HostPort = hostPort
 		}
-		
+
 		bindings = append(bindings, binding)
 	}
-	
+
 	return bindings
 }
 
@@ -239,7 +240,7 @@ func (nc *NetworkConverter) ParseNetworkAnnotations(annotations map[string]strin
 	if annotations == nil {
 		return nil
 	}
-	
+
 	return &types.NetworkAnnotations{
 		NetworkMode:    annotations["ecs.amazonaws.com/network-mode"],
 		Subnets:        annotations["ecs.amazonaws.com/subnets"],
@@ -254,12 +255,12 @@ func (nc *NetworkConverter) SerializeNetworkConfig(config *generated.NetworkConf
 	if config == nil {
 		return "", nil
 	}
-	
+
 	data, err := json.Marshal(config)
 	if err != nil {
 		return "", fmt.Errorf("failed to serialize network configuration: %w", err)
 	}
-	
+
 	return string(data), nil
 }
 
@@ -268,12 +269,12 @@ func (nc *NetworkConverter) DeserializeNetworkConfig(data string) (*generated.Ne
 	if data == "" {
 		return nil, nil
 	}
-	
+
 	var config generated.NetworkConfiguration
 	if err := json.Unmarshal([]byte(data), &config); err != nil {
 		return nil, fmt.Errorf("failed to deserialize network configuration: %w", err)
 	}
-	
+
 	return &config, nil
 }
 
@@ -282,16 +283,16 @@ func getPortName(containerName *string) string {
 	if containerName == nil || *containerName == "" {
 		return "default"
 	}
-	
+
 	// Kubernetes port names must be lowercase and max 15 chars
 	name := strings.ToLower(*containerName)
 	if len(name) > 15 {
 		name = name[:15]
 	}
-	
+
 	// Replace invalid characters
 	name = strings.ReplaceAll(name, "_", "-")
 	name = strings.ReplaceAll(name, ".", "-")
-	
+
 	return name
 }

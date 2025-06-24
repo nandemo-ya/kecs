@@ -2,6 +2,7 @@ package iam
 
 import (
 	"context"
+
 	iamapi "github.com/nandemo-ya/kecs/controlplane/internal/iam/generated"
 	stsapi "github.com/nandemo-ya/kecs/controlplane/internal/sts/generated"
 )
@@ -10,22 +11,22 @@ import (
 type Integration interface {
 	// CreateTaskRole creates an IAM role in LocalStack and corresponding ServiceAccount in Kubernetes
 	CreateTaskRole(taskDefArn, roleName string, trustPolicy string) error
-	
+
 	// CreateTaskExecutionRole creates an IAM execution role for ECS tasks
 	CreateTaskExecutionRole(roleName string) error
-	
+
 	// AttachPolicyToRole attaches an IAM policy to a role
 	AttachPolicyToRole(roleName, policyArn string) error
-	
+
 	// CreateInlinePolicy creates an inline policy for a role
 	CreateInlinePolicy(roleName, policyName, policyDocument string) error
-	
+
 	// DeleteRole deletes an IAM role and its corresponding ServiceAccount
 	DeleteRole(roleName string) error
-	
+
 	// GetServiceAccountForRole returns the ServiceAccount name for a given IAM role
 	GetServiceAccountForRole(roleName string) (string, error)
-	
+
 	// GetRoleCredentials gets temporary credentials for a role (if using STS)
 	GetRoleCredentials(roleName string) (*Credentials, error)
 }
@@ -56,12 +57,12 @@ type Config struct {
 
 // ServiceAccountAnnotations defines annotations added to ServiceAccounts
 var ServiceAccountAnnotations = struct {
-	RoleArn          string
-	RoleName         string
+	RoleArn           string
+	RoleName          string
 	TaskDefinitionArn string
 }{
-	RoleArn:          "kecs.io/iam-role-arn",
-	RoleName:         "kecs.io/iam-role-name",
+	RoleArn:           "kecs.io/iam-role-arn",
+	RoleName:          "kecs.io/iam-role-name",
 	TaskDefinitionArn: "kecs.io/task-definition-arn",
 }
 

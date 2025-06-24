@@ -23,7 +23,7 @@ func newSecretsManagerClient(endpoint string) SecretsManagerClient {
 	if endpoint == "" {
 		endpoint = "http://localhost:4566"
 	}
-	
+
 	return &secretsManagerClient{
 		endpoint:   endpoint,
 		httpClient: &http.Client{},

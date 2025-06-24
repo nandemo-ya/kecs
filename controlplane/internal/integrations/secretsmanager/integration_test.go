@@ -8,12 +8,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	smapi "github.com/nandemo-ya/kecs/controlplane/internal/secretsmanager/generated"
-	sm "github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	sm "github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
+	smapi "github.com/nandemo-ya/kecs/controlplane/internal/secretsmanager/generated"
 )
 
 var _ = Describe("Secrets Manager Integration", func() {
@@ -392,7 +393,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				{SecretName: "my-app/batch/secret2", JSONKey: "password"},
 				{SecretName: "my-app/batch/secret3"},
 			}
-			
+
 			// Add mock data
 			name1 := "my-app/batch/secret1"
 			value1 := "value-1"
@@ -454,7 +455,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				{SecretName: "my-app/batch/exists"},
 				{SecretName: "my-app/batch/notexists"},
 			}
-			
+
 			// Only setup one secret
 			nameExists := "my-app/batch/exists"
 			valueExists := "exists-value"
@@ -491,12 +492,12 @@ func (m *mockSecretsManagerClient) GetSecretValue(ctx context.Context, params *s
 	if params.SecretId == "" {
 		return nil, fmt.Errorf("secret ID is required")
 	}
-	
+
 	output, exists := m.secrets[params.SecretId]
 	if !exists {
 		return nil, fmt.Errorf("secret not found: %s", params.SecretId)
 	}
-	
+
 	return output, nil
 }
 

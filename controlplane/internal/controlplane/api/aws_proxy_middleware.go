@@ -71,7 +71,7 @@ func isAWSAPIRequest(r *http.Request) bool {
 	if host == "" {
 		host = r.URL.Host
 	}
-	
+
 	// Check for common AWS patterns
 	if strings.Contains(host, ".amazonaws.com") ||
 		strings.Contains(host, "aws.amazon.com") ||

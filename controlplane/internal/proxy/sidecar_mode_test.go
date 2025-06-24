@@ -242,14 +242,14 @@ func TestSidecarProxy_InjectSidecar(t *testing.T) {
 	// Check that AWS environment variables were added to app container
 	appContainer := pod.Spec.Containers[0]
 	expectedEnvVars := map[string]string{
-		"AWS_ENDPOINT_URL":               "http://localhost:4566",
-		"AWS_ENDPOINT_URL_S3":            "http://localhost:4566",
-		"AWS_ENDPOINT_URL_IAM":           "http://localhost:4566",
-		"AWS_ENDPOINT_URL_LOGS":          "http://localhost:4566",
-		"AWS_ENDPOINT_URL_SSM":           "http://localhost:4566",
+		"AWS_ENDPOINT_URL":                "http://localhost:4566",
+		"AWS_ENDPOINT_URL_S3":             "http://localhost:4566",
+		"AWS_ENDPOINT_URL_IAM":            "http://localhost:4566",
+		"AWS_ENDPOINT_URL_LOGS":           "http://localhost:4566",
+		"AWS_ENDPOINT_URL_SSM":            "http://localhost:4566",
 		"AWS_ENDPOINT_URL_SECRETSMANAGER": "http://localhost:4566",
-		"AWS_ENDPOINT_URL_ELB":           "http://localhost:4566",
-		"MY_ENV":                         "value", // Original env var should be preserved
+		"AWS_ENDPOINT_URL_ELB":            "http://localhost:4566",
+		"MY_ENV":                          "value", // Original env var should be preserved
 	}
 
 	envMap := make(map[string]string)

@@ -81,7 +81,7 @@ func LocalStackProxyMiddleware(next http.Handler, awsProxyRouter *AWSProxyRouter
 			awsProxyRouter.AWSProxyHandler.ServeHTTP(w, r)
 			return
 		}
-		
+
 		// Not an AWS API call or LocalStack is not available
 		next.ServeHTTP(w, r)
 	})

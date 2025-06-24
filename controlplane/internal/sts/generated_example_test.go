@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	sts "github.com/nandemo-ya/kecs/controlplane/internal/sts/generated"
 )
 
@@ -18,18 +19,18 @@ var _ = Describe("STS Generated Types", func() {
 	Describe("AssumeRoleRequest", func() {
 		Context("when marshaling to JSON", func() {
 			It("should use camelCase field names", func() {
-		req := &sts.AssumeRoleRequest{
-			RoleArn:         "arn:aws:iam::123456789012:role/MyRole",
-			RoleSessionName: "MySession",
-			DurationSeconds: int32Ptr(3600),
-			ExternalId:      stringPtr("unique-external-id"),
-			Tags: []sts.Tag{
-				{
-					Key:   "Environment",
-					Value: "Test",
-				},
-			},
-		}
+				req := &sts.AssumeRoleRequest{
+					RoleArn:         "arn:aws:iam::123456789012:role/MyRole",
+					RoleSessionName: "MySession",
+					DurationSeconds: int32Ptr(3600),
+					ExternalId:      stringPtr("unique-external-id"),
+					Tags: []sts.Tag{
+						{
+							Key:   "Environment",
+							Value: "Test",
+						},
+					},
+				}
 
 				// Marshal to JSON
 				data, err := json.Marshal(req)
@@ -58,7 +59,7 @@ var _ = Describe("STS Generated Types", func() {
 	Describe("AssumeRoleResponse", func() {
 		Context("when unmarshaling from JSON", func() {
 			It("should correctly parse camelCase fields", func() {
-		jsonData := `{
+				jsonData := `{
 			"credentials": {
 				"accessKeyId": "AKIAIOSFODNN7EXAMPLE",
 				"secretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",

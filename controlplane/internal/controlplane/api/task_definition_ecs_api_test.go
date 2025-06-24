@@ -25,8 +25,8 @@ var _ = Describe("Task Definition ECS API", func() {
 		mockStorage.SetTaskDefinitionStore(mockTaskDefStore)
 
 		server = &Server{
-			storage:     mockStorage,
-			ecsAPI:      NewDefaultECSAPI(mockStorage),
+			storage: mockStorage,
+			ecsAPI:  NewDefaultECSAPI(mockStorage),
 		}
 		ctx = context.Background()
 	})

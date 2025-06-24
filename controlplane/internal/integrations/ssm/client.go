@@ -23,7 +23,7 @@ func newSSMClient(endpoint string) SSMClient {
 	if endpoint == "" {
 		endpoint = "http://localhost:4566"
 	}
-	
+
 	return &ssmClient{
 		endpoint:   endpoint,
 		httpClient: &http.Client{},

@@ -6,12 +6,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	iamapi "github.com/nandemo-ya/kecs/controlplane/internal/iam/generated"
-	stsapi "github.com/nandemo-ya/kecs/controlplane/internal/sts/generated"
-	kecsIAM "github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	iamapi "github.com/nandemo-ya/kecs/controlplane/internal/iam/generated"
+	kecsIAM "github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	stsapi "github.com/nandemo-ya/kecs/controlplane/internal/sts/generated"
 )
 
 // mockIAMClient is a mock implementation of IAMClient
@@ -21,10 +22,10 @@ func (m *mockIAMClient) CreateRole(ctx context.Context, params *iamapi.CreateRol
 	arn := "arn:aws:iam::123456789012:role/" + params.RoleName
 	return &iamapi.CreateRoleResponse{
 		Role: iamapi.Role{
-			RoleName: params.RoleName,
-			Arn:      arn,
-			Path:     "/",
-			RoleId:   "AIDAQ3EGKSO2V4EXAMPLE",
+			RoleName:   params.RoleName,
+			Arn:        arn,
+			Path:       "/",
+			RoleId:     "AIDAQ3EGKSO2V4EXAMPLE",
 			CreateDate: time.Now(),
 		},
 	}, nil
@@ -143,12 +144,12 @@ func (m *mockLocalStackManager) CheckServiceHealth(service string) error {
 
 var _ = Describe("IAM Integration", func() {
 	var (
-		integration       kecsIAM.Integration
-		kubeClient        *fake.Clientset
+		integration kecsIAM.Integration
+		kubeClient  *fake.Clientset
 		// localstackManager localstack.Manager // unused in temp implementation
-		config            *kecsIAM.Config
-		iamClient         kecsIAM.IAMClient
-		stsClient         kecsIAM.STSClient
+		config    *kecsIAM.Config
+		iamClient kecsIAM.IAMClient
+		stsClient kecsIAM.STSClient
 	)
 
 	BeforeEach(func() {
@@ -162,7 +163,7 @@ var _ = Describe("IAM Integration", func() {
 
 		iamClient = &mockIAMClient{}
 		stsClient = &mockSTSClient{}
-		
+
 		// Use the test constructor with mocked clients
 		integration = kecsIAM.NewIntegrationWithClient(
 			kubeClient,
@@ -268,7 +269,7 @@ var _ = Describe("IAM Integration", func() {
 
 			err = integration.CreateInlinePolicy("kecs-test-role", policyName, policyDoc)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Only ServiceAccount should exist, no RBAC resources
 			_, err = kubeClient.CoreV1().ServiceAccounts("default").Get(context.Background(), "kecs-test-role-sa", metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())

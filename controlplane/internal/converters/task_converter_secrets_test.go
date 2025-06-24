@@ -2,14 +2,15 @@ package converters_test
 
 import (
 	"encoding/json"
-	
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	
+
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
-	corev1 "k8s.io/api/core/v1"
 )
 
 var _ = Describe("TaskConverter Secrets", func() {
@@ -47,10 +48,10 @@ var _ = Describe("TaskConverter Secrets", func() {
 						},
 					},
 				}
-				
+
 				containerDefsJSON, err := json.Marshal(containerDefs)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				taskDef = &storage.TaskDefinition{
 					Family:               "test-task",
 					Revision:             1,
@@ -59,21 +60,21 @@ var _ = Describe("TaskConverter Secrets", func() {
 					CPU:                  "256",
 					Memory:               "512",
 				}
-				
+
 				runTaskReq := &types.RunTaskRequest{
 					TaskDefinition: stringPtr("test-task:1"),
 				}
 				runTaskReqJSON, err := json.Marshal(runTaskReq)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				pod, err := converter.ConvertTaskToPod(taskDef, runTaskReqJSON, cluster, "task-123")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pod).NotTo(BeNil())
-				
+
 				// Check container environment variables
 				Expect(pod.Spec.Containers).To(HaveLen(1))
 				container := pod.Spec.Containers[0]
-				
+
 				// Find the secret environment variables
 				var dbPasswordEnv, apiKeyEnv *corev1.EnvVar
 				for i := range container.Env {
@@ -83,21 +84,21 @@ var _ = Describe("TaskConverter Secrets", func() {
 						apiKeyEnv = &container.Env[i]
 					}
 				}
-				
+
 				// Verify DB_PASSWORD references the correct Kubernetes secret
 				Expect(dbPasswordEnv).NotTo(BeNil())
 				Expect(dbPasswordEnv.ValueFrom).NotTo(BeNil())
 				Expect(dbPasswordEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
 				Expect(dbPasswordEnv.ValueFrom.SecretKeyRef.Name).To(Equal("sm-db-password"))
 				Expect(dbPasswordEnv.ValueFrom.SecretKeyRef.Key).To(Equal("value"))
-				
+
 				// Verify API_KEY references the correct Kubernetes secret with JSON key
 				Expect(apiKeyEnv).NotTo(BeNil())
 				Expect(apiKeyEnv.ValueFrom).NotTo(BeNil())
 				Expect(apiKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
 				Expect(apiKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("sm-api-keys"))
 				Expect(apiKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal("api_key"))
-				
+
 				// Check pod annotations for secret tracking
 				Expect(pod.Annotations).To(HaveKeyWithValue("kecs.dev/secret-count", "2"))
 				Expect(pod.Annotations).To(HaveKey("kecs.dev/secret-0-arn"))
@@ -119,10 +120,10 @@ var _ = Describe("TaskConverter Secrets", func() {
 						},
 					},
 				}
-				
+
 				containerDefsJSON, err := json.Marshal(containerDefs)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				taskDef = &storage.TaskDefinition{
 					Family:               "test-task",
 					Revision:             1,
@@ -131,20 +132,20 @@ var _ = Describe("TaskConverter Secrets", func() {
 					CPU:                  "256",
 					Memory:               "512",
 				}
-				
+
 				runTaskReq := &types.RunTaskRequest{
 					TaskDefinition: stringPtr("test-task:1"),
 				}
 				runTaskReqJSON, err := json.Marshal(runTaskReq)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				pod, err := converter.ConvertTaskToPod(taskDef, runTaskReqJSON, cluster, "task-124")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pod).NotTo(BeNil())
-				
+
 				// Check container environment variables
 				container := pod.Spec.Containers[0]
-				
+
 				// Find the secret environment variable
 				var configValueEnv *corev1.EnvVar
 				for i := range container.Env {
@@ -152,7 +153,7 @@ var _ = Describe("TaskConverter Secrets", func() {
 						configValueEnv = &container.Env[i]
 					}
 				}
-				
+
 				// Verify CONFIG_VALUE references the correct Kubernetes secret
 				Expect(configValueEnv).NotTo(BeNil())
 				Expect(configValueEnv.ValueFrom).NotTo(BeNil())
@@ -180,10 +181,10 @@ var _ = Describe("TaskConverter Secrets", func() {
 						},
 					},
 				}
-				
+
 				containerDefsJSON, err := json.Marshal(containerDefs)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				taskDef = &storage.TaskDefinition{
 					Family:               "test-task",
 					Revision:             1,
@@ -192,20 +193,20 @@ var _ = Describe("TaskConverter Secrets", func() {
 					CPU:                  "256",
 					Memory:               "512",
 				}
-				
+
 				runTaskReq := &types.RunTaskRequest{
 					TaskDefinition: stringPtr("test-task:1"),
 				}
 				runTaskReqJSON, err := json.Marshal(runTaskReq)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				pod, err := converter.ConvertTaskToPod(taskDef, runTaskReqJSON, cluster, "task-125")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(pod).NotTo(BeNil())
-				
+
 				// Check that both types of secrets are properly referenced
 				container := pod.Spec.Containers[0]
-				
+
 				var dbPasswordEnv, appConfigEnv *corev1.EnvVar
 				for i := range container.Env {
 					if container.Env[i].Name == "DB_PASSWORD" {
@@ -214,11 +215,11 @@ var _ = Describe("TaskConverter Secrets", func() {
 						appConfigEnv = &container.Env[i]
 					}
 				}
-				
+
 				// Verify Secrets Manager secret
 				Expect(dbPasswordEnv).NotTo(BeNil())
 				Expect(dbPasswordEnv.ValueFrom.SecretKeyRef.Name).To(Equal("sm-db-password"))
-				
+
 				// Verify SSM parameter
 				Expect(appConfigEnv).NotTo(BeNil())
 				Expect(appConfigEnv.ValueFrom.SecretKeyRef.Name).To(Equal("ssm-app-config"))

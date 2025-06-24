@@ -6,9 +6,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 func TestClusterStore_ListWithPagination(t *testing.T) {
