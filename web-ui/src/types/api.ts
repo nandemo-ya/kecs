@@ -27,6 +27,7 @@ export interface Service {
   createdAt?: string;
   platformVersion?: string;
   schedulingStrategy?: string;
+  tags?: Tag[];
 }
 
 export interface Task {
@@ -55,6 +56,7 @@ export interface TaskDefinition {
   networkMode?: string;
   requiresCompatibilities?: string[];
   containerDefinitions?: ContainerDefinition[];
+  tags?: Tag[];
 }
 
 export interface ContainerDefinition {

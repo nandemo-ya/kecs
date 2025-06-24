@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useApiData } from '../hooks/useApi';
 import { apiClient } from '../services/api';
+import { TagEditor } from './TagEditor';
 import './DetailPages.css';
 
 export function TaskDefinitionDetail() {
@@ -154,6 +155,13 @@ export function TaskDefinitionDetail() {
           </div>
         </div>
 
+        <div className="detail-card">
+          <TagEditor 
+            resourceArn={taskDefinition.taskDefinitionArn} 
+            editable={true}
+          />
+        </div>
+
         {taskDefinition.containerDefinitions && taskDefinition.containerDefinitions.length > 0 && (
           <div className="detail-card full-width">
             <h2>Container Definitions</h2>
@@ -218,7 +226,6 @@ export function TaskDefinitionDetail() {
           </div>
         )}
       </div>
-
     </div>
   );
 }

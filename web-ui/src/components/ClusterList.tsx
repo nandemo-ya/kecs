@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../services/api';
-import { ListClustersResponse, DescribeClustersResponse } from '../types/api';
+import { ListClustersResponse, DescribeClustersResponse, Tag } from '../types/api';
 import { ClusterCreate } from './ClusterCreate';
+import { TagBadges } from './TagEditor';
 
 interface ClusterListItem {
   name: string;
@@ -12,6 +13,7 @@ interface ClusterListItem {
   activeServicesCount: number;
   registeredContainerInstancesCount: number;
   pendingTasksCount: number;
+  tags?: Tag[];
 }
 
 export function ClusterList() {
@@ -54,6 +56,7 @@ export function ClusterList() {
         activeServicesCount: cluster.activeServicesCount || 0,
         registeredContainerInstancesCount: cluster.registeredContainerInstancesCount || 0,
         pendingTasksCount: cluster.pendingTasksCount || 0,
+        tags: cluster.tags,
       }));
 
       setClusters(clusterList);
@@ -120,6 +123,10 @@ export function ClusterList() {
               <div className="cluster-arn">
                 {cluster.arn}
               </div>
+
+              {cluster.tags && cluster.tags.length > 0 && (
+                <TagBadges tags={cluster.tags} />
+              )}
 
               <div className="cluster-metrics">
                 <div className="metric-item">

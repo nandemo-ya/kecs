@@ -3,6 +3,7 @@ import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom'
 import { useApiData } from '../hooks/useApi';
 import { apiClient } from '../services/api';
 import { useOperationNotification } from '../hooks/useOperationNotification';
+import { TagEditor } from './TagEditor';
 import './DetailPages.css';
 
 export function ServiceDetail() {
@@ -188,6 +189,13 @@ export function ServiceDetail() {
               <div className="metric-label">Health</div>
             </div>
           </div>
+        </div>
+
+        <div className="detail-card">
+          <TagEditor 
+            resourceArn={service.serviceArn} 
+            editable={true}
+          />
         </div>
 
         <div className="detail-card">
