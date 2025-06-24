@@ -499,6 +499,12 @@ func (s *Server) RecoverState(ctx context.Context) error {
 
 // recoverServicesForCluster recovers services and their deployments for a cluster
 func (s *Server) recoverServicesForCluster(ctx context.Context, cluster *storage.Cluster) error {
+	// Skip if storage is not available
+	if s.storage == nil || s.storage.ServiceStore() == nil {
+		log.Printf("Storage not available, skipping service recovery for cluster %s", cluster.Name)
+		return nil
+	}
+
 	// Get all services for this cluster
 	services, _, err := s.storage.ServiceStore().List(ctx, cluster.Name, "", "", 100, "")
 	if err != nil {
