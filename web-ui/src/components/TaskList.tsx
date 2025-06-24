@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../services/api';
 import { ListClustersResponse, ListTasksResponse, DescribeTasksResponse } from '../types/api';
+import { RunTask } from './RunTask';
 
 interface TaskListItem {
   taskId: string;
@@ -23,6 +24,7 @@ export function TaskList() {
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showRunTaskModal, setShowRunTaskModal] = useState(false);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -127,9 +129,14 @@ export function TaskList() {
     <main className="App-main">
       <div className="dashboard-header">
         <h2>Tasks</h2>
-        <button className="refresh-button" onClick={loadTasks}>
-          Refresh
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button className="button button-primary" onClick={() => setShowRunTaskModal(true)}>
+            Run Task
+          </button>
+          <button className="refresh-button" onClick={loadTasks}>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {tasks.length === 0 ? (
@@ -230,6 +237,12 @@ export function TaskList() {
           })}
         </div>
       )}
+
+      <RunTask
+        isOpen={showRunTaskModal}
+        onClose={() => setShowRunTaskModal(false)}
+        onSuccess={loadTasks}
+      />
     </main>
   );
 }

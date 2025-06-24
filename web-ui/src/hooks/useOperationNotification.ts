@@ -51,5 +51,22 @@ export function useOperationNotification() {
     }
   }, [addNotification]);
 
-  return { executeWithNotification };
+  const notifySuccess = useCallback((message: string) => {
+    addNotification({
+      type: 'success',
+      title: 'Success',
+      message,
+    });
+  }, [addNotification]);
+
+  const notifyError = useCallback((message: string) => {
+    addNotification({
+      type: 'error',
+      title: 'Error',
+      message,
+      duration: 0, // Don't auto-dismiss errors
+    });
+  }, [addNotification]);
+
+  return { executeWithNotification, notifySuccess, notifyError };
 }
