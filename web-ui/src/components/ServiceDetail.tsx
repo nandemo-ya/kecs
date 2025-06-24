@@ -4,6 +4,8 @@ import { useApiData } from '../hooks/useApi';
 import { apiClient } from '../services/api';
 import { useOperationNotification } from '../hooks/useOperationNotification';
 import { TagEditor } from './TagEditor';
+import { ServiceDeployments } from './ServiceDeployments';
+import { ServiceRevisions } from './ServiceRevisions';
 import './DetailPages.css';
 
 export function ServiceDetail() {
@@ -12,6 +14,7 @@ export function ServiceDetail() {
   const clusterName = searchParams.get('cluster') || 'default';
   const navigate = useNavigate();
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'deployments' | 'revisions'>('overview');
   const { executeWithNotification } = useOperationNotification();
   
   const { data: services, loading: servicesLoading, error: servicesError } = useApiData(
@@ -126,7 +129,29 @@ export function ServiceDetail() {
         </div>
       </div>
 
-      <div className="detail-grid">
+      <div className="tabs">
+        <button
+          className={`tab ${activeTab === 'overview' ? 'active' : ''}`}
+          onClick={() => setActiveTab('overview')}
+        >
+          Overview
+        </button>
+        <button
+          className={`tab ${activeTab === 'deployments' ? 'active' : ''}`}
+          onClick={() => setActiveTab('deployments')}
+        >
+          Deployments
+        </button>
+        <button
+          className={`tab ${activeTab === 'revisions' ? 'active' : ''}`}
+          onClick={() => setActiveTab('revisions')}
+        >
+          Revisions
+        </button>
+      </div>
+
+      {activeTab === 'overview' && (
+        <div className="detail-grid">
         <div className="detail-card">
           <h2>Overview</h2>
           <div className="info-grid">
@@ -267,6 +292,21 @@ export function ServiceDetail() {
           )}
         </div>
       </div>
+      )}
+
+      {activeTab === 'deployments' && (
+        <ServiceDeployments 
+          serviceArn={service.serviceArn} 
+          clusterArn={service.clusterArn}
+        />
+      )}
+
+      {activeTab === 'revisions' && (
+        <ServiceRevisions 
+          serviceArn={service.serviceArn}
+          currentTaskDefinition={service.taskDefinition}
+        />
+      )}
     </div>
   );
 }
