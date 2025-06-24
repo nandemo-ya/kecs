@@ -52,10 +52,10 @@ func (m *mockS3Integration) DeleteObject(ctx context.Context, bucket, key string
 
 var _ = Describe("Artifact Manager", func() {
 	var (
-		manager      *artifacts.Manager
-		mockS3       *mockS3Integration
-		tempDir      string
-		testServer   *httptest.Server
+		manager    *artifacts.Manager
+		mockS3     *mockS3Integration
+		tempDir    string
+		testServer *httptest.Server
 	)
 
 	BeforeEach(func() {

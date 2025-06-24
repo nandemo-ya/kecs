@@ -12,15 +12,15 @@ func GetKubeConfig() (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	configOverrides := &clientcmd.ConfigOverrides{}
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
-	
+
 	config, err := kubeConfig.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Adjust config for better performance
 	config.QPS = 100
 	config.Burst = 200
-	
+
 	return config, nil
 }

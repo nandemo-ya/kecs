@@ -413,7 +413,7 @@ func (tm *TaskManager) CreateServiceDeployment(ctx context.Context, cluster *sto
 		}
 	}
 
-	log.Printf("Created/updated deployment for service %s in namespace %s", 
+	log.Printf("Created/updated deployment for service %s in namespace %s",
 		service.ServiceName, namespace)
 
 	return nil

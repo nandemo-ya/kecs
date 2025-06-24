@@ -34,27 +34,27 @@ const (
 
 // ServiceRegistry represents a service registry configuration
 type ServiceRegistry struct {
-	RegistryArn    *string `json:"registryArn,omitempty"`
-	Port           *int    `json:"port,omitempty"`
-	ContainerName  *string `json:"containerName,omitempty"`
-	ContainerPort  *int    `json:"containerPort,omitempty"`
+	RegistryArn   *string `json:"registryArn,omitempty"`
+	Port          *int    `json:"port,omitempty"`
+	ContainerName *string `json:"containerName,omitempty"`
+	ContainerPort *int    `json:"containerPort,omitempty"`
 }
 
 // LoadBalancer represents a load balancer configuration
 type LoadBalancer struct {
-	TargetGroupArn *string `json:"targetGroupArn,omitempty"`
+	TargetGroupArn   *string `json:"targetGroupArn,omitempty"`
 	LoadBalancerName *string `json:"loadBalancerName,omitempty"`
-	ContainerName  *string `json:"containerName,omitempty"`
-	ContainerPort  *int    `json:"containerPort,omitempty"`
+	ContainerName    *string `json:"containerName,omitempty"`
+	ContainerPort    *int    `json:"containerPort,omitempty"`
 }
 
 // NetworkAnnotations contains Kubernetes annotations for network configuration
 type NetworkAnnotations struct {
-	NetworkMode    string   `json:"ecs.amazonaws.com/network-mode,omitempty"`
-	Subnets        string   `json:"ecs.amazonaws.com/subnets,omitempty"`
-	SecurityGroups string   `json:"ecs.amazonaws.com/security-groups,omitempty"`
-	AssignPublicIp string   `json:"ecs.amazonaws.com/assign-public-ip,omitempty"`
-	PrivateIp      string   `json:"ecs.amazonaws.com/private-ip,omitempty"`
+	NetworkMode    string `json:"ecs.amazonaws.com/network-mode,omitempty"`
+	Subnets        string `json:"ecs.amazonaws.com/subnets,omitempty"`
+	SecurityGroups string `json:"ecs.amazonaws.com/security-groups,omitempty"`
+	AssignPublicIp string `json:"ecs.amazonaws.com/assign-public-ip,omitempty"`
+	PrivateIp      string `json:"ecs.amazonaws.com/private-ip,omitempty"`
 }
 
 // GetNetworkMode returns the network mode from a string pointer, defaulting to awsvpc

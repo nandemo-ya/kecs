@@ -104,8 +104,8 @@ var _ = Describe("WebSocket LocalStack Integration", func() {
 
 	Describe("LocalStackEventIntegration", func() {
 		var (
-			mockManager   *mockLocalStackManagerForWS
-			integration   *api.LocalStackEventIntegration
+			mockManager *mockLocalStackManagerForWS
+			integration *api.LocalStackEventIntegration
 		)
 
 		BeforeEach(func() {
@@ -131,7 +131,7 @@ var _ = Describe("WebSocket LocalStack Integration", func() {
 			disabledConfig := &api.LocalStackEventConfig{
 				Enabled: false,
 			}
-			
+
 			disabledIntegration := api.NewLocalStackEventIntegration(
 				mockManager,
 				hub,
@@ -181,23 +181,31 @@ func (m *mockLocalStackManagerForWS) IsHealthy() bool {
 }
 
 // Implement other Manager interface methods as no-ops for testing
-func (m *mockLocalStackManagerForWS) Start(ctx context.Context) error { return nil }
-func (m *mockLocalStackManagerForWS) Stop(ctx context.Context) error { return nil }
+func (m *mockLocalStackManagerForWS) Start(ctx context.Context) error   { return nil }
+func (m *mockLocalStackManagerForWS) Stop(ctx context.Context) error    { return nil }
 func (m *mockLocalStackManagerForWS) Restart(ctx context.Context) error { return nil }
-func (m *mockLocalStackManagerForWS) GetStatus() (*localstack.Status, error) { 
-	return &localstack.Status{Healthy: m.healthy}, nil 
+func (m *mockLocalStackManagerForWS) GetStatus() (*localstack.Status, error) {
+	return &localstack.Status{Healthy: m.healthy}, nil
 }
 func (m *mockLocalStackManagerForWS) UpdateServices(services []string) error { return nil }
-func (m *mockLocalStackManagerForWS) GetEnabledServices() ([]string, error) { return []string{"ecs"}, nil }
-func (m *mockLocalStackManagerForWS) GetEndpoint() (string, error) { return "http://localhost:4566", nil }
-func (m *mockLocalStackManagerForWS) GetServiceEndpoint(service string) (string, error) { return "http://localhost:4566", nil }
-func (m *mockLocalStackManagerForWS) WaitForReady(ctx context.Context, timeout time.Duration) error { return nil }
-func (m *mockLocalStackManagerForWS) IsRunning() bool { return m.healthy }
+func (m *mockLocalStackManagerForWS) GetEnabledServices() ([]string, error) {
+	return []string{"ecs"}, nil
+}
+func (m *mockLocalStackManagerForWS) GetEndpoint() (string, error) {
+	return "http://localhost:4566", nil
+}
+func (m *mockLocalStackManagerForWS) GetServiceEndpoint(service string) (string, error) {
+	return "http://localhost:4566", nil
+}
+func (m *mockLocalStackManagerForWS) WaitForReady(ctx context.Context, timeout time.Duration) error {
+	return nil
+}
+func (m *mockLocalStackManagerForWS) IsRunning() bool                         { return m.healthy }
 func (m *mockLocalStackManagerForWS) CheckServiceHealth(service string) error { return nil }
-func (m *mockLocalStackManagerForWS) GetConfig() *localstack.Config { 
+func (m *mockLocalStackManagerForWS) GetConfig() *localstack.Config {
 	return &localstack.Config{
-		Enabled: true,
+		Enabled:  true,
 		Services: []string{"ecs"},
-		Version: "latest",
+		Version:  "latest",
 	}
 }

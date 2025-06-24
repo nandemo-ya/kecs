@@ -29,7 +29,7 @@ type Client struct {
 func NewClient(config awsclient.Config) *Client {
 	client := awsclient.NewClient(config)
 	endpoint := client.BuildEndpoint(serviceName)
-	
+
 	return &Client{
 		client:   client,
 		endpoint: endpoint,

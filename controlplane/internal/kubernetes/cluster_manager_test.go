@@ -105,7 +105,6 @@ func TestK3dClusterManagerBasicOperations(t *testing.T) {
 	})
 }
 
-
 // isDockerAvailable checks if Docker is available for testing
 func isDockerAvailable() bool {
 	// Check if Docker socket exists

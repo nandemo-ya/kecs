@@ -10,12 +10,13 @@ import (
 	"sync"
 	"time"
 
-	secretsmanagerapi "github.com/nandemo-ya/kecs/controlplane/internal/secretsmanager/generated"
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	secretsmanagerapi "github.com/nandemo-ya/kecs/controlplane/internal/secretsmanager/generated"
 )
 
 // integration implements the Secrets Manager integration
@@ -56,7 +57,7 @@ func NewIntegration(kubeClient kubernetes.Interface, localStackManager localstac
 	if endpoint == "" {
 		endpoint = "http://localhost:4566"
 	}
-	
+
 	smClient := newSecretsManagerClient(endpoint)
 
 	return &integration{
@@ -196,7 +197,7 @@ func (i *integration) CreateOrUpdateSecret(ctx context.Context, secret *Secret, 
 
 	// Prepare secret data
 	secretData := make(map[string][]byte)
-	
+
 	if jsonKey != "" && jsonKey != "default" {
 		// Extract specific JSON key
 		value, err := i.extractJSONKey(secret.Value, jsonKey)
@@ -211,16 +212,16 @@ func (i *integration) CreateOrUpdateSecret(ctx context.Context, secret *Secret, 
 
 	// Prepare annotations
 	annotations := map[string]string{
-		SecretAnnotations.SecretName:   secret.Name,
-		SecretAnnotations.VersionId:    secret.VersionId,
-		SecretAnnotations.LastSynced:   time.Now().UTC().Format(time.RFC3339),
-		SecretAnnotations.Source:       SourceSecretsManager,
+		SecretAnnotations.SecretName: secret.Name,
+		SecretAnnotations.VersionId:  secret.VersionId,
+		SecretAnnotations.LastSynced: time.Now().UTC().Format(time.RFC3339),
+		SecretAnnotations.Source:     SourceSecretsManager,
 	}
-	
+
 	if len(secret.VersionStage) > 0 {
 		annotations[SecretAnnotations.VersionStage] = strings.Join(secret.VersionStage, ",")
 	}
-	
+
 	if jsonKey != "" {
 		annotations[SecretAnnotations.JSONKey] = jsonKey
 	}
@@ -314,7 +315,7 @@ func (i *integration) SyncSecrets(ctx context.Context, secrets []SecretReference
 		wg.Add(1)
 		go func(ref SecretReference) {
 			defer wg.Done()
-			
+
 			// Get the secret
 			secret, err := i.GetSecret(ctx, ref.SecretName)
 			if err != nil {
@@ -350,21 +351,21 @@ func (i *integration) GetSecretNameForSecret(secretName string) string {
 	// Remove the random suffix that Secrets Manager adds (e.g., -AbCdEf)
 	re := regexp.MustCompile(`-[A-Za-z0-9]{6}$`)
 	cleanName := re.ReplaceAllString(secretName, "")
-	
+
 	// Replace slashes and other non-alphanumeric characters with hyphens
 	re = regexp.MustCompile(`[^a-zA-Z0-9\-]`)
 	cleanName = re.ReplaceAllString(cleanName, "-")
-	
+
 	// Remove consecutive hyphens
 	re = regexp.MustCompile(`-+`)
 	cleanName = re.ReplaceAllString(cleanName, "-")
-	
+
 	// Remove leading and trailing hyphens
 	cleanName = strings.Trim(cleanName, "-")
-	
+
 	// Convert to lowercase
 	cleanName = strings.ToLower(cleanName)
-	
+
 	// Add prefix
 	return i.config.SecretPrefix + cleanName
 }

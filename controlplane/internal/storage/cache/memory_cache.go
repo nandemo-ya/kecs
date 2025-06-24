@@ -14,12 +14,12 @@ type MemoryCache struct {
 	evictList  *list.List
 	maxItems   int
 	defaultTTL time.Duration
-	
+
 	// Statistics
-	hits       int64
-	misses     int64
-	evictions  int64
-	sets       int64
+	hits      int64
+	misses    int64
+	evictions int64
+	sets      int64
 }
 
 type cacheItem struct {
@@ -37,10 +37,10 @@ func NewMemoryCache(maxItems int, defaultTTL time.Duration) *MemoryCache {
 		maxItems:   maxItems,
 		defaultTTL: defaultTTL,
 	}
-	
+
 	// Start cleanup goroutine
 	go cache.cleanupLoop()
-	
+
 	return cache
 }
 
@@ -49,14 +49,14 @@ func (c *MemoryCache) Get(ctx context.Context, key string) (interface{}, bool) {
 	c.mu.RLock()
 	item, exists := c.items[key]
 	c.mu.RUnlock()
-	
+
 	if !exists {
 		c.mu.Lock()
 		c.misses++
 		c.mu.Unlock()
 		return nil, false
 	}
-	
+
 	// Check expiration
 	if time.Now().After(item.expiration) {
 		c.mu.Lock()
@@ -65,13 +65,13 @@ func (c *MemoryCache) Get(ctx context.Context, key string) (interface{}, bool) {
 		c.mu.Unlock()
 		return nil, false
 	}
-	
+
 	// Move to front (LRU)
 	c.mu.Lock()
 	c.evictList.MoveToFront(item.element)
 	c.hits++
 	c.mu.Unlock()
-	
+
 	return item.value, true
 }
 
@@ -84,9 +84,9 @@ func (c *MemoryCache) Set(ctx context.Context, key string, value interface{}) {
 func (c *MemoryCache) SetWithTTL(ctx context.Context, key string, value interface{}, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.sets++
-	
+
 	// Check if key already exists
 	if item, exists := c.items[key]; exists {
 		// Update existing item
@@ -95,19 +95,19 @@ func (c *MemoryCache) SetWithTTL(ctx context.Context, key string, value interfac
 		c.evictList.MoveToFront(item.element)
 		return
 	}
-	
+
 	// Evict if at capacity
 	if len(c.items) >= c.maxItems {
 		c.evictOldest()
 	}
-	
+
 	// Create new item
 	item := &cacheItem{
 		key:        key,
 		value:      value,
 		expiration: time.Now().Add(ttl),
 	}
-	
+
 	// Add to front of list
 	item.element = c.evictList.PushFront(item)
 	c.items[key] = item
@@ -117,7 +117,7 @@ func (c *MemoryCache) SetWithTTL(ctx context.Context, key string, value interfac
 func (c *MemoryCache) Delete(ctx context.Context, key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if item, exists := c.items[key]; exists {
 		c.removeItem(item)
 	}
@@ -127,7 +127,7 @@ func (c *MemoryCache) Delete(ctx context.Context, key string) {
 func (c *MemoryCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.items = make(map[string]*cacheItem)
 	c.evictList.Init()
 }
@@ -136,7 +136,7 @@ func (c *MemoryCache) Clear() {
 func (c *MemoryCache) Stats() CacheStats {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	return CacheStats{
 		Hits:      c.hits,
 		Misses:    c.misses,
@@ -167,7 +167,7 @@ func (c *MemoryCache) evictOldest() {
 func (c *MemoryCache) cleanupLoop() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		c.cleanup()
 	}
@@ -177,17 +177,17 @@ func (c *MemoryCache) cleanupLoop() {
 func (c *MemoryCache) cleanup() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	now := time.Now()
 	var toRemove []*cacheItem
-	
+
 	// Find expired items
 	for _, item := range c.items {
 		if now.After(item.expiration) {
 			toRemove = append(toRemove, item)
 		}
 	}
-	
+
 	// Remove expired items
 	for _, item := range toRemove {
 		c.removeItem(item)
@@ -240,7 +240,7 @@ func (m *MultiLevelCache) Get(ctx context.Context, key string) (interface{}, boo
 	if value, found := m.memory.Get(ctx, key); found {
 		return value, true
 	}
-	
+
 	// Check storage backend
 	if m.storage != nil {
 		if value, found := m.storage.Get(ctx, key); found {
@@ -249,7 +249,7 @@ func (m *MultiLevelCache) Get(ctx context.Context, key string) (interface{}, boo
 			return value, true
 		}
 	}
-	
+
 	return nil, false
 }
 
@@ -257,11 +257,11 @@ func (m *MultiLevelCache) Get(ctx context.Context, key string) (interface{}, boo
 func (m *MultiLevelCache) Set(ctx context.Context, key string, value interface{}) error {
 	// Set in memory
 	m.memory.Set(ctx, key, value)
-	
+
 	// Set in storage backend
 	if m.storage != nil {
 		return m.storage.Set(ctx, key, value)
 	}
-	
+
 	return nil
 }

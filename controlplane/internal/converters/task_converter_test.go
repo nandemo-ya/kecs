@@ -59,7 +59,6 @@ var _ = Describe("TaskConverter", func() {
 		})
 	})
 
-
 	Describe("ConvertTaskToPod", func() {
 		var (
 			taskDef     *storage.TaskDefinition

@@ -100,7 +100,7 @@ var _ = Describe("TaskConverter S3 Integration", func() {
 			// Check command
 			Expect(initContainer.Command).To(Equal([]string{"/bin/sh", "-c"}))
 			Expect(initContainer.Args).To(HaveLen(1))
-			
+
 			// Verify the download script contains S3 and HTTP commands
 			script := initContainer.Args[0]
 			Expect(script).To(ContainSubstring("aws s3 cp s3://my-bucket/config/app.conf"))

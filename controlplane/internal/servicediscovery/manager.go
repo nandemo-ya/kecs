@@ -35,13 +35,13 @@ type manager struct {
 	kubeClient kubernetes.Interface
 	region     string
 	accountID  string
-	
+
 	// In-memory storage for namespaces, services, and instances
 	mu         sync.RWMutex
 	namespaces map[string]*Namespace
 	services   map[string]*Service
 	instances  map[string]map[string]*Instance // serviceID -> instanceID -> Instance
-	
+
 	// DNS namespace to Kubernetes namespace mapping
 	dnsToK8sNamespace map[string]string
 }
@@ -275,10 +275,10 @@ func (m *manager) RegisterInstance(ctx context.Context, serviceID string, instan
 	if instance.Attributes == nil {
 		instance.Attributes = make(map[string]string)
 	}
-	
+
 	// AWS SDK compatibility attributes
 	instance.Attributes["AWS_INSTANCE_ID"] = instanceID
-	
+
 	m.instances[serviceID][instanceID] = instance
 	service.InstanceCount++
 

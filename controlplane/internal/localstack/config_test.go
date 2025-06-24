@@ -3,7 +3,7 @@ package localstack_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
@@ -139,7 +139,7 @@ var _ = Describe("LocalStack Configuration", func() {
 				"CUSTOM_VAR": "value",
 				"DEBUG":      "1",
 			})
-			
+
 			Expect(config.Environment["CUSTOM_VAR"]).To(Equal("value"))
 			Expect(config.Environment["DEBUG"]).To(Equal("1"))
 		})
@@ -148,9 +148,9 @@ var _ = Describe("LocalStack Configuration", func() {
 			config.Services = []string{"s3", "iam"}
 			config.Debug = true
 			config.Persistence = false
-			
+
 			envVars := config.GetEnvironmentVars()
-			
+
 			Expect(envVars["SERVICES"]).To(Equal("s3,iam"))
 			Expect(envVars["DEBUG"]).To(Equal("1"))
 			Expect(envVars["PERSISTENCE"]).To(Equal("0"))

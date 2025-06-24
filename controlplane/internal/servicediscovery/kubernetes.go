@@ -40,14 +40,14 @@ func (m *manager) updateKubernetesEndpoints(ctx context.Context, service *Servic
 					"kecs.io/service":           service.Name,
 				},
 				Annotations: map[string]string{
-					"kecs.io/service-id":    service.ID,
-					"kecs.io/namespace-id":  service.NamespaceID,
-					"kecs.io/service-arn":   service.ARN,
+					"kecs.io/service-id":   service.ID,
+					"kecs.io/namespace-id": service.NamespaceID,
+					"kecs.io/service-arn":  service.ARN,
 				},
 			},
 			Spec: corev1.ServiceSpec{
 				ClusterIP: corev1.ClusterIPNone, // Headless service
-				Selector:  nil, // We'll manage endpoints manually
+				Selector:  nil,                  // We'll manage endpoints manually
 				Ports:     m.getServicePorts(service),
 			},
 		}
@@ -161,7 +161,7 @@ func (m *manager) buildEndpointSubsets(instances map[string]*Instance, service *
 
 	// Build ports
 	ports := []corev1.EndpointPort{}
-	
+
 	// Check if we have SRV records that specify ports
 	if service.DnsConfig != nil {
 		for _, record := range service.DnsConfig.DnsRecords {
@@ -194,7 +194,7 @@ func (m *manager) buildEndpointSubsets(instances map[string]*Instance, service *
 	subset := corev1.EndpointSubset{
 		Addresses:         addresses,
 		NotReadyAddresses: notReadyAddresses,
-		Ports:            ports,
+		Ports:             ports,
 	}
 
 	return []corev1.EndpointSubset{subset}

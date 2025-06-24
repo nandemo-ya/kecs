@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
 // Manager manages AWS proxy modes for LocalStack integration
@@ -92,18 +93,18 @@ func (m *Manager) startEnvironmentMode(ctx context.Context) error {
 // startSidecarMode starts the sidecar proxy mode
 func (m *Manager) startSidecarMode(ctx context.Context) error {
 	klog.Info("Starting sidecar proxy mode")
-	
+
 	// Create sidecar proxy
 	sidecarProxy := NewSidecarProxy(m.localStackEndpoint)
-	
+
 	// Set custom proxy image if configured
 	if proxyImage := os.Getenv("KECS_AWS_PROXY_IMAGE"); proxyImage != "" {
 		sidecarProxy.SetProxyImage(proxyImage)
 	}
-	
+
 	// Store reference for later use
 	m.sidecarProxy = sidecarProxy
-	
+
 	klog.Info("Sidecar proxy mode initialized successfully")
 	return nil
 }
@@ -116,11 +117,11 @@ func (m *Manager) GetMode() localstack.ProxyMode {
 // UpdateEndpoint updates the LocalStack endpoint
 func (m *Manager) UpdateEndpoint(endpoint string) {
 	m.localStackEndpoint = endpoint
-	
+
 	if m.envProxy != nil {
 		m.envProxy.UpdateEndpoint(endpoint)
 	}
-	
+
 	if m.sidecarProxy != nil {
 		m.sidecarProxy.UpdateEndpoint(endpoint)
 	}

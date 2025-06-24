@@ -19,24 +19,24 @@ func extractK8sNamespace(dnsNamespace string) string {
 	name := strings.TrimSuffix(dnsNamespace, ".local")
 	name = strings.TrimSuffix(name, ".ecs")
 	name = strings.TrimSuffix(name, ".internal")
-	
+
 	// Replace dots with hyphens
 	name = strings.ReplaceAll(name, ".", "-")
-	
+
 	// Ensure it's a valid Kubernetes namespace name
 	name = strings.ToLower(name)
-	
+
 	// Limit length
 	if len(name) > 63 {
 		name = name[:63]
 	}
-	
+
 	// Remove trailing hyphens
 	name = strings.TrimRight(name, "-")
-	
+
 	if name == "" {
 		return "default"
 	}
-	
+
 	return name
 }

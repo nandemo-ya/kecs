@@ -13,14 +13,13 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/memory"
 )
 
-
 var _ = Describe("Server Shutdown", func() {
 	var (
-		server         *Server
-		mockStorage    storage.Storage
-		mockClusterMgr *MockClusterManager
-		ctx            context.Context
-		origTestMode   string
+		server           *Server
+		mockStorage      storage.Storage
+		mockClusterMgr   *MockClusterManager
+		ctx              context.Context
+		origTestMode     string
 		origKeepClusters string
 	)
 
@@ -35,7 +34,7 @@ var _ = Describe("Server Shutdown", func() {
 		ctx = context.Background()
 		mockStorage = memory.NewMemoryStorage()
 		mockClusterMgr = NewMockClusterManager()
-		
+
 		// Reset mock state
 		mockClusterMgr.DeletedClusters = []string{}
 
@@ -115,7 +114,7 @@ var _ = Describe("Server Shutdown", func() {
 				// Call Stop
 				shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				defer cancel()
-				
+
 				err := server.Stop(shutdownCtx)
 				Expect(err).To(BeNil())
 
@@ -137,7 +136,7 @@ var _ = Describe("Server Shutdown", func() {
 				// Call Stop
 				shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				defer cancel()
-				
+
 				err := server.Stop(shutdownCtx)
 				Expect(err).To(BeNil())
 
@@ -155,7 +154,7 @@ var _ = Describe("Server Shutdown", func() {
 			// Call Stop
 			shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			
+
 			err := server.Stop(shutdownCtx)
 			Expect(err).To(BeNil())
 
@@ -178,7 +177,7 @@ var _ = Describe("Server Shutdown", func() {
 			// Call Stop
 			shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			
+
 			err := serverNoMgr.Stop(shutdownCtx)
 			Expect(err).To(BeNil())
 		})
@@ -198,7 +197,7 @@ var _ = Describe("Server Shutdown", func() {
 			// Call Stop
 			shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			
+
 			err := serverNoStorage.Stop(shutdownCtx)
 			Expect(err).To(BeNil())
 

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
@@ -17,7 +19,6 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
-	corev1 "k8s.io/api/core/v1"
 )
 
 // RunTask implements the RunTask operation
@@ -638,20 +639,20 @@ func extractSSMParameters(taskDef *storage.TaskDefinition) []string {
 	// Extract SSM parameter ARNs from each container's secrets
 	for _, container := range containerDefs {
 		for _, secret := range container.Secrets {
-				if secret.ValueFrom != nil && strings.Contains(*secret.ValueFrom, ":ssm:") {
-					// Parse SSM parameter name from ARN
-					// Format: arn:aws:ssm:region:account-id:parameter/name
-					parts := strings.Split(*secret.ValueFrom, ":")
-					if len(parts) >= 6 {
-						resourcePart := parts[5]
-						if strings.HasPrefix(resourcePart, "parameter/") {
-							paramName := strings.TrimPrefix(resourcePart, "parameter/")
-							ssmParams = append(ssmParams, "/"+paramName)
-						} else if strings.HasPrefix(resourcePart, "parameter") && len(parts) > 6 {
-							ssmParams = append(ssmParams, "/"+parts[6])
-						}
+			if secret.ValueFrom != nil && strings.Contains(*secret.ValueFrom, ":ssm:") {
+				// Parse SSM parameter name from ARN
+				// Format: arn:aws:ssm:region:account-id:parameter/name
+				parts := strings.Split(*secret.ValueFrom, ":")
+				if len(parts) >= 6 {
+					resourcePart := parts[5]
+					if strings.HasPrefix(resourcePart, "parameter/") {
+						paramName := strings.TrimPrefix(resourcePart, "parameter/")
+						ssmParams = append(ssmParams, "/"+paramName)
+					} else if strings.HasPrefix(resourcePart, "parameter") && len(parts) > 6 {
+						ssmParams = append(ssmParams, "/"+parts[6])
 					}
 				}
+			}
 		}
 	}
 

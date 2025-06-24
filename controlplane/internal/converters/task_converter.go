@@ -75,13 +75,13 @@ func (c *TaskConverter) ConvertTaskToPod(
 ) (*corev1.Pod, error) {
 	// Import the generated types to properly handle network configuration
 	var runTaskReq struct {
-		Cluster                  *string `json:"cluster,omitempty"`
-		TaskDefinition           *string `json:"taskDefinition"`
-		Count                    *int    `json:"count,omitempty"`
-		Group                    *string `json:"group,omitempty"`
-		StartedBy                *string `json:"startedBy,omitempty"`
-		LaunchType               *string `json:"launchType,omitempty"`
-		NetworkConfiguration     *struct {
+		Cluster              *string `json:"cluster,omitempty"`
+		TaskDefinition       *string `json:"taskDefinition"`
+		Count                *int    `json:"count,omitempty"`
+		Group                *string `json:"group,omitempty"`
+		StartedBy            *string `json:"startedBy,omitempty"`
+		LaunchType           *string `json:"launchType,omitempty"`
+		NetworkConfiguration *struct {
 			AwsvpcConfiguration *struct {
 				Subnets        []string `json:"subnets"`
 				SecurityGroups []string `json:"securityGroups,omitempty"`
@@ -191,7 +191,7 @@ func (c *TaskConverter) ConvertTaskToPod(
 			// ServiceAccount name is typically rolename-sa
 			serviceAccountName := fmt.Sprintf("%s-sa", roleName)
 			pod.Spec.ServiceAccountName = serviceAccountName
-			
+
 			// Add annotations for tracking
 			pod.Annotations["kecs.dev/task-role-arn"] = taskDef.TaskRoleARN
 			pod.Annotations["kecs.dev/task-role-name"] = roleName
@@ -240,14 +240,14 @@ func (c *TaskConverter) ConvertTaskToPod(
 	// Apply CloudWatch logs configuration
 	if c.cloudWatchIntegration != nil {
 		c.applyCloudWatchLogsConfiguration(pod, containerDefs, taskDef)
-		
+
 		// Add FluentBit sidecar if needed
 		sidecar, configMap := c.createCloudWatchSidecar(containerDefs, taskDef, taskID)
 		if sidecar != nil {
 			pod.Spec.Containers = append(pod.Spec.Containers, *sidecar)
-			
+
 			// Add host path volumes for logs
-			pod.Spec.Volumes = append(pod.Spec.Volumes, 
+			pod.Spec.Volumes = append(pod.Spec.Volumes,
 				corev1.Volume{
 					Name: "varlog",
 					VolumeSource: corev1.VolumeSource{
@@ -265,7 +265,7 @@ func (c *TaskConverter) ConvertTaskToPod(
 					},
 				},
 			)
-			
+
 			// Store config map info for later creation
 			if configMap != nil {
 				pod.Annotations["kecs.dev/fluent-bit-configmap"] = configMap.Name
@@ -294,7 +294,7 @@ func (c *TaskConverter) convertContainers(
 	runTaskReq *types.RunTaskRequest,
 ) []corev1.Container {
 	containers := make([]corev1.Container, 0, len(containerDefs))
-	
+
 	// Generate task ARN for logging
 	taskArn := taskDef.ARN
 
@@ -772,7 +772,7 @@ func (c *TaskConverter) applyResourceConstraints(pod *corev1.Pod, taskCPU, taskM
 					}
 				}
 			}
-			
+
 			if memoryMi > 0 && totalRequestedMemory > 0 {
 				memScale := float64(memoryMi) / float64(totalRequestedMemory)
 				for i := range pod.Spec.Containers {
@@ -1284,7 +1284,7 @@ func (c *TaskConverter) addSecretAnnotations(pod *corev1.Pod, containerDefs []ty
 			}
 		}
 	}
-	
+
 	// Add total count of secrets
 	if secretIndex > 0 {
 		pod.Annotations["kecs.dev/secret-count"] = fmt.Sprintf("%d", secretIndex)
@@ -1295,22 +1295,22 @@ func (c *TaskConverter) addSecretAnnotations(pod *corev1.Pod, containerDefs []ty
 func (c *TaskConverter) applyIAMRole(pod *corev1.Pod, roleArn string) {
 	// Add role ARN annotation
 	pod.ObjectMeta.Annotations["kecs.dev/task-role-arn"] = roleArn
-	
+
 	// Extract role name from ARN
 	// ARN format: arn:aws:iam::account-id:role/role-name
 	parts := strings.Split(roleArn, "/")
 	if len(parts) >= 2 {
 		roleName := parts[len(parts)-1]
-		
+
 		// ServiceAccount name would be created by IAM integration
 		serviceAccountName := fmt.Sprintf("%s-sa", roleName)
-		
+
 		// Set ServiceAccount on the pod
 		pod.Spec.ServiceAccountName = serviceAccountName
-		
+
 		// Add label for easier querying
 		pod.ObjectMeta.Labels["kecs.dev/iam-role"] = roleName
-		
+
 		// Inject AWS credentials for LocalStack
 		c.injectAWSCredentials(pod)
 	}
@@ -1333,17 +1333,17 @@ func (c *TaskConverter) injectAWSCredentials(pod *corev1.Pod) {
 			Value: c.region,
 		},
 	}
-	
+
 	// Add credentials to all containers
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
-		
+
 		// Check if env vars already exist to avoid duplicates
 		envMap := make(map[string]bool)
 		for _, env := range container.Env {
 			envMap[env.Name] = true
 		}
-		
+
 		// Add AWS env vars if not already present
 		for _, envVar := range awsEnvVars {
 			if !envMap[envVar.Name] {
@@ -1378,7 +1378,7 @@ func (c *TaskConverter) applyCloudWatchLogsConfiguration(pod *corev1.Pod, contai
 			if def.Name == nil {
 				continue
 			}
-			
+
 			options := def.LogConfiguration.Options
 			if options == nil {
 				options = make(map[string]string)
@@ -1389,15 +1389,15 @@ func (c *TaskConverter) applyCloudWatchLogsConfiguration(pod *corev1.Pod, contai
 			if logGroupName == "" {
 				logGroupName = c.cloudWatchIntegration.GetLogGroupForTask(taskDef.ARN)
 			}
-			
+
 			logStreamName := c.cloudWatchIntegration.GetLogStreamForContainer(taskDef.ARN, *def.Name)
-			
+
 			// Add annotations for each container's log configuration
 			annotationPrefix := fmt.Sprintf("kecs.dev/container-%s-logs", *def.Name)
 			pod.Annotations[annotationPrefix+"-driver"] = "awslogs"
 			pod.Annotations[annotationPrefix+"-group"] = logGroupName
 			pod.Annotations[annotationPrefix+"-stream"] = logStreamName
-			
+
 			if region, ok := options["awslogs-region"]; ok {
 				pod.Annotations[annotationPrefix+"-region"] = region
 			}
@@ -1406,23 +1406,23 @@ func (c *TaskConverter) applyCloudWatchLogsConfiguration(pod *corev1.Pod, contai
 
 	// Add global CloudWatch logs enabled annotation
 	pod.Annotations["kecs.dev/cloudwatch-logs-enabled"] = "true"
-	
+
 	// Create log streams for each container
 	for _, def := range containerDefs {
-		if def.LogConfiguration != nil && def.LogConfiguration.LogDriver != nil && 
-		   *def.LogConfiguration.LogDriver == "awslogs" && def.Name != nil {
+		if def.LogConfiguration != nil && def.LogConfiguration.LogDriver != nil &&
+			*def.LogConfiguration.LogDriver == "awslogs" && def.Name != nil {
 			options := def.LogConfiguration.Options
 			if options == nil {
 				options = make(map[string]string)
 			}
-			
+
 			logGroupName := options["awslogs-group"]
 			if logGroupName == "" {
 				logGroupName = c.cloudWatchIntegration.GetLogGroupForTask(taskDef.ARN)
 			}
-			
+
 			logStreamName := c.cloudWatchIntegration.GetLogStreamForContainer(taskDef.ARN, *def.Name)
-			
+
 			// Create log group and stream
 			if err := c.cloudWatchIntegration.CreateLogGroup(logGroupName); err != nil {
 				log.Printf("Warning: Failed to create log group %s: %v", logGroupName, err)
@@ -1610,10 +1610,10 @@ func (c *TaskConverter) sanitizeLabelValue(value string) string {
 func (c *TaskConverter) convertECSAttributeToK8sLabel(attribute string) string {
 	// Common ECS attributes mapping
 	mappings := map[string]string{
-		"ecs.instance-type":      "node.kubernetes.io/instance-type",
-		"ecs.availability-zone":  "topology.kubernetes.io/zone",
+		"ecs.instance-type":     "node.kubernetes.io/instance-type",
+		"ecs.availability-zone": "topology.kubernetes.io/zone",
 		"ecs.os-type":           "kubernetes.io/os",
-		"ecs.cpu-architecture":   "kubernetes.io/arch",
+		"ecs.cpu-architecture":  "kubernetes.io/arch",
 		"ecs.ami-id":            "kecs.dev/ami-id",
 		"ecs.instance-id":       "kecs.dev/instance-id",
 		"ecs.subnet-id":         "kecs.dev/subnet-id",
@@ -1747,7 +1747,7 @@ func (c *TaskConverter) sanitizeSecretName(name string) string {
 	// Determine the prefix based on the source
 	// The integration modules will handle the actual prefixing,
 	// but we need to ensure consistency here
-	
+
 	// Remove the random suffix from Secrets Manager secret names
 	// Format: my-secret-AbCdEf -> my-secret
 	if idx := strings.LastIndex(name, "-"); idx > 0 && len(name)-idx == 7 {
@@ -1757,10 +1757,10 @@ func (c *TaskConverter) sanitizeSecretName(name string) string {
 			name = name[:idx]
 		}
 	}
-	
+
 	// Handle path separators for hierarchical secrets
 	name = strings.ReplaceAll(name, "/", "-")
-	
+
 	// Similar to volume names, but for secrets
 	name = strings.ToLower(name)
 	name = regexp.MustCompile(`[^a-z0-9-]`).ReplaceAllString(name, "-")
@@ -1776,7 +1776,7 @@ func (c *TaskConverter) extractRoleNameFromARN(arn string) string {
 	if arn == "" {
 		return ""
 	}
-	
+
 	// ARN format: arn:aws:iam::account-id:role/role-name
 	parts := strings.Split(arn, ":")
 	if len(parts) >= 6 && parts[2] == "iam" {
@@ -1786,12 +1786,12 @@ func (c *TaskConverter) extractRoleNameFromARN(arn string) string {
 			return strings.TrimPrefix(resourcePart, "role/")
 		}
 	}
-	
+
 	// If it's not a valid ARN, assume it's already a role name
 	if !strings.HasPrefix(arn, "arn:") {
 		return arn
 	}
-	
+
 	return ""
 }
 
@@ -1890,10 +1890,10 @@ func (c *TaskConverter) createArtifactInitContainers(containerDefs []types.Conta
 
 		// Create init container for downloading artifacts
 		initContainer := corev1.Container{
-			Name:  fmt.Sprintf("artifact-downloader-%s", *def.Name),
-			Image: "amazon/aws-cli:latest", // Use AWS CLI image for S3 support
+			Name:    fmt.Sprintf("artifact-downloader-%s", *def.Name),
+			Image:   "amazon/aws-cli:latest", // Use AWS CLI image for S3 support
 			Command: []string{"/bin/sh", "-c"},
-			Args: []string{c.generateArtifactDownloadScript(def.Artifacts)},
+			Args:    []string{c.generateArtifactDownloadScript(def.Artifacts)},
 			VolumeMounts: []corev1.VolumeMount{
 				{
 					Name:      volumeName,

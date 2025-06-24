@@ -32,24 +32,24 @@ func GenerateCoreDNSConfig(namespaces map[string]*Namespace, services map[string
 		config.WriteString("    errors\n")
 		config.WriteString("    health\n")
 		config.WriteString("    ready\n")
-		
+
 		// Use Kubernetes plugin for service discovery
 		config.WriteString("    kubernetes cluster.local in-addr.arpa ip6.arpa {\n")
 		config.WriteString("        pods insecure\n")
 		config.WriteString("        fallthrough in-addr.arpa ip6.arpa\n")
 		config.WriteString("        ttl 30\n")
 		config.WriteString("    }\n")
-		
+
 		// Rewrite rules for Cloud Map compatibility
 		if services, ok := servicesByNamespace[namespaceID]; ok {
 			for _, service := range services {
 				// Rewrite service.namespace to sd-service.k8s-namespace
 				k8sServiceName := fmt.Sprintf("sd-%s", service.Name)
-				config.WriteString(fmt.Sprintf("    rewrite name %s.%s %s.default.svc.cluster.local\n", 
+				config.WriteString(fmt.Sprintf("    rewrite name %s.%s %s.default.svc.cluster.local\n",
 					service.Name, namespace.Name, k8sServiceName))
 			}
 		}
-		
+
 		config.WriteString("    forward . /etc/resolv.conf\n")
 		config.WriteString("    cache 30\n")
 		config.WriteString("    loop\n")
@@ -64,7 +64,7 @@ func GenerateCoreDNSConfig(namespaces map[string]*Namespace, services map[string
 // GenerateCoreDNSConfigMap generates a ConfigMap for CoreDNS
 func GenerateCoreDNSConfigMap(namespaces map[string]*Namespace, services map[string]*Service) map[string]string {
 	corefile := GenerateCoreDNSConfig(namespaces, services)
-	
+
 	// Add default configuration
 	defaultConfig := `.:53 {
     errors
@@ -82,7 +82,7 @@ func GenerateCoreDNSConfigMap(namespaces map[string]*Namespace, services map[str
     loadbalance
 }
 `
-	
+
 	return map[string]string{
 		"Corefile": defaultConfig + "\n" + corefile,
 	}

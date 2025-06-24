@@ -23,7 +23,7 @@ func (api *DefaultECSAPI) getServiceManager() (*kubernetes.ServiceManager, error
 	if os.Getenv("KECS_TEST_MODE") == "true" {
 		return kubernetes.NewServiceManager(api.storage, nil), nil
 	}
-	
+
 	// Get cluster manager
 	if clusterManager := api.getClusterManager(); clusterManager != nil {
 		return kubernetes.NewServiceManager(api.storage, clusterManager), nil

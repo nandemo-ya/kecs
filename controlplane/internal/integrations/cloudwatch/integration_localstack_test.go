@@ -11,9 +11,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 )
 
 var _ = Describe("CloudWatch LocalStack Integration", func() {
@@ -28,10 +28,10 @@ var _ = Describe("CloudWatch LocalStack Integration", func() {
 		}
 
 		kubeClient = fake.NewSimpleClientset()
-		
+
 		// Create real LocalStack manager
 		lsManager := &mockLocalStackManager{}
-		
+
 		config := &cloudwatch.Config{
 			LocalStackEndpoint: "http://localhost:4566",
 			LogGroupPrefix:     "/ecs/test/",

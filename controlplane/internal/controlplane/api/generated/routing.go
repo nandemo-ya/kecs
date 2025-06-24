@@ -1561,11 +1561,11 @@ func (r *Router) handleUpdateTaskSet(w http.ResponseWriter, req *http.Request) {
 // writeJSON writes a JSON response
 func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
-	
+
 	// Marshal the data first to get the content length
 	var jsonData []byte
 	var err error
-	
+
 	if data != nil {
 		jsonData, err = json.Marshal(data)
 		if err != nil {
@@ -1577,11 +1577,11 @@ func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	} else {
 		jsonData = []byte("{}")
 	}
-	
+
 	// Set content length to ensure proper response handling
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(jsonData)))
 	w.WriteHeader(statusCode)
-	
+
 	// Write the response
 	if _, err := w.Write(jsonData); err != nil {
 		fmt.Printf("Error writing response: %v\n", err)

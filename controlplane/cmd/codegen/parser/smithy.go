@@ -10,27 +10,27 @@ import (
 
 // SmithyAPI represents the parsed Smithy API definition
 type SmithyAPI struct {
-	Smithy   string                         `json:"smithy"`
-	Metadata map[string]interface{}         `json:"metadata"`
-	Shapes   map[string]*SmithyShape        `json:"shapes"`
+	Smithy   string                  `json:"smithy"`
+	Metadata map[string]interface{}  `json:"metadata"`
+	Shapes   map[string]*SmithyShape `json:"shapes"`
 }
 
 // SmithyShape represents a shape in the Smithy model
 type SmithyShape struct {
-	Type       string                 `json:"type"`
+	Type       string                   `json:"type"`
 	Members    map[string]*SmithyMember `json:"members,omitempty"`
-	Member     *SmithyMember          `json:"member,omitempty"` // For list/map types
-	Key        *SmithyMember          `json:"key,omitempty"`    // For map types
-	Value      *SmithyMember          `json:"value,omitempty"`  // For map types
-	Traits     map[string]interface{} `json:"traits,omitempty"`
-	Target     string                 `json:"target,omitempty"`
-	Input      *SmithyRef             `json:"input,omitempty"`
-	Output     *SmithyRef             `json:"output,omitempty"`
-	Errors     []SmithyRef            `json:"errors,omitempty"`
-	Operations []SmithyRef            `json:"operations,omitempty"`
-	Resources  []SmithyRef            `json:"resources,omitempty"`
-	Min        *int                   `json:"min,omitempty"`
-	Max        *int                   `json:"max,omitempty"`
+	Member     *SmithyMember            `json:"member,omitempty"` // For list/map types
+	Key        *SmithyMember            `json:"key,omitempty"`    // For map types
+	Value      *SmithyMember            `json:"value,omitempty"`  // For map types
+	Traits     map[string]interface{}   `json:"traits,omitempty"`
+	Target     string                   `json:"target,omitempty"`
+	Input      *SmithyRef               `json:"input,omitempty"`
+	Output     *SmithyRef               `json:"output,omitempty"`
+	Errors     []SmithyRef              `json:"errors,omitempty"`
+	Operations []SmithyRef              `json:"operations,omitempty"`
+	Resources  []SmithyRef              `json:"resources,omitempty"`
+	Min        *int                     `json:"min,omitempty"`
+	Max        *int                     `json:"max,omitempty"`
 }
 
 // SmithyMember represents a member of a structure
@@ -78,7 +78,7 @@ func (api *SmithyAPI) GetServiceShape() (*SmithyShape, string, error) {
 // GetOperations returns all operation shapes for the service
 func (api *SmithyAPI) GetOperations() map[string]*SmithyShape {
 	operations := make(map[string]*SmithyShape)
-	
+
 	serviceShape, _, err := api.GetServiceShape()
 	if err != nil {
 		return operations
@@ -168,7 +168,7 @@ func (s *SmithyShape) IsEnum() bool {
 // GetEnumValues returns the enum values for an enum shape
 func (s *SmithyShape) GetEnumValues() []string {
 	var values []string
-	
+
 	if s.Traits != nil {
 		if enumTrait, ok := s.Traits["smithy.api#enum"]; ok {
 			if enumList, ok := enumTrait.([]interface{}); ok {
@@ -182,23 +182,23 @@ func (s *SmithyShape) GetEnumValues() []string {
 			}
 		}
 	}
-	
+
 	// For member-based enums
 	if len(values) == 0 && s.Type == "enum" && s.Members != nil {
 		for name := range s.Members {
 			values = append(values, name)
 		}
 	}
-	
+
 	return values
 }
 
 // IsPrimitive checks if a shape is a primitive type
 func (s *SmithyShape) IsPrimitive() bool {
 	switch s.Type {
-	case "string", "boolean", "byte", "short", "integer", "long", 
-	     "float", "double", "bigInteger", "bigDecimal", "timestamp",
-	     "blob", "document":
+	case "string", "boolean", "byte", "short", "integer", "long",
+		"float", "double", "bigInteger", "bigDecimal", "timestamp",
+		"blob", "document":
 		return true
 	}
 	return false

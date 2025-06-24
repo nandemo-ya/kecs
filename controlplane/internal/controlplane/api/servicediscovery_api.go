@@ -6,32 +6,33 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
 	"k8s.io/klog/v2"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
 )
 
 // ServiceDiscoveryAPI handles Cloud Map API operations
 type ServiceDiscoveryAPI struct {
-	manager servicediscovery.Manager
-	region  string
+	manager   servicediscovery.Manager
+	region    string
 	accountID string
 }
 
 // NewServiceDiscoveryAPI creates a new ServiceDiscoveryAPI
 func NewServiceDiscoveryAPI(manager servicediscovery.Manager, region, accountID string) *ServiceDiscoveryAPI {
 	return &ServiceDiscoveryAPI{
-		manager: manager,
-		region:  region,
+		manager:   manager,
+		region:    region,
 		accountID: accountID,
 	}
 }
 
 // CreatePrivateDnsNamespaceRequest represents the request for creating a private DNS namespace
 type CreatePrivateDnsNamespaceRequest struct {
-	Name        string                              `json:"Name"`
-	Vpc         string                              `json:"Vpc"`
-	Description string                              `json:"Description,omitempty"`
-	Tags        []Tag                               `json:"Tags,omitempty"`
+	Name        string                                `json:"Name"`
+	Vpc         string                                `json:"Vpc"`
+	Description string                                `json:"Description,omitempty"`
+	Tags        []Tag                                 `json:"Tags,omitempty"`
 	Properties  *servicediscovery.NamespaceProperties `json:"Properties,omitempty"`
 }
 
@@ -42,13 +43,13 @@ type CreatePrivateDnsNamespaceResponse struct {
 
 // CreateServiceDiscoveryServiceRequest represents the request for creating a service
 type CreateServiceDiscoveryServiceRequest struct {
-	Name                 string                           `json:"Name"`
-	NamespaceId          string                           `json:"NamespaceId"`
-	Description          string                           `json:"Description,omitempty"`
-	DnsConfig            *servicediscovery.DnsConfig      `json:"DnsConfig"`
-	HealthCheckConfig    *servicediscovery.HealthCheckConfig `json:"HealthCheckConfig,omitempty"`
-	HealthCheckCustomConfig *HealthCheckCustomConfig       `json:"HealthCheckCustomConfig,omitempty"`
-	Tags                 []Tag                            `json:"Tags,omitempty"`
+	Name                    string                              `json:"Name"`
+	NamespaceId             string                              `json:"NamespaceId"`
+	Description             string                              `json:"Description,omitempty"`
+	DnsConfig               *servicediscovery.DnsConfig         `json:"DnsConfig"`
+	HealthCheckConfig       *servicediscovery.HealthCheckConfig `json:"HealthCheckConfig,omitempty"`
+	HealthCheckCustomConfig *HealthCheckCustomConfig            `json:"HealthCheckCustomConfig,omitempty"`
+	Tags                    []Tag                               `json:"Tags,omitempty"`
 }
 
 // HealthCheckCustomConfig represents custom health check configuration

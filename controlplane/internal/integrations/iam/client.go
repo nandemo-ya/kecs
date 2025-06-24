@@ -24,7 +24,7 @@ func newIAMClient(endpoint string) IAMClient {
 	if endpoint == "" {
 		endpoint = "http://localhost:4566"
 	}
-	
+
 	return &iamClient{
 		endpoint:   endpoint,
 		httpClient: &http.Client{},
@@ -317,7 +317,7 @@ func newSTSClient(endpoint string) STSClient {
 	if endpoint == "" {
 		endpoint = "http://localhost:4566"
 	}
-	
+
 	return &stsClient{
 		endpoint:   endpoint,
 		httpClient: &http.Client{},

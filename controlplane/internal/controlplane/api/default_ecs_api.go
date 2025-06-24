@@ -14,16 +14,16 @@ import (
 
 // DefaultECSAPI provides the default implementation of ECS API operations
 type DefaultECSAPI struct {
-	storage                    storage.Storage
-	clusterManager             kubernetes.ClusterManager
-	region                     string
-	accountID                  string
-	iamIntegration             iam.Integration
-	cloudWatchIntegration      cloudwatch.Integration
-	ssmIntegration             ssm.Integration
-	secretsManagerIntegration  secretsmanager.Integration
-	s3Integration              s3.Integration
-	serviceDiscoveryManager    servicediscovery.Manager
+	storage                   storage.Storage
+	clusterManager            kubernetes.ClusterManager
+	region                    string
+	accountID                 string
+	iamIntegration            iam.Integration
+	cloudWatchIntegration     cloudwatch.Integration
+	ssmIntegration            ssm.Integration
+	secretsManagerIntegration secretsmanager.Integration
+	s3Integration             s3.Integration
+	serviceDiscoveryManager   servicediscovery.Manager
 }
 
 // NewDefaultECSAPI creates a new default ECS API implementation with storage
@@ -65,7 +65,6 @@ func (api *DefaultECSAPI) SetS3Integration(s3Integration s3.Integration) {
 func (api *DefaultECSAPI) SetServiceDiscoveryManager(serviceDiscoveryManager servicediscovery.Manager) {
 	api.serviceDiscoveryManager = serviceDiscoveryManager
 }
-
 
 // NewDefaultECSAPIWithConfig creates a new default ECS API implementation with custom region and accountID
 // Deprecated: Use NewDefaultECSAPIWithClusterManager instead

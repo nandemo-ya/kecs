@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	k8s "k8s.io/client-go/kubernetes"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	k8s "k8s.io/client-go/kubernetes"
 )
 
 // CreateCluster implements the CreateCluster operation
@@ -681,7 +682,7 @@ func (api *DefaultECSAPI) createK8sClusterAndNamespace(cluster *storage.Cluster)
 			log.Printf("Failed to create k3d cluster %s for ECS cluster %s: %v", cluster.K8sClusterName, cluster.Name, err)
 			return
 		}
-		
+
 		// Wait for the k3d cluster to be ready before proceeding
 		log.Printf("Waiting for k3d cluster %s to be ready...", cluster.K8sClusterName)
 		if err := clusterManager.WaitForClusterReady(cluster.K8sClusterName, 60*time.Second); err != nil {

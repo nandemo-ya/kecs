@@ -11,17 +11,17 @@ import (
 
 // TypeInfo holds information about a generated type
 type TypeInfo struct {
-	Name         string
-	GoType       string
-	JSONName     string
-	IsPointer    bool
-	IsRequired   bool
-	IsEnum       bool
-	IsError      bool
-	ErrorType    string // "client" or "server"
-	HTTPStatus   int
-	EnumValues   []string
-	Fields       []FieldInfo
+	Name       string
+	GoType     string
+	JSONName   string
+	IsPointer  bool
+	IsRequired bool
+	IsEnum     bool
+	IsError    bool
+	ErrorType  string // "client" or "server"
+	HTTPStatus int
+	EnumValues []string
+	Fields     []FieldInfo
 }
 
 // FieldInfo holds information about a struct field
@@ -45,14 +45,14 @@ func (g *Generator) generateEnumsFile(api *parser.SmithyAPI) error {
 	allTypes := g.collectTypes(api)
 	enumTypes := make(map[string]*TypeInfo)
 	var enumNames []string
-	
+
 	for name, typeInfo := range allTypes {
 		if typeInfo.IsEnum {
 			enumTypes[name] = typeInfo
 			enumNames = append(enumNames, name)
 		}
 	}
-	
+
 	sort.Strings(enumNames)
 
 	// Generate content
@@ -86,14 +86,14 @@ func (g *Generator) generateTypesFile(api *parser.SmithyAPI) error {
 	// Collect all types to generate (excluding enums which go in enums.go)
 	allTypes := g.collectTypes(api)
 	types := make(map[string]*TypeInfo)
-	
+
 	// Filter out enum types
 	for name, typeInfo := range allTypes {
 		if !typeInfo.IsEnum {
 			types[name] = typeInfo
 		}
 	}
-	
+
 	// Sort types for consistent output
 	var typeNames []string
 	for name := range types {
@@ -130,22 +130,22 @@ func (g *Generator) generateTypesFile(api *parser.SmithyAPI) error {
 // collectTypes collects all types from the API definition
 func (g *Generator) collectTypes(api *parser.SmithyAPI) map[string]*TypeInfo {
 	types := make(map[string]*TypeInfo)
-	
+
 	// Process all shapes
 	for shapeName, shape := range api.Shapes {
 		// Skip service and operation shapes
 		if shape.Type == "service" || shape.Type == "operation" {
 			continue
 		}
-		
+
 		// Get simple name
 		name := parser.GetShapeName(shapeName)
-		
+
 		// Skip if already processed
 		if _, exists := types[name]; exists {
 			continue
 		}
-		
+
 		// Generate type info based on shape type
 		switch shape.Type {
 		case "structure":
@@ -181,7 +181,7 @@ func (g *Generator) collectTypes(api *parser.SmithyAPI) map[string]*TypeInfo {
 			}
 		}
 	}
-	
+
 	return types
 }
 
@@ -192,33 +192,33 @@ func (g *Generator) generateStructType(name string, shape *parser.SmithyShape, a
 		GoType:  name,
 		IsError: shape.IsError(),
 	}
-	
+
 	// Set error type information
 	if typeInfo.IsError {
 		typeInfo.ErrorType = shape.GetErrorType()
 		typeInfo.HTTPStatus = shape.GetHTTPStatus()
 	}
-	
+
 	// Check if this is an empty structure
 	if shape.Members == nil || len(shape.Members) == 0 {
 		// Empty structures should have at least one field to be valid
 		// We'll handle this in the template
 		return typeInfo
 	}
-	
+
 	// Process members
 	var fieldNames []string
 	for fieldName := range shape.Members {
 		fieldNames = append(fieldNames, fieldName)
 	}
 	sort.Strings(fieldNames)
-	
+
 	for _, fieldName := range fieldNames {
 		member := shape.Members[fieldName]
 		field := g.generateField(fieldName, member, api)
 		typeInfo.Fields = append(typeInfo.Fields, field)
 	}
-	
+
 	return typeInfo
 }
 
@@ -226,13 +226,13 @@ func (g *Generator) generateStructType(name string, shape *parser.SmithyShape, a
 func (g *Generator) generateField(fieldName string, member *parser.SmithyMember, api *parser.SmithyAPI) FieldInfo {
 	// Resolve target shape
 	targetShape, targetName := api.ResolveShape(member.Target)
-	
+
 	field := FieldInfo{
 		Name:       g.exportFieldName(fieldName),
 		JSONName:   member.GetJSONName(fieldName),
 		IsRequired: member.IsRequired(),
 	}
-	
+
 	// Determine Go type
 	if targetShape != nil {
 		field.GoType = g.getGoType(targetName, targetShape, api)
@@ -244,7 +244,7 @@ func (g *Generator) generateField(fieldName string, member *parser.SmithyMember,
 		// Default to interface{} if shape not found
 		field.GoType = "interface{}"
 	}
-	
+
 	return field
 }
 
@@ -257,7 +257,7 @@ func (g *Generator) generateListType(name string, shape *parser.SmithyShape, api
 			memberType = g.getGoType(targetName, targetShape, api)
 		}
 	}
-	
+
 	return &TypeInfo{
 		Name:   name,
 		GoType: fmt.Sprintf("[]%s", memberType),
@@ -268,21 +268,21 @@ func (g *Generator) generateListType(name string, shape *parser.SmithyShape, api
 func (g *Generator) generateMapType(name string, shape *parser.SmithyShape, api *parser.SmithyAPI) *TypeInfo {
 	keyType := "string" // Default key type
 	valueType := "interface{}"
-	
+
 	if shape.Key != nil {
 		targetShape, targetName := api.ResolveShape(shape.Key.Target)
 		if targetShape != nil {
 			keyType = g.getGoType(targetName, targetShape, api)
 		}
 	}
-	
+
 	if shape.Value != nil {
 		targetShape, targetName := api.ResolveShape(shape.Value.Target)
 		if targetShape != nil {
 			valueType = g.getGoType(targetName, targetShape, api)
 		}
 	}
-	
+
 	return &TypeInfo{
 		Name:   name,
 		GoType: fmt.Sprintf("map[%s]%s", keyType, valueType),
@@ -313,7 +313,7 @@ func (g *Generator) generateUnionType(name string, shape *parser.SmithyShape, ap
 		Name:   name,
 		GoType: name,
 	}
-	
+
 	// Process union members as optional fields
 	if shape.Members != nil {
 		var fieldNames []string
@@ -321,14 +321,14 @@ func (g *Generator) generateUnionType(name string, shape *parser.SmithyShape, ap
 			fieldNames = append(fieldNames, fieldName)
 		}
 		sort.Strings(fieldNames)
-		
+
 		for _, fieldName := range fieldNames {
 			member := shape.Members[fieldName]
 			field := g.generateField(fieldName, member, api)
 			// Union members are always optional
 			field.IsRequired = false
 			field.IsPointer = true
-			
+
 			// Add documentation comment from traits
 			if member.Traits != nil {
 				if doc, ok := member.Traits["smithy.api#documentation"]; ok {
@@ -339,11 +339,11 @@ func (g *Generator) generateUnionType(name string, shape *parser.SmithyShape, ap
 					}
 				}
 			}
-			
+
 			typeInfo.Fields = append(typeInfo.Fields, field)
 		}
 	}
-	
+
 	return typeInfo
 }
 
@@ -359,7 +359,7 @@ func (g *Generator) generatePrimitiveType(name string, shape *parser.SmithyShape
 // getGoType returns the Go type for a shape
 func (g *Generator) getGoType(shapeName string, shape *parser.SmithyShape, api *parser.SmithyAPI) string {
 	name := parser.GetShapeName(shapeName)
-	
+
 	// Handle smithy built-in types
 	if strings.HasPrefix(shapeName, "smithy.api#") {
 		switch shapeName {
@@ -383,7 +383,7 @@ func (g *Generator) getGoType(shapeName string, shape *parser.SmithyShape, api *
 			return "float64"
 		}
 	}
-	
+
 	switch shape.Type {
 	case "string":
 		if shape.IsEnum() {
@@ -509,7 +509,6 @@ func (g *Generator) exportFieldName(name string) string {
 	// Convert first character to uppercase
 	return strings.ToUpper(name[:1]) + name[1:]
 }
-
 
 const typesTemplate = `// Code generated by cmd/codegen. DO NOT EDIT.
 

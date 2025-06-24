@@ -277,11 +277,11 @@ type RuntimePlatform struct {
 
 // Artifact represents a container artifact to be downloaded
 type Artifact struct {
-	Name          *string `json:"name"`
-	ArtifactUrl   *string `json:"artifactUrl"`
-	Type          *string `json:"type,omitempty"` // "s3", "http", "https"
-	TargetPath    *string `json:"targetPath"`      // Path in container where artifact will be placed
-	Permissions   *string `json:"permissions,omitempty"` // File permissions (e.g., "0644")
-	Checksum      *string `json:"checksum,omitempty"`    // Optional checksum for validation
-	ChecksumType  *string `json:"checksumType,omitempty"` // "sha256", "md5"
+	Name         *string `json:"name"`
+	ArtifactUrl  *string `json:"artifactUrl"`
+	Type         *string `json:"type,omitempty"`         // "s3", "http", "https"
+	TargetPath   *string `json:"targetPath"`             // Path in container where artifact will be placed
+	Permissions  *string `json:"permissions,omitempty"`  // File permissions (e.g., "0644")
+	Checksum     *string `json:"checksum,omitempty"`     // Optional checksum for validation
+	ChecksumType *string `json:"checksumType,omitempty"` // "sha256", "md5"
 }

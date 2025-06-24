@@ -5,13 +5,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"gopkg.in/yaml.v3"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
 // Config represents the KECS configuration
 type Config struct {
-	Server     ServerConfig     `yaml:"server"`
+	Server     ServerConfig      `yaml:"server"`
 	LocalStack localstack.Config `yaml:"localstack"`
 }
 

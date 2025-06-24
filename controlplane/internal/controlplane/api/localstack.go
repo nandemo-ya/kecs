@@ -9,16 +9,16 @@ import (
 
 // LocalStackStatus represents the status of LocalStack integration
 type LocalStackStatus struct {
-	Enabled         bool                       `json:"enabled"`
-	Running         bool                       `json:"running"`
-	Endpoint        string                     `json:"endpoint"`
-	Services        []string                   `json:"services"`
-	ServiceStatuses map[string]ServiceStatus   `json:"serviceStatuses"`
-	ProxyMode       string                     `json:"proxyMode"`
-	ProxyEnabled    bool                       `json:"proxyEnabled"`
-	ProxyEndpoint   string                     `json:"proxyEndpoint,omitempty"`
-	Version         string                     `json:"version,omitempty"`
-	Timestamp       string                     `json:"timestamp"`
+	Enabled         bool                     `json:"enabled"`
+	Running         bool                     `json:"running"`
+	Endpoint        string                   `json:"endpoint"`
+	Services        []string                 `json:"services"`
+	ServiceStatuses map[string]ServiceStatus `json:"serviceStatuses"`
+	ProxyMode       string                   `json:"proxyMode"`
+	ProxyEnabled    bool                     `json:"proxyEnabled"`
+	ProxyEndpoint   string                   `json:"proxyEndpoint,omitempty"`
+	Version         string                   `json:"version,omitempty"`
+	Timestamp       string                   `json:"timestamp"`
 }
 
 // ServiceStatus represents the status of a LocalStack service
@@ -30,21 +30,21 @@ type ServiceStatus struct {
 
 // LocalStackService represents a LocalStack service in the dashboard
 type LocalStackService struct {
-	Name         string    `json:"name"`
-	Available    bool      `json:"available"`
-	Endpoint     string    `json:"endpoint"`
-	LastChecked  time.Time `json:"lastChecked"`
-	LastError    string    `json:"lastError,omitempty"`
+	Name        string    `json:"name"`
+	Available   bool      `json:"available"`
+	Endpoint    string    `json:"endpoint"`
+	LastChecked time.Time `json:"lastChecked"`
+	LastError   string    `json:"lastError,omitempty"`
 }
 
 // LocalStackDashboardResponse represents the LocalStack dashboard response
 type LocalStackDashboardResponse struct {
-	Running              bool                 `json:"running"`
-	Services             []LocalStackService  `json:"services"`
-	ActiveServicesCount  int                  `json:"activeServicesCount"`
-	TasksUsingLocalStack int                  `json:"tasksUsingLocalStack"`
-	ResourceUsage        []string             `json:"resourceUsage"`
-	LastUpdated          time.Time            `json:"lastUpdated"`
+	Running              bool                `json:"running"`
+	Services             []LocalStackService `json:"services"`
+	ActiveServicesCount  int                 `json:"activeServicesCount"`
+	TasksUsingLocalStack int                 `json:"tasksUsingLocalStack"`
+	ResourceUsage        []string            `json:"resourceUsage"`
+	LastUpdated          time.Time           `json:"lastUpdated"`
 }
 
 // GetLocalStackStatus handles the LocalStack status API endpoint
@@ -68,7 +68,7 @@ func (s *Server) GetLocalStackStatus(w http.ResponseWriter, r *http.Request) {
 	// Check if LocalStack manager is available
 	if s.localStackManager != nil {
 		status.Enabled = true
-		
+
 		// Get LocalStack status
 		if s.localStackManager.IsRunning() {
 			status.Running = true
@@ -76,32 +76,32 @@ func (s *Server) GetLocalStackStatus(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				status.Endpoint = endpoint
 			}
-			
+
 			// Get configured services
 			config := s.localStackManager.GetConfig()
 			if config != nil {
 				status.Services = config.Services
 				status.Version = config.Version
 			}
-			
+
 			// Check individual service statuses
 			for _, service := range status.Services {
 				serviceStatus := ServiceStatus{
 					Available: false,
 					Endpoint:  status.Endpoint,
 				}
-				
+
 				// Check if service is healthy
 				if err := s.localStackManager.CheckServiceHealth(service); err != nil {
 					serviceStatus.Error = err.Error()
 				} else {
 					serviceStatus.Available = true
 				}
-				
+
 				status.ServiceStatuses[service] = serviceStatus
 			}
 		}
-		
+
 		// Get proxy configuration from AWS proxy router if available
 		if s.awsProxyRouter != nil {
 			// For now, set proxy as enabled if AWS proxy router is available
@@ -141,7 +141,7 @@ func (s *Server) GetLocalStackDashboard(w http.ResponseWriter, r *http.Request) 
 	// Check if LocalStack manager is available
 	if s.localStackManager != nil && s.localStackManager.IsRunning() {
 		response.Running = true
-		
+
 		// Get LocalStack status
 		status, _ := s.localStackManager.GetStatus()
 		if status != nil {
@@ -154,7 +154,7 @@ func (s *Server) GetLocalStackDashboard(w http.ResponseWriter, r *http.Request) 
 					LastChecked: time.Now(),
 				}
 				response.Services = append(response.Services, service)
-				
+
 				if serviceInfo.Healthy {
 					response.ActiveServicesCount++
 				}
@@ -167,7 +167,7 @@ func (s *Server) GetLocalStackDashboard(w http.ResponseWriter, r *http.Request) 
 		services, _, err := s.storage.ServiceStore().List(r.Context(), "", "", "", 0, "")
 		if err == nil {
 			resourceMap := make(map[string]bool)
-			
+
 			for _, service := range services {
 				if service.TaskDefinitionARN != "" {
 					// Extract task definition family and revision from ARN
@@ -177,7 +177,7 @@ func (s *Server) GetLocalStackDashboard(w http.ResponseWriter, r *http.Request) 
 						if strings.Contains(taskDefID, "/") {
 							taskDefID = strings.Split(taskDefID, "/")[1]
 						}
-						
+
 						// Get task definition
 						taskDef, err := s.storage.TaskDefinitionStore().GetByARN(r.Context(), service.TaskDefinitionARN)
 						if err == nil && taskDef.ContainerDefinitions != "" {
@@ -185,7 +185,7 @@ func (s *Server) GetLocalStackDashboard(w http.ResponseWriter, r *http.Request) 
 							var containers []map[string]interface{}
 							if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containers); err == nil {
 								hasLocalStack := false
-								
+
 								for _, container := range containers {
 									// Check environment variables
 									if envVars, ok := container["environment"].([]interface{}); ok {
@@ -193,13 +193,13 @@ func (s *Server) GetLocalStackDashboard(w http.ResponseWriter, r *http.Request) 
 											if env, ok := envVar.(map[string]interface{}); ok {
 												if name, ok := env["name"].(string); ok {
 													// Check for AWS service usage
-													if strings.HasPrefix(name, "AWS_") || 
+													if strings.HasPrefix(name, "AWS_") ||
 														strings.Contains(name, "_BUCKET") ||
 														strings.Contains(name, "_TABLE") ||
 														strings.Contains(name, "_QUEUE") ||
 														strings.Contains(name, "_TOPIC") {
 														hasLocalStack = true
-														
+
 														// Detect resource types
 														if strings.Contains(name, "S3") || strings.Contains(name, "_BUCKET") {
 															resourceMap["s3"] = true
@@ -222,7 +222,7 @@ func (s *Server) GetLocalStackDashboard(w http.ResponseWriter, r *http.Request) 
 										}
 									}
 								}
-								
+
 								if hasLocalStack {
 									response.TasksUsingLocalStack++
 								}
@@ -231,7 +231,7 @@ func (s *Server) GetLocalStackDashboard(w http.ResponseWriter, r *http.Request) 
 					}
 				}
 			}
-			
+
 			// Convert resource map to slice
 			for resource := range resourceMap {
 				response.ResourceUsage = append(response.ResourceUsage, resource)

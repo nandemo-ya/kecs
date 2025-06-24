@@ -4,8 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	k8s "k8s.io/client-go/kubernetes"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 )
 
 // MockClusterManager is a mock implementation of ClusterManager for testing

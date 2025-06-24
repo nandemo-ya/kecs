@@ -44,7 +44,7 @@ var _ = Describe("Server Command", func() {
 			os.Unsetenv("KECS_DATA_DIR")
 
 			result := getDefaultDataDir()
-			
+
 			// Should contain .kecs/data pattern
 			if home, err := os.UserHomeDir(); err == nil {
 				expectedPath := filepath.Join(home, ".kecs", "data")
@@ -58,7 +58,7 @@ var _ = Describe("Server Command", func() {
 			os.Setenv("KECS_DATA_DIR", "")
 
 			result := getDefaultDataDir()
-			
+
 			// Should contain .kecs/data pattern
 			if home, err := os.UserHomeDir(); err == nil {
 				expectedPath := filepath.Join(home, ".kecs", "data")

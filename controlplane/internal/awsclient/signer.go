@@ -17,10 +17,10 @@ import (
 const (
 	// AWS4-HMAC-SHA256 is the signing algorithm
 	algorithm = "AWS4-HMAC-SHA256"
-	
+
 	// DateFormat is the ISO8601 date format
 	dateFormat = "20060102T150405Z"
-	
+
 	// ShortDateFormat is the short date format
 	shortDateFormat = "20060102"
 )

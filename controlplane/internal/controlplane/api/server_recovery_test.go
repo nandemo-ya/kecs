@@ -148,22 +148,22 @@ var _ = Describe("Server State Recovery", func() {
 	Describe("Server Start with Recovery", func() {
 		It("should skip recovery when KECS_TEST_MODE is true", func() {
 			os.Setenv("KECS_TEST_MODE", "true")
-			
+
 			// We can't easily test the full Start method, but we can verify
 			// that RecoverState would be skipped based on environment
 			testMode := os.Getenv("KECS_TEST_MODE")
 			autoRecover := os.Getenv("KECS_AUTO_RECOVER_STATE")
-			
+
 			shouldRecover := testMode != "true" && autoRecover != "false"
 			Expect(shouldRecover).To(BeFalse())
 		})
 
 		It("should skip recovery when KECS_AUTO_RECOVER_STATE is false", func() {
 			os.Setenv("KECS_AUTO_RECOVER_STATE", "false")
-			
+
 			testMode := os.Getenv("KECS_TEST_MODE")
 			autoRecover := os.Getenv("KECS_AUTO_RECOVER_STATE")
-			
+
 			shouldRecover := testMode != "true" && autoRecover != "false"
 			Expect(shouldRecover).To(BeFalse())
 		})
@@ -171,10 +171,10 @@ var _ = Describe("Server State Recovery", func() {
 		It("should enable recovery by default", func() {
 			os.Unsetenv("KECS_TEST_MODE")
 			os.Unsetenv("KECS_AUTO_RECOVER_STATE")
-			
+
 			testMode := os.Getenv("KECS_TEST_MODE")
 			autoRecover := os.Getenv("KECS_AUTO_RECOVER_STATE")
-			
+
 			shouldRecover := testMode != "true" && autoRecover != "false"
 			Expect(shouldRecover).To(BeTrue())
 		})

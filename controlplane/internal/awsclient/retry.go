@@ -8,11 +8,11 @@ import (
 
 // RetryConfig holds retry configuration
 type RetryConfig struct {
-	MaxRetries     int
-	InitialDelay   time.Duration
-	MaxDelay       time.Duration
-	BackoffFactor  float64
-	JitterEnabled  bool
+	MaxRetries    int
+	InitialDelay  time.Duration
+	MaxDelay      time.Duration
+	BackoffFactor float64
+	JitterEnabled bool
 }
 
 // DefaultRetryConfig returns default retry configuration
@@ -48,7 +48,7 @@ func (r *Retryer) RetryDelay(attempt int) time.Duration {
 
 	// Calculate exponential backoff
 	delay := float64(r.config.InitialDelay) * math.Pow(r.config.BackoffFactor, float64(attempt-1))
-	
+
 	// Cap at max delay
 	if delay > float64(r.config.MaxDelay) {
 		delay = float64(r.config.MaxDelay)

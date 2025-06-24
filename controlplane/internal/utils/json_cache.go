@@ -30,10 +30,10 @@ func NewJSONCache(maxSize int, ttl time.Duration) *JSONCache {
 		maxSize: maxSize,
 		ttl:     ttl,
 	}
-	
+
 	// Start cleanup goroutine
 	go cache.cleanupLoop()
-	
+
 	return cache
 }
 
@@ -43,57 +43,57 @@ func (c *JSONCache) Marshal(v interface{}) ([]byte, error) {
 	c.mu.RLock()
 	entry, exists := c.cache[v]
 	c.mu.RUnlock()
-	
+
 	if exists && time.Since(entry.timestamp) < c.ttl {
 		c.mu.Lock()
 		c.hits++
 		c.mu.Unlock()
-		
+
 		// Return a copy to prevent mutation
 		result := make([]byte, len(entry.data))
 		copy(result, entry.data)
 		return result, nil
 	}
-	
+
 	// Cache miss - marshal the value
 	c.mu.Lock()
 	c.misses++
 	c.marshals++
 	c.mu.Unlock()
-	
+
 	data, err := json.Marshal(v)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Store in cache
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	// Evict if at capacity
 	if len(c.cache) >= c.maxSize {
 		// Simple eviction - remove oldest entry
 		var oldestKey interface{}
 		oldestTime := time.Now()
-		
+
 		for k, v := range c.cache {
 			if v.timestamp.Before(oldestTime) {
 				oldestTime = v.timestamp
 				oldestKey = k
 			}
 		}
-		
+
 		if oldestKey != nil {
 			delete(c.cache, oldestKey)
 		}
 	}
-	
+
 	// Cache the result
 	c.cache[v] = &jsonCacheEntry{
 		data:      data,
 		timestamp: time.Now(),
 	}
-	
+
 	// Return a copy
 	result := make([]byte, len(data))
 	copy(result, data)
@@ -109,7 +109,7 @@ func (c *JSONCache) MarshalIndent(v interface{}, prefix, indent string) ([]byte,
 func (c *JSONCache) Invalidate(v interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	delete(c.cache, v)
 }
 
@@ -117,7 +117,7 @@ func (c *JSONCache) Invalidate(v interface{}) {
 func (c *JSONCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.cache = make(map[interface{}]*jsonCacheEntry)
 }
 
@@ -125,14 +125,14 @@ func (c *JSONCache) Clear() {
 func (c *JSONCache) Stats() JSONCacheStats {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	return JSONCacheStats{
-		Hits:        c.hits,
-		Misses:      c.misses,
-		Marshals:    c.marshals,
-		Size:        len(c.cache),
-		MaxSize:     c.maxSize,
-		HitRate:     c.hitRate(),
+		Hits:     c.hits,
+		Misses:   c.misses,
+		Marshals: c.marshals,
+		Size:     len(c.cache),
+		MaxSize:  c.maxSize,
+		HitRate:  c.hitRate(),
 	}
 }
 
@@ -148,7 +148,7 @@ func (c *JSONCache) hitRate() float64 {
 func (c *JSONCache) cleanupLoop() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		c.cleanup()
 	}
@@ -158,16 +158,16 @@ func (c *JSONCache) cleanupLoop() {
 func (c *JSONCache) cleanup() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	now := time.Now()
 	toRemove := []interface{}{}
-	
+
 	for k, v := range c.cache {
 		if now.Sub(v.timestamp) > c.ttl {
 			toRemove = append(toRemove, k)
 		}
 	}
-	
+
 	for _, k := range toRemove {
 		delete(c.cache, k)
 	}
@@ -219,7 +219,7 @@ func (p *BufferPool) Put(buf *bytes.Buffer) {
 // Global instances for convenience
 var (
 	defaultJSONCache = NewJSONCache(1000, 5*time.Minute)
-	bufferPool      = NewBufferPool()
+	bufferPool       = NewBufferPool()
 )
 
 // MarshalCached uses the global JSON cache

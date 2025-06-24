@@ -29,7 +29,7 @@ func NewHealthChecker(endpoint string) HealthChecker {
 // CheckHealth performs a health check on LocalStack
 func (hc *healthChecker) CheckHealth(ctx context.Context) (*HealthStatus, error) {
 	healthURL := fmt.Sprintf("%s%s", hc.endpoint, HealthCheckPath)
-	
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -119,7 +119,7 @@ func (hc *healthChecker) checkServiceHealth(ctx context.Context) map[string]Serv
 func (hc *healthChecker) checkIndividualService(ctx context.Context, service string) ServiceHealth {
 	// LocalStack provides service-specific health endpoints
 	// For now, we'll do a simple check by trying to access the service endpoint
-	
+
 	serviceHealth := ServiceHealth{
 		Service: service,
 		Healthy: true, // Assume healthy by default

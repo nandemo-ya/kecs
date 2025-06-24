@@ -77,7 +77,7 @@ func (p *LocalStackEventProcessor) createWebSocketMessage(ecsEvent *localstack.E
 		resourceID = extractResourceID(ecsEvent.TaskArn)
 	case localstack.EventTypeServiceAction:
 		messageType = "service_updated"
-		resourceType = "service" 
+		resourceType = "service"
 		resourceID = extractResourceID(ecsEvent.ServiceArn)
 	case localstack.EventTypeClusterStateChange:
 		messageType = "cluster_updated"
@@ -95,13 +95,13 @@ func (p *LocalStackEventProcessor) createWebSocketMessage(ecsEvent *localstack.E
 
 	// Create the payload
 	payload := map[string]interface{}{
-		"source":     "localstack",
-		"eventType":  ecsEvent.EventType,
-		"service":    ecsEvent.Service,
-		"region":     ecsEvent.Region,
-		"account":    ecsEvent.Account,
-		"timestamp":  ecsEvent.Time.Format(time.RFC3339),
-		"detail":     ecsEvent.Detail,
+		"source":    "localstack",
+		"eventType": ecsEvent.EventType,
+		"service":   ecsEvent.Service,
+		"region":    ecsEvent.Region,
+		"account":   ecsEvent.Account,
+		"timestamp": ecsEvent.Time.Format(time.RFC3339),
+		"detail":    ecsEvent.Detail,
 	}
 
 	// Add ECS-specific fields
@@ -151,7 +151,7 @@ func extractResourceID(arn string) string {
 
 	// Get the resource part (last part)
 	resourcePart := parts[len(parts)-1]
-	
+
 	// Handle resource-type/resource-name format
 	if strings.Contains(resourcePart, "/") {
 		resourceParts := strings.Split(resourcePart, "/")

@@ -7,12 +7,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/client-go/kubernetes/fake"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/proxy"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
-	"k8s.io/client-go/kubernetes/fake"
 )
 
 var _ = Describe("TaskConverter Sidecar Injection", func() {
@@ -25,7 +26,7 @@ var _ = Describe("TaskConverter Sidecar Injection", func() {
 
 	BeforeEach(func() {
 		converter = converters.NewTaskConverter("us-east-1", "123456789012")
-		
+
 		// Create proxy manager with sidecar mode
 		kubeClient := fake.NewSimpleClientset()
 		proxyConfig := &localstack.ProxyConfig{
@@ -35,11 +36,11 @@ var _ = Describe("TaskConverter Sidecar Injection", func() {
 		var err error
 		proxyManager, err = proxy.NewManager(kubeClient, proxyConfig)
 		Expect(err).ToNot(HaveOccurred())
-		
+
 		// Start proxy manager to initialize sidecar proxy
 		err = proxyManager.Start(context.Background())
 		Expect(err).ToNot(HaveOccurred())
-		
+
 		// Set proxy manager on converter
 		converter.SetProxyManager(proxyManager)
 
@@ -83,14 +84,14 @@ var _ = Describe("TaskConverter Sidecar Injection", func() {
 
 			// Check that sidecar was injected
 			Expect(len(pod.Spec.Containers)).To(Equal(2))
-			
+
 			// Find the sidecar
 			var sidecarFound bool
 			for _, container := range pod.Spec.Containers {
 				if container.Name == "aws-proxy-sidecar" {
 					sidecarFound = true
 					Expect(container.Image).To(Equal("kecs/aws-proxy:latest"))
-					
+
 					// Check environment variables
 					envMap := make(map[string]string)
 					for _, env := range container.Env {
@@ -154,7 +155,7 @@ var _ = Describe("TaskConverter Sidecar Injection", func() {
 			if proxyManager.GetSidecarProxy() != nil {
 				sidecarProxy := proxyManager.GetSidecarProxy()
 				sidecarContainer := sidecarProxy.CreateProxySidecar(pod)
-				
+
 				// Check environment variables
 				envMap := make(map[string]string)
 				for _, env := range sidecarContainer.Env {
@@ -203,7 +204,7 @@ var _ = Describe("TaskConverter Sidecar Injection", func() {
 			if proxyManager.GetSidecarProxy() != nil {
 				sidecarProxy := proxyManager.GetSidecarProxy()
 				sidecarContainer := sidecarProxy.CreateProxySidecar(pod)
-				
+
 				// Check DEBUG environment variable
 				var debugValue string
 				for _, env := range sidecarContainer.Env {
@@ -268,4 +269,3 @@ var _ = Describe("TaskConverter Sidecar Injection", func() {
 		})
 	})
 })
-

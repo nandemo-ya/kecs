@@ -12,9 +12,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/klog/v2"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/s3"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
-	"k8s.io/klog/v2"
 )
 
 // Manager handles artifact downloads and management

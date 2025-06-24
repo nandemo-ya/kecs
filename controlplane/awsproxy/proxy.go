@@ -25,7 +25,7 @@ func NewAWSProxy(localStackEndpoint string, debug bool) (*AWSProxy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid LocalStack endpoint: %w", err)
 	}
-	
+
 	// Validate that the URL has a valid scheme
 	if targetURL.Scheme != "http" && targetURL.Scheme != "https" {
 		return nil, fmt.Errorf("invalid LocalStack endpoint scheme: %s", targetURL.Scheme)
@@ -33,17 +33,17 @@ func NewAWSProxy(localStackEndpoint string, debug bool) (*AWSProxy, error) {
 
 	// Create a reverse proxy
 	reverseProxy := httputil.NewSingleHostReverseProxy(targetURL)
-	
+
 	// Customize the director to handle AWS service routing
 	originalDirector := reverseProxy.Director
 	reverseProxy.Director = func(req *http.Request) {
 		originalDirector(req)
-		
+
 		// Preserve the original host header for AWS signature validation
 		req.Host = targetURL.Host
 		req.URL.Host = targetURL.Host
 		req.URL.Scheme = targetURL.Scheme
-		
+
 		// Log the request if debug is enabled
 		if debug {
 			log.Printf("Proxying request: %s %s -> %s", req.Method, req.URL.Path, targetURL.String())
@@ -172,7 +172,7 @@ func (p *AWSProxy) handleHealth(w http.ResponseWriter, r *http.Request) {
 	// Return healthy status
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"status":"healthy","localstack_endpoint":"%s","timestamp":"%s"}`, 
+	fmt.Fprintf(w, `{"status":"healthy","localstack_endpoint":"%s","timestamp":"%s"}`,
 		p.localStackEndpoint, time.Now().UTC().Format(time.RFC3339))
 }
 
@@ -189,10 +189,10 @@ func copyHeaders(dst, src http.Header) {
 func copyResponse(w http.ResponseWriter, resp *http.Response) error {
 	// Copy headers
 	copyHeaders(w.Header(), resp.Header)
-	
+
 	// Copy status code
 	w.WriteHeader(resp.StatusCode)
-	
+
 	// Copy body
 	_, err := io.Copy(w, resp.Body)
 	return err

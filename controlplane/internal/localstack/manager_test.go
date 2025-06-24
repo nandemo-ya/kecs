@@ -3,12 +3,13 @@ package localstack_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	
+
 	"context"
 	"time"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
 var _ = Describe("LocalStack Manager", func() {
@@ -22,11 +23,11 @@ var _ = Describe("LocalStack Manager", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		kubeClient = fake.NewSimpleClientset()
-		
+
 		config = localstack.DefaultConfig()
 		config.Enabled = true
 		config.Services = []string{"iam", "logs", "ssm"}
-		
+
 		var err error
 		manager, err = localstack.NewManager(config, kubeClient)
 		Expect(err).NotTo(HaveOccurred())

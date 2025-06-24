@@ -353,11 +353,11 @@ var _ = Describe("WebSocketRateLimit", func() {
 			if conn3 != nil {
 				conn3.Close()
 			}
-			
+
 			// The server should return 429 before WebSocket upgrade
 			Expect(resp).NotTo(BeNil())
 			Expect(resp.StatusCode).To(Equal(http.StatusTooManyRequests))
-			
+
 			// WebSocket dial may or may not return an error depending on the client implementation
 			// The important thing is that we get a 429 response
 		})
@@ -396,11 +396,11 @@ var _ = Describe("WebSocketRateLimit", func() {
 			if conn4 != nil {
 				conn4.Close()
 			}
-			
+
 			// The server should return 429 before WebSocket upgrade
 			Expect(resp).NotTo(BeNil())
 			Expect(resp.StatusCode).To(Equal(http.StatusTooManyRequests))
-			
+
 			// WebSocket dial may or may not return an error depending on the client implementation
 			// The important thing is that we get a 429 response
 		})
