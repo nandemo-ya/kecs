@@ -245,3 +245,563 @@ export interface HealthStatus {
   message: string;
   timestamp: string;
 }
+
+// Cluster Management Types
+export interface CreateClusterRequest {
+  clusterName: string;
+  capacityProviders?: string[];
+  defaultCapacityProviderStrategy?: CapacityProviderStrategyItem[];
+  tags?: Tag[];
+  settings?: ClusterSetting[];
+  configuration?: ClusterConfiguration;
+}
+
+export interface CreateClusterResponse {
+  cluster: Cluster;
+}
+
+export interface DeleteClusterRequest {
+  cluster: string;
+}
+
+export interface DeleteClusterResponse {
+  cluster: Cluster;
+}
+
+export interface UpdateClusterRequest {
+  cluster: string;
+  settings?: ClusterSetting[];
+  configuration?: ClusterConfiguration;
+}
+
+export interface UpdateClusterResponse {
+  cluster: Cluster;
+}
+
+// Task Management Types
+export interface RunTaskRequest {
+  cluster?: string;
+  taskDefinition: string;
+  count?: number;
+  startedBy?: string;
+  group?: string;
+  overrides?: TaskOverride;
+  networkConfiguration?: NetworkConfiguration;
+  launchType?: string;
+  platformVersion?: string;
+  placementConstraints?: PlacementConstraint[];
+  placementStrategy?: PlacementStrategy[];
+  tags?: Tag[];
+  enableECSManagedTags?: boolean;
+  enableExecuteCommand?: boolean;
+  propagateTags?: string;
+  referenceId?: string;
+}
+
+export interface RunTaskResponse {
+  tasks: Task[];
+  failures?: Failure[];
+}
+
+export interface StopTaskRequest {
+  cluster?: string;
+  task: string;
+  reason?: string;
+}
+
+export interface StopTaskResponse {
+  task: Task;
+}
+
+export interface StartTaskRequest {
+  cluster?: string;
+  taskDefinition: string;
+  containerInstances: string[];
+  overrides?: TaskOverride;
+  networkConfiguration?: NetworkConfiguration;
+  startedBy?: string;
+  tags?: Tag[];
+  enableECSManagedTags?: boolean;
+  enableExecuteCommand?: boolean;
+  propagateTags?: string;
+  referenceId?: string;
+}
+
+export interface StartTaskResponse {
+  tasks: Task[];
+  failures?: Failure[];
+}
+
+// Task Definition Batch Operations
+export interface DeleteTaskDefinitionsRequest {
+  taskDefinitions: string[];
+}
+
+export interface DeleteTaskDefinitionsResponse {
+  taskDefinitions?: TaskDefinition[];
+  failures?: Failure[];
+}
+
+// Service Deployment Types
+export interface ServiceDeployment {
+  id?: string;
+  status?: string;
+  taskDefinition?: string;
+  desiredCount?: number;
+  pendingCount?: number;
+  runningCount?: number;
+  failedTasks?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  launchType?: string;
+  platformVersion?: string;
+  platformFamily?: string;
+  networkConfiguration?: NetworkConfiguration;
+  rolloutState?: string;
+  rolloutStateReason?: string;
+  serviceConnectConfiguration?: ServiceConnectConfiguration;
+  volumeConfigurations?: ServiceVolumeConfiguration[];
+}
+
+export interface ServiceRevision {
+  serviceRevisionArn?: string;
+  serviceArn?: string;
+  clusterArn?: string;
+  taskDefinition?: string;
+  capacityProviderStrategy?: CapacityProviderStrategyItem[];
+  launchType?: string;
+  platformVersion?: string;
+  platformFamily?: string;
+  loadBalancers?: LoadBalancer[];
+  serviceRegistries?: ServiceRegistry[];
+  networkConfiguration?: NetworkConfiguration;
+  containerImages?: ContainerImage[];
+  createdAt?: string;
+}
+
+export interface DescribeServiceDeploymentsRequest {
+  serviceDeploymentArns: string[];
+}
+
+export interface DescribeServiceDeploymentsResponse {
+  serviceDeployments?: ServiceDeployment[];
+  failures?: Failure[];
+}
+
+export interface DescribeServiceRevisionsRequest {
+  serviceRevisionArns: string[];
+}
+
+export interface DescribeServiceRevisionsResponse {
+  serviceRevisions?: ServiceRevision[];
+  failures?: Failure[];
+}
+
+export interface ListServiceDeploymentsRequest {
+  service: string;
+  cluster?: string;
+  status?: string[];
+  maxResults?: number;
+  nextToken?: string;
+}
+
+export interface ListServiceDeploymentsResponse {
+  serviceDeployments?: ServiceDeployment[];
+  nextToken?: string;
+}
+
+// Task Set Types (for blue/green deployments)
+export interface TaskSet {
+  id?: string;
+  taskSetArn?: string;
+  serviceArn?: string;
+  clusterArn?: string;
+  startedBy?: string;
+  taskDefinition?: string;
+  computedDesiredCount?: number;
+  pendingCount?: number;
+  runningCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  launchType?: string;
+  platformVersion?: string;
+  platformFamily?: string;
+  networkConfiguration?: NetworkConfiguration;
+  loadBalancers?: LoadBalancer[];
+  serviceRegistries?: ServiceRegistry[];
+  scale?: Scale;
+  stabilityStatus?: string;
+  stabilityStatusAt?: string;
+  tags?: Tag[];
+}
+
+export interface CreateTaskSetRequest {
+  service: string;
+  cluster: string;
+  taskDefinition: string;
+  externalId?: string;
+  networkConfiguration?: NetworkConfiguration;
+  loadBalancers?: LoadBalancer[];
+  serviceRegistries?: ServiceRegistry[];
+  launchType?: string;
+  capacityProviderStrategy?: CapacityProviderStrategyItem[];
+  platformVersion?: string;
+  scale?: Scale;
+  clientToken?: string;
+  tags?: Tag[];
+}
+
+export interface CreateTaskSetResponse {
+  taskSet?: TaskSet;
+}
+
+// Container Instance Types
+export interface ContainerInstance {
+  containerInstanceArn?: string;
+  ec2InstanceId?: string;
+  capacityProviderName?: string;
+  version?: number;
+  versionInfo?: VersionInfo;
+  remainingResources?: Resource[];
+  registeredResources?: Resource[];
+  status?: string;
+  statusReason?: string;
+  agentConnected?: boolean;
+  runningTasksCount?: number;
+  pendingTasksCount?: number;
+  agentUpdateStatus?: string;
+  attributes?: Attribute[];
+  registeredAt?: string;
+  attachments?: Attachment[];
+  tags?: Tag[];
+  healthStatus?: ContainerInstanceHealthStatus;
+}
+
+export interface ListContainerInstancesRequest {
+  cluster?: string;
+  filter?: string;
+  maxResults?: number;
+  nextToken?: string;
+  status?: string;
+}
+
+export interface ListContainerInstancesResponse {
+  containerInstanceArns?: string[];
+  nextToken?: string;
+}
+
+// Capacity Provider Types
+export interface CapacityProvider {
+  capacityProviderArn?: string;
+  name?: string;
+  status?: string;
+  autoScalingGroupProvider?: AutoScalingGroupProvider;
+  updateStatus?: string;
+  updateStatusReason?: string;
+  tags?: Tag[];
+}
+
+export interface CreateCapacityProviderRequest {
+  name: string;
+  autoScalingGroupProvider: AutoScalingGroupProvider;
+  tags?: Tag[];
+}
+
+export interface CreateCapacityProviderResponse {
+  capacityProvider?: CapacityProvider;
+}
+
+// Tagging Types
+export interface TagResourceRequest {
+  resourceArn: string;
+  tags: Tag[];
+}
+
+export interface TagResourceResponse {}
+
+export interface UntagResourceRequest {
+  resourceArn: string;
+  tagKeys: string[];
+}
+
+export interface UntagResourceResponse {}
+
+export interface ListTagsForResourceRequest {
+  resourceArn: string;
+}
+
+export interface ListTagsForResourceResponse {
+  tags?: Tag[];
+}
+
+// Additional Supporting Types
+export interface TaskOverride {
+  containerOverrides?: ContainerOverride[];
+  cpu?: string;
+  memory?: string;
+  taskRoleArn?: string;
+  executionRoleArn?: string;
+  inferenceAcceleratorOverrides?: InferenceAcceleratorOverride[];
+  ephemeralStorage?: EphemeralStorage;
+}
+
+export interface ContainerOverride {
+  name?: string;
+  command?: string[];
+  environment?: EnvironmentVariable[];
+  environmentFiles?: EnvironmentFile[];
+  cpu?: number;
+  memory?: number;
+  memoryReservation?: number;
+  resourceRequirements?: ResourceRequirement[];
+}
+
+export interface NetworkConfiguration {
+  awsvpcConfiguration?: AwsVpcConfiguration;
+}
+
+export interface AwsVpcConfiguration {
+  subnets: string[];
+  securityGroups?: string[];
+  assignPublicIp?: string;
+}
+
+export interface PlacementStrategy {
+  type?: string;
+  field?: string;
+}
+
+export interface LoadBalancer {
+  targetGroupArn?: string;
+  loadBalancerName?: string;
+  containerName?: string;
+  containerPort?: number;
+}
+
+export interface ServiceRegistry {
+  registryArn?: string;
+  port?: number;
+  containerName?: string;
+  containerPort?: number;
+}
+
+export interface ServiceConnectConfiguration {
+  enabled: boolean;
+  namespace?: string;
+  services?: ServiceConnectService[];
+  logConfiguration?: LogConfiguration;
+}
+
+export interface ServiceConnectService {
+  portName: string;
+  discoveryName?: string;
+  clientAliases?: ServiceConnectClientAlias[];
+  ingressPortOverride?: number;
+  timeout?: TimeoutConfiguration;
+  tls?: ServiceConnectTlsConfiguration;
+}
+
+export interface ServiceConnectClientAlias {
+  port: number;
+  dnsName?: string;
+}
+
+export interface TimeoutConfiguration {
+  idleTimeoutSeconds?: number;
+  perRequestTimeoutSeconds?: number;
+}
+
+export interface ServiceConnectTlsConfiguration {
+  issuerCertificateAuthority: ServiceConnectTlsCertificateAuthority;
+  kmsKey?: string;
+  roleArn?: string;
+}
+
+export interface ServiceConnectTlsCertificateAuthority {
+  awsPcaAuthorityArn?: string;
+}
+
+export interface ServiceVolumeConfiguration {
+  name: string;
+  managedEBSVolume?: ServiceManagedEBSVolumeConfiguration;
+}
+
+export interface ServiceManagedEBSVolumeConfiguration {
+  encrypted?: boolean;
+  kmsKeyId?: string;
+  volumeType?: string;
+  sizeInGiB?: number;
+  snapshotId?: string;
+  iops?: number;
+  throughput?: number;
+  tagSpecifications?: EBSTagSpecification[];
+  roleArn: string;
+  filesystemType?: string;
+}
+
+export interface EBSTagSpecification {
+  resourceType: string;
+  tags?: Tag[];
+  propagateTags?: string;
+}
+
+export interface ContainerImage {
+  containerName?: string;
+  imageDigest?: string;
+  image?: string;
+}
+
+export interface CapacityProviderStrategyItem {
+  capacityProvider: string;
+  weight?: number;
+  base?: number;
+}
+
+export interface Scale {
+  value?: number;
+  unit?: string;
+}
+
+export interface Resource {
+  name?: string;
+  type?: string;
+  doubleValue?: number;
+  longValue?: number;
+  integerValue?: number;
+  stringSetValue?: string[];
+}
+
+export interface VersionInfo {
+  agentVersion?: string;
+  agentHash?: string;
+  dockerVersion?: string;
+}
+
+export interface Attachment {
+  id?: string;
+  type?: string;
+  status?: string;
+  details?: KeyValuePair[];
+}
+
+export interface KeyValuePair {
+  name?: string;
+  value?: string;
+}
+
+export interface ContainerInstanceHealthStatus {
+  overallStatus?: string;
+  details?: InstanceHealthCheckResult[];
+}
+
+export interface InstanceHealthCheckResult {
+  type?: string;
+  status?: string;
+  lastUpdated?: string;
+  lastStatusChange?: string;
+}
+
+export interface AutoScalingGroupProvider {
+  autoScalingGroupArn: string;
+  managedTerminationProtection?: string;
+  managedDraining?: string;
+}
+
+export interface InferenceAcceleratorOverride {
+  deviceName?: string;
+  deviceType?: string;
+}
+
+export interface EphemeralStorage {
+  sizeInGiB: number;
+}
+
+export interface EnvironmentFile {
+  value: string;
+  type: string;
+}
+
+export interface ResourceRequirement {
+  value: string;
+  type: string;
+}
+
+export interface LogConfiguration {
+  logDriver: string;
+  options?: { [key: string]: string };
+  secretOptions?: Secret[];
+}
+
+export interface Secret {
+  name: string;
+  valueFrom: string;
+}
+
+export interface ClusterSetting {
+  name?: string;
+  value?: string;
+}
+
+export interface ClusterConfiguration {
+  executeCommandConfiguration?: ExecuteCommandConfiguration;
+  managedStorageConfiguration?: ManagedStorageConfiguration;
+}
+
+export interface ExecuteCommandConfiguration {
+  kmsKeyId?: string;
+  logging?: string;
+  logConfiguration?: ExecuteCommandLogConfiguration;
+}
+
+export interface ExecuteCommandLogConfiguration {
+  cloudWatchLogGroupName?: string;
+  cloudWatchEncryptionEnabled?: boolean;
+  s3BucketName?: string;
+  s3EncryptionEnabled?: boolean;
+  s3KeyPrefix?: string;
+}
+
+export interface ManagedStorageConfiguration {
+  kmsKeyId?: string;
+  fargateEphemeralStorageKmsKeyId?: string;
+}
+
+// Attribute Types (for container instances and tasks)
+export interface Attribute {
+  name: string;
+  value?: string;
+  targetType?: string;
+  targetId?: string;
+}
+
+export interface PutAttributesRequest {
+  cluster?: string;
+  attributes: Attribute[];
+}
+
+export interface PutAttributesResponse {
+  attributes?: Attribute[];
+}
+
+export interface ListAttributesRequest {
+  cluster?: string;
+  targetType: string;
+  attributeName?: string;
+  attributeValue?: string;
+  maxResults?: number;
+  nextToken?: string;
+}
+
+export interface ListAttributesResponse {
+  attributes?: Attribute[];
+  nextToken?: string;
+}
+
+export interface DeleteAttributesRequest {
+  cluster?: string;
+  attributes: Attribute[];
+}
+
+export interface DeleteAttributesResponse {
+  attributes?: Attribute[];
+}
