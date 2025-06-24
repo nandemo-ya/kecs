@@ -30,7 +30,7 @@ build:
 generate:
 	@echo "Generating code from AWS API definitions..."
 	cd $(CONTROLPLANE_DIR) && $(GO) build -o ../bin/codegen ./cmd/codegen
-	cd $(CONTROLPLANE_DIR) && ../bin/codegen -service ecs -input api-models/ecs.json -output internal/controlplane/api/generated_v2 -package api
+	cd $(CONTROLPLANE_DIR) && ../bin/codegen -service ecs -input cmd/codegen/ecs.json -output internal/controlplane/api/generated_v2 -package api
 
 # Build with Web UI embedded
 .PHONY: build-with-ui
