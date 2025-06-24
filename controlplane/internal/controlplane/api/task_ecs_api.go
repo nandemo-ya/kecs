@@ -137,7 +137,7 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 		}
 
 		// Set tags
-		if req.Tags != nil && len(req.Tags) > 0 {
+		if len(req.Tags) > 0 {
 			tagsJSON, err := json.Marshal(req.Tags)
 			if err == nil {
 				task.Tags = string(tagsJSON)

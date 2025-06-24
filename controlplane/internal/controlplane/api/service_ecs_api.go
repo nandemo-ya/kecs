@@ -283,7 +283,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	}
 
 	// Handle Service Discovery registration if ServiceRegistries are specified
-	if req.ServiceRegistries != nil && len(req.ServiceRegistries) > 0 {
+	if len(req.ServiceRegistries) > 0 {
 		if err := api.registerServiceWithDiscovery(ctx, storageService, req.ServiceRegistries); err != nil {
 			// Log error but don't fail service creation
 			log.Printf("Warning: Failed to register service with service discovery: %v", err)
@@ -1085,7 +1085,7 @@ func (api *DefaultECSAPI) ListServiceDeployments(ctx context.Context, req *gener
 	}
 
 	// Apply status filter if specified
-	if req.Status != nil && len(req.Status) > 0 {
+	if len(req.Status) > 0 {
 		// Filter deployments by status
 		filteredDeployments := []generated.ServiceDeploymentBrief{}
 		for _, deployment := range deployments {
