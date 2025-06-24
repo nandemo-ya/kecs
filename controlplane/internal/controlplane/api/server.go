@@ -313,6 +313,17 @@ func (s *Server) Start() error {
 	ctx := context.Background()
 	go s.webSocketHub.Run(ctx)
 
+	// Recover state if enabled and not in test mode
+	if os.Getenv("KECS_TEST_MODE") != "true" && os.Getenv("KECS_AUTO_RECOVER_STATE") != "false" {
+		log.Println("Starting state recovery...")
+		if err := s.RecoverState(ctx); err != nil {
+			log.Printf("State recovery failed: %v", err)
+			// Continue startup even if recovery fails
+		} else {
+			log.Println("State recovery completed")
+		}
+	}
+
 	// Start test mode worker if available
 	if s.testModeWorker != nil {
 		s.testModeWorker.Start(ctx)
@@ -404,6 +415,161 @@ func (s *Server) Stop(ctx context.Context) error {
 	}
 	
 	return s.httpServer.Shutdown(ctx)
+}
+
+// RecoverState recovers k3d clusters and Kubernetes resources from storage
+func (s *Server) RecoverState(ctx context.Context) error {
+	if s.storage == nil || s.clusterManager == nil {
+		log.Println("Skipping state recovery: storage or cluster manager not available")
+		return nil
+	}
+
+	// Get all clusters from storage
+	clusters, err := s.storage.ClusterStore().List(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list clusters from storage: %w", err)
+	}
+
+	if len(clusters) == 0 {
+		log.Println("No clusters found in storage, nothing to recover")
+		return nil
+	}
+
+	log.Printf("Found %d clusters in storage, checking which need recovery...", len(clusters))
+
+	// Track recovery results
+	var recoveredCount, skippedCount, failedCount int
+
+	for _, cluster := range clusters {
+		if cluster.K8sClusterName == "" {
+			log.Printf("Cluster %s has no k8s cluster name, skipping", cluster.Name)
+			skippedCount++
+			continue
+		}
+
+		// Check if k3d cluster exists
+		exists, err := s.clusterManager.ClusterExists(ctx, cluster.K8sClusterName)
+		if err != nil {
+			log.Printf("Failed to check if k3d cluster %s exists: %v", cluster.K8sClusterName, err)
+			failedCount++
+			continue
+		}
+
+		if exists {
+			log.Printf("K3d cluster %s already exists, skipping recovery", cluster.K8sClusterName)
+			skippedCount++
+			continue
+		}
+
+		// Recreate k3d cluster
+		log.Printf("Recovering k3d cluster %s for ECS cluster %s...", cluster.K8sClusterName, cluster.Name)
+		if err := s.clusterManager.CreateCluster(ctx, cluster.K8sClusterName); err != nil {
+			log.Printf("Failed to recreate k3d cluster %s: %v", cluster.K8sClusterName, err)
+			failedCount++
+			continue
+		}
+
+		// Wait for cluster to be ready
+		log.Printf("Waiting for k3d cluster %s to be ready...", cluster.K8sClusterName)
+		if err := s.clusterManager.WaitForClusterReady(cluster.K8sClusterName, 60*time.Second); err != nil {
+			log.Printf("K3d cluster %s did not become ready: %v", cluster.K8sClusterName, err)
+			failedCount++
+			continue
+		}
+
+		// Recover services for this cluster
+		if err := s.recoverServicesForCluster(ctx, cluster); err != nil {
+			log.Printf("Failed to recover services for cluster %s: %v", cluster.Name, err)
+			// Don't count as failed since cluster was recovered
+		}
+
+		recoveredCount++
+		log.Printf("Successfully recovered k3d cluster %s", cluster.K8sClusterName)
+	}
+
+	log.Printf("State recovery summary: %d recovered, %d skipped, %d failed", 
+		recoveredCount, skippedCount, failedCount)
+
+	if failedCount > 0 {
+		return fmt.Errorf("failed to recover %d clusters", failedCount)
+	}
+
+	return nil
+}
+
+// recoverServicesForCluster recovers services and their deployments for a cluster
+func (s *Server) recoverServicesForCluster(ctx context.Context, cluster *storage.Cluster) error {
+	// Get all services for this cluster
+	services, _, err := s.storage.ServiceStore().List(ctx, cluster.Name, "", "", 100, "")
+	if err != nil {
+		return fmt.Errorf("failed to list services for cluster %s: %w", cluster.Name, err)
+	}
+
+	if len(services) == 0 {
+		log.Printf("No services found for cluster %s", cluster.Name)
+		return nil
+	}
+
+	log.Printf("Found %d services to recover for cluster %s", len(services), cluster.Name)
+
+	// Get Kubernetes client for the cluster
+	kubeClient, err := s.clusterManager.GetKubeClient(cluster.K8sClusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client for cluster %s: %w", cluster.K8sClusterName, err)
+	}
+
+	// Create namespace if it doesn't exist
+	namespace := fmt.Sprintf("kecs-%s", cluster.Name)
+	if err := kubernetes.EnsureNamespace(ctx, kubeClient, namespace); err != nil {
+		return fmt.Errorf("failed to ensure namespace %s: %w", namespace, err)
+	}
+
+	// Recover each service
+	for _, service := range services {
+		log.Printf("Recovering service %s in cluster %s...", service.ServiceName, cluster.Name)
+
+		// Get task definition
+		taskDefArn := service.TaskDefinitionARN
+		if taskDefArn == "" {
+			log.Printf("Service %s has no task definition, skipping", service.ServiceName)
+			continue
+		}
+
+		// Parse task definition family and revision
+		taskDef, err := s.storage.TaskDefinitionStore().GetByARN(ctx, taskDefArn)
+		if err != nil {
+			log.Printf("Failed to get task definition %s: %v", taskDefArn, err)
+			continue
+		}
+
+		// Create service manager if not exists
+		if s.taskManager == nil {
+			log.Printf("Task manager not available, skipping service deployment for %s", service.ServiceName)
+			continue
+		}
+
+		// Create deployment for the service
+		deployment, err := s.taskManager.CreateServiceDeployment(ctx, cluster, service, taskDef)
+		if err != nil {
+			log.Printf("Failed to create deployment for service %s: %v", service.ServiceName, err)
+			continue
+		}
+
+		// Update service with deployment info
+		service.DeploymentName = deployment.Name
+		service.Namespace = deployment.Namespace
+		service.RunningCount = 0 // Will be updated by deployment controller
+		service.Status = "ACTIVE"
+		service.UpdatedAt = time.Now()
+
+		if err := s.storage.ServiceStore().Update(ctx, service); err != nil {
+			log.Printf("Failed to update service %s after recovery: %v", service.ServiceName, err)
+		}
+
+		log.Printf("Successfully recovered service %s", service.ServiceName)
+	}
+
+	return nil
 }
 
 // SetupRoutes configures all the API routes

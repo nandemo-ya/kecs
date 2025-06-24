@@ -471,6 +471,9 @@ export KECS_KEEP_CLUSTERS_ON_SHUTDOWN=true  # Keep k3d clusters when KECS stops
 
 # Data persistence
 export KECS_DATA_DIR=/data  # Data directory path (useful in container mode)
+
+# State recovery
+export KECS_AUTO_RECOVER_STATE=true  # Auto-recover k3d clusters on startup (default: true)
 ```
 
 ### Environment Variable Mapping
