@@ -774,3 +774,47 @@
 .env-value {
   color: #6b7280;
 }
+
+/* Batch selection styles */
+.batch-select-all {
+  padding: 1rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.batch-select-all label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+}
+
+.resource-select {
+  display: flex;
+  align-items: center;
+  margin-right: 0.75rem;
+}
+
+.resource-select input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+}
+
+.resource-header {
+  display: flex;
+  align-items: center;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
