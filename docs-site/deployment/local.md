@@ -182,11 +182,13 @@ services:
       - "8081:8081"
     environment:
       - KECS_LOG_LEVEL=debug
+      - KECS_CONTAINER_MODE=true
+      - KECS_DATA_DIR=/data
       - KECS_LOCALSTACK_ENABLED=true
       - KECS_LOCALSTACK_ENDPOINT=http://localstack:4566
     volumes:
-      - ./data:/data
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./kecs-data:/data  # Persist data between restarts
+      - /var/run/docker.sock:/var/run/docker.sock  # Required for k3d
     depends_on:
       - localstack
 
@@ -245,6 +247,17 @@ Example `.vscode/launch.json`:
 3. Set up run configuration:
    - Program arguments: `server --log-level debug`
    - Environment variables: `KECS_DATA_DIR=/path/to/data`
+
+## Data Persistence in Container Mode
+
+When running KECS in Docker, data is stored in `/data` by default. To persist data between container restarts:
+
+1. **Mount a volume**: Map a host directory to `/data` in the container
+2. **Set environment variables**:
+   - `KECS_CONTAINER_MODE=true`
+   - `KECS_DATA_DIR=/data`
+
+For detailed information, see the [Container Mode Persistence Guide](/guides/container-persistence).
 
 ## Common Development Tasks
 
