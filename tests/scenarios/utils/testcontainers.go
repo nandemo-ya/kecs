@@ -25,7 +25,7 @@ func StartKECS(t TestingT) *KECSContainer {
 	ctx := context.Background()
 
 	// Check if running in test mode
-	testMode := getEnvOrDefault("KECS_TEST_MODE", "false")
+	testMode := getEnvOrDefault("KECS_TEST_MODE", "true")
 	// Enable container mode for proper cluster management
 	containerMode := getEnvOrDefault("KECS_CONTAINER_MODE", "true")
 	// Get cluster provider (k3d or kind)
@@ -50,6 +50,7 @@ func StartKECS(t TestingT) *KECSContainer {
 			"KECS_CONTAINER_MODE":    containerMode,
 			"KECS_CLUSTER_PROVIDER":  clusterProvider,
 			"KECS_KUBECONFIG_PATH":   "/kecs/kubeconfig",
+			"KECS_K3D_OPTIMIZED":     "true",
 		},
 		Mounts: testcontainers.ContainerMounts{
 			{
@@ -198,7 +199,7 @@ func (k *KECSContainer) Cleanup() error {
 	var err error
 	
 	// Clean up any clusters created during tests
-	if os.Getenv("KECS_CONTAINER_MODE") == "true" && os.Getenv("KECS_TEST_MODE") != "true" {
+	if os.Getenv("KECS_CONTAINER_MODE") == "true" {
 		clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
 		
 		if clusterProvider == "k3d" {
@@ -238,6 +239,11 @@ func (k *KECSContainer) Cleanup() error {
 			fmt.Printf("Warning: failed to remove kubeconfig directory: %v\n", removeErr)
 		}
 	}
+	
+	// Give KECS some time to complete async k3d cluster deletion
+	// This is important because DeleteCluster in KECS deletes k3d clusters asynchronously
+	fmt.Println("Waiting for async k3d cluster deletion to complete...")
+	time.Sleep(5 * time.Second)
 	
 	if k.container != nil {
 		err = k.container.Terminate(k.ctx)
