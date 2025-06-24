@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -376,4 +377,51 @@ func (tm *TaskManager) createSecrets(ctx context.Context, namespace string, secr
 	}
 
 	return nil
+}
+
+// CreateServiceDeployment creates a Kubernetes deployment for an ECS service
+func (tm *TaskManager) CreateServiceDeployment(ctx context.Context, cluster *storage.Cluster, service *storage.Service, taskDef *storage.TaskDefinition) error {
+	// Ensure namespace exists
+	namespace := fmt.Sprintf("kecs-%s", cluster.Name)
+	if err := EnsureNamespace(ctx, tm.clientset, namespace); err != nil {
+		return fmt.Errorf("failed to ensure namespace: %w", err)
+	}
+
+	// Parse container definitions from storage
+	var containerDefs []types.ContainerDefinition
+	if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
+		return fmt.Errorf("failed to parse container definitions: %w", err)
+	}
+
+	// Create deployment info
+	deploymentInfo := converters.ConvertServiceToDeployment(service, taskDef, namespace)
+
+	// Convert to Kubernetes deployment
+	k8sDeployment := converters.ConvertDeploymentToK8s(deploymentInfo, containerDefs)
+
+	// Create deployment in Kubernetes
+	_, err := tm.clientset.AppsV1().Deployments(namespace).Create(ctx, k8sDeployment, metav1.CreateOptions{})
+	if err != nil {
+		if errors.IsAlreadyExists(err) {
+			// Update existing deployment
+			_, err = tm.clientset.AppsV1().Deployments(namespace).Update(ctx, k8sDeployment, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to update existing deployment: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to create deployment: %w", err)
+		}
+	}
+
+	log.Printf("Created/updated deployment for service %s in namespace %s", 
+		service.ServiceName, namespace)
+
+	return nil
+}
+
+// generateShortID generates a short random ID for resource naming
+func generateShortID() string {
+	b := make([]byte, 4)
+	rand.Read(b)
+	return fmt.Sprintf("%x", b)
 }

@@ -9,55 +9,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/memory"
-	k8s "k8s.io/client-go/kubernetes"
 )
 
-// MockClusterManager is a mock implementation of ClusterManager for testing
-type MockClusterManager struct {
-	DeletedClusters []string
-	ClusterMap      map[string]bool
-}
-
-func NewMockClusterManager() *MockClusterManager {
-	return &MockClusterManager{
-		DeletedClusters: []string{},
-		ClusterMap:      make(map[string]bool),
-	}
-}
-
-func (m *MockClusterManager) CreateCluster(ctx context.Context, clusterName string) error {
-	m.ClusterMap[clusterName] = true
-	return nil
-}
-
-func (m *MockClusterManager) DeleteCluster(ctx context.Context, clusterName string) error {
-	m.DeletedClusters = append(m.DeletedClusters, clusterName)
-	delete(m.ClusterMap, clusterName)
-	return nil
-}
-
-func (m *MockClusterManager) ClusterExists(ctx context.Context, clusterName string) (bool, error) {
-	return m.ClusterMap[clusterName], nil
-}
-
-func (m *MockClusterManager) GetKubeClient(clusterName string) (k8s.Interface, error) {
-	return nil, nil
-}
-
-func (m *MockClusterManager) WaitForClusterReady(clusterName string, timeout time.Duration) error {
-	return nil
-}
-
-func (m *MockClusterManager) GetKubeconfigPath(clusterName string) string {
-	return ""
-}
-
-func (m *MockClusterManager) GetClusterInfo(ctx context.Context, clusterName string) (*kubernetes.ClusterInfo, error) {
-	return nil, nil
-}
 
 var _ = Describe("Server Shutdown", func() {
 	var (
