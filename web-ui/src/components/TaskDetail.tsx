@@ -1,21 +1,50 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { useApiData } from '../hooks/useApi';
 import { apiClient } from '../services/api';
+import { useOperationNotification } from '../hooks/useOperationNotification';
 import './DetailPages.css';
 
 export function TaskDetail() {
   const { taskId } = useParams<{ taskId: string }>();
   const [searchParams] = useSearchParams();
   const clusterName = searchParams.get('cluster') || 'default';
+  const [stopping, setStopping] = useState(false);
+  const { notifySuccess, notifyError } = useOperationNotification();
   
   // We need to construct the full task ARN for the API call
   const taskArn = `arn:aws:ecs:ap-northeast-1:123456789012:task/${clusterName}/${taskId}`;
   
-  const { data: tasks, loading: tasksLoading, error: tasksError } = useApiData(
+  const { data: tasks, loading: tasksLoading, error: tasksError, refresh } = useApiData(
     () => apiClient.describeTasks([taskArn], clusterName),
     [taskArn, clusterName]
   );
+
+  const handleStop = async () => {
+    if (!taskId) return;
+    
+    const confirmed = window.confirm(`Are you sure you want to stop task "${taskId}"?`);
+    if (!confirmed) return;
+
+    setStopping(true);
+    try {
+      await apiClient.stopTask({ 
+        cluster: clusterName,
+        task: taskId 
+      });
+      notifySuccess(`Task "${taskId}" stop request sent successfully`);
+      
+      // Refresh task data to show updated status
+      setTimeout(() => {
+        refresh();
+      }, 1000);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to stop task';
+      notifyError(errorMessage);
+    } finally {
+      setStopping(false);
+    }
+  };
 
   if (tasksLoading) {
     return (
@@ -65,8 +94,19 @@ export function TaskDetail() {
       <div className="detail-header">
         <Link to="/" className="back-link">← Back to Dashboard</Link>
         <h1>Task: {taskId}</h1>
-        <div className={`status-badge ${getStatusClass(task.lastStatus)}`}>
-          {task.lastStatus}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className={`status-badge ${getStatusClass(task.lastStatus)}`}>
+            {task.lastStatus}
+          </div>
+          {task.lastStatus.toLowerCase() === 'running' && (
+            <button 
+              className="button button-danger" 
+              onClick={handleStop}
+              disabled={stopping}
+            >
+              {stopping ? 'Stopping...' : 'Stop Task'}
+            </button>
+          )}
         </div>
       </div>
 

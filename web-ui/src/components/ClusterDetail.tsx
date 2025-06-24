@@ -1,11 +1,17 @@
-import React, { useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useCallback, useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useApiData } from '../hooks/useApi';
 import { apiClient } from '../services/api';
+import { useOperationNotification } from '../hooks/useOperationNotification';
+import { RunTask } from './RunTask';
 import './DetailPages.css';
 
 export function ClusterDetail() {
   const { clusterName } = useParams<{ clusterName: string }>();
+  const navigate = useNavigate();
+  const [deleting, setDeleting] = useState(false);
+  const [showRunTaskModal, setShowRunTaskModal] = useState(false);
+  const { notifySuccess, notifyError } = useOperationNotification();
   
   const describeClusters = useCallback(
     () => apiClient.describeClusters([clusterName || '']),
@@ -32,10 +38,29 @@ export function ClusterDetail() {
     [clusterName]
   );
   
-  const { data: tasks, loading: tasksLoading } = useApiData(
+  const { data: tasks, loading: tasksLoading, refresh: refetchTasks } = useApiData(
     listTasks,
     [clusterName]
   );
+
+  const handleDelete = async () => {
+    if (!clusterName) return;
+    
+    const confirmed = window.confirm(`Are you sure you want to delete cluster "${clusterName}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      await apiClient.deleteCluster({ cluster: clusterName });
+      notifySuccess(`Cluster "${clusterName}" deleted successfully`);
+      navigate('/clusters');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete cluster';
+      notifyError(errorMessage);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (clustersLoading) {
     return (
@@ -70,7 +95,17 @@ export function ClusterDetail() {
       <div className="detail-header">
         <Link to="/" className="back-link">← Back to Dashboard</Link>
         <h1>Cluster: {cluster.clusterName}</h1>
-        <div className="status-badge status-active">{cluster.status}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="status-badge status-active">{cluster.status}</div>
+          <button 
+            className="button button-danger" 
+            onClick={handleDelete}
+            disabled={deleting || cluster.activeServicesCount > 0 || cluster.runningTasksCount > 0}
+            title={cluster.activeServicesCount > 0 || cluster.runningTasksCount > 0 ? 'Cannot delete cluster with active services or running tasks' : ''}
+          >
+            {deleting ? 'Deleting...' : 'Delete Cluster'}
+          </button>
+        </div>
       </div>
 
       <div className="detail-grid">
@@ -143,7 +178,15 @@ export function ClusterDetail() {
         </div>
 
         <div className="detail-card">
-          <h2>Tasks</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h2>Tasks</h2>
+            <button 
+              className="button button-primary" 
+              onClick={() => setShowRunTaskModal(true)}
+            >
+              Run Task
+            </button>
+          </div>
           {tasksLoading ? (
             <div className="loading">Loading tasks...</div>
           ) : tasks?.taskArns && tasks.taskArns.length > 0 ? (
@@ -173,6 +216,13 @@ export function ClusterDetail() {
           )}
         </div>
       </div>
+
+      <RunTask
+        isOpen={showRunTaskModal}
+        onClose={() => setShowRunTaskModal(false)}
+        onSuccess={refetchTasks}
+        clusterName={clusterName}
+      />
     </div>
   );
 }

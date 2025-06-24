@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../services/api';
 import { ListClustersResponse, DescribeClustersResponse } from '../types/api';
+import { ClusterCreate } from './ClusterCreate';
 
 interface ClusterListItem {
   name: string;
@@ -17,6 +18,7 @@ export function ClusterList() {
   const [clusters, setClusters] = useState<ClusterListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     loadClusters();
@@ -86,9 +88,14 @@ export function ClusterList() {
     <main className="App-main">
       <div className="dashboard-header">
         <h2>Clusters</h2>
-        <button className="refresh-button" onClick={loadClusters}>
-          Refresh
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button className="button button-primary" onClick={() => setShowCreateModal(true)}>
+            Create Cluster
+          </button>
+          <button className="refresh-button" onClick={loadClusters}>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {clusters.length === 0 ? (
@@ -136,6 +143,12 @@ export function ClusterList() {
           ))}
         </div>
       )}
+
+      <ClusterCreate
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={loadClusters}
+      />
     </main>
   );
 }
