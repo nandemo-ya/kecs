@@ -796,7 +796,7 @@ func (api *DefaultECSAPI) UpdateServicePrimaryTaskSet(ctx context.Context, req *
 // DescribeServiceDeployments implements the DescribeServiceDeployments operation
 func (api *DefaultECSAPI) DescribeServiceDeployments(ctx context.Context, req *generated.DescribeServiceDeploymentsRequest) (*generated.DescribeServiceDeploymentsResponse, error) {
 	// Validate required fields
-	if req.ServiceDeploymentArns == nil || len(req.ServiceDeploymentArns) == 0 {
+	if len(req.ServiceDeploymentArns) == 0 {
 		return nil, fmt.Errorf("serviceDeploymentArns is required")
 	}
 
@@ -896,7 +896,7 @@ func (api *DefaultECSAPI) DescribeServiceDeployments(ctx context.Context, req *g
 // DescribeServiceRevisions implements the DescribeServiceRevisions operation
 func (api *DefaultECSAPI) DescribeServiceRevisions(ctx context.Context, req *generated.DescribeServiceRevisionsRequest) (*generated.DescribeServiceRevisionsResponse, error) {
 	// Validate required fields
-	if req.ServiceRevisionArns == nil || len(req.ServiceRevisionArns) == 0 {
+	if len(req.ServiceRevisionArns) == 0 {
 		return nil, fmt.Errorf("serviceRevisionArns is required")
 	}
 

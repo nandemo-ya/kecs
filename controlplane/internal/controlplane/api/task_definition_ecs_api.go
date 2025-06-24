@@ -45,7 +45,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	if req.Family == "" {
 		return nil, fmt.Errorf("family is required")
 	}
-	if req.ContainerDefinitions == nil || len(req.ContainerDefinitions) == 0 {
+	if len(req.ContainerDefinitions) == 0 {
 		return nil, fmt.Errorf("containerDefinitions is required")
 	}
 
@@ -335,7 +335,7 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 
 // DeleteTaskDefinitions implements the DeleteTaskDefinitions operation
 func (api *DefaultECSAPI) DeleteTaskDefinitions(ctx context.Context, req *generated.DeleteTaskDefinitionsRequest) (*generated.DeleteTaskDefinitionsResponse, error) {
-	if req.TaskDefinitions == nil || len(req.TaskDefinitions) == 0 {
+	if len(req.TaskDefinitions) == 0 {
 		return nil, fmt.Errorf("taskDefinitions is required")
 	}
 

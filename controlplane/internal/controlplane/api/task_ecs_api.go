@@ -312,7 +312,7 @@ func (api *DefaultECSAPI) StopTask(ctx context.Context, req *generated.StopTaskR
 // DescribeTasks implements the DescribeTasks operation
 func (api *DefaultECSAPI) DescribeTasks(ctx context.Context, req *generated.DescribeTasksRequest) (*generated.DescribeTasksResponse, error) {
 	// Validate required fields
-	if req.Tasks == nil || len(req.Tasks) == 0 {
+	if len(req.Tasks) == 0 {
 		return nil, fmt.Errorf("tasks is required")
 	}
 
@@ -637,8 +637,7 @@ func extractSSMParameters(taskDef *storage.TaskDefinition) []string {
 
 	// Extract SSM parameter ARNs from each container's secrets
 	for _, container := range containerDefs {
-		if container.Secrets != nil {
-			for _, secret := range container.Secrets {
+		for _, secret := range container.Secrets {
 				if secret.ValueFrom != nil && strings.Contains(*secret.ValueFrom, ":ssm:") {
 					// Parse SSM parameter name from ARN
 					// Format: arn:aws:ssm:region:account-id:parameter/name
@@ -653,7 +652,6 @@ func extractSSMParameters(taskDef *storage.TaskDefinition) []string {
 						}
 					}
 				}
-			}
 		}
 	}
 
@@ -672,14 +670,12 @@ func extractSecretsManagerSecrets(taskDef *storage.TaskDefinition) []secretsmana
 
 	// Extract Secrets Manager ARNs from each container's secrets
 	for _, container := range containerDefs {
-		if container.Secrets != nil {
-			for _, secret := range container.Secrets {
-				if secret.ValueFrom != nil && strings.Contains(*secret.ValueFrom, ":secretsmanager:") {
-					// Parse the ARN to extract secret name and JSON key
-					secretRef := parseSecretsManagerARN(*secret.ValueFrom)
-					if secretRef.SecretName != "" {
-						secretRefs = append(secretRefs, secretRef)
-					}
+		for _, secret := range container.Secrets {
+			if secret.ValueFrom != nil && strings.Contains(*secret.ValueFrom, ":secretsmanager:") {
+				// Parse the ARN to extract secret name and JSON key
+				secretRef := parseSecretsManagerARN(*secret.ValueFrom)
+				if secretRef.SecretName != "" {
+					secretRefs = append(secretRefs, secretRef)
 				}
 			}
 		}
