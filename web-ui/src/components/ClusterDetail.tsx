@@ -4,6 +4,7 @@ import { useApiData } from '../hooks/useApi';
 import { apiClient } from '../services/api';
 import { useOperationNotification } from '../hooks/useOperationNotification';
 import { RunTask } from './RunTask';
+import { TagEditor } from './TagEditor';
 import './DetailPages.css';
 
 export function ClusterDetail() {
@@ -149,6 +150,13 @@ export function ClusterDetail() {
               <div className="metric-label">Container Instances</div>
             </div>
           </div>
+        </div>
+
+        <div className="detail-card">
+          <TagEditor 
+            resourceArn={cluster.clusterArn} 
+            editable={true}
+          />
         </div>
 
         <div className="detail-card">

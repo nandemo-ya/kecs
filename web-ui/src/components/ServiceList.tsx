@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../services/api';
-import { ListClustersResponse, ListServicesResponse, DescribeServicesResponse } from '../types/api';
+import { ListClustersResponse, ListServicesResponse, DescribeServicesResponse, Tag } from '../types/api';
+import { TagBadges } from './TagEditor';
 
 interface ServiceListItem {
   serviceName: string;
@@ -14,6 +15,7 @@ interface ServiceListItem {
   taskDefinition: string;
   launchType: string;
   createdAt?: string;
+  tags?: Tag[];
 }
 
 export function ServiceList() {
@@ -68,6 +70,7 @@ export function ServiceList() {
               taskDefinition: service.taskDefinition,
               launchType: service.launchType,
               createdAt: service.createdAt,
+              tags: service.tags,
             }));
 
             allServices.push(...clusterServices);
@@ -162,6 +165,10 @@ export function ServiceList() {
                 <div className="resource-arn">
                   {service.serviceArn}
                 </div>
+
+                {service.tags && service.tags.length > 0 && (
+                  <TagBadges tags={service.tags} />
+                )}
 
                 <div className="resource-info">
                   <div className="info-row">
