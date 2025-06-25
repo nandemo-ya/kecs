@@ -1,0 +1,341 @@
+name: Scenario Tests (Optimized)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/scenarios/**'
+      - 'controlplane/**'
+      - '.github/workflows/scenario-tests-optimized.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+env:
+  # Enable Go module caching
+  GOCACHE: /tmp/go-cache
+  GOMODCACHE: /tmp/go-mod-cache
+
+jobs:
+  # Build KECS image once and share across jobs
+  build-kecs:
+    runs-on: [self-hosted, aws-testable, medium]
+    outputs:
+      image-tag: ${{ steps.image.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Generate image tag
+        id: image
+        run: echo "tag=kecs:test-${{ github.sha }}" >> $GITHUB_OUTPUT
+      
+      - name: Build KECS Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./controlplane
+          file: ./controlplane/Dockerfile.test
+          tags: ${{ steps.image.outputs.tag }}
+          outputs: type=docker,dest=/tmp/kecs-image.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Upload Docker image
+        uses: actions/upload-artifact@v4
+        with:
+          name: kecs-docker-image
+          path: /tmp/kecs-image.tar
+          retention-days: 1
+
+  # Phase 1 tests run in parallel
+  test-phase1:
+    needs: build-kecs
+    runs-on: [self-hosted, aws-testable, large]
+    strategy:
+      fail-fast: false
+      matrix:
+        test-group:
+          - name: "cluster-basic"
+            pattern: "Basic Operations"
+          - name: "cluster-advanced"
+            pattern: "Advanced Features"
+          - name: "cluster-error"
+            pattern: "Error Scenarios"
+          - name: "cluster-readonly"
+            pattern: "Read-Only Operations"
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: tests/scenarios/go.mod
+          cache: true
+          cache-dependency-path: tests/scenarios/go.sum
+      
+      - name: Download KECS Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: kecs-docker-image
+          path: /tmp
+      
+      - name: Load Docker image
+        run: |
+          docker load --input /tmp/kecs-image.tar
+          docker tag ${{ needs.build-kecs.outputs.image-tag }} kecs:test
+      
+      - name: Install Ginkgo
+        run: |
+          cd tests/scenarios
+          go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo
+      
+      - name: Run Phase 1 tests - ${{ matrix.test-group.name }}
+        id: test
+        run: |
+          cd tests/scenarios
+          echo "## Running Phase 1: ${{ matrix.test-group.name }} tests ##"
+          
+          # Use shared clusters and optimized settings
+          export KECS_LOG_LEVEL=info
+          export KECS_K3D_OPTIMIZED=true
+          export KECS_TEST_MODE=true
+          
+          ginkgo -v \
+            --timeout 15m \
+            --no-color \
+            --junit-report=junit-phase1-${{ matrix.test-group.name }}.xml \
+            --output-dir=. \
+            --focus="${{ matrix.test-group.pattern }}" \
+            ./phase1/... | tee test-output-phase1-${{ matrix.test-group.name }}.log
+          
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-phase1-${{ matrix.test-group.name }}
+          path: |
+            tests/scenarios/junit-phase1-${{ matrix.test-group.name }}.xml
+            tests/scenarios/test-output-phase1-${{ matrix.test-group.name }}.log
+
+  # Phase 2 tests also run in parallel
+  test-phase2:
+    needs: build-kecs
+    runs-on: [self-hosted, aws-testable, large]
+    strategy:
+      fail-fast: false
+      matrix:
+        test-group:
+          - name: "task-simple"
+            pattern: "Simple Web Application"
+          - name: "task-advanced"
+            pattern: "Advanced Task Features"
+          - name: "task-worker"
+            pattern: "Worker Pattern"
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: tests/scenarios/go.mod
+          cache: true
+          cache-dependency-path: tests/scenarios/go.sum
+      
+      - name: Download KECS Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: kecs-docker-image
+          path: /tmp
+      
+      - name: Load Docker image
+        run: |
+          docker load --input /tmp/kecs-image.tar
+          docker tag ${{ needs.build-kecs.outputs.image-tag }} kecs:test
+      
+      - name: Install Ginkgo
+        run: |
+          cd tests/scenarios
+          go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo
+      
+      - name: Run Phase 2 tests - ${{ matrix.test-group.name }}
+        id: test
+        run: |
+          cd tests/scenarios
+          echo "## Running Phase 2: ${{ matrix.test-group.name }} tests ##"
+          
+          # Use optimized settings
+          export KECS_LOG_LEVEL=info
+          export KECS_K3D_OPTIMIZED=true
+          export KECS_TEST_MODE=true
+          
+          ginkgo -v \
+            --timeout 15m \
+            --no-color \
+            --junit-report=junit-phase2-${{ matrix.test-group.name }}.xml \
+            --output-dir=. \
+            --focus="${{ matrix.test-group.pattern }}" \
+            ./phase2/... | tee test-output-phase2-${{ matrix.test-group.name }}.log
+          
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-phase2-${{ matrix.test-group.name }}
+          path: |
+            tests/scenarios/junit-phase2-${{ matrix.test-group.name }}.xml
+            tests/scenarios/test-output-phase2-${{ matrix.test-group.name }}.log
+
+  # Aggregate results and comment on PR
+  report-results:
+    needs: [test-phase1, test-phase2]
+    if: always()
+    runs-on: [self-hosted, linux, small]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-*
+          path: test-results
+      
+      - name: Generate test report
+        uses: dorny/test-reporter@v1
+        if: always() && github.event_name == 'pull_request'
+        with:
+          name: Scenario Tests Report
+          path: 'test-results/**/junit-*.xml'
+          reporter: java-junit
+          fail-on-error: false
+          fail-on-empty: false
+      
+      - name: Comment PR with aggregated results
+        uses: actions/github-script@v7
+        if: always() && github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Function to parse test results from all test outputs
+            function parseAllTestResults() {
+              const testResults = [];
+              const resultsDir = 'test-results';
+              
+              // Read all subdirectories
+              const dirs = fs.readdirSync(resultsDir);
+              
+              dirs.forEach(dir => {
+                const dirPath = path.join(resultsDir, dir);
+                if (fs.statSync(dirPath).isDirectory()) {
+                  const files = fs.readdirSync(dirPath);
+                  
+                  // Find log files
+                  const logFiles = files.filter(f => f.endsWith('.log'));
+                  
+                  logFiles.forEach(logFile => {
+                    const content = fs.readFileSync(path.join(dirPath, logFile), 'utf8');
+                    const cleanContent = content.replace(/\x1b\[[0-9;]*m/g, '');
+                    
+                    // Extract test group name
+                    const groupMatch = logFile.match(/test-output-(phase\d+)-(.*?)\.log/);
+                    if (groupMatch) {
+                      const phase = groupMatch[1];
+                      const group = groupMatch[2];
+                      
+                      // Parse test summary
+                      const summaryMatch = cleanContent.match(/Ran (\d+) of (\d+) Specs in ([\d.]+) seconds/);
+                      const resultsMatch = cleanContent.match(/(\d+) Passed.*?(\d+) Failed.*?(\d+) Pending.*?(\d+) Skipped/);
+                      
+                      if (summaryMatch && resultsMatch) {
+                        testResults.push({
+                          phase: phase,
+                          group: group,
+                          ran: parseInt(summaryMatch[1]),
+                          total: parseInt(summaryMatch[2]),
+                          duration: parseFloat(summaryMatch[3]),
+                          passed: parseInt(resultsMatch[1]),
+                          failed: parseInt(resultsMatch[2]),
+                          pending: parseInt(resultsMatch[3]),
+                          skipped: parseInt(resultsMatch[4])
+                        });
+                      }
+                    }
+                  });
+                }
+              });
+              
+              return testResults;
+            }
+            
+            const results = parseAllTestResults();
+            
+            // Generate summary
+            let summary = '## 🚀 Optimized Scenario Test Results\n\n';
+            
+            // Overall metrics
+            const totalDuration = results.reduce((sum, r) => sum + r.duration, 0);
+            const totalPassed = results.reduce((sum, r) => sum + r.passed, 0);
+            const totalFailed = results.reduce((sum, r) => sum + r.failed, 0);
+            const totalRan = results.reduce((sum, r) => sum + r.ran, 0);
+            
+            summary += '### 📊 Overall Summary\n';
+            summary += `- **Total Tests Run**: ${totalRan}\n`;
+            summary += `- **Total Duration**: ${totalDuration.toFixed(1)}s\n`;
+            summary += `- ✅ **Passed**: ${totalPassed}\n`;
+            summary += `- ❌ **Failed**: ${totalFailed}\n`;
+            summary += `- **Status**: ${totalFailed === 0 ? '✅ All tests passed!' : '❌ Some tests failed'}\n\n`;
+            
+            // Performance improvements
+            summary += '### ⚡ Performance Optimizations Applied\n';
+            summary += '- 🚀 Parallel test execution across multiple jobs\n';
+            summary += '- 🐳 Docker image built once and shared\n';
+            summary += '- 💾 Go module caching enabled\n';
+            summary += '- 🔄 Shared cluster management for tests\n';
+            summary += '- ⏱️ Dynamic readiness checks\n';
+            summary += '- 🏎️ K3d optimizations enabled\n\n';
+            
+            // Results by phase
+            summary += '### 📋 Detailed Results\n\n';
+            
+            ['phase1', 'phase2'].forEach(phase => {
+              const phaseResults = results.filter(r => r.phase === phase);
+              if (phaseResults.length > 0) {
+                const phaseTotal = phaseResults.reduce((sum, r) => sum + r.duration, 0);
+                const phasePassed = phaseResults.reduce((sum, r) => sum + r.passed, 0);
+                const phaseFailed = phaseResults.reduce((sum, r) => sum + r.failed, 0);
+                
+                summary += `#### ${phase.toUpperCase()}\n`;
+                summary += `- Duration: ${phaseTotal.toFixed(1)}s\n`;
+                summary += `- Tests: ${phasePassed} passed, ${phaseFailed} failed\n`;
+                summary += `- Test Groups:\n`;
+                
+                phaseResults.forEach(r => {
+                  const status = r.failed === 0 ? '✅' : '❌';
+                  summary += `  - ${status} **${r.group}**: ${r.duration.toFixed(1)}s (${r.passed}/${r.ran} passed)\n`;
+                });
+                
+                summary += '\n';
+              }
+            });
+            
+            // Post comment
+            try {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: summary
+              });
+            } catch (error) {
+              console.error('Failed to post comment:', error);
+            }
