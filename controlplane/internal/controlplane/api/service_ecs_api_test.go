@@ -40,9 +40,9 @@ var _ = Describe("Service ECS API", func() {
 		// Add a default cluster
 		cluster := &storage.Cluster{
 			Name:      "default",
-			ARN:       "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
+			ARN:       "arn:aws:ecs:us-east-1:123456789012:cluster/default",
 			Status:    "ACTIVE",
-			Region:    "ap-northeast-1",
+			Region:    "us-east-1",
 			AccountID: "123456789012",
 		}
 		err := mockClusterStore.Create(ctx, cluster)
@@ -51,17 +51,17 @@ var _ = Describe("Service ECS API", func() {
 		// Add test services
 		testService := &storage.Service{
 			ID:                "service-1",
-			ARN:               "arn:aws:ecs:ap-northeast-1:123456789012:service/default/test-service",
+			ARN:               "arn:aws:ecs:us-east-1:123456789012:service/default/test-service",
 			ServiceName:       "test-service",
 			ClusterARN:        cluster.ARN,
-			TaskDefinitionARN: "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/nginx:1",
+			TaskDefinitionARN: "arn:aws:ecs:us-east-1:123456789012:task-definition/nginx:1",
 			DesiredCount:      2,
 			RunningCount:      2,
 			PendingCount:      0,
 			LaunchType:        "FARGATE",
 			Status:            "ACTIVE",
 			Namespace:         "test-namespace",
-			Region:            "ap-northeast-1",
+			Region:            "us-east-1",
 			AccountID:         "123456789012",
 			CreatedAt:         time.Now().Add(-1 * time.Hour),
 			UpdatedAt:         time.Now().Add(-30 * time.Minute),
@@ -76,9 +76,9 @@ var _ = Describe("Service ECS API", func() {
 				// Add more services with different namespaces
 				service2 := &storage.Service{
 					ID:          "service-2",
-					ARN:         "arn:aws:ecs:ap-northeast-1:123456789012:service/default/test-service-2",
+					ARN:         "arn:aws:ecs:us-east-1:123456789012:service/default/test-service-2",
 					ServiceName: "test-service-2",
-					ClusterARN:  "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
+					ClusterARN:  "arn:aws:ecs:us-east-1:123456789012:cluster/default",
 					Namespace:   "test-namespace",
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
@@ -88,9 +88,9 @@ var _ = Describe("Service ECS API", func() {
 
 				service3 := &storage.Service{
 					ID:          "service-3",
-					ARN:         "arn:aws:ecs:ap-northeast-1:123456789012:service/default/other-service",
+					ARN:         "arn:aws:ecs:us-east-1:123456789012:service/default/other-service",
 					ServiceName: "other-service",
-					ClusterARN:  "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
+					ClusterARN:  "arn:aws:ecs:us-east-1:123456789012:cluster/default",
 					Namespace:   "other-namespace",
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
@@ -148,11 +148,11 @@ var _ = Describe("Service ECS API", func() {
 			// Create a task set for testing
 			taskSet := &storage.TaskSet{
 				ID:                   "new-task-set",
-				ARN:                  "arn:aws:ecs:ap-northeast-1:123456789012:task-set/default/test-service/new-task-set",
-				ServiceARN:           "arn:aws:ecs:ap-northeast-1:123456789012:service/default/test-service",
-				ClusterARN:           "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
+				ARN:                  "arn:aws:ecs:us-east-1:123456789012:task-set/default/test-service/new-task-set",
+				ServiceARN:           "arn:aws:ecs:us-east-1:123456789012:service/default/test-service",
+				ClusterARN:           "arn:aws:ecs:us-east-1:123456789012:cluster/default",
 				Status:               "ACTIVE",
-				TaskDefinition:       "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/nginx:1",
+				TaskDefinition:       "arn:aws:ecs:us-east-1:123456789012:task-definition/nginx:1",
 				LaunchType:           "FARGATE",
 				Scale:                `{"value":100.0,"unit":"PERCENT"}`,
 				StabilityStatus:      "STEADY_STATE",
@@ -211,7 +211,7 @@ var _ = Describe("Service ECS API", func() {
 	Describe("DescribeServiceDeployments", func() {
 		Context("when describing service deployments", func() {
 			It("should describe deployment successfully", func() {
-				deploymentArn := "arn:aws:ecs:ap-northeast-1:123456789012:service-deployment/default/test-service/deployment-1"
+				deploymentArn := "arn:aws:ecs:us-east-1:123456789012:service-deployment/default/test-service/deployment-1"
 				req := &generated.DescribeServiceDeploymentsRequest{
 					ServiceDeploymentArns: []string{deploymentArn},
 				}
@@ -256,7 +256,7 @@ var _ = Describe("Service ECS API", func() {
 	Describe("DescribeServiceRevisions", func() {
 		Context("when describing service revisions", func() {
 			It("should describe revision successfully", func() {
-				revisionArn := "arn:aws:ecs:ap-northeast-1:123456789012:service-revision/default/test-service/revision-1"
+				revisionArn := "arn:aws:ecs:us-east-1:123456789012:service-revision/default/test-service/revision-1"
 				req := &generated.DescribeServiceRevisionsRequest{
 					ServiceRevisionArns: []string{revisionArn},
 				}
@@ -331,7 +331,7 @@ var _ = Describe("Service ECS API", func() {
 	Describe("StopServiceDeployment", func() {
 		Context("when stopping a deployment", func() {
 			It("should stop deployment successfully", func() {
-				deploymentArn := "arn:aws:ecs:ap-northeast-1:123456789012:service-deployment/default/test-service/deployment-1"
+				deploymentArn := "arn:aws:ecs:us-east-1:123456789012:service-deployment/default/test-service/deployment-1"
 				req := &generated.StopServiceDeploymentRequest{
 					ServiceDeploymentArn: deploymentArn,
 				}

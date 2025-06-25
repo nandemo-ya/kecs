@@ -103,7 +103,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 
 		// Verify response
 		assert.NotNil(t, listResp.ClusterArns)
-		assert.Contains(t, listResp.ClusterArns, "arn:aws:ecs:ap-northeast-1:123456789012:cluster/test-cluster")
+		assert.Contains(t, listResp.ClusterArns, "arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster")
 	})
 
 	t.Run("DescribeClusters", func(t *testing.T) {
