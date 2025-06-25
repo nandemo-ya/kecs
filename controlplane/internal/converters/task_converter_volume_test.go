@@ -258,7 +258,7 @@ func TestConvertVolumes(t *testing.T) {
 }
 
 func TestConvertEFSVolume(t *testing.T) {
-	converter := NewTaskConverter("ap-northeast-1", "123456789012")
+	converter := NewTaskConverter("us-east-1", "123456789012")
 
 	tests := []struct {
 		name      string
@@ -272,7 +272,7 @@ func TestConvertEFSVolume(t *testing.T) {
 			},
 			validate: func(t *testing.T, vs corev1.VolumeSource) {
 				require.NotNil(t, vs.NFS)
-				assert.Equal(t, "fs-12345678.efs.ap-northeast-1.amazonaws.com", vs.NFS.Server)
+				assert.Equal(t, "fs-12345678.efs.us-east-1.amazonaws.com", vs.NFS.Server)
 				assert.Equal(t, "/", vs.NFS.Path)
 			},
 		},
@@ -284,7 +284,7 @@ func TestConvertEFSVolume(t *testing.T) {
 			},
 			validate: func(t *testing.T, vs corev1.VolumeSource) {
 				require.NotNil(t, vs.NFS)
-				assert.Equal(t, "fs-87654321.efs.ap-northeast-1.amazonaws.com", vs.NFS.Server)
+				assert.Equal(t, "fs-87654321.efs.us-east-1.amazonaws.com", vs.NFS.Server)
 				assert.Equal(t, "/my/custom/path", vs.NFS.Path)
 			},
 		},

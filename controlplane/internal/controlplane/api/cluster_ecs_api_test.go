@@ -185,7 +185,7 @@ var _ = Describe("Cluster ECS API", func() {
 				}
 
 				for _, name := range clusterNames {
-					expectedArn := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/" + name
+					expectedArn := "arn:aws:ecs:us-east-1:123456789012:cluster/" + name
 					Expect(arnMap).To(HaveKey(expectedArn))
 				}
 			})
@@ -550,7 +550,7 @@ var _ = Describe("Cluster ECS API", func() {
 
 	Describe("extractClusterNameFromARN", func() {
 		It("should extract cluster name from valid ARN", func() {
-			arn := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/my-cluster"
+			arn := "arn:aws:ecs:us-east-1:123456789012:cluster/my-cluster"
 			name := extractClusterNameFromARN(arn)
 			Expect(name).To(Equal("my-cluster"))
 		})
@@ -562,17 +562,17 @@ var _ = Describe("Cluster ECS API", func() {
 
 		It("should return input for invalid ARN format", func() {
 			// Missing cluster name after slash
-			arn := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/"
+			arn := "arn:aws:ecs:us-east-1:123456789012:cluster/"
 			name := extractClusterNameFromARN(arn)
 			Expect(name).To(Equal(arn))
 
 			// No slash
-			arn2 := "arn:aws:ecs:ap-northeast-1:123456789012:cluster"
+			arn2 := "arn:aws:ecs:us-east-1:123456789012:cluster"
 			name2 := extractClusterNameFromARN(arn2)
 			Expect(name2).To(Equal(arn2))
 
 			// Multiple slashes
-			arn3 := "arn:aws:ecs:ap-northeast-1:123456789012:cluster/my/cluster"
+			arn3 := "arn:aws:ecs:us-east-1:123456789012:cluster/my/cluster"
 			name3 := extractClusterNameFromARN(arn3)
 			Expect(name3).To(Equal(arn3))
 		})

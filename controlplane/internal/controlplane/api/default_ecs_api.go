@@ -31,8 +31,8 @@ type DefaultECSAPI struct {
 func NewDefaultECSAPI(storage storage.Storage) generated.ECSAPIInterface {
 	return &DefaultECSAPI{
 		storage:   storage,
-		region:    "ap-northeast-1", // Default region
-		accountID: "123456789012",   // Default account ID
+		region:    "us-east-1",    // Default region
+		accountID: "123456789012", // Default account ID
 	}
 }
 

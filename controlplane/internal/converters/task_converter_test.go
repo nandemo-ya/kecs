@@ -15,7 +15,7 @@ var _ = Describe("TaskConverter", func() {
 	var converter *TaskConverter
 
 	BeforeEach(func() {
-		converter = NewTaskConverter("ap-northeast-1", "123456789012")
+		converter = NewTaskConverter("us-east-1", "123456789012")
 	})
 
 	Describe("parseSecretARN", func() {
@@ -89,7 +89,7 @@ var _ = Describe("TaskConverter", func() {
 			taskDef = &storage.TaskDefinition{
 				Family:               "test-task",
 				Revision:             1,
-				ARN:                  "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/test-task:1",
+				ARN:                  "arn:aws:ecs:us-east-1:123456789012:task-definition/test-task:1",
 				ContainerDefinitions: string(containerDefsJSON),
 				TaskRoleARN:          "",
 				Memory:               "1024",
@@ -101,7 +101,7 @@ var _ = Describe("TaskConverter", func() {
 			runTaskJSON = []byte(`{}`)
 			cluster = &storage.Cluster{
 				Name:   "test-cluster",
-				Region: "ap-northeast-1",
+				Region: "us-east-1",
 			}
 			taskID = "test-task-id"
 		})
@@ -112,7 +112,7 @@ var _ = Describe("TaskConverter", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pod).NotTo(BeNil())
 			Expect(pod.Name).To(Equal("ecs-task-test-task-id"))
-			Expect(pod.Namespace).To(Equal("test-cluster-ap-northeast-1"))
+			Expect(pod.Namespace).To(Equal("test-cluster-us-east-1"))
 			Expect(pod.Labels).To(HaveKeyWithValue("kecs.dev/task-family", "test-task"))
 			Expect(pod.Labels).To(HaveKeyWithValue("kecs.dev/task-revision", "1"))
 
