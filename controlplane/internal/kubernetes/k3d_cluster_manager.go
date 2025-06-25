@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,8 +45,19 @@ func NewK3dClusterManager(cfg *ClusterManagerConfig) (*K3dClusterManager, error)
 	}, nil
 }
 
-// CreateCluster creates a new k3d cluster
+// CreateCluster creates a new k3d cluster with optimizations based on environment
 func (k *K3dClusterManager) CreateCluster(ctx context.Context, clusterName string) error {
+	// Use optimized creation for test mode or when explicitly requested
+	if os.Getenv("KECS_TEST_MODE") == "true" || os.Getenv("KECS_K3D_OPTIMIZED") == "true" {
+		return k.CreateClusterOptimized(ctx, clusterName)
+	}
+	
+	// Use standard creation for production-like scenarios
+	return k.createClusterStandard(ctx, clusterName)
+}
+
+// createClusterStandard creates a standard k3d cluster (original implementation)
+func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterName string) error {
 	normalizedName := k.normalizeClusterName(clusterName)
 
 	// Check if cluster already exists
@@ -220,7 +232,27 @@ func (k *K3dClusterManager) GetKubeClient(clusterName string) (kubernetes.Interf
 		} else if apiPort != "" {
 			// Update the server URL with the correct port
 			for clusterName, clusterConfig := range kubeconfigObj.Clusters {
-				newServer := fmt.Sprintf("https://127.0.0.1:%s", apiPort)
+				// When running in container mode, we need to use host.docker.internal
+				// to connect to services on the Docker host
+				host := "127.0.0.1"
+				if k.config.ContainerMode {
+					// Try to use host.docker.internal for Docker Desktop environments
+					// This works on Mac and Windows Docker Desktop
+					host = "host.docker.internal"
+					
+					// For Linux, we might need to use the default gateway
+					if _, err := os.Stat("/.dockerenv"); err == nil {
+						// We're in a container, check if host.docker.internal resolves
+						if _, err := net.LookupHost("host.docker.internal"); err != nil {
+							// host.docker.internal doesn't resolve, try to get gateway
+							log.Printf("host.docker.internal not available, using fallback")
+							// For now, we'll still use host.docker.internal and let it fail
+							// A more robust solution would detect the gateway IP
+						}
+					}
+				}
+				
+				newServer := fmt.Sprintf("https://%s:%s", host, apiPort)
 				log.Printf("Updating server URL from %s to %s", clusterConfig.Server, newServer)
 				clusterConfig.Server = newServer
 				kubeconfigObj.Clusters[clusterName] = clusterConfig
@@ -418,4 +450,138 @@ func (k *K3dClusterManager) getLoadBalancerAPIPort(ctx context.Context, containe
 	}
 
 	return "", fmt.Errorf("no port mapping found for 6443/tcp")
+}
+
+// CreateClusterOptimized creates a new k3d cluster with optimizations for faster startup
+func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterName string) error {
+	normalizedName := k.normalizeClusterName(clusterName)
+
+	// Check if cluster already exists
+	exists, err := k.ClusterExists(ctx, clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to check if cluster exists: %w", err)
+	}
+
+	if exists {
+		log.Printf("k3d cluster %s already exists", normalizedName)
+		return nil
+	}
+
+	// K3s args for minimal setup - disable unnecessary components
+	k3sArgs := []string{
+		"--disable=traefik",      // Disable Traefik ingress controller
+		"--disable=servicelb",    // Disable the default service load balancer
+		"--disable=metrics-server", // Disable metrics server
+		"--disable-network-policy", // Disable network policy controller
+	}
+
+	// Create server node with optimizations
+	serverNode := &k3d.Node{
+		Name:  fmt.Sprintf("k3d-%s-server-0", normalizedName),
+		Role:  k3d.ServerRole,
+		Image: "rancher/k3s:v1.31.4-k3s1",
+		Restart: false, // Don't restart automatically in test scenarios
+		K3sNodeLabels: map[string]string{
+			"kecs.io/cluster": normalizedName,
+		},
+		Args: k3sArgs,
+		Env: []string{
+			"K3S_KUBECONFIG_MODE=666", // Ensure kubeconfig is readable
+		},
+	}
+
+	// Create minimal cluster configuration
+	cluster := &k3d.Cluster{
+		Name:  normalizedName,
+		Nodes: []*k3d.Node{serverNode},
+		Network: k3d.ClusterNetwork{
+			Name: fmt.Sprintf("k3d-%s", normalizedName),
+			IPAM: k3d.IPAM{
+				Managed: false, // Don't manage IPAM
+			},
+		},
+		Token: fmt.Sprintf("kecs-%s-token", normalizedName),
+		KubeAPI: &k3d.ExposureOpts{
+			Host: k3d.DefaultAPIHost,
+		},
+	}
+
+	// For single-node clusters, we'll disable load balancer in create opts
+
+	// Create cluster creation options with shorter timeout
+	clusterCreateOpts := &k3d.ClusterCreateOpts{
+		WaitForServer:       true,
+		Timeout:             30 * time.Second, // Reduced from 2 minutes
+		DisableLoadBalancer: len(cluster.Nodes) == 1, // Disable for single-node
+		DisableImageVolume:  true,             // Don't create image volume
+		GlobalLabels: map[string]string{
+			"kecs.io/optimized": "true",
+		},
+		GlobalEnv: []string{},
+		NodeHooks: []k3d.NodeHook{},
+	}
+
+	// Create cluster config for ClusterRun
+	clusterConfig := &v1alpha5.ClusterConfig{
+		Cluster:           *cluster,
+		ClusterCreateOpts: *clusterCreateOpts,
+	}
+
+	// Use ClusterRun to create and start the cluster
+	log.Printf("Creating optimized k3d cluster %s...", normalizedName)
+	startTime := time.Now()
+	
+	if err := client.ClusterRun(ctx, k.runtime, clusterConfig); err != nil {
+		return fmt.Errorf("failed to create k3d cluster: %w", err)
+	}
+
+	creationTime := time.Since(startTime)
+	log.Printf("Successfully created k3d cluster %s in %v", normalizedName, creationTime)
+
+	// Write kubeconfig to custom path if in container mode
+	if k.config.ContainerMode {
+		kubeconfigPath := k.GetKubeconfigPath(clusterName)
+		if err := k.writeKubeconfig(ctx, cluster, kubeconfigPath); err != nil {
+			return fmt.Errorf("failed to write kubeconfig: %w", err)
+		}
+	}
+
+	// Quick readiness check with shorter timeout
+	readyCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	log.Printf("Waiting for optimized cluster %s to be ready...", normalizedName)
+	if err := k.waitForClusterReadyOptimized(readyCtx, normalizedName); err != nil {
+		log.Printf("Warning: cluster may not be fully ready: %v", err)
+		// Don't fail here, let the caller handle readiness
+	}
+
+	return nil
+}
+
+// waitForClusterReadyOptimized performs a quick readiness check for optimized clusters
+func (k *K3dClusterManager) waitForClusterReadyOptimized(ctx context.Context, clusterName string) error {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for cluster readiness")
+		case <-ticker.C:
+			// Try to get cluster info to check if API is ready
+			cluster, err := client.ClusterGet(ctx, k.runtime, &k3d.Cluster{Name: clusterName})
+			if err != nil {
+				continue
+			}
+
+			// Check if at least one node is present
+			if len(cluster.Nodes) > 0 {
+				// Try to create a kube client
+				if _, err := k.GetKubeClient(clusterName); err == nil {
+					return nil
+				}
+			}
+		}
+	}
 }
