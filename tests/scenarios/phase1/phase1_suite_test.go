@@ -11,9 +11,10 @@ import (
 
 // Suite-level shared resources
 var (
-	sharedKECS   *utils.KECSContainer
-	sharedClient utils.ECSClientInterface
-	sharedLogger *utils.TestLogger
+	sharedKECS           *utils.KECSContainer
+	sharedClient         utils.ECSClientInterface
+	sharedLogger         *utils.TestLogger
+	sharedClusterManager *utils.SharedClusterManager
 )
 
 var _ = BeforeSuite(func() {
@@ -21,9 +22,17 @@ var _ = BeforeSuite(func() {
 	sharedKECS = utils.StartKECS(GinkgoT())
 	sharedClient = utils.NewECSClientInterface(sharedKECS.Endpoint(), utils.AWSCLIMode)
 	sharedLogger = utils.NewTestLogger(GinkgoT())
+	
+	// Initialize shared cluster manager
+	sharedClusterManager = utils.NewSharedClusterManager(sharedClient, true)
 })
 
 var _ = AfterSuite(func() {
+	// Clean up shared clusters first
+	if sharedClusterManager != nil {
+		sharedClusterManager.CleanupAll()
+	}
+	
 	// Clean up container after all tests
 	if sharedKECS != nil {
 		sharedKECS.Cleanup()
