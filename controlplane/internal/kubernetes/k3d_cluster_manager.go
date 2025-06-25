@@ -469,10 +469,17 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 
 	// K3s args for minimal setup - disable unnecessary components
 	k3sArgs := []string{
-		"--disable=traefik",      // Disable Traefik ingress controller
-		"--disable=servicelb",    // Disable the default service load balancer
+		"--disable=traefik",        // Disable Traefik ingress controller
+		"--disable=servicelb",      // Disable the default service load balancer
 		"--disable=metrics-server", // Disable metrics server
 		"--disable-network-policy", // Disable network policy controller
+		"--disable=local-storage",  // Disable local storage provisioner
+	}
+	
+	// Optionally disable CoreDNS based on environment variable
+	// Some tests might need DNS resolution
+	if os.Getenv("KECS_DISABLE_COREDNS") == "true" {
+		k3sArgs = append(k3sArgs, "--disable=coredns")
 	}
 
 	// Create server node with optimizations
@@ -488,6 +495,7 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		Env: []string{
 			"K3S_KUBECONFIG_MODE=666", // Ensure kubeconfig is readable
 		},
+		Memory: "512M", // Limit memory usage for faster startup
 	}
 
 	// Create minimal cluster configuration
@@ -508,9 +516,16 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 
 	// For single-node clusters, we'll disable load balancer in create opts
 
+	// Determine if we should wait for server based on environment
+	waitForServer := true
+	if os.Getenv("KECS_K3D_ASYNC") == "true" {
+		waitForServer = false
+		log.Printf("Creating k3d cluster asynchronously (KECS_K3D_ASYNC=true)")
+	}
+	
 	// Create cluster creation options with shorter timeout
 	clusterCreateOpts := &k3d.ClusterCreateOpts{
-		WaitForServer:       true,
+		WaitForServer:       waitForServer,
 		Timeout:             30 * time.Second, // Reduced from 2 minutes
 		DisableLoadBalancer: len(cluster.Nodes) == 1, // Disable for single-node
 		DisableImageVolume:  true,             // Don't create image volume
@@ -546,14 +561,18 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		}
 	}
 
-	// Quick readiness check with shorter timeout
-	readyCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
+	// Quick readiness check with shorter timeout - only if we waited for server
+	if waitForServer {
+		readyCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		defer cancel()
 
-	log.Printf("Waiting for optimized cluster %s to be ready...", normalizedName)
-	if err := k.waitForClusterReadyOptimized(readyCtx, normalizedName); err != nil {
-		log.Printf("Warning: cluster may not be fully ready: %v", err)
-		// Don't fail here, let the caller handle readiness
+		log.Printf("Waiting for optimized cluster %s to be ready...", normalizedName)
+		if err := k.waitForClusterReadyOptimized(readyCtx, normalizedName); err != nil {
+			log.Printf("Warning: cluster may not be fully ready: %v", err)
+			// Don't fail here, let the caller handle readiness
+		}
+	} else {
+		log.Printf("Cluster %s creation initiated asynchronously", normalizedName)
 	}
 
 	return nil
