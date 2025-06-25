@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -109,28 +110,18 @@ func StartKECS(t TestingT) *KECSContainer {
 	endpoint := fmt.Sprintf("http://%s:%s", apiHost, apiPort.Port())
 
 	// Wait a bit for KECS to be fully ready
-	if testMode != "true" && containerMode == "true" {
-		// Wait for cluster creation in container mode
-		if clusterProvider == "k3d" {
-			// k3d is faster to start
-			time.Sleep(15 * time.Second)
-		} else {
-			// Kind needs more time
-			time.Sleep(30 * time.Second)
-		}
-	} else if testMode != "true" {
-		// Wait for cluster creation in normal mode
-		if clusterProvider == "k3d" {
-			// k3d is faster
-			time.Sleep(5 * time.Second)
-		} else {
-			// Kind needs more time
-			time.Sleep(10 * time.Second)
-		}
+	// Use shorter initial wait based on mode
+	var initialWait time.Duration
+	if testMode == "true" {
+		initialWait = 2 * time.Second
+	} else if containerMode == "true" {
+		initialWait = 5 * time.Second
 	} else {
-		// Shorter wait in test mode
-		time.Sleep(2 * time.Second)
+		initialWait = 3 * time.Second
 	}
+	
+	log.Printf("Waiting %v for KECS to initialize...", initialWait)
+	time.Sleep(initialWait)
 	
 
 	return &KECSContainer{
