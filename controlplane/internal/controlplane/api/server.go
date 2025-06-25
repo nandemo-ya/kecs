@@ -92,11 +92,22 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 			clusterConfig.ContainerMode)
 	}
 
+	// Get region and accountID from environment variables
+	region := os.Getenv("KECS_DEFAULT_REGION")
+	if region == "" {
+		region = "us-east-1" // Default region
+	}
+	
+	accountID := os.Getenv("KECS_ACCOUNT_ID")
+	if accountID == "" {
+		accountID = "123456789012" // Default account ID
+	}
+
 	s := &Server{
 		port:           port,
 		kubeconfig:     kubeconfig,
-		region:         "ap-northeast-1", // Default region
-		accountID:      "123456789012",   // Default account ID
+		region:         region,
+		accountID:      accountID,
 		ecsAPI:         nil,              // Will be set after IAM integration
 		storage:        storage,
 		clusterManager: clusterManager,
@@ -292,11 +303,11 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 			}
 
 			if kubeClient != nil {
-				serviceDiscoveryManager := servicediscovery.NewManager(kubeClient, "us-east-1", "123456789012")
+				serviceDiscoveryManager := servicediscovery.NewManager(kubeClient, s.region, s.accountID)
 				defaultAPI.SetServiceDiscoveryManager(serviceDiscoveryManager)
 
 				// Create Service Discovery API handler
-				s.serviceDiscoveryAPI = NewServiceDiscoveryAPI(serviceDiscoveryManager, "us-east-1", "123456789012")
+				s.serviceDiscoveryAPI = NewServiceDiscoveryAPI(serviceDiscoveryManager, s.region, s.accountID)
 
 				log.Println("Service Discovery integration initialized successfully")
 			}

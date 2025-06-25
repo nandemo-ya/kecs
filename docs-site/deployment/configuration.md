@@ -474,6 +474,10 @@ export KECS_DATA_DIR=/data  # Data directory path (useful in container mode)
 
 # State recovery
 export KECS_AUTO_RECOVER_STATE=true  # Auto-recover k3d clusters on startup (default: true)
+
+# Default AWS region and account settings
+export KECS_DEFAULT_REGION=us-east-1  # Default AWS region for KECS (default: us-east-1)
+export KECS_ACCOUNT_ID=123456789012   # AWS account ID for KECS (default: 123456789012)
 ```
 
 ### Environment Variable Mapping
