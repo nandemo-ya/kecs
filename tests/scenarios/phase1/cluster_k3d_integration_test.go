@@ -58,10 +58,10 @@ var _ = Describe("K3D Cluster Integration", Serial, func() {
 				}
 				Expect(found).To(BeTrue(), "Cluster should be present in list")
 
-				// Step 4: Wait a bit to ensure k3d cluster is fully initialized
-				// k3d cluster creation can take 20-30 seconds
-				logger.Info("Step 4: Waiting for k3d cluster to be fully initialized (30s)")
-				time.Sleep(30 * time.Second)
+				// Step 4: Wait for k3d cluster to be fully initialized
+				logger.Info("Step 4: Waiting for k3d cluster to be fully initialized")
+				err = utils.WaitForClusterReady(GinkgoT(), client, clusterName)
+				Expect(err).NotTo(HaveOccurred(), "Failed waiting for cluster to be ready")
 
 				// Step 5: Describe cluster again to verify it's still active
 				logger.Info("Step 5: Re-verifying cluster status after initialization")
@@ -75,8 +75,9 @@ var _ = Describe("K3D Cluster Integration", Serial, func() {
 				Expect(err).NotTo(HaveOccurred(), "Failed to delete k3d cluster")
 
 				// Step 7: Wait for k3d cluster deletion to complete
-				logger.Info("Step 7: Waiting for k3d cluster deletion to complete (10s)")
-				time.Sleep(10 * time.Second)
+				logger.Info("Step 7: Waiting for k3d cluster deletion to complete")
+				err = utils.WaitForClusterDeleted(GinkgoT(), client, clusterName, 30*time.Second)
+				Expect(err).NotTo(HaveOccurred(), "Failed waiting for cluster deletion")
 
 				// Step 8: Verify cluster is deleted via describe (the most important check)
 				logger.Info("Step 8: Verifying cluster is deleted via describe")
