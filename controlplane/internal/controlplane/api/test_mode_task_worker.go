@@ -3,9 +3,9 @@ package api
 import (
 	"context"
 	"log"
-	"os"
 	"time"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -27,7 +27,7 @@ func NewTestModeTaskWorker(storage storage.Storage) *TestModeTaskWorker {
 // Start begins the background task processing
 func (w *TestModeTaskWorker) Start(ctx context.Context) {
 	// Only run in test mode
-	if os.Getenv("KECS_TEST_MODE") != "true" {
+	if !config.GetBool("features.testMode") {
 		return
 	}
 

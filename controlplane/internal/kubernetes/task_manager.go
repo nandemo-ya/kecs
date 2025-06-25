@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -16,6 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
@@ -30,7 +30,7 @@ type TaskManager struct {
 // NewTaskManager creates a new task manager
 func NewTaskManager(storage storage.Storage) (*TaskManager, error) {
 	// In container mode, defer kubernetes client creation
-	if os.Getenv("KECS_CONTAINER_MODE") == "true" {
+	if config.GetBool("features.containerMode") {
 		log.Println("Container mode enabled - deferring kubernetes client initialization")
 		return &TaskManager{
 			clientset: nil, // Will be initialized later

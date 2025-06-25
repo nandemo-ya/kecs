@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
@@ -20,7 +20,7 @@ import (
 func (api *DefaultECSAPI) getServiceManager() (*kubernetes.ServiceManager, error) {
 	// In test mode, we can return a ServiceManager with nil cluster manager
 	// as the ServiceManager handles test mode internally
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if config.GetBool("features.testMode") {
 		return kubernetes.NewServiceManager(api.storage, nil), nil
 	}
 
@@ -159,7 +159,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	}
 
 	// Check if k3d cluster exists (but don't wait synchronously to avoid API timeout)
-	if os.Getenv("KECS_TEST_MODE") != "true" {
+	if !config.GetBool("features.testMode") {
 		clusterManager := api.getClusterManager()
 		if clusterManager != nil {
 			exists, err := clusterManager.ClusterExists(ctx, cluster.K8sClusterName)

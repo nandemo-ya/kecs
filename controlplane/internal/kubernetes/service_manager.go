@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -13,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -39,7 +39,7 @@ func (sm *ServiceManager) CreateService(
 	storageService *storage.Service,
 ) error {
 	// Check if running in test mode
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if config.GetBool("features.testMode") {
 		// In test mode, simulate service creation
 		log.Printf("TEST MODE: Simulated service creation for %s in namespace %s", storageService.ServiceName, deployment.Namespace)
 
@@ -133,7 +133,7 @@ func (sm *ServiceManager) UpdateService(
 	storageService *storage.Service,
 ) error {
 	// Check if running in test mode
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if config.GetBool("features.testMode") {
 		// In test mode, simulate service update
 		log.Printf("TEST MODE: Simulated service update for %s in namespace %s", storageService.ServiceName, deployment.Namespace)
 
@@ -257,7 +257,7 @@ func (sm *ServiceManager) DeleteService(
 	storageService *storage.Service,
 ) error {
 	// Check if running in test mode
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if config.GetBool("features.testMode") {
 		// In test mode, simulate service deletion
 		log.Printf("TEST MODE: Simulated service deletion for %s", storageService.ServiceName)
 
@@ -336,7 +336,7 @@ func (sm *ServiceManager) GetServiceStatus(
 	storageService *storage.Service,
 ) (*ServiceStatus, error) {
 	// Check if running in test mode
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if config.GetBool("features.testMode") {
 		// In test mode, return simulated status based on stored service data
 		log.Printf("TEST MODE: Returning simulated status for service %s", storageService.ServiceName)
 

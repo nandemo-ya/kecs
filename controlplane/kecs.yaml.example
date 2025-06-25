@@ -1,0 +1,94 @@
+# KECS Configuration File Example
+# This file demonstrates all available configuration options for KECS.
+# Copy this file to one of the following locations and rename to kecs.yaml:
+# - Current directory (.)
+# - $HOME/.kecs/
+# - /etc/kecs/
+#
+# Environment variables can override these settings using the KECS_ prefix.
+# For example: server.port can be overridden with KECS_SERVER_PORT
+
+# Server configuration
+server:
+  # API server port (default: 8080)
+  port: 8080
+  
+  # Admin server port for health checks and metrics (default: 8081)
+  adminPort: 8081
+  
+  # Data directory for persistent storage (default: ~/.kecs/data)
+  dataDir: ~/.kecs/data
+  
+  # Log level: debug, info, warn, error (default: info)
+  logLevel: info
+  
+  # Additional allowed origins for WebSocket CORS (comma-separated)
+  # Can be set via KECS_ALLOWED_ORIGINS environment variable
+  allowedOrigins: []
+  
+  # KECS endpoint URL (used by clients)
+  # Can be set via KECS_ENDPOINT environment variable
+  endpoint: ""
+
+# Kubernetes configuration
+kubernetes:
+  # Path to kubeconfig file (default: uses standard kubeconfig discovery)
+  # Can be set via KECS_KUBECONFIG_PATH environment variable
+  kubeconfigPath: ""
+  
+  # Enable optimized k3d cluster creation (default: false)
+  # Can be set via KECS_K3D_OPTIMIZED environment variable
+  k3dOptimized: false
+  
+  # Enable asynchronous k3d cluster creation (default: false)
+  # Can be set via KECS_K3D_ASYNC environment variable
+  k3dAsync: false
+  
+  # Disable CoreDNS in k3d clusters for faster startup (default: false)
+  # Can be set via KECS_DISABLE_COREDNS environment variable
+  disableCoreDNS: false
+  
+  # Keep k3d clusters running on shutdown (default: false)
+  # Can be set via KECS_KEEP_CLUSTERS_ON_SHUTDOWN environment variable
+  keepClustersOnShutdown: false
+
+# UI configuration
+ui:
+  # Base path for UI resources
+  # Can be set via KECS_UI_BASE_PATH environment variable
+  basePath: ""
+
+# Feature toggles
+features:
+  # Enable test mode - simulates Kubernetes operations (default: false)
+  # Can be set via KECS_TEST_MODE environment variable
+  testMode: false
+  
+  # Enable container mode - adjusts behavior for containerized environments (default: false)
+  # Can be set via KECS_CONTAINER_MODE environment variable
+  containerMode: false
+  
+  # Enable automatic state recovery on startup (default: false)
+  # Can be set via KECS_AUTO_RECOVER_STATE environment variable
+  autoRecoverState: false
+
+# AWS configuration
+aws:
+  # Default AWS region (default: us-east-1)
+  # Can be set via KECS_DEFAULT_REGION environment variable
+  defaultRegion: us-east-1
+  
+  # AWS account ID (default: 123456789012)
+  # Can be set via KECS_ACCOUNT_ID environment variable
+  accountID: "123456789012"
+  
+  # Custom AWS proxy image for sidecar mode
+  # Can be set via KECS_AWS_PROXY_IMAGE environment variable
+  proxyImage: ""
+
+# LocalStack configuration (optional)
+# See localstack documentation for more details
+localstack:
+  enabled: false
+  services: []
+  # Additional LocalStack configuration options...
