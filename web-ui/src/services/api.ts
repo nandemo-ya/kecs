@@ -59,9 +59,18 @@ import {
   DeleteAttributesResponse,
 } from '../types/api';
 
-// In development, use empty string to leverage proxy
-// In production, use full URL
-const API_BASE_URL = process.env.NODE_ENV === 'development' ? '' : 'http://localhost:8080';
+// Get API base URL from runtime config or environment
+const getApiBaseUrl = (): string => {
+  // Check runtime config first (for Docker deployments)
+  if (typeof window !== 'undefined' && (window as any).KECS_CONFIG?.API_ENDPOINT) {
+    return (window as any).KECS_CONFIG.API_ENDPOINT;
+  }
+  // In development, use empty string to leverage proxy
+  // In production, use full URL
+  return process.env.NODE_ENV === 'development' ? '' : 'http://localhost:8080';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 class KECSApiClient {
   private baseUrl: string;

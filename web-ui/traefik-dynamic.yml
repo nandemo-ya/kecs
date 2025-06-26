@@ -1,0 +1,76 @@
+# Traefik dynamic configuration
+http:
+  routers:
+    # API proxy router
+    api-router:
+      rule: "PathPrefix(`/v1/`)"
+      service: api-service
+      priority: 100
+      middlewares:
+        - api-headers
+
+    # WebSocket router
+    websocket-router:
+      rule: "Path(`/ws`)"
+      service: api-service
+      priority: 200
+      middlewares:
+        - websocket-headers
+
+    # Health check router
+    health-router:
+      rule: "Path(`/health`)"
+      service: health-service
+      priority: 300
+
+    # Static files router (default)
+    static-router:
+      rule: "PathPrefix(`/`)"
+      service: static-service
+      priority: 1
+      middlewares:
+        - spa-redirect
+
+  services:
+    # API backend service (dynamic - will be updated by entrypoint)
+    api-service:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:8080"  # Placeholder - will be replaced
+
+    # Health check service
+    health-service:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:3001/health"
+
+    # Static file service
+    static-service:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:3001"
+
+  middlewares:
+    # API headers middleware
+    api-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+        customResponseHeaders:
+          X-Content-Type-Options: "nosniff"
+          X-Frame-Options: "SAMEORIGIN"
+          X-XSS-Protection: "1; mode=block"
+
+    # WebSocket headers middleware
+    websocket-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+          Connection: "upgrade"
+          Upgrade: "websocket"
+
+    # SPA redirect middleware for React Router
+    spa-redirect:
+      replacePath:
+        regex: "^/(?!static/|favicon\\.ico|manifest\\.json|logo[0-9]+\\.png|config\\.js).*"
+        replacement: "/index.html"
