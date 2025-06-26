@@ -122,15 +122,23 @@ jobs:
             // Function to parse test timing from Ginkgo output
             function parseTestTiming(output) {
               const tests = [];
-              // Match pattern: • [0.523 seconds]
-              // Followed by test description on next line
-              const testPattern = /• \[(\d+\.?\d*) seconds?\]\n([^\n]+)/g;
+              // Match pattern: Context and test description followed by timing
+              // Example:
+              // Cluster CreateCluster 
+              //   should successfully create a new cluster
+              //   /path/to/file:line
+              // • [15.123 seconds]
+              const testPattern = /([^\n]+)\n\s+([^\n]+)\n\s+[^\n]+\n• (?:\[SLOW TEST\] )?\[(\d+\.?\d*) seconds?\]/gm;
               let match;
               
               while ((match = testPattern.exec(output)) !== null) {
+                const context = match[1].trim();
+                const description = match[2].trim();
+                const fullName = `${context} ${description}`;
+                
                 tests.push({
-                  duration: parseFloat(match[1]),
-                  name: match[2].trim()
+                  duration: parseFloat(match[3]),
+                  name: fullName
                 });
               }
               
@@ -336,6 +344,37 @@ jobs:
                 }
               });
               summary += '\n';
+              
+              // Detailed test results table
+              summary += '### 📊 Detailed Test Results\n\n';
+              summary += '<details>\n<summary>Click to expand all test results</summary>\n\n';
+              
+              phases.forEach(phase => {
+                if (phase.testTimings && phase.testTimings.length > 0) {
+                  summary += `\n#### ${phase.phase}\n\n`;
+                  summary += '| Test Name | Duration | Status |\n';
+                  summary += '|-----------|----------|--------|\n';
+                  
+                  // Sort tests by duration (slowest first)
+                  const sortedTests = [...phase.testTimings].sort((a, b) => b.duration - a.duration);
+                  
+                  sortedTests.forEach(test => {
+                    let durationIcon = '🚀';
+                    if (test.duration > 30) durationIcon = '🐌';
+                    else if (test.duration > 10) durationIcon = '🐢';
+                    else if (test.duration > 5) durationIcon = '⚡';
+                    
+                    // Truncate long test names
+                    const testName = test.name.length > 80 
+                      ? test.name.substring(0, 77) + '...' 
+                      : test.name;
+                    
+                    summary += `| ${testName} | ${durationIcon} ${test.duration.toFixed(2)}s | ✅ |\n`;
+                  });
+                }
+              });
+              
+              summary += '\n</details>\n\n';
             }
             
             // Add test details sections for each phase
