@@ -4,18 +4,19 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"strings"
+	"syscall"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
 	"github.com/spf13/cobra"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/runtime"
 )
 
 const (
@@ -34,13 +35,14 @@ var (
 	startLocalBuild    bool
 	startConfigFile    string
 	startAutoPort      bool
+	startRuntime       string
 )
 
 var startCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start KECS server in a Docker container",
-	Long: `Start KECS server in a Docker container running in the background.
-This allows you to run KECS without keeping a terminal session open.`,
+	Short: "Start KECS server in a container",
+	Long: `Start KECS server in a container running in the background.
+This command supports both Docker and containerd runtimes.`,
 	RunE: runStart,
 }
 
@@ -56,293 +58,378 @@ func init() {
 	startCmd.Flags().BoolVar(&startLocalBuild, "local-build", false, "Build and use local image")
 	startCmd.Flags().StringVar(&startConfigFile, "config", "", "Path to configuration file")
 	startCmd.Flags().BoolVar(&startAutoPort, "auto-port", false, "Automatically find available ports")
+	startCmd.Flags().StringVar(&startRuntime, "runtime", "", "Container runtime to use (docker, containerd, or auto)")
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	// Load configuration from file if specified
-	if startConfigFile != "" {
-		instancesConfig, err := LoadContainerConfig(startConfigFile)
-		if err != nil {
-			return fmt.Errorf("failed to load config file: %w", err)
-		}
-
-		// If no specific instance name is provided, use the default
-		if startContainerName == defaultContainerName && len(args) > 0 {
-			startContainerName = args[0]
-		} else if startContainerName == defaultContainerName {
-			startContainerName = instancesConfig.DefaultInstance
-		}
-
-		// Find the instance configuration
-		var instanceConfig *ContainerConfig
-		for _, inst := range instancesConfig.Instances {
-			if inst.Name == startContainerName {
-				instanceConfig = &inst
-				break
+	// Get runtime manager
+	manager := runtime.GetDefaultManager()
+	
+	// Set runtime if specified
+	if startRuntime != "" {
+		switch startRuntime {
+		case "docker":
+			if err := manager.UseDocker(); err != nil {
+				return fmt.Errorf("failed to use Docker runtime: %w", err)
 			}
-		}
-
-		if instanceConfig == nil {
-			return fmt.Errorf("instance '%s' not found in configuration file", startContainerName)
-		}
-
-		// Apply configuration from file
-		startImageName = instanceConfig.Image
-		startApiPort = instanceConfig.Ports.API
-		startAdminPort = instanceConfig.Ports.Admin
-		if instanceConfig.DataDir != "" {
-			startDataDir = instanceConfig.DataDir
+		case "containerd":
+			if err := manager.UseContainerd(""); err != nil {
+				return fmt.Errorf("failed to use containerd runtime: %w", err)
+			}
+		case "auto":
+			if err := manager.AutoDetect(); err != nil {
+				return fmt.Errorf("failed to auto-detect runtime: %w", err)
+			}
+		default:
+			return fmt.Errorf("unknown runtime: %s", startRuntime)
 		}
 	}
 
-	// Create Docker client
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	// Get runtime
+	rt, err := manager.GetRuntime()
 	if err != nil {
-		return fmt.Errorf("failed to create Docker client: %w", err)
-	}
-	defer cli.Close()
-
-	// Check if Docker daemon is running
-	if _, err := cli.Ping(ctx); err != nil {
-		return fmt.Errorf("Docker daemon is not running: %w", err)
+		return fmt.Errorf("failed to get container runtime: %w", err)
 	}
 
-	// Check for port conflicts if auto-port is enabled
-	if startAutoPort {
-		usedPorts, err := getUsedPorts(ctx, cli)
-		if err != nil {
-			return fmt.Errorf("failed to get used ports: %w", err)
-		}
-
-		// Find available ports
-		if availableApiPort := findAvailablePort(startApiPort, usedPorts); availableApiPort != -1 {
-			startApiPort = availableApiPort
-		} else {
-			return fmt.Errorf("no available API port found starting from %d", startApiPort)
-		}
-
-		if availableAdminPort := findAvailablePort(startAdminPort, usedPorts); availableAdminPort != -1 {
-			startAdminPort = availableAdminPort
-		} else {
-			return fmt.Errorf("no available admin port found starting from %d", startAdminPort)
-		}
-
-		fmt.Printf("Auto-assigned ports: API=%d, Admin=%d\n", startApiPort, startAdminPort)
-	} else {
-		// Check if specified ports are available
-		if !isPortAvailable(startApiPort) {
-			return fmt.Errorf("API port %d is already in use", startApiPort)
-		}
-		if !isPortAvailable(startAdminPort) {
-			return fmt.Errorf("Admin port %d is already in use", startAdminPort)
-		}
-	}
+	fmt.Printf("Using container runtime: %s\n", rt.Name())
 
 	// Check if container already exists
-	filters := filters.NewArgs()
-	filters.Add("name", startContainerName)
-	containers, err := cli.ContainerList(ctx, container.ListOptions{
-		All:     true,
-		Filters: filters,
+	containers, err := rt.ListContainers(ctx, runtime.ListContainersOptions{
+		All:   true,
+		Names: []string{startContainerName},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
 
 	if len(containers) > 0 {
-		containerInfo := containers[0]
-		if containerInfo.State == "running" {
-			fmt.Printf("KECS container '%s' is already running on ports %d (API) and %d (admin)\n", 
-				startContainerName, startApiPort, startAdminPort)
+		container := containers[0]
+		if container.State == "running" {
+			fmt.Printf("KECS server '%s' is already running\n", startContainerName)
+			fmt.Printf("API endpoint: http://localhost:%d\n", startApiPort)
+			fmt.Printf("Admin endpoint: http://localhost:%d\n", startAdminPort)
 			return nil
 		}
 
-		// Start stopped container
-		fmt.Printf("Starting existing KECS container '%s'...\n", startContainerName)
-		if err := cli.ContainerStart(ctx, containerInfo.ID, container.StartOptions{}); err != nil {
-			return fmt.Errorf("failed to start container: %w", err)
+		// Remove the stopped container
+		fmt.Printf("Removing existing container '%s'...\n", startContainerName)
+		if err := rt.RemoveContainer(ctx, container.ID, true); err != nil {
+			return fmt.Errorf("failed to remove existing container: %w", err)
 		}
+	}
+
+	// Set up data directory
+	if startDataDir == "" {
+		home, _ := os.UserHomeDir()
+		startDataDir = filepath.Join(home, ".kecs", "data")
+	}
+
+	// Expand tilde in path
+	if strings.HasPrefix(startDataDir, "~") {
+		home, _ := os.UserHomeDir()
+		startDataDir = filepath.Join(home, startDataDir[1:])
+	}
+
+	// Convert to absolute path
+	absDataDir, err := filepath.Abs(startDataDir)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	// Create data directory if it doesn't exist
+	if err := os.MkdirAll(absDataDir, 0755); err != nil {
+		return fmt.Errorf("failed to create data directory: %w", err)
+	}
+
+	// Auto-assign ports if requested
+	if startAutoPort {
+		// Try to find available ports starting from the specified ones
+		availablePorts, err := findAvailablePorts(startApiPort, startAdminPort, make(map[int]string))
+		if err != nil {
+			return fmt.Errorf("failed to find available ports: %w", err)
+		}
+		startApiPort = availablePorts[0]
+		startAdminPort = availablePorts[1]
+		fmt.Printf("Auto-assigned ports - API: %d, Admin: %d\n", startApiPort, startAdminPort)
 	} else {
-		// Build local image if requested
-		if startLocalBuild {
-			fmt.Println("Building local KECS image...")
-			if err := buildLocalImage(); err != nil {
-				return fmt.Errorf("failed to build local image: %w", err)
-			}
-			startImageName = "kecs:local"
-		}
-
-		// Pull image if not using local build
-		if !startLocalBuild {
-			fmt.Printf("Pulling image %s...\n", startImageName)
-			reader, err := cli.ImagePull(ctx, startImageName, image.PullOptions{})
-			if err != nil {
-				return fmt.Errorf("failed to pull image: %w", err)
-			}
-			defer reader.Close()
-			io.Copy(io.Discard, reader)
-		}
-
-		// Create container
-		if err := createAndStartContainer(ctx, cli); err != nil {
+		// Check if ports are available
+		if err := checkPortsAvailable(startApiPort, startAdminPort); err != nil {
 			return err
 		}
 	}
 
-	// Wait for health check
-	fmt.Printf("Waiting for KECS to be ready...\n")
-	if err := waitForHealthCheck(ctx, cli); err != nil {
-		return fmt.Errorf("health check failed: %w", err)
-	}
-
-	fmt.Printf("KECS started successfully!\n")
-	fmt.Printf("API endpoint: http://localhost:%d\n", startApiPort)
-	fmt.Printf("Admin endpoint: http://localhost:%d\n", startAdminPort)
-	fmt.Printf("Web UI: http://localhost:%d\n", startApiPort)
-	
-	return nil
-}
-
-func createAndStartContainer(ctx context.Context, cli *client.Client) error {
-	// Set up data directory
-	if startDataDir == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("failed to get home directory: %w", err)
+	// Build local image if requested
+	imageName := startImageName
+	if startLocalBuild {
+		fmt.Println("Building local image...")
+		if err := buildLocalImage(); err != nil {
+			return fmt.Errorf("failed to build local image: %w", err)
 		}
-		startDataDir = filepath.Join(homeDir, ".kecs", "data")
+		imageName = "kecs:local"
 	}
 
-	// Ensure data directory exists
-	if err := os.MkdirAll(startDataDir, 0755); err != nil {
-		return fmt.Errorf("failed to create data directory: %w", err)
+	// Pull image if not local build
+	if !startLocalBuild {
+		fmt.Printf("Pulling image %s...\n", imageName)
+		reader, err := rt.PullImage(ctx, imageName, runtime.PullImageOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to pull image: %w", err)
+		}
+		defer reader.Close()
+		io.Copy(io.Discard, reader)
 	}
 
-	// Container configuration
-	config := &container.Config{
-		Image: startImageName,
-		ExposedPorts: nat.PortSet{
-			nat.Port(fmt.Sprintf("%d/tcp", startApiPort)):   struct{}{},
-			nat.Port(fmt.Sprintf("%d/tcp", startAdminPort)): struct{}{},
-		},
-		Env: []string{
-			"KECS_CONTAINER_MODE=true",
-			"KECS_DATA_DIR=/data",
-			fmt.Sprintf("KECS_API_PORT=%d", startApiPort),
-			fmt.Sprintf("KECS_ADMIN_PORT=%d", startAdminPort),
-		},
+	// Prepare environment variables
+	env := []string{
+		"KECS_CONTAINER_MODE=true",
+		fmt.Sprintf("KECS_DATA_DIR=%s", "/data"),
+		"KECS_LOG_LEVEL=info",
+	}
+
+	// Add config file if specified
+	configMount := []runtime.Mount{}
+	if startConfigFile != "" {
+		absConfigPath, err := filepath.Abs(startConfigFile)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute config path: %w", err)
+		}
+		env = append(env, "KECS_CONFIG_FILE=/config/kecs.yaml")
+		configMount = append(configMount, runtime.Mount{
+			Type:   "bind",
+			Source: absConfigPath,
+			Target: "/config/kecs.yaml",
+			ReadOnly: true,
+		})
+	}
+
+	// Create container configuration
+	containerConfig := &runtime.ContainerConfig{
+		Name:  startContainerName,
+		Image: imageName,
+		Env:   env,
 		Labels: map[string]string{
-			"app":       "kecs",
-			"api-port":  fmt.Sprintf("%d", startApiPort),
-			"admin-port": fmt.Sprintf("%d", startAdminPort),
-			"instance":   startContainerName,
+			"com.kecs.managed": "true",
+			"com.kecs.name":    startContainerName,
 		},
-	}
-
-	// Host configuration
-	hostConfig := &container.HostConfig{
-		PortBindings: nat.PortMap{
-			nat.Port(fmt.Sprintf("%d/tcp", 8080)): []nat.PortBinding{{HostPort: fmt.Sprintf("%d", startApiPort)}},
-			nat.Port(fmt.Sprintf("%d/tcp", 8081)): []nat.PortBinding{{HostPort: fmt.Sprintf("%d", startAdminPort)}},
-		},
-		Mounts: []mount.Mount{
+		Ports: []runtime.PortBinding{
 			{
-				Type:   mount.TypeBind,
-				Source: startDataDir,
-				Target: "/data",
+				ContainerPort: 8080,
+				HostPort:      uint16(startApiPort),
+				Protocol:      "tcp",
+				HostIP:        "0.0.0.0",
+			},
+			{
+				ContainerPort: 8081,
+				HostPort:      uint16(startAdminPort),
+				Protocol:      "tcp",
+				HostIP:        "0.0.0.0",
 			},
 		},
-		RestartPolicy: container.RestartPolicy{
+		Mounts: append([]runtime.Mount{
+			{
+				Type:   "bind",
+				Source: absDataDir,
+				Target: "/data",
+			},
+			{
+				Type:   "bind",
+				Source: "/var/run/docker.sock",
+				Target: "/var/run/docker.sock",
+			},
+		}, configMount...),
+		RestartPolicy: runtime.RestartPolicy{
 			Name: "unless-stopped",
+		},
+		HealthCheck: &runtime.HealthCheck{
+			Test:        []string{"CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"},
+			Interval:    30 * time.Second,
+			Timeout:     10 * time.Second,
+			StartPeriod: 10 * time.Second,
+			Retries:     3,
 		},
 	}
 
-	// Create container
-	fmt.Printf("Creating KECS container '%s'...\n", startContainerName)
-	resp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, startContainerName)
+	// Create the container
+	fmt.Printf("Creating KECS server container...\n")
+	container, err := rt.CreateContainer(ctx, containerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create container: %w", err)
 	}
 
-	// Start container
-	fmt.Printf("Starting KECS container...\n")
-	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+	// Start the container
+	fmt.Printf("Starting KECS server...\n")
+	if err := rt.StartContainer(ctx, container.ID); err != nil {
 		return fmt.Errorf("failed to start container: %w", err)
 	}
 
-	return nil
-}
+	fmt.Printf("KECS server '%s' started successfully\n", startContainerName)
+	fmt.Printf("API endpoint: http://localhost:%d\n", startApiPort)
+	fmt.Printf("Admin endpoint: http://localhost:%d\n", startAdminPort)
+	fmt.Printf("Data directory: %s\n", absDataDir)
 
-func waitForHealthCheck(ctx context.Context, cli *client.Client) error {
-	start := time.Now()
-	for {
-		if time.Since(start) > healthCheckTimeout {
-			return fmt.Errorf("timeout waiting for KECS to be ready")
-		}
-
-		// Get container info
-		filters := filters.NewArgs()
-		filters.Add("name", startContainerName)
-		containers, err := cli.ContainerList(ctx, container.ListOptions{
-			Filters: filters,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to list containers: %w", err)
-		}
-
-		if len(containers) == 0 {
-			return fmt.Errorf("container not found")
-		}
-
-		// Check if container is running
-		if containers[0].State != "running" {
-			return fmt.Errorf("container is not running")
-		}
-
-		// Check admin health endpoint
-		cmd := exec.Command("curl", "-s", "-f", fmt.Sprintf("http://localhost:%d/health", startAdminPort))
-		if err := cmd.Run(); err == nil {
-			return nil
-		}
-
-		time.Sleep(1 * time.Second)
+	// Wait for server to be ready
+	fmt.Print("Waiting for server to be ready...")
+	if err := waitForServerReady(fmt.Sprintf("http://localhost:%d/health", startAdminPort), healthCheckTimeout); err != nil {
+		fmt.Println(" timeout!")
+		fmt.Println("Server may still be starting. Check logs with: kecs logs")
+		return nil
 	}
+	fmt.Println(" ready!")
+
+	// If not detached, wait for signals
+	if !startDetach {
+		fmt.Println("\nRunning in foreground mode. Press Ctrl+C to stop...")
+
+		// Set up signal handling
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+		// Wait for signal
+		<-sigChan
+
+		fmt.Println("\nReceived interrupt signal, stopping container...")
+		timeout := 10
+		if err := rt.StopContainer(ctx, container.ID, &timeout); err != nil {
+			return fmt.Errorf("failed to stop container: %w", err)
+		}
+
+		if err := rt.RemoveContainer(ctx, container.ID, false); err != nil {
+			return fmt.Errorf("failed to remove container: %w", err)
+		}
+
+		fmt.Println("Container stopped and removed")
+	}
+
+	return nil
 }
 
 func buildLocalImage() error {
-	// Get the directory of the current executable
+	// Determine the path to the controlplane directory
 	execPath, err := os.Executable()
 	if err != nil {
-		return fmt.Errorf("failed to get executable path: %w", err)
-	}
-	
-	// Navigate to the project root (assuming binary is in bin/ directory)
-	binDir := filepath.Dir(execPath)
-	projectRoot := filepath.Dir(binDir)
-	
-	// Check if Dockerfile exists in the project root
-	dockerfilePath := filepath.Join(projectRoot, "Dockerfile")
-	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
-		// Try controlplane directory
-		dockerfilePath = filepath.Join(projectRoot, "controlplane", "Dockerfile")
-		if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
-			return fmt.Errorf("Dockerfile not found in project root or controlplane directory")
+		// Fallback: try to find the directory relative to current directory
+		if _, err := os.Stat("Dockerfile"); err == nil {
+			// We're already in the controlplane directory
+			cmd := exec.Command("docker", "build", "-t", "kecs:local", ".")
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			return cmd.Run()
 		}
-		projectRoot = filepath.Join(projectRoot, "controlplane")
+		// Try parent directory
+		if _, err := os.Stat("controlplane/Dockerfile"); err == nil {
+			cmd := exec.Command("docker", "build", "-t", "kecs:local", "controlplane")
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			return cmd.Run()
+		}
+		return fmt.Errorf("cannot find Dockerfile")
 	}
 
-	// Run docker build
-	cmd := exec.Command("docker", "build", "-t", "kecs:local", "-f", "Dockerfile", ".")
-	cmd.Dir = projectRoot
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Navigate from the binary location to find the source directory
+	dir := filepath.Dir(execPath)
+	for {
+		// Check if we found the controlplane directory
+		dockerfilePath := filepath.Join(dir, "controlplane", "Dockerfile")
+		if _, err := os.Stat(dockerfilePath); err == nil {
+			cmd := exec.Command("docker", "build", "-t", "kecs:local", filepath.Join(dir, "controlplane"))
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			return cmd.Run()
+		}
 
-	fmt.Printf("Building Docker image from %s...\n", projectRoot)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to build Docker image: %w", err)
+		// Check if we're in the controlplane directory
+		dockerfilePath = filepath.Join(dir, "Dockerfile")
+		if _, err := os.Stat(dockerfilePath); err == nil {
+			cmd := exec.Command("docker", "build", "-t", "kecs:local", dir)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			return cmd.Run()
+		}
+
+		// Move up one directory
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// We've reached the root
+			break
+		}
+		dir = parent
 	}
 
+	return fmt.Errorf("cannot find Dockerfile in any parent directory")
+}
+
+// Helper functions
+
+func waitForServerReady(url string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	for time.Now().Before(deadline) {
+		resp, err := client.Get(url)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	return fmt.Errorf("server did not become ready within %v", timeout)
+}
+
+func checkPortsAvailable(apiPort, adminPort int) error {
+	ports := []int{apiPort, adminPort}
+	for _, port := range ports {
+		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		if err != nil {
+			return fmt.Errorf("port %d is already in use", port)
+		}
+		ln.Close()
+	}
 	return nil
+}
+
+func findAvailablePorts(startApiPort, startAdminPort int, usedPorts map[int]string) ([]int, error) {
+	var ports []int
+	
+	// Try to find available API port
+	apiPort := startApiPort
+	for i := 0; i < 100; i++ {
+		if _, used := usedPorts[apiPort]; !used {
+			ln, err := net.Listen("tcp", fmt.Sprintf(":%d", apiPort))
+			if err == nil {
+				ln.Close()
+				ports = append(ports, apiPort)
+				break
+			}
+		}
+		apiPort++
+	}
+	
+	if len(ports) == 0 {
+		return nil, fmt.Errorf("no available API port found starting from %d", startApiPort)
+	}
+	
+	// Try to find available admin port
+	adminPort := startAdminPort
+	for i := 0; i < 100; i++ {
+		if _, used := usedPorts[adminPort]; !used && adminPort != ports[0] {
+			ln, err := net.Listen("tcp", fmt.Sprintf(":%d", adminPort))
+			if err == nil {
+				ln.Close()
+				ports = append(ports, adminPort)
+				break
+			}
+		}
+		adminPort++
+	}
+	
+	if len(ports) == 1 {
+		return nil, fmt.Errorf("no available admin port found starting from %d", startAdminPort)
+	}
+	
+	return ports, nil
 }
