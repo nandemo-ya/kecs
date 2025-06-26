@@ -18,6 +18,23 @@
 
 </div>
 
+## ⚠️ Important Disclaimer
+
+**KECS is designed exclusively for local development and CI environments.**
+
+### Supported Environments
+✅ Local development machines  
+✅ CI/CD pipelines (GitHub Actions, GitLab CI, etc.)  
+✅ Isolated test environments  
+
+### NOT Supported
+❌ Production environments  
+❌ Public-facing deployments  
+❌ Multi-tenant systems  
+❌ Any environment with untrusted users  
+
+**Security Notice**: KECS requires Docker daemon access to manage local Kubernetes clusters (k3d). This level of access is equivalent to root privileges. Only run KECS in trusted environments.
+
 ## Overview
 
 KECS (Kubernetes-based ECS Compatible Service) is a standalone service that provides Amazon ECS compatible APIs running on Kubernetes. It enables a fully local ECS-compatible environment that operates independently of AWS environments.
@@ -85,6 +102,24 @@ docker pull ghcr.io/nandemo-ya/kecs:latest
 ```
 
 ## Usage
+
+### Required Permissions
+
+KECS requires the following permissions to function properly:
+
+- **Docker Socket Access**: When running in a container, mount `/var/run/docker.sock`
+- **Network Ports**: Default ports 8080 (API) and 8081 (Admin)
+- **Local Storage**: For data persistence (default: `~/.kecs/data`)
+
+```bash
+# Container mode requires Docker socket mounting
+docker run -v /var/run/docker.sock:/var/run/docker.sock \
+           -p 8080:8080 -p 8081:8081 \
+           ghcr.io/nandemo-ya/kecs:latest
+
+# Binary mode requires Docker to be installed and accessible
+kecs server
+```
 
 ### Container Commands
 
@@ -340,6 +375,26 @@ KECS provides ECS-compatible API endpoints:
 - Architectural Decision Records (ADRs) are stored in the `docs/adr/records` directory
 - API documentation is available in the `docs/api` directory
 - For more detailed documentation, visit our [documentation site](https://nandemo-ya.github.io/kecs/)
+
+## Security Considerations
+
+KECS is a development tool that requires elevated permissions:
+
+1. **Docker Daemon Access**: KECS needs access to the Docker daemon to create and manage k3d clusters. This is equivalent to root access on Linux systems.
+
+2. **Network Access**: KECS creates virtual networks and exposes ports for service communication.
+
+3. **Not for Production**: KECS is explicitly NOT designed for production use. It lacks the security features required for multi-tenant or public-facing deployments.
+
+### Comparison with Similar Tools
+
+| Tool | Purpose | Required Permissions |
+|------|---------|---------------------|
+| Docker Desktop | Container runtime | Root/Admin privileges |
+| kind | Local Kubernetes | Docker socket access |
+| k3d | Local k3s clusters | Docker socket access |
+| LocalStack | AWS service emulation | Network ports |
+| **KECS** | ECS emulation | Docker socket + Network ports |
 
 ## License
 
