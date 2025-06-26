@@ -35,7 +35,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go build -ldflags="-s -w" -o controlplane ./cmd/controlplane
 
 # Stage 3: Final image - use debian slim for docker-cli support
-FROM debian:12-slim
+FROM debian:stable-slim
 
 # Install docker-cli and required utilities
 RUN apt-get update && apt-get install -y \
