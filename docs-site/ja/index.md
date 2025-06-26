@@ -40,36 +40,36 @@ import { onMounted } from 'vue'
   <h2 class="section-title">スケールでのパフォーマンス</h2>
   <p class="section-subtitle">KECS はコンテナ化されたワークロードに対してプロダクショングレードのパフォーマンスを提供します</p>
   
-  <MetricsCard :metrics='[
+  <MetricsCard :metrics="[
     {
-      icon: "⚡",
+      icon: '⚡',
       value: 1000,
-      suffix: "+",
-      label: "クラスターあたりのタスク数",
-      description: "数千の同時実行タスクを簡単に処理"
+      suffix: '+',
+      label: 'クラスターあたりのタスク数',
+      description: '数千の同時実行タスクを簡単に処理'
     },
     {
-      icon: "🚄",
+      icon: '🚄',
       value: 50,
-      suffix: "ms",
-      label: "API レスポンスタイム",
-      description: "シームレスな操作のための超高速 API レスポンス"
+      suffix: 'ms',
+      label: 'API レスポンスタイム',
+      description: 'シームレスな操作のための超高速 API レスポンス'
     },
     {
-      icon: "💾",
+      icon: '💾',
       value: 99.9,
-      suffix: "%",
-      label: "データ耐久性",
-      description: "DuckDB ストレージによる信頼性の高い永続化"
+      suffix: '%',
+      label: 'データ耐久性',
+      description: 'DuckDB ストレージによる信頼性の高い永続化'
     },
     {
-      icon: "🔄",
+      icon: '🔄',
       value: 0,
-      suffix: "",
-      label: "ゼロダウンタイム",
-      description: "グレースフルな更新とローリングデプロイメント"
+      suffix: '',
+      label: 'ゼロダウンタイム',
+      description: 'グレースフルな更新とローリングデプロイメント'
     }
-  ]' />
+  ]" />
 </div>
 
 <!-- インタラクティブデモセクション -->

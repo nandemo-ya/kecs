@@ -40,36 +40,36 @@ import { onMounted } from 'vue'
   <h2 class="section-title">Performance at Scale</h2>
   <p class="section-subtitle">KECS delivers production-grade performance for your containerized workloads</p>
   
-  <MetricsCard :metrics='[
+  <MetricsCard :metrics="[
     {
-      icon: "⚡",
+      icon: '⚡',
       value: 1000,
-      suffix: "+",
-      label: "Tasks per Cluster",
-      description: "Handle thousands of concurrent tasks with ease"
+      suffix: '+',
+      label: 'Tasks per Cluster',
+      description: 'Handle thousands of concurrent tasks with ease'
     },
     {
-      icon: "🚄",
+      icon: '🚄',
       value: 50,
-      suffix: "ms",
-      label: "API Response Time",
-      description: "Lightning-fast API responses for seamless operations"
+      suffix: 'ms',
+      label: 'API Response Time',
+      description: 'Lightning-fast API responses for seamless operations'
     },
     {
-      icon: "💾",
+      icon: '💾',
       value: 99.9,
-      suffix: "%",
-      label: "Data Durability",
-      description: "Reliable persistence with DuckDB storage"
+      suffix: '%',
+      label: 'Data Durability',
+      description: 'Reliable persistence with DuckDB storage'
     },
     {
-      icon: "🔄",
+      icon: '🔄',
       value: 0,
-      suffix: "",
-      label: "Zero Downtime",
-      description: "Graceful updates and rolling deployments"
+      suffix: '',
+      label: 'Zero Downtime',
+      description: 'Graceful updates and rolling deployments'
     }
-  ]' />
+  ]" />
 </div>
 
 <!-- Interactive Demo Section -->
