@@ -169,7 +169,10 @@ jobs:
               // Remove ANSI color codes before parsing
               const cleanOutput = testOutput.replace(/\x1b\[[0-9;]*m/g, '');
               
-              const summaryMatch = cleanOutput.match(/Ran (\d+) of (\d+) Specs in ([\d.]+)s/);
+              const summaryMatch = cleanOutput.match(/Ran (\d+) of (\d+) Specs in ([\d.]+)\s*(?:seconds?|s)/);
+              // Fallback: Try to get total specs from "Will run X of Y specs"
+              const willRunMatch = cleanOutput.match(/Will run (\d+) of (\d+) specs/);
+              
               // Look for the summary line pattern: "X Passed | Y Failed | Z Pending | W Skipped"
               const summaryLine = cleanOutput.match(/(\d+) Passed.*?(\d+) Failed.*?(\d+) Pending.*?(\d+) Skipped/);
               
@@ -191,10 +194,25 @@ jobs:
               const testTimings = parseTestTiming(cleanOutput);
               const phaseStats = calculatePhaseStats(testTimings);
               
+              // Calculate total and ran values
+              let total = 0, ran = 0;
+              if (summaryMatch) {
+                ran = parseInt(summaryMatch[1]);
+                total = parseInt(summaryMatch[2]);
+              } else if (willRunMatch) {
+                // If we couldn't parse the summary but have "Will run", use that for total
+                total = parseInt(willRunMatch[2]);
+                // For ran, sum up all the results
+                ran = (passedMatch ? parseInt(passedMatch[1]) : 0) + 
+                      (failedMatch ? parseInt(failedMatch[1]) : 0) + 
+                      (pendingMatch ? parseInt(pendingMatch[1]) : 0) + 
+                      (skippedMatch ? parseInt(skippedMatch[1]) : 0);
+              }
+              
               const result = {
                 phase: phaseName,
-                total: summaryMatch ? parseInt(summaryMatch[2]) : 0,
-                ran: summaryMatch ? parseInt(summaryMatch[1]) : 0,
+                total: total,
+                ran: ran,
                 passed: passedMatch ? parseInt(passedMatch[1]) : 0,
                 failed: failedMatch ? parseInt(failedMatch[1]) : 0,
                 pending: pendingMatch ? parseInt(pendingMatch[1]) : 0,
