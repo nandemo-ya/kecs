@@ -125,7 +125,10 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	if EnableWebUI() && GetWebUIFS != nil {
 		if fs := GetWebUIFS(); fs != nil {
 			s.webUIHandler = NewWebUIHandler(fs)
+			log.Println("Web UI enabled")
 		}
+	} else {
+		log.Println("Web UI disabled")
 	}
 
 	// Initialize test mode worker if in test mode

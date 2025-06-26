@@ -74,7 +74,9 @@ KECS implements a clean architecture with the following key components:
 ### Dual Server Design
 - **API Server (port 8080)**: Handles ECS-compatible API requests at `/v1/<action>` endpoints
 - **Admin Server (port 8081)**: Provides operational endpoints like `/health`
-- **Web UI (embedded)**: React-based dashboard served at `/` (when enabled)
+- **Web UI (embedded)**: React-based dashboard served at `/ui` (when enabled)
+  - Can be disabled with `--no-webui` flag or `KECS_WEBUI_ENABLED=false`
+  - Saves resources when running in API-only mode
 
 ### Directory Structure
 - `cmd/controlplane/`: Entry point for the control plane binary
@@ -113,6 +115,7 @@ KECS includes a modern React/TypeScript Web UI for managing ECS resources:
 - **Real-time Updates**: WebSocket integration for live status updates
 - **Visualization**: Service topology, metrics charts, log viewer
 - **Responsive Design**: Works on desktop and mobile devices
+- **Optional**: Can be disabled for API-only deployments to save resources
 
 ### Web UI Build Process
 ```bash

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"path"
 	"strings"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 )
 
 // WebUIHandler handles serving the Web UI static files and WebSocket connections
@@ -134,8 +136,14 @@ func (h *WebUIHandler) setContentType(w http.ResponseWriter, path string) {
 
 // EnableWebUI checks if the Web UI should be enabled
 func EnableWebUI() bool {
-	// Can be controlled by environment variable
-	return true
+	// Check configuration for Web UI enabled state
+	// Using direct import to avoid circular dependency
+	cfg := config.GetConfig()
+	if cfg != nil {
+		return cfg.UI.Enabled
+	}
+	// Default to enabled if config is not available
+	return config.GetBool("ui.enabled")
 }
 
 // GetWebUIFS returns the embedded Web UI file system

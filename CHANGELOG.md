@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Data persistence through volume mounts
   - Local build support with `--local-build` flag
   - Container labeling for better identification
+- Web UI configuration options (#253 Phase 1)
+  - `--no-webui` flag to disable Web UI
+  - `KECS_WEBUI_ENABLED` environment variable
+  - Configurable via `ui.enabled` in config file
+  - Improves resource usage and startup time when UI not needed
 
 ### Changed
 
