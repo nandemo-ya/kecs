@@ -2,10 +2,13 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -31,18 +34,18 @@ func (w *TestModeTaskWorker) Start(ctx context.Context) {
 		return
 	}
 
-	// Check every 500ms for fast test execution
-	w.ticker = time.NewTicker(500 * time.Millisecond)
+	// Check every 100ms for fast test execution
+	w.ticker = time.NewTicker(100 * time.Millisecond)
 
 	go func() {
-		log.Println("Starting test mode task worker")
+		log.Println("Test mode task worker: Started successfully, checking tasks every 100ms")
 		for {
 			select {
 			case <-ctx.Done():
-				log.Println("Test mode task worker stopping due to context cancellation")
+				log.Println("Test mode task worker: Stopping due to context cancellation")
 				return
 			case <-w.done:
-				log.Println("Test mode task worker stopping")
+				log.Println("Test mode task worker: Stopping")
 				return
 			case <-w.ticker.C:
 				w.processTasks(ctx)
@@ -64,6 +67,7 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 	// Get all clusters first
 	clusters, err := w.storage.ClusterStore().List(ctx)
 	if err != nil {
+		log.Printf("Test mode worker: Failed to list clusters: %v", err)
 		return
 	}
 
@@ -75,7 +79,12 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 		}
 		tasks, err := w.storage.TaskStore().List(ctx, cluster.ARN, filters)
 		if err != nil {
+			log.Printf("Test mode worker: Failed to list tasks for cluster %s: %v", cluster.Name, err)
 			continue
+		}
+		
+		if len(tasks) > 0 {
+			log.Printf("Test mode worker: Processing %d tasks for cluster %s", len(tasks), cluster.Name)
 		}
 
 		for _, task := range tasks {
@@ -91,7 +100,9 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 			switch task.LastStatus {
 			case "PROVISIONING":
 				// Move to PENDING after a short delay
-				if time.Since(task.CreatedAt) > 100*time.Millisecond {
+				timeSinceCreated := time.Since(task.CreatedAt)
+				if timeSinceCreated > 50*time.Millisecond {
+					log.Printf("Test mode worker: Task %s transitioning from PROVISIONING to PENDING (age: %v)", task.ID, timeSinceCreated)
 					task.LastStatus = "PENDING"
 					updated = true
 				}
@@ -99,15 +110,26 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 			case "PENDING":
 				// Move to RUNNING after another short delay
 				// Check against CreatedAt since we don't have UpdatedAt
-				if time.Since(task.CreatedAt) > 200*time.Millisecond {
+				timeSinceCreated := time.Since(task.CreatedAt)
+				if timeSinceCreated > 100*time.Millisecond {
+					log.Printf("Test mode worker: Task %s transitioning from PENDING to RUNNING (age: %v)", task.ID, timeSinceCreated)
 					task.LastStatus = "RUNNING"
 					task.StartedAt = &now
 					task.PullStartedAt = &now
 					task.PullStoppedAt = &now
 
-					// Set container status
-					// Note: This is a simple container status - actual implementation would parse task definition
-					task.Containers = `[{"containerArn":"` + task.ARN + `/container-1","taskArn":"` + task.ARN + `","name":"app","lastStatus":"RUNNING","cpu":"256","memory":"512"}]`
+					// Update container status to RUNNING
+					// Parse existing containers JSON and update status
+					var containers []generated.Container
+					if err := json.Unmarshal([]byte(task.Containers), &containers); err == nil && len(containers) > 0 {
+						// Update all containers to RUNNING
+						for i := range containers {
+							containers[i].LastStatus = ptr.String("RUNNING")
+						}
+						if updatedContainersJSON, err := json.Marshal(containers); err == nil {
+							task.Containers = string(updatedContainersJSON)
+						}
+					}
 					updated = true
 				}
 
@@ -122,8 +144,18 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 					}
 					task.StopCode = "TaskStoppedByUser"
 
-					// Update container status
-					task.Containers = `[{"containerArn":"` + task.ARN + `/container-1","taskArn":"` + task.ARN + `","name":"app","lastStatus":"STOPPED","exitCode":0,"cpu":"256","memory":"512"}]`
+					// Update container status to STOPPED
+					var containers []generated.Container
+					if err := json.Unmarshal([]byte(task.Containers), &containers); err == nil && len(containers) > 0 {
+						// Update all containers to STOPPED
+						for i := range containers {
+							containers[i].LastStatus = ptr.String("STOPPED")
+							containers[i].ExitCode = ptr.Int32(0)
+						}
+						if updatedContainersJSON, err := json.Marshal(containers); err == nil {
+							task.Containers = string(updatedContainersJSON)
+						}
+					}
 					updated = true
 				} else {
 					// For short-lived tasks (like echo commands), auto-stop after a brief period
@@ -136,8 +168,18 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 						task.StoppedReason = "Essential container in task exited"
 						task.StopCode = "EssentialContainerExited"
 
-						// Set exit code 0 for successful completion
-						task.Containers = `[{"containerArn":"` + task.ARN + `/container-1","taskArn":"` + task.ARN + `","name":"app","lastStatus":"STOPPED","exitCode":0,"cpu":"256","memory":"512"}]`
+						// Update container status to STOPPED with exit code 0
+						var containers []generated.Container
+						if err := json.Unmarshal([]byte(task.Containers), &containers); err == nil && len(containers) > 0 {
+							// Update all containers to STOPPED
+							for i := range containers {
+								containers[i].LastStatus = ptr.String("STOPPED")
+								containers[i].ExitCode = ptr.Int32(0)
+							}
+							if updatedContainersJSON, err := json.Marshal(containers); err == nil {
+								task.Containers = string(updatedContainersJSON)
+							}
+						}
 						updated = true
 					}
 				}
@@ -147,7 +189,9 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 			if updated {
 				task.Version++
 				if err := w.storage.TaskStore().Update(ctx, task); err != nil {
-					log.Printf("Failed to update task %s: %v", task.ID, err)
+					log.Printf("Test mode worker: Failed to update task %s: %v", task.ID, err)
+				} else {
+					log.Printf("Test mode worker: Successfully updated task %s to status %s", task.ID, task.LastStatus)
 				}
 			}
 		}
