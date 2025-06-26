@@ -19,6 +19,8 @@ import (
 	"github.com/k3d-io/k3d/v5/pkg/runtimes"
 	"github.com/k3d-io/k3d/v5/pkg/runtimes/docker"
 	k3d "github.com/k3d-io/k3d/v5/pkg/types"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 )
 
 // K3dClusterManager implements ClusterManager interface using k3d
@@ -32,7 +34,7 @@ func NewK3dClusterManager(cfg *ClusterManagerConfig) (*K3dClusterManager, error)
 	if cfg == nil {
 		cfg = &ClusterManagerConfig{
 			Provider:      "k3d",
-			ContainerMode: os.Getenv("KECS_CONTAINER_MODE") == "true",
+			ContainerMode: config.GetBool("features.containerMode"),
 		}
 	}
 
@@ -48,7 +50,7 @@ func NewK3dClusterManager(cfg *ClusterManagerConfig) (*K3dClusterManager, error)
 // CreateCluster creates a new k3d cluster with optimizations based on environment
 func (k *K3dClusterManager) CreateCluster(ctx context.Context, clusterName string) error {
 	// Use optimized creation for test mode or when explicitly requested
-	if os.Getenv("KECS_TEST_MODE") == "true" || os.Getenv("KECS_K3D_OPTIMIZED") == "true" {
+	if config.GetBool("features.testMode") || config.GetBool("kubernetes.k3dOptimized") {
 		return k.CreateClusterOptimized(ctx, clusterName)
 	}
 	
@@ -341,7 +343,7 @@ func (k *K3dClusterManager) GetKubeconfigPath(clusterName string) string {
 	if k.config.ContainerMode {
 		kubeconfigPath := k.config.KubeconfigPath
 		if kubeconfigPath == "" {
-			kubeconfigPath = os.Getenv("KECS_KUBECONFIG_PATH")
+			kubeconfigPath = config.GetString("kubernetes.kubeconfigPath")
 			if kubeconfigPath == "" {
 				kubeconfigPath = "/kecs/kubeconfig"
 			}
@@ -476,9 +478,9 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		"--disable=local-storage",  // Disable local storage provisioner
 	}
 	
-	// Optionally disable CoreDNS based on environment variable
+	// Optionally disable CoreDNS based on configuration
 	// Some tests might need DNS resolution
-	if os.Getenv("KECS_DISABLE_COREDNS") == "true" {
+	if config.GetBool("kubernetes.disableCoreDNS") {
 		k3sArgs = append(k3sArgs, "--disable=coredns")
 	}
 
@@ -516,9 +518,9 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 
 	// For single-node clusters, we'll disable load balancer in create opts
 
-	// Determine if we should wait for server based on environment
+	// Determine if we should wait for server based on configuration
 	waitForServer := true
-	if os.Getenv("KECS_K3D_ASYNC") == "true" {
+	if config.GetBool("kubernetes.k3dAsync") {
 		waitForServer = false
 		log.Printf("Creating k3d cluster asynchronously (KECS_K3D_ASYNC=true)")
 	}

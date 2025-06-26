@@ -7,6 +7,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 )
 
 func TestCmd(t *testing.T) {
@@ -21,6 +23,8 @@ var _ = Describe("Server Command", func() {
 		BeforeEach(func() {
 			// Save original env var
 			originalDataDir = os.Getenv("KECS_DATA_DIR")
+			// Reset config instance for each test
+			config.ResetConfig()
 		})
 
 		AfterEach(func() {
@@ -30,6 +34,8 @@ var _ = Describe("Server Command", func() {
 			} else {
 				os.Unsetenv("KECS_DATA_DIR")
 			}
+			// Reset config instance after each test
+			config.ResetConfig()
 		})
 
 		It("should use KECS_DATA_DIR when set", func() {

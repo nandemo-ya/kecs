@@ -43,17 +43,9 @@ The server connects to a Kubernetes cluster and translates ECS API calls to Kube
 
 // getDefaultDataDir returns the default data directory path
 func getDefaultDataDir() string {
-	// Check KECS_DATA_DIR env var first
-	if dataDir := os.Getenv("KECS_DATA_DIR"); dataDir != "" {
-		return dataDir
-	}
-
-	// Fall back to home directory
-	if home, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(home, ".kecs", "data")
-	}
-
-	return "~/.kecs/data"
+	// Use config package to get data directory
+	cfg := config.DefaultConfig()
+	return cfg.Server.DataDir
 }
 
 func init() {
@@ -67,10 +59,10 @@ func init() {
 
 func runServer() {
 	// Log mode status for debugging
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if config.GetBool("features.testMode") {
 		fmt.Println("KECS_TEST_MODE is enabled - running in test mode")
 	}
-	if os.Getenv("KECS_CONTAINER_MODE") == "true" {
+	if config.GetBool("features.containerMode") {
 		fmt.Println("KECS_CONTAINER_MODE is enabled - running in container mode")
 	}
 

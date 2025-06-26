@@ -11,6 +11,7 @@ import (
 
 	k8s "k8s.io/client-go/kubernetes"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
@@ -61,24 +62,22 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	}
 
 	// Add environment-specific origins
-	if envOrigins := os.Getenv("KECS_ALLOWED_ORIGINS"); envOrigins != "" {
-		additionalOrigins := strings.Split(envOrigins, ",")
-		for _, origin := range additionalOrigins {
-			origin = strings.TrimSpace(origin)
-			if origin != "" {
-				wsConfig.AllowedOrigins = append(wsConfig.AllowedOrigins, origin)
-			}
+	allowedOrigins := config.GetStringSlice("server.allowedOrigins")
+	for _, origin := range allowedOrigins {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			wsConfig.AllowedOrigins = append(wsConfig.AllowedOrigins, origin)
 		}
 	}
 
 	// Initialize cluster manager first
 	var clusterManager kubernetes.ClusterManager
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if config.GetBool("features.testMode") {
 		log.Println("Running in test mode - Kubernetes operations will be simulated")
 	} else {
 		// Create cluster manager (k3d only)
 		clusterConfig := &kubernetes.ClusterManagerConfig{
-			ContainerMode:  os.Getenv("KECS_CONTAINER_MODE") == "true",
+			ContainerMode:  config.GetBool("features.containerMode"),
 			KubeconfigPath: kubeconfig,
 		}
 
@@ -92,16 +91,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 			clusterConfig.ContainerMode)
 	}
 
-	// Get region and accountID from environment variables
-	region := os.Getenv("KECS_DEFAULT_REGION")
-	if region == "" {
-		region = "us-east-1" // Default region
-	}
-	
-	accountID := os.Getenv("KECS_ACCOUNT_ID")
-	if accountID == "" {
-		accountID = "123456789012" // Default account ID
-	}
+	// Get region and accountID from configuration
+	region := config.GetString("aws.defaultRegion")
+	accountID := config.GetString("aws.accountID")
 
 	s := &Server{
 		port:           port,
@@ -137,7 +129,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	}
 
 	// Initialize test mode worker if in test mode
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if config.GetBool("features.testMode") {
 		s.testModeWorker = NewTestModeTaskWorker(storage)
 	}
 
@@ -325,7 +317,7 @@ func (s *Server) Start() error {
 	go s.webSocketHub.Run(ctx)
 
 	// Recover state if enabled and not in test mode
-	if os.Getenv("KECS_TEST_MODE") != "true" && os.Getenv("KECS_AUTO_RECOVER_STATE") != "false" {
+	if !config.GetBool("features.testMode") && config.GetBool("features.autoRecoverState") {
 		log.Println("Starting state recovery...")
 		if err := s.RecoverState(ctx); err != nil {
 			log.Printf("State recovery failed: %v", err)
@@ -399,7 +391,7 @@ func (s *Server) Stop(ctx context.Context) error {
 	}
 
 	// Clean up k3d clusters if not in test mode and environment variable allows
-	if os.Getenv("KECS_TEST_MODE") != "true" && os.Getenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN") != "true" {
+	if !config.GetBool("features.testMode") && !config.GetBool("kubernetes.keepClustersOnShutdown") {
 		if s.clusterManager != nil && s.storage != nil {
 			log.Println("Cleaning up k3d clusters...")
 
@@ -421,7 +413,7 @@ func (s *Server) Stop(ctx context.Context) error {
 				log.Println("k3d cluster cleanup completed")
 			}
 		}
-	} else if os.Getenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN") == "true" {
+	} else if config.GetBool("kubernetes.keepClustersOnShutdown") {
 		log.Println("KECS_KEEP_CLUSTERS_ON_SHUTDOWN is set, keeping k3d clusters")
 	}
 

@@ -3,11 +3,11 @@ package proxy
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
@@ -98,7 +98,7 @@ func (m *Manager) startSidecarMode(ctx context.Context) error {
 	sidecarProxy := NewSidecarProxy(m.localStackEndpoint)
 
 	// Set custom proxy image if configured
-	if proxyImage := os.Getenv("KECS_AWS_PROXY_IMAGE"); proxyImage != "" {
+	if proxyImage := config.GetString("aws.proxyImage"); proxyImage != "" {
 		sidecarProxy.SetProxyImage(proxyImage)
 	}
 
