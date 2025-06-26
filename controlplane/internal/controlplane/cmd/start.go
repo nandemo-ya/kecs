@@ -32,6 +32,8 @@ var (
 	startDataDir       string
 	startDetach        bool
 	startLocalBuild    bool
+	startConfigFile    string
+	startAutoPort      bool
 )
 
 var startCmd = &cobra.Command{
@@ -52,10 +54,48 @@ func init() {
 	startCmd.Flags().StringVar(&startDataDir, "data-dir", "", "Data directory (default: ~/.kecs/data)")
 	startCmd.Flags().BoolVarP(&startDetach, "detach", "d", true, "Run container in background")
 	startCmd.Flags().BoolVar(&startLocalBuild, "local-build", false, "Build and use local image")
+	startCmd.Flags().StringVar(&startConfigFile, "config", "", "Path to configuration file")
+	startCmd.Flags().BoolVar(&startAutoPort, "auto-port", false, "Automatically find available ports")
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
+
+	// Load configuration from file if specified
+	if startConfigFile != "" {
+		instancesConfig, err := LoadContainerConfig(startConfigFile)
+		if err != nil {
+			return fmt.Errorf("failed to load config file: %w", err)
+		}
+
+		// If no specific instance name is provided, use the default
+		if startContainerName == defaultContainerName && len(args) > 0 {
+			startContainerName = args[0]
+		} else if startContainerName == defaultContainerName {
+			startContainerName = instancesConfig.DefaultInstance
+		}
+
+		// Find the instance configuration
+		var instanceConfig *ContainerConfig
+		for _, inst := range instancesConfig.Instances {
+			if inst.Name == startContainerName {
+				instanceConfig = &inst
+				break
+			}
+		}
+
+		if instanceConfig == nil {
+			return fmt.Errorf("instance '%s' not found in configuration file", startContainerName)
+		}
+
+		// Apply configuration from file
+		startImageName = instanceConfig.Image
+		startApiPort = instanceConfig.Ports.API
+		startAdminPort = instanceConfig.Ports.Admin
+		if instanceConfig.DataDir != "" {
+			startDataDir = instanceConfig.DataDir
+		}
+	}
 
 	// Create Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -67,6 +107,37 @@ func runStart(cmd *cobra.Command, args []string) error {
 	// Check if Docker daemon is running
 	if _, err := cli.Ping(ctx); err != nil {
 		return fmt.Errorf("Docker daemon is not running: %w", err)
+	}
+
+	// Check for port conflicts if auto-port is enabled
+	if startAutoPort {
+		usedPorts, err := getUsedPorts(ctx, cli)
+		if err != nil {
+			return fmt.Errorf("failed to get used ports: %w", err)
+		}
+
+		// Find available ports
+		if availableApiPort := findAvailablePort(startApiPort, usedPorts); availableApiPort != -1 {
+			startApiPort = availableApiPort
+		} else {
+			return fmt.Errorf("no available API port found starting from %d", startApiPort)
+		}
+
+		if availableAdminPort := findAvailablePort(startAdminPort, usedPorts); availableAdminPort != -1 {
+			startAdminPort = availableAdminPort
+		} else {
+			return fmt.Errorf("no available admin port found starting from %d", startAdminPort)
+		}
+
+		fmt.Printf("Auto-assigned ports: API=%d, Admin=%d\n", startApiPort, startAdminPort)
+	} else {
+		// Check if specified ports are available
+		if !isPortAvailable(startApiPort) {
+			return fmt.Errorf("API port %d is already in use", startApiPort)
+		}
+		if !isPortAvailable(startAdminPort) {
+			return fmt.Errorf("Admin port %d is already in use", startAdminPort)
+		}
 	}
 
 	// Check if container already exists
@@ -159,6 +230,14 @@ func createAndStartContainer(ctx context.Context, cli *client.Client) error {
 		Env: []string{
 			"KECS_CONTAINER_MODE=true",
 			"KECS_DATA_DIR=/data",
+			fmt.Sprintf("KECS_API_PORT=%d", startApiPort),
+			fmt.Sprintf("KECS_ADMIN_PORT=%d", startAdminPort),
+		},
+		Labels: map[string]string{
+			"app":       "kecs",
+			"api-port":  fmt.Sprintf("%d", startApiPort),
+			"admin-port": fmt.Sprintf("%d", startAdminPort),
+			"instance":   startContainerName,
 		},
 	}
 
