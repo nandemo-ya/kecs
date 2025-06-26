@@ -1357,11 +1357,43 @@ func (api *DefaultECSAPI) registerServiceWithDiscovery(ctx context.Context, serv
 
 // createTasksForService creates tasks for a service in test mode
 func (api *DefaultECSAPI) createTasksForService(ctx context.Context, service *storage.Service, taskDef *storage.TaskDefinition, cluster *storage.Cluster) error {
+	// Parse container definitions to get container names
+	var containerDefs []map[string]interface{}
+	if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
+		return fmt.Errorf("failed to parse container definitions: %w", err)
+	}
+	
 	// In test mode, we create tasks directly in storage without kubernetes resources
 	for i := 0; i < service.DesiredCount; i++ {
 		// Generate task ID
 		taskID := uuid.New().String()
 		taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", api.region, api.accountID, cluster.Name, taskID)
+		
+		// Build initial container status using generated.Container type
+		var containers []generated.Container
+		for _, containerDef := range containerDefs {
+			containerName, _ := containerDef["name"].(string)
+			containerCPU := ""
+			if cpu, ok := containerDef["cpu"].(float64); ok {
+				containerCPU = fmt.Sprintf("%d", int(cpu))
+			}
+			containerMemory := ""
+			if memory, ok := containerDef["memory"].(float64); ok {
+				containerMemory = fmt.Sprintf("%d", int(memory))
+			}
+			
+			container := generated.Container{
+				ContainerArn: ptr.String(fmt.Sprintf("%s/container-%s", taskARN, containerName)),
+				TaskArn:      ptr.String(taskARN),
+				Name:         ptr.String(containerName),
+				LastStatus:   ptr.String("PENDING"),
+				Cpu:          ptr.String(containerCPU),
+				Memory:       ptr.String(containerMemory),
+			}
+			containers = append(containers, container)
+		}
+		
+		containersJSON, _ := json.Marshal(containers)
 		
 		// Create storage task
 		now := time.Now()
@@ -1380,7 +1412,7 @@ func (api *DefaultECSAPI) createTasksForService(ctx context.Context, service *st
 			Memory:             taskDef.Memory,
 			ContainerInstanceARN: "", // Empty in test mode
 			Group:              fmt.Sprintf("service:%s", service.ServiceName),
-			Containers:         "[]", // Empty containers JSON initially
+			Containers:         string(containersJSON),
 		}
 		
 		// Save task to storage
