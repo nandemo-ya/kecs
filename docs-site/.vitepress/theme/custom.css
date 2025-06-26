@@ -1,0 +1,368 @@
+/* Modern KECS Documentation Theme */
+
+/* CSS Variables for consistent theming */
+:root {
+  --kecs-primary: #667eea;
+  --kecs-secondary: #764ba2;
+  --kecs-accent: #48bb78;
+  --kecs-gradient: linear-gradient(135deg, var(--kecs-primary) 0%, var(--kecs-secondary) 100%);
+  --kecs-gradient-light: linear-gradient(135deg, #9ca3f5 0%, #a57fd1 100%);
+  
+  /* Override VitePress defaults */
+  --vp-c-brand: var(--kecs-primary);
+  --vp-c-brand-light: #7c8df1;
+  --vp-c-brand-lighter: #9ca3f5;
+  --vp-c-brand-dark: #5568d9;
+  --vp-c-brand-darker: #4455c9;
+  
+  /* Animation timings */
+  --kecs-transition-fast: 0.2s ease;
+  --kecs-transition-medium: 0.3s ease;
+  --kecs-transition-slow: 0.5s ease;
+}
+
+/* Dark mode adjustments */
+.dark {
+  --kecs-gradient: linear-gradient(135deg, #4c5bcc 0%, #5a3a8a 100%);
+  --kecs-gradient-light: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Hero Section Enhancements */
+.VPHero {
+  position: relative;
+  overflow: hidden;
+}
+
+.VPHero::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: var(--kecs-gradient);
+  opacity: 0.05;
+  transform: rotate(-12deg);
+  z-index: -1;
+  animation: gradient-shift 15s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% { transform: rotate(-12deg) translateY(0); }
+  50% { transform: rotate(-12deg) translateY(-20px); }
+}
+
+/* Hero text animations */
+.VPHero .name {
+  background: var(--kecs-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: text-shimmer 3s ease-in-out infinite;
+}
+
+@keyframes text-shimmer {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.2); }
+}
+
+/* Modern button styles */
+.VPButton {
+  position: relative;
+  overflow: hidden;
+  transition: all var(--kecs-transition-medium);
+}
+
+.VPButton.brand {
+  background: var(--kecs-gradient);
+  border: none;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.VPButton.brand:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.VPButton::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.VPButton:active::after {
+  width: 300px;
+  height: 300px;
+}
+
+/* Feature cards with glassmorphism */
+.VPFeatures .VPFeature {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all var(--kecs-transition-medium);
+  position: relative;
+  overflow: hidden;
+}
+
+.dark .VPFeatures .VPFeature {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.VPFeatures .VPFeature:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border-color: var(--kecs-primary);
+}
+
+.VPFeatures .VPFeature::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--kecs-gradient);
+  transform: scaleX(0);
+  transition: transform var(--kecs-transition-medium);
+}
+
+.VPFeatures .VPFeature:hover::before {
+  transform: scaleX(1);
+}
+
+/* Feature icons with animation */
+.VPFeatures .icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+  display: inline-block;
+  animation: float 3s ease-in-out infinite;
+}
+
+.VPFeatures .VPFeature:nth-child(1) .icon { animation-delay: 0s; }
+.VPFeatures .VPFeature:nth-child(2) .icon { animation-delay: 0.5s; }
+.VPFeatures .VPFeature:nth-child(3) .icon { animation-delay: 1s; }
+.VPFeatures .VPFeature:nth-child(4) .icon { animation-delay: 1.5s; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Code blocks enhancement */
+.vp-code-group {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: all var(--kecs-transition-medium);
+}
+
+.vp-code-group:hover {
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Navigation enhancements */
+.VPNav {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dark .VPNav {
+  background: rgba(0, 0, 0, 0.8) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--vp-c-bg-soft);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--kecs-gradient);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--kecs-gradient-light);
+}
+
+/* Loading animation for async content */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.loading {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Enhanced typography */
+.VPDoc h1 {
+  position: relative;
+  padding-bottom: 1rem;
+}
+
+.VPDoc h1::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100px;
+  height: 4px;
+  background: var(--kecs-gradient);
+  border-radius: 2px;
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+  .VPFeatures .icon {
+    font-size: 36px;
+  }
+  
+  .VPHero .name {
+    font-size: 3rem !important;
+  }
+}
+
+/* Accessibility: Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Hero video container */
+.hero-video-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.hero-video-container::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1;
+}
+
+.hero-video {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  min-width: 100%;
+  min-height: 100%;
+  width: auto;
+  height: auto;
+  transform: translateX(-50%) translateY(-50%);
+  z-index: 0;
+}
+
+/* Interactive elements */
+.interactive-demo {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 2rem;
+  margin: 2rem 0;
+  transition: all var(--kecs-transition-medium);
+}
+
+.interactive-demo:hover {
+  border-color: var(--kecs-primary);
+  box-shadow: 0 0 20px rgba(102, 126, 234, 0.2);
+}
+
+/* Performance metrics visualization */
+.metrics-card {
+  background: var(--vp-c-bg-soft);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.metrics-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--kecs-gradient);
+}
+
+.metric-value {
+  font-size: 2.5rem;
+  font-weight: bold;
+  background: var(--kecs-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Enhanced focus states for accessibility */
+*:focus {
+  outline: 2px solid var(--kecs-primary);
+  outline-offset: 2px;
+}
+
+/* Custom tooltip styles */
+.tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--kecs-transition-fast);
+  margin-bottom: 5px;
+}
+
+.tooltip:hover::after {
+  opacity: 1;
+}
