@@ -158,7 +158,7 @@ func createAndStartContainer(ctx context.Context, cli *client.Client) error {
 		},
 		Env: []string{
 			"KECS_CONTAINER_MODE=true",
-			fmt.Sprintf("KECS_DATA_DIR=/data"),
+			"KECS_DATA_DIR=/data",
 		},
 	}
 
@@ -233,17 +233,34 @@ func waitForHealthCheck(ctx context.Context, cli *client.Client) error {
 }
 
 func buildLocalImage() error {
-	// Change to the project root directory
-	projectRoot := filepath.Join("..", "..", "..", "..")
-	if err := os.Chdir(projectRoot); err != nil {
-		return fmt.Errorf("failed to change directory: %w", err)
+	// Get the directory of the current executable
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+	
+	// Navigate to the project root (assuming binary is in bin/ directory)
+	binDir := filepath.Dir(execPath)
+	projectRoot := filepath.Dir(binDir)
+	
+	// Check if Dockerfile exists in the project root
+	dockerfilePath := filepath.Join(projectRoot, "Dockerfile")
+	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
+		// Try controlplane directory
+		dockerfilePath = filepath.Join(projectRoot, "controlplane", "Dockerfile")
+		if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
+			return fmt.Errorf("Dockerfile not found in project root or controlplane directory")
+		}
+		projectRoot = filepath.Join(projectRoot, "controlplane")
 	}
 
 	// Run docker build
 	cmd := exec.Command("docker", "build", "-t", "kecs:local", "-f", "Dockerfile", ".")
+	cmd.Dir = projectRoot
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
+	fmt.Printf("Building Docker image from %s...\n", projectRoot)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to build Docker image: %w", err)
 	}
