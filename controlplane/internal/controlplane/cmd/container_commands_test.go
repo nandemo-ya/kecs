@@ -19,7 +19,7 @@ var _ = Describe("Container Commands", func() {
 			
 			Expect(startCmd).NotTo(BeNil())
 			Expect(startCmd.Use).To(Equal("start"))
-			Expect(startCmd.Short).To(ContainSubstring("Start KECS server in a Docker container"))
+			Expect(startCmd.Short).To(ContainSubstring("Start KECS server in a container"))
 		})
 
 		It("should have required flags", func() {

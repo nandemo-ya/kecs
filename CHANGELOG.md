@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Separate Docker images: `kecs-api` and `kecs-ui`
   - Docker Compose profiles for combined/separated modes
   - Runtime configuration injection for API endpoints
+- Container runtime abstraction
+  - Support for both Docker and containerd runtimes
+  - Auto-detection of available runtime
+  - Works with k3s, k3d, Rancher Desktop, and Kind
+  - `--runtime` flag for manual runtime selection
+  - Unified API for container operations
 
 ### Changed
 

@@ -3,17 +3,16 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 	"github.com/spf13/cobra"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/runtime"
 )
 
 var (
 	stopContainerName string
 	stopForce         bool
+	stopRuntime       string
 )
 
 var stopCmd = &cobra.Command{
@@ -30,71 +29,80 @@ func init() {
 
 	stopCmd.Flags().StringVar(&stopContainerName, "name", defaultContainerName, "Container name")
 	stopCmd.Flags().BoolVarP(&stopForce, "force", "f", false, "Force stop without graceful shutdown")
+	stopCmd.Flags().StringVar(&stopRuntime, "runtime", "", "Container runtime to use (docker, containerd, or auto)")
 }
 
 func runStop(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	// Create Docker client
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return fmt.Errorf("failed to create Docker client: %w", err)
+	// Get runtime manager
+	manager := runtime.GetDefaultManager()
+	
+	// Set runtime if specified
+	if stopRuntime != "" {
+		switch stopRuntime {
+		case "docker":
+			if err := manager.UseDocker(); err != nil {
+				return fmt.Errorf("failed to use Docker runtime: %w", err)
+			}
+		case "containerd":
+			if err := manager.UseContainerd(""); err != nil {
+				return fmt.Errorf("failed to use containerd runtime: %w", err)
+			}
+		case "auto":
+			if err := manager.AutoDetect(); err != nil {
+				return fmt.Errorf("failed to auto-detect runtime: %w", err)
+			}
+		default:
+			return fmt.Errorf("unknown runtime: %s", stopRuntime)
+		}
 	}
-	defer cli.Close()
 
-	// Check if Docker daemon is running
-	if _, err := cli.Ping(ctx); err != nil {
-		return fmt.Errorf("Docker daemon is not running: %w", err)
+	// Get runtime
+	rt, err := manager.GetRuntime()
+	if err != nil {
+		return fmt.Errorf("failed to get container runtime: %w", err)
 	}
+
+	fmt.Printf("Using container runtime: %s\n", rt.Name())
 
 	// Find container
-	filters := filters.NewArgs()
-	filters.Add("name", stopContainerName)
-	containers, err := cli.ContainerList(ctx, container.ListOptions{
-		All:     true,
-		Filters: filters,
+	containers, err := rt.ListContainers(ctx, runtime.ListContainersOptions{
+		All:   true,
+		Names: []string{stopContainerName},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
 
 	if len(containers) == 0 {
-		fmt.Printf("KECS container '%s' not found\n", stopContainerName)
+		fmt.Printf("No KECS server container found with name '%s'\n", stopContainerName)
 		return nil
 	}
 
-	containerInfo := containers[0]
+	container := containers[0]
 
 	// Stop container if running
-	if containerInfo.State == "running" {
-		fmt.Printf("Stopping KECS container '%s'...\n", stopContainerName)
-		
-		// Graceful shutdown timeout
-		timeout := 10
+	if container.State == "running" {
+		fmt.Printf("Stopping KECS server '%s'...\n", stopContainerName)
+		timeout := 30
 		if stopForce {
 			timeout = 0
 		}
-		
-		if err := cli.ContainerStop(ctx, containerInfo.ID, container.StopOptions{
-			Timeout: &timeout,
-		}); err != nil {
+		if err := rt.StopContainer(ctx, container.ID, &timeout); err != nil {
 			return fmt.Errorf("failed to stop container: %w", err)
 		}
-
-		// Wait a bit for container to fully stop
-		time.Sleep(1 * time.Second)
+		fmt.Println("Container stopped")
 	}
 
 	// Remove container
-	fmt.Printf("Removing KECS container '%s'...\n", stopContainerName)
-	if err := cli.ContainerRemove(ctx, containerInfo.ID, container.RemoveOptions{
-		Force: stopForce,
-	}); err != nil {
+	fmt.Printf("Removing container '%s'...\n", stopContainerName)
+	if err := rt.RemoveContainer(ctx, container.ID, stopForce); err != nil {
 		return fmt.Errorf("failed to remove container: %w", err)
 	}
 
-	fmt.Printf("KECS container '%s' stopped and removed successfully\n", stopContainerName)
-	fmt.Println("Note: Data directory has been preserved")
-	
+	fmt.Printf("KECS server '%s' has been stopped and removed\n", stopContainerName)
+	fmt.Println("Data directory has been preserved")
+
 	return nil
 }

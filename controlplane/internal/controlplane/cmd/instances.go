@@ -271,3 +271,14 @@ func runInstancesStopAll(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
+
+// truncate truncates a string to the specified length
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return s[:maxLen]
+	}
+	return s[:maxLen-3] + "..."
+}

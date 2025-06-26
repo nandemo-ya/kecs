@@ -6,15 +6,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 	"github.com/spf13/cobra"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/runtime"
 )
 
 var (
 	statusContainerName string
 	statusAll           bool
+	statusRuntime       string
 )
 
 var statusCmd = &cobra.Command{
@@ -29,133 +29,114 @@ func init() {
 
 	statusCmd.Flags().StringVar(&statusContainerName, "name", "", "Container name (empty for all KECS containers)")
 	statusCmd.Flags().BoolVarP(&statusAll, "all", "a", false, "Show all containers including stopped ones")
+	statusCmd.Flags().StringVar(&statusRuntime, "runtime", "", "Container runtime to use (docker, containerd, or auto)")
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	// Create Docker client
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return fmt.Errorf("failed to create Docker client: %w", err)
+	// Get runtime manager
+	manager := runtime.GetDefaultManager()
+	
+	// Set runtime if specified
+	if statusRuntime != "" {
+		switch statusRuntime {
+		case "docker":
+			if err := manager.UseDocker(); err != nil {
+				return fmt.Errorf("failed to use Docker runtime: %w", err)
+			}
+		case "containerd":
+			if err := manager.UseContainerd(""); err != nil {
+				return fmt.Errorf("failed to use containerd runtime: %w", err)
+			}
+		case "auto":
+			if err := manager.AutoDetect(); err != nil {
+				return fmt.Errorf("failed to auto-detect runtime: %w", err)
+			}
+		default:
+			return fmt.Errorf("unknown runtime: %s", statusRuntime)
+		}
 	}
-	defer cli.Close()
 
-	// Check if Docker daemon is running
-	if _, err := cli.Ping(ctx); err != nil {
-		return fmt.Errorf("Docker daemon is not running: %w", err)
+	// Get runtime
+	rt, err := manager.GetRuntime()
+	if err != nil {
+		return fmt.Errorf("failed to get container runtime: %w", err)
 	}
+
+	fmt.Printf("Using container runtime: %s\n", rt.Name())
 
 	// Set up filters
-	filters := filters.NewArgs()
+	opts := runtime.ListContainersOptions{
+		All: statusAll,
+		Labels: map[string]string{
+			"com.kecs.managed": "true",
+		},
+	}
+
+	// Add specific container name filter if provided
 	if statusContainerName != "" {
-		filters.Add("name", statusContainerName)
-	} else {
-		// Look for containers with the kecs label
-		filters.Add("label", "app=kecs")
+		opts.Names = []string{statusContainerName}
 	}
 
 	// List containers
-	containers, err := cli.ContainerList(ctx, container.ListOptions{
-		All:     statusAll,
-		Filters: filters,
-	})
+	containers, err := rt.ListContainers(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
 
-	// No additional filtering needed as we're using labels
-
 	if len(containers) == 0 {
 		if statusContainerName != "" {
-			fmt.Printf("KECS container '%s' not found\n", statusContainerName)
+			fmt.Printf("No KECS container found with name '%s'\n", statusContainerName)
 		} else {
 			fmt.Println("No KECS containers found")
 		}
 		return nil
 	}
 
-	// Print header
-	fmt.Printf("%-20s %-10s %-15s %-20s %-30s\n", "NAME", "STATUS", "CREATED", "PORTS", "IMAGE")
-	fmt.Println(strings.Repeat("-", 95))
+	// Display header
+	fmt.Printf("%-20s %-15s %-25s %-30s %-20s\n", "NAME", "STATUS", "CREATED", "IMAGE", "PORTS")
+	fmt.Println(strings.Repeat("-", 120))
 
-	// Print container info
+	// Display containers
 	for _, c := range containers {
-		name := strings.TrimPrefix(c.Names[0], "/")
-		status := c.State
-		if c.Status != "" {
-			status = c.Status
-		}
-		
-		created := time.Unix(c.Created, 0).Format("2006-01-02 15:04")
-		
 		// Format ports
 		var ports []string
 		for _, p := range c.Ports {
-			if p.PublicPort != 0 {
-				ports = append(ports, fmt.Sprintf("%d->%d", p.PublicPort, p.PrivatePort))
-			}
+			ports = append(ports, fmt.Sprintf("%d:%d/%s", p.HostPort, p.ContainerPort, p.Protocol))
 		}
 		portsStr := strings.Join(ports, ", ")
-		if portsStr == "" {
-			portsStr = "-"
+		if len(portsStr) > 20 {
+			portsStr = portsStr[:17] + "..."
 		}
 
-		fmt.Printf("%-20s %-10s %-15s %-20s %-30s\n",
-			truncate(name, 20),
-			truncate(status, 10),
-			created,
-			truncate(portsStr, 20),
-			truncate(c.Image, 30))
-	}
-
-	// Show additional details for single container
-	if statusContainerName != "" && len(containers) == 1 {
-		c := containers[0]
-		fmt.Println("\nDetails:")
-		fmt.Printf("  Container ID: %s\n", c.ID[:12])
-		fmt.Printf("  State: %s\n", c.State)
-		
-		// Get more details
-		inspect, err := cli.ContainerInspect(ctx, c.ID)
-		if err == nil {
-			if inspect.State.Running {
-				fmt.Printf("  Started: %s\n", inspect.State.StartedAt)
-				if startedAt, err := time.Parse(time.RFC3339, inspect.State.StartedAt); err == nil {
-				fmt.Printf("  Uptime: %s\n", time.Since(startedAt).Round(time.Second))
-			}
-			}
-			
-			// Show mounts
-			if len(inspect.Mounts) > 0 {
-				fmt.Println("  Mounts:")
-				for _, m := range inspect.Mounts {
-					fmt.Printf("    %s -> %s\n", m.Source, m.Destination)
-				}
-			}
-			
-			// Show environment variables
-			envVars := []string{}
-			for _, env := range inspect.Config.Env {
-				if strings.HasPrefix(env, "KECS_") {
-					envVars = append(envVars, env)
-				}
-			}
-			if len(envVars) > 0 {
-				fmt.Println("  Environment:")
-				for _, env := range envVars {
-					fmt.Printf("    %s\n", env)
-				}
-			}
+		// Format created time
+		created := time.Since(c.Created).Round(time.Second)
+		var createdStr string
+		if created < time.Minute {
+			createdStr = fmt.Sprintf("%d seconds ago", int(created.Seconds()))
+		} else if created < time.Hour {
+			createdStr = fmt.Sprintf("%d minutes ago", int(created.Minutes()))
+		} else if created < 24*time.Hour {
+			createdStr = fmt.Sprintf("%d hours ago", int(created.Hours()))
+		} else {
+			createdStr = fmt.Sprintf("%d days ago", int(created.Hours()/24))
 		}
+
+		// Truncate image name if too long
+		image := c.Image
+		if len(image) > 30 {
+			image = "..." + image[len(image)-27:]
+		}
+
+		fmt.Printf("%-20s %-15s %-25s %-30s %-20s\n",
+			c.Name,
+			c.State,
+			createdStr,
+			image,
+			portsStr,
+		)
 	}
 
 	return nil
-}
-
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
 }

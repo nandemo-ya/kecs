@@ -27,7 +27,8 @@ KECS (Kubernetes-based ECS Compatible Service) is a standalone service that prov
 - **ECS API Compatibility**: Provides API endpoints compatible with Amazon ECS
 - **Kubernetes Backend**: Leverages Kubernetes for container orchestration
 - **Local Execution**: Runs completely locally without AWS dependencies
-- **Container-based Background Execution**: Run KECS in Docker containers with simple commands
+- **Container Runtime Support**: Works with both Docker and containerd (k3s, k3d, Rancher Desktop)
+- **Container-based Background Execution**: Run KECS in containers with simple commands
 - **Multiple Instance Support**: Run multiple KECS instances with different configurations
 - **CI/CD Integration**: Easily integrates with CI/CD pipelines
 
@@ -87,18 +88,18 @@ docker pull ghcr.io/nandemo-ya/kecs:latest
 
 ### Container Commands
 
-KECS provides Docker container-based execution similar to tools like kind and k3d:
+KECS provides container-based execution similar to tools like kind and k3d, supporting both Docker and containerd runtimes:
 
 #### Start Command
 
-Starts KECS server in a Docker container:
+Starts KECS server in a container:
 
 ```bash
 kecs start [flags]
 
 Flags:
   --name string        Container name (default "kecs-server")
-  --image string       Docker image to use (default "ghcr.io/nandemo-ya/kecs:latest")
+  --image string       Container image to use (default "ghcr.io/nandemo-ya/kecs:latest")
   --api-port int       API server port (default 8080)
   --admin-port int     Admin server port (default 8081)
   --data-dir string    Data directory (default "~/.kecs/data")
@@ -106,12 +107,13 @@ Flags:
   --local-build        Build and use local image
   --config string      Path to configuration file
   --auto-port          Automatically find available ports
+  --runtime string     Container runtime to use (docker, containerd, or auto)
 ```
 
 Examples:
 
 ```bash
-# Start with default settings
+# Start with default settings (auto-detects runtime)
 kecs start
 
 # Start with custom ports
@@ -122,6 +124,13 @@ kecs start --local-build
 
 # Start using configuration file
 kecs start --config ~/.kecs/instances.yaml staging
+
+# Use specific runtime
+kecs start --runtime docker
+kecs start --runtime containerd
+
+# Works with k3d/k3s environments
+kecs start --runtime containerd  # Automatically uses k3s socket
 ```
 
 #### Stop Command
@@ -235,6 +244,27 @@ instances:
     labels:
       environment: test
 ```
+
+### Container Runtime Support
+
+KECS supports multiple container runtimes:
+
+#### Docker
+- Docker Desktop
+- Docker Engine
+- Default runtime for most environments
+
+#### Containerd
+- k3s/k3d environments
+- Rancher Desktop (containerd mode)
+- Kind clusters
+- Standard Kubernetes nodes
+
+#### Auto-detection
+KECS automatically detects the available runtime:
+1. Checks for Docker first (backward compatibility)
+2. Falls back to containerd if Docker is not available
+3. Automatically finds k3s containerd socket at `/run/k3s/containerd/containerd.sock`
 
 ### Traditional Server Mode
 
