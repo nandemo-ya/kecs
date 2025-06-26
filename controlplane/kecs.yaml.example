@@ -54,6 +54,10 @@ kubernetes:
 
 # UI configuration
 ui:
+  # Enable or disable the Web UI (default: true)
+  # Can be set via KECS_WEBUI_ENABLED environment variable
+  enabled: true
+  
   # Base path for UI resources
   # Can be set via KECS_UI_BASE_PATH environment variable
   basePath: ""

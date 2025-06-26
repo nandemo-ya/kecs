@@ -28,6 +28,7 @@ var (
 	dataDir           string
 	localstackEnabled bool
 	configFile        string
+	noWebUI           bool
 
 	// serverCmd represents the server command
 	serverCmd = &cobra.Command{
@@ -55,6 +56,7 @@ func init() {
 	serverCmd.Flags().StringVar(&dataDir, "data-dir", getDefaultDataDir(), "Directory for storing persistent data")
 	serverCmd.Flags().BoolVar(&localstackEnabled, "localstack-enabled", false, "Enable LocalStack integration for AWS service emulation")
 	serverCmd.Flags().StringVar(&configFile, "config", "", "Path to configuration file")
+	serverCmd.Flags().BoolVar(&noWebUI, "no-webui", false, "Disable Web UI")
 }
 
 func runServer() {
@@ -87,6 +89,9 @@ func runServer() {
 	}
 	if localstackEnabled {
 		cfg.LocalStack.Enabled = true
+	}
+	if noWebUI {
+		cfg.UI.Enabled = false
 	}
 
 	// Validate configuration

@@ -246,6 +246,9 @@ kecs server
 
 # Or with custom configuration
 kecs server --port 8080 --admin-port 8081
+
+# Run without Web UI for better performance
+kecs server --no-webui
 ```
 
 ## API Endpoints
@@ -254,7 +257,7 @@ KECS provides ECS-compatible API endpoints:
 
 - **API Server** (default port 8080): ECS API endpoints at `/v1/<action>`
 - **Admin Server** (default port 8081): Health checks at `/health`
-- **Web UI**: Dashboard at `/` (when enabled)
+- **Web UI**: Dashboard at `/ui` (when enabled, can be disabled with `--no-webui` or `KECS_WEBUI_ENABLED=false`)
 
 ## Documentation
 
