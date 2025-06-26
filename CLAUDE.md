@@ -15,6 +15,19 @@ make run            # Build and run the application
 make all            # Clean, format, vet, test, and build
 ```
 
+### Container-based Execution
+```bash
+kecs start          # Start KECS in a Docker container
+kecs stop           # Stop and remove KECS container
+kecs status         # Show container status
+kecs logs -f        # Follow container logs
+
+# Multiple instances
+kecs start --name dev --api-port 8080
+kecs start --name staging --api-port 8090 --auto-port
+kecs instances list # List all instances
+```
+
 ### Testing and Code Quality
 ```bash
 make test           # Run tests with race detection
@@ -199,7 +212,16 @@ cd docs-site && npm run docs:build
 - **Kubernetes**: Task converter with secret management
 - **Web UI**: Dashboard, detail views, WebSocket support
 - **MCP Server**: TypeScript-based Model Context Protocol server for AI assistant integration
+- **Container Commands**: Docker-based background execution with multiple instance support
 - **In Progress**: Full Kubernetes task lifecycle management
+
+### Container Commands Implementation
+KECS includes Docker container management commands similar to kind/k3d:
+- `start`, `stop`, `status`, `logs` commands for container lifecycle
+- Multiple instance support with configuration files
+- Automatic port conflict detection and resolution
+- Data persistence through volume mounts
+- See `docs/container-commands.md` for detailed usage
 
 ## MCP Server Development
 

@@ -1,0 +1,124 @@
+# Example GitHub Actions workflow using KECS container commands
+name: Test with KECS Container
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-with-kecs:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Install KECS
+      run: |
+        # Download and install KECS binary
+        curl -L https://github.com/nandemo-ya/kecs/releases/latest/download/kecs-linux-amd64 -o kecs
+        chmod +x kecs
+        sudo mv kecs /usr/local/bin/
+    
+    - name: Start KECS Instance
+      run: |
+        # Start KECS with auto-port to avoid conflicts
+        kecs start --name ci-test --auto-port
+        
+        # Wait for KECS to be ready
+        sleep 5
+        
+        # Check status
+        kecs status
+    
+    - name: Get KECS Endpoint
+      id: kecs-endpoint
+      run: |
+        # Extract the API port from status
+        API_PORT=$(kecs status --name ci-test | grep ci-test | awk '{print $3}' | cut -d'-' -f1)
+        echo "endpoint=http://localhost:${API_PORT}" >> $GITHUB_OUTPUT
+    
+    - name: Run Integration Tests
+      env:
+        KECS_ENDPOINT: ${{ steps.kecs-endpoint.outputs.endpoint }}
+      run: |
+        # Run your tests against KECS
+        echo "Running tests against KECS at ${KECS_ENDPOINT}"
+        
+        # Example: Create a cluster
+        aws ecs create-cluster --cluster-name test-cluster --endpoint-url ${KECS_ENDPOINT}
+        
+        # Add your actual tests here
+        # npm test
+        # go test ./...
+        # pytest tests/
+    
+    - name: View KECS Logs
+      if: always()
+      run: |
+        # Show logs for debugging
+        kecs logs --name ci-test --tail 100
+    
+    - name: Stop KECS
+      if: always()
+      run: |
+        # Clean up
+        kecs stop --name ci-test
+
+  test-multiple-instances:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Install KECS
+      run: |
+        curl -L https://github.com/nandemo-ya/kecs/releases/latest/download/kecs-linux-amd64 -o kecs
+        chmod +x kecs
+        sudo mv kecs /usr/local/bin/
+    
+    - name: Create KECS Configuration
+      run: |
+        mkdir -p ~/.kecs
+        cat > ~/.kecs/ci-instances.yaml << EOF
+        defaultInstance: dev
+        instances:
+          - name: dev
+            ports:
+              api: 8080
+              admin: 8081
+            autoStart: true
+            env:
+              KECS_LOG_LEVEL: debug
+          - name: staging
+            ports:
+              api: 8090
+              admin: 8091
+            autoStart: true
+            env:
+              KECS_LOG_LEVEL: info
+        EOF
+    
+    - name: Start All KECS Instances
+      run: |
+        kecs instances start-all --config ~/.kecs/ci-instances.yaml
+        kecs instances list --config ~/.kecs/ci-instances.yaml
+    
+    - name: Test Against Multiple Instances
+      run: |
+        # Test dev instance
+        aws ecs list-clusters --endpoint-url http://localhost:8080
+        
+        # Test staging instance
+        aws ecs list-clusters --endpoint-url http://localhost:8090
+    
+    - name: Stop All Instances
+      if: always()
+      run: |
+        kecs instances stop-all
