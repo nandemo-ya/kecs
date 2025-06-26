@@ -97,6 +97,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *ContainerCo
 		Cmd:          config.Cmd,
 		Labels:       config.Labels,
 		ExposedPorts: exposedPorts,
+		User:         config.User,
 	}
 	
 	// Host configuration
@@ -107,6 +108,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *ContainerCo
 			Name:              container.RestartPolicyMode(config.RestartPolicy.Name),
 			MaximumRetryCount: config.RestartPolicy.MaximumRetryCount,
 		},
+		GroupAdd: config.GroupAdd,
 	}
 	
 	// Set resource limits if specified
