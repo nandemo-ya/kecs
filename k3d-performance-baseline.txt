@@ -1,0 +1,24 @@
+K3D Performance Baseline Measurement
+Date: #午後
+========================================
+
+Iteration 1/3
+-------------------
+Creation time: [36mINFO[0m[0000] Prep: Network                                
+[36mINFO[0m[0000] Created network 'k3d-kecs-perf-test-1750813035-1' 
+[36mINFO[0m[0000] Created image volume k3d-kecs-perf-test-1750813035-1-images 
+[36mINFO[0m[0000] Starting new tools node...                   
+[36mINFO[0m[0000] Starting node 'k3d-kecs-perf-test-1750813035-1-tools' 
+[36mINFO[0m[0001] Creating node 'k3d-kecs-perf-test-1750813035-1-server-0' 
+[36mINFO[0m[0001] Using the k3d-tools node to gather environment information 
+[36mINFO[0m[0001] HostIP: using network gateway 192.168.147.1 address 
+[36mINFO[0m[0001] Starting cluster 'kecs-perf-test-1750813035-1' 
+[36mINFO[0m[0001] Starting servers...                          
+[36mINFO[0m[0001] Starting node 'k3d-kecs-perf-test-1750813035-1-server-0' 
+[36mINFO[0m[0003] All agents already running.                  
+[36mINFO[0m[0003] All helpers already running.                 
+[36mINFO[0m[0003] Injecting records for hostAliases (incl. host.k3d.internal) and for 1 network members into CoreDNS configmap... 
+[36mINFO[0m[0005] Cluster 'kecs-perf-test-1750813035-1' created successfully! 
+[36mINFO[0m[0005] You can now use it like this:                
+kubectl cluster-info
+5.806505000s

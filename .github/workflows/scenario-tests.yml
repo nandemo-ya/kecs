@@ -119,6 +119,42 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             
+            // Function to parse test timing from Ginkgo output
+            function parseTestTiming(output) {
+              const tests = [];
+              // Match pattern: • [0.523 seconds]
+              // Followed by test description on next line
+              const testPattern = /• \[(\d+\.?\d*) seconds?\]\n([^\n]+)/g;
+              let match;
+              
+              while ((match = testPattern.exec(output)) !== null) {
+                tests.push({
+                  duration: parseFloat(match[1]),
+                  name: match[2].trim()
+                });
+              }
+              
+              return tests;
+            }
+            
+            // Calculate phase statistics
+            function calculatePhaseStats(tests) {
+              if (tests.length === 0) return null;
+              
+              const totalDuration = tests.reduce((sum, test) => sum + test.duration, 0);
+              const avgDuration = totalDuration / tests.length;
+              const slowestTests = tests
+                .sort((a, b) => b.duration - a.duration)
+                .slice(0, 3);
+              
+              return {
+                totalDuration,
+                avgDuration,
+                slowestTests,
+                testCount: tests.length
+              };
+            }
+            
             // Function to parse test output
             function parseTestOutput(filename, phaseName) {
               let testOutput = '';
@@ -133,7 +169,7 @@ jobs:
               // Remove ANSI color codes before parsing
               const cleanOutput = testOutput.replace(/\x1b\[[0-9;]*m/g, '');
               
-              const summaryMatch = cleanOutput.match(/Ran (\d+) of (\d+) Specs in .*/);
+              const summaryMatch = cleanOutput.match(/Ran (\d+) of (\d+) Specs in ([\d.]+)s/);
               // Look for the summary line pattern: "X Passed | Y Failed | Z Pending | W Skipped"
               const summaryLine = cleanOutput.match(/(\d+) Passed.*?(\d+) Failed.*?(\d+) Pending.*?(\d+) Skipped/);
               
@@ -151,6 +187,10 @@ jobs:
                 skippedMatch = cleanOutput.match(/(\d+) Skipped/);
               }
               
+              // Parse individual test timings
+              const testTimings = parseTestTiming(cleanOutput);
+              const phaseStats = calculatePhaseStats(testTimings);
+              
               const result = {
                 phase: phaseName,
                 total: summaryMatch ? parseInt(summaryMatch[2]) : 0,
@@ -159,6 +199,9 @@ jobs:
                 failed: failedMatch ? parseInt(failedMatch[1]) : 0,
                 pending: pendingMatch ? parseInt(pendingMatch[1]) : 0,
                 skipped: skippedMatch ? parseInt(skippedMatch[1]) : 0,
+                totalDuration: summaryMatch ? parseFloat(summaryMatch[3]) : null,
+                testTimings: testTimings,
+                stats: phaseStats,
                 output: testOutput
               };
               
@@ -167,6 +210,7 @@ jobs:
               console.log(`  summaryMatch: ${summaryMatch}`);
               console.log(`  passedMatch: ${passedMatch}`);
               console.log(`  failedMatch: ${failedMatch}`);
+              console.log(`  testTimings found: ${testTimings.length}`);
               console.log(`  Result:`, result);
               
               return result;
@@ -182,19 +226,36 @@ jobs:
             let summary = '## 🧪 Scenario Test Results\n\n';
             
             // Overall summary
-            let totalPassed = 0, totalFailed = 0, totalRan = 0, totalSpecs = 0;
+            let totalPassed = 0, totalFailed = 0, totalRan = 0, totalSpecs = 0, totalDuration = 0;
             phases.forEach(phase => {
               totalPassed += phase.passed;
               totalFailed += phase.failed;
               totalRan += phase.ran;
               totalSpecs += phase.total;
+              if (phase.totalDuration) {
+                totalDuration += phase.totalDuration;
+              }
             });
+            
+            // Format duration
+            function formatDuration(seconds) {
+              if (seconds < 60) {
+                return `${seconds.toFixed(1)}s`;
+              }
+              const minutes = Math.floor(seconds / 60);
+              const secs = (seconds % 60).toFixed(0);
+              return `${minutes}m ${secs}s`;
+            }
             
             summary += `### Overall Summary\n`;
             summary += `- Total Specs: ${totalSpecs}\n`;
             summary += `- Total Ran: ${totalRan}\n`;
             summary += `- ✅ Total Passed: ${totalPassed}\n`;
-            summary += `- ❌ Total Failed: ${totalFailed}\n\n`;
+            summary += `- ❌ Total Failed: ${totalFailed}\n`;
+            if (totalDuration > 0) {
+              summary += `- ⏱️ Total Duration: ${formatDuration(totalDuration)}\n`;
+            }
+            summary += '\n';
             
             if (totalFailed === 0 && totalRan > 0) {
               summary += '### ✅ All tests passed!\n\n';
@@ -206,9 +267,58 @@ jobs:
             summary += '### Phase Results\n\n';
             phases.forEach(phase => {
               const status = phase.failed === 0 ? '✅' : '❌';
-              summary += `**${phase.phase}** ${status}\n`;
+              const durationStr = phase.totalDuration ? ` (${formatDuration(phase.totalDuration)})` : '';
+              summary += `**${phase.phase}** ${status}${durationStr}\n`;
               summary += `- Specs: ${phase.total} | Ran: ${phase.ran} | Passed: ${phase.passed} | Failed: ${phase.failed}\n\n`;
             });
+            
+            // Performance Analysis
+            const allTests = [];
+            phases.forEach(phase => {
+              if (phase.testTimings && phase.testTimings.length > 0) {
+                phase.testTimings.forEach(test => {
+                  allTests.push({
+                    ...test,
+                    phase: phase.phase
+                  });
+                });
+              }
+            });
+            
+            if (allTests.length > 0) {
+              summary += '### ⚡ Performance Analysis\n\n';
+              
+              // Slowest tests
+              const slowestTests = allTests
+                .sort((a, b) => b.duration - a.duration)
+                .slice(0, 5);
+              
+              if (slowestTests.length > 0) {
+                summary += '**Slowest Tests:**\n';
+                slowestTests.forEach((test, index) => {
+                  let icon = '🚀';
+                  if (test.duration > 30) icon = '🐌';
+                  else if (test.duration > 10) icon = '🐢';
+                  
+                  summary += `${index + 1}. ${icon} ${test.name} (${test.duration.toFixed(1)}s) - ${test.phase}\n`;
+                });
+                summary += '\n';
+              }
+              
+              // Phase timing breakdown
+              summary += '**Phase Timing Breakdown:**\n';
+              summary += '| Phase | Duration | Tests | Avg Time/Test |\n';
+              summary += '|-------|----------|-------|---------------|\n';
+              
+              phases.forEach(phase => {
+                if (phase.stats && phase.stats.testCount > 0) {
+                  const avgTime = phase.stats.avgDuration.toFixed(2);
+                  const duration = formatDuration(phase.totalDuration || phase.stats.totalDuration);
+                  summary += `| ${phase.phase} | ${duration} | ${phase.stats.testCount} | ${avgTime}s |\n`;
+                }
+              });
+              summary += '\n';
+            }
             
             // Add test details sections for each phase
             phases.forEach(phase => {
