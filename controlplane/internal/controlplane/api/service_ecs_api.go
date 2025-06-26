@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
@@ -287,6 +288,15 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		if err := api.registerServiceWithDiscovery(ctx, storageService, req.ServiceRegistries); err != nil {
 			// Log error but don't fail service creation
 			log.Printf("Warning: Failed to register service with service discovery: %v", err)
+		}
+	}
+
+	// In test mode, create tasks immediately for the service
+	if config.GetBool("features.testMode") && storageService.DesiredCount > 0 {
+		log.Printf("Test mode: Creating %d tasks for service %s", storageService.DesiredCount, storageService.ServiceName)
+		if err := api.createTasksForService(ctx, storageService, taskDef, cluster); err != nil {
+			log.Printf("Warning: Failed to create tasks for service in test mode: %v", err)
+			// Don't fail service creation, tasks will be created by the worker
 		}
 	}
 
@@ -1342,5 +1352,54 @@ func (api *DefaultECSAPI) registerServiceWithDiscovery(ctx context.Context, serv
 		return fmt.Errorf("failed to update service with registry metadata: %w", err)
 	}
 
+	return nil
+}
+
+// createTasksForService creates tasks for a service in test mode
+func (api *DefaultECSAPI) createTasksForService(ctx context.Context, service *storage.Service, taskDef *storage.TaskDefinition, cluster *storage.Cluster) error {
+	// In test mode, we create tasks directly in storage without kubernetes resources
+	for i := 0; i < service.DesiredCount; i++ {
+		// Generate task ID
+		taskID := uuid.New().String()
+		taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", api.region, api.accountID, cluster.Name, taskID)
+		
+		// Create storage task
+		now := time.Now()
+		task := &storage.Task{
+			ID:                 taskID,
+			ARN:                taskARN,
+			ClusterARN:         cluster.ARN,
+			TaskDefinitionARN:  taskDef.ARN,
+			LastStatus:         "PROVISIONING",
+			DesiredStatus:      "RUNNING",
+			LaunchType:         service.LaunchType,
+			StartedBy:          fmt.Sprintf("ecs-svc/%s", service.ServiceName),
+			CreatedAt:          now,
+			Version:            1,
+			CPU:                taskDef.CPU,
+			Memory:             taskDef.Memory,
+			ContainerInstanceARN: "", // Empty in test mode
+			Group:              fmt.Sprintf("service:%s", service.ServiceName),
+			Containers:         "[]", // Empty containers JSON initially
+		}
+		
+		// Save task to storage
+		if err := api.storage.TaskStore().Create(ctx, task); err != nil {
+			return fmt.Errorf("failed to create task %d: %w", i, err)
+		}
+		
+		log.Printf("Created task %s for service %s in test mode", taskID, service.ServiceName)
+	}
+	
+	// Update service counts
+	service.RunningCount = service.DesiredCount
+	service.PendingCount = 0
+	service.Status = "ACTIVE"
+	service.UpdatedAt = time.Now()
+	
+	if err := api.storage.ServiceStore().Update(ctx, service); err != nil {
+		return fmt.Errorf("failed to update service counts: %w", err)
+	}
+	
 	return nil
 }
