@@ -301,6 +301,22 @@ export function getWebSocketInstance(): WebSocketService | null {
 
 // WebSocket URL builder
 export function buildWebSocketUrl(path: string, params?: Record<string, string>): string {
+  // Check runtime config first (for Docker deployments)
+  if (typeof window !== 'undefined' && (window as any).KECS_CONFIG?.WS_ENDPOINT) {
+    const wsEndpoint = (window as any).KECS_CONFIG.WS_ENDPOINT;
+    let url = wsEndpoint.replace(/\/$/, '') + path;
+    
+    if (params) {
+      const queryString = new URLSearchParams(params).toString();
+      if (queryString) {
+        url += `?${queryString}`;
+      }
+    }
+    
+    return url;
+  }
+  
+  // Fallback to default behavior
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = process.env.REACT_APP_WS_HOST || window.location.host;
   

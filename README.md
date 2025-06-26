@@ -251,6 +251,52 @@ kecs server --port 8080 --admin-port 8081
 kecs server --no-webui
 ```
 
+### Separated UI/API Deployment
+
+KECS supports running the API and UI as separate containers for better scalability and resource management:
+
+#### Using Docker Compose
+
+```bash
+# Run combined mode (default)
+docker compose up
+
+# Run separated mode with Traefik-powered UI
+docker compose --profile separated up
+
+# Run only the API
+docker compose --profile separated up kecs-api
+
+# Run API and UI separately
+docker compose --profile separated up kecs-api kecs-ui
+```
+
+#### Using KECS CLI
+
+```bash
+# Start API without UI
+kecs start --name kecs-api --no-webui --api-port 8080
+
+# Start UI separately with Traefik
+kecs start-ui --name kecs-ui --api-endpoint http://localhost:8080 --port 3000
+
+# Stop UI
+kecs stop-ui --name kecs-ui
+```
+
+#### Building Separated Images
+
+```bash
+# Build API-only image
+make docker-build-api
+
+# Build UI-only image with Traefik
+make docker-build-ui
+
+# Build both separated images
+make docker-build-separated
+```
+
 ## API Endpoints
 
 KECS provides ECS-compatible API endpoints:

@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `KECS_WEBUI_ENABLED` environment variable
   - Configurable via `ui.enabled` in config file
   - Improves resource usage and startup time when UI not needed
+- Separated UI/API deployment support (#253 Phase 2)
+  - `kecs start-ui` command to run UI in separate container
+  - Traefik-powered Web UI with advanced routing
+  - Separate Docker images: `kecs-api` and `kecs-ui`
+  - Docker Compose profiles for combined/separated modes
+  - Runtime configuration injection for API endpoints
 
 ### Changed
 

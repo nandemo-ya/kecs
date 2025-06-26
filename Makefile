@@ -135,12 +135,39 @@ docker-build:
 	$(DOCKER) build -t $(DOCKER_IMAGE):$(VERSION) $(CONTROLPLANE_DIR)
 	$(DOCKER) tag $(DOCKER_IMAGE):$(VERSION) $(DOCKER_IMAGE):latest
 
+# Build API-only Docker image
+.PHONY: docker-build-api
+docker-build-api:
+	@echo "Building API-only Docker image..."
+	$(DOCKER) build -t $(DOCKER_IMAGE)-api:$(VERSION) -f $(CONTROLPLANE_DIR)/Dockerfile.api $(CONTROLPLANE_DIR)
+	$(DOCKER) tag $(DOCKER_IMAGE)-api:$(VERSION) $(DOCKER_IMAGE)-api:latest
+
+# Build UI-only Docker image
+.PHONY: docker-build-ui
+docker-build-ui:
+	@echo "Building UI-only Docker image..."
+	$(DOCKER) build -t $(DOCKER_IMAGE)-ui:$(VERSION) $(WEBUI_DIR)
+	$(DOCKER) tag $(DOCKER_IMAGE)-ui:$(VERSION) $(DOCKER_IMAGE)-ui:latest
+
+# Build both separated images
+.PHONY: docker-build-separated
+docker-build-separated: docker-build-api docker-build-ui
+
 # Push Docker image
 .PHONY: docker-push
 docker-push: docker-build
 	@echo "Pushing Docker image..."
 	$(DOCKER) push $(DOCKER_IMAGE):$(VERSION)
 	$(DOCKER) push $(DOCKER_IMAGE):latest
+
+# Push separated Docker images
+.PHONY: docker-push-separated
+docker-push-separated: docker-build-separated
+	@echo "Pushing separated Docker images..."
+	$(DOCKER) push $(DOCKER_IMAGE)-api:$(VERSION)
+	$(DOCKER) push $(DOCKER_IMAGE)-api:latest
+	$(DOCKER) push $(DOCKER_IMAGE)-ui:$(VERSION)
+	$(DOCKER) push $(DOCKER_IMAGE)-ui:latest
 
 # Build AWS Proxy Docker image
 .PHONY: docker-build-awsproxy
