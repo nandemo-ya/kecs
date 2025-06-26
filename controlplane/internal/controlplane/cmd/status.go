@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
@@ -52,8 +51,8 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	if statusContainerName != "" {
 		filters.Add("name", statusContainerName)
 	} else {
-		// Look for containers with names starting with "kecs"
-		filters.Add("name", "kecs")
+		// Look for containers with the kecs label
+		filters.Add("label", "app=kecs")
 	}
 
 	// List containers
@@ -65,19 +64,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
 
-	// Filter to only KECS containers if no specific name was provided
-	if statusContainerName == "" {
-		var kecsContainers []types.Container
-		for _, c := range containers {
-			for _, name := range c.Names {
-				if strings.HasPrefix(strings.TrimPrefix(name, "/"), "kecs") {
-					kecsContainers = append(kecsContainers, c)
-					break
-				}
-			}
-		}
-		containers = kecsContainers
-	}
+	// No additional filtering needed as we're using labels
 
 	if len(containers) == 0 {
 		if statusContainerName != "" {

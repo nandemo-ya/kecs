@@ -1,0 +1,62 @@
+# KECS Multiple Instances Configuration Example
+# This file demonstrates how to configure multiple KECS instances
+# Copy this file to ~/.kecs/instances.yaml and customize as needed
+
+# Default instance to use when no specific instance is specified
+defaultInstance: dev
+
+# List of KECS instances
+instances:
+  # Development instance
+  - name: dev
+    image: ghcr.io/nandemo-ya/kecs:latest
+    ports:
+      api: 8080
+      admin: 8081
+    dataDir: ~/.kecs/instances/dev/data
+    autoStart: true
+    env:
+      KECS_LOG_LEVEL: debug
+    labels:
+      environment: development
+
+  # Staging instance
+  - name: staging
+    image: ghcr.io/nandemo-ya/kecs:latest
+    ports:
+      api: 8090
+      admin: 8091
+    dataDir: ~/.kecs/instances/staging/data
+    autoStart: true
+    env:
+      KECS_LOG_LEVEL: info
+    labels:
+      environment: staging
+
+  # Testing instance
+  - name: test
+    image: ghcr.io/nandemo-ya/kecs:latest
+    ports:
+      api: 8100
+      admin: 8101
+    dataDir: ~/.kecs/instances/test/data
+    autoStart: false  # Don't auto-start test instance
+    env:
+      KECS_TEST_MODE: "true"
+      KECS_LOG_LEVEL: warn
+    labels:
+      environment: test
+
+  # Local build instance
+  - name: local
+    image: kecs:local  # Use local build
+    ports:
+      api: 8110
+      admin: 8111
+    dataDir: ~/.kecs/instances/local/data
+    autoStart: false
+    env:
+      KECS_LOG_LEVEL: debug
+    labels:
+      environment: local
+      build: local
