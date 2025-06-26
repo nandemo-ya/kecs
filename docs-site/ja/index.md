@@ -40,36 +40,36 @@ import { onMounted } from 'vue'
   <h2 class="section-title">スケールでのパフォーマンス</h2>
   <p class="section-subtitle">KECS はコンテナ化されたワークロードに対してプロダクショングレードのパフォーマンスを提供します</p>
   
-  <MetricsCard :metrics="[
+  <MetricsCard :metrics='[
     {
-      icon: '⚡',
+      icon: "⚡",
       value: 1000,
-      suffix: '+',
-      label: 'クラスターあたりのタスク数',
-      description: '数千の同時実行タスクを簡単に処理'
+      suffix: "+",
+      label: "クラスターあたりのタスク数",
+      description: "数千の同時実行タスクを簡単に処理"
     },
     {
-      icon: '🚄',
+      icon: "🚄",
       value: 50,
-      suffix: 'ms',
-      label: 'API レスポンスタイム',
-      description: 'シームレスな操作のための超高速 API レスポンス'
+      suffix: "ms",
+      label: "API レスポンスタイム",
+      description: "シームレスな操作のための超高速 API レスポンス"
     },
     {
-      icon: '💾',
+      icon: "💾",
       value: 99.9,
-      suffix: '%',
-      label: 'データ耐久性',
-      description: 'DuckDB ストレージによる信頼性の高い永続化'
+      suffix: "%",
+      label: "データ耐久性",
+      description: "DuckDB ストレージによる信頼性の高い永続化"
     },
     {
-      icon: '🔄',
+      icon: "🔄",
       value: 0,
-      suffix: '',
-      label: 'ゼロダウンタイム',
-      description: 'グレースフルな更新とローリングデプロイメント'
+      suffix: "",
+      label: "ゼロダウンタイム",
+      description: "グレースフルな更新とローリングデプロイメント"
     }
-  ]" />
+  ]' />
 </div>
 
 <!-- インタラクティブデモセクション -->
@@ -78,11 +78,11 @@ import { onMounted } from 'vue'
   <p class="section-subtitle">KECS のシンプルさとパワーを体験してください</p>
   
   <InteractiveDemo 
-    title="クイックスタート例"
-    :tabs="[
+    title='クイックスタート例'
+    :tabs='[
       {
-        label: 'クラスター作成',
-        language: 'bash',
+        label: "クラスター作成",
+        language: "bash",
         code: `# KECS サーバーを起動
 kecs server --port 8080
 
@@ -91,25 +91,25 @@ aws ecs create-cluster \\
   --cluster-name my-app \\
   --endpoint-url http://localhost:8080`,
         output: `{
-  \"cluster\": {
-    \"clusterArn\": \"arn:aws:ecs:us-east-1:123456789012:cluster/my-app\",
-    \"clusterName\": \"my-app\",
-    \"status\": \"ACTIVE\"
+  "cluster": {
+    "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/my-app",
+    "clusterName": "my-app",
+    "status": "ACTIVE"
   }
 }`
       },
       {
-        label: 'サービスのデプロイ',
-        language: 'bash',
+        label: "サービスのデプロイ",
+        language: "bash",
         code: `# タスク定義を登録
 aws ecs register-task-definition \\
   --family nginx-app \\
   --container-definitions '[{
-    \"name\": \"nginx\",
-    \"image\": \"nginx:latest\",
-    \"memory\": 512,
-    \"portMappings\": [{
-      \"containerPort\": 80
+    "name": "nginx",
+    "image": "nginx:latest",
+    "memory": 512,
+    "portMappings": [{
+      "containerPort": 80
     }]
   }]' \\
   --endpoint-url http://localhost:8080
@@ -125,8 +125,8 @@ aws ecs create-service \\
 3 つのタスクがローカル Kubernetes クラスターで実行中です`
       },
       {
-        label: 'Web UI',
-        language: 'javascript',
+        label: "Web UI",
+        language: "javascript",
         code: `// Web UI には http://localhost:8080/ui でアクセス
 // WebSocket によるリアルタイム更新
 
@@ -142,7 +142,7 @@ ws.onmessage = (event) => {
         output: `KECS WebSocket に接続しました
 すべての ECS リソースのリアルタイム更新を受信中...`
       }
-    ]"
+    ]'
   />
 </div>
 

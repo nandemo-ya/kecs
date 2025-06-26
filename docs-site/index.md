@@ -40,36 +40,36 @@ import { onMounted } from 'vue'
   <h2 class="section-title">Performance at Scale</h2>
   <p class="section-subtitle">KECS delivers production-grade performance for your containerized workloads</p>
   
-  <MetricsCard :metrics="[
+  <MetricsCard :metrics='[
     {
-      icon: '⚡',
+      icon: "⚡",
       value: 1000,
-      suffix: '+',
-      label: 'Tasks per Cluster',
-      description: 'Handle thousands of concurrent tasks with ease'
+      suffix: "+",
+      label: "Tasks per Cluster",
+      description: "Handle thousands of concurrent tasks with ease"
     },
     {
-      icon: '🚄',
+      icon: "🚄",
       value: 50,
-      suffix: 'ms',
-      label: 'API Response Time',
-      description: 'Lightning-fast API responses for seamless operations'
+      suffix: "ms",
+      label: "API Response Time",
+      description: "Lightning-fast API responses for seamless operations"
     },
     {
-      icon: '💾',
+      icon: "💾",
       value: 99.9,
-      suffix: '%',
-      label: 'Data Durability',
-      description: 'Reliable persistence with DuckDB storage'
+      suffix: "%",
+      label: "Data Durability",
+      description: "Reliable persistence with DuckDB storage"
     },
     {
-      icon: '🔄',
+      icon: "🔄",
       value: 0,
-      suffix: '',
-      label: 'Zero Downtime',
-      description: 'Graceful updates and rolling deployments'
+      suffix: "",
+      label: "Zero Downtime",
+      description: "Graceful updates and rolling deployments"
     }
-  ]" />
+  ]' />
 </div>
 
 <!-- Interactive Demo Section -->
@@ -78,11 +78,11 @@ import { onMounted } from 'vue'
   <p class="section-subtitle">Experience the simplicity and power of KECS</p>
   
   <InteractiveDemo 
-    title="Quick Start Example"
-    :tabs="[
+    title='Quick Start Example'
+    :tabs='[
       {
-        label: 'Create Cluster',
-        language: 'bash',
+        label: "Create Cluster",
+        language: "bash",
         code: `# Start KECS server
 kecs server --port 8080
 
@@ -91,25 +91,25 @@ aws ecs create-cluster \\
   --cluster-name my-app \\
   --endpoint-url http://localhost:8080`,
         output: `{
-  \"cluster\": {
-    \"clusterArn\": \"arn:aws:ecs:us-east-1:123456789012:cluster/my-app\",
-    \"clusterName\": \"my-app\",
-    \"status\": \"ACTIVE\"
+  "cluster": {
+    "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/my-app",
+    "clusterName": "my-app",
+    "status": "ACTIVE"
   }
 }`
       },
       {
-        label: 'Deploy Service',
-        language: 'bash',
+        label: "Deploy Service",
+        language: "bash",
         code: `# Register task definition
 aws ecs register-task-definition \\
   --family nginx-app \\
   --container-definitions '[{
-    \"name\": \"nginx\",
-    \"image\": \"nginx:latest\",
-    \"memory\": 512,
-    \"portMappings\": [{
-      \"containerPort\": 80
+    "name": "nginx",
+    "image": "nginx:latest",
+    "memory": 512,
+    "portMappings": [{
+      "containerPort": 80
     }]
   }]' \\
   --endpoint-url http://localhost:8080
@@ -125,8 +125,8 @@ aws ecs create-service \\
 3 tasks are now running in your local Kubernetes cluster`
       },
       {
-        label: 'Web UI',
-        language: 'javascript',
+        label: "Web UI",
+        language: "javascript",
         code: `// Access the Web UI at http://localhost:8080/ui
 // Real-time updates via WebSocket
 
@@ -142,7 +142,7 @@ ws.onmessage = (event) => {
         output: `Connected to KECS WebSocket
 Receiving real-time updates for all ECS resources...`
       }
-    ]"
+    ]'
   />
 </div>
 
