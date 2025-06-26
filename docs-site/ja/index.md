@@ -83,64 +83,20 @@ import { onMounted } from 'vue'
       {
         label: "クラスター作成",
         language: "bash",
-        code: `# KECS サーバーを起動
-kecs server --port 8080
-
-# 新しい ECS クラスターを作成
-aws ecs create-cluster \\
-  --cluster-name my-app \\
-  --endpoint-url http://localhost:8080`,
-        output: `{
-  "cluster": {
-    "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/my-app",
-    "clusterName": "my-app",
-    "status": "ACTIVE"
-  }
-}`
+        code: '# KECS サーバーを起動\nkecs server --port 8080\n\n# 新しい ECS クラスターを作成\naws ecs create-cluster \\\n  --cluster-name my-app \\\n  --endpoint-url http://localhost:8080',
+        output: '{\n  "cluster": {\n    "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/my-app",\n    "clusterName": "my-app",\n    "status": "ACTIVE"\n  }\n}'
       },
       {
         label: "サービスのデプロイ",
         language: "bash",
-        code: `# タスク定義を登録
-aws ecs register-task-definition \\
-  --family nginx-app \\
-  --container-definitions '[{
-    "name": "nginx",
-    "image": "nginx:latest",
-    "memory": 512,
-    "portMappings": [{
-      "containerPort": 80
-    }]
-  }]' \\
-  --endpoint-url http://localhost:8080
-
-# サービスを作成
-aws ecs create-service \\
-  --cluster my-app \\
-  --service-name nginx-service \\
-  --task-definition nginx-app \\
-  --desired-count 3 \\
-  --endpoint-url http://localhost:8080`,
-        output: `サービスが正常に作成されました！
-3 つのタスクがローカル Kubernetes クラスターで実行中です`
+        code: '# タスク定義を登録\naws ecs register-task-definition \\\n  --family nginx-app \\\n  --container-definitions \'[{\n    "name": "nginx",\n    "image": "nginx:latest",\n    "memory": 512,\n    "portMappings": [{\n      "containerPort": 80\n    }]\n  }]\' \\\n  --endpoint-url http://localhost:8080\n\n# サービスを作成\naws ecs create-service \\\n  --cluster my-app \\\n  --service-name nginx-service \\\n  --task-definition nginx-app \\\n  --desired-count 3 \\\n  --endpoint-url http://localhost:8080',
+        output: 'サービスが正常に作成されました！\n3 つのタスクがローカル Kubernetes クラスターで実行中です'
       },
       {
         label: "Web UI",
         language: "javascript",
-        code: `// Web UI には http://localhost:8080/ui でアクセス
-// WebSocket によるリアルタイム更新
-
-const ws = new WebSocket('ws://localhost:8080/ws');
-
-ws.onmessage = (event) => {
-  const update = JSON.parse(event.data);
-  console.log('タスクステータス:', update.taskArn, update.lastStatus);
-};
-
-// ライブ更新でサービスをモニタリング
-// ログ、メトリクスの表示、リソースの視覚的管理`,
-        output: `KECS WebSocket に接続しました
-すべての ECS リソースのリアルタイム更新を受信中...`
+        code: '// Web UI には http://localhost:8080/ui でアクセス\n// WebSocket によるリアルタイム更新\n\nconst ws = new WebSocket(\'ws://localhost:8080/ws\');\n\nws.onmessage = (event) => {\n  const update = JSON.parse(event.data);\n  console.log(\'タスクステータス:\', update.taskArn, update.lastStatus);\n};\n\n// ライブ更新でサービスをモニタリング\n// ログ、メトリクスの表示、リソースの視覚的管理',
+        output: 'KECS WebSocket に接続しました\nすべての ECS リソースのリアルタイム更新を受信中...'
       }
     ]'
   />

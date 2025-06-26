@@ -78,71 +78,27 @@ import { onMounted } from 'vue'
   <p class="section-subtitle">Experience the simplicity and power of KECS</p>
   
   <InteractiveDemo 
-    title='Quick Start Example'
-    :tabs='[
+    title="Quick Start Example"
+    :tabs="[
       {
-        label: "Create Cluster",
-        language: "bash",
-        code: `# Start KECS server
-kecs server --port 8080
-
-# Create a new ECS cluster
-aws ecs create-cluster \\
-  --cluster-name my-app \\
-  --endpoint-url http://localhost:8080`,
-        output: `{
-  "cluster": {
-    "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/my-app",
-    "clusterName": "my-app",
-    "status": "ACTIVE"
-  }
-}`
+        label: 'Create Cluster',
+        language: 'bash',
+        code: '# Start KECS server\nkecs server --port 8080\n\n# Create a new ECS cluster\naws ecs create-cluster \\\n  --cluster-name my-app \\\n  --endpoint-url http://localhost:8080',
+        output: '{\n  \"cluster\": {\n    \"clusterArn\": \"arn:aws:ecs:us-east-1:123456789012:cluster/my-app\",\n    \"clusterName\": \"my-app\",\n    \"status\": \"ACTIVE\"\n  }\n}'
       },
       {
-        label: "Deploy Service",
-        language: "bash",
-        code: `# Register task definition
-aws ecs register-task-definition \\
-  --family nginx-app \\
-  --container-definitions '[{
-    "name": "nginx",
-    "image": "nginx:latest",
-    "memory": 512,
-    "portMappings": [{
-      "containerPort": 80
-    }]
-  }]' \\
-  --endpoint-url http://localhost:8080
-
-# Create service
-aws ecs create-service \\
-  --cluster my-app \\
-  --service-name nginx-service \\
-  --task-definition nginx-app \\
-  --desired-count 3 \\
-  --endpoint-url http://localhost:8080`,
-        output: `Service created successfully!
-3 tasks are now running in your local Kubernetes cluster`
+        label: 'Deploy Service',
+        language: 'bash',
+        code: '# Register task definition\naws ecs register-task-definition \\\n  --family nginx-app \\\n  --container-definitions \'[{\n    \"name\": \"nginx\",\n    \"image\": \"nginx:latest\",\n    \"memory\": 512,\n    \"portMappings\": [{\n      \"containerPort\": 80\n    }]\n  }]\' \\\n  --endpoint-url http://localhost:8080\n\n# Create service\naws ecs create-service \\\n  --cluster my-app \\\n  --service-name nginx-service \\\n  --task-definition nginx-app \\\n  --desired-count 3 \\\n  --endpoint-url http://localhost:8080',
+        output: 'Service created successfully!\n3 tasks are now running in your local Kubernetes cluster'
       },
       {
-        label: "Web UI",
-        language: "javascript",
-        code: `// Access the Web UI at http://localhost:8080/ui
-// Real-time updates via WebSocket
-
-const ws = new WebSocket('ws://localhost:8080/ws');
-
-ws.onmessage = (event) => {
-  const update = JSON.parse(event.data);
-  console.log('Task status:', update.taskArn, update.lastStatus);
-};
-
-// Monitor your services with live updates
-// View logs, metrics, and manage resources visually`,
-        output: `Connected to KECS WebSocket
-Receiving real-time updates for all ECS resources...`
+        label: 'Web UI',
+        language: 'javascript',
+        code: '// Access the Web UI at http://localhost:8080/ui\n// Real-time updates via WebSocket\n\nconst ws = new WebSocket(\'ws://localhost:8080/ws\');\n\nws.onmessage = (event) => {\n  const update = JSON.parse(event.data);\n  console.log(\'Task status:\', update.taskArn, update.lastStatus);\n};\n\n// Monitor your services with live updates\n// View logs, metrics, and manage resources visually',
+        output: 'Connected to KECS WebSocket\nReceiving real-time updates for all ECS resources...'
       }
-    ]'
+    ]"
   />
 </div>
 
