@@ -4,7 +4,13 @@
 
 ## Status
 
-Proposed
+Superseded by ADR-0016
+
+## Superseding Note
+
+This ADR has been superseded by ADR-0016 (Web UI Deprecation and TUI Adoption). The decision to implement a React-based Web UI has been reversed in favor of a Terminal User Interface (TUI) built with Bubbletea. The TUI approach better aligns with KECS's target audience and reduces maintenance complexity by keeping the entire codebase in Go.
+
+For details on the new approach, see [ADR-0016](./0016-web-ui-deprecation-and-tui-adoption.md).
 
 ## Context
 
