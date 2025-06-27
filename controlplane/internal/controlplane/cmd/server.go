@@ -17,6 +17,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/admin"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/security"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/cache"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 )
@@ -97,6 +98,15 @@ func runServer() {
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
 		log.Fatalf("Invalid configuration: %v", err)
+	}
+
+	// Show security disclaimer if needed
+	if err := security.ShowDisclaimerIfNeeded(
+		cfg.Features.SkipSecurityDisclaimer,
+		cfg.Features.SecurityAcknowledged,
+		cfg.Server.DataDir,
+	); err != nil {
+		log.Fatalf("Security disclaimer not acknowledged: %v", err)
 	}
 
 	fmt.Printf("Starting KECS Control Plane server on port %d with log level %s\n", cfg.Server.Port, cfg.Server.LogLevel)

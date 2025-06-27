@@ -53,6 +53,10 @@ type ContainerConfig struct {
 	
 	// Health check
 	HealthCheck *HealthCheck
+	
+	// User and group settings
+	User       string   // User or UID
+	GroupAdd   []string // Additional groups
 }
 
 // Container represents a container

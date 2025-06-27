@@ -186,6 +186,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		"KECS_CONTAINER_MODE=true",
 		fmt.Sprintf("KECS_DATA_DIR=%s", "/data"),
 		"KECS_LOG_LEVEL=info",
+		"KECS_SECURITY_ACKNOWLEDGED=true",  // Skip security disclaimer in container
 	}
 
 	// Add config file if specified
@@ -204,6 +205,10 @@ func runStart(cmd *cobra.Command, args []string) error {
 		})
 	}
 
+	// Add docker socket group (typically 0/root on most systems)
+	// This allows the container to access the Docker socket
+	groupAdd := []string{"0"}
+
 	// Create container configuration
 	containerConfig := &runtime.ContainerConfig{
 		Name:  startContainerName,
@@ -213,6 +218,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 			"com.kecs.managed": "true",
 			"com.kecs.name":    startContainerName,
 		},
+		GroupAdd: groupAdd,
 		Ports: []runtime.PortBinding{
 			{
 				ContainerPort: 8080,

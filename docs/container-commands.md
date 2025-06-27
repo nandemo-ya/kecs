@@ -2,6 +2,15 @@
 
 This guide covers the container-based execution features of KECS, which allow you to run KECS in Docker containers similar to tools like kind and k3d.
 
+## ⚠️ Security Notice
+
+KECS requires Docker daemon access to manage local Kubernetes clusters. This provides significant capabilities including:
+- Full access to Docker daemon (equivalent to root access)
+- Ability to create, modify, and delete containers
+- Access to the host filesystem through volume mounts
+
+**Only use KECS in trusted environments**. See the [main README](../README.md#-security-notice---please-read) for detailed security information.
+
 ## Overview
 
 KECS provides container commands that make it easy to:
@@ -15,6 +24,7 @@ KECS provides container commands that make it easy to:
 - Docker installed and running
 - KECS binary in your PATH
 - Sufficient permissions to run Docker commands
+- A trusted environment (local development or CI/CD)
 
 ## Basic Usage
 

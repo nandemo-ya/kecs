@@ -18,22 +18,44 @@
 
 </div>
 
-## ⚠️ Important Disclaimer
+## ⚠️ Security Notice - Please Read
 
 **KECS is designed exclusively for local development and CI environments.**
 
-### Supported Environments
-✅ Local development machines  
-✅ CI/CD pipelines (GitHub Actions, GitLab CI, etc.)  
-✅ Isolated test environments  
+KECS requires access to the Docker daemon to create and manage local Kubernetes clusters. This provides significant capabilities:
 
-### NOT Supported
-❌ Production environments  
-❌ Public-facing deployments  
-❌ Multi-tenant systems  
-❌ Any environment with untrusted users  
+- **Full access to Docker daemon** (equivalent to root access)
+- **Ability to create, modify, and delete containers**
+- **Access to the host filesystem through volume mounts**
+- **Network configuration capabilities**
 
-**Security Notice**: KECS requires Docker daemon access to manage local Kubernetes clusters (k3d). This level of access is equivalent to root privileges. Only run KECS in trusted environments.
+### ✅ Supported Environments
+- Local development machines  
+- CI/CD pipelines (GitHub Actions, GitLab CI, Jenkins, etc.)  
+- Isolated test environments  
+
+### ❌ NOT Supported/Unsafe
+- Production environments  
+- Public-facing deployments  
+- Multi-tenant systems  
+- Environments with untrusted users  
+
+**By using KECS, you acknowledge that:**
+1. You understand the security implications
+2. You trust KECS with Docker daemon access
+3. You will only use KECS in supported environments
+
+### First Run
+
+On first run, KECS will display a security disclaimer and request acknowledgment. To skip this in automated environments:
+
+```bash
+# Set environment variable
+export KECS_SECURITY_ACKNOWLEDGED=true
+
+# Or add to config file
+echo "features.securityAcknowledged: true" >> ~/.kecs/config.yaml
+```
 
 ## Overview
 

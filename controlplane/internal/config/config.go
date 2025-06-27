@@ -48,9 +48,11 @@ type UIConfig struct {
 
 // FeaturesConfig represents feature toggles
 type FeaturesConfig struct {
-	TestMode         bool `yaml:"testMode" mapstructure:"testMode"`
-	ContainerMode    bool `yaml:"containerMode" mapstructure:"containerMode"`
-	AutoRecoverState bool `yaml:"autoRecoverState" mapstructure:"autoRecoverState"`
+	TestMode                bool `yaml:"testMode" mapstructure:"testMode"`
+	ContainerMode           bool `yaml:"containerMode" mapstructure:"containerMode"`
+	AutoRecoverState        bool `yaml:"autoRecoverState" mapstructure:"autoRecoverState"`
+	SecurityAcknowledged    bool `yaml:"securityAcknowledged" mapstructure:"securityAcknowledged"`
+	SkipSecurityDisclaimer  bool `yaml:"skipSecurityDisclaimer" mapstructure:"skipSecurityDisclaimer"`
 }
 
 // AWSConfig represents AWS-related configuration
@@ -102,6 +104,8 @@ func InitConfig() error {
 	v.SetDefault("features.testMode", false)
 	v.SetDefault("features.containerMode", false)
 	v.SetDefault("features.autoRecoverState", false)
+	v.SetDefault("features.securityAcknowledged", false)
+	v.SetDefault("features.skipSecurityDisclaimer", false)
 	
 	// AWS defaults
 	v.SetDefault("aws.defaultRegion", "us-east-1")
@@ -138,6 +142,8 @@ func bindLegacyEnvVars() {
 	v.BindEnv("kubernetes.keepClustersOnShutdown", "KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
 	v.BindEnv("features.autoRecoverState", "KECS_AUTO_RECOVER_STATE")
 	v.BindEnv("aws.proxyImage", "KECS_AWS_PROXY_IMAGE")
+	v.BindEnv("features.securityAcknowledged", "KECS_SECURITY_ACKNOWLEDGED")
+	v.BindEnv("features.skipSecurityDisclaimer", "KECS_SKIP_SECURITY_DISCLAIMER")
 }
 
 // DefaultConfig returns the default configuration
