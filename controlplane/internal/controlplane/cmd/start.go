@@ -187,6 +187,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 		fmt.Sprintf("KECS_DATA_DIR=%s", "/data"),
 		"KECS_LOG_LEVEL=info",
 		"KECS_SECURITY_ACKNOWLEDGED=true",  // Skip security disclaimer in container
+		"KECS_KUBECONFIG_PATH=/data/kubeconfig", // Store kubeconfig in data directory
+		"KECS_TEST_MODE=false", // Disable test mode for normal operation
 	}
 
 	// Add config file if specified
