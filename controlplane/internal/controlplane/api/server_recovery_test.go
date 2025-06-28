@@ -90,6 +90,75 @@ var _ = Describe("Server State Recovery", func() {
 				Expect(mockClusterMgr.ClusterMap).NotTo(HaveKey("kecs-test-cluster-2"))
 			})
 
+			It("should recover services and reschedule tasks", func() {
+				// Setup server with region and accountID
+				server.region = "us-east-1"
+				server.accountID = "123456789012"
+
+				// Create a task definition
+				taskDef := &storage.TaskDefinition{
+					ID:       "taskdef-1",
+					ARN:      "arn:aws:ecs:us-east-1:123456789012:task-definition/test-task:1",
+					Family:   "test-task",
+					Revision: 1,
+					Status:   "ACTIVE",
+					ContainerDefinitions: `[{
+						"name": "test-container",
+						"image": "nginx:latest",
+						"memory": 512,
+						"cpu": 256
+					}]`,
+					CPU:          "256",
+					Memory:       "512",
+					NetworkMode:  "bridge",
+					RegisteredAt: time.Now(),
+				}
+				_, err := mockStorage.TaskDefinitionStore().Register(ctx, taskDef)
+				Expect(err).To(BeNil())
+
+				// Create a service with desired count
+				service := &storage.Service{
+					ID:                "service-1",
+					ARN:               "arn:aws:ecs:us-east-1:123456789012:service/test-cluster-1/test-service",
+					ServiceName:       "test-service",
+					ClusterARN:        "arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-1",
+					TaskDefinitionARN: taskDef.ARN,
+					DesiredCount:      3, // We want 3 tasks
+					RunningCount:      0,
+					PendingCount:      0,
+					LaunchType:        "EC2",
+					Status:            "ACTIVE",
+					CreatedAt:         time.Now(),
+					UpdatedAt:         time.Now(),
+				}
+				err = mockStorage.ServiceStore().Create(ctx, service)
+				Expect(err).To(BeNil())
+
+				// Ensure cluster doesn't exist initially
+				mockClusterMgr.ClusterMap = make(map[string]bool)
+
+				// Run recovery
+				err = server.RecoverState(ctx)
+				Expect(err).To(BeNil())
+
+				// Verify cluster was created
+				Expect(mockClusterMgr.ClusterMap).To(HaveKey("kecs-test-cluster-1"))
+
+				// Verify tasks were created
+				tasks, err := mockStorage.TaskStore().List(ctx, "arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-1", storage.TaskFilters{})
+				Expect(err).To(BeNil())
+				Expect(len(tasks)).To(Equal(3), "Should have created 3 tasks for the service")
+
+				// Verify task properties
+				for _, task := range tasks {
+					Expect(task.ClusterARN).To(Equal("arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-1"))
+					Expect(task.TaskDefinitionARN).To(Equal(taskDef.ARN))
+					Expect(task.DesiredStatus).To(Equal("RUNNING"))
+					Expect(task.LaunchType).To(Equal("EC2"))
+					Expect(task.StartedBy).To(Equal("ecs-svc/test-service"))
+				}
+			})
+
 			It("should skip clusters that already exist", func() {
 				// Mark cluster as existing
 				mockClusterMgr.ClusterMap["kecs-test-cluster-1"] = true
