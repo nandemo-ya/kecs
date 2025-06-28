@@ -94,7 +94,7 @@ func InitConfig() error {
 	// Features defaults
 	v.SetDefault("features.testMode", false)
 	v.SetDefault("features.containerMode", false)
-	v.SetDefault("features.autoRecoverState", false)
+	v.SetDefault("features.autoRecoverState", true)
 	v.SetDefault("features.securityAcknowledged", false)
 	v.SetDefault("features.skipSecurityDisclaimer", false)
 	

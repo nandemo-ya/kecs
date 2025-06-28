@@ -20,6 +20,7 @@ type KECSContainer struct {
 	endpoint  string
 	adminPort string
 	ctx       context.Context
+	DataDir   string // For persistence testing
 }
 
 // StartKECS starts a new KECS container for testing
@@ -259,4 +260,250 @@ func getEnvOrDefault(key, defaultValue string) string {
 // getEnv is a wrapper for getting environment variables (for testing)
 var getEnv = func(key string) string {
 	return os.Getenv(key)
+}
+
+// StartKECSWithPersistence starts a KECS container with a persistent data directory
+func StartKECSWithPersistence(t TestingT) *KECSContainer {
+	ctx := context.Background()
+
+	// Create a temporary directory for persistent data
+	dataDir, err := os.MkdirTemp("", "kecs-test-data-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp data directory: %v", err)
+	}
+
+	// Ensure we're not in test mode for persistence tests
+	testMode := "false"
+
+	// Get cluster provider (k3d or kind)
+	clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
+
+	// Create temporary directory for kubeconfig if it doesn't exist
+	kubeconfigHostPath := "/tmp/kecs-kubeconfig"
+	os.MkdirAll(kubeconfigHostPath, 0755)
+
+	// Container request configuration with persistent volume
+	req := testcontainers.ContainerRequest{
+		Image:        getEnvOrDefault("KECS_IMAGE", "kecs:test"),
+		ExposedPorts: []string{"8080/tcp", "8081/tcp"},
+		Cmd:          []string{"server"}, // Use 'server' command to run directly
+		Env: map[string]string{
+			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
+			"KECS_TEST_MODE":              testMode,
+			"KECS_CONTAINER_MODE":         "false", // Disable container mode to prevent recursive container creation
+			"KECS_CLUSTER_PROVIDER":       clusterProvider,
+			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
+			"KECS_K3D_OPTIMIZED":          "true",
+			"KECS_SECURITY_ACKNOWLEDGED":  "true", // Skip security disclaimer
+			"KECS_DATA_DIR":               "/data",
+			"KECS_AUTO_RECOVER_STATE":     "true", // Enable auto recovery
+		},
+		WaitingFor: wait.ForAll(
+			wait.ForListeningPort("8080/tcp"),
+			wait.ForHTTP("/health").WithPort("8081/tcp"),
+		).WithDeadline(60 * time.Second),
+		// Add root group (0) to access Docker socket
+		HostConfigModifier: func(hc *container.HostConfig) {
+			hc.GroupAdd = []string{"0"}
+		},
+		Mounts: testcontainers.Mounts(
+			testcontainers.BindMount(dataDir, "/data"),
+		),
+	}
+
+	// Add Docker socket volume for container mode
+	req.Mounts = append(req.Mounts, testcontainers.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
+
+	// Add k3d kubeconfig volume
+	req.Mounts = append(req.Mounts, testcontainers.BindMount(kubeconfigHostPath, "/kecs/kubeconfig"))
+
+	// Start container
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	if err != nil {
+		os.RemoveAll(dataDir) // Clean up on failure
+		logs := getLogs(ctx, container)
+		t.Fatalf("Failed to start KECS container: %v\nLogs:\n%s", err, logs)
+	}
+
+	// Get exposed ports
+	endpoint, err := container.Endpoint(ctx, "http")
+	if err != nil {
+		container.Terminate(ctx)
+		os.RemoveAll(dataDir)
+		logs := getLogs(ctx, container)
+		t.Fatalf("Failed to get container endpoint: %v\nLogs:\n%s", err, logs)
+	}
+
+	adminPort, err := container.MappedPort(ctx, "8081")
+	if err != nil {
+		container.Terminate(ctx)
+		os.RemoveAll(dataDir)
+		logs := getLogs(ctx, container)
+		t.Fatalf("Failed to get admin port: %v\nLogs:\n%s", err, logs)
+	}
+
+	// Initialize API client
+	client, err := NewAWSClient(endpoint)
+	if err != nil {
+		container.Terminate(ctx)
+		os.RemoveAll(dataDir)
+		logs := getLogs(ctx, container)
+		t.Fatalf("Failed to initialize AWS client: %v\nLogs:\n%s", err, logs)
+	}
+
+	// Store client in registry for KECS CLI commands
+	clientRegistry[endpoint] = client
+
+	// Wait for KECS to be fully ready
+	waitForKECSReady(t, endpoint, fmt.Sprintf("http://localhost:%s", adminPort.Port()))
+
+	return &KECSContainer{
+		container: container,
+		endpoint:  endpoint,
+		adminPort: adminPort.Port(),
+		ctx:       ctx,
+		DataDir:   dataDir,
+	}
+}
+
+// RestartKECSWithPersistence restarts KECS with the same data directory
+func RestartKECSWithPersistence(t TestingT, dataDir string) *KECSContainer {
+	ctx := context.Background()
+
+	// Ensure we're not in test mode for persistence tests
+	testMode := "false"
+
+	// Get cluster provider (k3d or kind)
+	clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
+
+	// Create temporary directory for kubeconfig if it doesn't exist
+	kubeconfigHostPath := "/tmp/kecs-kubeconfig"
+	os.MkdirAll(kubeconfigHostPath, 0755)
+
+	// Container request configuration with persistent volume
+	req := testcontainers.ContainerRequest{
+		Image:        getEnvOrDefault("KECS_IMAGE", "kecs:test"),
+		ExposedPorts: []string{"8080/tcp", "8081/tcp"},
+		Cmd:          []string{"server"}, // Use 'server' command to run directly
+		Env: map[string]string{
+			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
+			"KECS_TEST_MODE":              testMode,
+			"KECS_CONTAINER_MODE":         "false", // Disable container mode to prevent recursive container creation
+			"KECS_CLUSTER_PROVIDER":       clusterProvider,
+			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
+			"KECS_K3D_OPTIMIZED":          "true",
+			"KECS_SECURITY_ACKNOWLEDGED":  "true", // Skip security disclaimer
+			"KECS_DATA_DIR":               "/data",
+			"KECS_AUTO_RECOVER_STATE":     "true", // Enable auto recovery
+		},
+		WaitingFor: wait.ForAll(
+			wait.ForListeningPort("8080/tcp"),
+			wait.ForHTTP("/health").WithPort("8081/tcp"),
+		).WithDeadline(60 * time.Second),
+		// Add root group (0) to access Docker socket
+		HostConfigModifier: func(hc *container.HostConfig) {
+			hc.GroupAdd = []string{"0"}
+		},
+		Mounts: testcontainers.Mounts(
+			testcontainers.BindMount(dataDir, "/data"),
+		),
+	}
+
+	// Add Docker socket volume for container mode
+	req.Mounts = append(req.Mounts, testcontainers.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
+
+	// Add k3d kubeconfig volume
+	req.Mounts = append(req.Mounts, testcontainers.BindMount(kubeconfigHostPath, "/kecs/kubeconfig"))
+
+	// Start container
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	if err != nil {
+		logs := getLogs(ctx, container)
+		t.Fatalf("Failed to restart KECS container: %v\nLogs:\n%s", err, logs)
+	}
+
+	// Get exposed ports
+	endpoint, err := container.Endpoint(ctx, "http")
+	if err != nil {
+		container.Terminate(ctx)
+		logs := getLogs(ctx, container)
+		t.Fatalf("Failed to get container endpoint: %v\nLogs:\n%s", err, logs)
+	}
+
+	adminPort, err := container.MappedPort(ctx, "8081")
+	if err != nil {
+		container.Terminate(ctx)
+		logs := getLogs(ctx, container)
+		t.Fatalf("Failed to get admin port: %v\nLogs:\n%s", err, logs)
+	}
+
+	// Initialize API client
+	client, err := NewAWSClient(endpoint)
+	if err != nil {
+		container.Terminate(ctx)
+		logs := getLogs(ctx, container)
+		t.Fatalf("Failed to initialize AWS client: %v\nLogs:\n%s", err, logs)
+	}
+
+	// Store client in registry for KECS CLI commands
+	clientRegistry[endpoint] = client
+
+	// Wait for KECS to be fully ready
+	waitForKECSReady(t, endpoint, fmt.Sprintf("http://localhost:%s", adminPort.Port()))
+
+	return &KECSContainer{
+		container: container,
+		endpoint:  endpoint,
+		adminPort: adminPort.Port(),
+		ctx:       ctx,
+		DataDir:   dataDir,
+	}
+}
+
+// Stop stops the KECS container without cleanup
+func (k *KECSContainer) Stop() error {
+	return k.container.Stop(k.ctx, nil)
+}
+
+// getLogs gets container logs for debugging
+func getLogs(ctx context.Context, container testcontainers.Container) string {
+	if container == nil {
+		return "container is nil"
+	}
+
+	logs, err := container.Logs(ctx)
+	if err != nil {
+		return fmt.Sprintf("failed to get logs: %v", err)
+	}
+
+	// Read all available logs
+	buf := make([]byte, 100000)
+	n, _ := logs.Read(buf)
+	return string(buf[:n])
+}
+
+// waitForKECSReady waits for KECS to be fully operational
+func waitForKECSReady(t TestingT, apiEndpoint, adminEndpoint string) {
+	// Wait a bit for initial startup
+	time.Sleep(3 * time.Second)
+
+	// TODO: Add health check polling if needed
+	// For now, just wait a bit more for KECS to be ready
+	time.Sleep(2 * time.Second)
+}
+
+// clientRegistry stores AWS clients for KECS endpoints
+var clientRegistry = make(map[string]interface{})
+
+// NewAWSClient creates an AWS client for the given endpoint
+func NewAWSClient(endpoint string) (interface{}, error) {
+	// This is a placeholder - actual implementation would create an AWS SDK client
+	// For testing purposes, we just return a dummy client
+	return endpoint, nil
 }
