@@ -42,6 +42,8 @@ type Model struct {
 	keyMap         keys.KeyMap
 	selectedARN    string
 	showDetails    bool
+	showCreate     bool
+	createModel    CreateModel
 }
 
 // tickMsg is sent when the refresh timer ticks
@@ -58,6 +60,9 @@ type clustersMsg struct {
 	clusters []api.Cluster
 	err      error
 }
+
+// ServiceListMsg is sent to return to the service list view
+type ServiceListMsg struct{}
 
 // New creates a new service list model
 func New(endpoint string) (*Model, error) {
@@ -93,10 +98,11 @@ func New(endpoint string) (*Model, error) {
 	t.SetStyles(s)
 
 	return &Model{
-		client:  client,
-		table:   t,
-		loading: true,
-		keyMap:  keys.DefaultKeyMap(),
+		client:      client,
+		table:       t,
+		loading:     true,
+		keyMap:      keys.DefaultKeyMap(),
+		createModel: NewCreateModel(client, []api.Cluster{}),
 	}, nil
 }
 
@@ -112,6 +118,23 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
+
+	// Handle create model updates
+	if m.showCreate {
+		switch msg := msg.(type) {
+		case ServiceListMsg:
+			m.showCreate = false
+			m.loading = true
+			return m, m.fetchServices
+		case CreatedMsg:
+			m.showCreate = false
+			m.loading = true
+			return m, m.fetchServices
+		default:
+			m.createModel, cmd = m.createModel.Update(msg)
+			return m, cmd
+		}
+	}
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -135,8 +158,9 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 				return m, m.fetchServices
 				
 			case keys.Matches(msg, m.keyMap.Create):
-				// TODO: Implement service creation
-				return m, nil
+				m.showCreate = true
+				m.createModel = NewCreateModel(m.client, m.clusters)
+				return m, m.createModel.Init()
 				
 			case keys.Matches(msg, m.keyMap.Delete):
 				// TODO: Implement service deletion
@@ -191,6 +215,10 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 
 // View implements tea.Model
 func (m *Model) View() string {
+	if m.showCreate {
+		return m.createModel.View()
+	}
+
 	if m.loading && len(m.services) == 0 {
 		return styles.Content.Render("Loading services...")
 	}
