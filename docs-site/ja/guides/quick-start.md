@@ -168,12 +168,6 @@ aws ecs describe-tasks \
   --endpoint-url http://localhost:8080
 ```
 
-### Web UI で表示
-
-1. ブラウザで http://localhost:8080/ui を開く
-2. クラスター → my-first-cluster に移動
-3. サービスをクリックして nginx-service を確認
-4. タスクをクリックして実行中のコンテナを確認
 
 ## ステップ 5: アプリケーションへのアクセス
 

@@ -168,12 +168,6 @@ aws ecs describe-tasks \
   --endpoint-url http://localhost:8080
 ```
 
-### View in Web UI
-
-1. Open http://localhost:8080/ui in your browser
-2. Navigate to Clusters → my-first-cluster
-3. Click on Services to see your nginx-service
-4. Click on Tasks to see running containers
 
 ## Step 5: Access Your Application
 

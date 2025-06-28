@@ -24,7 +24,6 @@ kecs/
 │   └── utils/                   # Utility functions
 ├── api/                          # API specifications
 │   └── openapi/                 # OpenAPI specs
-├── web-ui/                       # React Web UI
 ├── mcp-server/                   # Model Context Protocol server
 ├── tests/                        # Test suites
 │   ├── integration/             # Integration tests

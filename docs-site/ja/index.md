@@ -22,7 +22,7 @@ features:
     details: 信頼性とスケーラビリティのために Kubernetes 上に構築
   - icon: 🛠️
     title: 開発者フレンドリー
-    details: Kind による簡単なセットアップ、包括的な Web UI、WebSocket によるリアルタイム更新
+    details: Kind による簡単なセットアップ、WebSocket によるリアルタイム更新
   - icon: 📦
     title: 本番環境対応
     details: DuckDB による永続化、グレースフルシャットダウン、包括的なモニタリング
@@ -40,9 +40,6 @@ cd kecs
 # ビルドと実行
 make build
 ./bin/kecs server
-
-# Web UI にアクセス
-open http://localhost:8080
 ```
 
 ## なぜ KECS？
@@ -61,7 +58,6 @@ KECS は Kubernetes 上に ECS API 仕様を実装しています：
 - **コントロールプレーン**: ECS API リクエストの処理と状態管理
 - **ストレージレイヤー**: DuckDB による永続的なストレージ
 - **Kubernetes バックエンド**: ECS の概念を Kubernetes リソースに変換
-- **Web UI**: ビジュアル管理のためのモダンな React インターフェース
 
 ## コミュニティ
 

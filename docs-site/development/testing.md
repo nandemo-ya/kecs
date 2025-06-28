@@ -31,12 +31,6 @@ kecs/
 │   └── scenarios/                     # Scenario tests
 │       ├── cluster_lifecycle_test.go
 │       └── service_deployment_test.go
-└── web-ui/
-    └── src/
-        ├── components/
-        │   └── __tests__/            # React component tests
-        └── hooks/
-            └── __tests__/            # Hook tests
 ```
 
 ## Unit Testing
@@ -454,81 +448,6 @@ func TestServiceDeploymentScenario(t *testing.T) {
 }
 ```
 
-## Testing Web UI
-
-### Component Tests
-
-```typescript
-// web-ui/src/components/__tests__/ClusterCard.test.tsx
-import { render, screen, fireEvent } from '@testing-library/react';
-import { ClusterCard } from '../ClusterCard';
-
-describe('ClusterCard', () => {
-  const mockCluster = {
-    clusterName: 'test-cluster',
-    status: 'ACTIVE',
-    runningTasksCount: 5,
-    activeServicesCount: 2,
-  };
-
-  it('renders cluster information', () => {
-    render(<ClusterCard cluster={mockCluster} />);
-    
-    expect(screen.getByText('test-cluster')).toBeInTheDocument();
-    expect(screen.getByText('ACTIVE')).toBeInTheDocument();
-    expect(screen.getByText('5 tasks')).toBeInTheDocument();
-    expect(screen.getByText('2 services')).toBeInTheDocument();
-  });
-
-  it('calls onDelete when delete button clicked', () => {
-    const onDelete = jest.fn();
-    render(<ClusterCard cluster={mockCluster} onDelete={onDelete} />);
-    
-    fireEvent.click(screen.getByRole('button', { name: /delete/i }));
-    
-    expect(onDelete).toHaveBeenCalledWith('test-cluster');
-  });
-});
-```
-
-### Hook Tests
-
-```typescript
-// web-ui/src/hooks/__tests__/useCluster.test.ts
-import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useCluster } from '../useCluster';
-
-const createWrapper = () => {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  
-  return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
-};
-
-describe('useCluster', () => {
-  it('fetches cluster data', async () => {
-    const { result } = renderHook(
-      () => useCluster('test-cluster'),
-      { wrapper: createWrapper() }
-    );
-    
-    expect(result.current.isLoading).toBe(true);
-    
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
-    
-    expect(result.current.data?.clusterName).toBe('test-cluster');
-  });
-});
-```
-
 ## Performance Testing
 
 ### Load Tests
@@ -715,10 +634,6 @@ go test -race ./...
 cd controlplane
 ginkgo -r
 
-# Web UI tests
-cd web-ui
-npm test
-npm run test:coverage
 ```
 
 ### CI/CD Integration
@@ -745,7 +660,6 @@ jobs:
       - name: Install dependencies
         run: |
           make deps
-          cd web-ui && npm ci
       
       - name: Run unit tests
         run: make test-coverage
@@ -753,8 +667,6 @@ jobs:
       - name: Run integration tests
         run: make test-integration
       
-      - name: Run Web UI tests
-        run: cd web-ui && npm test -- --coverage
       
       - name: Upload coverage
         uses: codecov/codecov-action@v3

@@ -13,7 +13,7 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application without Web UI
+# Build the application
 RUN make build
 
 # Runtime stage
@@ -45,4 +45,4 @@ USER kecs
 
 # Set default command
 ENTRYPOINT ["/usr/local/bin/kecs"]
-CMD ["server", "--webui=false"]
+CMD ["server"]

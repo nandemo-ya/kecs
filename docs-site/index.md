@@ -25,7 +25,7 @@ features:
     details: Built on Kubernetes for reliability and scalability
   - icon: 🛠️
     title: Developer Friendly
-    details: Simple setup with Kind, comprehensive Web UI, and WebSocket real-time updates
+    details: Simple setup with Kind and WebSocket real-time updates
   - icon: 📦
     title: Production Ready
     details: DuckDB persistence, graceful shutdown, and comprehensive monitoring
@@ -44,8 +44,6 @@ cd kecs
 make build
 ./bin/kecs server
 
-# Access the Web UI
-open http://localhost:8080
 ```
 
 ## Why KECS?
@@ -64,7 +62,6 @@ KECS implements the ECS API specification on top of Kubernetes:
 - **Control Plane**: Handles ECS API requests and manages state
 - **Storage Layer**: DuckDB for persistent storage
 - **Kubernetes Backend**: Translates ECS concepts to Kubernetes resources
-- **Web UI**: Modern React interface for visual management
 
 ## Community
 

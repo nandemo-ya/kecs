@@ -9,11 +9,6 @@ server:
   idleTimeout: 120s
   shutdownTimeout: 30s
 
-# Web UI configuration
-webui:
-  enabled: true
-  basePath: "/ui"
-  
 # WebSocket configuration
 websocket:
   allowedOrigins:

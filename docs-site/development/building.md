@@ -7,7 +7,6 @@ This guide covers building KECS from source, creating releases, and packaging fo
 ### Required Tools
 
 - **Go 1.21+**: Programming language
-- **Node.js 18+**: For Web UI development
 - **Docker**: For container builds
 - **Make**: Build automation
 - **Git**: Version control
@@ -47,46 +46,14 @@ cd controlplane
 go build -o ../bin/kecs ./cmd/controlplane
 ```
 
-#### 2. Web UI Only
-
-```bash
-# Build Web UI
-cd web-ui
-npm install
-npm run build
-
-# Output in web-ui/dist/
-```
-
-#### 3. Complete Build with Embedded UI
-
-```bash
-# Build everything
-./scripts/build-webui.sh
-
-# Or step by step
-cd web-ui
-npm install
-npm run build
-
-cd ../controlplane
-go generate ./...
-go build -tags webui -o ../bin/kecs ./cmd/controlplane
-```
 
 ## Build Options
 
 ### Build Tags
 
 ```bash
-# Build with Web UI embedded
-go build -tags webui
-
 # Build with experimental features
 go build -tags experimental
-
-# Build with all features
-go build -tags "webui experimental"
 ```
 
 ### Build Variables
@@ -148,13 +115,9 @@ RUN go mod download
 # Copy source
 COPY . .
 
-# Build Web UI
-WORKDIR /build/web-ui
-RUN npm ci && npm run build
-
 # Build control plane
 WORKDIR /build
-RUN make build-webui
+RUN make build
 
 # Runtime stage
 FROM alpine:latest AS runtime
@@ -212,14 +175,11 @@ project_name: kecs
 before:
   hooks:
     - go mod tidy
-    - ./scripts/build-webui.sh
 
 builds:
   - id: kecs
     main: ./controlplane/cmd/controlplane
     binary: kecs
-    tags:
-      - webui
     ldflags:
       - -s -w
       - -X main.version={{.Version}}
@@ -404,25 +364,6 @@ build-fast:
 	go build -i -o bin/kecs ./cmd/controlplane
 ```
 
-### Conditional Compilation
-
-```go
-// +build webui
-
-package main
-
-import (
-    "embed"
-    "net/http"
-)
-
-//go:embed all:web-ui/dist
-var webUI embed.FS
-
-func init() {
-    http.Handle("/ui/", http.FileServer(http.FS(webUI)))
-}
-```
 
 ## Development Builds
 
@@ -505,14 +446,7 @@ dpkg-deb --build debian kecs_1.0.0_amd64.deb
    go mod tidy
    ```
 
-2. **Node dependencies**
-   ```bash
-   cd web-ui
-   rm -rf node_modules package-lock.json
-   npm install
-   ```
-
-3. **Build cache issues**
+2. **Build cache issues**
    ```bash
    go clean -cache
    go clean -modcache
@@ -536,7 +470,6 @@ docker run --rm kecs:latest version
 
 # Check dependencies
 go mod graph
-npm list --depth=0
 ```
 
 ## Next Steps

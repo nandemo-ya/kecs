@@ -36,7 +36,6 @@ type Server struct {
 	region                    string
 	accountID                 string
 	webSocketHub              *WebSocketHub
-	webUIHandler              *WebUIHandler
 	testModeWorker            *TestModeTaskWorker
 	localStackManager         localstack.Manager
 	awsProxyRouter            *AWSProxyRouter
@@ -121,15 +120,6 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		s.taskManager = taskManager
 	}
 
-	// Initialize Web UI handler if enabled
-	if EnableWebUI() && GetWebUIFS != nil {
-		if fs := GetWebUIFS(); fs != nil {
-			s.webUIHandler = NewWebUIHandler(fs)
-			log.Println("Web UI enabled")
-		}
-	} else {
-		log.Println("Web UI disabled")
-	}
 
 	// Initialize test mode worker if in test mode
 	if config.GetBool("features.testMode") {
@@ -360,13 +350,6 @@ func (s *Server) Start() error {
 	}
 
 	log.Printf("Starting API server on port %d", s.port)
-	if s.webUIHandler != nil {
-		uiBasePath := os.Getenv("KECS_UI_BASE_PATH")
-		if uiBasePath == "" {
-			uiBasePath = "/ui"
-		}
-		log.Printf("Web UI available at http://localhost:%d%s/", s.port, uiBasePath)
-	}
 	return s.httpServer.ListenAndServe()
 }
 
@@ -614,28 +597,6 @@ func (s *Server) SetupRoutes() http.Handler {
 	mux.HandleFunc("/ws/notifications", s.HandleWebSocket(s.webSocketHub))
 	mux.HandleFunc("/ws/tasks", s.HandleWebSocket(s.webSocketHub))
 
-	// Web UI endpoint (must be last to catch all)
-	if s.webUIHandler != nil {
-		// Support configurable UI base path
-		uiBasePath := os.Getenv("KECS_UI_BASE_PATH")
-		if uiBasePath == "" {
-			uiBasePath = "/ui"
-		}
-		// Ensure base path starts with /
-		if !strings.HasPrefix(uiBasePath, "/") {
-			uiBasePath = "/" + uiBasePath
-		}
-		// Remove trailing slash
-		uiBasePath = strings.TrimSuffix(uiBasePath, "/")
-
-		// Handle UI routes - this will match /ui/* paths
-		mux.Handle(uiBasePath+"/", http.StripPrefix(uiBasePath, s.webUIHandler))
-
-		// Redirect /ui to /ui/
-		mux.HandleFunc(uiBasePath, func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, uiBasePath+"/", http.StatusMovedPermanently)
-		})
-	}
 
 	// Apply middleware
 	handler := http.Handler(mux)

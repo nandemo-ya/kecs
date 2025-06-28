@@ -16,7 +16,6 @@ type Config struct {
 	Server     ServerConfig      `yaml:"server"`
 	LocalStack localstack.Config `yaml:"localstack"`
 	Kubernetes KubernetesConfig  `yaml:"kubernetes"`
-	UI         UIConfig          `yaml:"ui"`
 	Features   FeaturesConfig    `yaml:"features"`
 	AWS        AWSConfig         `yaml:"aws"`
 }
@@ -40,11 +39,6 @@ type KubernetesConfig struct {
 	KeepClustersOnShutdown bool   `yaml:"keepClustersOnShutdown" mapstructure:"keepClustersOnShutdown"`
 }
 
-// UIConfig represents UI-related configuration
-type UIConfig struct {
-	BasePath string `yaml:"basePath" mapstructure:"basePath"`
-	Enabled  bool   `yaml:"enabled" mapstructure:"enabled"`
-}
 
 // FeaturesConfig represents feature toggles
 type FeaturesConfig struct {
@@ -96,9 +90,6 @@ func InitConfig() error {
 	v.SetDefault("kubernetes.disableCoreDNS", false)
 	v.SetDefault("kubernetes.keepClustersOnShutdown", false)
 	
-	// UI defaults
-	v.SetDefault("ui.basePath", "")
-	v.SetDefault("ui.enabled", true)
 	
 	// Features defaults
 	v.SetDefault("features.testMode", false)
@@ -132,8 +123,6 @@ func bindLegacyEnvVars() {
 	v.BindEnv("aws.defaultRegion", "KECS_DEFAULT_REGION")
 	v.BindEnv("aws.accountID", "KECS_ACCOUNT_ID")
 	v.BindEnv("server.allowedOrigins", "KECS_ALLOWED_ORIGINS")
-	v.BindEnv("ui.basePath", "KECS_UI_BASE_PATH")
-	v.BindEnv("ui.enabled", "KECS_WEBUI_ENABLED")
 	v.BindEnv("server.endpoint", "KECS_ENDPOINT")
 	v.BindEnv("kubernetes.kubeconfigPath", "KECS_KUBECONFIG_PATH")
 	v.BindEnv("kubernetes.k3dOptimized", "KECS_K3D_OPTIMIZED")

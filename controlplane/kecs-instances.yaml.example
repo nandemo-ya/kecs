@@ -61,29 +61,15 @@ instances:
       environment: local
       build: local
 
-  # Separated mode example - API only
-  - name: prod-api
-    image: ghcr.io/nandemo-ya/kecs-api:latest
+  # Production example
+  - name: prod
+    image: ghcr.io/nandemo-ya/kecs:latest
     ports:
       api: 8200
       admin: 8201
     dataDir: ~/.kecs/instances/prod/data
     autoStart: false
     env:
-      KECS_WEBUI_ENABLED: "false"
       KECS_LOG_LEVEL: info
     labels:
       environment: production
-      component: api
-
-  # Separated mode example - UI only
-  - name: prod-ui
-    image: ghcr.io/nandemo-ya/kecs-ui:latest
-    ports:
-      ui: 3000  # UI port
-    autoStart: false
-    env:
-      KECS_API_ENDPOINT: "http://localhost:8200"
-    labels:
-      environment: production
-      component: ui

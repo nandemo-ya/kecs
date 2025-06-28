@@ -70,18 +70,8 @@ KECS_REGION=ap-northeast-1
 KECS_ACCOUNT_ID=123456789012
 KECS_STORAGE_PATH=/tmp/kecs-${branch_name}.db
 KECS_LOG_LEVEL=debug
-KECS_ENABLE_WEB_UI=true
 EOF
 
-    # Create web-ui .env
-    if [ -d "${worktree_path}/web-ui" ]; then
-        cat > "${worktree_path}/web-ui/.env" << EOF
-# Web UI configuration for ${branch_name}
-VITE_API_URL=http://localhost:8080
-VITE_WS_URL=ws://localhost:8080
-VITE_APP_TITLE=KECS Dashboard (${branch_name})
-EOF
-    fi
     
     # Create mcp-server .env
     if [ -d "${worktree_path}/mcp-server" ]; then
@@ -108,11 +98,6 @@ setup_dependencies() {
         (cd "${worktree_path}/controlplane" && go mod download)
     fi
     
-    # Node dependencies for web-ui
-    if [ -f "${worktree_path}/web-ui/package.json" ]; then
-        print_info "Installing web-ui dependencies..."
-        (cd "${worktree_path}/web-ui" && npm install)
-    fi
     
     # Node dependencies for mcp-server
     if [ -f "${worktree_path}/mcp-server/package.json" ]; then
@@ -174,10 +159,6 @@ create_vscode_workspace() {
             "path": "controlplane"
         },
         {
-            "name": "Web UI",
-            "path": "web-ui"
-        },
-        {
             "name": "MCP Server",
             "path": "mcp-server"
         },
@@ -198,7 +179,6 @@ create_vscode_workspace() {
         "editor.codeActionsOnSave": {
             "source.organizeImports": true
         },
-        "typescript.tsdk": "web-ui/node_modules/typescript/lib",
         "window.title": "KECS - ${branch_name}"
     },
     "launch": {
@@ -214,15 +194,6 @@ create_vscode_workspace() {
                 "env": {
                     "KECS_STORAGE_PATH": "/tmp/kecs-${branch_name}.db"
                 }
-            },
-            {
-                "name": "Launch Web UI",
-                "type": "node",
-                "request": "launch",
-                "runtimeExecutable": "npm",
-                "runtimeArgs": ["run", "dev"],
-                "cwd": "\${workspaceFolder:Web UI}",
-                "console": "integratedTerminal"
             }
         ]
     }

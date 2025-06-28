@@ -64,14 +64,6 @@ kind create cluster --name kecs-dev
 curl http://localhost:8081/health
 ```
 
-### Web UI
-
-ブラウザを開いて以下にアクセス：
-```
-http://localhost:8080
-```
-
-KECS Web UI ダッシュボードが表示されるはずです。
 
 ### API テスト
 
@@ -89,8 +81,7 @@ KECS が実行されたので、以下のことができます：
 
 1. [最初のクラスターを作成](/ja/guides/quick-start)
 2. [サービスをデプロイ](/ja/guides/services)
-3. [Web UI を探索](/ja/guides/web-ui)
-4. [タスク定義について学ぶ](/ja/guides/task-definitions)
+3. [タスク定義について学ぶ](/ja/guides/task-definitions)
 
 ## トラブルシューティング
 

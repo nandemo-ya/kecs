@@ -38,7 +38,6 @@ export default defineConfig({
               items: [
                 { text: 'Services', link: '/guides/services' },
                 { text: 'Task Definitions', link: '/guides/task-definitions' },
-                { text: 'Web UI', link: '/guides/web-ui' }
               ]
             },
             {
@@ -107,7 +106,6 @@ export default defineConfig({
                 { text: 'Control Plane', link: '/architecture/control-plane' },
                 { text: 'Storage Layer', link: '/architecture/storage' },
                 { text: 'Kubernetes Integration', link: '/architecture/kubernetes' },
-                { text: 'Web UI', link: '/architecture/web-ui' }
               ]
             }
           ]
@@ -140,7 +138,6 @@ export default defineConfig({
               items: [
                 { text: 'サービス', link: '/ja/guides/services' },
                 { text: 'タスク定義', link: '/ja/guides/task-definitions' },
-                { text: 'Web UI', link: '/ja/guides/web-ui' }
               ]
             },
             {
@@ -209,7 +206,6 @@ export default defineConfig({
                 { text: 'コントロールプレーン', link: '/ja/architecture/control-plane' },
                 { text: 'ストレージレイヤー', link: '/ja/architecture/storage' },
                 { text: 'Kubernetes 統合', link: '/ja/architecture/kubernetes' },
-                { text: 'Web UI', link: '/ja/architecture/web-ui' }
               ]
             }
           ]
