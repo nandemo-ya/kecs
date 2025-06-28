@@ -28,38 +28,6 @@ jobs:
           echo "Running Go tests..."
           go test -v -race ./...
       
-      # Web UI tests
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          cache: 'npm'
-          cache-dependency-path: web-ui/package-lock.json
-      
-      - name: Install Web UI dependencies
-        working-directory: ./web-ui
-        run: npm ci
-      
-      - name: Run Web UI tests
-        working-directory: ./web-ui
-        run: |
-          echo "Running Web UI tests..."
-          npm test -- --watchAll=false
-        env:
-          CI: true
-      
-      - name: Build Web UI
-        working-directory: ./web-ui
-        run: npm run build
-        env:
-          CI: false
-      
-      # Full build check
-      - name: Build with embedded Web UI
-        run: |
-          echo "Building full application with embedded Web UI..."
-          ./scripts/build-webui.sh
-      
       - name: Summary
         if: always()
         run: |

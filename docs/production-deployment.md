@@ -59,7 +59,6 @@ cp .env.production.example .env.production
 Key environment variables:
 - `PORT`: API server port (default: 8080)
 - `ADMIN_PORT`: Admin server port (default: 8081)
-- `KECS_UI_BASE_PATH`: Web UI base path (default: /ui)
 - `KECS_STORAGE_PATH`: Database file path (default: /data/kecs.db)
 - `KECS_LOG_LEVEL`: Logging level (default: info)
 
@@ -99,7 +98,6 @@ services:
       - "8081:8081"
     environment:
       - KECS_LOG_LEVEL=info
-      - KECS_UI_ENABLED=true
     volumes:
       - kecs-data:/data
     healthcheck:

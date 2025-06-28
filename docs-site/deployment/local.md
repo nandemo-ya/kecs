@@ -29,19 +29,6 @@ make build
 # The binary will be created at ./bin/kecs
 ```
 
-### Build with Web UI
-
-```bash
-# Build Web UI and embed into binary
-./scripts/build-webui.sh
-
-# Or manually:
-cd web-ui
-npm install
-npm run build
-cd ../controlplane
-go build -tags webui -o ../bin/kecs ./cmd/controlplane
-```
 
 ## Running Locally
 
@@ -54,7 +41,6 @@ go build -tags webui -o ../bin/kecs ./cmd/controlplane
 # KECS will start on:
 # - API Server: http://localhost:8080
 # - Admin Server: http://localhost:8081
-# - Web UI: http://localhost:8080/ui
 ```
 
 ### Custom Configuration
@@ -135,7 +121,7 @@ tmp_dir = "tmp"
   bin = "./tmp/main"
   cmd = "go build -o ./tmp/main ./controlplane/cmd/controlplane"
   delay = 1000
-  exclude_dir = ["assets", "tmp", "vendor", "testdata", "web-ui"]
+  exclude_dir = ["assets", "tmp", "vendor", "testdata"]
   exclude_file = []
   exclude_regex = ["_test.go"]
   exclude_unchanged = false
@@ -275,16 +261,6 @@ For detailed information, see the [Container Mode Persistence Guide](/guides/con
 3. Update storage interface if needed
 4. Run tests to verify changes
 
-### Working with the Web UI
-
-```bash
-# Start Web UI development server
-cd web-ui
-npm install
-npm run dev
-
-# The UI will be available at http://localhost:5173
-# API proxy is configured to forward to http://localhost:8080
 ```
 
 ## Troubleshooting

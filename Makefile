@@ -15,7 +15,6 @@ GOTEST=$(GO) test
 GOVET=$(GO) vet
 PLATFORMS=linux/amd64 linux/arm64
 CONTROLPLANE_DIR=./controlplane
-WEBUI_DIR=./web-ui
 
 # Default target
 .PHONY: all
@@ -34,24 +33,6 @@ generate:
 	cd $(CONTROLPLANE_DIR) && $(GO) build -o ../bin/codegen ./cmd/codegen
 	cd $(CONTROLPLANE_DIR) && ../bin/codegen -service ecs -input cmd/codegen/ecs.json -output internal/controlplane/api/generated_v2 -package api
 
-# Build with Web UI embedded
-.PHONY: build-with-ui
-build-with-ui: build-webui
-	@echo "Building $(BINARY_NAME) with embedded Web UI..."
-	cd $(CONTROLPLANE_DIR) && $(GO) build -tags embed_webui $(LDFLAGS) -o ../bin/$(BINARY_NAME) ./cmd/controlplane
-
-# Build Web UI
-.PHONY: build-webui
-build-webui:
-	@echo "Building Web UI..."
-	@if [ -d "$(WEBUI_DIR)" ]; then \
-		cd $(WEBUI_DIR) && npm install && npm run build; \
-		rm -rf $(CONTROLPLANE_DIR)/internal/controlplane/api/webui_dist; \
-		mkdir -p $(CONTROLPLANE_DIR)/internal/controlplane/api/webui_dist; \
-		cp -r $(WEBUI_DIR)/build/* $(CONTROLPLANE_DIR)/internal/controlplane/api/webui_dist/; \
-	else \
-		echo "Web UI directory not found, skipping..."; \
-	fi
 
 # Run the application
 .PHONY: run
@@ -65,7 +46,6 @@ clean:
 	@echo "Cleaning..."
 	rm -rf bin/
 	rm -f coverage.txt
-	rm -rf $(CONTROLPLANE_DIR)/internal/controlplane/api/webui_dist
 
 # Format code
 .PHONY: fmt
@@ -142,16 +122,9 @@ docker-build-api:
 	$(DOCKER) build -t $(DOCKER_IMAGE)-api:$(VERSION) -f $(CONTROLPLANE_DIR)/Dockerfile.api $(CONTROLPLANE_DIR)
 	$(DOCKER) tag $(DOCKER_IMAGE)-api:$(VERSION) $(DOCKER_IMAGE)-api:latest
 
-# Build UI-only Docker image
-.PHONY: docker-build-ui
-docker-build-ui:
-	@echo "Building UI-only Docker image..."
-	$(DOCKER) build -t $(DOCKER_IMAGE)-ui:$(VERSION) $(WEBUI_DIR)
-	$(DOCKER) tag $(DOCKER_IMAGE)-ui:$(VERSION) $(DOCKER_IMAGE)-ui:latest
-
-# Build both separated images
+# Build separated image (API only)
 .PHONY: docker-build-separated
-docker-build-separated: docker-build-api docker-build-ui
+docker-build-separated: docker-build-api
 
 # Push Docker image
 .PHONY: docker-push
@@ -160,14 +133,12 @@ docker-push: docker-build
 	$(DOCKER) push $(DOCKER_IMAGE):$(VERSION)
 	$(DOCKER) push $(DOCKER_IMAGE):latest
 
-# Push separated Docker images
+# Push separated Docker image (API only)
 .PHONY: docker-push-separated
 docker-push-separated: docker-build-separated
-	@echo "Pushing separated Docker images..."
+	@echo "Pushing separated Docker image..."
 	$(DOCKER) push $(DOCKER_IMAGE)-api:$(VERSION)
 	$(DOCKER) push $(DOCKER_IMAGE)-api:latest
-	$(DOCKER) push $(DOCKER_IMAGE)-ui:$(VERSION)
-	$(DOCKER) push $(DOCKER_IMAGE)-ui:latest
 
 # Build AWS Proxy Docker image
 .PHONY: docker-build-awsproxy
@@ -203,6 +174,4 @@ help:
 	@echo "  docker-push    - Push Docker image"
 	@echo "  docker-build-awsproxy - Build AWS Proxy Docker image"
 	@echo "  docker-push-awsproxy  - Push AWS Proxy Docker image"
-	@echo "  build-webui    - Build Web UI"
-	@echo "  build-with-ui  - Build with embedded Web UI"
 	@echo "  help           - Show this help message"

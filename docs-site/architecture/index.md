@@ -7,12 +7,12 @@ KECS is designed with a clean, modular architecture that provides ECS compatibil
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        Client Layer                          │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │   AWS CLI   │  │   AWS SDKs   │  │     Web UI       │  │
-│  └──────┬──────┘  └──────┬───────┘  └────────┬─────────┘  │
-└─────────┼─────────────────┼──────────────────┼─────────────┘
-          │                 │                   │
-          ▼                 ▼                   ▼
+│  ┌─────────────┐  ┌──────────────┐                         │
+│  │   AWS CLI   │  │   AWS SDKs   │                         │
+│  └──────┬──────┘  └──────┬───────┘                         │
+└─────────┼─────────────────┼────────────────────────────────┘
+          │                 │
+          ▼                 ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      API Gateway                             │
 │  ┌──────────────────────────────────────────────────────┐  │
@@ -61,7 +61,6 @@ The API Gateway handles all incoming requests and routes them appropriately:
   - Implements AWS ECS API specification
   - Handles REST API requests
   - Manages WebSocket connections for real-time updates
-  - Serves the embedded Web UI
 
 - **Admin Server** (Port 8081)
   - Health checks (`/health`)
@@ -124,7 +123,6 @@ Interfaces with the Kubernetes API:
 
 ### 4. Developer Experience
 - Simple local setup
-- Comprehensive Web UI
 - Real-time updates via WebSocket
 - Clear error messages
 
@@ -169,4 +167,3 @@ Interfaces with the Kubernetes API:
 - [Control Plane Details](/architecture/control-plane)
 - [Storage Layer Design](/architecture/storage)
 - [Kubernetes Integration](/architecture/kubernetes)
-- [Web UI Architecture](/architecture/web-ui)

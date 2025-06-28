@@ -29,19 +29,6 @@ make build
 # バイナリは ./bin/kecs に作成されます
 ```
 
-### Web UI を含むビルド
-
-```bash
-# Web UI をビルドしてバイナリに埋め込む
-./scripts/build-webui.sh
-
-# または手動で:
-cd web-ui
-npm install
-npm run build
-cd ../controlplane
-go build -tags webui -o ../bin/kecs ./cmd/controlplane
-```
 
 ## ローカルでの実行
 
@@ -54,7 +41,6 @@ go build -tags webui -o ../bin/kecs ./cmd/controlplane
 # KECS は以下で起動します:
 # - API サーバー: http://localhost:8080
 # - 管理サーバー: http://localhost:8081
-# - Web UI: http://localhost:8080/ui
 ```
 
 ### カスタム設定
@@ -135,7 +121,7 @@ tmp_dir = "tmp"
   bin = "./tmp/main"
   cmd = "go build -o ./tmp/main ./controlplane/cmd/controlplane"
   delay = 1000
-  exclude_dir = ["assets", "tmp", "vendor", "testdata", "web-ui"]
+  exclude_dir = ["assets", "tmp", "vendor", "testdata"]
   exclude_file = []
   exclude_regex = ["_test.go"]
   exclude_unchanged = false
@@ -262,16 +248,6 @@ docker-compose up
 3. 必要に応じてストレージインターフェイスを更新
 4. テストを実行して変更を確認
 
-### Web UI の作業
-
-```bash
-# Web UI 開発サーバーの起動
-cd web-ui
-npm install
-npm run dev
-
-# UI は http://localhost:5173 で利用可能
-# API プロキシは http://localhost:8080 に転送するよう設定済み
 ```
 
 ## トラブルシューティング

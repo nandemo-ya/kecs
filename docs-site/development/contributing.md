@@ -41,7 +41,6 @@ Please read and follow our [Code of Conduct](https://github.com/nandemo-ya/kecs/
 
 - Go 1.21 or later
 - Docker Desktop
-- Node.js 18+ (for Web UI)
 - Make
 - Git
 
@@ -108,9 +107,6 @@ make vet
 - Format with Prettier
 
 ```bash
-# Format Web UI code
-cd web-ui
-npm run format
 
 # Run linter
 npm run lint
@@ -158,7 +154,6 @@ kecs/
 │   └── converters/        # Type converters
 ├── pkg/                   # Public packages
 ├── api/                   # API definitions
-├── web-ui/               # React Web UI
 ├── tests/                # Integration tests
 └── docs/                 # Documentation
 ```

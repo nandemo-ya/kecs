@@ -24,14 +24,6 @@ spec:
   - host: kecs.example.com  # Change to your domain
     http:
       paths:
-      # Web UI
-      - path: /ui
-        pathType: Prefix
-        backend:
-          service:
-            name: kecs-controlplane
-            port:
-              number: 80
       # WebSocket endpoints
       - path: /ws
         pathType: Prefix

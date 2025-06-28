@@ -64,15 +64,6 @@ kind create cluster --name kecs-dev
 curl http://localhost:8081/health
 ```
 
-### Web UI
-
-Open your browser and navigate to:
-```
-http://localhost:8080
-```
-
-You should see the KECS Web UI dashboard.
-
 ### API Test
 
 ```bash
@@ -89,8 +80,7 @@ Now that you have KECS running, you can:
 
 1. [Create your first cluster](/guides/quick-start)
 2. [Deploy a service](/guides/services)
-3. [Explore the Web UI](/guides/web-ui)
-4. [Learn about Task Definitions](/guides/task-definitions)
+3. [Learn about Task Definitions](/guides/task-definitions)
 
 ## Troubleshooting
 

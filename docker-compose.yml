@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Option 1: Combined mode (default) - API and UI in single container
+  # KECS Control Plane Service
   kecs:
     image: ghcr.io/nandemo-ya/kecs:latest
     container_name: kecs-controlplane
@@ -27,49 +27,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    profiles: ["combined"]
+    # Remove profiles since we only have one mode now
 
-  # Option 2: Separated mode - API without UI
-  kecs-api:
-    image: ghcr.io/nandemo-ya/kecs:latest
-    container_name: kecs-api
-    environment:
-      - KECS_CONTAINER_MODE=true
-      - KECS_DATA_DIR=/data
-      - KECS_LOG_LEVEL=info
-      - KECS_WEBUI_ENABLED=false  # Disable Web UI
-    ports:
-      - "8080:8080"  # API port
-      - "8081:8081"  # Admin port
-    volumes:
-      - ./kecs-data:/data
-      - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - kecs-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    profiles: ["separated"]
-
-  # Option 2: Separated mode - UI only
-  kecs-ui:
-    image: ghcr.io/nandemo-ya/kecs-ui:latest
-    container_name: kecs-ui
-    environment:
-      - KECS_API_ENDPOINT=http://kecs-api:8080
-    ports:
-      - "3000:80"
-    networks:
-      - kecs-network
-    depends_on:
-      kecs-api:
-        condition: service_healthy
-    restart: unless-stopped
-    profiles: ["separated"]
 
   # Optional: LocalStack for AWS service emulation
   localstack:
@@ -86,7 +45,7 @@ services:
     networks:
       - kecs-network
     restart: unless-stopped
-    profiles: ["localstack", "combined", "separated"]
+    profiles: ["localstack"]
 
 networks:
   kecs-network:

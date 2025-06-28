@@ -33,22 +33,6 @@ if ! docker buildx version >/dev/null 2>&1; then
     docker buildx create --name kecs-builder --use
 fi
 
-# Build Web UI first (for local testing)
-if [ "$SKIP_WEBUI_BUILD" != "true" ]; then
-    echo -e "${GREEN}Building Web UI...${NC}"
-    cd "$PROJECT_ROOT/web-ui"
-    
-    if [ ! -d "node_modules" ]; then
-        echo "Installing dependencies..."
-        npm ci
-    fi
-    
-    echo "Creating production build..."
-    npm run build
-    
-    echo -e "${GREEN}Web UI build complete!${NC}"
-fi
-
 # Build multi-platform Docker image
 cd "$PROJECT_ROOT"
 
@@ -57,7 +41,7 @@ echo -e "${GREEN}Building Docker image...${NC}"
 # Build flags
 BUILD_FLAGS="--platform=$PLATFORMS"
 BUILD_FLAGS="$BUILD_FLAGS --build-arg VERSION=$VERSION"
-BUILD_FLAGS="$BUILD_FLAGS -f controlplane/Dockerfile.production"
+BUILD_FLAGS="$BUILD_FLAGS -f controlplane/Dockerfile"
 BUILD_FLAGS="$BUILD_FLAGS -t $DOCKER_REGISTRY:$VERSION"
 BUILD_FLAGS="$BUILD_FLAGS -t $DOCKER_REGISTRY:latest"
 

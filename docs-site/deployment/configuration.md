@@ -346,8 +346,6 @@ cache:
 
 # Feature Flags
 features:
-  # Enable Web UI
-  webUI: true
   
   # Enable WebSocket support
   websocket: true
@@ -600,7 +598,6 @@ auth:
   enabled: false
 
 features:
-  webUI: true
   experimental:
     dynamicClusters: true
 ```
