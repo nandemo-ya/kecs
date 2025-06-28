@@ -62,9 +62,9 @@ features:
   # Can be set via KECS_CONTAINER_MODE environment variable
   containerMode: false
   
-  # Enable automatic state recovery on startup (default: false)
+  # Enable automatic state recovery on startup (default: true)
   # Can be set via KECS_AUTO_RECOVER_STATE environment variable
-  autoRecoverState: false
+  autoRecoverState: true
 
 # AWS configuration
 aws:
