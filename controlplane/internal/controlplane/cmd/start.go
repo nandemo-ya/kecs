@@ -213,6 +213,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	containerConfig := &runtime.ContainerConfig{
 		Name:  startContainerName,
 		Image: imageName,
+		Cmd:   []string{"server"}, // Run the server command
 		Env:   env,
 		Labels: map[string]string{
 			"com.kecs.managed": "true",
