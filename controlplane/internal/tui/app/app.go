@@ -20,6 +20,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/keys"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/styles"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/clusters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/dashboard"
 )
 
@@ -40,6 +41,7 @@ type App struct {
 	endpoint     string
 	currentView  ViewType
 	dashboard    *dashboard.Model
+	clusterList  *clusters.Model
 	width        int
 	height       int
 	ready        bool
@@ -54,10 +56,16 @@ func New(endpoint string) (*App, error) {
 		return nil, fmt.Errorf("failed to create dashboard: %w", err)
 	}
 
+	clusterListModel, err := clusters.New(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cluster list: %w", err)
+	}
+
 	return &App{
 		endpoint:    endpoint,
 		currentView: ViewDashboard,
 		dashboard:   dashboardModel,
+		clusterList: clusterListModel,
 		keyMap:      keys.DefaultKeyMap(),
 	}, nil
 }
@@ -76,6 +84,7 @@ func (a *App) Init() tea.Cmd {
 	return tea.Batch(
 		tea.EnterAltScreen,
 		a.dashboard.Init(),
+		a.clusterList.Init(),
 	)
 }
 
@@ -89,8 +98,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.height = msg.Height
 		a.ready = true
 		
-		// Update dashboard size
+		// Update view sizes
 		a.dashboard.SetSize(msg.Width, msg.Height-3) // Leave room for header and footer
+		a.clusterList.SetSize(msg.Width, msg.Height-3)
 		
 	case tea.KeyMsg:
 		switch {
@@ -130,6 +140,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.dashboard, dashboardCmd = a.dashboard.Update(msg)
 		cmds = append(cmds, dashboardCmd)
 		
+	case ViewClusters:
+		var clusterCmd tea.Cmd
+		a.clusterList, clusterCmd = a.clusterList.Update(msg)
+		cmds = append(cmds, clusterCmd)
+		
 	// TODO: Handle other views
 	}
 
@@ -155,6 +170,9 @@ func (a *App) View() string {
 	switch a.currentView {
 	case ViewDashboard:
 		content = a.dashboard.View()
+		
+	case ViewClusters:
+		content = a.clusterList.View()
 		
 	case ViewHelp:
 		content = a.renderHelp()
