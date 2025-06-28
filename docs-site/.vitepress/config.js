@@ -41,6 +41,12 @@ export default defineConfig({
               ]
             },
             {
+              text: 'Operations',
+              items: [
+                { text: 'Kubeconfig Management', link: '/guides/kubeconfig-management' }
+              ]
+            },
+            {
               text: 'Integration',
               items: [
                 { text: 'LocalStack Integration', link: '/guides/localstack-integration' }
@@ -138,6 +144,12 @@ export default defineConfig({
               items: [
                 { text: 'サービス', link: '/ja/guides/services' },
                 { text: 'タスク定義', link: '/ja/guides/task-definitions' },
+              ]
+            },
+            {
+              text: '運用',
+              items: [
+                { text: 'Kubeconfig 管理', link: '/ja/guides/kubeconfig-management' }
               ]
             },
             {

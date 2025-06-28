@@ -1,6 +1,6 @@
 {
   "serviceName": "simple-service",
-  "cluster": "default",
+  "cluster": "test-cluster",
   "taskDefinition": "nginx-fargate",
   "desiredCount": 1,
   "tags": [
