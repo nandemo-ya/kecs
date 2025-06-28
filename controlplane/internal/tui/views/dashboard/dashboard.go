@@ -15,11 +15,13 @@
 package dashboard
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/styles"
 )
 
@@ -36,6 +38,7 @@ type Stats struct {
 // Model represents the dashboard view model
 type Model struct {
 	endpoint string
+	client   *api.Client
 	stats    Stats
 	width    int
 	height   int
@@ -56,6 +59,7 @@ type statsMsg struct {
 func New(endpoint string) (*Model, error) {
 	return &Model{
 		endpoint: endpoint,
+		client:   api.NewClient(endpoint),
 		loading:  true,
 	}, nil
 }
@@ -169,18 +173,41 @@ func (m *Model) createStatBox(title string, value int, valueStyle lipgloss.Style
 
 // fetchStats fetches the latest statistics
 func (m *Model) fetchStats() tea.Msg {
-	// TODO: Implement actual API calls to fetch stats
-	// For now, return mock data
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	stats := Stats{
+		LastUpdateTime: time.Now(),
+	}
+
+	// Fetch clusters
+	listResp, err := m.client.ListClusters(ctx)
+	if err != nil {
+		// Return partial stats even on error
+		return statsMsg{stats: stats, err: err}
+	}
+
+	stats.Clusters = len(listResp.ClusterArns)
+
+	// If we have clusters, get detailed info
+	if len(listResp.ClusterArns) > 0 {
+		descResp, err := m.client.DescribeClusters(ctx, listResp.ClusterArns)
+		if err == nil {
+			for _, cluster := range descResp.Clusters {
+				stats.Services += cluster.ActiveServicesCount
+				stats.RunningTasks += cluster.RunningTasksCount
+				stats.PendingTasks += cluster.PendingTasksCount
+			}
+		}
+	}
+
+	// TODO: Fetch task definitions count when API is available
+	// For now, use a placeholder
+	stats.TaskDefs = 0
+
 	return statsMsg{
-		stats: Stats{
-			Clusters:       3,
-			Services:       12,
-			RunningTasks:   45,
-			PendingTasks:   5,
-			TaskDefs:       18,
-			LastUpdateTime: time.Now(),
-		},
-		err: nil,
+		stats: stats,
+		err:   nil,
 	}
 }
 
