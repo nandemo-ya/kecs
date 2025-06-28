@@ -119,3 +119,46 @@ func (c *Client) DeleteCluster(ctx context.Context, cluster string) (*DeleteClus
 	}, &resp)
 	return &resp, err
 }
+
+// ListServices lists services in a cluster
+func (c *Client) ListServices(ctx context.Context, cluster string) (*ListServicesResponse, error) {
+	var resp ListServicesResponse
+	err := c.makeRequest(ctx, "ListServices", &ListServicesRequest{
+		Cluster: cluster,
+	}, &resp)
+	return &resp, err
+}
+
+// DescribeServices describes one or more services
+func (c *Client) DescribeServices(ctx context.Context, cluster string, services []string) (*DescribeServicesResponse, error) {
+	var resp DescribeServicesResponse
+	err := c.makeRequest(ctx, "DescribeServices", &DescribeServicesRequest{
+		Cluster:  cluster,
+		Services: services,
+	}, &resp)
+	return &resp, err
+}
+
+// CreateService creates a new service
+func (c *Client) CreateService(ctx context.Context, req *CreateServiceRequest) (*CreateServiceResponse, error) {
+	var resp CreateServiceResponse
+	err := c.makeRequest(ctx, "CreateService", req, &resp)
+	return &resp, err
+}
+
+// UpdateService updates a service
+func (c *Client) UpdateService(ctx context.Context, req *UpdateServiceRequest) (*UpdateServiceResponse, error) {
+	var resp UpdateServiceResponse
+	err := c.makeRequest(ctx, "UpdateService", req, &resp)
+	return &resp, err
+}
+
+// DeleteService deletes a service
+func (c *Client) DeleteService(ctx context.Context, cluster, service string) (*DeleteServiceResponse, error) {
+	var resp DeleteServiceResponse
+	err := c.makeRequest(ctx, "DeleteService", &DeleteServiceRequest{
+		Cluster: cluster,
+		Service: service,
+	}, &resp)
+	return &resp, err
+}

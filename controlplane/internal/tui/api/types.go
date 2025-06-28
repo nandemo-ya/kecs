@@ -86,3 +86,91 @@ type Failure struct {
 	Reason string `json:"reason"`
 	Detail string `json:"detail,omitempty"`
 }
+
+// Service represents an ECS service
+type Service struct {
+	ServiceArn        string       `json:"serviceArn"`
+	ServiceName       string       `json:"serviceName"`
+	ClusterArn        string       `json:"clusterArn"`
+	Status            string       `json:"status"`
+	DesiredCount      int          `json:"desiredCount"`
+	RunningCount      int          `json:"runningCount"`
+	PendingCount      int          `json:"pendingCount"`
+	TaskDefinition    string       `json:"taskDefinition"`
+	LaunchType        string       `json:"launchType,omitempty"`
+	PlatformVersion   string       `json:"platformVersion,omitempty"`
+	PlatformFamily    string       `json:"platformFamily,omitempty"`
+	SchedulingStrategy string      `json:"schedulingStrategy,omitempty"`
+	Tags              []Tag        `json:"tags,omitempty"`
+	CreatedAt         time.Time    `json:"createdAt,omitempty"`
+	CreatedBy         string       `json:"createdBy,omitempty"`
+	HealthCheckGracePeriodSeconds int `json:"healthCheckGracePeriodSeconds,omitempty"`
+}
+
+// ListServicesRequest represents a request to list services
+type ListServicesRequest struct {
+	Cluster       string `json:"cluster"`
+	NextToken     string `json:"nextToken,omitempty"`
+	MaxResults    int    `json:"maxResults,omitempty"`
+	LaunchType    string `json:"launchType,omitempty"`
+	SchedulingStrategy string `json:"schedulingStrategy,omitempty"`
+}
+
+// ListServicesResponse represents a response from ListServices
+type ListServicesResponse struct {
+	ServiceArns []string `json:"serviceArns"`
+	NextToken   string   `json:"nextToken,omitempty"`
+}
+
+// DescribeServicesRequest represents a request to describe services
+type DescribeServicesRequest struct {
+	Cluster  string   `json:"cluster"`
+	Services []string `json:"services"`
+	Include  []string `json:"include,omitempty"`
+}
+
+// DescribeServicesResponse represents a response from DescribeServices
+type DescribeServicesResponse struct {
+	Services []Service `json:"services"`
+	Failures []Failure `json:"failures,omitempty"`
+}
+
+// CreateServiceRequest represents a request to create a service
+type CreateServiceRequest struct {
+	Cluster             string `json:"cluster"`
+	ServiceName         string `json:"serviceName"`
+	TaskDefinition      string `json:"taskDefinition"`
+	DesiredCount        int    `json:"desiredCount"`
+	LaunchType          string `json:"launchType,omitempty"`
+	Tags                []Tag  `json:"tags,omitempty"`
+}
+
+// CreateServiceResponse represents a response from CreateService
+type CreateServiceResponse struct {
+	Service Service `json:"service"`
+}
+
+// UpdateServiceRequest represents a request to update a service
+type UpdateServiceRequest struct {
+	Cluster        string `json:"cluster"`
+	Service        string `json:"service"`
+	DesiredCount   *int   `json:"desiredCount,omitempty"`
+	TaskDefinition string `json:"taskDefinition,omitempty"`
+}
+
+// UpdateServiceResponse represents a response from UpdateService
+type UpdateServiceResponse struct {
+	Service Service `json:"service"`
+}
+
+// DeleteServiceRequest represents a request to delete a service
+type DeleteServiceRequest struct {
+	Cluster string `json:"cluster"`
+	Service string `json:"service"`
+	Force   bool   `json:"force,omitempty"`
+}
+
+// DeleteServiceResponse represents a response from DeleteService
+type DeleteServiceResponse struct {
+	Service Service `json:"service"`
+}
