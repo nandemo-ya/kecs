@@ -22,6 +22,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/styles"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/clusters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/dashboard"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/services"
 )
 
 // ViewType represents the different views available in the TUI
@@ -42,6 +43,7 @@ type App struct {
 	currentView  ViewType
 	dashboard    *dashboard.Model
 	clusterList  *clusters.Model
+	serviceList  *services.Model
 	width        int
 	height       int
 	ready        bool
@@ -61,11 +63,17 @@ func New(endpoint string) (*App, error) {
 		return nil, fmt.Errorf("failed to create cluster list: %w", err)
 	}
 
+	serviceListModel, err := services.New(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service list: %w", err)
+	}
+
 	return &App{
 		endpoint:    endpoint,
 		currentView: ViewDashboard,
 		dashboard:   dashboardModel,
 		clusterList: clusterListModel,
+		serviceList: serviceListModel,
 		keyMap:      keys.DefaultKeyMap(),
 	}, nil
 }
@@ -85,6 +93,7 @@ func (a *App) Init() tea.Cmd {
 		tea.EnterAltScreen,
 		a.dashboard.Init(),
 		a.clusterList.Init(),
+		a.serviceList.Init(),
 	)
 }
 
@@ -101,6 +110,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update view sizes
 		a.dashboard.SetSize(msg.Width, msg.Height-3) // Leave room for header and footer
 		a.clusterList.SetSize(msg.Width, msg.Height-3)
+		a.serviceList.SetSize(msg.Width, msg.Height-3)
 		
 	case tea.KeyMsg:
 		switch {
@@ -145,6 +155,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.clusterList, clusterCmd = a.clusterList.Update(msg)
 		cmds = append(cmds, clusterCmd)
 		
+	case ViewServices:
+		var serviceCmd tea.Cmd
+		a.serviceList, serviceCmd = a.serviceList.Update(msg)
+		cmds = append(cmds, serviceCmd)
+		
 	// TODO: Handle other views
 	}
 
@@ -173,6 +188,9 @@ func (a *App) View() string {
 		
 	case ViewClusters:
 		content = a.clusterList.View()
+		
+	case ViewServices:
+		content = a.serviceList.View()
 		
 	case ViewHelp:
 		content = a.renderHelp()

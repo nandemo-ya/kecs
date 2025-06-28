@@ -396,7 +396,7 @@ func (api *DefaultECSAPI) DescribeServices(ctx context.Context, req *generated.D
 	// Default cluster if not specified
 	clusterName := "default"
 	if req.Cluster != nil && *req.Cluster != "" {
-		clusterName = *req.Cluster
+		clusterName = extractClusterNameFromARN(*req.Cluster)
 	}
 
 	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", api.region, api.accountID, clusterName)
@@ -412,7 +412,17 @@ func (api *DefaultECSAPI) DescribeServices(ctx context.Context, req *generated.D
 		}, nil
 	}
 
-	for _, serviceName := range req.Services {
+	for _, serviceIdentifier := range req.Services {
+		// Extract service name from ARN if necessary
+		serviceName := serviceIdentifier
+		if strings.HasPrefix(serviceIdentifier, "arn:aws:ecs:") {
+			// ARN format: arn:aws:ecs:region:account:service/cluster/service-name
+			parts := strings.Split(serviceIdentifier, "/")
+			if len(parts) >= 2 {
+				serviceName = parts[len(parts)-1]
+			}
+		}
+		
 		storageService, err := api.storage.ServiceStore().Get(ctx, clusterARN, serviceName)
 		if err != nil {
 			failures = append(failures, generated.Failure{
@@ -440,7 +450,7 @@ func (api *DefaultECSAPI) ListServices(ctx context.Context, req *generated.ListS
 	// Default cluster if not specified
 	clusterName := "default"
 	if req.Cluster != nil && *req.Cluster != "" {
-		clusterName = *req.Cluster
+		clusterName = extractClusterNameFromARN(*req.Cluster)
 	}
 
 	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", api.region, api.accountID, clusterName)
