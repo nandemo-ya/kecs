@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -27,15 +28,8 @@ func StartKECS(t TestingT) *KECSContainer {
 
 	// Check if running in test mode
 	testMode := getEnvOrDefault("KECS_TEST_MODE", "true")
-	// Enable container mode for proper cluster management
-	containerMode := getEnvOrDefault("KECS_CONTAINER_MODE", "true")
 	// Get cluster provider (k3d or kind)
 	clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
-	
-	// Debug: Print environment variable
-	fmt.Printf("DEBUG: KECS_TEST_MODE from environment: %s\n", testMode)
-	fmt.Printf("DEBUG: KECS_CONTAINER_MODE from environment: %s\n", containerMode)
-	fmt.Printf("DEBUG: KECS_CLUSTER_PROVIDER from environment: %s\n", clusterProvider)
 
 	// Create temporary directory for kubeconfig if it doesn't exist
 	kubeconfigHostPath := "/tmp/kecs-kubeconfig"
@@ -45,13 +39,19 @@ func StartKECS(t TestingT) *KECSContainer {
 	req := testcontainers.ContainerRequest{
 		Image:        getEnvOrDefault("KECS_IMAGE", "kecs:test"),
 		ExposedPorts: []string{"8080/tcp", "8081/tcp"},
+		Cmd:          []string{"server"}, // Use 'server' command to run directly
 		Env: map[string]string{
-			"LOG_LEVEL":              getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
-			"KECS_TEST_MODE":         testMode,
-			"KECS_CONTAINER_MODE":    containerMode,
-			"KECS_CLUSTER_PROVIDER":  clusterProvider,
-			"KECS_KUBECONFIG_PATH":   "/kecs/kubeconfig",
-			"KECS_K3D_OPTIMIZED":     "true",
+			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
+			"KECS_TEST_MODE":              testMode,
+			"KECS_CONTAINER_MODE":         "false", // Disable container mode to prevent recursive container creation
+			"KECS_CLUSTER_PROVIDER":       clusterProvider,
+			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
+			"KECS_K3D_OPTIMIZED":          "true",
+			"KECS_SECURITY_ACKNOWLEDGED":  "true", // Skip security disclaimer
+		},
+		// Add root group (0) to access Docker socket
+		HostConfigModifier: func(hc *container.HostConfig) {
+			hc.GroupAdd = []string{"0"}
 		},
 		Mounts: testcontainers.ContainerMounts{
 			{
@@ -73,11 +73,6 @@ func StartKECS(t TestingT) *KECSContainer {
 			WithPort("8081/tcp").
 			WithStartupTimeout(120*time.Second),
 	}
-	
-	// Debug: Print environment being set
-	fmt.Printf("DEBUG: Setting container env KECS_TEST_MODE=%s\n", testMode)
-	fmt.Printf("DEBUG: Setting container env KECS_CONTAINER_MODE=%s\n", containerMode)
-	fmt.Printf("DEBUG: Setting container env KECS_CLUSTER_PROVIDER=%s\n", clusterProvider)
 
 	// Start container
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -110,12 +105,10 @@ func StartKECS(t TestingT) *KECSContainer {
 	endpoint := fmt.Sprintf("http://%s:%s", apiHost, apiPort.Port())
 
 	// Wait a bit for KECS to be fully ready
-	// Use shorter initial wait based on mode
+	// Use shorter initial wait in test mode
 	var initialWait time.Duration
 	if testMode == "true" {
 		initialWait = 2 * time.Second
-	} else if containerMode == "true" {
-		initialWait = 5 * time.Second
 	} else {
 		initialWait = 3 * time.Second
 	}
