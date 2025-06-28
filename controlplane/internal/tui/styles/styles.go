@@ -149,7 +149,7 @@ func GetStatusStyle(status string) lipgloss.Style {
 		return StatusRunning
 	case "PENDING", "PROVISIONING", "ACTIVATING":
 		return StatusPending
-	case "STOPPED", "INACTIVE", "FAILED":
+	case "STOPPED", "INACTIVE", "FAILED", "DRAINING", "DEREGISTERING":
 		return StatusStopped
 	default:
 		return StatusUnknown
