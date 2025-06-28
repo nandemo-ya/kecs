@@ -117,6 +117,29 @@ cd kecs/controlplane
 make build
 ```
 
+### Development Setup
+
+For contributors, we use [Lefthook](https://github.com/evilmartians/lefthook) to ensure code quality with git hooks:
+
+```bash
+# Run the setup script (installs Lefthook and configures git hooks)
+./scripts/setup-lefthook.sh
+
+# Or install manually
+brew install lefthook  # macOS
+# or
+curl -sSfL https://raw.githubusercontent.com/evilmartians/lefthook/master/install.sh | sh -s -- -b /usr/local/bin  # Linux
+
+# Install git hooks
+lefthook install
+```
+
+The git hooks will:
+- **Pre-commit**: Run unit tests, go fmt, and go vet for changed files
+- **Pre-push**: Run the full test suite with race detection
+
+To skip hooks temporarily: `git commit --no-verify` or `git push --no-verify`
+
 ### Using Docker
 
 ```bash
