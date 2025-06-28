@@ -23,6 +23,8 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/clusters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/dashboard"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/services"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/taskdefs"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/tasks"
 )
 
 // ViewType represents the different views available in the TUI
@@ -44,6 +46,8 @@ type App struct {
 	dashboard    *dashboard.Model
 	clusterList  *clusters.Model
 	serviceList  *services.Model
+	taskList     *tasks.Model
+	taskDefList  *taskdefs.Model
 	width        int
 	height       int
 	ready        bool
@@ -68,12 +72,24 @@ func New(endpoint string) (*App, error) {
 		return nil, fmt.Errorf("failed to create service list: %w", err)
 	}
 
+	taskListModel, err := tasks.New(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create task list: %w", err)
+	}
+
+	taskDefListModel, err := taskdefs.New(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create task definition list: %w", err)
+	}
+
 	return &App{
 		endpoint:    endpoint,
 		currentView: ViewDashboard,
 		dashboard:   dashboardModel,
 		clusterList: clusterListModel,
 		serviceList: serviceListModel,
+		taskList:    taskListModel,
+		taskDefList: taskDefListModel,
 		keyMap:      keys.DefaultKeyMap(),
 	}, nil
 }
@@ -94,6 +110,8 @@ func (a *App) Init() tea.Cmd {
 		a.dashboard.Init(),
 		a.clusterList.Init(),
 		a.serviceList.Init(),
+		a.taskList.Init(),
+		a.taskDefList.Init(),
 	)
 }
 
@@ -111,6 +129,8 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.dashboard.SetSize(msg.Width, msg.Height-3) // Leave room for header and footer
 		a.clusterList.SetSize(msg.Width, msg.Height-3)
 		a.serviceList.SetSize(msg.Width, msg.Height-3)
+		a.taskList.SetSize(msg.Width, msg.Height-3)
+		a.taskDefList.SetSize(msg.Width, msg.Height-3)
 		
 	case tea.KeyMsg:
 		switch {
@@ -160,6 +180,16 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.serviceList, serviceCmd = a.serviceList.Update(msg)
 		cmds = append(cmds, serviceCmd)
 		
+	case ViewTasks:
+		var taskCmd tea.Cmd
+		a.taskList, taskCmd = a.taskList.Update(msg)
+		cmds = append(cmds, taskCmd)
+		
+	case ViewTaskDefs:
+		var taskDefCmd tea.Cmd
+		a.taskDefList, taskDefCmd = a.taskDefList.Update(msg)
+		cmds = append(cmds, taskDefCmd)
+		
 	// TODO: Handle other views
 	}
 
@@ -191,6 +221,12 @@ func (a *App) View() string {
 		
 	case ViewServices:
 		content = a.serviceList.View()
+		
+	case ViewTasks:
+		content = a.taskList.View()
+		
+	case ViewTaskDefs:
+		content = a.taskDefList.View()
 		
 	case ViewHelp:
 		content = a.renderHelp()

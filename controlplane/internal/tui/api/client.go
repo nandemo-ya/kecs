@@ -162,3 +162,73 @@ func (c *Client) DeleteService(ctx context.Context, cluster, service string) (*D
 	}, &resp)
 	return &resp, err
 }
+
+// ListTasks lists tasks in a cluster
+func (c *Client) ListTasks(ctx context.Context, cluster string, serviceName string) (*ListTasksResponse, error) {
+	var resp ListTasksResponse
+	req := &ListTasksRequest{
+		Cluster: cluster,
+	}
+	if serviceName != "" {
+		req.ServiceName = serviceName
+	}
+	err := c.makeRequest(ctx, "ListTasks", req, &resp)
+	return &resp, err
+}
+
+// DescribeTasks describes one or more tasks
+func (c *Client) DescribeTasks(ctx context.Context, cluster string, tasks []string) (*DescribeTasksResponse, error) {
+	var resp DescribeTasksResponse
+	err := c.makeRequest(ctx, "DescribeTasks", &DescribeTasksRequest{
+		Cluster: cluster,
+		Tasks:   tasks,
+	}, &resp)
+	return &resp, err
+}
+
+// StopTask stops a running task
+func (c *Client) StopTask(ctx context.Context, cluster, task string, reason string) (*StopTaskResponse, error) {
+	var resp StopTaskResponse
+	err := c.makeRequest(ctx, "StopTask", &StopTaskRequest{
+		Cluster: cluster,
+		Task:    task,
+		Reason:  reason,
+	}, &resp)
+	return &resp, err
+}
+
+// ListTaskDefinitions lists task definitions
+func (c *Client) ListTaskDefinitions(ctx context.Context, familyPrefix string) (*ListTaskDefinitionsResponse, error) {
+	var resp ListTaskDefinitionsResponse
+	req := &ListTaskDefinitionsRequest{}
+	if familyPrefix != "" {
+		req.FamilyPrefix = familyPrefix
+	}
+	err := c.makeRequest(ctx, "ListTaskDefinitions", req, &resp)
+	return &resp, err
+}
+
+// DescribeTaskDefinition describes a task definition
+func (c *Client) DescribeTaskDefinition(ctx context.Context, taskDefinition string) (*DescribeTaskDefinitionResponse, error) {
+	var resp DescribeTaskDefinitionResponse
+	err := c.makeRequest(ctx, "DescribeTaskDefinition", &DescribeTaskDefinitionRequest{
+		TaskDefinition: taskDefinition,
+	}, &resp)
+	return &resp, err
+}
+
+// RegisterTaskDefinition registers a new task definition
+func (c *Client) RegisterTaskDefinition(ctx context.Context, req *RegisterTaskDefinitionRequest) (*RegisterTaskDefinitionResponse, error) {
+	var resp RegisterTaskDefinitionResponse
+	err := c.makeRequest(ctx, "RegisterTaskDefinition", req, &resp)
+	return &resp, err
+}
+
+// DeregisterTaskDefinition deregisters a task definition
+func (c *Client) DeregisterTaskDefinition(ctx context.Context, taskDefinition string) (*DeregisterTaskDefinitionResponse, error) {
+	var resp DeregisterTaskDefinitionResponse
+	err := c.makeRequest(ctx, "DeregisterTaskDefinition", &DeregisterTaskDefinitionRequest{
+		TaskDefinition: taskDefinition,
+	}, &resp)
+	return &resp, err
+}
