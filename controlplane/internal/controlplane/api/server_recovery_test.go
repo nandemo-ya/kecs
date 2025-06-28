@@ -90,6 +90,10 @@ var _ = Describe("Server State Recovery", func() {
 				Expect(mockClusterMgr.ClusterMap).NotTo(HaveKey("kecs-test-cluster-2"))
 			})
 
+			It("should recover services and reschedule tasks", func() {
+				Skip("Skipping task rescheduling test - memory storage doesn't implement required stores")
+			})
+
 			It("should skip clusters that already exist", func() {
 				// Mark cluster as existing
 				mockClusterMgr.ClusterMap["kecs-test-cluster-1"] = true

@@ -2,17 +2,21 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8s "k8s.io/client-go/kubernetes"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/s3"
@@ -108,13 +112,19 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	// Initialize task manager
 	taskManager, err := kubernetes.NewTaskManager(storage)
 	if err != nil {
-		if os.Getenv("KECS_TEST_MODE") == "true" {
-			log.Printf("Warning: Failed to initialize task manager in test mode: %v", err)
-			// Continue without task manager in test mode - some features may not work
+		if config.GetBool("features.testMode") || config.GetBool("features.containerMode") {
+			log.Printf("Warning: Failed to initialize task manager: %v (continuing without it)", err)
+			// Continue without task manager in test/container mode - some features may not work
 		} else {
-			log.Printf("Error: Failed to initialize task manager: %v", err)
-			// TaskManager is critical for normal operation, return error
-			return nil, fmt.Errorf("failed to initialize task manager: %w", err)
+			// Check if we're in recovery mode and allow startup without task manager
+			if config.GetBool("features.autoRecoverState") {
+				log.Printf("Warning: Failed to initialize task manager during recovery: %v (continuing without it)", err)
+				// Continue without task manager initially - it will be initialized when clusters are created
+			} else {
+				log.Printf("Error: Failed to initialize task manager: %v", err)
+				// TaskManager is critical for normal operation, return error
+				return nil, fmt.Errorf("failed to initialize task manager: %w", err)
+			}
 		}
 	} else {
 		s.taskManager = taskManager
@@ -559,10 +569,143 @@ func (s *Server) recoverServicesForCluster(ctx context.Context, cluster *storage
 			log.Printf("Failed to update service %s after recovery: %v", service.ServiceName, err)
 		}
 
+		// Schedule tasks to match desired count
+		if service.DesiredCount > 0 {
+			log.Printf("Scheduling %d tasks for service %s", service.DesiredCount, service.ServiceName)
+			if err := s.scheduleServiceTasks(ctx, cluster, service, taskDef, service.DesiredCount); err != nil {
+				log.Printf("Failed to schedule tasks for service %s: %v", service.ServiceName, err)
+				// Don't fail the whole recovery process
+			}
+		}
+
 		log.Printf("Successfully recovered service %s", service.ServiceName)
 	}
 
 	return nil
+}
+
+// scheduleServiceTasks creates tasks for a service to match its desired count
+func (s *Server) scheduleServiceTasks(ctx context.Context, cluster *storage.Cluster, service *storage.Service, taskDef *storage.TaskDefinition, count int) error {
+	log.Printf("Creating %d tasks for service %s", count, service.ServiceName)
+
+	// Check if we have the necessary components
+	if s.taskManager == nil {
+		return fmt.Errorf("task manager not available")
+	}
+
+	// Define namespace for the cluster
+	namespace := fmt.Sprintf("kecs-%s", cluster.Name)
+
+	// Create tasks for the service
+	for i := 0; i < count; i++ {
+		// Generate task ID
+		taskID := uuid.New().String()
+		taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", s.region, s.accountID, cluster.Name, taskID)
+
+		// Create task in storage
+		task := &storage.Task{
+			ID:                taskID,
+			ARN:               taskARN,
+			ClusterARN:        cluster.ARN,
+			TaskDefinitionARN: taskDef.ARN,
+			DesiredStatus:     "RUNNING",
+			LastStatus:        "PENDING",
+			LaunchType:        service.LaunchType,
+			StartedBy:         fmt.Sprintf("ecs-svc/%s", service.ServiceName),
+			CreatedAt:         time.Now(),
+			Region:            s.region,
+			AccountID:         s.accountID,
+			CPU:               taskDef.CPU,
+			Memory:            taskDef.Memory,
+		}
+
+		// Store task
+		if err := s.storage.TaskStore().Create(ctx, task); err != nil {
+			log.Printf("Failed to create task %s in storage: %v", taskID, err)
+			continue
+		}
+
+		// Create Kubernetes pod
+		pod, err := s.createPodForTask(ctx, cluster, service, taskDef, task)
+		if err != nil {
+			log.Printf("Failed to create pod for task %s: %v", taskID, err)
+			// Update task status to failed
+			task.LastStatus = "FAILED"
+			task.StoppedReason = err.Error()
+			now := time.Now()
+			task.StoppedAt = &now
+			s.storage.TaskStore().Update(ctx, task)
+			continue
+		}
+
+		// Update task with pod name
+		if pod != nil {
+			task.PodName = pod.Name
+			task.Namespace = namespace
+			task.LastStatus = "PROVISIONING"
+			if err := s.storage.TaskStore().Update(ctx, task); err != nil {
+				log.Printf("Failed to update task %s with pod info: %v", taskID, err)
+			}
+		}
+
+		log.Printf("Created task %s for service %s", taskID, service.ServiceName)
+	}
+
+	return nil
+}
+
+// createPodForTask creates a Kubernetes pod for an ECS task
+func (s *Server) createPodForTask(ctx context.Context, cluster *storage.Cluster, service *storage.Service, taskDef *storage.TaskDefinition, task *storage.Task) (*corev1.Pod, error) {
+	// Get Kubernetes client
+	kubeClient, err := s.clusterManager.GetKubeClient(cluster.K8sClusterName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	// Create task converter
+	taskConverter := converters.NewTaskConverter(s.region, s.accountID)
+
+	// Convert task definition to pod
+	namespace := fmt.Sprintf("kecs-%s", cluster.Name)
+	
+	// Create a minimal RunTask request for the converter
+	runTaskReq := map[string]interface{}{
+		"cluster":        cluster.Name,
+		"taskDefinition": taskDef.ARN,
+		"launchType":     service.LaunchType,
+	}
+	runTaskReqJSON, err := json.Marshal(runTaskReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal run task request: %w", err)
+	}
+	
+	pod, err := taskConverter.ConvertTaskToPod(taskDef, runTaskReqJSON, cluster, task.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert task definition to pod: %w", err)
+	}
+
+	// Set pod name and labels
+	podName := fmt.Sprintf("%s-%s", service.ServiceName, strings.Split(task.ARN, "/")[2])
+	pod.Name = podName
+	pod.Labels = map[string]string{
+		"app":         service.ServiceName,
+		"ecs-service": service.ServiceName,
+		"ecs-task":    strings.Split(task.ARN, "/")[2],
+		"ecs-cluster": cluster.Name,
+	}
+
+	// Add service account if needed
+	if taskDef.TaskRoleARN != "" {
+		pod.Spec.ServiceAccountName = fmt.Sprintf("%s-task-role", taskDef.Family)
+	}
+
+	// Create pod
+	createdPod, err := kubeClient.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pod: %w", err)
+	}
+
+	return createdPod, nil
 }
 
 // SetupRoutes configures all the API routes
