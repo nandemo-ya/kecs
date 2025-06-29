@@ -863,8 +863,13 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 
 	// Start LocalStack in the cluster
 	log.Printf("Starting LocalStack in cluster %s...", cluster.Name)
+	// Update LocalStack state to deploying
+	api.updateLocalStackState(cluster, "deploying", "")
+	
 	if err := clusterLocalStackManager.Start(ctx); err != nil {
 		log.Printf("Failed to start LocalStack in cluster %s: %v", cluster.Name, err)
+		// Update LocalStack state to failed
+		api.updateLocalStackState(cluster, "failed", err.Error())
 		return
 	}
 
@@ -872,8 +877,45 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 	log.Printf("Waiting for LocalStack to be ready in cluster %s...", cluster.Name)
 	if err := clusterLocalStackManager.WaitForReady(ctx, 2*time.Minute); err != nil {
 		log.Printf("LocalStack failed to become ready in cluster %s: %v", cluster.Name, err)
+		// Update LocalStack state to failed
+		api.updateLocalStackState(cluster, "failed", err.Error())
 		return
 	}
 
 	log.Printf("LocalStack successfully deployed in cluster %s", cluster.Name)
+	
+	// Update LocalStack state to running
+	api.updateLocalStackState(cluster, "running", "")
+}
+
+// updateLocalStackState updates the LocalStack deployment state in storage
+func (api *DefaultECSAPI) updateLocalStackState(cluster *storage.Cluster, status string, errorMsg string) {
+	ctx := context.Background()
+	
+	// Create LocalStack state
+	now := time.Now()
+	state := &storage.LocalStackState{
+		Deployed: true,
+		Status:   status,
+		DeployedAt: &now,
+		Namespace: "aws-services",
+	}
+	
+	// Add error message if status is failed
+	if status == "failed" && errorMsg != "" {
+		state.HealthStatus = errorMsg
+	}
+	
+	// Serialize state
+	stateJSON, err := storage.SerializeLocalStackState(state)
+	if err != nil {
+		log.Printf("Failed to serialize LocalStack state: %v", err)
+		return
+	}
+	
+	// Update cluster
+	cluster.LocalStackState = stateJSON
+	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
+		log.Printf("Failed to update LocalStack state for cluster %s: %v", cluster.Name, err)
+	}
 }

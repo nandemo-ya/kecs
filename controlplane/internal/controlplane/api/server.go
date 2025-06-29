@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -479,6 +480,12 @@ func (s *Server) RecoverState(ctx context.Context) error {
 			continue
 		}
 
+		// Recover LocalStack if it was deployed
+		if err := s.recoverLocalStackForCluster(ctx, cluster); err != nil {
+			log.Printf("Failed to recover LocalStack for cluster %s: %v", cluster.Name, err)
+			// Don't count as failed since cluster was recovered
+		}
+		
 		// Recover services for this cluster
 		if err := s.recoverServicesForCluster(ctx, cluster); err != nil {
 			log.Printf("Failed to recover services for cluster %s: %v", cluster.Name, err)
@@ -709,6 +716,105 @@ func (s *Server) createPodForTask(ctx context.Context, cluster *storage.Cluster,
 	}
 
 	return createdPod, nil
+}
+
+// recoverLocalStackForCluster recovers LocalStack deployment if it was previously deployed
+func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *storage.Cluster) error {
+	// Check if LocalStack was deployed
+	if cluster.LocalStackState == "" {
+		log.Printf("No LocalStack state found for cluster %s", cluster.Name)
+		return nil
+	}
+	
+	// Deserialize LocalStack state
+	state, err := storage.DeserializeLocalStackState(cluster.LocalStackState)
+	if err != nil {
+		return fmt.Errorf("failed to deserialize LocalStack state: %w", err)
+	}
+	
+	if state == nil || !state.Deployed {
+		log.Printf("LocalStack was not deployed in cluster %s", cluster.Name)
+		return nil
+	}
+	
+	log.Printf("LocalStack was deployed in cluster %s with status %s, attempting recovery...", cluster.Name, state.Status)
+	
+	// Check if LocalStack is enabled
+	var config *localstack.Config
+	if s.localStackManager != nil {
+		config = s.localStackManager.GetConfig()
+	} else {
+		// Use default config and check if enabled via environment
+		config = localstack.DefaultConfig()
+		if envEnabled := os.Getenv("KECS_LOCALSTACK_ENABLED"); envEnabled == "true" {
+			config.Enabled = true
+		}
+	}
+	
+	if config == nil || !config.Enabled {
+		log.Printf("LocalStack is not enabled in configuration, skipping recovery")
+		return nil
+	}
+	
+	// Get Kubernetes client for the specific k3d cluster
+	kubeClient, err := s.clusterManager.GetKubeClient(cluster.K8sClusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get Kubernetes client: %w", err)
+	}
+	
+	// Create a new LocalStack manager with the cluster-specific client
+	clusterLocalStackManager, err := localstack.NewManager(config, kubeClient.(*k8s.Clientset))
+	if err != nil {
+		return fmt.Errorf("failed to create LocalStack manager: %w", err)
+	}
+	
+	// Check if LocalStack is already running in this cluster
+	if clusterLocalStackManager.IsRunning() {
+		log.Printf("LocalStack is already running in cluster %s", cluster.Name)
+		// Update state to running
+		if s.ecsAPI != nil {
+			if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {
+				defaultAPI.updateLocalStackState(cluster, "running", "")
+			}
+		}
+		return nil
+	}
+	
+	// Start LocalStack in the cluster
+	log.Printf("Starting LocalStack in cluster %s...", cluster.Name)
+	if err := clusterLocalStackManager.Start(ctx); err != nil {
+		log.Printf("Failed to start LocalStack in cluster %s: %v", cluster.Name, err)
+		// Update state to failed
+		if s.ecsAPI != nil {
+			if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {
+				defaultAPI.updateLocalStackState(cluster, "failed", err.Error())
+			}
+		}
+		return err
+	}
+	
+	// Wait for LocalStack to be ready
+	log.Printf("Waiting for LocalStack to be ready in cluster %s...", cluster.Name)
+	if err := clusterLocalStackManager.WaitForReady(ctx, 2*time.Minute); err != nil {
+		log.Printf("LocalStack failed to become ready in cluster %s: %v", cluster.Name, err)
+		// Update state to failed
+		if s.ecsAPI != nil {
+			if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {
+				defaultAPI.updateLocalStackState(cluster, "failed", err.Error())
+			}
+		}
+		return err
+	}
+	
+	log.Printf("LocalStack successfully recovered in cluster %s", cluster.Name)
+	// Update state to running
+	if s.ecsAPI != nil {
+		if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {
+			defaultAPI.updateLocalStackState(cluster, "running", "")
+		}
+	}
+	
+	return nil
 }
 
 // SetupRoutes configures all the API routes

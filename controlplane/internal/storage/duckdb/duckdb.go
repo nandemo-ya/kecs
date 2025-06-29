@@ -203,6 +203,7 @@ func (s *DuckDBStorage) createClustersTable(ctx context.Context) error {
 		active_services_count INTEGER DEFAULT 0,
 		capacity_providers VARCHAR,
 		default_capacity_provider_strategy VARCHAR,
+		localstack_state VARCHAR,
 		created_at TIMESTAMP NOT NULL,
 		updated_at TIMESTAMP NOT NULL
 	)`
@@ -435,6 +436,7 @@ func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 			active_services_count INTEGER DEFAULT 0,
 			capacity_providers VARCHAR,
 			default_capacity_provider_strategy VARCHAR,
+			localstack_state VARCHAR,
 			created_at TIMESTAMP NOT NULL,
 			updated_at TIMESTAMP NOT NULL
 		)
@@ -458,6 +460,7 @@ func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 			active_services_count,
 			CAST(capacity_providers AS VARCHAR),
 			CAST(default_capacity_provider_strategy AS VARCHAR),
+			NULL as localstack_state,
 			created_at, updated_at
 		FROM clusters
 	`)
