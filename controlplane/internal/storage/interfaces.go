@@ -112,6 +112,9 @@ type Cluster struct {
 	// Default capacity provider strategy as JSON
 	DefaultCapacityProviderStrategy string `json:"defaultCapacityProviderStrategy,omitempty"`
 
+	// LocalStack deployment state
+	LocalStackState string `json:"localStackState,omitempty"`
+
 	// Timestamps
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
