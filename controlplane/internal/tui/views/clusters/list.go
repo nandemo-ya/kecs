@@ -40,6 +40,8 @@ type Model struct {
 	keyMap       keys.KeyMap
 	selectedARN  string
 	showDetails  bool
+	showCreate   bool
+	createModel  CreateModel
 }
 
 // tickMsg is sent when the refresh timer ticks
@@ -50,6 +52,9 @@ type clustersMsg struct {
 	clusters []api.Cluster
 	err      error
 }
+
+// ClusterListMsg is sent to return to the cluster list view
+type ClusterListMsg struct{}
 
 // New creates a new cluster list model
 func New(endpoint string) (*Model, error) {
@@ -83,10 +88,11 @@ func New(endpoint string) (*Model, error) {
 	t.SetStyles(s)
 
 	return &Model{
-		client:  client,
-		table:   t,
-		loading: true,
-		keyMap:  keys.DefaultKeyMap(),
+		client:      client,
+		table:       t,
+		loading:     true,
+		keyMap:      keys.DefaultKeyMap(),
+		createModel: NewCreateModel(client),
 	}, nil
 }
 
@@ -102,6 +108,23 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
+
+	// Handle create model updates
+	if m.showCreate {
+		switch msg := msg.(type) {
+		case ClusterListMsg:
+			m.showCreate = false
+			m.loading = true
+			return m, m.fetchClusters
+		case CreatedMsg:
+			m.showCreate = false
+			m.loading = true
+			return m, m.fetchClusters
+		default:
+			m.createModel, cmd = m.createModel.Update(msg)
+			return m, cmd
+		}
+	}
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -125,8 +148,9 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 				return m, m.fetchClusters
 				
 			case keys.Matches(msg, m.keyMap.Create):
-				// TODO: Implement cluster creation
-				return m, nil
+				m.showCreate = true
+				m.createModel = NewCreateModel(m.client)
+				return m, m.createModel.Init()
 				
 			case keys.Matches(msg, m.keyMap.Delete):
 				// TODO: Implement cluster deletion
@@ -169,6 +193,10 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 
 // View implements tea.Model
 func (m *Model) View() string {
+	if m.showCreate {
+		return m.createModel.View()
+	}
+
 	if m.loading && len(m.clusters) == 0 {
 		return styles.Content.Render("Loading clusters...")
 	}

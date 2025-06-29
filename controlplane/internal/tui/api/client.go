@@ -30,6 +30,9 @@ type Client struct {
 	httpClient *http.Client
 }
 
+// Ensure Client implements APIClient interface
+var _ APIClient = (*Client)(nil)
+
 // NewClient creates a new API client
 func NewClient(endpoint string) *Client {
 	return &Client{
@@ -103,20 +106,16 @@ func (c *Client) DescribeClusters(ctx context.Context, clusterArns []string) (*D
 }
 
 // CreateCluster creates a new cluster
-func (c *Client) CreateCluster(ctx context.Context, clusterName string) (*CreateClusterResponse, error) {
+func (c *Client) CreateCluster(ctx context.Context, req *CreateClusterRequest) (*CreateClusterResponse, error) {
 	var resp CreateClusterResponse
-	err := c.makeRequest(ctx, "CreateCluster", &CreateClusterRequest{
-		ClusterName: clusterName,
-	}, &resp)
+	err := c.makeRequest(ctx, "CreateCluster", req, &resp)
 	return &resp, err
 }
 
 // DeleteCluster deletes a cluster
-func (c *Client) DeleteCluster(ctx context.Context, cluster string) (*DeleteClusterResponse, error) {
+func (c *Client) DeleteCluster(ctx context.Context, req *DeleteClusterRequest) (*DeleteClusterResponse, error) {
 	var resp DeleteClusterResponse
-	err := c.makeRequest(ctx, "DeleteCluster", &DeleteClusterRequest{
-		Cluster: cluster,
-	}, &resp)
+	err := c.makeRequest(ctx, "DeleteCluster", req, &resp)
 	return &resp, err
 }
 
@@ -146,6 +145,13 @@ func (c *Client) CreateService(ctx context.Context, req *CreateServiceRequest) (
 	return &resp, err
 }
 
+// DeleteService deletes a service
+func (c *Client) DeleteService(ctx context.Context, req *DeleteServiceRequest) (*DeleteServiceResponse, error) {
+	var resp DeleteServiceResponse
+	err := c.makeRequest(ctx, "DeleteService", req, &resp)
+	return &resp, err
+}
+
 // UpdateService updates a service
 func (c *Client) UpdateService(ctx context.Context, req *UpdateServiceRequest) (*UpdateServiceResponse, error) {
 	var resp UpdateServiceResponse
@@ -153,15 +159,6 @@ func (c *Client) UpdateService(ctx context.Context, req *UpdateServiceRequest) (
 	return &resp, err
 }
 
-// DeleteService deletes a service
-func (c *Client) DeleteService(ctx context.Context, cluster, service string) (*DeleteServiceResponse, error) {
-	var resp DeleteServiceResponse
-	err := c.makeRequest(ctx, "DeleteService", &DeleteServiceRequest{
-		Cluster: cluster,
-		Service: service,
-	}, &resp)
-	return &resp, err
-}
 
 // ListTasks lists tasks in a cluster
 func (c *Client) ListTasks(ctx context.Context, cluster string, serviceName string) (*ListTasksResponse, error) {
@@ -232,3 +229,4 @@ func (c *Client) DeregisterTaskDefinition(ctx context.Context, taskDefinition st
 	}, &resp)
 	return &resp, err
 }
+

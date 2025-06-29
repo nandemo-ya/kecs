@@ -379,3 +379,4 @@ type DeregisterTaskDefinitionRequest struct {
 type DeregisterTaskDefinitionResponse struct {
 	TaskDefinition TaskDefinition `json:"taskDefinition"`
 }
+
