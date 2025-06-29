@@ -31,6 +31,7 @@ type K3dClusterManager struct {
 	config          *ClusterManagerConfig
 	traefikManager  *TraefikManager
 	portForwarder   *PortForwarder
+	traefikPorts    map[string]int // cluster name -> traefik port mapping
 }
 
 // NewK3dClusterManager creates a new k3d-based cluster manager
@@ -45,9 +46,13 @@ func NewK3dClusterManager(cfg *ClusterManagerConfig) (*K3dClusterManager, error)
 	// Use the Docker runtime from k3d
 	runtime := runtimes.Docker
 
+	log.Printf("Creating K3dClusterManager with config: ContainerMode=%v, EnableTraefik=%v", 
+		cfg.ContainerMode, cfg.EnableTraefik)
+
 	return &K3dClusterManager{
-		runtime: runtime,
-		config:  cfg,
+		runtime:      runtime,
+		config:       cfg,
+		traefikPorts: make(map[string]int),
 	}, nil
 }
 
@@ -83,14 +88,35 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 		Role:    k3d.ServerRole,
 		Image:   "rancher/k3s:v1.31.4-k3s1",
 		Restart: true,
-		Ports: nat.PortMap{
+	}
+	
+	// Add port mapping for Traefik if enabled
+	if k.config.EnableTraefik {
+		// Determine Traefik port
+		traefikPort := k.config.TraefikPort
+		log.Printf("Initial TraefikPort from config: %d", traefikPort)
+		if traefikPort == 0 {
+			// Find available port starting from 8090
+			port, err := k.findAvailablePort(8090)
+			if err != nil {
+				return fmt.Errorf("failed to find available port for Traefik: %w", err)
+			}
+			traefikPort = port
+			log.Printf("Found available port: %d", traefikPort)
+		}
+		
+		// Store the port for this cluster
+		k.traefikPorts[normalizedName] = traefikPort
+		
+		log.Printf("Adding port mapping for Traefik: %d/tcp", traefikPort)
+		serverNode.Ports = nat.PortMap{
 			"8090/tcp": []nat.PortBinding{
 				{
 					HostIP:   "0.0.0.0",
-					HostPort: "8090",
+					HostPort: fmt.Sprintf("%d", traefikPort),
 				},
 			},
-		},
+		}
 	}
 
 	// Create cluster configuration with minimal required fields
@@ -142,12 +168,17 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 	log.Printf("Successfully created k3d cluster %s", normalizedName)
 	
 	// Deploy Traefik if enabled
+	log.Printf("Traefik enabled: %v", k.config.EnableTraefik)
 	if k.config.EnableTraefik {
 		log.Printf("Deploying Traefik to cluster %s...", normalizedName)
 		if err := k.deployTraefik(ctx, clusterName); err != nil {
 			log.Printf("Warning: Failed to deploy Traefik: %v", err)
 			// Continue without Traefik
+		} else {
+			log.Printf("Successfully deployed Traefik to cluster %s", normalizedName)
 		}
+	} else {
+		log.Printf("Traefik is disabled, skipping deployment")
 	}
 	
 	return nil
@@ -510,17 +541,73 @@ func (k *K3dClusterManager) deployTraefik(ctx context.Context, clusterName strin
 // getRESTConfig returns the REST config for a cluster
 func (k *K3dClusterManager) getRESTConfig(clusterName string) (*rest.Config, error) {
 	normalizedName := k.normalizeClusterName(clusterName)
+	ctx := context.Background()
 
 	// Get cluster
-	cluster, err := client.ClusterGet(context.Background(), k.runtime, &k3d.Cluster{Name: normalizedName})
+	cluster, err := client.ClusterGet(ctx, k.runtime, &k3d.Cluster{Name: normalizedName})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cluster: %w", err)
 	}
 
+	// Get all nodes including the loadbalancer
+	nodes, err := k.runtime.GetNodesByLabel(ctx, map[string]string{k3d.LabelClusterName: normalizedName})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster nodes: %w", err)
+	}
+
+	// Find the loadbalancer node
+	var loadbalancerNode *k3d.Node
+	for i := range nodes {
+		if nodes[i].Role == k3d.LoadBalancerRole {
+			loadbalancerNode = nodes[i]
+			cluster.ServerLoadBalancer = &k3d.Loadbalancer{
+				Node: loadbalancerNode,
+			}
+			break
+		}
+	}
+
 	// Get kubeconfig
-	kubeconfigObj, err := client.KubeconfigGet(context.Background(), k.runtime, cluster)
+	kubeconfigObj, err := client.KubeconfigGet(ctx, k.runtime, cluster)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	// Fix the server URL by getting the actual port from Docker inspect
+	if loadbalancerNode != nil {
+		// Get the actual port mapping from Docker
+		apiPort, err := k.getLoadBalancerAPIPort(ctx, loadbalancerNode.Name)
+		if err != nil {
+			log.Printf("Failed to get loadbalancer port: %v", err)
+		} else if apiPort != "" {
+			// Update the server URL with the correct port
+			for clusterName, clusterConfig := range kubeconfigObj.Clusters {
+				// When running in container mode, we need to use host.docker.internal
+				// to connect to services on the Docker host
+				host := "127.0.0.1"
+				if k.config.ContainerMode {
+					// Try to use host.docker.internal for Docker Desktop environments
+					// This works on Mac and Windows Docker Desktop
+					host = "host.docker.internal"
+					
+					// For Linux, we might need to use the default gateway
+					if _, err := os.Stat("/.dockerenv"); err == nil {
+						// We're in a container, check if host.docker.internal resolves
+						if _, err := net.LookupHost("host.docker.internal"); err != nil {
+							// host.docker.internal doesn't resolve, try to get gateway
+							log.Printf("host.docker.internal not available, using fallback")
+							// For now, we'll still use host.docker.internal and let it fail
+							// A more robust solution would detect the gateway IP
+						}
+					}
+				}
+				
+				newServer := fmt.Sprintf("https://%s:%s", host, apiPort)
+				log.Printf("Updating server URL from %s to %s", clusterConfig.Server, newServer)
+				clusterConfig.Server = newServer
+				kubeconfigObj.Clusters[clusterName] = clusterConfig
+			}
+		}
 	}
 
 	// Convert to REST config
@@ -686,4 +773,23 @@ func (k *K3dClusterManager) waitForClusterReadyOptimized(ctx context.Context, cl
 			}
 		}
 	}
+}
+
+// findAvailablePort finds an available port starting from the given port
+func (k *K3dClusterManager) findAvailablePort(startPort int) (int, error) {
+	// Try up to 100 ports
+	for i := 0; i < 100; i++ {
+		port := startPort + i
+		if IsPortAvailable(port) {
+			return port, nil
+		}
+	}
+	return 0, fmt.Errorf("no available port found starting from %d", startPort)
+}
+
+// GetTraefikPort returns the Traefik port for a given cluster
+func (k *K3dClusterManager) GetTraefikPort(clusterName string) (int, bool) {
+	normalizedName := k.normalizeClusterName(clusterName)
+	port, exists := k.traefikPorts[normalizedName]
+	return port, exists
 }

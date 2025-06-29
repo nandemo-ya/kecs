@@ -84,6 +84,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 			ContainerMode:  config.GetBool("features.containerMode"),
 			KubeconfigPath: kubeconfig,
 			EnableTraefik:  config.GetBool("features.traefik"),
+			TraefikPort:    0, // 0 means dynamic port allocation
 		}
 
 		cm, err := kubernetes.NewClusterManager(clusterConfig)

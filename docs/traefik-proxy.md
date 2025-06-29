@@ -5,10 +5,14 @@ KECS supports Traefik as a reverse proxy to solve the LocalStack DNS resolution 
 ## Architecture
 
 ```
-[KECS Host] → [localhost:8090] → [Traefik in k3d] → [LocalStack/Services]
-                                        ↓
-                                Port Forward (8090)
+[KECS Host] → [localhost:<dynamic_port>] → [Traefik in k3d] → [LocalStack/Services]
+                                                 ↓
+                                     Port Forward (8090+)
 ```
+
+### Dynamic Port Allocation
+
+KECS automatically allocates available ports for Traefik starting from port 8090. This allows multiple clusters to run simultaneously, each with its own Traefik proxy on a different port.
 
 ## Configuration
 
@@ -27,10 +31,13 @@ features:
 
 ## How it Works
 
-1. When creating a k3d cluster, KECS maps port 8090 from the host to the cluster
-2. After cluster creation, KECS deploys Traefik
-3. Traefik routes requests to LocalStack and other services based on the path
-4. LocalStack health checks and API calls go through `http://localhost:8090`
+1. When creating a k3d cluster, KECS finds an available port (starting from 8090)
+2. KECS maps the selected port from the host to the cluster
+3. After cluster creation, KECS deploys Traefik
+4. Traefik routes requests to LocalStack and other services based on the path
+5. LocalStack health checks and API calls go through `http://localhost:<port>`
+
+The port is automatically selected for each cluster, allowing multiple clusters to coexist.
 
 ## Testing
 
@@ -44,12 +51,18 @@ features:
    aws --endpoint-url http://localhost:8080 ecs create-cluster --cluster-name test
    ```
 
-3. Check LocalStack status:
+3. Find the Traefik port for your cluster:
+   ```bash
+   # Check the KECS logs for the port assignment
+   # Look for: "Using dynamic Traefik port XXXX for LocalStack proxy"
+   ```
+
+4. Check LocalStack status (replace 8090 with your actual port):
    ```bash
    curl http://localhost:8090/_localstack/health
    ```
 
-4. Access LocalStack services through Traefik:
+5. Access LocalStack services through Traefik:
    ```bash
    aws --endpoint-url http://localhost:8090 s3 ls
    ```
