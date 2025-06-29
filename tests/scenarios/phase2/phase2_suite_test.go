@@ -9,13 +9,7 @@ import (
 	"github.com/nandemo-ya/kecs/tests/scenarios/utils"
 )
 
-// Suite-level shared resources
-var (
-	sharedKECS           *utils.KECSContainer
-	sharedClient         utils.ECSClientInterface
-	sharedLogger         *utils.TestLogger
-	sharedClusterManager *utils.SharedClusterManager
-)
+// Shared resources are defined in shared_test.go
 
 var _ = BeforeSuite(func() {
 	// Start KECS container once for the entire suite
