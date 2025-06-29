@@ -24,6 +24,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/components/filter"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/components/search"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/keys"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/styles"
 )
@@ -33,6 +35,7 @@ type Model struct {
 	client          *api.Client
 	table           table.Model
 	tasks           []api.Task
+	filtered        []api.Task
 	clusters        []api.Cluster
 	selectedCluster string
 	selectedService string
@@ -43,6 +46,10 @@ type Model struct {
 	keyMap          keys.KeyMap
 	selectedARN     string
 	showDetails     bool
+	searchModel     search.Model
+	filterModel     filter.Model
+	showSearch      bool
+	showFilter      bool
 }
 
 // tickMsg is sent when the refresh timer ticks
@@ -93,11 +100,21 @@ func New(endpoint string) (*Model, error) {
 		Bold(false)
 	t.SetStyles(s)
 
+	// Create filter options
+	filterOptions := []filter.Option{
+		{Label: "RUNNING", Value: "RUNNING"},
+		{Label: "PENDING", Value: "PENDING"},
+		{Label: "STOPPED", Value: "STOPPED"},
+	}
+
 	return &Model{
-		client:  client,
-		table:   t,
-		loading: true,
-		keyMap:  keys.DefaultKeyMap(),
+		client:      client,
+		table:       t,
+		loading:     true,
+		keyMap:      keys.DefaultKeyMap(),
+		searchModel: search.New("Search tasks by ID or task definition..."),
+		filterModel: filter.New("Filter by Status", filterOptions),
+		filtered:    []api.Task{},
 	}, nil
 }
 
@@ -114,6 +131,38 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
+	// Handle search updates
+	if m.showSearch {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			if keys.Matches(msg, m.keyMap.Back) {
+				m.showSearch = false
+				m.searchModel.SetActive(false)
+				m.applyFilters()
+				return m, nil
+			}
+		}
+		m.searchModel, cmd = m.searchModel.Update(msg)
+		m.applyFilters()
+		return m, cmd
+	}
+
+	// Handle filter updates
+	if m.showFilter {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			if keys.Matches(msg, m.keyMap.Back) {
+				m.showFilter = false
+				m.filterModel.SetActive(false)
+				m.applyFilters()
+				return m, nil
+			}
+		}
+		m.filterModel, cmd = m.filterModel.Update(msg)
+		m.applyFilters()
+		return m, cmd
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if m.showDetails {
@@ -125,8 +174,8 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 		} else {
 			switch {
 			case keys.Matches(msg, m.keyMap.Select):
-				if len(m.tasks) > 0 && m.table.SelectedRow() != nil {
-					m.selectedARN = m.tasks[m.table.Cursor()].TaskArn
+				if len(m.filtered) > 0 && m.table.SelectedRow() != nil {
+					m.selectedARN = m.filtered[m.table.Cursor()].TaskArn
 					m.showDetails = true
 				}
 				return m, nil
@@ -137,6 +186,16 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 				
 			case keys.Matches(msg, m.keyMap.Delete):
 				// TODO: Implement task stop
+				return m, nil
+				
+			case keys.Matches(msg, m.keyMap.Search):
+				m.showSearch = true
+				m.searchModel.SetActive(true)
+				return m, nil
+				
+			case keys.Matches(msg, m.keyMap.Filter):
+				m.showFilter = true
+				m.filterModel.SetActive(true)
 				return m, nil
 			}
 		}
@@ -165,7 +224,7 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 			m.err = msg.err
 		} else {
 			m.tasks = msg.tasks
-			m.updateTable()
+			m.applyFilters()
 			m.err = nil
 		}
 		return m, nil
@@ -188,6 +247,14 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 
 // View implements tea.Model
 func (m *Model) View() string {
+	if m.showSearch {
+		return m.renderWithSearch()
+	}
+
+	if m.showFilter {
+		return m.renderWithFilter()
+	}
+
 	if m.loading && len(m.tasks) == 0 {
 		return styles.Content.Render("Loading tasks...")
 	}
@@ -202,29 +269,7 @@ func (m *Model) View() string {
 		return m.renderDetails()
 	}
 
-	var content strings.Builder
-	content.WriteString(styles.ListTitle.Render("Tasks"))
-	
-	// Show current filters if any
-	if m.selectedCluster != "" {
-		clusterName := m.getClusterName(m.selectedCluster)
-		content.WriteString(fmt.Sprintf(" - Cluster: %s", styles.Info.Render(clusterName)))
-	}
-	if m.selectedService != "" {
-		content.WriteString(fmt.Sprintf(", Service: %s", styles.Info.Render(m.selectedService)))
-	}
-	
-	content.WriteString("\n\n")
-
-	if len(m.tasks) == 0 {
-		content.WriteString(styles.Info.Render("No tasks found."))
-	} else {
-		content.WriteString(m.table.View())
-		content.WriteString("\n\n")
-		content.WriteString(styles.Info.Render(fmt.Sprintf("Showing %d tasks", len(m.tasks))))
-	}
-
-	return styles.Content.Render(content.String())
+	return m.renderList()
 }
 
 // SetSize sets the size of the view
@@ -237,7 +282,7 @@ func (m *Model) SetSize(width, height int) {
 // updateTable updates the table with current tasks
 func (m *Model) updateTable() {
 	rows := []table.Row{}
-	for _, task := range m.tasks {
+	for _, task := range m.filtered {
 		// Extract task ID from ARN
 		taskID := m.extractTaskID(task.TaskArn)
 		
@@ -280,9 +325,9 @@ func (m *Model) renderDetails() string {
 
 	// Find the selected task
 	var task *api.Task
-	for i := range m.tasks {
-		if m.tasks[i].TaskArn == m.selectedARN {
-			task = &m.tasks[i]
+	for i := range m.filtered {
+		if m.filtered[i].TaskArn == m.selectedARN {
+			task = &m.filtered[i]
 			break
 		}
 	}
@@ -489,4 +534,107 @@ func tick() tea.Cmd {
 	return tea.Tick(30*time.Second, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
+}
+
+// applyFilters applies search and filter to the tasks
+func (m *Model) applyFilters() {
+	// Start with all tasks
+	filtered := m.tasks
+
+	// Apply search filter
+	if m.searchModel.Value() != "" {
+		filtered = search.Filter(filtered, m.searchModel.Value(), func(t api.Task) []string {
+			return []string{t.TaskArn, t.TaskDefinitionArn, m.extractTaskID(t.TaskArn), m.extractTaskDefName(t.TaskDefinitionArn)}
+		})
+	}
+
+	// Apply status filter
+	selectedStatuses := m.filterModel.SelectedValues()
+	if len(selectedStatuses) > 0 {
+		filtered = filter.Apply(filtered, selectedStatuses, func(t api.Task, values []string) bool {
+			for _, status := range values {
+				if t.LastStatus == status {
+					return true
+				}
+			}
+			return false
+		})
+	}
+
+	m.filtered = filtered
+	m.updateTable()
+}
+
+// renderWithSearch renders the view with search overlay
+func (m *Model) renderWithSearch() string {
+	// Render the main list
+	mainContent := m.renderList()
+	
+	// Add search overlay at the bottom
+	return lipgloss.JoinVertical(
+		lipgloss.Top,
+		mainContent,
+		"\n\n",
+		m.searchModel.View(),
+	)
+}
+
+// renderWithFilter renders the view with filter overlay
+func (m *Model) renderWithFilter() string {
+	// Render the main list dimmed
+	mainContent := m.renderList()
+	dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(mainContent)
+	
+	// Overlay filter in center
+	filterView := m.filterModel.View()
+	
+	// Simple overlay by joining vertically with some spacing
+	var content strings.Builder
+	content.WriteString(dimmed)
+	content.WriteString("\n\n")
+	content.WriteString(filterView)
+	
+	return content.String()
+}
+
+// renderList renders the main task list
+func (m *Model) renderList() string {
+	var content strings.Builder
+	content.WriteString(styles.ListTitle.Render("Tasks"))
+	
+	// Show current filters if any
+	if m.selectedCluster != "" {
+		clusterName := m.getClusterName(m.selectedCluster)
+		content.WriteString(fmt.Sprintf(" - Cluster: %s", styles.Info.Render(clusterName)))
+	}
+	if m.selectedService != "" {
+		content.WriteString(fmt.Sprintf(", Service: %s", styles.Info.Render(m.selectedService)))
+	}
+	
+	// Show active search/filter
+	if m.searchModel.Value() != "" || len(m.filterModel.SelectedValues()) > 0 {
+		content.WriteString(" ")
+		if m.searchModel.Value() != "" {
+			content.WriteString(styles.Info.Render(fmt.Sprintf("[Search: %s]", m.searchModel.Value())))
+		}
+		if len(m.filterModel.SelectedValues()) > 0 {
+			content.WriteString(styles.Info.Render(fmt.Sprintf("[Filter: %s]", strings.Join(m.filterModel.SelectedValues(), ", "))))
+		}
+	}
+	
+	content.WriteString("\n\n")
+
+	if len(m.filtered) == 0 {
+		if len(m.tasks) == 0 {
+			content.WriteString(styles.Info.Render("No tasks found."))
+		} else {
+			content.WriteString(styles.Info.Render("No tasks match the current filters."))
+		}
+	} else {
+		content.WriteString(m.table.View())
+		content.WriteString("\n\n")
+		content.WriteString(styles.Info.Render(fmt.Sprintf("Showing %d of %d tasks", len(m.filtered), len(m.tasks))))
+	}
+
+	return styles.Content.Render(content.String())
 }
