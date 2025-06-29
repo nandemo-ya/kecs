@@ -1,5 +1,4 @@
 # Example Docker Compose configuration for KECS
-version: '3.8'
 
 services:
   # Single KECS instance
