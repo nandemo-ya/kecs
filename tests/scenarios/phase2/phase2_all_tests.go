@@ -1,10 +1,8 @@
-package phase2_test
+package phase2
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -17,93 +15,22 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 	
 	Describe("Task Definition: Background Worker", func() {
 		var (
-			workerKecs        *utils.KECSContainer
 			workerClient      utils.ECSClientInterface
 			workerLogger      *utils.TestLogger
 			workerClusterName string
 		)
 
 		BeforeEach(func() {
-			if workerKecs == nil {
-				workerLogger = utils.NewTestLogger(GinkgoT())
-				workerLogger.Info("Starting Background Worker tests")
-
-				// Start KECS container
-				workerKecs = utils.StartKECS(GinkgoT())
-				workerClient = utils.NewECSClientInterface(workerKecs.Endpoint())
-
-				// Create cluster for this test suite
-				workerClusterName = utils.GenerateTestName("phase2-worker-cluster")
-				err := workerClient.CreateCluster(workerClusterName)
-				Expect(err).NotTo(HaveOccurred())
-
-				utils.AssertClusterActive(GinkgoT(), workerClient, workerClusterName)
-				workerLogger.Info("Created cluster: %s", workerClusterName)
-				
-				// Wait for k3d cluster to be created and ready
-				// The cluster is created asynchronously, so we need to wait for it to be fully ready
-				workerLogger.Info("Waiting for k3d cluster to be created and ready...")
-				
-				// First wait a bit for async cluster creation to start
-				time.Sleep(10 * time.Second)
-				
-				// Then actively check for cluster readiness
-				workerLogger.Info("Checking k3d cluster readiness...")
-				testServiceName := utils.GenerateTestName("worker-readiness")
-				testTaskDefFamily := utils.GenerateTestName("worker-ready-td")
-				
-				// Register a simple task definition for readiness check
-				testTaskDefJSON := `{
-					"family": "` + testTaskDefFamily + `",
-					"containerDefinitions": [{
-						"name": "test",
-						"image": "busybox:latest",
-						"cpu": 128,
-						"memory": 128,
-						"essential": true
-					}]
-				}`
-				
-				// First, try to delete any existing test service from previous runs
-				_ = workerClient.DeleteService(workerClusterName, testServiceName)
-				
-				// Wait for service deletion to complete
-				Eventually(func() bool {
-					services, _ := workerClient.ListServices(workerClusterName)
-					for _, svcName := range services {
-						// Extract service name from ARN if necessary
-						if strings.Contains(svcName, testServiceName) {
-							return false // Service still exists
-						}
-					}
-					return true // Service is gone
-				}, 30*time.Second, 2*time.Second).Should(BeTrue(), "Failed to delete existing test service")
-				
-				Eventually(func() error {
-					_, err := workerClient.RegisterTaskDefinitionFromJSON(testTaskDefJSON)
-					if err != nil {
-						return fmt.Errorf("failed to register test task definition: %w", err)
-					}
-					
-					err = workerClient.CreateService(workerClusterName, testServiceName, testTaskDefFamily, 1)
-					if err != nil {
-						// If it's still a duplicate key error, try deleting again
-						if strings.Contains(err.Error(), "Duplicate key") {
-							_ = workerClient.DeleteService(workerClusterName, testServiceName)
-							time.Sleep(5 * time.Second)
-							return fmt.Errorf("service still exists, retrying: %w", err)
-						}
-						return fmt.Errorf("failed to create test service: %w", err)
-					}
-					
-					// Success - clean up
-					_ = workerClient.DeleteService(workerClusterName, testServiceName)
-					_ = workerClient.DeregisterTaskDefinition(testTaskDefFamily + ":1")
-					return nil
-				}, 120*time.Second, 10*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
-				
-				workerLogger.Info("k3d cluster is ready")
-			}
+			// Use shared resources from suite
+			workerClient = sharedClient
+			workerLogger = sharedLogger
+			
+			// Get or create a shared cluster for worker tests
+			var err error
+			workerClusterName, err = sharedClusterManager.GetOrCreateCluster("phase2-worker")
+			Expect(err).NotTo(HaveOccurred())
+			
+			workerLogger.Info("Using shared cluster: %s", workerClusterName)
 		})
 
 		AfterEach(func() {
@@ -210,20 +137,25 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 
 				workerLogger.Info("Worker is running")
 
-				// Wait a bit to let the worker process some items
-				time.Sleep(15 * time.Second)
+				// Wait for worker to process some items
+				Eventually(func() bool {
+					// In a real implementation, we'd check logs or metrics
+					// For now, just ensure the task stays running
+					task, err := workerClient.DescribeTask(workerClusterName, taskArn)
+					if err != nil {
+						return false
+					}
+					return task.LastStatus == "RUNNING"
+				}, 15*time.Second, 2*time.Second).Should(BeTrue())
 
 				// Check logs to verify processing (placeholder - requires log retrieval implementation)
 				workerLogger.Info("Worker should be processing queue items")
 			})
 
 			It("should cleanup worker resources", Label("cleanup"), func() {
-				if workerClient != nil && workerClusterName != "" {
-					workerLogger.Info("Cleaning up cluster: %s", workerClusterName)
-					_ = workerClient.DeleteCluster(workerClusterName)
-				}
-				if workerKecs != nil {
-					workerKecs.Cleanup()
+				// Release the shared cluster
+				if sharedClusterManager != nil && workerClusterName != "" {
+					sharedClusterManager.ReleaseCluster(workerClusterName)
 				}
 			})
 		})
@@ -231,93 +163,22 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 
 	Describe("Task Definition: Failure Handling", func() {
 		var (
-			failureKecs        *utils.KECSContainer
 			failureClient      utils.ECSClientInterface
 			failureLogger      *utils.TestLogger
 			failureClusterName string
 		)
 
 		BeforeEach(func() {
-			if failureKecs == nil {
-				failureLogger = utils.NewTestLogger(GinkgoT())
-				failureLogger.Info("Starting Failure Handling tests")
-
-				// Start KECS container
-				failureKecs = utils.StartKECS(GinkgoT())
-				failureClient = utils.NewECSClientInterface(failureKecs.Endpoint())
-
-				// Create cluster for this test suite
-				failureClusterName = utils.GenerateTestName("phase2-failure-cluster")
-				err := failureClient.CreateCluster(failureClusterName)
-				Expect(err).NotTo(HaveOccurred())
-
-				utils.AssertClusterActive(GinkgoT(), failureClient, failureClusterName)
-				failureLogger.Info("Created cluster: %s", failureClusterName)
-				
-				// Wait for k3d cluster to be created and ready
-				// The cluster is created asynchronously, so we need to wait for it to be fully ready
-				failureLogger.Info("Waiting for k3d cluster to be created and ready...")
-				
-				// First wait a bit for async cluster creation to start
-				time.Sleep(10 * time.Second)
-				
-				// Then actively check for cluster readiness
-				failureLogger.Info("Checking k3d cluster readiness...")
-				testServiceName := utils.GenerateTestName("failure-readiness")
-				testTaskDefFamily := utils.GenerateTestName("failure-ready-td")
-				
-				// Register a simple task definition for readiness check
-				testTaskDefJSON := `{
-					"family": "` + testTaskDefFamily + `",
-					"containerDefinitions": [{
-						"name": "test",
-						"image": "busybox:latest",
-						"cpu": 128,
-						"memory": 128,
-						"essential": true
-					}]
-				}`
-				
-				// First, try to delete any existing test service from previous runs
-				_ = failureClient.DeleteService(failureClusterName, testServiceName)
-				
-				// Wait for service deletion to complete
-				Eventually(func() bool {
-					services, _ := failureClient.ListServices(failureClusterName)
-					for _, svcName := range services {
-						// Extract service name from ARN if necessary
-						if strings.Contains(svcName, testServiceName) {
-							return false // Service still exists
-						}
-					}
-					return true // Service is gone
-				}, 30*time.Second, 2*time.Second).Should(BeTrue(), "Failed to delete existing test service")
-				
-				Eventually(func() error {
-					_, err := failureClient.RegisterTaskDefinitionFromJSON(testTaskDefJSON)
-					if err != nil {
-						return fmt.Errorf("failed to register test task definition: %w", err)
-					}
-					
-					err = failureClient.CreateService(failureClusterName, testServiceName, testTaskDefFamily, 1)
-					if err != nil {
-						// If it's still a duplicate key error, try deleting again
-						if strings.Contains(err.Error(), "Duplicate key") {
-							_ = failureClient.DeleteService(failureClusterName, testServiceName)
-							time.Sleep(5 * time.Second)
-							return fmt.Errorf("service still exists, retrying: %w", err)
-						}
-						return fmt.Errorf("failed to create test service: %w", err)
-					}
-					
-					// Success - clean up
-					_ = failureClient.DeleteService(failureClusterName, testServiceName)
-					_ = failureClient.DeregisterTaskDefinition(testTaskDefFamily + ":1")
-					return nil
-				}, 120*time.Second, 10*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
-				
-				failureLogger.Info("k3d cluster is ready")
-			}
+			// Use shared resources from suite
+			failureClient = sharedClient
+			failureLogger = sharedLogger
+			
+			// Get or create a shared cluster for failure tests
+			var err error
+			failureClusterName, err = sharedClusterManager.GetOrCreateCluster("phase2-failure")
+			Expect(err).NotTo(HaveOccurred())
+			
+			failureLogger.Info("Using shared cluster: %s", failureClusterName)
 		})
 
 		Describe("Container Failure and Restart", func() {
@@ -434,12 +295,9 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 			})
 
 			It("should cleanup failure resources", Label("cleanup"), func() {
-				if failureClient != nil && failureClusterName != "" {
-					failureLogger.Info("Cleaning up cluster: %s", failureClusterName)
-					_ = failureClient.DeleteCluster(failureClusterName)
-				}
-				if failureKecs != nil {
-					failureKecs.Cleanup()
+				// Release the shared cluster
+				if sharedClusterManager != nil && failureClusterName != "" {
+					sharedClusterManager.ReleaseCluster(failureClusterName)
 				}
 			})
 		})
@@ -447,93 +305,22 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 
 	Describe("Task Definition: Health Check Failures", func() {
 		var (
-			healthKecs        *utils.KECSContainer
 			healthClient      utils.ECSClientInterface
 			healthLogger      *utils.TestLogger
 			healthClusterName string
 		)
 
 		BeforeEach(func() {
-			if healthKecs == nil {
-				healthLogger = utils.NewTestLogger(GinkgoT())
-				healthLogger.Info("Starting Health Check tests")
-
-				// Start KECS container
-				healthKecs = utils.StartKECS(GinkgoT())
-				healthClient = utils.NewECSClientInterface(healthKecs.Endpoint())
-
-				// Create cluster for this test suite
-				healthClusterName = utils.GenerateTestName("phase2-health-cluster")
-				err := healthClient.CreateCluster(healthClusterName)
-				Expect(err).NotTo(HaveOccurred())
-
-				utils.AssertClusterActive(GinkgoT(), healthClient, healthClusterName)
-				healthLogger.Info("Created cluster: %s", healthClusterName)
-				
-				// Wait for k3d cluster to be created and ready
-				// The cluster is created asynchronously, so we need to wait for it to be fully ready
-				healthLogger.Info("Waiting for k3d cluster to be created and ready...")
-				
-				// First wait a bit for async cluster creation to start
-				time.Sleep(10 * time.Second)
-				
-				// Then actively check for cluster readiness
-				healthLogger.Info("Checking k3d cluster readiness...")
-				testServiceName := utils.GenerateTestName("health-readiness")
-				testTaskDefFamily := utils.GenerateTestName("health-ready-td")
-				
-				// Register a simple task definition for readiness check
-				testTaskDefJSON := `{
-					"family": "` + testTaskDefFamily + `",
-					"containerDefinitions": [{
-						"name": "test",
-						"image": "busybox:latest",
-						"cpu": 128,
-						"memory": 128,
-						"essential": true
-					}]
-				}`
-				
-				// First, try to delete any existing test service from previous runs
-				_ = healthClient.DeleteService(healthClusterName, testServiceName)
-				
-				// Wait for service deletion to complete
-				Eventually(func() bool {
-					services, _ := healthClient.ListServices(healthClusterName)
-					for _, svcName := range services {
-						// Extract service name from ARN if necessary
-						if strings.Contains(svcName, testServiceName) {
-							return false // Service still exists
-						}
-					}
-					return true // Service is gone
-				}, 30*time.Second, 2*time.Second).Should(BeTrue(), "Failed to delete existing test service")
-				
-				Eventually(func() error {
-					_, err := healthClient.RegisterTaskDefinitionFromJSON(testTaskDefJSON)
-					if err != nil {
-						return fmt.Errorf("failed to register test task definition: %w", err)
-					}
-					
-					err = healthClient.CreateService(healthClusterName, testServiceName, testTaskDefFamily, 1)
-					if err != nil {
-						// If it's still a duplicate key error, try deleting again
-						if strings.Contains(err.Error(), "Duplicate key") {
-							_ = healthClient.DeleteService(healthClusterName, testServiceName)
-							time.Sleep(5 * time.Second)
-							return fmt.Errorf("service still exists, retrying: %w", err)
-						}
-						return fmt.Errorf("failed to create test service: %w", err)
-					}
-					
-					// Success - clean up
-					_ = healthClient.DeleteService(healthClusterName, testServiceName)
-					_ = healthClient.DeregisterTaskDefinition(testTaskDefFamily + ":1")
-					return nil
-				}, 120*time.Second, 10*time.Second).Should(Succeed(), "k3d cluster failed to become ready")
-				
-				healthLogger.Info("k3d cluster is ready")
-			}
+			// Use shared resources from suite
+			healthClient = sharedClient
+			healthLogger = sharedLogger
+			
+			// Get or create a shared cluster for health tests
+			var err error
+			healthClusterName, err = sharedClusterManager.GetOrCreateCluster("phase2-health")
+			Expect(err).NotTo(HaveOccurred())
+			
+			healthLogger.Info("Using shared cluster: %s", healthClusterName)
 		})
 
 		Describe("Container Health Check Management", func() {
@@ -617,12 +404,9 @@ var _ = Describe("Phase 2: Additional Task Definition Tests", Serial, func() {
 			})
 
 			It("should cleanup health check resources", Label("cleanup"), func() {
-				if healthClient != nil && healthClusterName != "" {
-					healthLogger.Info("Cleaning up cluster: %s", healthClusterName)
-					_ = healthClient.DeleteCluster(healthClusterName)
-				}
-				if healthKecs != nil {
-					healthKecs.Cleanup()
+				// Release the shared cluster
+				if sharedClusterManager != nil && healthClusterName != "" {
+					sharedClusterManager.ReleaseCluster(healthClusterName)
 				}
 			})
 		})
