@@ -79,6 +79,10 @@ type Config struct {
 	DataDir         string            `yaml:"data_dir" json:"data_dir"`
 	DockerHost      string            `yaml:"docker_host" json:"docker_host"`
 	CustomEndpoints map[string]string `yaml:"custom_endpoints" json:"custom_endpoints"`
+	
+	// Runtime configuration
+	UseExternalAccess bool   `yaml:"use_external_access" json:"use_external_access"`
+	ProxyEndpoint     string `yaml:"proxy_endpoint" json:"proxy_endpoint"`
 }
 
 // ResourceLimits defines resource constraints for LocalStack
@@ -119,6 +123,7 @@ type KubernetesManager interface {
 	GetLocalStackPod() (string, error)
 	GetServiceEndpoint() (string, error)
 	UpdateDeployment(ctx context.Context, config *Config) error
+	GetExternalEndpoint(ctx context.Context) (string, error)
 }
 
 // LocalStackContainer represents the LocalStack container state

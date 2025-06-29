@@ -299,6 +299,12 @@ func (km *kubernetesManager) createService(ctx context.Context, config *Config) 
 	return nil
 }
 
+// GetExternalEndpoint returns the external endpoint for accessing LocalStack
+func (km *kubernetesManager) GetExternalEndpoint(ctx context.Context) (string, error) {
+	// For now, this returns an error as we're using port forwarding instead
+	return "", fmt.Errorf("external endpoint not available, use port forwarding")
+}
+
 // WaitForLocalStackReady waits for LocalStack to output "Ready." in its logs
 func (km *kubernetesManager) WaitForLocalStackReady(ctx context.Context, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
