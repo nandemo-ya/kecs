@@ -138,7 +138,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 				})
 			})
 
-			PIt("should fail to delete cluster with active service", func() { // FLAKY: Service creation fails with duplicate key in shared container
+			It("should fail to delete cluster with active service", func() {
 				logger.Info("Attempting to delete cluster with active service: %s", clusterName)
 
 				err := client.DeleteCluster(clusterName)
