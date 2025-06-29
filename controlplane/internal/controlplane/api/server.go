@@ -286,6 +286,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		if s.s3Integration != nil {
 			defaultAPI.SetS3Integration(s.s3Integration)
 		}
+		if s.localStackManager != nil {
+			defaultAPI.SetLocalStackManager(s.localStackManager)
+		}
 
 		// Initialize Service Discovery if we have kubernetes client
 		if localStackConfig != nil && localStackConfig.Enabled {
