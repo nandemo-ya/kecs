@@ -38,6 +38,8 @@ type KeyMap struct {
 	Delete  key.Binding
 	Create  key.Binding
 	Edit    key.Binding
+	Search  key.Binding
+	Filter  key.Binding
 
 	// Views
 	Dashboard key.Binding
@@ -77,8 +79,8 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("pgup/ctrl+b", "page up"),
 		),
 		PageDown: key.NewBinding(
-			key.WithKeys("pgdown", "ctrl+f"),
-			key.WithHelp("pgdn/ctrl+f", "page down"),
+			key.WithKeys("pgdown", "ctrl+d"),
+			key.WithHelp("pgdn/ctrl+d", "page down"),
 		),
 		Home: key.NewBinding(
 			key.WithKeys("home", "g"),
@@ -113,6 +115,14 @@ func DefaultKeyMap() KeyMap {
 		Edit: key.NewBinding(
 			key.WithKeys("e"),
 			key.WithHelp("e", "edit"),
+		),
+		Search: key.NewBinding(
+			key.WithKeys("/", "ctrl+s"),
+			key.WithHelp("//ctrl+s", "search"),
+		),
+		Filter: key.NewBinding(
+			key.WithKeys("f", "ctrl+f"),
+			key.WithHelp("f/ctrl+f", "filter"),
 		),
 
 		// Views

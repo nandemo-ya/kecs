@@ -24,6 +24,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/components/filter"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/components/search"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/keys"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/styles"
 )
@@ -33,6 +35,7 @@ type Model struct {
 	client       *api.Client
 	table        table.Model
 	clusters     []api.Cluster
+	filtered     []api.Cluster
 	width        int
 	height       int
 	loading      bool
@@ -42,6 +45,10 @@ type Model struct {
 	showDetails  bool
 	showCreate   bool
 	createModel  CreateModel
+	searchModel  search.Model
+	filterModel  filter.Model
+	showSearch   bool
+	showFilter   bool
 }
 
 // tickMsg is sent when the refresh timer ticks
@@ -87,12 +94,24 @@ func New(endpoint string) (*Model, error) {
 		Bold(false)
 	t.SetStyles(s)
 
+	// Create filter options
+	filterOptions := []filter.Option{
+		{Label: "ACTIVE", Value: "ACTIVE"},
+		{Label: "PROVISIONING", Value: "PROVISIONING"},
+		{Label: "DEPROVISIONING", Value: "DEPROVISIONING"},
+		{Label: "FAILED", Value: "FAILED"},
+		{Label: "INACTIVE", Value: "INACTIVE"},
+	}
+
 	return &Model{
 		client:      client,
 		table:       t,
 		loading:     true,
 		keyMap:      keys.DefaultKeyMap(),
 		createModel: NewCreateModel(client),
+		searchModel: search.New("Search clusters by name..."),
+		filterModel: filter.New("Filter by Status", filterOptions),
+		filtered:    []api.Cluster{},
 	}, nil
 }
 
@@ -126,6 +145,38 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 		}
 	}
 
+	// Handle search updates
+	if m.showSearch {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			if keys.Matches(msg, m.keyMap.Back) {
+				m.showSearch = false
+				m.searchModel.SetActive(false)
+				m.applyFilters()
+				return m, nil
+			}
+		}
+		m.searchModel, cmd = m.searchModel.Update(msg)
+		m.applyFilters()
+		return m, cmd
+	}
+
+	// Handle filter updates
+	if m.showFilter {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			if keys.Matches(msg, m.keyMap.Back) {
+				m.showFilter = false
+				m.filterModel.SetActive(false)
+				m.applyFilters()
+				return m, nil
+			}
+		}
+		m.filterModel, cmd = m.filterModel.Update(msg)
+		m.applyFilters()
+		return m, cmd
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if m.showDetails {
@@ -155,6 +206,16 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 			case keys.Matches(msg, m.keyMap.Delete):
 				// TODO: Implement cluster deletion
 				return m, nil
+				
+			case keys.Matches(msg, m.keyMap.Search):
+				m.showSearch = true
+				m.searchModel.SetActive(true)
+				return m, nil
+				
+			case keys.Matches(msg, m.keyMap.Filter):
+				m.showFilter = true
+				m.filterModel.SetActive(true)
+				return m, nil
 			}
 		}
 
@@ -170,7 +231,7 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 			m.err = msg.err
 		} else {
 			m.clusters = msg.clusters
-			m.updateTable()
+			m.applyFilters()
 			m.err = nil
 		}
 		return m, nil
@@ -197,6 +258,14 @@ func (m *Model) View() string {
 		return m.createModel.View()
 	}
 
+	if m.showSearch {
+		return m.renderWithSearch()
+	}
+
+	if m.showFilter {
+		return m.renderWithFilter()
+	}
+
 	if m.loading && len(m.clusters) == 0 {
 		return styles.Content.Render("Loading clusters...")
 	}
@@ -211,19 +280,7 @@ func (m *Model) View() string {
 		return m.renderDetails()
 	}
 
-	var content strings.Builder
-	content.WriteString(styles.ListTitle.Render("Clusters"))
-	content.WriteString("\n\n")
-
-	if len(m.clusters) == 0 {
-		content.WriteString(styles.Info.Render("No clusters found. Press 'n' to create one."))
-	} else {
-		content.WriteString(m.table.View())
-		content.WriteString("\n\n")
-		content.WriteString(styles.Info.Render(fmt.Sprintf("Showing %d clusters", len(m.clusters))))
-	}
-
-	return styles.Content.Render(content.String())
+	return m.renderList()
 }
 
 // SetSize sets the size of the view
@@ -236,7 +293,7 @@ func (m *Model) SetSize(width, height int) {
 // updateTable updates the table with current clusters
 func (m *Model) updateTable() {
 	rows := []table.Row{}
-	for _, cluster := range m.clusters {
+	for _, cluster := range m.filtered {
 		status := styles.GetStatusStyle(cluster.Status).Render(cluster.Status)
 		rows = append(rows, table.Row{
 			cluster.ClusterName,
@@ -331,4 +388,98 @@ func tick() tea.Cmd {
 	return tea.Tick(30*time.Second, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
+}
+
+// applyFilters applies search and filter to the clusters
+func (m *Model) applyFilters() {
+	// Start with all clusters
+	filtered := m.clusters
+
+	// Apply search filter
+	if m.searchModel.Value() != "" {
+		filtered = search.Filter(filtered, m.searchModel.Value(), func(c api.Cluster) []string {
+			return []string{c.ClusterName, c.ClusterArn}
+		})
+	}
+
+	// Apply status filter
+	selectedStatuses := m.filterModel.SelectedValues()
+	if len(selectedStatuses) > 0 {
+		filtered = filter.Apply(filtered, selectedStatuses, func(c api.Cluster, values []string) bool {
+			for _, status := range values {
+				if c.Status == status {
+					return true
+				}
+			}
+			return false
+		})
+	}
+
+	m.filtered = filtered
+	m.updateTable()
+}
+
+// renderWithSearch renders the view with search overlay
+func (m *Model) renderWithSearch() string {
+	// Render the main list
+	mainContent := m.renderList()
+	
+	// Add search overlay at the bottom
+	return lipgloss.JoinVertical(
+		lipgloss.Top,
+		mainContent,
+		"\n\n",
+		m.searchModel.View(),
+	)
+}
+
+// renderWithFilter renders the view with filter overlay
+func (m *Model) renderWithFilter() string {
+	// Render the main list dimmed
+	mainContent := m.renderList()
+	dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(mainContent)
+	
+	// Overlay filter in center
+	filterView := m.filterModel.View()
+	
+	// Simple overlay by joining vertically with some spacing
+	var content strings.Builder
+	content.WriteString(dimmed)
+	content.WriteString("\n\n")
+	content.WriteString(filterView)
+	
+	return content.String()
+}
+
+// renderList renders the main cluster list
+func (m *Model) renderList() string {
+	var content strings.Builder
+	content.WriteString(styles.ListTitle.Render("Clusters"))
+	
+	// Show active filters
+	if m.searchModel.Value() != "" || len(m.filterModel.SelectedValues()) > 0 {
+		content.WriteString(" ")
+		if m.searchModel.Value() != "" {
+			content.WriteString(styles.Info.Render(fmt.Sprintf("[Search: %s]", m.searchModel.Value())))
+		}
+		if len(m.filterModel.SelectedValues()) > 0 {
+			content.WriteString(styles.Info.Render(fmt.Sprintf("[Filter: %s]", strings.Join(m.filterModel.SelectedValues(), ", "))))
+		}
+	}
+	
+	content.WriteString("\n\n")
+
+	if len(m.filtered) == 0 {
+		if len(m.clusters) == 0 {
+			content.WriteString(styles.Info.Render("No clusters found. Press 'n' to create one."))
+		} else {
+			content.WriteString(styles.Info.Render("No clusters match the current filters."))
+		}
+	} else {
+		content.WriteString(m.table.View())
+		content.WriteString("\n\n")
+		content.WriteString(styles.Info.Render(fmt.Sprintf("Showing %d of %d clusters", len(m.filtered), len(m.clusters))))
+	}
+
+	return styles.Content.Render(content.String())
 }

@@ -16,8 +16,11 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/components/help"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/keys"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/styles"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/clusters"
@@ -53,6 +56,7 @@ type App struct {
 	ready        bool
 	quitting     bool
 	keyMap       keys.KeyMap
+	help         *help.ContextualHelp
 }
 
 // New creates a new TUI application
@@ -91,6 +95,7 @@ func New(endpoint string) (*App, error) {
 		taskList:    taskListModel,
 		taskDefList: taskDefListModel,
 		keyMap:      keys.DefaultKeyMap(),
+		help:        help.NewContextualHelp(),
 	}, nil
 }
 
@@ -131,6 +136,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.serviceList.SetSize(msg.Width, msg.Height-3)
 		a.taskList.SetSize(msg.Width, msg.Height-3)
 		a.taskDefList.SetSize(msg.Width, msg.Height-3)
+		a.help.SetSize(msg.Width, msg.Height-3)
 		
 	case tea.KeyMsg:
 		switch {
@@ -139,29 +145,35 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, tea.Quit
 			
 		case keys.Matches(msg, a.keyMap.Help):
-			// Toggle help view
-			if a.currentView == ViewHelp {
-				a.currentView = ViewDashboard
-			} else {
-				a.currentView = ViewHelp
-			}
+			// Toggle help in the contextual help system
+			a.help.Toggle()
 			
 		case keys.Matches(msg, a.keyMap.Dashboard):
 			a.currentView = ViewDashboard
+			a.help.SetContext(help.ContextDashboard)
 			
 		case keys.Matches(msg, a.keyMap.Clusters):
 			a.currentView = ViewClusters
+			a.help.SetContext(help.ContextClusterList)
 			
 		case keys.Matches(msg, a.keyMap.Services):
 			a.currentView = ViewServices
+			a.help.SetContext(help.ContextServiceList)
 			
 		case keys.Matches(msg, a.keyMap.Tasks):
 			a.currentView = ViewTasks
+			a.help.SetContext(help.ContextTaskList)
 			
 		case keys.Matches(msg, a.keyMap.TaskDefs):
 			a.currentView = ViewTaskDefs
+			a.help.SetContext(help.ContextTaskDefList)
 		}
 	}
+
+	// Update help system
+	var helpCmd tea.Cmd
+	a.help, helpCmd = a.help.Update(msg)
+	cmds = append(cmds, helpCmd)
 
 	// Update the current view
 	switch a.currentView {
@@ -235,10 +247,31 @@ func (a *App) View() string {
 		content = "\n  View not implemented yet"
 	}
 	
-	// Render footer
+	// Render footer with help
 	footer := a.renderFooter()
 	
-	return header + "\n" + content + "\n" + footer
+	// Compose the view
+	mainView := header + "\n" + content + "\n" + footer
+	
+	// If help is shown, overlay it
+	helpView := a.help.View()
+	if strings.Contains(helpView, "Help - ") { // Check if full help is shown
+		// Split main view into lines
+		lines := strings.Split(mainView, "\n")
+		dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+		var dimmedView strings.Builder
+		for i, line := range lines {
+			if i > 0 {
+				dimmedView.WriteString("\n")
+			}
+			dimmedView.WriteString(dimmed.Render(line))
+		}
+		
+		// Simple overlay approach: just render the help below the dimmed view
+		return dimmedView.String() + "\n\n" + helpView
+	}
+	
+	return mainView
 }
 
 func (a *App) renderHeader() string {
@@ -247,6 +280,15 @@ func (a *App) renderHeader() string {
 }
 
 func (a *App) renderFooter() string {
+	// Get context-specific help from the help system
+	helpLine := a.help.View()
+	
+	// If it's not the full help, use it as the footer
+	if !strings.Contains(helpLine, "Help - ") {
+		return styles.Footer.Render(helpLine)
+	}
+	
+	// Otherwise, show the default navigation help
 	var items []string
 	
 	items = append(items, "1:Dashboard")
