@@ -2,7 +2,6 @@ package phase1
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -312,18 +311,19 @@ var _ = Describe("Cluster Basic Operations", Serial, func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// We should have at least 3 clusters (our test clusters)
-				Expect(len(clusters)).To(BeNumerically(">=", 3))
+				// Note: In shared test environments, there may be additional clusters
+				Expect(len(clusters)).To(BeNumerically(">=", 3), "Should have at least our 3 test clusters")
 
 				// Verify our specific clusters are in the list
 				clusterNames := make(map[string]bool)
 				for _, arn := range clusters {
-					if strings.Contains(arn, cluster1) {
+					if containsClusterName(arn, cluster1) {
 						clusterNames[cluster1] = true
 					}
-					if strings.Contains(arn, cluster2) {
+					if containsClusterName(arn, cluster2) {
 						clusterNames[cluster2] = true
 					}
-					if strings.Contains(arn, cluster3) {
+					if containsClusterName(arn, cluster3) {
 						clusterNames[cluster3] = true
 					}
 				}

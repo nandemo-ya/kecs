@@ -16,6 +16,11 @@ import (
 
 var _ = Describe("Cluster Persistence", Serial, func() {
 	BeforeEach(func() {
+		// Skip if running in CI without k3d support
+		if os.Getenv("CI") == "true" && os.Getenv("KECS_CLUSTER_PROVIDER") != "k3d" {
+			Skip("Skipping persistence test in CI without k3d support")
+		}
+		
 		// Ensure we're not in test mode
 		os.Unsetenv("KECS_TEST_MODE")
 	})

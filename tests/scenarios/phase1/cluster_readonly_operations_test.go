@@ -22,6 +22,9 @@ var _ = Describe("Cluster Read-Only Operations with Shared Clusters", Serial, fu
 		client = sharedClient
 		logger = sharedLogger
 
+		// Ensure sharedClusterManager is initialized
+		Expect(sharedClusterManager).NotTo(BeNil(), "sharedClusterManager should be initialized in BeforeSuite")
+
 		// Get or create a shared cluster for read-only operations
 		var err error
 		clusterName, err = sharedClusterManager.GetOrCreateCluster("readonly-test")
