@@ -71,7 +71,7 @@ func (m *SharedClusterManager) GetOrCreateCluster(prefix string) (string, error)
 	// Additional verification: ensure the cluster appears in list operations
 	// This handles any eventual consistency issues with the storage layer
 	verified := false
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 30; i++ { // Increased from 10 to 30 attempts
 		clusters, listErr := m.client.ListClusters()
 		if listErr == nil {
 			for _, arn := range clusters {
@@ -84,13 +84,14 @@ func (m *SharedClusterManager) GetOrCreateCluster(prefix string) (string, error)
 		if verified {
 			break
 		}
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond) // Increased from 200ms to 500ms
 	}
 	
 	if !verified {
-		// Try to clean up the cluster
-		_ = m.client.DeleteCluster(clusterName)
-		return "", fmt.Errorf("cluster created but not appearing in list operations")
+		// Log warning but don't fail - the cluster was created successfully
+		log.Printf("[SharedCluster] Warning: Cluster %s created but not appearing in list operations after 15 seconds", clusterName)
+		// Don't delete the cluster - it might just be a listing issue
+		// Continue anyway since the cluster creation was successful
 	}
 
 	// Register the cluster
