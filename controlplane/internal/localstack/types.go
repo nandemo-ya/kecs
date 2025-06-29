@@ -81,7 +81,8 @@ type Config struct {
 	CustomEndpoints map[string]string `yaml:"custom_endpoints" json:"custom_endpoints"`
 	
 	// Runtime configuration
-	UseExternalAccess bool `yaml:"use_external_access" json:"use_external_access"`
+	UseExternalAccess bool   `yaml:"use_external_access" json:"use_external_access"`
+	ProxyEndpoint     string `yaml:"proxy_endpoint" json:"proxy_endpoint"`
 }
 
 // ResourceLimits defines resource constraints for LocalStack
