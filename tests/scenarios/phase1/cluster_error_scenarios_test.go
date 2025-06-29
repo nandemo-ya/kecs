@@ -1,4 +1,4 @@
-package phase1_test
+package phase1
 
 import (
 	"fmt"
@@ -37,15 +37,15 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 
 			It("should handle cluster names with invalid characters", func() {
 				invalidNames := []string{
-					"cluster@name",     // @ symbol
-					"cluster name",     // space
-					"cluster/name",     // slash
-					"cluster\\name",    // backslash
-					"cluster:name",     // colon
-					"cluster*name",     // asterisk
-					"cluster?name",     // question mark
-					"cluster#name",     // hash
-					"cluster%name",     // percent
+					"cluster@name",  // @ symbol
+					"cluster name",  // space
+					"cluster/name",  // slash
+					"cluster\\name", // backslash
+					"cluster:name",  // colon
+					"cluster*name",  // asterisk
+					"cluster?name",  // question mark
+					"cluster#name",  // hash
+					"cluster%name",  // percent
 				}
 
 				for _, name := range invalidNames {
@@ -57,7 +57,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 
 			It("should handle empty cluster name in delete operation", func() {
 				logger.Info("Testing delete with empty cluster name")
-				
+
 				err := client.DeleteCluster("")
 				Expect(err).To(HaveOccurred())
 			})
@@ -67,10 +67,10 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 			It("should handle malformed ARNs in describe operation", func() {
 				invalidArns := []string{
 					"not-an-arn",
-					"arn:aws:ecs",  // incomplete ARN
-					"arn:aws:ecs:us-east-1",  // missing account and resource
-					"arn:aws:ecs:us-east-1:123456789012",  // missing resource
-					"arn:aws:ecs:us-east-1:123456789012:wrongtype/cluster-name",  // wrong resource type
+					"arn:aws:ecs",                        // incomplete ARN
+					"arn:aws:ecs:us-east-1",              // missing account and resource
+					"arn:aws:ecs:us-east-1:123456789012", // missing resource
+					"arn:aws:ecs:us-east-1:123456789012:wrongtype/cluster-name", // wrong resource type
 				}
 
 				for _, arn := range invalidArns {
@@ -82,7 +82,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 
 			It("should handle malformed ARNs in delete operation", func() {
 				logger.Info("Testing delete with malformed ARN")
-				
+
 				err := client.DeleteCluster("arn:invalid:format")
 				Expect(err).To(HaveOccurred())
 			})
@@ -98,10 +98,10 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 			BeforeEach(func() {
 				clusterName = utils.GenerateTestName("conflict-cluster")
 				serviceName = utils.GenerateTestName("conflict-service")
-				
+
 				// Create cluster
 				Expect(client.CreateCluster(clusterName)).To(Succeed())
-				
+
 				// Register a task definition
 				taskDef := `{
 					"family": "conflict-task",
@@ -138,7 +138,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 				})
 			})
 
-			PIt("should fail to delete cluster with active service", func() { // FLAKY: Service creation fails with duplicate key in shared container
+			It("should fail to delete cluster with active service", func() {
 				logger.Info("Attempting to delete cluster with active service: %s", clusterName)
 
 				err := client.DeleteCluster(clusterName)
@@ -156,10 +156,10 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 
 			BeforeEach(func() {
 				clusterName = utils.GenerateTestName("task-conflict")
-				
+
 				// Create cluster
 				Expect(client.CreateCluster(clusterName)).To(Succeed())
-				
+
 				// Register a task definition
 				taskDef := `{
 					"family": "running-task",
@@ -213,7 +213,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 			BeforeEach(func() {
 				clusterName = utils.GenerateTestName("settings-error")
 				Expect(client.CreateCluster(clusterName)).To(Succeed())
-				
+
 				DeferCleanup(func() {
 					_ = client.DeleteCluster(clusterName)
 				})
@@ -229,7 +229,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 						"value": "enabled",
 					},
 				}
-				
+
 				err := awsClient.UpdateClusterSettings(clusterName, settings)
 				Expect(err).To(HaveOccurred())
 			})
@@ -244,7 +244,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 						"value": "invalid-value", // Should be "enabled" or "disabled"
 					},
 				}
-				
+
 				err := awsClient.UpdateClusterSettings(clusterName, settings)
 				Expect(err).To(HaveOccurred())
 			})
@@ -256,7 +256,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 			BeforeEach(func() {
 				clusterName = utils.GenerateTestName("capacity-error")
 				Expect(client.CreateCluster(clusterName)).To(Succeed())
-				
+
 				DeferCleanup(func() {
 					_ = client.DeleteCluster(clusterName)
 				})
@@ -267,7 +267,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 
 				awsClient := client.(*utils.AWSCLIClient)
 				providers := []string{"INVALID_PROVIDER", "ANOTHER_INVALID"}
-				
+
 				err := awsClient.PutClusterCapacityProviders(clusterName, providers, nil)
 				Expect(err).To(HaveOccurred())
 			})
@@ -280,11 +280,11 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 				strategy := []map[string]interface{}{
 					{
 						"capacityProvider": "FARGATE",
-						"weight":          -1,  // Invalid: negative weight
-						"base":            -5,  // Invalid: negative base
+						"weight":           -1, // Invalid: negative weight
+						"base":             -5, // Invalid: negative base
 					},
 				}
-				
+
 				err := awsClient.PutClusterCapacityProviders(clusterName, providers, strategy)
 				Expect(err).To(HaveOccurred())
 			})
@@ -296,7 +296,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 			BeforeEach(func() {
 				clusterName = utils.GenerateTestName("config-error")
 				Expect(client.CreateCluster(clusterName)).To(Succeed())
-				
+
 				DeferCleanup(func() {
 					_ = client.DeleteCluster(clusterName)
 				})
@@ -306,7 +306,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 				logger.Info("Testing malformed configuration for cluster: %s", clusterName)
 
 				awsClient := client.(*utils.AWSCLIClient)
-				
+
 				// Invalid configuration with bad values
 				config := map[string]interface{}{
 					"configuration": map[string]interface{}{
@@ -316,7 +316,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 						},
 					},
 				}
-				
+
 				err := awsClient.UpdateCluster(clusterName, config)
 				Expect(err).To(HaveOccurred())
 			})
@@ -327,7 +327,7 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 		Context("when required parameters are missing", func() {
 			It("should handle missing cluster identifier in describe", func() {
 				logger.Info("Testing describe with missing cluster identifier")
-				
+
 				// Describing with empty string should fail
 				_, err := client.DescribeCluster("")
 				Expect(err).To(HaveOccurred())
@@ -335,14 +335,14 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 
 			It("should handle missing resource ARN in tag operations", func() {
 				logger.Info("Testing tag operations with missing resource ARN")
-				
+
 				tags := map[string]string{"Key": "Value"}
 				err := client.TagResource("", tags)
 				Expect(err).To(HaveOccurred())
-				
+
 				err = client.UntagResource("", []string{"Key"})
 				Expect(err).To(HaveOccurred())
-				
+
 				_, err = client.ListTagsForResource("")
 				Expect(err).To(HaveOccurred())
 			})
@@ -355,19 +355,19 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 
 			It("should fail to update settings on non-existent cluster", func() {
 				logger.Info("Testing update settings on non-existent cluster")
-				
+
 				awsClient := client.(*utils.AWSCLIClient)
 				settings := []map[string]string{
 					{"name": "containerInsights", "value": "enabled"},
 				}
-				
+
 				err := awsClient.UpdateClusterSettings(nonExistentCluster, settings)
 				Expect(err).To(HaveOccurred())
 			})
 
 			It("should fail to update configuration on non-existent cluster", func() {
 				logger.Info("Testing update configuration on non-existent cluster")
-				
+
 				awsClient := client.(*utils.AWSCLIClient)
 				config := map[string]interface{}{
 					"configuration": map[string]interface{}{
@@ -376,27 +376,27 @@ var _ = Describe("Cluster Error Scenarios", Serial, func() {
 						},
 					},
 				}
-				
+
 				err := awsClient.UpdateCluster(nonExistentCluster, config)
 				Expect(err).To(HaveOccurred())
 			})
 
 			It("should fail to set capacity providers on non-existent cluster", func() {
 				logger.Info("Testing put capacity providers on non-existent cluster")
-				
+
 				awsClient := client.(*utils.AWSCLIClient)
 				providers := []string{"FARGATE"}
-				
+
 				err := awsClient.PutClusterCapacityProviders(nonExistentCluster, providers, nil)
 				Expect(err).To(HaveOccurred())
 			})
 
 			It("should fail to tag non-existent cluster", func() {
 				logger.Info("Testing tag operations on non-existent cluster")
-				
+
 				fakeArn := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/%s", nonExistentCluster)
 				tags := map[string]string{"Environment": "test"}
-				
+
 				err := client.TagResource(fakeArn, tags)
 				Expect(err).To(HaveOccurred())
 			})

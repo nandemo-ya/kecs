@@ -1,4 +1,4 @@
-package phase1_test
+package phase1
 
 import (
 	"time"
@@ -48,7 +48,7 @@ var _ = Describe("K3D Cluster Integration", Serial, func() {
 				logger.Info("Step 3: Listing clusters to verify presence")
 				clusters, err := client.ListClusters()
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				found := false
 				for _, arn := range clusters {
 					if containsClusterName(arn, clusterName) {

@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 )
@@ -65,6 +66,31 @@ func (m *SharedClusterManager) GetOrCreateCluster(prefix string) (string, error)
 		// Try to clean up the failed cluster
 		_ = m.client.DeleteCluster(clusterName)
 		return "", fmt.Errorf("cluster not ready: %w", err)
+	}
+	
+	// Additional verification: ensure the cluster appears in list operations
+	// This handles any eventual consistency issues with the storage layer
+	verified := false
+	for i := 0; i < 10; i++ {
+		clusters, listErr := m.client.ListClusters()
+		if listErr == nil {
+			for _, arn := range clusters {
+				if containsClusterName(arn, clusterName) {
+					verified = true
+					break
+				}
+			}
+		}
+		if verified {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	
+	if !verified {
+		// Try to clean up the cluster
+		_ = m.client.DeleteCluster(clusterName)
+		return "", fmt.Errorf("cluster created but not appearing in list operations")
 	}
 
 	// Register the cluster
@@ -166,4 +192,11 @@ func (s *SharedClusterTest) TeardownSharedCluster() {
 		s.Manager.ReleaseCluster(s.ClusterName)
 		s.ClusterName = ""
 	}
+}
+
+// containsClusterName checks if an ARN or name contains the cluster name
+func containsClusterName(arn, clusterName string) bool {
+	// ARN format: arn:aws:ecs:region:account:cluster/cluster-name
+	// We check if the ARN contains the cluster name
+	return len(arn) > 0 && len(clusterName) > 0 && strings.Contains(arn, clusterName)
 }

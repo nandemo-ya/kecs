@@ -1,4 +1,4 @@
-package phase1_test
+package phase1
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -41,7 +41,7 @@ var _ = Describe("Cluster Advanced Features", Serial, func() {
 				// Update cluster settings via AWS CLI
 				// aws ecs update-cluster-settings --cluster <name> --settings name=containerInsights,value=enabled
 				// This needs to be implemented in the client
-				
+
 				// Verify cluster exists
 				cluster, err := client.DescribeCluster(clusterName)
 				Expect(err).NotTo(HaveOccurred())
@@ -70,7 +70,7 @@ var _ = Describe("Cluster Advanced Features", Serial, func() {
 		BeforeEach(func() {
 			clusterName = utils.GenerateTestName("tags-cluster")
 			Expect(client.CreateCluster(clusterName)).To(Succeed())
-			
+
 			// Get cluster ARN for tagging
 			cluster, err := client.DescribeCluster(clusterName)
 			Expect(err).NotTo(HaveOccurred())
@@ -134,7 +134,7 @@ var _ = Describe("Cluster Advanced Features", Serial, func() {
 		BeforeEach(func() {
 			clusterName = utils.GenerateTestName("capacity-cluster")
 			Expect(client.CreateCluster(clusterName)).To(Succeed())
-			
+
 			DeferCleanup(func() {
 				_ = client.DeleteCluster(clusterName)
 			})
@@ -145,7 +145,7 @@ var _ = Describe("Cluster Advanced Features", Serial, func() {
 				logger.Info("Setting capacity providers for cluster: %s", clusterName)
 
 				// This needs implementation in the AWS CLI client
-				// aws ecs put-cluster-capacity-providers --cluster <name> 
+				// aws ecs put-cluster-capacity-providers --cluster <name>
 				//   --capacity-providers FARGATE FARGATE_SPOT
 				//   --default-capacity-provider-strategy capacityProvider=FARGATE,weight=1
 			})
@@ -181,14 +181,14 @@ var _ = Describe("Cluster Advanced Features", Serial, func() {
 
 		BeforeEach(func() {
 			clusterName = utils.GenerateTestName("include-test")
-			
+
 			// Create cluster with various features
 			Expect(client.CreateCluster(clusterName)).To(Succeed())
-			
+
 			// Add tags
 			cluster, err := client.DescribeCluster(clusterName)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			tags := map[string]string{
 				"TestTag": "TestValue",
 			}
@@ -209,4 +209,3 @@ var _ = Describe("Cluster Advanced Features", Serial, func() {
 		})
 	})
 })
-

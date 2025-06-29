@@ -1,8 +1,7 @@
-package phase1_test
+package phase1
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -65,12 +64,12 @@ var _ = Describe("Cluster Basic Operations", Serial, func() {
 				// Verify cluster details
 				cluster, err := client.DescribeCluster(clusterName)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				Expect(cluster.ClusterName).To(Equal(clusterName))
 				Expect(cluster.Status).To(Equal("ACTIVE"))
 				Expect(cluster.ClusterArn).To(ContainSubstring("arn:aws:ecs:"))
 				Expect(cluster.ClusterArn).To(ContainSubstring(fmt.Sprintf("cluster/%s", clusterName)))
-				
+
 				// Initial counts should be zero
 				Expect(cluster.RegisteredContainerInstancesCount).To(Equal(0))
 				Expect(cluster.RunningTasksCount).To(Equal(0))
@@ -125,17 +124,17 @@ var _ = Describe("Cluster Basic Operations", Serial, func() {
 				cluster, err := client.DescribeCluster(clusterName)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(cluster.ClusterName).To(Equal(clusterName))
-				
+
 				// Also verify via list, but use Eventually for consistency
 				Eventually(func() int {
 					clusters, err := client.ListClusters()
 					if err != nil {
 						return -1
 					}
-					
+
 					count := 0
 					for _, arn := range clusters {
-						if strings.Contains(arn, clusterName) {
+						if containsClusterName(arn, clusterName) {
 							count++
 						}
 					}
@@ -231,7 +230,7 @@ var _ = Describe("Cluster Basic Operations", Serial, func() {
 			BeforeEach(func() {
 				clusterName = utils.GenerateTestName("delete-by-arn")
 				Expect(client.CreateCluster(clusterName)).To(Succeed())
-				
+
 				// Get the ARN
 				cluster, err := client.DescribeCluster(clusterName)
 				Expect(err).NotTo(HaveOccurred())
@@ -270,7 +269,7 @@ var _ = Describe("Cluster Basic Operations", Serial, func() {
 				// We cannot guarantee empty list with shared container
 				clusters, err := client.ListClusters()
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				// Verify response is valid (array of ARNs)
 				for _, arn := range clusters {
 					Expect(arn).To(ContainSubstring("arn:aws:ecs:"))
@@ -288,13 +287,13 @@ var _ = Describe("Cluster Basic Operations", Serial, func() {
 				cluster3 = utils.GenerateTestName("list-test-3")
 
 				logger.Info("Creating test clusters: %s, %s, %s", cluster1, cluster2, cluster3)
-				
+
 				err := client.CreateCluster(cluster1)
 				Expect(err).NotTo(HaveOccurred(), "Failed to create cluster1")
-				
+
 				err = client.CreateCluster(cluster2)
 				Expect(err).NotTo(HaveOccurred(), "Failed to create cluster2")
-				
+
 				err = client.CreateCluster(cluster3)
 				Expect(err).NotTo(HaveOccurred(), "Failed to create cluster3")
 
@@ -305,25 +304,26 @@ var _ = Describe("Cluster Basic Operations", Serial, func() {
 				})
 			})
 
-			PIt("should list all clusters including our test clusters", func() { // FLAKY: Passes individually but fails in full suite - timing issue with shared container
+			It("should list all clusters including our test clusters", func() {
 				logger.Info("Listing all clusters")
 
 				clusters, err := client.ListClusters()
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				// We should have at least 3 clusters (our test clusters)
-				Expect(len(clusters)).To(BeNumerically(">=", 3))
-				
+				// Note: In shared test environments, there may be additional clusters
+				Expect(len(clusters)).To(BeNumerically(">=", 3), "Should have at least our 3 test clusters")
+
 				// Verify our specific clusters are in the list
 				clusterNames := make(map[string]bool)
 				for _, arn := range clusters {
-					if strings.Contains(arn, cluster1) {
+					if containsClusterName(arn, cluster1) {
 						clusterNames[cluster1] = true
 					}
-					if strings.Contains(arn, cluster2) {
+					if containsClusterName(arn, cluster2) {
 						clusterNames[cluster2] = true
 					}
-					if strings.Contains(arn, cluster3) {
+					if containsClusterName(arn, cluster3) {
 						clusterNames[cluster3] = true
 					}
 				}

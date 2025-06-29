@@ -281,6 +281,11 @@ func (c *AWSCLIClient) ListServices(clusterName string) ([]string, error) {
 		return nil, err
 	}
 
+	// Handle empty response
+	if len(output) == 0 {
+		return []string{}, nil
+	}
+
 	var result struct {
 		ServiceArns []string `json:"serviceArns"`
 	}

@@ -1,6 +1,9 @@
-package phase1_test
+package phase1
 
 import (
+	"strings"
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -18,6 +21,9 @@ var _ = Describe("Cluster Read-Only Operations with Shared Clusters", Serial, fu
 		// Use shared resources from suite
 		client = sharedClient
 		logger = sharedLogger
+
+		// Ensure sharedClusterManager is initialized
+		Expect(sharedClusterManager).NotTo(BeNil(), "sharedClusterManager should be initialized in BeforeSuite")
 
 		// Get or create a shared cluster for read-only operations
 		var err error
@@ -100,18 +106,28 @@ var _ = Describe("Cluster Read-Only Operations with Shared Clusters", Serial, fu
 			It("should include the shared cluster", func() {
 				logger.Info("Listing clusters, expecting to find: %s", clusterName)
 
-				clusters, err := client.ListClusters()
-				Expect(err).NotTo(HaveOccurred())
-
-				// Verify our shared cluster is in the list
-				found := false
-				for _, arn := range clusters {
-					if containsClusterName(arn, clusterName) {
-						found = true
-						break
+				// Retry logic to handle eventual consistency
+				var clusters []string
+				var err error
+				Eventually(func() bool {
+					clusters, err = client.ListClusters()
+					if err != nil {
+						logger.Info("Error listing clusters (will retry): %v", err)
+						return false
 					}
-				}
-				Expect(found).To(BeTrue(), "Shared cluster should be present in list")
+					
+					// Check if our cluster is in the list
+					for _, arn := range clusters {
+						if strings.Contains(arn, clusterName) {
+							logger.Info("Found cluster %s in list of %d clusters", clusterName, len(clusters))
+							return true
+						}
+					}
+					
+					logger.Info("Cluster %s not found yet in list of %d clusters", clusterName, len(clusters))
+					return false
+				}, 10*time.Second, 500*time.Millisecond).Should(BeTrue(), 
+					"Shared cluster %s should eventually appear in cluster list", clusterName)
 			})
 		})
 

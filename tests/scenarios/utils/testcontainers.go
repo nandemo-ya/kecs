@@ -290,7 +290,7 @@ func StartKECSWithPersistence(t TestingT) *KECSContainer {
 		Env: map[string]string{
 			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
 			"KECS_TEST_MODE":              testMode,
-			"KECS_CONTAINER_MODE":         "false", // Disable container mode to prevent recursive container creation
+			"KECS_CONTAINER_MODE":         "true", // Enable container mode for k3d cluster creation
 			"KECS_CLUSTER_PROVIDER":       clusterProvider,
 			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
 			"KECS_K3D_OPTIMIZED":          "true",
@@ -391,7 +391,7 @@ func RestartKECSWithPersistence(t TestingT, dataDir string) *KECSContainer {
 		Env: map[string]string{
 			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
 			"KECS_TEST_MODE":              testMode,
-			"KECS_CONTAINER_MODE":         "false", // Disable container mode to prevent recursive container creation
+			"KECS_CONTAINER_MODE":         "true", // Enable container mode for k3d cluster creation
 			"KECS_CLUSTER_PROVIDER":       clusterProvider,
 			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
 			"KECS_K3D_OPTIMIZED":          "true",
