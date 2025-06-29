@@ -8,6 +8,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/ssm"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
@@ -24,6 +25,7 @@ type DefaultECSAPI struct {
 	secretsManagerIntegration secretsmanager.Integration
 	s3Integration             s3.Integration
 	serviceDiscoveryManager   servicediscovery.Manager
+	localStackManager         localstack.Manager
 }
 
 // NewDefaultECSAPI creates a new default ECS API implementation with storage
@@ -64,6 +66,11 @@ func (api *DefaultECSAPI) SetS3Integration(s3Integration s3.Integration) {
 // SetServiceDiscoveryManager sets the service discovery manager for the ECS API
 func (api *DefaultECSAPI) SetServiceDiscoveryManager(serviceDiscoveryManager servicediscovery.Manager) {
 	api.serviceDiscoveryManager = serviceDiscoveryManager
+}
+
+// SetLocalStackManager sets the LocalStack manager for the ECS API
+func (api *DefaultECSAPI) SetLocalStackManager(localStackManager localstack.Manager) {
+	api.localStackManager = localStackManager
 }
 
 // NewDefaultECSAPIWithConfig creates a new default ECS API implementation with custom region and accountID

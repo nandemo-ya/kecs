@@ -133,6 +133,7 @@ func bindLegacyEnvVars() {
 	v.BindEnv("aws.proxyImage", "KECS_AWS_PROXY_IMAGE")
 	v.BindEnv("features.securityAcknowledged", "KECS_SECURITY_ACKNOWLEDGED")
 	v.BindEnv("features.skipSecurityDisclaimer", "KECS_SKIP_SECURITY_DISCLAIMER")
+	v.BindEnv("localstack.enabled", "KECS_LOCALSTACK_ENABLED")
 }
 
 // DefaultConfig returns the default configuration

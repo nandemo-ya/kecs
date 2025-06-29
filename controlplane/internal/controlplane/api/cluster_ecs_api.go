@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -695,6 +697,9 @@ func (api *DefaultECSAPI) createK8sClusterAndNamespace(cluster *storage.Cluster)
 
 	// Create namespace
 	api.createNamespaceForCluster(cluster)
+
+	// Deploy LocalStack if enabled
+	api.deployLocalStackIfEnabled(cluster)
 }
 
 // createNamespaceForCluster creates a namespace in the k3d cluster
@@ -804,4 +809,71 @@ func extractClusterNameFromARN(identifier string) string {
 		}
 	}
 	return identifier
+}
+
+// deployLocalStackIfEnabled deploys LocalStack to the k3d cluster if enabled
+func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
+	// Skip if cluster manager is not available
+	if api.clusterManager == nil {
+		log.Printf("Cluster manager not available, cannot deploy LocalStack for cluster %s", cluster.Name)
+		return
+	}
+
+	ctx := context.Background()
+
+	// Get the LocalStack configuration
+	var config *localstack.Config
+	if api.localStackManager != nil {
+		config = api.localStackManager.GetConfig()
+	} else {
+		// Use default config and check if enabled via environment
+		config = localstack.DefaultConfig()
+		if envEnabled := os.Getenv("KECS_LOCALSTACK_ENABLED"); envEnabled == "true" {
+			config.Enabled = true
+		}
+	}
+	
+	if config == nil || !config.Enabled {
+		log.Printf("LocalStack is not enabled in configuration")
+		return
+	}
+
+	// Wait a bit for the k3d cluster to be fully ready
+	time.Sleep(5 * time.Second)
+
+	// Get Kubernetes client for the specific k3d cluster
+	kubeClient, err := api.clusterManager.GetKubeClient(cluster.K8sClusterName)
+	if err != nil {
+		log.Printf("Failed to get Kubernetes client for cluster %s: %v", cluster.K8sClusterName, err)
+		return
+	}
+
+	// Create a new LocalStack manager with the cluster-specific client
+	clusterLocalStackManager, err := localstack.NewManager(config, kubeClient.(*k8s.Clientset))
+	if err != nil {
+		log.Printf("Failed to create LocalStack manager for cluster %s: %v", cluster.Name, err)
+		return
+	}
+
+	// Check if LocalStack is already running in this cluster
+	if clusterLocalStackManager.IsRunning() {
+		log.Printf("LocalStack is already running in cluster %s", cluster.Name)
+		return
+	}
+
+	// Start LocalStack in the cluster
+	log.Printf("Starting LocalStack in cluster %s...", cluster.Name)
+	if err := clusterLocalStackManager.Start(ctx); err != nil {
+		log.Printf("Failed to start LocalStack in cluster %s: %v", cluster.Name, err)
+		return
+	}
+
+	// Wait for LocalStack to be ready
+	log.Printf("Waiting for LocalStack to be ready in cluster %s...", cluster.Name)
+	if err := clusterLocalStackManager.WaitForReady(ctx, 2*time.Minute); err != nil {
+		log.Printf("LocalStack failed to become ready in cluster %s: %v", cluster.Name, err)
+		return
+	}
+
+	log.Printf("LocalStack successfully deployed in cluster %s", cluster.Name)
 }
