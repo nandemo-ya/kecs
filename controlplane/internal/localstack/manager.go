@@ -98,7 +98,13 @@ func (m *localStackManager) Start(ctx context.Context) error {
 	}
 
 	// Update health checker endpoint
-	m.healthChecker = NewHealthChecker(endpoint)
+	// If Traefik is enabled, use the proxy endpoint for health checks
+	healthEndpoint := endpoint
+	if m.config.UseTraefik && m.config.ProxyEndpoint != "" {
+		healthEndpoint = m.config.ProxyEndpoint
+		klog.Infof("Using Traefik proxy endpoint for health checks: %s", healthEndpoint)
+	}
+	m.healthChecker = NewHealthChecker(healthEndpoint)
 
 	// Wait for LocalStack to output "Ready." in logs
 	klog.Info("Waiting for LocalStack to be ready...")
@@ -253,6 +259,11 @@ func (m *localStackManager) GetEndpoint() (string, error) {
 
 	if !m.status.Running {
 		return "", fmt.Errorf("LocalStack is not running")
+	}
+
+	// If Traefik is enabled, return the proxy endpoint
+	if m.config.UseTraefik && m.config.ProxyEndpoint != "" {
+		return m.config.ProxyEndpoint, nil
 	}
 
 	return m.status.Endpoint, nil

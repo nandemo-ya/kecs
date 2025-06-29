@@ -58,6 +58,9 @@ type ClusterManagerConfig struct {
 
 	// AdditionalOptions for provider-specific configuration
 	AdditionalOptions map[string]interface{} `json:"additionalOptions,omitempty"`
+	
+	// EnableTraefik enables Traefik reverse proxy deployment
+	EnableTraefik bool `json:"enableTraefik"`
 }
 
 // NewClusterManager creates a new cluster manager based on the configuration

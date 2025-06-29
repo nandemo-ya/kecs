@@ -1,0 +1,183 @@
+package kubernetes
+
+import (
+	"context"
+	_ "embed"
+	"fmt"
+	"io"
+	"strings"
+	"time"
+
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
+)
+
+//go:embed manifests/traefik.yaml
+var traefikManifest string
+
+// TraefikManager manages Traefik reverse proxy deployment
+type TraefikManager struct {
+	kubeClient    kubernetes.Interface
+	dynamicClient dynamic.Interface
+	restConfig    *rest.Config
+}
+
+// NewTraefikManager creates a new Traefik manager
+func NewTraefikManager(kubeClient kubernetes.Interface, restConfig *rest.Config) (*TraefikManager, error) {
+	dynamicClient, err := dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dynamic client: %w", err)
+	}
+
+	return &TraefikManager{
+		kubeClient:    kubeClient,
+		dynamicClient: dynamicClient,
+		restConfig:    restConfig,
+	}, nil
+}
+
+// Deploy deploys Traefik to the cluster
+func (tm *TraefikManager) Deploy(ctx context.Context) error {
+	klog.Info("Deploying Traefik reverse proxy...")
+
+	// Parse the manifest into individual resources
+	decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(traefikManifest), 4096)
+	
+	for {
+		var rawObj unstructured.Unstructured
+		if err := decoder.Decode(&rawObj); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("failed to decode manifest: %w", err)
+		}
+
+		// Skip empty objects
+		if len(rawObj.Object) == 0 {
+			continue
+		}
+
+		// Apply the resource
+		if err := tm.applyResource(ctx, &rawObj); err != nil {
+			// Log error but continue with other resources
+			klog.Warningf("Failed to apply resource %s/%s: %v", 
+				rawObj.GetKind(), rawObj.GetName(), err)
+		}
+	}
+
+	// Wait for Traefik to be ready
+	return tm.WaitForReady(ctx, 2*time.Minute)
+}
+
+// applyResource applies a single resource to the cluster
+func (tm *TraefikManager) applyResource(ctx context.Context, obj *unstructured.Unstructured) error {
+	gvk := obj.GroupVersionKind()
+	gvr := schema.GroupVersionResource{
+		Group:    gvk.Group,
+		Version:  gvk.Version,
+		Resource: tm.pluralize(gvk.Kind),
+	}
+
+	namespace := obj.GetNamespace()
+	var resourceClient dynamic.ResourceInterface
+	if namespace != "" {
+		resourceClient = tm.dynamicClient.Resource(gvr).Namespace(namespace)
+	} else {
+		resourceClient = tm.dynamicClient.Resource(gvr)
+	}
+
+	// Try to create the resource
+	_, err := resourceClient.Create(ctx, obj, metav1.CreateOptions{})
+	if err != nil {
+		if errors.IsAlreadyExists(err) {
+			// Resource already exists, try to update it
+			_, err = resourceClient.Update(ctx, obj, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to update resource: %w", err)
+			}
+			klog.V(2).Infof("Updated %s %s/%s", gvk.Kind, namespace, obj.GetName())
+		} else {
+			return fmt.Errorf("failed to create resource: %w", err)
+		}
+	} else {
+		klog.V(2).Infof("Created %s %s/%s", gvk.Kind, namespace, obj.GetName())
+	}
+
+	return nil
+}
+
+// WaitForReady waits for Traefik to be ready
+func (tm *TraefikManager) WaitForReady(ctx context.Context, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if time.Now().After(deadline) {
+				return fmt.Errorf("timeout waiting for Traefik to be ready")
+			}
+
+			// Check if Traefik deployment is ready
+			deployment, err := tm.kubeClient.AppsV1().Deployments("kecs-system").
+				Get(ctx, "traefik", metav1.GetOptions{})
+			if err != nil {
+				klog.V(4).Infof("Failed to get Traefik deployment: %v", err)
+				continue
+			}
+
+			if deployment.Status.ReadyReplicas == *deployment.Spec.Replicas {
+				klog.Info("Traefik is ready")
+				return nil
+			}
+
+			klog.V(4).Infof("Waiting for Traefik to be ready: %d/%d replicas ready",
+				deployment.Status.ReadyReplicas, *deployment.Spec.Replicas)
+		}
+	}
+}
+
+// GetProxyEndpoint returns the endpoint for accessing services through Traefik
+func (tm *TraefikManager) GetProxyEndpoint() string {
+	// This will be set up with port forwarding or NodePort
+	// For now, return the expected endpoint
+	return "http://localhost:8090"
+}
+
+// pluralize converts a Kind to its plural form for API resources
+func (tm *TraefikManager) pluralize(kind string) string {
+	// Simple pluralization rules
+	switch strings.ToLower(kind) {
+	case "ingress":
+		return "ingresses"
+	case "ingressroute":
+		return "ingressroutes"
+	case "service":
+		return "services"
+	case "deployment":
+		return "deployments"
+	case "configmap":
+		return "configmaps"
+	case "namespace":
+		return "namespaces"
+	case "serviceaccount":
+		return "serviceaccounts"
+	case "clusterrole":
+		return "clusterroles"
+	case "clusterrolebinding":
+		return "clusterrolebindings"
+	default:
+		// Default: lowercase and add 's'
+		return strings.ToLower(kind) + "s"
+	}
+}

@@ -10,8 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/go-connections/nat"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/k3d-io/k3d/v5/pkg/client"
@@ -25,8 +27,10 @@ import (
 
 // K3dClusterManager implements ClusterManager interface using k3d
 type K3dClusterManager struct {
-	runtime runtimes.Runtime
-	config  *ClusterManagerConfig
+	runtime         runtimes.Runtime
+	config          *ClusterManagerConfig
+	traefikManager  *TraefikManager
+	portForwarder   *PortForwarder
 }
 
 // NewK3dClusterManager creates a new k3d-based cluster manager
@@ -79,6 +83,14 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 		Role:    k3d.ServerRole,
 		Image:   "rancher/k3s:v1.31.4-k3s1",
 		Restart: true,
+		Ports: nat.PortMap{
+			"8090/tcp": []nat.PortBinding{
+				{
+					HostIP:   "0.0.0.0",
+					HostPort: "8090",
+				},
+			},
+		},
 	}
 
 	// Create cluster configuration with minimal required fields
@@ -128,6 +140,16 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 	}
 
 	log.Printf("Successfully created k3d cluster %s", normalizedName)
+	
+	// Deploy Traefik if enabled
+	if k.config.EnableTraefik {
+		log.Printf("Deploying Traefik to cluster %s...", normalizedName)
+		if err := k.deployTraefik(ctx, clusterName); err != nil {
+			log.Printf("Warning: Failed to deploy Traefik: %v", err)
+			// Continue without Traefik
+		}
+	}
+	
 	return nil
 }
 
@@ -452,6 +474,65 @@ func (k *K3dClusterManager) getLoadBalancerAPIPort(ctx context.Context, containe
 	}
 
 	return "", fmt.Errorf("no port mapping found for 6443/tcp")
+}
+
+// deployTraefik deploys Traefik reverse proxy to the cluster
+func (k *K3dClusterManager) deployTraefik(ctx context.Context, clusterName string) error {
+	// Get Kubernetes client for the cluster
+	kubeClient, err := k.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	// Get REST config
+	restConfig, err := k.getRESTConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get REST config: %w", err)
+	}
+
+	// Create Traefik manager
+	traefikManager, err := NewTraefikManager(kubeClient, restConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create Traefik manager: %w", err)
+	}
+
+	// Deploy Traefik
+	if err := traefikManager.Deploy(ctx); err != nil {
+		return fmt.Errorf("failed to deploy Traefik: %w", err)
+	}
+
+	// Store Traefik manager for later use
+	k.traefikManager = traefikManager
+
+	return nil
+}
+
+// getRESTConfig returns the REST config for a cluster
+func (k *K3dClusterManager) getRESTConfig(clusterName string) (*rest.Config, error) {
+	normalizedName := k.normalizeClusterName(clusterName)
+
+	// Get cluster
+	cluster, err := client.ClusterGet(context.Background(), k.runtime, &k3d.Cluster{Name: normalizedName})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster: %w", err)
+	}
+
+	// Get kubeconfig
+	kubeconfigObj, err := client.KubeconfigGet(context.Background(), k.runtime, cluster)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	// Convert to REST config
+	config, err := clientcmd.NewDefaultClientConfig(
+		*kubeconfigObj,
+		&clientcmd.ConfigOverrides{},
+	).ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	return config, nil
 }
 
 // CreateClusterOptimized creates a new k3d cluster with optimizations for faster startup

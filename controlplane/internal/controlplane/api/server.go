@@ -83,6 +83,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		clusterConfig := &kubernetes.ClusterManagerConfig{
 			ContainerMode:  config.GetBool("features.containerMode"),
 			KubeconfigPath: kubeconfig,
+			EnableTraefik:  config.GetBool("features.traefik"),
 		}
 
 		cm, err := kubernetes.NewClusterManager(clusterConfig)
@@ -155,6 +156,13 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 
 		if kubeClient != nil {
+			// Check if Traefik is enabled
+			if config.GetBool("features.traefik") {
+				localStackConfig.UseTraefik = true
+				localStackConfig.ProxyEndpoint = "http://localhost:8090"
+				log.Println("Traefik proxy enabled for LocalStack")
+			}
+			
 			localStackManager, err := localstack.NewManager(localStackConfig, kubeClient)
 			if err != nil {
 				log.Printf("Warning: Failed to initialize LocalStack manager: %v", err)
