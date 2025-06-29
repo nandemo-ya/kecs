@@ -4,160 +4,222 @@
 package phase1
 
 import (
+	"fmt"
 	"os"
-	"testing"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	"github.com/nandemo-ya/kecs/tests/scenarios/utils"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-// TestClusterPersistenceAfterRestart verifies that ECS clusters and their
-// corresponding k3d clusters are properly recovered after KECS restart
-func TestClusterPersistenceAfterRestart(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping cluster persistence test in short mode")
-	}
+var _ = Describe("Cluster Persistence", Serial, func() {
+	BeforeEach(func() {
+		// Ensure we're not in test mode
+		os.Unsetenv("KECS_TEST_MODE")
+	})
 
-	// Ensure we're not in test mode
-	os.Unsetenv("KECS_TEST_MODE")
+	Describe("Single Cluster Persistence", func() {
+		Context("when KECS is restarted with a persistent cluster", func() {
+			var (
+				kecs        *utils.KECSContainer
+				client      utils.ECSClientInterface
+				clusterName string
+			)
 
-	// Start KECS container with persistent data directory
-	kecs := utils.StartKECSWithPersistence(t)
-	defer kecs.Cleanup()
+			BeforeEach(func() {
+				// Start KECS container with persistent data directory
+				kecs = utils.StartKECSWithPersistence(GinkgoT())
+				client = utils.NewECSClientInterface(kecs.Endpoint())
+				clusterName = "persistence-test-cluster"
+			})
 
-	// Create ECS client
-	client := utils.NewECSClientInterface(kecs.Endpoint())
+			AfterEach(func() {
+				if kecs != nil {
+					kecs.Cleanup()
+				}
+			})
 
-	// Test data
-	clusterName := "persistence-test-cluster"
+			It("should recover ECS cluster and recreate k3d cluster after restart", func() {
+				By("Creating an ECS cluster")
+				err := client.CreateCluster(clusterName)
+				Expect(err).NotTo(HaveOccurred(), "Failed to create cluster")
 
-	// Step 1: Create a cluster
-	t.Log("Creating ECS cluster...")
-	err := client.CreateCluster(clusterName)
-	require.NoError(t, err, "Failed to create cluster")
+				By("Waiting for cluster to be active")
+				utils.AssertClusterActive(GinkgoT(), client, clusterName)
 
-	// Wait for cluster to be active
-	utils.AssertClusterActive(t, client, clusterName)
+				By("Verifying k3d cluster exists")
+				k3dName := "kecs-" + clusterName
+				Eventually(func() bool {
+					exists, err := utils.K3dClusterExists(k3dName)
+					if err != nil {
+						return false
+					}
+					return exists
+				}, 20*time.Second, 1*time.Second).Should(BeTrue(), "k3d cluster should exist after creation")
 
-	// Verify k3d cluster exists
-	k3dName := "kecs-" + clusterName
-	k3dExists, err := utils.K3dClusterExists(k3dName)
-	require.NoError(t, err, "Failed to check k3d cluster")
-	assert.True(t, k3dExists, "k3d cluster should exist after creation")
+				By("Stopping KECS")
+				err = kecs.Stop()
+				Expect(err).NotTo(HaveOccurred(), "Failed to stop KECS container")
 
-	// Step 2: Stop KECS
-	t.Log("Stopping KECS...")
-	err = kecs.Stop()
-	require.NoError(t, err, "Failed to stop KECS container")
+				// Ensure container is fully stopped
+				Eventually(func() bool {
+					// Container is considered stopped when Stop() returns without error
+					return true
+				}, 5*time.Second).Should(BeTrue())
 
-	// Wait a bit for container to fully stop
-	time.Sleep(2 * time.Second)
+				By("Restarting KECS with the same data directory")
+				kecs2 := utils.RestartKECSWithPersistence(GinkgoT(), kecs.DataDir)
+				defer kecs2.Cleanup()
 
-	// Step 3: Start KECS again with the same data directory
-	t.Log("Restarting KECS...")
-	kecs2 := utils.RestartKECSWithPersistence(t, kecs.DataDir)
-	defer kecs2.Cleanup()
+				// Create new client with new endpoint
+				client2 := utils.NewECSClientInterface(kecs2.Endpoint())
 
-	// Create new client with new endpoint
-	client2 := utils.NewECSClientInterface(kecs2.Endpoint())
+				By("Verifying cluster is recovered from storage")
+				clusters, err := client2.ListClusters()
+				Expect(err).NotTo(HaveOccurred(), "Failed to list clusters after restart")
+				// ListClusters returns ARNs, need to check if any ARN contains the cluster name
+				found := false
+				for _, arn := range clusters {
+					if containsClusterName(arn, clusterName) {
+						found = true
+						break
+					}
+				}
+				Expect(found).To(BeTrue(), "Cluster should be recovered from storage")
 
-	// Step 4: Verify cluster is recovered
-	t.Log("Verifying cluster recovery...")
-	clusters, err := client2.ListClusters()
-	require.NoError(t, err, "Failed to list clusters after restart")
-	assert.Contains(t, clusters, clusterName, "Cluster should be recovered from storage")
+				By("Verifying k3d cluster is recreated")
+				Eventually(func() bool {
+					exists, err := utils.K3dClusterExists(k3dName)
+					if err != nil {
+						return false
+					}
+					return exists
+				}, 15*time.Second, 1*time.Second).Should(BeTrue(), "k3d cluster should be recreated after KECS restart")
 
-	// Step 5: Verify k3d cluster is recreated
-	t.Log("Verifying k3d cluster recreation...")
-	// Give some time for the recovery process to complete
-	time.Sleep(10 * time.Second)
+				By("Verifying cluster is functional")
+				cluster, err := client2.DescribeCluster(clusterName)
+				Expect(err).NotTo(HaveOccurred(), "Failed to describe cluster after restart")
+				Expect(cluster.Status).To(Equal("ACTIVE"), "Cluster should be active after restart")
 
-	k3dExists, err = utils.K3dClusterExists(k3dName)
-	require.NoError(t, err, "Failed to check k3d cluster after restart")
-	assert.True(t, k3dExists, "k3d cluster should be recreated after KECS restart")
+				By("Cleaning up")
+				err = client2.DeleteCluster(clusterName)
+				Expect(err).NotTo(HaveOccurred(), "Failed to delete cluster during cleanup")
+			})
+		})
+	})
 
-	// Step 6: Verify cluster is functional
-	t.Log("Verifying cluster functionality...")
-	cluster, err := client2.DescribeCluster(clusterName)
-	require.NoError(t, err, "Failed to describe cluster after restart")
-	assert.Equal(t, "ACTIVE", cluster.Status, "Cluster should be active after restart")
+	Describe("Multiple Cluster Persistence", func() {
+		Context("when KECS is restarted with multiple persistent clusters", func() {
+			var (
+				kecs         *utils.KECSContainer
+				client       utils.ECSClientInterface
+				clusterNames []string
+			)
 
-	// Clean up
-	err = client2.DeleteCluster(clusterName)
-	assert.NoError(t, err, "Failed to delete cluster during cleanup")
-}
+			BeforeEach(func() {
+				// Start KECS
+				kecs = utils.StartKECSWithPersistence(GinkgoT())
+				client = utils.NewECSClientInterface(kecs.Endpoint())
+				clusterNames = []string{
+					"persistence-cluster-1",
+					"persistence-cluster-2",
+					"persistence-cluster-3",
+				}
+			})
 
-// TestMultipleClusterPersistence tests recovery of multiple clusters
-func TestMultipleClusterPersistence(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping multiple cluster persistence test in short mode")
-	}
+			AfterEach(func() {
+				if kecs != nil {
+					kecs.Cleanup()
+				}
+			})
 
-	// Ensure we're not in test mode
-	os.Unsetenv("KECS_TEST_MODE")
+			It("should recover all clusters and recreate their k3d clusters", func() {
+				By("Creating multiple clusters")
+				for _, name := range clusterNames {
+					err := client.CreateCluster(name)
+					Expect(err).NotTo(HaveOccurred(), "Failed to create cluster %s", name)
+					utils.AssertClusterActive(GinkgoT(), client, name)
+				}
 
-	// Start KECS
-	kecs := utils.StartKECSWithPersistence(t)
-	defer kecs.Cleanup()
+				By("Verifying all k3d clusters exist")
+				for _, name := range clusterNames {
+					k3dName := "kecs-" + name
+					Eventually(func() bool {
+						exists, err := utils.K3dClusterExists(k3dName)
+						if err != nil {
+							return false
+						}
+						return exists
+					}, 25*time.Second, 1*time.Second).Should(BeTrue(), "k3d cluster %s should exist", k3dName)
+				}
 
-	client := utils.NewECSClientInterface(kecs.Endpoint())
+				By("Restarting KECS")
+				err := kecs.Stop()
+				Expect(err).NotTo(HaveOccurred())
+				
+				// Ensure container is fully stopped
+				Eventually(func() bool {
+					return true
+				}, 5*time.Second).Should(BeTrue())
 
-	// Create multiple clusters
-	clusterNames := []string{
-		"persistence-cluster-1",
-		"persistence-cluster-2",
-		"persistence-cluster-3",
-	}
+				kecs2 := utils.RestartKECSWithPersistence(GinkgoT(), kecs.DataDir)
+				defer kecs2.Cleanup()
 
-	t.Log("Creating multiple clusters...")
-	for _, name := range clusterNames {
-		err := client.CreateCluster(name)
-		require.NoError(t, err, "Failed to create cluster %s", name)
-		utils.AssertClusterActive(t, client, name)
-	}
+				client2 := utils.NewECSClientInterface(kecs2.Endpoint())
 
-	// Verify all k3d clusters exist
-	for _, name := range clusterNames {
-		k3dName := "kecs-" + name
-		exists, err := utils.K3dClusterExists(k3dName)
-		require.NoError(t, err)
-		assert.True(t, exists, "k3d cluster %s should exist", k3dName)
-	}
+				By("Waiting for recovery process")
+				// Wait for KECS to fully recover clusters from storage
+				Eventually(func() bool {
+					clusters, err := client2.ListClusters()
+					if err != nil {
+						return false
+					}
+					// Check if all clusters are recovered
+					recoveredCount := 0
+					for _, name := range clusterNames {
+						for _, arn := range clusters {
+							if containsClusterName(arn, name) {
+								recoveredCount++
+								break
+							}
+						}
+					}
+					return recoveredCount == len(clusterNames)
+				}, 20*time.Second, 1*time.Second).Should(BeTrue(), "All clusters should be recovered from storage")
 
-	// Restart KECS
-	t.Log("Restarting KECS...")
-	err := kecs.Stop()
-	require.NoError(t, err)
-	time.Sleep(2 * time.Second)
+				By("Verifying all clusters are recovered")
+				clusters, err := client2.ListClusters()
+				Expect(err).NotTo(HaveOccurred())
 
-	kecs2 := utils.RestartKECSWithPersistence(t, kecs.DataDir)
-	defer kecs2.Cleanup()
+				for _, name := range clusterNames {
+					found := false
+					for _, arn := range clusters {
+						if containsClusterName(arn, name) {
+							found = true
+							break
+						}
+					}
+					Expect(found).To(BeTrue(), "Cluster %s should be recovered", name)
 
-	client2 := utils.NewECSClientInterface(kecs2.Endpoint())
+					By(fmt.Sprintf("Verifying k3d cluster %s is recreated", name))
+					k3dName := "kecs-" + name
+					Eventually(func() bool {
+						exists, err := utils.K3dClusterExists(k3dName)
+						if err != nil {
+							return false
+						}
+						return exists
+					}, 15*time.Second, 1*time.Second).Should(BeTrue(), "k3d cluster %s should be recreated", k3dName)
+				}
 
-	// Wait for recovery
-	time.Sleep(15 * time.Second)
-
-	// Verify all clusters are recovered
-	t.Log("Verifying all clusters are recovered...")
-	clusters, err := client2.ListClusters()
-	require.NoError(t, err)
-
-	for _, name := range clusterNames {
-		assert.Contains(t, clusters, name, "Cluster %s should be recovered", name)
-
-		// Verify k3d cluster is recreated
-		k3dName := "kecs-" + name
-		exists, err := utils.K3dClusterExists(k3dName)
-		require.NoError(t, err)
-		assert.True(t, exists, "k3d cluster %s should be recreated", k3dName)
-	}
-
-	// Clean up
-	for _, name := range clusterNames {
-		err := client2.DeleteCluster(name)
-		assert.NoError(t, err, "Failed to delete cluster %s", name)
-	}
-}
+				By("Cleaning up all clusters")
+				for _, name := range clusterNames {
+					err := client2.DeleteCluster(name)
+					Expect(err).NotTo(HaveOccurred(), "Failed to delete cluster %s", name)
+				}
+			})
+		})
+	})
+})
