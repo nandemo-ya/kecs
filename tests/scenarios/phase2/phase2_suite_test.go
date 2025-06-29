@@ -1,4 +1,4 @@
-package phase2_test
+package phase2
 
 import (
 	"testing"
@@ -9,20 +9,35 @@ import (
 	"github.com/nandemo-ya/kecs/tests/scenarios/utils"
 )
 
-// Shared resources for Phase 2 tests
+// Suite-level shared resources
 var (
-	// Logger instance
-	sharedLogger *utils.TestLogger
+	sharedKECS           *utils.KECSContainer
+	sharedClient         utils.ECSClientInterface
+	sharedLogger         *utils.TestLogger
+	sharedClusterManager *utils.SharedClusterManager
 )
 
-// Resources that are unique per test file
-var (
-	// KECS container - initialized per test file
-	sharedKECS *utils.KECSContainer
+var _ = BeforeSuite(func() {
+	// Start KECS container once for the entire suite
+	sharedKECS = utils.StartKECS(GinkgoT())
+	sharedClient = utils.NewECSClientInterface(sharedKECS.Endpoint(), utils.AWSCLIMode)
+	sharedLogger = utils.NewTestLogger(GinkgoT())
 	
-	// ECS client - initialized per test file
-	sharedClient utils.ECSClientInterface
-)
+	// Initialize shared cluster manager
+	sharedClusterManager = utils.NewSharedClusterManager(sharedClient, true)
+})
+
+var _ = AfterSuite(func() {
+	// Clean up shared clusters first
+	if sharedClusterManager != nil {
+		sharedClusterManager.CleanupAll()
+	}
+	
+	// Clean up container after all tests
+	if sharedKECS != nil {
+		sharedKECS.Cleanup()
+	}
+})
 
 func TestPhase2(t *testing.T) {
 	if testing.Short() {

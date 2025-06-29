@@ -1,4 +1,4 @@
-package phase2_test
+package phase2
 
 import (
 	"encoding/json"
@@ -15,45 +15,27 @@ import (
 
 var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Serial, func() {
 	var (
-		advancedKecs   *utils.KECSContainer
-		advancedClient *utils.AWSCLIClient
+		advancedClient      utils.ECSClientInterface
+		advancedLogger      *utils.TestLogger
 		advancedClusterName string
-		client      *utils.AWSCLIClient
-		logger      *utils.TestLogger
-		clusterName string
 	)
 
 	BeforeEach(func() {
-		if advancedKecs == nil {
-			logger = utils.NewTestLogger(GinkgoT())
-			logger.Info("Starting Advanced Features tests")
-
-			// Start KECS container
-			advancedKecs = utils.StartKECS(GinkgoT())
-			advancedClient = utils.NewAWSCLIClient(advancedKecs.Endpoint())
-
-			// Create cluster for this test suite
-			advancedClusterName = utils.GenerateTestName("phase2-advanced-cluster")
-			err := advancedClient.CreateCluster(advancedClusterName)
-			Expect(err).NotTo(HaveOccurred())
-
-			utils.AssertClusterActive(GinkgoT(), advancedClient, advancedClusterName)
-			logger.Info("Created cluster: %s", advancedClusterName)
-			
-			// Give k3d cluster some time to start up in the background
-			// The actual readiness will be checked when we try to create services
-			logger.Info("Allowing k3d cluster initialization to begin...")
-			time.Sleep(5 * time.Second)
-		}
-		// Set local variables
-		client = advancedClient
-		clusterName = advancedClusterName
+		// Use shared resources from suite
+		advancedClient = sharedClient
+		advancedLogger = sharedLogger
+		
+		// Get or create a shared cluster for advanced tests
+		var err error
+		advancedClusterName, err = sharedClusterManager.GetOrCreateCluster("phase2-advanced")
+		Expect(err).NotTo(HaveOccurred())
+		
+		advancedLogger.Info("Using shared cluster: %s", advancedClusterName)
 	})
 
 	AfterEach(func() {
-		// Cleanup is handled per test
+		// Cleanup is done in the last test of each describe block
 	})
-
 
 	Describe("Task Definition Revision Management", func() {
 		var taskDefFamily string
@@ -64,12 +46,12 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 
 		AfterEach(func() {
 			// Deregister all revisions
-			_ = client.DeregisterTaskDefinition(fmt.Sprintf("%s:1", taskDefFamily))
-			_ = client.DeregisterTaskDefinition(fmt.Sprintf("%s:2", taskDefFamily))
+			_ = advancedClient.DeregisterTaskDefinition(fmt.Sprintf("%s:1", taskDefFamily))
+			_ = advancedClient.DeregisterTaskDefinition(fmt.Sprintf("%s:2", taskDefFamily))
 		})
 
 		It("should increment revision number when updating task definition", func() {
-			logger.Info("Testing task definition revision increments")
+			advancedLogger.Info("Testing task definition revision increments")
 
 			// First registration
 			taskDef1 := map[string]interface{}{
@@ -85,7 +67,7 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 			}
 
 			taskDef1JSON, _ := json.Marshal(taskDef1)
-			resp1, err := client.RegisterTaskDefinitionFromJSON(string(taskDef1JSON))
+			resp1, err := advancedClient.RegisterTaskDefinitionFromJSON(string(taskDef1JSON))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp1.Revision).To(Equal(1))
 
@@ -103,15 +85,15 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 			}
 
 			taskDef2JSON, _ := json.Marshal(taskDef2)
-			resp2, err := client.RegisterTaskDefinitionFromJSON(string(taskDef2JSON))
+			resp2, err := advancedClient.RegisterTaskDefinitionFromJSON(string(taskDef2JSON))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp2.Revision).To(Equal(2))
 
-			logger.Info("Successfully created task definition revisions 1 and 2")
+			advancedLogger.Info("Successfully created task definition revisions 1 and 2")
 		})
 
 		It("should retrieve specific task definition revision", func() {
-			logger.Info("Testing retrieval of specific revisions")
+			advancedLogger.Info("Testing retrieval of specific revisions")
 
 			// Create two revisions
 			taskDef := map[string]interface{}{
@@ -127,28 +109,28 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 			}
 
 			taskDefJSON, _ := json.Marshal(taskDef)
-			_, err := client.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
+			_, err := advancedClient.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
 			Expect(err).NotTo(HaveOccurred())
 
 			// Update for revision 2
 			taskDef["containerDefinitions"].([]map[string]interface{})[0]["memory"] = 256
 			taskDef2JSON, _ := json.Marshal(taskDef)
-			_, err = client.RegisterTaskDefinitionFromJSON(string(taskDef2JSON))
+			_, err = advancedClient.RegisterTaskDefinitionFromJSON(string(taskDef2JSON))
 			Expect(err).NotTo(HaveOccurred())
 
 			// Describe specific revision
-			desc1, err := client.DescribeTaskDefinition(fmt.Sprintf("%s:1", taskDefFamily))
+			desc1, err := advancedClient.DescribeTaskDefinition(fmt.Sprintf("%s:1", taskDefFamily))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(desc1.Revision).To(Equal(1))
 			Expect(desc1.ContainerDefs[0].Memory).To(Equal(128))
 
 			// Describe latest revision
-			descLatest, err := client.DescribeTaskDefinition(taskDefFamily)
+			descLatest, err := advancedClient.DescribeTaskDefinition(taskDefFamily)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(descLatest.Revision).To(Equal(2))
 			Expect(descLatest.ContainerDefs[0].Memory).To(Equal(256))
 
-			logger.Info("Successfully retrieved specific and latest revisions")
+			advancedLogger.Info("Successfully retrieved specific and latest revisions")
 		})
 	})
 
@@ -160,11 +142,11 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 		})
 
 		AfterEach(func() {
-			_ = client.DeregisterTaskDefinition(taskDefFamily)
+			_ = advancedClient.DeregisterTaskDefinition(taskDefFamily)
 		})
 
 		It("should support volume sharing between containers", func() {
-			logger.Info("Testing volume configuration and sharing")
+			advancedLogger.Info("Testing volume configuration and sharing")
 
 			// Load template and modify
 			templatePath := "templates/multi-container/nginx-webapp.json"
@@ -212,11 +194,11 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 			}
 
 			taskDefJSON, _ := json.Marshal(taskDef)
-			resp, err := client.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
+			resp, err := advancedClient.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.Volumes).To(HaveLen(2))
 
-			logger.Info("Successfully registered task definition with volume configuration")
+			advancedLogger.Info("Successfully registered task definition with volume configuration")
 		})
 	})
 
@@ -243,46 +225,77 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 				},
 			}
 			taskDefJSON, _ := json.Marshal(taskDef)
-			_, err := client.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
+			_, err := advancedClient.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		AfterEach(func() {
-			_ = client.DeleteService(clusterName, serviceName)
-			_ = client.DeregisterTaskDefinition(taskDefFamily)
+			// Clean up service
+			if serviceName != "" {
+				advancedLogger.Info("Deleting service: %s", serviceName)
+				_ = advancedClient.DeleteService(advancedClusterName, serviceName)
+
+				// Wait for tasks to stop
+				Eventually(func() int {
+					tasks, _ := advancedClient.ListTasks(advancedClusterName, serviceName)
+					return len(tasks)
+				}, 60*time.Second, 5*time.Second).Should(Equal(0))
+			}
+			_ = advancedClient.DeregisterTaskDefinition(taskDefFamily)
 		})
 
 		It("should create service with custom deployment configuration", func() {
-			logger.Info("Testing service creation with deployment configuration")
+			advancedLogger.Info("Testing service creation with deployment configuration")
 
 			// Create service with standard API
-			err := client.CreateService(clusterName, serviceName, taskDefFamily, 2)
-			Expect(err).NotTo(HaveOccurred())
+			// Retry service creation in case k3d cluster is still initializing
+			Eventually(func() error {
+				return advancedClient.CreateService(advancedClusterName, serviceName, taskDefFamily, 2)
+			}, 60*time.Second, 5*time.Second).Should(Succeed(), "Failed to create service after retries")
 
 			// Verify service was created
-			service, err := client.DescribeService(clusterName, serviceName)
-			Expect(err).NotTo(HaveOccurred())
+			var service *utils.Service
+			Eventually(func() error {
+				var err error
+				service, err = advancedClient.DescribeService(advancedClusterName, serviceName)
+				return err
+			}, 30*time.Second, 2*time.Second).Should(Succeed())
+			
 			Expect(service.ServiceName).To(Equal(serviceName))
 			Expect(service.DesiredCount).To(Equal(2))
 
-			logger.Info("Successfully created service with deployment configuration")
+			advancedLogger.Info("Successfully created service with deployment configuration")
 		})
 
 		It("should update service deployment configuration", func() {
-			logger.Info("Testing service deployment configuration update")
+			advancedLogger.Info("Testing service deployment configuration update")
 
 			// Create service first
-			err := client.CreateService(clusterName, serviceName, taskDefFamily, 2)
-			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() error {
+				return advancedClient.CreateService(advancedClusterName, serviceName, taskDefFamily, 2)
+			}, 60*time.Second, 5*time.Second).Should(Succeed(), "Failed to create service after retries")
+
+			// Wait for service to be stable
+			Eventually(func() int {
+				service, err := advancedClient.DescribeService(advancedClusterName, serviceName)
+				if err != nil {
+					return -1
+				}
+				return service.DesiredCount
+			}, 30*time.Second, 2*time.Second).Should(Equal(2))
 
 			// Update service count
-			err = client.UpdateService(clusterName, serviceName, 3)
+			err := advancedClient.UpdateService(advancedClusterName, serviceName, 3)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify update
-			service, err := client.DescribeService(clusterName, serviceName)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(service.DesiredCount).To(Equal(3))
+			Eventually(func() int {
+				service, err := advancedClient.DescribeService(advancedClusterName, serviceName)
+				if err != nil {
+					return -1
+				}
+				return service.DesiredCount
+			}, 30*time.Second, 2*time.Second).Should(Equal(3))
 
 			// Update with new task definition revision
 			// First create a new revision
@@ -298,43 +311,43 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 				},
 			}
 			taskDefJSON, _ := json.Marshal(taskDef)
-			newTaskDef, err := client.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
+			newTaskDef, err := advancedClient.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
 			Expect(err).NotTo(HaveOccurred())
 
 			// Update service with new task definition
-			err = client.UpdateServiceTaskDefinition(clusterName, serviceName, newTaskDef.TaskDefinitionArn)
+			err = advancedClient.UpdateServiceTaskDefinition(advancedClusterName, serviceName, newTaskDef.TaskDefinitionArn)
 			Expect(err).NotTo(HaveOccurred())
 
-			logger.Info("Successfully updated service deployment configuration")
+			advancedLogger.Info("Successfully updated service deployment configuration")
 		})
 	})
 
 	Describe("Error Handling and Edge Cases", func() {
 		It("should handle task definition deregistration errors gracefully", func() {
-			logger.Info("Testing error handling for deregistration")
+			advancedLogger.Info("Testing error handling for deregistration")
 
 			// Try to deregister non-existent task definition
-			err := client.DeregisterTaskDefinition("non-existent-task:1")
+			err := advancedClient.DeregisterTaskDefinition("non-existent-task:1")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("ClientException"))
 
-			logger.Info("Error handling works correctly for non-existent resources")
+			advancedLogger.Info("Error handling works correctly for non-existent resources")
 		})
 
 		It("should handle service creation with invalid task definition", func() {
-			logger.Info("Testing service creation with invalid task definition")
+			advancedLogger.Info("Testing service creation with invalid task definition")
 
 			serviceName := utils.GenerateTestName("svc-invalid")
 			
-			err := client.CreateService(clusterName, serviceName, "invalid-task-def:1", 1)
+			err := advancedClient.CreateService(advancedClusterName, serviceName, "invalid-task-def:1", 1)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("ClientException"))
 
-			logger.Info("Service creation correctly fails with invalid task definition")
+			advancedLogger.Info("Service creation correctly fails with invalid task definition")
 		})
 
 		It("should maintain idempotency for task definition registration", func() {
-			logger.Info("Testing idempotency of task definition registration")
+			advancedLogger.Info("Testing idempotency of task definition registration")
 
 			taskDefFamily := utils.GenerateTestName("td-idempotent")
 			taskDef := map[string]interface{}{
@@ -351,11 +364,11 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 
 			// Register twice with identical definition
 			taskDefJSON, _ := json.Marshal(taskDef)
-			resp1, err := client.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
+			resp1, err := advancedClient.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
 			Expect(err).NotTo(HaveOccurred())
 			revision1 := resp1.Revision
 
-			resp2, err := client.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
+			resp2, err := advancedClient.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
 			Expect(err).NotTo(HaveOccurred())
 			revision2 := resp2.Revision
 
@@ -364,16 +377,16 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 			Expect(revision1).To(Equal(1))
 
 			// Cleanup
-			_ = client.DeregisterTaskDefinition(fmt.Sprintf("%s:1", taskDefFamily))
-			_ = client.DeregisterTaskDefinition(fmt.Sprintf("%s:2", taskDefFamily))
+			_ = advancedClient.DeregisterTaskDefinition(fmt.Sprintf("%s:1", taskDefFamily))
+			_ = advancedClient.DeregisterTaskDefinition(fmt.Sprintf("%s:2", taskDefFamily))
 
-			logger.Info("Task definition registration maintains proper revision behavior")
+			advancedLogger.Info("Task definition registration maintains proper revision behavior")
 		})
 	})
 
 	Describe("Pagination Support", func() {
 		It("should list task definitions", func() {
-			logger.Info("Testing task definition listing")
+			advancedLogger.Info("Testing task definition listing")
 
 			// Create multiple task definitions
 			taskDefFamilies := []string{}
@@ -393,13 +406,20 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 					},
 				}
 				taskDefJSON, _ := json.Marshal(taskDef)
-				_, err := client.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
+				_, err := advancedClient.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
 				Expect(err).NotTo(HaveOccurred())
 			}
 
 			// List task definitions
-			taskDefs, err := client.ListTaskDefinitions()
-			Expect(err).NotTo(HaveOccurred())
+			var taskDefs []string
+			Eventually(func() int {
+				var err error
+				taskDefs, err = advancedClient.ListTaskDefinitions()
+				if err != nil {
+					return 0
+				}
+				return len(taskDefs)
+			}, 30*time.Second, 2*time.Second).Should(BeNumerically(">=", 5))
 			
 			// Should contain our task definitions
 			for _, family := range taskDefFamilies {
@@ -415,14 +435,14 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 
 			// Cleanup
 			for _, family := range taskDefFamilies {
-				_ = client.DeregisterTaskDefinition(family)
+				_ = advancedClient.DeregisterTaskDefinition(family)
 			}
 
-			logger.Info("Task definition listing verified")
+			advancedLogger.Info("Task definition listing verified")
 		})
 
 		It("should list services", func() {
-			logger.Info("Testing service listing")
+			advancedLogger.Info("Testing service listing")
 
 			// Create a task definition for services
 			taskDefFamily := utils.GenerateTestName("td-svc-list")
@@ -438,7 +458,7 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 				},
 			}
 			taskDefJSON, _ := json.Marshal(taskDef)
-			_, err := client.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
+			_, err := advancedClient.RegisterTaskDefinitionFromJSON(string(taskDefJSON))
 			Expect(err).NotTo(HaveOccurred())
 
 			// Create multiple services
@@ -447,12 +467,32 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 				serviceName := utils.GenerateTestName(fmt.Sprintf("svc-list-%02d", i))
 				serviceNames = append(serviceNames, serviceName)
 				
-				err := client.CreateService(clusterName, serviceName, taskDefFamily, 1)
-				Expect(err).NotTo(HaveOccurred())
+				// Retry service creation in case k3d cluster is still initializing
+				Eventually(func() error {
+					return advancedClient.CreateService(advancedClusterName, serviceName, taskDefFamily, 1)
+				}, 60*time.Second, 5*time.Second).Should(Succeed(), fmt.Sprintf("Failed to create service %s", serviceName))
 			}
 
+			// Wait for all services to be created
+			Eventually(func() int {
+				services, err := advancedClient.ListServices(advancedClusterName)
+				if err != nil {
+					return 0
+				}
+				count := 0
+				for _, serviceName := range serviceNames {
+					for _, svc := range services {
+						if strings.Contains(svc, serviceName) {
+							count++
+							break
+						}
+					}
+				}
+				return count
+			}, 60*time.Second, 5*time.Second).Should(Equal(3))
+
 			// List services
-			services, err := client.ListServices(clusterName)
+			services, err := advancedClient.ListServices(advancedClusterName)
 			Expect(err).NotTo(HaveOccurred())
 			
 			// Should contain our services
@@ -469,11 +509,24 @@ var _ = Describe("Phase 2: Advanced Task Definition and Service Features", Seria
 
 			// Cleanup
 			for _, serviceName := range serviceNames {
-				_ = client.DeleteService(clusterName, serviceName)
+				_ = advancedClient.DeleteService(advancedClusterName, serviceName)
+				
+				// Wait for service deletion
+				Eventually(func() int {
+					tasks, _ := advancedClient.ListTasks(advancedClusterName, serviceName)
+					return len(tasks)
+				}, 60*time.Second, 5*time.Second).Should(Equal(0))
 			}
-			_ = client.DeregisterTaskDefinition(taskDefFamily)
+			_ = advancedClient.DeregisterTaskDefinition(taskDefFamily)
 
-			logger.Info("Service listing verified")
+			advancedLogger.Info("Service listing verified")
+		})
+
+		It("should cleanup advanced features resources", Label("cleanup"), func() {
+			// Release the shared cluster
+			if sharedClusterManager != nil && advancedClusterName != "" {
+				sharedClusterManager.ReleaseCluster(advancedClusterName)
+			}
 		})
 	})
 
