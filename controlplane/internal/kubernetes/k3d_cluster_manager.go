@@ -94,7 +94,6 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 	if k.config.EnableTraefik {
 		// Determine Traefik port
 		traefikPort := k.config.TraefikPort
-		log.Printf("Initial TraefikPort from config: %d", traefikPort)
 		if traefikPort == 0 {
 			// Find available port starting from 8090
 			port, err := k.findAvailablePort(8090)
@@ -102,7 +101,6 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 				return fmt.Errorf("failed to find available port for Traefik: %w", err)
 			}
 			traefikPort = port
-			log.Printf("Found available port: %d", traefikPort)
 		}
 		
 		// Store the port for this cluster
@@ -667,6 +665,33 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		},
 		Memory: "512M", // Limit memory usage for faster startup
 	}
+	
+	// Add port mapping for Traefik if enabled (even in optimized mode)
+	if k.config.EnableTraefik {
+		// Determine Traefik port
+		traefikPort := k.config.TraefikPort
+		if traefikPort == 0 {
+			// Find available port starting from 8090
+			port, err := k.findAvailablePort(8090)
+			if err != nil {
+				return fmt.Errorf("failed to find available port for Traefik: %w", err)
+			}
+			traefikPort = port
+		}
+		
+		// Store the port for this cluster
+		k.traefikPorts[normalizedName] = traefikPort
+		
+		log.Printf("Adding port mapping for Traefik: %d/tcp", traefikPort)
+		serverNode.Ports = nat.PortMap{
+			"8090/tcp": []nat.PortBinding{
+				{
+					HostIP:   "0.0.0.0",
+					HostPort: fmt.Sprintf("%d", traefikPort),
+				},
+			},
+		}
+	}
 
 	// Create minimal cluster configuration
 	cluster := &k3d.Cluster{
@@ -743,6 +768,17 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		}
 	} else {
 		log.Printf("Cluster %s creation initiated asynchronously", normalizedName)
+	}
+	
+	// Deploy Traefik if enabled (even in optimized mode)
+	if k.config.EnableTraefik && waitForServer {
+		log.Printf("Deploying Traefik to optimized cluster %s...", normalizedName)
+		if err := k.deployTraefik(ctx, clusterName); err != nil {
+			log.Printf("Warning: Failed to deploy Traefik: %v", err)
+			// Continue without Traefik
+		} else {
+			log.Printf("Successfully deployed Traefik to optimized cluster %s", normalizedName)
+		}
 	}
 
 	return nil
