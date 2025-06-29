@@ -885,6 +885,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 	log.Printf("LocalStack successfully deployed in cluster %s", cluster.Name)
 	
 	// Update LocalStack state to running
+	// Note: WaitForReady might have returned nil despite DNS issues
 	api.updateLocalStackState(cluster, "running", "")
 }
 
@@ -904,6 +905,9 @@ func (api *DefaultECSAPI) updateLocalStackState(cluster *storage.Cluster, status
 	// Add error message if status is failed
 	if status == "failed" && errorMsg != "" {
 		state.HealthStatus = errorMsg
+	} else if status == "running" && errorMsg != "" {
+		// If running but with warnings (e.g., DNS issues), record as warning
+		state.HealthStatus = "warning: " + errorMsg
 	}
 	
 	// Serialize state
