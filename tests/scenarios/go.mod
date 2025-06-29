@@ -10,6 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.58.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.42.2
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.81.0
+	github.com/docker/docker v28.0.1+incompatible
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/stretchr/testify v1.10.0
@@ -41,7 +42,6 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/docker v28.0.1+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.8.2 // indirect

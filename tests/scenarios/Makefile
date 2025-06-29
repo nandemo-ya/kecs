@@ -11,9 +11,9 @@ test-phase1:
 test-phase2:
 	go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout $(TIMEOUT) ./phase2/...
 
-# Test Phase 3: Task Lifecycle & Status
+# Test Phase 3: LocalStack Transparent Communication
 test-phase3:
-	go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout $(TIMEOUT) ./task/... ./service/service_tasks_test.go
+	go run github.com/onsi/ginkgo/v2/ginkgo -v -timeout $(TIMEOUT) ./phase3/...
 
 # Test tasks only
 test-task:

@@ -481,9 +481,29 @@ func (c *AWSCLIClient) DeleteAttributes(clusterName string, attributes []Attribu
 
 // GetLocalStackStatus gets the LocalStack status
 func (c *AWSCLIClient) GetLocalStackStatus(clusterName string) (string, error) {
-	// Note: This is a KECS-specific extension, not part of standard ECS API
-	// For now, we'll return "unknown" as AWS CLI doesn't support this
-	return "unknown", nil
+	// This is a KECS-specific API endpoint
+	url := fmt.Sprintf("%s/api/localstack/status", c.endpoint)
+	
+	cmd := exec.Command("curl", "-s", "-X", "GET", url)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to get LocalStack status: %w\nOutput: %s", err, output)
+	}
+
+	var result struct {
+		Running bool   `json:"running"`
+		Enabled bool   `json:"enabled"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return "", fmt.Errorf("failed to parse LocalStack status: %w", err)
+	}
+
+	if result.Running {
+		return "healthy", nil
+	} else if result.Enabled {
+		return "enabled", nil
+	}
+	return "disabled", nil
 }
 
 // UpdateClusterSettings updates cluster settings

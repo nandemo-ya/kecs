@@ -37,10 +37,12 @@ func StartKECS(t TestingT) *KECSContainer {
 	os.MkdirAll(kubeconfigHostPath, 0755)
 
 	// Container request configuration
+	imageTag := getEnvOrDefault("KECS_IMAGE", "kecs:test")
+	fmt.Printf("DEBUG: Using KECS image: %s\n", imageTag)
 	req := testcontainers.ContainerRequest{
-		Image:        getEnvOrDefault("KECS_IMAGE", "kecs:test"),
+		Image:        imageTag,
 		ExposedPorts: []string{"8080/tcp", "8081/tcp"},
-		Cmd:          []string{"server"}, // Use 'server' command to run directly
+		Cmd:          []string{"server"}, // Run server command
 		Env: map[string]string{
 			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
 			"KECS_TEST_MODE":              testMode,
@@ -49,6 +51,7 @@ func StartKECS(t TestingT) *KECSContainer {
 			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
 			"KECS_K3D_OPTIMIZED":          "true",
 			"KECS_SECURITY_ACKNOWLEDGED":  "true", // Skip security disclaimer
+			"KECS_LOCALSTACK_ENABLED":     "true", // Enable LocalStack for tests
 		},
 		// Add root group (0) to access Docker socket
 		HostConfigModifier: func(hc *container.HostConfig) {
@@ -160,23 +163,12 @@ func (k *KECSContainer) GetLogs() (string, error) {
 
 // ExecuteCommand executes a command inside the KECS container
 func (k *KECSContainer) ExecuteCommand(args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(k.ctx, 30*time.Second)
-	defer cancel()
-
-	exitCode, reader, err := k.container.Exec(ctx, append([]string{"kecs"}, args...))
-	if err != nil {
-		return "", fmt.Errorf("failed to execute command: %w", err)
-	}
-	
-	// Read output from reader
-	buf := make([]byte, 4096)
-	n, _ := reader.Read(buf)
-	output := string(buf[:n])
-	
-	if exitCode != 0 {
-		return output, fmt.Errorf("command exited with code %d: %s", exitCode, output)
-	}
-	return output, nil
+	// Note: This container is running the KECS server, not the CLI
+	// CLI commands like "localstack start" need to connect to the server via API
+	// This method is currently not functional for CLI commands
+	return "", fmt.Errorf("ExecuteCommand is not supported for CLI commands in server container. " +
+		"The container is running KECS server, not the CLI. " +
+		"LocalStack operations should be performed via API calls to the server.")
 }
 
 // Cleanup terminates the container and cleans up resources

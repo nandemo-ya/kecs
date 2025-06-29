@@ -469,8 +469,8 @@ func (c *CurlClient) DeleteAttributes(clusterName string, attributes []Attribute
 
 // GetLocalStackStatus gets the LocalStack status (KECS-specific)
 func (c *CurlClient) GetLocalStackStatus(clusterName string) (string, error) {
-	// This would be a custom KECS endpoint
-	url := fmt.Sprintf("%s/localstack/status?cluster=%s", c.endpoint, clusterName)
+	// KECS LocalStack status is global, not per-cluster
+	url := fmt.Sprintf("%s/api/localstack/status", c.endpoint)
 	
 	args := []string{
 		"-s", "-X", "GET",
@@ -484,14 +484,20 @@ func (c *CurlClient) GetLocalStackStatus(clusterName string) (string, error) {
 	}
 
 	var result struct {
-		Status string `json:"status"`
+		Running bool   `json:"running"`
+		Enabled bool   `json:"enabled"`
 	}
 
 	if err := json.Unmarshal(output, &result); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	return result.Status, nil
+	if result.Running {
+		return "healthy", nil
+	} else if result.Enabled {
+		return "enabled", nil
+	}
+	return "disabled", nil
 }
 
 // RegisterTaskDefinitionFromJSON registers a task definition from JSON

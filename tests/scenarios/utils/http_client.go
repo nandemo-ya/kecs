@@ -386,5 +386,38 @@ func (c *HTTPClient) DeleteAttributes(clusterName string, attributes []Attribute
 }
 
 func (c *HTTPClient) GetLocalStackStatus(clusterName string) (string, error) {
-	return "unknown", nil
+	// KECS LocalStack status is global, not per-cluster
+	url := fmt.Sprintf("%s/api/localstack/status", c.endpoint)
+	
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var result struct {
+		Running bool   `json:"running"`
+		Enabled bool   `json:"enabled"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if result.Running {
+		return "healthy", nil
+	} else if result.Enabled {
+		return "enabled", nil
+	}
+	return "disabled", nil
 }
