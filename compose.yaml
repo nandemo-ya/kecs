@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # KECS Control Plane Service
   kecs:
