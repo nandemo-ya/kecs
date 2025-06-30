@@ -86,13 +86,26 @@ data:
         address: ":80"
       websecure:
         address: ":443"
+      proxy:
+        address: ":8090"
     providers:
-      kubernetesCRD:
-        allowCrossNamespace: true
-      kubernetesIngress:
-        allowExternalNameServices: true
+      file:
+        filename: /config/dynamic.yml
     log:
-      level: INFO
+      level: DEBUG
+  dynamic.yml: |
+    tcp:
+      routers:
+        localstack:
+          entryPoints:
+            - proxy
+          rule: "HostSNI(`*`)"
+          service: localstack
+      services:
+        localstack:
+          loadBalancer:
+            servers:
+              - address: "localstack.aws-services.svc.cluster.local:4566"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -124,9 +137,12 @@ spec:
           containerPort: 443
         - name: dashboard
           containerPort: 8080
+        - name: proxy
+          containerPort: 8090
         volumeMounts:
         - name: config
           mountPath: /config
+          readOnly: true
         resources:
           limits:
             memory: "128Mi"
@@ -145,49 +161,23 @@ metadata:
   name: traefik
   namespace: kecs-system
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: traefik
   ports:
     - name: web
       port: 80
       targetPort: 80
+      nodePort: 30080
     - name: websecure
       port: 443
       targetPort: 443
+      nodePort: 30443
     - name: dashboard
       port: 8080
       targetPort: 8080
----
-# IngressRoute for LocalStack
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: localstack
-  namespace: kecs-system
-spec:
-  entryPoints:
-    - web
-  routes:
-  - match: PathPrefix(`/`)
-    kind: Rule
-    services:
-    - name: localstack
-      namespace: aws-services
-      port: 4566
----
-# IngressRoute for Traefik Dashboard (optional, for debugging)
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: traefik-dashboard
-  namespace: kecs-system
-spec:
-  entryPoints:
-    - web
-  routes:
-  - match: PathPrefix(`/dashboard`) || PathPrefix(`/api`)
-    kind: Rule
-    services:
-    - name: api@internal
-      kind: TraefikService
+      nodePort: 30808
+    - name: proxy
+      port: 8090
+      targetPort: 8090
+      nodePort: 30890

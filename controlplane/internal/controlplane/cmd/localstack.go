@@ -301,7 +301,7 @@ func getLocalStackManager() (localstack.Manager, error) {
 	}
 
 	// Create and return manager
-	manager, err := localstack.NewManager(lsConfig, clientset)
+	manager, err := localstack.NewManager(lsConfig, clientset, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LocalStack manager: %w", err)
 	}

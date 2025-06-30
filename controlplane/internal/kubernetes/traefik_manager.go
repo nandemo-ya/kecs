@@ -47,6 +47,10 @@ func NewTraefikManager(kubeClient kubernetes.Interface, restConfig *rest.Config)
 func (tm *TraefikManager) Deploy(ctx context.Context) error {
 	klog.Info("Deploying Traefik reverse proxy...")
 
+	// First pass: collect resources by type
+	var ingressRoutes []*unstructured.Unstructured
+	var otherResources []*unstructured.Unstructured
+
 	// Parse the manifest into individual resources
 	decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(traefikManifest), 4096)
 	
@@ -64,16 +68,41 @@ func (tm *TraefikManager) Deploy(ctx context.Context) error {
 			continue
 		}
 
-		// Apply the resource
-		if err := tm.applyResource(ctx, &rawObj); err != nil {
+		// Separate IngressRoute resources to apply after Traefik is ready
+		if rawObj.GetKind() == "IngressRoute" {
+			ingressRoutes = append(ingressRoutes, rawObj.DeepCopy())
+		} else {
+			otherResources = append(otherResources, rawObj.DeepCopy())
+		}
+	}
+
+	// Apply non-IngressRoute resources first
+	for _, obj := range otherResources {
+		if err := tm.applyResource(ctx, obj); err != nil {
 			// Log error but continue with other resources
 			klog.Warningf("Failed to apply resource %s/%s: %v", 
-				rawObj.GetKind(), rawObj.GetName(), err)
+				obj.GetKind(), obj.GetName(), err)
 		}
 	}
 
 	// Wait for Traefik to be ready
-	return tm.WaitForReady(ctx, 2*time.Minute)
+	if err := tm.WaitForReady(ctx, 2*time.Minute); err != nil {
+		return err
+	}
+
+	// Install Traefik CRDs if needed
+	if err := tm.ensureTraefikCRDs(ctx); err != nil {
+		klog.Warningf("Failed to ensure Traefik CRDs: %v", err)
+	}
+
+	// Now apply IngressRoute resources
+	for _, obj := range ingressRoutes {
+		if err := tm.applyResource(ctx, obj); err != nil {
+			klog.Warningf("Failed to apply IngressRoute %s: %v", obj.GetName(), err)
+		}
+	}
+
+	return nil
 }
 
 // applyResource applies a single resource to the cluster
@@ -152,6 +181,45 @@ func (tm *TraefikManager) GetProxyEndpoint() string {
 	// This will be set up with port forwarding or NodePort
 	// For now, return the expected endpoint
 	return "http://localhost:8090"
+}
+
+// ensureTraefikCRDs waits for Traefik CRDs to be available
+func (tm *TraefikManager) ensureTraefikCRDs(ctx context.Context) error {
+	klog.Info("Waiting for Traefik CRDs to be available...")
+	
+	// Wait up to 30 seconds for CRDs to be available
+	deadline := time.Now().Add(30 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if time.Now().After(deadline) {
+				return fmt.Errorf("timeout waiting for Traefik CRDs")
+			}
+
+			// Check if IngressRoute CRD exists
+			gvr := schema.GroupVersionResource{
+				Group:    "traefik.io",
+				Version:  "v1alpha1",
+				Resource: "ingressroutes",
+			}
+
+			// Try to list IngressRoutes to check if CRD is available
+			_, err := tm.dynamicClient.Resource(gvr).List(ctx, metav1.ListOptions{Limit: 1})
+			if err == nil {
+				klog.Info("Traefik CRDs are available")
+				return nil
+			}
+
+			if !errors.IsNotFound(err) {
+				klog.V(4).Infof("Waiting for Traefik CRDs: %v", err)
+			}
+		}
+	}
 }
 
 // pluralize converts a Kind to its plural form for API resources

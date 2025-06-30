@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8s "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
@@ -160,11 +161,20 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 			// Check if Traefik is enabled
 			if config.GetBool("features.traefik") {
 				localStackConfig.UseTraefik = true
-				localStackConfig.ProxyEndpoint = "http://localhost:8090"
-				log.Println("Traefik proxy enabled for LocalStack")
+				// Don't set ProxyEndpoint here - it will be set dynamically when LocalStack is deployed
+				log.Println("Traefik proxy enabled for LocalStack (port will be assigned dynamically)")
 			}
 			
-			localStackManager, err := localstack.NewManager(localStackConfig, kubeClient)
+			// Set container mode
+			localStackConfig.ContainerMode = config.GetBool("features.containerMode")
+			
+			// Get kubeconfig if available
+			var kubeConfig *rest.Config
+			// We'll create LocalStack managers per-cluster when they're created
+			// At startup, we don't have a cluster yet
+			kubeConfig = nil
+			
+			localStackManager, err := localstack.NewManager(localStackConfig, kubeClient, kubeConfig)
 			if err != nil {
 				log.Printf("Warning: Failed to initialize LocalStack manager: %v", err)
 			} else {
@@ -298,6 +308,10 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 		if s.localStackManager != nil {
 			defaultAPI.SetLocalStackManager(s.localStackManager)
+		}
+		// Also set the LocalStack config so it can be used when creating clusters
+		if localStackConfig != nil {
+			defaultAPI.SetLocalStackConfig(localStackConfig)
 		}
 
 		// Initialize Service Discovery if we have kubernetes client
@@ -750,13 +764,27 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 	
 	// Check if LocalStack is enabled
 	var config *localstack.Config
-	if s.localStackManager != nil {
+	if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok && defaultAPI.localStackConfig != nil {
+		// Create a copy of the config from ECS API
+		configCopy := *defaultAPI.localStackConfig
+		config = &configCopy
+	} else if s.localStackManager != nil {
 		config = s.localStackManager.GetConfig()
 	} else {
 		// Use default config and check if enabled via environment
 		config = localstack.DefaultConfig()
 		if envEnabled := os.Getenv("KECS_LOCALSTACK_ENABLED"); envEnabled == "true" {
 			config.Enabled = true
+		}
+		// Check if Traefik is enabled
+		if os.Getenv("KECS_ENABLE_TRAEFIK") == "true" || os.Getenv("KECS_FEATURES_TRAEFIK") == "true" {
+			config.UseTraefik = true
+			log.Printf("Traefik is enabled for LocalStack recovery")
+		}
+		// Set container mode
+		if os.Getenv("KECS_FEATURES_CONTAINER_MODE") == "true" {
+			config.ContainerMode = true
+			log.Printf("Container mode is enabled for LocalStack recovery")
 		}
 	}
 	
@@ -771,8 +799,24 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 		return fmt.Errorf("failed to get Kubernetes client: %w", err)
 	}
 	
+	// If Traefik is enabled, get the dynamic port from cluster manager
+	if config.UseTraefik && s.clusterManager != nil {
+		if port, exists := s.clusterManager.GetTraefikPort(cluster.K8sClusterName); exists {
+			config.ProxyEndpoint = fmt.Sprintf("http://localhost:%d", port)
+			log.Printf("Using dynamic Traefik port %d for LocalStack proxy endpoint: %s", port, config.ProxyEndpoint)
+		} else {
+			log.Printf("Warning: Traefik is enabled but no port found for cluster %s", cluster.K8sClusterName)
+		}
+	}
+
+	// Get kube config
+	kubeConfig, err := s.clusterManager.GetKubeConfig(cluster.K8sClusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kube config: %w", err)
+	}
+
 	// Create a new LocalStack manager with the cluster-specific client
-	clusterLocalStackManager, err := localstack.NewManager(config, kubeClient.(*k8s.Clientset))
+	clusterLocalStackManager, err := localstack.NewManager(config, kubeClient.(*k8s.Clientset), kubeConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create LocalStack manager: %w", err)
 	}

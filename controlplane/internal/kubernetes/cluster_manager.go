@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // ClusterManager defines the interface for managing local Kubernetes clusters
@@ -21,6 +22,9 @@ type ClusterManager interface {
 
 	// GetKubeClient returns a Kubernetes client for the specified cluster
 	GetKubeClient(clusterName string) (kubernetes.Interface, error)
+
+	// GetKubeConfig returns the REST config for the specified cluster
+	GetKubeConfig(clusterName string) (*rest.Config, error)
 
 	// WaitForClusterReady waits for a cluster to be ready with the specified timeout
 	WaitForClusterReady(clusterName string, timeout time.Duration) error

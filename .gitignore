@@ -26,6 +26,7 @@ go.work.sum
 
 # Build output
 bin/
+controlplane/kecs
 
 
 # Coverage reports
