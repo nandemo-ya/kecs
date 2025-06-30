@@ -47,7 +47,7 @@ func StartKECS(t TestingT) *KECSContainer {
 		Env: map[string]string{
 			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
 			"KECS_TEST_MODE":              testMode,
-			"KECS_CONTAINER_MODE":         "false", // Disable container mode to prevent recursive container creation
+			"KECS_CONTAINER_MODE":         "true", // Enable container mode for k3d cluster creation
 			"KECS_CLUSTER_PROVIDER":       clusterProvider,
 			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
 			"KECS_K3D_OPTIMIZED":          "true",
@@ -111,14 +111,9 @@ func StartKECS(t TestingT) *KECSContainer {
 	endpoint := fmt.Sprintf("http://%s:%s", apiHost, apiPort.Port())
 
 	// Wait a bit for KECS to be fully ready
-	// Use shorter initial wait in test mode
-	var initialWait time.Duration
-	if testMode == "true" {
-		initialWait = 2 * time.Second
-	} else {
-		initialWait = 3 * time.Second
-	}
-	
+	// Wait for KECS to initialize
+	// In container mode, it needs more time to start k3d cluster
+	initialWait := 5 * time.Second
 	log.Printf("Waiting %v for KECS to initialize...", initialWait)
 	time.Sleep(initialWait)
 	
@@ -179,7 +174,8 @@ func (k *KECSContainer) Cleanup() error {
 	var err error
 	
 	// Clean up any clusters created during tests
-	if os.Getenv("KECS_CONTAINER_MODE") == "true" {
+	// Since we're running KECS in container mode, clean up k3d clusters
+	if true {
 		clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
 		
 		if clusterProvider == "k3d" {
