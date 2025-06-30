@@ -24,13 +24,12 @@ type KECSContainer struct {
 	LocalStackEnabled string // Whether LocalStack is enabled
 }
 
-// StartKECS starts a new KECS container with k3d cluster for testing
-// This creates a full KECS environment including Kubernetes cluster for quality testing
+// StartKECS starts a new KECS container for testing
 func StartKECS(t TestingT) *KECSContainer {
 	ctx := context.Background()
 
-	// Disable test mode to ensure k3d cluster creation
-	testMode := "false" // Always use production mode for quality testing
+	// Check if running in test mode
+	testMode := getEnvOrDefault("KECS_TEST_MODE", "true")
 	// Get cluster provider (k3d or kind)
 	clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
 
@@ -48,23 +47,17 @@ func StartKECS(t TestingT) *KECSContainer {
 		Env: map[string]string{
 			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
 			"KECS_TEST_MODE":              testMode,
-			"KECS_CONTAINER_MODE":         "true", // Always create k3d cluster for quality testing
+			"KECS_CONTAINER_MODE":         "false", // Disable container mode to prevent recursive container creation
 			"KECS_CLUSTER_PROVIDER":       clusterProvider,
 			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
 			"KECS_K3D_OPTIMIZED":          "true",
 			"KECS_SECURITY_ACKNOWLEDGED":  "true", // Skip security disclaimer
 			"KECS_LOCALSTACK_ENABLED":     getEnvOrDefault("KECS_LOCALSTACK_ENABLED", "true"), // Enable LocalStack for tests
 			"KECS_LOCALSTACK_USE_TRAEFIK": getEnvOrDefault("KECS_LOCALSTACK_USE_TRAEFIK", "true"), // Enable Traefik proxy for LocalStack
-			"KECS_ENABLE_K3D_CLUSTER":     "true", // Explicitly enable k3d cluster creation
-			"KECS_K3D_CREATE_CLUSTER":     "true", // Force k3d cluster creation
-			"DOCKER_HOST":                 "unix:///var/run/docker.sock", // Explicit Docker socket path
-			"K3D_FIX_DNS":                 "1", // Fix DNS issues in k3d
 		},
-		// Add root group (0) to access Docker socket and enable privileged mode for k3d
+		// Add root group (0) to access Docker socket
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.GroupAdd = []string{"0"}
-			hc.Privileged = true // Required for k3d to create containers
-			hc.SecurityOpt = []string{"seccomp=unconfined"} // Allow system calls needed by k3d
 		},
 		Mounts: testcontainers.ContainerMounts{
 			{
@@ -84,7 +77,7 @@ func StartKECS(t TestingT) *KECSContainer {
 		},
 		WaitingFor: wait.ForHTTP("/health").
 			WithPort("8081/tcp").
-			WithStartupTimeout(180*time.Second), // Extended timeout for k3d cluster creation
+			WithStartupTimeout(120*time.Second),
 	}
 
 	// Start container
@@ -118,10 +111,15 @@ func StartKECS(t TestingT) *KECSContainer {
 	endpoint := fmt.Sprintf("http://%s:%s", apiHost, apiPort.Port())
 
 	// Wait a bit for KECS to be fully ready
-	// Wait for KECS to initialize with k3d cluster
-	// k3d cluster creation takes time but ensures quality testing environment
-	initialWait := 10 * time.Second
-	log.Printf("Waiting %v for KECS to initialize with k3d cluster...", initialWait)
+	// Use shorter initial wait in test mode
+	var initialWait time.Duration
+	if testMode == "true" {
+		initialWait = 2 * time.Second
+	} else {
+		initialWait = 3 * time.Second
+	}
+	
+	log.Printf("Waiting %v for KECS to initialize...", initialWait)
 	time.Sleep(initialWait)
 	
 
@@ -181,8 +179,7 @@ func (k *KECSContainer) Cleanup() error {
 	var err error
 	
 	// Clean up any clusters created during tests
-	// Since we're running KECS in container mode, clean up k3d clusters
-	if true {
+	if os.Getenv("KECS_CONTAINER_MODE") == "true" {
 		clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
 		
 		if clusterProvider == "k3d" {
@@ -270,8 +267,8 @@ func StartKECSWithPersistence(t TestingT) *KECSContainer {
 		t.Fatalf("Failed to create temp data directory: %v", err)
 	}
 
-	// Disable test mode to ensure k3d cluster creation
-	testMode := "false" // Always use production mode for quality testing
+	// Ensure we're not in test mode for persistence tests
+	testMode := "false"
 
 	// Get cluster provider (k3d or kind)
 	clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
@@ -288,27 +285,21 @@ func StartKECSWithPersistence(t TestingT) *KECSContainer {
 		Env: map[string]string{
 			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
 			"KECS_TEST_MODE":              testMode,
-			"KECS_CONTAINER_MODE":         "true", // Always create k3d cluster for quality testing
+			"KECS_CONTAINER_MODE":         "true", // Enable container mode for k3d cluster creation
 			"KECS_CLUSTER_PROVIDER":       clusterProvider,
 			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
 			"KECS_K3D_OPTIMIZED":          "true",
 			"KECS_SECURITY_ACKNOWLEDGED":  "true", // Skip security disclaimer
 			"KECS_DATA_DIR":               "/data",
 			"KECS_AUTO_RECOVER_STATE":     "true", // Enable auto recovery
-			"KECS_ENABLE_K3D_CLUSTER":     "true", // Explicitly enable k3d cluster creation
-			"KECS_K3D_CREATE_CLUSTER":     "true", // Force k3d cluster creation
-			"DOCKER_HOST":                 "unix:///var/run/docker.sock", // Explicit Docker socket path
-			"K3D_FIX_DNS":                 "1", // Fix DNS issues in k3d
 		},
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("8080/tcp"),
 			wait.ForHTTP("/health").WithPort("8081/tcp"),
-		).WithDeadline(180 * time.Second), // Extended timeout for k3d cluster creation
-		// Add root group (0) to access Docker socket and enable privileged mode for k3d
+		).WithDeadline(60 * time.Second),
+		// Add root group (0) to access Docker socket
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.GroupAdd = []string{"0"}
-			hc.Privileged = true // Required for k3d to create containers
-			hc.SecurityOpt = []string{"seccomp=unconfined"} // Allow system calls needed by k3d
 		},
 		Mounts: testcontainers.Mounts(
 			testcontainers.BindMount(dataDir, "/data"),
@@ -378,8 +369,8 @@ func StartKECSWithPersistence(t TestingT) *KECSContainer {
 func RestartKECSWithPersistence(t TestingT, dataDir string) *KECSContainer {
 	ctx := context.Background()
 
-	// Disable test mode to ensure k3d cluster creation
-	testMode := "false" // Always use production mode for quality testing
+	// Ensure we're not in test mode for persistence tests
+	testMode := "false"
 
 	// Get cluster provider (k3d or kind)
 	clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
@@ -396,27 +387,21 @@ func RestartKECSWithPersistence(t TestingT, dataDir string) *KECSContainer {
 		Env: map[string]string{
 			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
 			"KECS_TEST_MODE":              testMode,
-			"KECS_CONTAINER_MODE":         "true", // Always create k3d cluster for quality testing
+			"KECS_CONTAINER_MODE":         "true", // Enable container mode for k3d cluster creation
 			"KECS_CLUSTER_PROVIDER":       clusterProvider,
 			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
 			"KECS_K3D_OPTIMIZED":          "true",
 			"KECS_SECURITY_ACKNOWLEDGED":  "true", // Skip security disclaimer
 			"KECS_DATA_DIR":               "/data",
 			"KECS_AUTO_RECOVER_STATE":     "true", // Enable auto recovery
-			"KECS_ENABLE_K3D_CLUSTER":     "true", // Explicitly enable k3d cluster creation
-			"KECS_K3D_CREATE_CLUSTER":     "true", // Force k3d cluster creation
-			"DOCKER_HOST":                 "unix:///var/run/docker.sock", // Explicit Docker socket path
-			"K3D_FIX_DNS":                 "1", // Fix DNS issues in k3d
 		},
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("8080/tcp"),
 			wait.ForHTTP("/health").WithPort("8081/tcp"),
-		).WithDeadline(180 * time.Second), // Extended timeout for k3d cluster creation
-		// Add root group (0) to access Docker socket and enable privileged mode for k3d
+		).WithDeadline(60 * time.Second),
+		// Add root group (0) to access Docker socket
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.GroupAdd = []string{"0"}
-			hc.Privileged = true // Required for k3d to create containers
-			hc.SecurityOpt = []string{"seccomp=unconfined"} // Allow system calls needed by k3d
 		},
 		Mounts: testcontainers.Mounts(
 			testcontainers.BindMount(dataDir, "/data"),
@@ -500,15 +485,14 @@ func getLogs(ctx context.Context, container testcontainers.Container) string {
 	return string(buf[:n])
 }
 
-// waitForKECSReady waits for KECS to be fully operational with k3d cluster
+// waitForKECSReady waits for KECS to be fully operational
 func waitForKECSReady(t TestingT, apiEndpoint, adminEndpoint string) {
-	// Wait for k3d cluster to be fully ready
-	log.Printf("Waiting for KECS and k3d cluster to be fully operational...")
-	time.Sleep(5 * time.Second)
-	
-	// Additional wait to ensure all components are initialized
-	// This includes LocalStack deployment if enabled
-	time.Sleep(5 * time.Second)
+	// Wait a bit for initial startup
+	time.Sleep(3 * time.Second)
+
+	// TODO: Add health check polling if needed
+	// For now, just wait a bit more for KECS to be ready
+	time.Sleep(2 * time.Second)
 }
 
 // clientRegistry stores AWS clients for KECS endpoints
