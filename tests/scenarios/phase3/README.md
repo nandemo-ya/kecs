@@ -8,22 +8,34 @@ These tests verify that containers can run successfully within KECS, with proper
 
 ## Test Scenarios
 
-### Container Communication Tests (`container_communication_test.go`)
+### Basic Functionality Tests (`basic_functionality_test.go`)
 
-1. **Network Connectivity Test**
-   - Verifies containers can access external networks
-   - Tests basic HTTP connectivity
-   - Ensures network isolation works correctly
+1. **Task Definition Management**
+   - Register and describe task definitions
+   - Verify task definition persistence
 
-2. **Environment Variable Test**
-   - Verifies environment variables are properly set
-   - Tests custom environment variable handling
-   - Ensures AWS-related variables are available
+2. **Service Management**
+   - Create and list services
+   - Basic service lifecycle operations
 
-3. **Container Logging Test**
-   - Verifies container logs are captured
-   - Tests multi-line log output
-   - Ensures logs are accessible through KECS
+3. **Task Operations**
+   - Run tasks and track their status
+   - List and describe running tasks
+
+### LocalStack S3 Proxy Tests (`localstack_s3_proxy_test.go`)
+
+1. **S3 API Proxy Test**
+   - Verifies S3 API calls are transparently proxied to LocalStack
+   - Tests bucket creation and listing operations
+   - Ensures no manual endpoint configuration is needed
+
+2. **Environment-based Proxy Test**
+   - Tests S3 operations with proxy environment variables
+   - Verifies requests reach LocalStack, not real AWS
+
+3. **Multiple S3 Operations Test**
+   - Tests complex S3 workflows (create bucket, upload, list)
+   - Verifies all operations are proxied correctly
 
 ## Running Tests
 
@@ -80,12 +92,16 @@ The tests use:
    - Multi-line log handling
    - Log accessibility
 
-## Future LocalStack Integration
+## LocalStack Integration
 
-In future phases, KECS will support:
+KECS now supports automatic LocalStack integration with:
 - Automatic LocalStack deployment within clusters
-- Transparent proxy for AWS API calls
+- Transparent proxy for AWS API calls through Traefik
 - Routing of AWS service calls to LocalStack
-- No manual endpoint configuration in containers
+- No manual endpoint configuration needed in containers
 
-The tests verify basic container functionality as a foundation for more advanced features like LocalStack integration in future phases.
+The LocalStack S3 proxy tests verify that:
+1. AWS SDK calls from containers are automatically routed to LocalStack
+2. No explicit endpoint configuration is required
+3. Multiple AWS services can be accessed transparently
+4. The proxy works with standard AWS CLI and SDKs
