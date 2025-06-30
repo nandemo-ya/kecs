@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	k8s "k8s.io/client-go/kubernetes"
 
+	apiconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
@@ -833,16 +833,17 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 	} else {
 		// Use default config and check if enabled via environment
 		config = localstack.DefaultConfig()
-		if envEnabled := os.Getenv("KECS_LOCALSTACK_ENABLED"); envEnabled == "true" {
+		// Use Viper config which handles environment variables
+		appConfig := apiconfig.GetConfig()
+		if appConfig.LocalStack.Enabled {
 			config.Enabled = true
 		}
-		// Check if Traefik is enabled
-		if os.Getenv("KECS_ENABLE_TRAEFIK") == "true" || os.Getenv("KECS_FEATURES_TRAEFIK") == "true" {
+		if appConfig.LocalStack.UseTraefik {
 			config.UseTraefik = true
 			log.Printf("Traefik is enabled for LocalStack")
 		}
 		// Set container mode
-		if os.Getenv("KECS_FEATURES_CONTAINER_MODE") == "true" {
+		if appConfig.Features.ContainerMode {
 			config.ContainerMode = true
 			log.Printf("Container mode is enabled for LocalStack")
 		}

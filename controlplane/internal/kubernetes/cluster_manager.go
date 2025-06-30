@@ -2,11 +2,12 @@ package kubernetes
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	appconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
 )
 
 // ClusterManager defines the interface for managing local Kubernetes clusters
@@ -82,14 +83,17 @@ func NewClusterManager(config *ClusterManagerConfig) (ClusterManager, error) {
 	// k3d is the only supported provider now
 	config.Provider = "k3d"
 
-	// Set container mode from environment variable if not explicitly set
-	if !config.ContainerMode && os.Getenv("KECS_CONTAINER_MODE") == "true" {
+	// Use Viper config which handles environment variables
+	viperConfig := appconfig.GetConfig()
+	
+	// Set container mode from app config if not explicitly set
+	if !config.ContainerMode && viperConfig.Features.ContainerMode {
 		config.ContainerMode = true
 	}
 
-	// Set kubeconfig path from environment variable if not specified
+	// Set kubeconfig path from app config if not specified
 	if config.KubeconfigPath == "" {
-		config.KubeconfigPath = os.Getenv("KECS_KUBECONFIG_PATH")
+		config.KubeconfigPath = viperConfig.Kubernetes.KubeconfigPath
 	}
 
 	return NewK3dClusterManager(config)
