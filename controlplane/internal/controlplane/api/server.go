@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 	k8s "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	apiconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
@@ -67,7 +66,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	}
 
 	// Add environment-specific origins
-	allowedOrigins := config.GetStringSlice("server.allowedOrigins")
+	allowedOrigins := apiconfig.GetStringSlice("server.allowedOrigins")
 	for _, origin := range allowedOrigins {
 		origin = strings.TrimSpace(origin)
 		if origin != "" {
@@ -77,14 +76,14 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 
 	// Initialize cluster manager first
 	var clusterManager kubernetes.ClusterManager
-	if config.GetBool("features.testMode") {
+	if apiconfig.GetBool("features.testMode") {
 		log.Println("Running in test mode - Kubernetes operations will be simulated")
 	} else {
 		// Create cluster manager (k3d only)
 		clusterConfig := &kubernetes.ClusterManagerConfig{
-			ContainerMode:  config.GetBool("features.containerMode"),
+			ContainerMode:  apiconfig.GetBool("features.containerMode"),
 			KubeconfigPath: kubeconfig,
-			EnableTraefik:  config.GetBool("features.traefik"),
+			EnableTraefik:  apiconfig.GetBool("features.traefik"),
 			TraefikPort:    0, // 0 means dynamic port allocation
 		}
 
@@ -99,8 +98,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	}
 
 	// Get region and accountID from configuration
-	region := config.GetString("aws.defaultRegion")
-	accountID := config.GetString("aws.accountID")
+	region := apiconfig.GetString("aws.defaultRegion")
+	accountID := apiconfig.GetString("aws.accountID")
 
 	s := &Server{
 		port:           port,
@@ -116,12 +115,12 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	// Initialize task manager
 	taskManager, err := kubernetes.NewTaskManager(storage)
 	if err != nil {
-		if config.GetBool("features.testMode") || config.GetBool("features.containerMode") {
+		if apiconfig.GetBool("features.testMode") || apiconfig.GetBool("features.containerMode") {
 			log.Printf("Warning: Failed to initialize task manager: %v (continuing without it)", err)
 			// Continue without task manager in test/container mode - some features may not work
 		} else {
 			// Check if we're in recovery mode and allow startup without task manager
-			if config.GetBool("features.autoRecoverState") {
+			if apiconfig.GetBool("features.autoRecoverState") {
 				log.Printf("Warning: Failed to initialize task manager during recovery: %v (continuing without it)", err)
 				// Continue without task manager initially - it will be initialized when clusters are created
 			} else {
@@ -136,7 +135,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 
 
 	// Initialize test mode worker if in test mode
-	if config.GetBool("features.testMode") {
+	if apiconfig.GetBool("features.testMode") {
 		s.testModeWorker = NewTestModeTaskWorker(storage)
 	}
 
@@ -159,14 +158,14 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 
 		if kubeClient != nil {
 			// Check if Traefik is enabled
-			if config.GetBool("features.traefik") {
+			if apiconfig.GetBool("features.traefik") {
 				localStackConfig.UseTraefik = true
 				// Don't set ProxyEndpoint here - it will be set dynamically when LocalStack is deployed
 				log.Println("Traefik proxy enabled for LocalStack (port will be assigned dynamically)")
 			}
 			
 			// Set container mode
-			localStackConfig.ContainerMode = config.GetBool("features.containerMode")
+			localStackConfig.ContainerMode = apiconfig.GetBool("features.containerMode")
 			
 			// Get kubeconfig if available
 			var kubeConfig *rest.Config
@@ -347,7 +346,7 @@ func (s *Server) Start() error {
 	go s.webSocketHub.Run(ctx)
 
 	// Recover state if enabled and not in test mode
-	if !config.GetBool("features.testMode") && config.GetBool("features.autoRecoverState") {
+	if !apiconfig.GetBool("features.testMode") && apiconfig.GetBool("features.autoRecoverState") {
 		log.Println("Starting state recovery...")
 		if err := s.RecoverState(ctx); err != nil {
 			log.Printf("State recovery failed: %v", err)
@@ -414,7 +413,7 @@ func (s *Server) Stop(ctx context.Context) error {
 	}
 
 	// Clean up k3d clusters if not in test mode and environment variable allows
-	if !config.GetBool("features.testMode") && !config.GetBool("kubernetes.keepClustersOnShutdown") {
+	if !apiconfig.GetBool("features.testMode") && !apiconfig.GetBool("kubernetes.keepClustersOnShutdown") {
 		if s.clusterManager != nil && s.storage != nil {
 			log.Println("Cleaning up k3d clusters...")
 
@@ -436,7 +435,7 @@ func (s *Server) Stop(ctx context.Context) error {
 				log.Println("k3d cluster cleanup completed")
 			}
 		}
-	} else if config.GetBool("kubernetes.keepClustersOnShutdown") {
+	} else if apiconfig.GetBool("kubernetes.keepClustersOnShutdown") {
 		log.Println("KECS_KEEP_CLUSTERS_ON_SHUTDOWN is set, keeping k3d clusters")
 	}
 
@@ -773,16 +772,17 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 	} else {
 		// Use default config and check if enabled via environment
 		config = localstack.DefaultConfig()
-		if envEnabled := os.Getenv("KECS_LOCALSTACK_ENABLED"); envEnabled == "true" {
+		// Use Viper config which handles environment variables
+		appConfig := apiconfig.GetConfig()
+		if appConfig.LocalStack.Enabled {
 			config.Enabled = true
 		}
-		// Check if Traefik is enabled
-		if os.Getenv("KECS_ENABLE_TRAEFIK") == "true" || os.Getenv("KECS_FEATURES_TRAEFIK") == "true" {
+		if appConfig.LocalStack.UseTraefik {
 			config.UseTraefik = true
 			log.Printf("Traefik is enabled for LocalStack recovery")
 		}
 		// Set container mode
-		if os.Getenv("KECS_FEATURES_CONTAINER_MODE") == "true" {
+		if appConfig.Features.ContainerMode {
 			config.ContainerMode = true
 			log.Printf("Container mode is enabled for LocalStack recovery")
 		}
