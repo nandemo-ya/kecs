@@ -24,7 +24,8 @@ type KECSContainer struct {
 	LocalStackEnabled string // Whether LocalStack is enabled
 }
 
-// StartKECS starts a new KECS container for testing
+// StartKECS starts a new KECS container with k3d cluster for testing
+// This creates a full KECS environment including Kubernetes cluster for quality testing
 func StartKECS(t TestingT) *KECSContainer {
 	ctx := context.Background()
 
@@ -47,7 +48,7 @@ func StartKECS(t TestingT) *KECSContainer {
 		Env: map[string]string{
 			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
 			"KECS_TEST_MODE":              testMode,
-			"KECS_CONTAINER_MODE":         "true", // Enable container mode for k3d cluster creation
+			"KECS_CONTAINER_MODE":         "true", // Always create k3d cluster for quality testing
 			"KECS_CLUSTER_PROVIDER":       clusterProvider,
 			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
 			"KECS_K3D_OPTIMIZED":          "true",
@@ -77,7 +78,7 @@ func StartKECS(t TestingT) *KECSContainer {
 		},
 		WaitingFor: wait.ForHTTP("/health").
 			WithPort("8081/tcp").
-			WithStartupTimeout(120*time.Second),
+			WithStartupTimeout(180*time.Second), // Extended timeout for k3d cluster creation
 	}
 
 	// Start container
@@ -111,10 +112,10 @@ func StartKECS(t TestingT) *KECSContainer {
 	endpoint := fmt.Sprintf("http://%s:%s", apiHost, apiPort.Port())
 
 	// Wait a bit for KECS to be fully ready
-	// Wait for KECS to initialize
-	// In container mode, it needs more time to start k3d cluster
-	initialWait := 5 * time.Second
-	log.Printf("Waiting %v for KECS to initialize...", initialWait)
+	// Wait for KECS to initialize with k3d cluster
+	// k3d cluster creation takes time but ensures quality testing environment
+	initialWait := 10 * time.Second
+	log.Printf("Waiting %v for KECS to initialize with k3d cluster...", initialWait)
 	time.Sleep(initialWait)
 	
 
@@ -281,7 +282,7 @@ func StartKECSWithPersistence(t TestingT) *KECSContainer {
 		Env: map[string]string{
 			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
 			"KECS_TEST_MODE":              testMode,
-			"KECS_CONTAINER_MODE":         "true", // Enable container mode for k3d cluster creation
+			"KECS_CONTAINER_MODE":         "true", // Always create k3d cluster for quality testing
 			"KECS_CLUSTER_PROVIDER":       clusterProvider,
 			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
 			"KECS_K3D_OPTIMIZED":          "true",
@@ -292,7 +293,7 @@ func StartKECSWithPersistence(t TestingT) *KECSContainer {
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("8080/tcp"),
 			wait.ForHTTP("/health").WithPort("8081/tcp"),
-		).WithDeadline(60 * time.Second),
+		).WithDeadline(180 * time.Second), // Extended timeout for k3d cluster creation
 		// Add root group (0) to access Docker socket
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.GroupAdd = []string{"0"}
@@ -383,7 +384,7 @@ func RestartKECSWithPersistence(t TestingT, dataDir string) *KECSContainer {
 		Env: map[string]string{
 			"LOG_LEVEL":                   getEnvOrDefault("KECS_LOG_LEVEL", "debug"),
 			"KECS_TEST_MODE":              testMode,
-			"KECS_CONTAINER_MODE":         "true", // Enable container mode for k3d cluster creation
+			"KECS_CONTAINER_MODE":         "true", // Always create k3d cluster for quality testing
 			"KECS_CLUSTER_PROVIDER":       clusterProvider,
 			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
 			"KECS_K3D_OPTIMIZED":          "true",
@@ -394,7 +395,7 @@ func RestartKECSWithPersistence(t TestingT, dataDir string) *KECSContainer {
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("8080/tcp"),
 			wait.ForHTTP("/health").WithPort("8081/tcp"),
-		).WithDeadline(60 * time.Second),
+		).WithDeadline(180 * time.Second), // Extended timeout for k3d cluster creation
 		// Add root group (0) to access Docker socket
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.GroupAdd = []string{"0"}
@@ -481,14 +482,15 @@ func getLogs(ctx context.Context, container testcontainers.Container) string {
 	return string(buf[:n])
 }
 
-// waitForKECSReady waits for KECS to be fully operational
+// waitForKECSReady waits for KECS to be fully operational with k3d cluster
 func waitForKECSReady(t TestingT, apiEndpoint, adminEndpoint string) {
-	// Wait a bit for initial startup
-	time.Sleep(3 * time.Second)
-
-	// TODO: Add health check polling if needed
-	// For now, just wait a bit more for KECS to be ready
-	time.Sleep(2 * time.Second)
+	// Wait for k3d cluster to be fully ready
+	log.Printf("Waiting for KECS and k3d cluster to be fully operational...")
+	time.Sleep(5 * time.Second)
+	
+	// Additional wait to ensure all components are initialized
+	// This includes LocalStack deployment if enabled
+	time.Sleep(5 * time.Second)
 }
 
 // clientRegistry stores AWS clients for KECS endpoints
