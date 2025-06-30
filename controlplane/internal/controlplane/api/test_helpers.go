@@ -52,3 +52,7 @@ func (m *MockClusterManager) GetKubeconfigPath(clusterName string) string {
 func (m *MockClusterManager) GetClusterInfo(ctx context.Context, clusterName string) (*kubernetes.ClusterInfo, error) {
 	return nil, nil
 }
+
+func (m *MockClusterManager) GetTraefikPort(clusterName string) (int, bool) {
+	return 0, false
+}

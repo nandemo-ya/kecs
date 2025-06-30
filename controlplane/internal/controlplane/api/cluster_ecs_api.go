@@ -837,6 +837,14 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		log.Printf("LocalStack is not enabled in configuration")
 		return
 	}
+	
+	// If Traefik is enabled, get the dynamic port from cluster manager
+	if config.UseTraefik && api.clusterManager != nil {
+		if port, exists := api.clusterManager.GetTraefikPort(cluster.K8sClusterName); exists {
+			config.ProxyEndpoint = fmt.Sprintf("http://localhost:%d", port)
+			log.Printf("Using dynamic Traefik port %d for LocalStack proxy", port)
+		}
+	}
 
 	// Wait a bit for the k3d cluster to be fully ready
 	time.Sleep(5 * time.Second)

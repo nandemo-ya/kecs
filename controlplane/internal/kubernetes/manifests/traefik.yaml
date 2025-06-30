@@ -1,0 +1,193 @@
+# Traefik deployment for KECS proxy
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kecs-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traefik
+  namespace: kecs-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: traefik
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+      - endpoints
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses
+      - ingressclasses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+  - apiGroups:
+      - traefik.io
+      - traefik.containo.us
+    resources:
+      - ingressroutes
+      - ingressroutetcps
+      - ingressrouteudps
+      - middlewares
+      - middlewaretcps
+      - serverstransports
+      - tlsoptions
+      - tlsstores
+      - traefikservices
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: traefik
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traefik
+subjects:
+- kind: ServiceAccount
+  name: traefik
+  namespace: kecs-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-config
+  namespace: kecs-system
+data:
+  traefik.yml: |
+    api:
+      dashboard: true
+      debug: true
+    entryPoints:
+      web:
+        address: ":80"
+      websecure:
+        address: ":443"
+    providers:
+      kubernetesCRD:
+        allowCrossNamespace: true
+      kubernetesIngress:
+        allowExternalNameServices: true
+    log:
+      level: INFO
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik
+  namespace: kecs-system
+  labels:
+    app: traefik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traefik
+  template:
+    metadata:
+      labels:
+        app: traefik
+    spec:
+      serviceAccountName: traefik
+      containers:
+      - name: traefik
+        image: traefik:v3.0
+        args:
+          - --configfile=/config/traefik.yml
+        ports:
+        - name: web
+          containerPort: 80
+        - name: websecure
+          containerPort: 443
+        - name: dashboard
+          containerPort: 8080
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+      volumes:
+      - name: config
+        configMap:
+          name: traefik-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: kecs-system
+spec:
+  type: ClusterIP
+  selector:
+    app: traefik
+  ports:
+    - name: web
+      port: 80
+      targetPort: 80
+    - name: websecure
+      port: 443
+      targetPort: 443
+    - name: dashboard
+      port: 8080
+      targetPort: 8080
+---
+# IngressRoute for LocalStack
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: localstack
+  namespace: kecs-system
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: PathPrefix(`/`)
+    kind: Rule
+    services:
+    - name: localstack
+      namespace: aws-services
+      port: 4566
+---
+# IngressRoute for Traefik Dashboard (optional, for debugging)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-dashboard
+  namespace: kecs-system
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: PathPrefix(`/dashboard`) || PathPrefix(`/api`)
+    kind: Rule
+    services:
+    - name: api@internal
+      kind: TraefikService
