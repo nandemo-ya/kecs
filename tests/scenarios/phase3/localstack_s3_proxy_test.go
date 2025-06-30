@@ -131,9 +131,7 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 					],
 					"command": [
 						"s3api",
-						"head-bucket",
-						"--bucket",
-						"test-nonexistent-bucket"
+						"list-buckets"
 					]
 				}]
 			}`
@@ -157,15 +155,16 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 				return tasks[0].LastStatus
 			}, 120*time.Second, 2*time.Second).Should(Equal("STOPPED"))
 
-			// The task should have stopped (bucket doesn't exist is expected)
-			// But the important part is that it reached LocalStack, not real AWS
+			// The task should have stopped successfully
+			// The important part is that it reached LocalStack, not real AWS
 			tasks, err := sharedClient.DescribeTasks(clusterName, []string{taskArn})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(tasks).To(HaveLen(1))
 			
-			// The task should have an exit code indicating the bucket wasn't found
-			// This is expected and shows the request went to LocalStack
+			// The task should complete successfully with list-buckets
+			// Even with empty bucket list, success shows the request went to LocalStack
 			// If it went to real AWS, we'd get authentication errors instead
+			GinkgoT().Logf("Task stopped with status: %s, reason: %s", tasks[0].LastStatus, tasks[0].StoppedReason)
 			Expect(tasks[0].LastStatus).To(Equal("STOPPED"))
 		})
 
