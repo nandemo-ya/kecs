@@ -97,11 +97,16 @@ func InitConfig() error {
 	v.SetDefault("features.autoRecoverState", true)
 	v.SetDefault("features.securityAcknowledged", false)
 	v.SetDefault("features.skipSecurityDisclaimer", false)
+	v.SetDefault("features.traefik", false)
 	
 	// AWS defaults
 	v.SetDefault("aws.defaultRegion", "us-east-1")
 	v.SetDefault("aws.accountID", "123456789012")
 	v.SetDefault("aws.proxyImage", "")
+	
+	// LocalStack defaults
+	v.SetDefault("localstack.enabled", false)
+	v.SetDefault("localstack.useTraefik", false)
 	
 	// Enable environment variable support
 	v.SetEnvPrefix("KECS")
@@ -133,7 +138,9 @@ func bindLegacyEnvVars() {
 	v.BindEnv("aws.proxyImage", "KECS_AWS_PROXY_IMAGE")
 	v.BindEnv("features.securityAcknowledged", "KECS_SECURITY_ACKNOWLEDGED")
 	v.BindEnv("features.skipSecurityDisclaimer", "KECS_SKIP_SECURITY_DISCLAIMER")
+	v.BindEnv("features.traefik", "KECS_ENABLE_TRAEFIK", "KECS_FEATURES_TRAEFIK")
 	v.BindEnv("localstack.enabled", "KECS_LOCALSTACK_ENABLED")
+	v.BindEnv("localstack.useTraefik", "KECS_LOCALSTACK_USE_TRAEFIK")
 }
 
 // DefaultConfig returns the default configuration

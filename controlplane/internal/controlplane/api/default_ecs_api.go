@@ -26,6 +26,7 @@ type DefaultECSAPI struct {
 	s3Integration             s3.Integration
 	serviceDiscoveryManager   servicediscovery.Manager
 	localStackManager         localstack.Manager
+	localStackConfig          *localstack.Config
 }
 
 // NewDefaultECSAPI creates a new default ECS API implementation with storage
@@ -71,6 +72,11 @@ func (api *DefaultECSAPI) SetServiceDiscoveryManager(serviceDiscoveryManager ser
 // SetLocalStackManager sets the LocalStack manager for the ECS API
 func (api *DefaultECSAPI) SetLocalStackManager(localStackManager localstack.Manager) {
 	api.localStackManager = localStackManager
+}
+
+// SetLocalStackConfig sets the LocalStack configuration for the ECS API
+func (api *DefaultECSAPI) SetLocalStackConfig(config *localstack.Config) {
+	api.localStackConfig = config
 }
 
 // NewDefaultECSAPIWithConfig creates a new default ECS API implementation with custom region and accountID

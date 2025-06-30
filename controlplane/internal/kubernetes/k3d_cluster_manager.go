@@ -115,7 +115,7 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 		
 		log.Printf("Adding port mapping for Traefik: %d/tcp", traefikPort)
 		serverNode.Ports = nat.PortMap{
-			"8090/tcp": []nat.PortBinding{
+			"30890/tcp": []nat.PortBinding{
 				{
 					HostIP:   "0.0.0.0",
 					HostPort: fmt.Sprintf("%d", traefikPort),
@@ -358,6 +358,11 @@ func (k *K3dClusterManager) GetKubeClient(clusterName string) (kubernetes.Interf
 	}
 
 	return clientset, nil
+}
+
+// GetKubeConfig returns the REST config for the specified cluster
+func (k *K3dClusterManager) GetKubeConfig(clusterName string) (*rest.Config, error) {
+	return k.getRESTConfig(clusterName)
 }
 
 // WaitForClusterReady waits for a k3d cluster to be ready
@@ -696,7 +701,7 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		
 		log.Printf("Adding port mapping for Traefik: %d/tcp", traefikPort)
 		serverNode.Ports = nat.PortMap{
-			"8090/tcp": []nat.PortBinding{
+			"30890/tcp": []nat.PortBinding{
 				{
 					HostIP:   "0.0.0.0",
 					HostPort: fmt.Sprintf("%d", traefikPort),

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	k8s "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 )
@@ -38,6 +39,10 @@ func (m *MockClusterManager) ClusterExists(ctx context.Context, clusterName stri
 }
 
 func (m *MockClusterManager) GetKubeClient(clusterName string) (k8s.Interface, error) {
+	return nil, nil
+}
+
+func (m *MockClusterManager) GetKubeConfig(clusterName string) (*rest.Config, error) {
 	return nil, nil
 }
 

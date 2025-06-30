@@ -14,19 +14,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
 
 // kubernetesManager implements KubernetesManager interface
 type kubernetesManager struct {
 	client    kubernetes.Interface
+	config    *rest.Config
 	namespace string
 }
 
 // NewKubernetesManager creates a new Kubernetes manager
-func NewKubernetesManager(client kubernetes.Interface, namespace string) KubernetesManager {
+func NewKubernetesManager(client kubernetes.Interface, config *rest.Config, namespace string) KubernetesManager {
 	return &kubernetesManager{
 		client:    client,
+		config:    config,
 		namespace: namespace,
 	}
 }
@@ -73,6 +76,8 @@ func (km *kubernetesManager) DeployLocalStack(ctx context.Context, config *Confi
 	if err := km.createService(ctx, config); err != nil {
 		return fmt.Errorf("failed to create service: %w", err)
 	}
+
+	// Note: When using Traefik, routing is handled by static TCP proxy configuration
 
 	return nil
 }
@@ -411,6 +416,7 @@ func (km *kubernetesManager) DeleteLocalStack(ctx context.Context) error {
 
 	return nil
 }
+
 
 // GetLocalStackPod returns the name of the LocalStack pod
 func (km *kubernetesManager) GetLocalStackPod() (string, error) {

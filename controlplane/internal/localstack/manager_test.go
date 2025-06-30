@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
@@ -18,6 +19,7 @@ var _ = Describe("LocalStack Manager", func() {
 		kubeClient *fake.Clientset
 		config     *localstack.Config
 		ctx        context.Context
+		restConfig *rest.Config
 	)
 
 	BeforeEach(func() {
@@ -28,8 +30,13 @@ var _ = Describe("LocalStack Manager", func() {
 		config.Enabled = true
 		config.Services = []string{"iam", "logs", "ssm"}
 
+		// Create a minimal rest.Config for testing
+		restConfig = &rest.Config{
+			Host: "http://localhost:8080",
+		}
+
 		var err error
-		manager, err = localstack.NewManager(config, kubeClient)
+		manager, err = localstack.NewManager(config, kubeClient, restConfig)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -42,13 +49,13 @@ var _ = Describe("LocalStack Manager", func() {
 
 		Context("when creating with invalid config", func() {
 			It("should return error for nil config", func() {
-				_, err := localstack.NewManager(nil, kubeClient)
+				_, err := localstack.NewManager(nil, kubeClient, restConfig)
 				Expect(err).To(HaveOccurred())
 			})
 
 			It("should return error for invalid service", func() {
 				config.Services = []string{"invalid-service"}
-				_, err := localstack.NewManager(config, kubeClient)
+				_, err := localstack.NewManager(config, kubeClient, restConfig)
 				Expect(err).To(HaveOccurred())
 			})
 		})

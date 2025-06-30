@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	k8s "k8s.io/client-go/kubernetes"
 
+	apiconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
@@ -823,13 +823,29 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 
 	// Get the LocalStack configuration
 	var config *localstack.Config
-	if api.localStackManager != nil {
+	if api.localStackConfig != nil {
+		// Create a copy of the config to avoid modifying the shared instance
+		configCopy := *api.localStackConfig
+		config = &configCopy
+		log.Printf("Using LocalStack config from API: Enabled=%v, UseTraefik=%v", config.Enabled, config.UseTraefik)
+	} else if api.localStackManager != nil {
 		config = api.localStackManager.GetConfig()
 	} else {
 		// Use default config and check if enabled via environment
 		config = localstack.DefaultConfig()
-		if envEnabled := os.Getenv("KECS_LOCALSTACK_ENABLED"); envEnabled == "true" {
+		// Use Viper config which handles environment variables
+		appConfig := apiconfig.GetConfig()
+		if appConfig.LocalStack.Enabled {
 			config.Enabled = true
+		}
+		if appConfig.LocalStack.UseTraefik {
+			config.UseTraefik = true
+			log.Printf("Traefik is enabled for LocalStack")
+		}
+		// Set container mode
+		if appConfig.Features.ContainerMode {
+			config.ContainerMode = true
+			log.Printf("Container mode is enabled for LocalStack")
 		}
 	}
 	
@@ -842,8 +858,12 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 	if config.UseTraefik && api.clusterManager != nil {
 		if port, exists := api.clusterManager.GetTraefikPort(cluster.K8sClusterName); exists {
 			config.ProxyEndpoint = fmt.Sprintf("http://localhost:%d", port)
-			log.Printf("Using dynamic Traefik port %d for LocalStack proxy", port)
+			log.Printf("Using dynamic Traefik port %d for LocalStack proxy endpoint: %s", port, config.ProxyEndpoint)
+		} else {
+			log.Printf("Warning: Traefik is enabled but no port found for cluster %s", cluster.K8sClusterName)
 		}
+	} else {
+		log.Printf("Traefik disabled or cluster manager not available. UseTraefik=%v, clusterManager=%v", config.UseTraefik, api.clusterManager != nil)
 	}
 
 	// Wait a bit for the k3d cluster to be fully ready
@@ -856,8 +876,15 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		return
 	}
 
+	// Get kube config
+	kubeConfig, err := api.clusterManager.GetKubeConfig(cluster.K8sClusterName)
+	if err != nil {
+		log.Printf("Failed to get kube config for cluster %s: %v", cluster.Name, err)
+		return
+	}
+
 	// Create a new LocalStack manager with the cluster-specific client
-	clusterLocalStackManager, err := localstack.NewManager(config, kubeClient.(*k8s.Clientset))
+	clusterLocalStackManager, err := localstack.NewManager(config, kubeClient.(*k8s.Clientset), kubeConfig)
 	if err != nil {
 		log.Printf("Failed to create LocalStack manager for cluster %s: %v", cluster.Name, err)
 		return
