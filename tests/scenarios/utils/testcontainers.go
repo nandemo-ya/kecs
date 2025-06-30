@@ -59,8 +59,6 @@ func StartKECS(t TestingT) *KECSContainer {
 			"KECS_K3D_CREATE_CLUSTER":     "true", // Force k3d cluster creation
 			"DOCKER_HOST":                 "unix:///var/run/docker.sock", // Explicit Docker socket path
 			"K3D_FIX_DNS":                 "1", // Fix DNS issues in k3d
-			"DOCKER_HOST":                 "unix:///var/run/docker.sock", // Explicit Docker socket path
-			"K3D_FIX_DNS":                 "1", // Fix DNS issues in k3d
 		},
 		// Add root group (0) to access Docker socket and enable privileged mode for k3d
 		HostConfigModifier: func(hc *container.HostConfig) {
