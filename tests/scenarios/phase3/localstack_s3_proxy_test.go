@@ -23,13 +23,20 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 		
 		// Give LocalStack time to deploy (LocalStack deployment happens automatically)
 		GinkgoT().Log("Waiting for LocalStack deployment...")
-		time.Sleep(30 * time.Second)
+		// Wait longer for LocalStack to be fully ready with all services
+		// LocalStack needs time to:
+		// 1. Deploy the container
+		// 2. Initialize all AWS services
+		// 3. Set up Traefik TCP proxy routes
+		time.Sleep(45 * time.Second)
 	})
 
 	Context("S3 API Proxy through LocalStack", func() {
 		It("should proxy S3 API calls to LocalStack transparently", func() {
 			// Register a simple task definition that lists S3 buckets
 			// This should work even with an empty LocalStack
+			// Note: AWS credentials are required even with transparent proxy
+			// The Traefik TCP proxy intercepts S3 requests at the network level
 			taskDefJSON := `{
 				"family": "s3-list-test",
 				"networkMode": "bridge",
