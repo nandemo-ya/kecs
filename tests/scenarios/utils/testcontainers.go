@@ -57,10 +57,16 @@ func StartKECS(t TestingT) *KECSContainer {
 			"KECS_LOCALSTACK_USE_TRAEFIK": getEnvOrDefault("KECS_LOCALSTACK_USE_TRAEFIK", "true"), // Enable Traefik proxy for LocalStack
 			"KECS_ENABLE_K3D_CLUSTER":     "true", // Explicitly enable k3d cluster creation
 			"KECS_K3D_CREATE_CLUSTER":     "true", // Force k3d cluster creation
+			"DOCKER_HOST":                 "unix:///var/run/docker.sock", // Explicit Docker socket path
+			"K3D_FIX_DNS":                 "1", // Fix DNS issues in k3d
+			"DOCKER_HOST":                 "unix:///var/run/docker.sock", // Explicit Docker socket path
+			"K3D_FIX_DNS":                 "1", // Fix DNS issues in k3d
 		},
-		// Add root group (0) to access Docker socket
+		// Add root group (0) to access Docker socket and enable privileged mode for k3d
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.GroupAdd = []string{"0"}
+			hc.Privileged = true // Required for k3d to create containers
+			hc.SecurityOpt = []string{"seccomp=unconfined"} // Allow system calls needed by k3d
 		},
 		Mounts: testcontainers.ContainerMounts{
 			{
@@ -293,14 +299,18 @@ func StartKECSWithPersistence(t TestingT) *KECSContainer {
 			"KECS_AUTO_RECOVER_STATE":     "true", // Enable auto recovery
 			"KECS_ENABLE_K3D_CLUSTER":     "true", // Explicitly enable k3d cluster creation
 			"KECS_K3D_CREATE_CLUSTER":     "true", // Force k3d cluster creation
+			"DOCKER_HOST":                 "unix:///var/run/docker.sock", // Explicit Docker socket path
+			"K3D_FIX_DNS":                 "1", // Fix DNS issues in k3d
 		},
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("8080/tcp"),
 			wait.ForHTTP("/health").WithPort("8081/tcp"),
 		).WithDeadline(180 * time.Second), // Extended timeout for k3d cluster creation
-		// Add root group (0) to access Docker socket
+		// Add root group (0) to access Docker socket and enable privileged mode for k3d
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.GroupAdd = []string{"0"}
+			hc.Privileged = true // Required for k3d to create containers
+			hc.SecurityOpt = []string{"seccomp=unconfined"} // Allow system calls needed by k3d
 		},
 		Mounts: testcontainers.Mounts(
 			testcontainers.BindMount(dataDir, "/data"),
@@ -397,14 +407,18 @@ func RestartKECSWithPersistence(t TestingT, dataDir string) *KECSContainer {
 			"KECS_AUTO_RECOVER_STATE":     "true", // Enable auto recovery
 			"KECS_ENABLE_K3D_CLUSTER":     "true", // Explicitly enable k3d cluster creation
 			"KECS_K3D_CREATE_CLUSTER":     "true", // Force k3d cluster creation
+			"DOCKER_HOST":                 "unix:///var/run/docker.sock", // Explicit Docker socket path
+			"K3D_FIX_DNS":                 "1", // Fix DNS issues in k3d
 		},
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("8080/tcp"),
 			wait.ForHTTP("/health").WithPort("8081/tcp"),
 		).WithDeadline(180 * time.Second), // Extended timeout for k3d cluster creation
-		// Add root group (0) to access Docker socket
+		// Add root group (0) to access Docker socket and enable privileged mode for k3d
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.GroupAdd = []string{"0"}
+			hc.Privileged = true // Required for k3d to create containers
+			hc.SecurityOpt = []string{"seccomp=unconfined"} // Allow system calls needed by k3d
 		},
 		Mounts: testcontainers.Mounts(
 			testcontainers.BindMount(dataDir, "/data"),
