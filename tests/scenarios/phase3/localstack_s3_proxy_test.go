@@ -101,7 +101,7 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 			GinkgoT().Logf("Task stopped with status: %s, reason: %s", tasks[0].LastStatus, tasks[0].StoppedReason)
 		})
 
-		XIt("should handle S3 operations with environment-based proxy configuration", func() {
+		It("should handle S3 operations with environment-based proxy configuration", func() {
 			// Test with explicit proxy environment variables
 			taskDefJSON := `{
 				"family": "s3-env-proxy-test",
@@ -169,7 +169,7 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 			Expect(tasks[0].LastStatus).To(Equal("STOPPED"))
 		})
 
-		XIt("should support multiple S3 operations in a single task", func() {
+		It("should support multiple S3 operations in a single task", func() {
 			// Create a task that performs multiple S3 operations
 			bucketName := fmt.Sprintf("test-multi-ops-%d", time.Now().Unix())
 			taskDefJSON := fmt.Sprintf(`{
