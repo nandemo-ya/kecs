@@ -23,12 +23,9 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 		
 		// Give LocalStack time to deploy (LocalStack deployment happens automatically)
 		GinkgoT().Log("Waiting for LocalStack deployment...")
-		// Wait longer for LocalStack to be fully ready with all services
-		// LocalStack needs time to:
-		// 1. Deploy the container
-		// 2. Initialize all AWS services
-		// 3. Set up Traefik TCP proxy routes
-		time.Sleep(45 * time.Second)
+		// Wait for LocalStack to be ready
+		// In test environment, we might not need LocalStack for basic connectivity test
+		time.Sleep(15 * time.Second)
 	})
 
 	Context("S3 API Proxy through LocalStack", func() {
@@ -84,11 +81,16 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 			GinkgoT().Log("Waiting for S3 task to complete...")
 			Eventually(func() string {
 				tasks, err := sharedClient.DescribeTasks(clusterName, []string{taskArn})
-				if err != nil || len(tasks) == 0 {
-					return "UNKNOWN"
+				if err != nil {
+					GinkgoT().Logf("Error describing task: %v", err)
+					return "ERROR"
 				}
+				if len(tasks) == 0 {
+					return "NO_TASK"
+				}
+				GinkgoT().Logf("Task status: %s (Desired: %s)", tasks[0].LastStatus, tasks[0].DesiredStatus)
 				return tasks[0].LastStatus
-			}, 120*time.Second, 2*time.Second).Should(Equal("STOPPED"))
+			}, 120*time.Second, 5*time.Second).Should(Equal("STOPPED"))
 
 			// Check task completion status
 			tasks, err := sharedClient.DescribeTasks(clusterName, []string{taskArn})
