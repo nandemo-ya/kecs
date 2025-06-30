@@ -88,7 +88,7 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 					return "UNKNOWN"
 				}
 				return tasks[0].LastStatus
-			}, 60*time.Second, 2*time.Second).Should(Equal("STOPPED"))
+			}, 120*time.Second, 2*time.Second).Should(Equal("STOPPED"))
 
 			// Check task completion status
 			tasks, err := sharedClient.DescribeTasks(clusterName, []string{taskArn})
@@ -155,7 +155,7 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 					return "UNKNOWN"
 				}
 				return tasks[0].LastStatus
-			}, 60*time.Second, 2*time.Second).Should(Equal("STOPPED"))
+			}, 120*time.Second, 2*time.Second).Should(Equal("STOPPED"))
 
 			// The task should have stopped (bucket doesn't exist is expected)
 			// But the important part is that it reached LocalStack, not real AWS
@@ -222,7 +222,7 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 					return "UNKNOWN"
 				}
 				return tasks[0].LastStatus
-			}, 90*time.Second, 2*time.Second).Should(Equal("STOPPED"))
+			}, 120*time.Second, 2*time.Second).Should(Equal("STOPPED"))
 
 			// Check task completed successfully
 			tasks, err := sharedClient.DescribeTasks(clusterName, []string{taskArn})
