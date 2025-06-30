@@ -16,11 +16,12 @@ import (
 
 // KECSContainer represents a running KECS instance for testing
 type KECSContainer struct {
-	container testcontainers.Container
-	endpoint  string
-	adminPort string
-	ctx       context.Context
-	DataDir   string // For persistence testing
+	container         testcontainers.Container
+	endpoint          string
+	adminPort         string
+	ctx               context.Context
+	DataDir           string // For persistence testing
+	LocalStackEnabled string // Whether LocalStack is enabled
 }
 
 // StartKECS starts a new KECS container for testing
@@ -51,7 +52,8 @@ func StartKECS(t TestingT) *KECSContainer {
 			"KECS_KUBECONFIG_PATH":        "/kecs/kubeconfig",
 			"KECS_K3D_OPTIMIZED":          "true",
 			"KECS_SECURITY_ACKNOWLEDGED":  "true", // Skip security disclaimer
-			"KECS_LOCALSTACK_ENABLED":     "true", // Enable LocalStack for tests
+			"KECS_LOCALSTACK_ENABLED":     getEnvOrDefault("KECS_LOCALSTACK_ENABLED", "true"), // Enable LocalStack for tests
+			"KECS_LOCALSTACK_USE_TRAEFIK": getEnvOrDefault("KECS_LOCALSTACK_USE_TRAEFIK", "true"), // Enable Traefik proxy for LocalStack
 		},
 		// Add root group (0) to access Docker socket
 		HostConfigModifier: func(hc *container.HostConfig) {
@@ -122,10 +124,11 @@ func StartKECS(t TestingT) *KECSContainer {
 	
 
 	return &KECSContainer{
-		container: container,
-		endpoint:  endpoint,
-		adminPort: adminPort.Port(),
-		ctx:       ctx,
+		container:         container,
+		endpoint:          endpoint,
+		adminPort:         adminPort.Port(),
+		ctx:               ctx,
+		LocalStackEnabled: getEnvOrDefault("KECS_LOCALSTACK_ENABLED", "true"),
 	}
 }
 
@@ -357,7 +360,8 @@ func StartKECSWithPersistence(t TestingT) *KECSContainer {
 		endpoint:  endpoint,
 		adminPort: adminPort.Port(),
 		ctx:       ctx,
-		DataDir:   dataDir,
+		DataDir:           dataDir,
+		LocalStackEnabled: getEnvOrDefault("KECS_LOCALSTACK_ENABLED", "true"),
 	}
 }
 
@@ -454,7 +458,8 @@ func RestartKECSWithPersistence(t TestingT, dataDir string) *KECSContainer {
 		endpoint:  endpoint,
 		adminPort: adminPort.Port(),
 		ctx:       ctx,
-		DataDir:   dataDir,
+		DataDir:           dataDir,
+		LocalStackEnabled: getEnvOrDefault("KECS_LOCALSTACK_ENABLED", "true"),
 	}
 }
 
