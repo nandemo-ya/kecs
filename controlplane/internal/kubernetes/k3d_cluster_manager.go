@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/go-connections/nat"
@@ -32,6 +33,7 @@ type K3dClusterManager struct {
 	traefikManager  *TraefikManager
 	portForwarder   *PortForwarder
 	traefikPorts    map[string]int // cluster name -> traefik port mapping
+	portMutex       sync.Mutex     // protects port allocation
 }
 
 // NewK3dClusterManager creates a new k3d-based cluster manager
@@ -92,12 +94,16 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 	
 	// Add port mapping for Traefik if enabled
 	if k.config.EnableTraefik {
+		// Lock for thread-safe port allocation
+		k.portMutex.Lock()
+		
 		// Determine Traefik port
 		traefikPort := k.config.TraefikPort
 		if traefikPort == 0 {
 			// Find available port starting from 8090
 			port, err := k.findAvailablePort(8090)
 			if err != nil {
+				k.portMutex.Unlock()
 				return fmt.Errorf("failed to find available port for Traefik: %w", err)
 			}
 			traefikPort = port
@@ -105,6 +111,7 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 		
 		// Store the port for this cluster
 		k.traefikPorts[normalizedName] = traefikPort
+		k.portMutex.Unlock()
 		
 		log.Printf("Adding port mapping for Traefik: %d/tcp", traefikPort)
 		serverNode.Ports = nat.PortMap{
@@ -668,12 +675,16 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 	
 	// Add port mapping for Traefik if enabled (even in optimized mode)
 	if k.config.EnableTraefik {
+		// Lock for thread-safe port allocation
+		k.portMutex.Lock()
+		
 		// Determine Traefik port
 		traefikPort := k.config.TraefikPort
 		if traefikPort == 0 {
 			// Find available port starting from 8090
 			port, err := k.findAvailablePort(8090)
 			if err != nil {
+				k.portMutex.Unlock()
 				return fmt.Errorf("failed to find available port for Traefik: %w", err)
 			}
 			traefikPort = port
@@ -681,6 +692,7 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		
 		// Store the port for this cluster
 		k.traefikPorts[normalizedName] = traefikPort
+		k.portMutex.Unlock()
 		
 		log.Printf("Adding port mapping for Traefik: %d/tcp", traefikPort)
 		serverNode.Ports = nat.PortMap{
@@ -816,6 +828,22 @@ func (k *K3dClusterManager) findAvailablePort(startPort int) (int, error) {
 	// Try up to 100 ports
 	for i := 0; i < 100; i++ {
 		port := startPort + i
+		
+		// Check if port is already allocated to another cluster
+		portInUse := false
+		for _, allocatedPort := range k.traefikPorts {
+			if allocatedPort == port {
+				portInUse = true
+				break
+			}
+		}
+		
+		// Skip if already allocated
+		if portInUse {
+			continue
+		}
+		
+		// Check if port is available on the host
 		if IsPortAvailable(port) {
 			return port, nil
 		}
@@ -825,6 +853,9 @@ func (k *K3dClusterManager) findAvailablePort(startPort int) (int, error) {
 
 // GetTraefikPort returns the Traefik port for a given cluster
 func (k *K3dClusterManager) GetTraefikPort(clusterName string) (int, bool) {
+	k.portMutex.Lock()
+	defer k.portMutex.Unlock()
+	
 	normalizedName := k.normalizeClusterName(clusterName)
 	port, exists := k.traefikPorts[normalizedName]
 	return port, exists
