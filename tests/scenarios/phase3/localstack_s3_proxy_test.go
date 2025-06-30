@@ -46,6 +46,14 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 						{
 							"name": "AWS_DEFAULT_REGION",
 							"value": "us-east-1"
+						},
+						{
+							"name": "AWS_ACCESS_KEY_ID",
+							"value": "test"
+						},
+						{
+							"name": "AWS_SECRET_ACCESS_KEY",
+							"value": "test"
 						}
 					],
 					"command": [
@@ -104,6 +112,14 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 						{
 							"name": "AWS_DEFAULT_REGION",
 							"value": "us-east-1"
+						},
+						{
+							"name": "AWS_ACCESS_KEY_ID",
+							"value": "test"
+						},
+						{
+							"name": "AWS_SECRET_ACCESS_KEY",
+							"value": "test"
 						}
 					],
 					"command": [
@@ -165,6 +181,14 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 						{
 							"name": "AWS_DEFAULT_REGION",
 							"value": "us-east-1"
+						},
+						{
+							"name": "AWS_ACCESS_KEY_ID",
+							"value": "test"
+						},
+						{
+							"name": "AWS_SECRET_ACCESS_KEY",
+							"value": "test"
 						}
 					],
 					"entryPoint": ["sh", "-c"],
