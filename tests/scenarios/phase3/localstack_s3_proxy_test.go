@@ -8,7 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("LocalStack S3 Proxy Integration", func() {
+var _ = Describe("LocalStack S3 Proxy Integration", Ordered, func() {
 	var clusterName string
 
 	BeforeEach(func() {
@@ -26,6 +26,52 @@ var _ = Describe("LocalStack S3 Proxy Integration", func() {
 		// Wait for LocalStack to be ready
 		// In test environment, we might not need LocalStack for basic connectivity test
 		time.Sleep(15 * time.Second)
+	})
+
+	Context("Basic Task Execution", func() {
+		It("should run a simple echo task", func() {
+			// First verify basic task execution works
+			taskDefJSON := `{
+				"family": "echo-test",
+				"networkMode": "bridge",
+				"requiresCompatibilities": ["EC2"],
+				"cpu": "256",
+				"memory": "512",
+				"containerDefinitions": [{
+					"name": "echo-container",
+					"image": "busybox:latest",
+					"cpu": 256,
+					"memory": 512,
+					"essential": true,
+					"command": ["echo", "Hello from KECS"]
+				}]
+			}`
+
+			taskDef, err := sharedClient.RegisterTaskDefinitionFromJSON(taskDefJSON)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(taskDef).NotTo(BeNil())
+
+			// Run the task
+			runResp, err := sharedClient.RunTask(clusterName, "echo-test", 1)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(runResp.Tasks).To(HaveLen(1))
+			taskArn := runResp.Tasks[0].TaskArn
+
+			// Wait for task to complete
+			GinkgoT().Log("Waiting for echo task to complete...")
+			Eventually(func() string {
+				tasks, err := sharedClient.DescribeTasks(clusterName, []string{taskArn})
+				if err != nil {
+					GinkgoT().Logf("Error describing task: %v", err)
+					return "ERROR"
+				}
+				if len(tasks) == 0 {
+					return "NO_TASK"
+				}
+				GinkgoT().Logf("Task status: %s (Desired: %s)", tasks[0].LastStatus, tasks[0].DesiredStatus)
+				return tasks[0].LastStatus
+			}, 60*time.Second, 5*time.Second).Should(Equal("STOPPED"))
+		})
 	})
 
 	Context("S3 API Proxy through LocalStack", func() {
