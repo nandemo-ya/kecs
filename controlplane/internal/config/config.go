@@ -103,6 +103,10 @@ func InitConfig() error {
 	v.SetDefault("aws.accountID", "123456789012")
 	v.SetDefault("aws.proxyImage", "")
 	
+	// LocalStack defaults
+	v.SetDefault("localstack.enabled", false)
+	v.SetDefault("localstack.useTraefik", false)
+	
 	// Enable environment variable support
 	v.SetEnvPrefix("KECS")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -134,6 +138,7 @@ func bindLegacyEnvVars() {
 	v.BindEnv("features.securityAcknowledged", "KECS_SECURITY_ACKNOWLEDGED")
 	v.BindEnv("features.skipSecurityDisclaimer", "KECS_SKIP_SECURITY_DISCLAIMER")
 	v.BindEnv("localstack.enabled", "KECS_LOCALSTACK_ENABLED")
+	v.BindEnv("localstack.useTraefik", "KECS_LOCALSTACK_USE_TRAEFIK")
 }
 
 // DefaultConfig returns the default configuration
