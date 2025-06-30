@@ -29,8 +29,8 @@ type KECSContainer struct {
 func StartKECS(t TestingT) *KECSContainer {
 	ctx := context.Background()
 
-	// Check if running in test mode
-	testMode := getEnvOrDefault("KECS_TEST_MODE", "true")
+	// Disable test mode to ensure k3d cluster creation
+	testMode := "false" // Always use production mode for quality testing
 	// Get cluster provider (k3d or kind)
 	clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
 
@@ -55,6 +55,8 @@ func StartKECS(t TestingT) *KECSContainer {
 			"KECS_SECURITY_ACKNOWLEDGED":  "true", // Skip security disclaimer
 			"KECS_LOCALSTACK_ENABLED":     getEnvOrDefault("KECS_LOCALSTACK_ENABLED", "true"), // Enable LocalStack for tests
 			"KECS_LOCALSTACK_USE_TRAEFIK": getEnvOrDefault("KECS_LOCALSTACK_USE_TRAEFIK", "true"), // Enable Traefik proxy for LocalStack
+			"KECS_ENABLE_K3D_CLUSTER":     "true", // Explicitly enable k3d cluster creation
+			"KECS_K3D_CREATE_CLUSTER":     "true", // Force k3d cluster creation
 		},
 		// Add root group (0) to access Docker socket
 		HostConfigModifier: func(hc *container.HostConfig) {
@@ -264,8 +266,8 @@ func StartKECSWithPersistence(t TestingT) *KECSContainer {
 		t.Fatalf("Failed to create temp data directory: %v", err)
 	}
 
-	// Ensure we're not in test mode for persistence tests
-	testMode := "false"
+	// Disable test mode to ensure k3d cluster creation
+	testMode := "false" // Always use production mode for quality testing
 
 	// Get cluster provider (k3d or kind)
 	clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
@@ -289,6 +291,8 @@ func StartKECSWithPersistence(t TestingT) *KECSContainer {
 			"KECS_SECURITY_ACKNOWLEDGED":  "true", // Skip security disclaimer
 			"KECS_DATA_DIR":               "/data",
 			"KECS_AUTO_RECOVER_STATE":     "true", // Enable auto recovery
+			"KECS_ENABLE_K3D_CLUSTER":     "true", // Explicitly enable k3d cluster creation
+			"KECS_K3D_CREATE_CLUSTER":     "true", // Force k3d cluster creation
 		},
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("8080/tcp"),
@@ -366,8 +370,8 @@ func StartKECSWithPersistence(t TestingT) *KECSContainer {
 func RestartKECSWithPersistence(t TestingT, dataDir string) *KECSContainer {
 	ctx := context.Background()
 
-	// Ensure we're not in test mode for persistence tests
-	testMode := "false"
+	// Disable test mode to ensure k3d cluster creation
+	testMode := "false" // Always use production mode for quality testing
 
 	// Get cluster provider (k3d or kind)
 	clusterProvider := getEnvOrDefault("KECS_CLUSTER_PROVIDER", "k3d")
@@ -391,6 +395,8 @@ func RestartKECSWithPersistence(t TestingT, dataDir string) *KECSContainer {
 			"KECS_SECURITY_ACKNOWLEDGED":  "true", // Skip security disclaimer
 			"KECS_DATA_DIR":               "/data",
 			"KECS_AUTO_RECOVER_STATE":     "true", // Enable auto recovery
+			"KECS_ENABLE_K3D_CLUSTER":     "true", // Explicitly enable k3d cluster creation
+			"KECS_K3D_CREATE_CLUSTER":     "true", // Force k3d cluster creation
 		},
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("8080/tcp"),
