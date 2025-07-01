@@ -11,7 +11,7 @@ import (
 
 // Suite-level shared resources
 var (
-	sharedKECS           *utils.KECSContainer
+	sharedKECS           utils.KECSContainerInterface
 	sharedClient         utils.ECSClientInterface
 	sharedLogger         *utils.TestLogger
 	sharedClusterManager *utils.SharedClusterManager
@@ -23,8 +23,8 @@ func TestPhase3(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	// Start KECS container once for the entire suite
-	sharedKECS = utils.StartKECS(GinkgoT())
+	// Start KECS container once for the entire suite using factory
+	sharedKECS = utils.StartKECSForTest(GinkgoT(), "phase3-suite")
 	sharedClient = utils.NewECSClientInterface(sharedKECS.Endpoint(), utils.AWSCLIMode)
 	sharedLogger = utils.NewTestLogger(GinkgoT())
 
@@ -41,5 +41,10 @@ var _ = AfterSuite(func() {
 	// Clean up container after all tests
 	if sharedKECS != nil {
 		sharedKECS.Cleanup()
+	}
+	
+	// Clean up any orphaned resources in native mode
+	if err := utils.CleanupTestResources(); err != nil {
+		GinkgoT().Logf("Warning: failed to cleanup test resources: %v", err)
 	}
 })
