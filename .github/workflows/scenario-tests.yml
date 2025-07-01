@@ -30,18 +30,39 @@ jobs:
           go mod download
           go mod tidy
 
+      - name: Build KECS binary
+        run: |
+          echo "Building KECS binary..."
+          make build
+          echo "KECS binary built successfully"
+          
+          # Make binary available in PATH for tests
+          sudo cp bin/kecs /usr/local/bin/
+          kecs version || echo "KECS version check failed"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build KECS Docker image
+      - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./controlplane
-          file: ./controlplane/Dockerfile.test
-          tags: kecs:test
+          push: false
           load: true
+          tags: |
+            ghcr.io/nandemo-ya/kecs:latest
+            ghcr.io/nandemo-ya/kecs:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify KECS setup
+        run: |
+          echo "Checking KECS binary..."
+          which kecs || echo "kecs not found in PATH"
+          kecs version || echo "Failed to get kecs version"
+          echo "Docker images:"
+          docker images | grep kecs || echo "No kecs images found"
+          echo "PATH=$PATH"
 
       - name: Run Phase 1 tests (Cluster Operations)
         id: test-phase1
@@ -50,14 +71,20 @@ jobs:
           echo "## Running Phase 1: Cluster Operations tests ##"
           ginkgo -v -timeout 30m \
             --no-color \
+            --flake-attempts=0 \
+            --progress \
+            --trace \
             --junit-report=junit-phase1.xml \
             --output-dir=. \
-            ./phase1/... | tee test-output-phase1.log
+            ./phase1/... 2>&1 | tee test-output-phase1.log
           
           # Capture exit code
           echo "exit_code=$?" >> $GITHUB_OUTPUT
         env:
           KECS_LOG_LEVEL: info
+          KECS_PROJECT_ROOT: ${{ github.workspace }}
+          KECS_IMAGE: ghcr.io/nandemo-ya/kecs:latest
+          KECS_LOCAL_BUILD: "false"
 
       - name: Run Phase 2 tests (Task Definitions and Services)
         id: test-phase2
@@ -74,8 +101,30 @@ jobs:
           echo "exit_code=$?" >> $GITHUB_OUTPUT
         env:
           KECS_LOG_LEVEL: info
+          KECS_PROJECT_ROOT: ${{ github.workspace }}
+          KECS_IMAGE: ghcr.io/nandemo-ya/kecs:latest
+          KECS_LOCAL_BUILD: "false"
 
-      # Phase 3-4 tests are not yet implemented
+      - name: Run Phase 3 tests (S3 Proxy and Advanced Features)
+        id: test-phase3
+        run: |
+          cd tests/scenarios
+          echo "## Running Phase 3: S3 Proxy and Advanced Features tests ##"
+          ginkgo -v -timeout 30m \
+            --no-color \
+            --junit-report=junit-phase3.xml \
+            --output-dir=. \
+            ./phase3/... | tee test-output-phase3.log
+          
+          # Capture exit code
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        env:
+          KECS_LOG_LEVEL: info
+          KECS_PROJECT_ROOT: ${{ github.workspace }}
+          KECS_IMAGE: ghcr.io/nandemo-ya/kecs:latest
+          KECS_LOCAL_BUILD: "false"
+
+      # Phase 4 tests are not yet implemented
 
       - name: Upload test results
         if: always()
@@ -87,6 +136,8 @@ jobs:
             tests/scenarios/test-output-phase1.log
             tests/scenarios/junit-phase2.xml
             tests/scenarios/test-output-phase2.log
+            tests/scenarios/junit-phase3.xml
+            tests/scenarios/test-output-phase3.log
 
       - name: Test Report - Phase 1
         uses: dorny/test-reporter@v1
@@ -98,17 +149,27 @@ jobs:
           fail-on-error: false
           fail-on-empty: false
 
-      # - name: Test Report - Phase 2
-      #   uses: dorny/test-reporter@v1
-      #   if: always() && github.event_name == 'pull_request'
-      #   with:
-      #     name: Phase 2 - Task Definitions and Services Tests
-      #     path: tests/scenarios/junit-phase2.xml
-      #     reporter: java-junit
-      #     fail-on-error: false
-      #     fail-on-empty: false
+      - name: Test Report - Phase 2
+        uses: dorny/test-reporter@v1
+        if: always() && github.event_name == 'pull_request'
+        with:
+          name: Phase 2 - Task Definitions and Services Tests
+          path: tests/scenarios/junit-phase2.xml
+          reporter: java-junit
+          fail-on-error: false
+          fail-on-empty: false
 
-      # Phase 3-4 test reports are not yet implemented
+      - name: Test Report - Phase 3
+        uses: dorny/test-reporter@v1
+        if: always() && github.event_name == 'pull_request'
+        with:
+          name: Phase 3 - S3 Proxy and Advanced Features Tests
+          path: tests/scenarios/junit-phase3.xml
+          reporter: java-junit
+          fail-on-error: false
+          fail-on-empty: false
+
+      # Phase 4 test reports are not yet implemented
 
       - name: Comment PR with test results
         uses: actions/github-script@v7
@@ -242,12 +303,13 @@ jobs:
               return result;
             }
             
-            // Parse outputs from phase 1 and phase 2
+            // Parse outputs from phase 1, phase 2, and phase 3
             const phase1 = parseTestOutput('tests/scenarios/test-output-phase1.log', 'Phase 1: Cluster Operations');
             const phase2 = parseTestOutput('tests/scenarios/test-output-phase2.log', 'Phase 2: Task Definitions and Services');
+            const phase3 = parseTestOutput('tests/scenarios/test-output-phase3.log', 'Phase 3: S3 Proxy and Advanced Features');
             
             // Combine results
-            const phases = [phase1, phase2].filter(p => p !== null);
+            const phases = [phase1, phase2, phase3].filter(p => p !== null);
             
             let summary = '## 🧪 Scenario Test Results\n\n';
             

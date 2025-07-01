@@ -315,6 +315,19 @@ func runStart(cmd *cobra.Command, args []string) error {
 }
 
 func buildLocalImage() error {
+	fmt.Println("Building local image...")
+	
+	// Check if KECS_PROJECT_ROOT is set (useful for CI/CD)
+	if projectRoot := os.Getenv("KECS_PROJECT_ROOT"); projectRoot != "" {
+		dockerfilePath := filepath.Join(projectRoot, "controlplane", "Dockerfile")
+		if _, err := os.Stat(dockerfilePath); err == nil {
+			cmd := exec.Command("docker", "build", "-t", "kecs:local", filepath.Join(projectRoot, "controlplane"))
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			return cmd.Run()
+		}
+	}
+	
 	// Determine the path to the controlplane directory
 	execPath, err := os.Executable()
 	if err != nil {

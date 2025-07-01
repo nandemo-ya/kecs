@@ -53,13 +53,20 @@ func NewNativeKECSManager() *NativeKECSManager {
 		}
 	}
 	
+	// In CI, we pre-build the image, so default to false
+	defaultLocalBuild := "false"
+	if _, ci := os.LookupEnv("CI"); !ci {
+		// Local development defaults to true
+		defaultLocalBuild = "true"
+	}
+	
 	return &NativeKECSManager{
 		instances:      make(map[string]*NativeKECSInstance),
 		allocatedPorts: make(map[int]string),
 		baseAPIPort:    baseAPIPort,
 		baseAdminPort:  baseAdminPort,
-		imageTag:       getEnvOrDefault("KECS_IMAGE", "kecs:test"),
-		localBuild:     getEnvOrDefault("KECS_LOCAL_BUILD", "true") == "true",
+		imageTag:       getEnvOrDefault("KECS_IMAGE", "ghcr.io/nandemo-ya/kecs:latest"),
+		localBuild:     getEnvOrDefault("KECS_LOCAL_BUILD", defaultLocalBuild) == "true",
 	}
 }
 
@@ -132,8 +139,8 @@ func (m *NativeKECSManager) StartKECS(testName string) (*NativeKECSInstance, err
 		AdminPort:     adminPort,
 		DataDir:       dataDir,
 		ContainerName: containerName,
-		Endpoint:      fmt.Sprintf("http://localhost:%d", apiPort),
-		AdminEndpoint: fmt.Sprintf("http://localhost:%d", adminPort),
+		Endpoint:      fmt.Sprintf("http://127.0.0.1:%d", apiPort),
+		AdminEndpoint: fmt.Sprintf("http://127.0.0.1:%d", adminPort),
 		Started:       time.Now(),
 	}
 	
@@ -185,6 +192,27 @@ func (m *NativeKECSManager) StartKECSWithDataDir(testName string, dataDir string
 	}
 	
 	// Execute kecs start command
+	fmt.Printf("Starting KECS with command: kecs %s\n", strings.Join(args, " "))
+	fmt.Printf("Using image: %s\n", m.imageTag)
+	fmt.Printf("Local build: %v\n", m.localBuild)
+	
+	// First check if kecs binary exists
+	if _, err := exec.LookPath("kecs"); err != nil {
+		return nil, fmt.Errorf("kecs binary not found in PATH: %w", err)
+	}
+	
+	// Check if the Docker image exists (only if not local build)
+	if !m.localBuild {
+		checkImageCmd := exec.Command("docker", "images", "--format", "{{.Repository}}:{{.Tag}}", m.imageTag)
+		imageOutput, _ := checkImageCmd.CombinedOutput()
+		fmt.Printf("Available Docker images matching %s:\n%s\n", m.imageTag, string(imageOutput))
+		
+		// List all images for debugging
+		allImagesCmd := exec.Command("docker", "images", "--format", "table {{.Repository}}:{{.Tag}}\t{{.Size}}")
+		allImagesOutput, _ := allImagesCmd.CombinedOutput()
+		fmt.Printf("All available Docker images:\n%s\n", string(allImagesOutput))
+	}
+	
 	cmd := exec.Command("kecs", args...)
 	
 	// Set environment variables
@@ -199,12 +227,32 @@ func (m *NativeKECSManager) StartKECSWithDataDir(testName string, dataDir string
 		"KECS_AUTO_RECOVER_STATE=true", // Enable auto recovery for persistence tests
 	)
 	
+	// Add project root if in CI
+	if projectRoot := os.Getenv("KECS_PROJECT_ROOT"); projectRoot != "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("KECS_PROJECT_ROOT=%s", projectRoot))
+	}
+	
 	output, err := cmd.CombinedOutput()
+	fmt.Printf("KECS start command completed with error: %v\n", err)
+	fmt.Printf("KECS start command output:\n%s\n", string(output))
+	
 	if err != nil {
 		// Clean up on failure
 		m.releasePortsLocked(apiPort, adminPort)
 		return nil, fmt.Errorf("failed to start KECS: %w\nOutput: %s", err, output)
 	}
+	
+	// Verify container is actually running
+	checkCmd := exec.Command("docker", "ps", "--filter", fmt.Sprintf("name=%s", containerName), "--format", "{{.Names}}")
+	checkOutput, checkErr := checkCmd.CombinedOutput()
+	if checkErr != nil || !strings.Contains(string(checkOutput), containerName) {
+		// List all containers to debug
+		allCmd := exec.Command("docker", "ps", "-a", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}")
+		allOutput, _ := allCmd.CombinedOutput()
+		return nil, fmt.Errorf("container %s is not running after start command.\nDocker ps -a output:\n%s", containerName, allOutput)
+	}
+	
+	fmt.Printf("Container %s is running\n", containerName)
 	
 	// Create instance object
 	instance := &NativeKECSInstance{
@@ -213,8 +261,8 @@ func (m *NativeKECSManager) StartKECSWithDataDir(testName string, dataDir string
 		AdminPort:     adminPort,
 		DataDir:       dataDir,
 		ContainerName: containerName,
-		Endpoint:      fmt.Sprintf("http://localhost:%d", apiPort),
-		AdminEndpoint: fmt.Sprintf("http://localhost:%d", adminPort),
+		Endpoint:      fmt.Sprintf("http://127.0.0.1:%d", apiPort),
+		AdminEndpoint: fmt.Sprintf("http://127.0.0.1:%d", adminPort),
 		Started:       time.Now(),
 	}
 	
@@ -377,25 +425,46 @@ func (m *NativeKECSManager) releasePortsLocked(ports ...int) {
 
 func (m *NativeKECSManager) waitForReady(instance *NativeKECSInstance) error {
 	client := &http.Client{Timeout: 5 * time.Second}
-	deadline := time.Now().Add(60 * time.Second)
+	// Increase timeout for CI environments
+	timeoutDuration := 120 * time.Second
+	if os.Getenv("CI") != "" {
+		timeoutDuration = 300 * time.Second // 5 minutes in CI
+	}
+	deadline := time.Now().Add(timeoutDuration)
+	
+	fmt.Printf("Waiting for KECS instance %s to be ready (timeout: %v)...\n", instance.ContainerName, timeoutDuration)
+	checkInterval := 2 * time.Second
+	attempts := 0
 	
 	for time.Now().Before(deadline) {
+		attempts++
 		// Check admin health endpoint
 		resp, err := client.Get(instance.AdminEndpoint + "/health")
 		if err == nil {
 			resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
+				fmt.Printf("KECS instance %s is ready after %d attempts\n", instance.ContainerName, attempts)
 				// Give it a bit more time to fully initialize
 				time.Sleep(2 * time.Second)
 				return nil
 			}
+			fmt.Printf("Health check returned status %d (attempt %d)\n", resp.StatusCode, attempts)
+		} else {
+			if attempts % 10 == 0 {
+				fmt.Printf("Health check failed (attempt %d): %v\n", attempts, err)
+			}
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(checkInterval)
 	}
 	
 	// Get logs for debugging
 	logs, _ := instance.GetLogs()
-	return fmt.Errorf("instance did not become ready within 60s. Logs:\n%s", logs)
+	
+	// Also check container status
+	statusCmd := exec.Command("docker", "ps", "-a", "--filter", fmt.Sprintf("name=%s", instance.ContainerName), "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}")
+	statusOutput, _ := statusCmd.CombinedOutput()
+	
+	return fmt.Errorf("instance did not become ready within %v. Container status:\n%s\n\nLogs:\n%s", timeoutDuration, statusOutput, logs)
 }
 
 func sanitizeName(name string) string {
