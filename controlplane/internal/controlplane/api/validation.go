@@ -46,18 +46,18 @@ var (
 func ValidateClusterName(name string) error {
 	// Check length
 	if len(name) < minClusterNameLength || len(name) > maxClusterNameLength {
-		return fmt.Errorf("Invalid parameter: Cluster name length must be between %d and %d characters",
-			minClusterNameLength, maxClusterNameLength)
+		return fmt.Errorf("cluster name must be between 1 and 255 characters")
 	}
 
-	// Check for invalid characters
-	if !clusterNameRegex.MatchString(name) {
-		return fmt.Errorf("Invalid parameter: Cluster name can only contain alphanumeric characters and hyphens")
-	}
-
-	// Check for consecutive hyphens (AWS doesn't allow this)
-	if strings.Contains(name, "--") {
-		return fmt.Errorf("Invalid parameter: Cluster name cannot contain consecutive hyphens")
+	// Check for invalid characters using a simpler approach
+	// Valid characters: alphanumeric, hyphens, and underscores
+	for _, char := range name {
+		if !((char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '-' || char == '_') {
+			return fmt.Errorf("cluster name can only contain alphanumeric characters, dashes, and underscores")
+		}
 	}
 
 	return nil
@@ -68,24 +68,24 @@ func ValidateClusterARN(arn string) error {
 	// Basic ARN format validation
 	// Format: arn:aws:ecs:region:account-id:cluster/cluster-name
 	if !strings.HasPrefix(arn, "arn:aws:ecs:") {
-		return fmt.Errorf("Invalid parameter: ARN must start with 'arn:aws:ecs:'")
+		return fmt.Errorf("invalid ARN format")
 	}
 
 	parts := strings.Split(arn, ":")
 	if len(parts) < 6 {
-		return fmt.Errorf("Invalid parameter: Malformed ARN")
+		return fmt.Errorf("invalid ARN format")
 	}
 
 	// Check resource type
 	resourceParts := strings.Split(parts[5], "/")
 	if len(resourceParts) != 2 || resourceParts[0] != "cluster" {
-		return fmt.Errorf("Invalid parameter: ARN must be a cluster ARN")
+		return fmt.Errorf("invalid ARN format")
 	}
 
 	// Validate the cluster name part
 	clusterName := resourceParts[1]
 	if clusterName == "" {
-		return fmt.Errorf("Invalid parameter: ARN missing cluster name")
+		return fmt.Errorf("invalid ARN format")
 	}
 
 	return nil
@@ -95,19 +95,18 @@ func ValidateClusterARN(arn string) error {
 func ValidateClusterSettings(settings []generated.ClusterSetting) error {
 	for _, setting := range settings {
 		if setting.Name == nil || setting.Value == nil {
-			return fmt.Errorf("Invalid parameter: Setting name and value are required")
+			return fmt.Errorf("settings are required")
 		}
 
 		// Check if setting name is valid
 		if !validSettingNames[*setting.Name] {
-			return fmt.Errorf("Invalid parameter: Unknown setting name '%s'", *setting.Name)
+			return fmt.Errorf("invalid setting name: %s", *setting.Name)
 		}
 
 		// Check if setting value is valid for the given name
 		if validValues, ok := validSettingValues[*setting.Name]; ok {
 			if !validValues[*setting.Value] {
-				return fmt.Errorf("Invalid parameter: Invalid value '%s' for setting '%s'",
-					*setting.Value, *setting.Name)
+				return fmt.Errorf("invalid value for containerInsights: %s (must be 'enabled' or 'disabled')", *setting.Value)
 			}
 		}
 	}
@@ -120,14 +119,14 @@ func ValidateCapacityProviders(providers []string, strategy []generated.Capacity
 	// Validate providers
 	for _, provider := range providers {
 		if !validCapacityProviders[provider] {
-			return fmt.Errorf("Invalid parameter: Unknown capacity provider '%s'", provider)
+			return fmt.Errorf("invalid capacity provider: %s", provider)
 		}
 	}
 
 	// Validate strategy
 	for _, item := range strategy {
 		if item.CapacityProvider == "" {
-			return fmt.Errorf("Invalid parameter: Capacity provider is required in strategy")
+			return fmt.Errorf("capacity provider is required in strategy")
 		}
 
 		// Check if the provider in strategy is in the providers list
@@ -139,17 +138,19 @@ func ValidateCapacityProviders(providers []string, strategy []generated.Capacity
 			}
 		}
 		if !found {
-			return fmt.Errorf("Invalid parameter: Capacity provider '%s' in strategy is not in the providers list", item.CapacityProvider)
+			return fmt.Errorf("capacity provider '%s' in strategy is not in the providers list", item.CapacityProvider)
 		}
 
 		// Validate weight
-		if item.Weight != nil && *item.Weight < 0 {
-			return fmt.Errorf("Invalid parameter: Weight must be non-negative")
+		if item.Weight != nil {
+			if *item.Weight < 0 || *item.Weight > 1000 {
+				return fmt.Errorf("weight must be between 0 and 1000")
+			}
 		}
 
 		// Validate base
 		if item.Base != nil && *item.Base < 0 {
-			return fmt.Errorf("Invalid parameter: Base must be non-negative")
+			return fmt.Errorf("base must be non-negative")
 		}
 	}
 
@@ -195,7 +196,7 @@ func ValidateExecuteCommandConfiguration(config *generated.ExecuteCommandConfigu
 // ValidateClusterIdentifier validates cluster identifier (name or ARN)
 func ValidateClusterIdentifier(identifier string) error {
 	if identifier == "" {
-		return fmt.Errorf("Invalid parameter: Cluster identifier is required")
+		return fmt.Errorf("cluster identifier is required")
 	}
 
 	// Check if it's an ARN
@@ -210,11 +211,11 @@ func ValidateClusterIdentifier(identifier string) error {
 // ValidateResourceARN validates a generic resource ARN for tagging operations
 func ValidateResourceARN(arn string) error {
 	if arn == "" {
-		return fmt.Errorf("Invalid parameter: Resource ARN is required")
+		return fmt.Errorf("resource ARN is required")
 	}
 
 	if !strings.HasPrefix(arn, "arn:aws:ecs:") {
-		return fmt.Errorf("Invalid parameter: Invalid resource ARN format")
+		return fmt.Errorf("invalid resource ARN format")
 	}
 
 	return nil

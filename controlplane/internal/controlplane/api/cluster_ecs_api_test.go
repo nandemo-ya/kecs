@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -580,6 +581,303 @@ var _ = Describe("Cluster ECS API", func() {
 		It("should handle empty string", func() {
 			name := extractClusterNameFromARN("")
 			Expect(name).To(Equal(""))
+		})
+	})
+
+	// Validation tests moved from phase1 error scenarios
+	Describe("CreateCluster Validation", func() {
+		Context("when cluster name is invalid", func() {
+			It("should reject cluster names that are too long", func() {
+				// AWS ECS cluster names must be 1-255 characters
+				longName := strings.Repeat("a", 256)
+				req := &generated.CreateClusterRequest{
+					ClusterName: &longName,
+				}
+
+				_, err := server.ecsAPI.CreateCluster(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("cluster name must be between 1 and 255 characters"))
+			})
+
+			It("should reject empty cluster names", func() {
+				emptyName := ""
+				req := &generated.CreateClusterRequest{
+					ClusterName: &emptyName,
+				}
+
+				_, err := server.ecsAPI.CreateCluster(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("cluster name must be between 1 and 255 characters"))
+			})
+
+			It("should reject cluster names with invalid characters", func() {
+				invalidNames := []string{
+					"cluster@name",  // @ symbol
+					"cluster name",  // space
+					"cluster/name",  // slash
+					"cluster\\name", // backslash
+					"cluster:name",  // colon
+					"cluster*name",  // asterisk
+					"cluster?name",  // question mark
+					"cluster#name",  // hash
+					"cluster%name",  // percent
+				}
+
+				for _, name := range invalidNames {
+					clusterName := name
+					req := &generated.CreateClusterRequest{
+						ClusterName: &clusterName,
+					}
+
+					_, err := server.ecsAPI.CreateCluster(ctx, req)
+					Expect(err).To(HaveOccurred(), "Should fail for cluster name: %s", name)
+					Expect(err.Error()).To(ContainSubstring("cluster name can only contain alphanumeric characters, dashes, and underscores"))
+				}
+			})
+		})
+	})
+
+	Describe("DeleteCluster Validation", func() {
+		Context("when cluster identifier is invalid", func() {
+			It("should reject empty cluster identifier", func() {
+				req := &generated.DeleteClusterRequest{
+					Cluster: "",
+				}
+
+				_, err := server.ecsAPI.DeleteCluster(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("cluster identifier is required"))
+			})
+
+			It("should reject malformed ARN", func() {
+				req := &generated.DeleteClusterRequest{
+					Cluster: "arn:invalid:format",
+				}
+
+				_, err := server.ecsAPI.DeleteCluster(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("invalid ARN format"))
+			})
+		})
+	})
+
+	Describe("DescribeClusters Validation", func() {
+		Context("when cluster identifiers are invalid", func() {
+			It("should handle empty cluster identifier", func() {
+				req := &generated.DescribeClustersRequest{
+					Clusters: []string{""},
+				}
+
+				resp, err := server.ecsAPI.DescribeClusters(ctx, req)
+				Expect(err).NotTo(HaveOccurred()) // DescribeClusters should not error, but return failure
+				Expect(resp.Failures).To(HaveLen(1))
+				Expect(*resp.Failures[0].Reason).To(Equal("MISSING"))
+			})
+
+			It("should handle malformed ARNs", func() {
+				invalidArns := []string{
+					"not-an-arn",
+					"arn:aws:ecs",                        // incomplete ARN
+					"arn:aws:ecs:us-east-1",              // missing account and resource
+					"arn:aws:ecs:us-east-1:123456789012", // missing resource
+					"arn:aws:ecs:us-east-1:123456789012:wrongtype/cluster-name", // wrong resource type
+				}
+
+				req := &generated.DescribeClustersRequest{
+					Clusters: invalidArns,
+				}
+
+				resp, err := server.ecsAPI.DescribeClusters(ctx, req)
+				Expect(err).NotTo(HaveOccurred()) // DescribeClusters should not error, but return failures
+				Expect(resp.Failures).To(HaveLen(len(invalidArns)))
+				for _, failure := range resp.Failures {
+					Expect(*failure.Reason).To(Equal("MISSING"))
+				}
+			})
+		})
+	})
+
+	Describe("UpdateCluster Validation", func() {
+		Context("when cluster identifier is invalid", func() {
+			It("should reject empty cluster identifier", func() {
+				req := &generated.UpdateClusterRequest{
+					Cluster: "",
+				}
+
+				_, err := server.ecsAPI.UpdateCluster(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("cluster identifier is required"))
+			})
+		})
+	})
+
+	Describe("UpdateClusterSettings Validation", func() {
+		Context("when settings are invalid", func() {
+			BeforeEach(func() {
+				// Create a test cluster
+				clusterName := "settings-validation-test"
+				_, err := server.ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{
+					ClusterName: &clusterName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should reject invalid setting names", func() {
+				clusterName := "settings-validation-test"
+				invalidSettingName := "invalidSettingName"
+				settingValue := "enabled"
+				settings := []generated.ClusterSetting{
+					{
+						Name:  (*generated.ClusterSettingName)(&invalidSettingName),
+						Value: &settingValue,
+					},
+				}
+
+				req := &generated.UpdateClusterSettingsRequest{
+					Cluster:  clusterName,
+					Settings: settings,
+				}
+
+				_, err := server.ecsAPI.UpdateClusterSettings(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("invalid setting name"))
+			})
+
+			It("should reject invalid setting values", func() {
+				clusterName := "settings-validation-test"
+				settingName := generated.ClusterSettingNameCONTAINER_INSIGHTS
+				invalidValue := "invalid-value" // Should be "enabled" or "disabled"
+				settings := []generated.ClusterSetting{
+					{
+						Name:  &settingName,
+						Value: &invalidValue,
+					},
+				}
+
+				req := &generated.UpdateClusterSettingsRequest{
+					Cluster:  clusterName,
+					Settings: settings,
+				}
+
+				_, err := server.ecsAPI.UpdateClusterSettings(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("invalid value for containerInsights"))
+			})
+		})
+	})
+
+	Describe("PutClusterCapacityProviders Validation", func() {
+		Context("when capacity providers are invalid", func() {
+			BeforeEach(func() {
+				// Create a test cluster
+				clusterName := "capacity-validation-test"
+				_, err := server.ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{
+					ClusterName: &clusterName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should reject invalid capacity provider names", func() {
+				clusterName := "capacity-validation-test"
+				invalidProviders := []string{"INVALID_PROVIDER", "ANOTHER_INVALID"}
+
+				req := &generated.PutClusterCapacityProvidersRequest{
+					Cluster:           clusterName,
+					CapacityProviders: invalidProviders,
+				}
+
+				_, err := server.ecsAPI.PutClusterCapacityProviders(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("invalid capacity provider"))
+			})
+
+			It("should reject invalid capacity provider strategy", func() {
+				clusterName := "capacity-validation-test"
+				providers := []string{"FARGATE"}
+				strategy := []generated.CapacityProviderStrategyItem{
+					{
+						CapacityProvider: "FARGATE",
+						Weight:           ptr.Int32(-1), // Invalid: negative weight
+						Base:             ptr.Int32(-5), // Invalid: negative base
+					},
+				}
+
+				req := &generated.PutClusterCapacityProvidersRequest{
+					Cluster:                         clusterName,
+					CapacityProviders:               providers,
+					DefaultCapacityProviderStrategy: strategy,
+				}
+
+				_, err := server.ecsAPI.PutClusterCapacityProviders(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("weight must be between 0 and 1000"))
+			})
+
+			It("should reject strategy weight greater than 1000", func() {
+				clusterName := "capacity-validation-test"
+				providers := []string{"FARGATE"}
+				strategy := []generated.CapacityProviderStrategyItem{
+					{
+						CapacityProvider: "FARGATE",
+						Weight:           ptr.Int32(1001), // Invalid: > 1000
+					},
+				}
+
+				req := &generated.PutClusterCapacityProvidersRequest{
+					Cluster:                         clusterName,
+					CapacityProviders:               providers,
+					DefaultCapacityProviderStrategy: strategy,
+				}
+
+				_, err := server.ecsAPI.PutClusterCapacityProviders(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("weight must be between 0 and 1000"))
+			})
+		})
+	})
+
+	Describe("TagResource/UntagResource Validation", func() {
+		Context("when resource ARN is invalid", func() {
+			It("should reject empty resource ARN for TagResource", func() {
+				tags := []generated.Tag{
+					{
+						Key:   ptr.String("Environment"),
+						Value: ptr.String("test"),
+					},
+				}
+
+				req := &generated.TagResourceRequest{
+					ResourceArn: "",
+					Tags:        tags,
+				}
+
+				_, err := server.ecsAPI.TagResource(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("resource ARN is required"))
+			})
+
+			It("should reject empty resource ARN for UntagResource", func() {
+				tagKeys := []string{"Environment"}
+
+				req := &generated.UntagResourceRequest{
+					ResourceArn: "",
+					TagKeys:     tagKeys,
+				}
+
+				_, err := server.ecsAPI.UntagResource(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("resource ARN is required"))
+			})
+
+			It("should reject empty resource ARN for ListTagsForResource", func() {
+				req := &generated.ListTagsForResourceRequest{
+					ResourceArn: "",
+				}
+
+				_, err := server.ecsAPI.ListTagsForResource(ctx, req)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("resource ARN is required"))
+			})
 		})
 	})
 })

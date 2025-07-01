@@ -117,13 +117,17 @@ var _ = Describe("Cluster Basic Operations", Serial, func() {
 				err = client.CreateCluster(clusterName)
 				Expect(err).NotTo(HaveOccurred(), "CreateCluster should be idempotent")
 
-				// Wait a bit for eventual consistency
-				time.Sleep(1 * time.Second)
-
-				// Verify cluster can be described (more reliable than list)
-				cluster, err := client.DescribeCluster(clusterName)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(cluster.ClusterName).To(Equal(clusterName))
+				// Verify cluster can be described using Eventually for consistency
+				Eventually(func() error {
+					cluster, err := client.DescribeCluster(clusterName)
+					if err != nil {
+						return err
+					}
+					if cluster.ClusterName != clusterName {
+						return fmt.Errorf("cluster name mismatch: got %s, want %s", cluster.ClusterName, clusterName)
+					}
+					return nil
+				}, 5*time.Second, 500*time.Millisecond).Should(Succeed())
 
 				// Also verify via list, but use Eventually for consistency
 				Eventually(func() int {
