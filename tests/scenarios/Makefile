@@ -1,4 +1,4 @@
-.PHONY: test test-cluster test-verbose deps clean docker-build
+.PHONY: test test-cluster test-verbose deps clean docker-build clean-test-resources
 
 # Default test timeout
 TIMEOUT ?= 30m
@@ -47,6 +47,15 @@ clean:
 	go clean -testcache
 	rm -f *.coverprofile coverage.out coverage.html
 
+# Clean up orphaned test resources (containers, temp dirs, k3d clusters)
+clean-test-resources:
+	@echo "Cleaning up orphaned test resources..."
+	@docker ps -a --filter "label=com.kecs.managed=true" --format "{{.Names}}" | grep "^kecs-test-" | xargs -r docker stop || true
+	@docker ps -a --filter "label=com.kecs.managed=true" --format "{{.Names}}" | grep "^kecs-test-" | xargs -r docker rm || true
+	@k3d cluster list -o json 2>/dev/null | jq -r '.[].name' 2>/dev/null | grep '^kecs-test-' | xargs -r -I {} k3d cluster delete {} || true
+	@find /tmp -maxdepth 1 -type d -name "kecs-test-*" -exec rm -rf {} + 2>/dev/null || true
+	@echo "Cleanup complete"
+
 # Build KECS docker image for testing
 docker-build:
 	cd ../../controlplane && docker build -f Dockerfile.test -t kecs:test .
@@ -67,3 +76,13 @@ check-aws:
 # Setup test environment
 setup: check-aws deps docker-build
 	@echo "Test environment setup complete"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  make test              # Run all tests"
+	@echo "  make test-phase1       # Run Phase 1 tests (Cluster Operations)"
+	@echo "  make test-phase2       # Run Phase 2 tests (Task Definitions and Services)"
+	@echo "  make test-phase3       # Run Phase 3 tests (LocalStack Integration)"
+	@echo "  make test-verbose      # Run with debug logging"
+	@echo ""
+	@echo "Clean up test resources:"
+	@echo "  make clean-test-resources"

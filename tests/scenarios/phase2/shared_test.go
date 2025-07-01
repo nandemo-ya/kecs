@@ -6,7 +6,7 @@ import (
 
 // Suite-level shared resources
 var (
-	sharedKECS           *utils.KECSContainer
+	sharedKECS           utils.KECSContainerInterface
 	sharedClient         utils.ECSClientInterface
 	sharedLogger         *utils.TestLogger
 	sharedClusterManager *utils.SharedClusterManager

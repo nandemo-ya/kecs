@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 )
@@ -26,6 +27,7 @@ func DefaultTestConfig() *TestConfig {
 type TestingT interface {
 	Logf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
+	Cleanup(f func())
 }
 
 // WaitForCondition waits for a condition to be true
@@ -98,7 +100,7 @@ func (l *TestLogger) Info(format string, args ...interface{}) {
 
 // Debug logs a debug message
 func (l *TestLogger) Debug(format string, args ...interface{}) {
-	if getEnvOrDefault("KECS_LOG_LEVEL", "info") == "debug" {
+	if os.Getenv("KECS_LOG_LEVEL") == "debug" {
 		l.t.Logf("[DEBUG] "+format, args...)
 	}
 }
