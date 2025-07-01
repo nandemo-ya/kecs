@@ -98,15 +98,15 @@ jobs:
           fail-on-error: false
           fail-on-empty: false
 
-      - name: Test Report - Phase 2
-        uses: dorny/test-reporter@v1
-        if: always() && github.event_name == 'pull_request'
-        with:
-          name: Phase 2 - Task Definitions and Services Tests
-          path: tests/scenarios/junit-phase2.xml
-          reporter: java-junit
-          fail-on-error: false
-          fail-on-empty: false
+      # - name: Test Report - Phase 2
+      #   uses: dorny/test-reporter@v1
+      #   if: always() && github.event_name == 'pull_request'
+      #   with:
+      #     name: Phase 2 - Task Definitions and Services Tests
+      #     path: tests/scenarios/junit-phase2.xml
+      #     reporter: java-junit
+      #     fail-on-error: false
+      #     fail-on-empty: false
 
       # Phase 3-4 test reports are not yet implemented
 

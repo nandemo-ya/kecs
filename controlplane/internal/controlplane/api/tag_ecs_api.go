@@ -12,9 +12,6 @@ import (
 // TagResource implements the TagResource operation
 func (api *DefaultECSAPI) TagResource(ctx context.Context, req *generated.TagResourceRequest) (*generated.TagResourceResponse, error) {
 	// Validate resource ARN
-	if req.ResourceArn == "" {
-		return nil, fmt.Errorf("Invalid parameter: Resource ARN is required")
-	}
 	if err := ValidateResourceARN(req.ResourceArn); err != nil {
 		return nil, err
 	}
@@ -101,9 +98,6 @@ func (api *DefaultECSAPI) TagResource(ctx context.Context, req *generated.TagRes
 // UntagResource implements the UntagResource operation
 func (api *DefaultECSAPI) UntagResource(ctx context.Context, req *generated.UntagResourceRequest) (*generated.UntagResourceResponse, error) {
 	// Validate resource ARN
-	if req.ResourceArn == "" {
-		return nil, fmt.Errorf("Invalid parameter: Resource ARN is required")
-	}
 	if err := ValidateResourceARN(req.ResourceArn); err != nil {
 		return nil, err
 	}
@@ -192,9 +186,6 @@ func (api *DefaultECSAPI) UntagResource(ctx context.Context, req *generated.Unta
 // ListTagsForResource implements the ListTagsForResource operation
 func (api *DefaultECSAPI) ListTagsForResource(ctx context.Context, req *generated.ListTagsForResourceRequest) (*generated.ListTagsForResourceResponse, error) {
 	// Validate resource ARN
-	if req.ResourceArn == "" {
-		return nil, fmt.Errorf("Invalid parameter: Resource ARN is required")
-	}
 	if err := ValidateResourceARN(req.ResourceArn); err != nil {
 		return nil, err
 	}

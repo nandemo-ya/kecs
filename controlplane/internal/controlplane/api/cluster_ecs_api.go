@@ -201,19 +201,6 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 
 // DescribeClusters implements the DescribeClusters operation
 func (api *DefaultECSAPI) DescribeClusters(ctx context.Context, req *generated.DescribeClustersRequest) (*generated.DescribeClustersResponse, error) {
-	// Validate cluster identifiers
-	for _, identifier := range req.Clusters {
-		if identifier == "" {
-			return nil, fmt.Errorf("Invalid parameter: Empty cluster identifier")
-		}
-		// Validate if it looks like an ARN
-		if strings.HasPrefix(identifier, "arn:") {
-			if err := ValidateClusterARN(identifier); err != nil {
-				return nil, err
-			}
-		}
-	}
-
 	// If no clusters specified, describe all clusters
 	clusterIdentifiers := req.Clusters
 	if len(clusterIdentifiers) == 0 {
@@ -231,6 +218,28 @@ func (api *DefaultECSAPI) DescribeClusters(ctx context.Context, req *generated.D
 	var failures []generated.Failure
 
 	for _, identifier := range clusterIdentifiers {
+		// Handle empty identifier
+		if identifier == "" {
+			failures = append(failures, generated.Failure{
+				Arn:    ptr.String(""),
+				Reason: ptr.String("MISSING"),
+				Detail: ptr.String("Empty cluster identifier"),
+			})
+			continue
+		}
+
+		// Validate ARN format if it looks like an ARN
+		if strings.HasPrefix(identifier, "arn:") {
+			if err := ValidateClusterARN(identifier); err != nil {
+				failures = append(failures, generated.Failure{
+					Arn:    ptr.String(identifier),
+					Reason: ptr.String("MISSING"),
+					Detail: ptr.String("Invalid ARN format"),
+				})
+				continue
+			}
+		}
+
 		// Extract cluster name from ARN if necessary
 		clusterName := extractClusterNameFromARN(identifier)
 
@@ -571,9 +580,6 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 	}
 	if req.CapacityProviders == nil {
 		return nil, fmt.Errorf("capacityProviders is required")
-	}
-	if req.DefaultCapacityProviderStrategy == nil {
-		return nil, fmt.Errorf("defaultCapacityProviderStrategy is required")
 	}
 
 	// Validate cluster identifier
