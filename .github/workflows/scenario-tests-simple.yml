@@ -63,27 +63,96 @@ jobs:
             exit 1
           fi
 
-      - name: Run all scenario tests
-        id: run-tests
+      - name: Setup test environment
         run: |
           cd tests/scenarios
-          
           # Download test dependencies
           go mod download
           go mod tidy
           
-          # Run tests in simple mode
-          export KECS_ENDPOINT=http://localhost:8080
-          export KECS_ADMIN_ENDPOINT=http://localhost:8081
-          export KECS_TEST_MODE=simple
-          export KECS_LOG_LEVEL=info
+          # Export environment variables for all test steps
+          echo "KECS_ENDPOINT=http://localhost:8080" >> $GITHUB_ENV
+          echo "KECS_ADMIN_ENDPOINT=http://localhost:8081" >> $GITHUB_ENV
+          echo "KECS_TEST_MODE=simple" >> $GITHUB_ENV
+          echo "KECS_LOG_LEVEL=info" >> $GITHUB_ENV
+
+      - name: Run Phase 1 tests (Cluster Operations)
+        id: phase1-tests
+        run: |
+          cd tests/scenarios
+          echo "## Running Phase 1: Cluster Operations ##"
+          go test -v ./phase1 -p 1 -timeout 10m -json | tee phase1-output.json || true
+          go test -v ./phase1 -p 1 -timeout 10m 2>&1 | tee phase1-verbose.txt || true
+          echo "phase1_exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+
+      - name: Run Phase 2 tests (Task Definitions and Services)
+        id: phase2-tests
+        if: always()
+        run: |
+          cd tests/scenarios
+          echo "## Running Phase 2: Task Definitions and Services ##"
+          go test -v ./phase2 -p 1 -timeout 10m -json | tee phase2-output.json || true
+          go test -v ./phase2 -p 1 -timeout 10m 2>&1 | tee phase2-verbose.txt || true
+          echo "phase2_exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+
+      - name: Run Phase 3 tests (Advanced Features)
+        id: phase3-tests
+        if: always()
+        run: |
+          cd tests/scenarios
+          echo "## Running Phase 3: Advanced Features ##"
+          go test -v ./phase3 -p 1 -timeout 10m -json | tee phase3-output.json || true
+          go test -v ./phase3 -p 1 -timeout 10m 2>&1 | tee phase3-verbose.txt || true
+          echo "phase3_exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+
+      - name: Combine test results
+        if: always()
+        run: |
+          cd tests/scenarios
+          # Combine JSON outputs
+          cat phase1-output.json phase2-output.json phase3-output.json > test-output.json 2>/dev/null || true
+          # Combine verbose outputs
+          cat phase1-verbose.txt phase2-verbose.txt phase3-verbose.txt > test-output-verbose.txt 2>/dev/null || true
           
-          echo "## Running Scenario Tests in Simple Mode ##"
-          go test -v ./phase1 ./phase2 ./phase3 -p 1 -timeout 30m \
-            -json | tee test-output.json
+          # Calculate overall exit code
+          PHASE1_EXIT=${{ steps.phase1-tests.outputs.phase1_exit_code || 0 }}
+          PHASE2_EXIT=${{ steps.phase2-tests.outputs.phase2_exit_code || 0 }}
+          PHASE3_EXIT=${{ steps.phase3-tests.outputs.phase3_exit_code || 0 }}
+          OVERALL_EXIT=$((PHASE1_EXIT + PHASE2_EXIT + PHASE3_EXIT))
+          if [ $OVERALL_EXIT -gt 0 ]; then
+            echo "exit_code=1" >> $GITHUB_OUTPUT
+          else
+            echo "exit_code=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Display test results summary
+        if: always()
+        run: |
+          cd tests/scenarios
+          echo "## Test Results Summary ##"
           
-          # Capture exit code
-          echo "exit_code=$?" >> $GITHUB_OUTPUT
+          # Phase 1 results
+          echo "### Phase 1: Cluster Operations"
+          if [ -f phase1-verbose.txt ]; then
+            grep -E "^(ok|FAIL)\s+github\.com.*phase1" phase1-verbose.txt || echo "No phase1 results found"
+            grep -E "^--- FAIL:" phase1-verbose.txt | head -5 || true
+          fi
+          echo ""
+          
+          # Phase 2 results  
+          echo "### Phase 2: Task Definitions and Services"
+          if [ -f phase2-verbose.txt ]; then
+            grep -E "^(ok|FAIL)\s+github\.com.*phase2" phase2-verbose.txt || echo "No phase2 results found"
+            grep -E "^--- FAIL:" phase2-verbose.txt | head -5 || true
+          fi
+          echo ""
+          
+          # Phase 3 results
+          echo "### Phase 3: Advanced Features"
+          if [ -f phase3-verbose.txt ]; then
+            grep -E "^(ok|FAIL)\s+github\.com.*phase3" phase3-verbose.txt || echo "No phase3 results found"
+            grep -E "^--- FAIL:" phase3-verbose.txt | head -5 || true
+          fi
 
       - name: Stop KECS server
         if: always()
@@ -108,6 +177,13 @@ jobs:
           path: |
             kecs-test.log
             tests/scenarios/test-output.json
+            tests/scenarios/test-output-verbose.txt
+            tests/scenarios/phase1-*.txt
+            tests/scenarios/phase2-*.txt
+            tests/scenarios/phase3-*.txt
+            tests/scenarios/phase1-*.json
+            tests/scenarios/phase2-*.json
+            tests/scenarios/phase3-*.json
 
       - name: Parse and comment test results
         uses: actions/github-script@v7
@@ -141,6 +217,7 @@ jobs:
             let totalDuration = 0;
             const failures = [];
             const slowTests = [];
+            const failureDetails = new Map(); // Track detailed failure info
             
             testResults.forEach(result => {
               if (result.Action === 'pass' && result.Test) {
@@ -156,19 +233,37 @@ jobs:
               } else if (result.Action === 'fail' && result.Test) {
                 failedTests++;
                 totalTests++;
-                failures.push({
-                  name: result.Test,
-                  package: result.Package,
-                  output: result.Output
-                });
+                const key = `${result.Package}::${result.Test}`;
+                if (!failureDetails.has(key)) {
+                  failureDetails.set(key, {
+                    name: result.Test,
+                    package: result.Package,
+                    outputs: []
+                  });
+                }
               } else if (result.Action === 'skip' && result.Test) {
                 skippedTests++;
                 totalTests++;
+              } else if (result.Action === 'output' && result.Test) {
+                // Collect output for failed tests
+                const key = `${result.Package}::${result.Test}`;
+                if (failureDetails.has(key)) {
+                  failureDetails.get(key).outputs.push(result.Output);
+                }
               }
               
               if (result.Action === 'pass' && !result.Test && result.Elapsed) {
                 totalDuration += result.Elapsed;
               }
+            });
+            
+            // Convert failure details to array
+            failureDetails.forEach(failure => {
+              failures.push({
+                name: failure.name,
+                package: failure.package,
+                output: failure.outputs.join('')
+              });
             });
             
             // Sort slow tests
@@ -184,28 +279,96 @@ jobs:
               return `${minutes}m ${secs}s`;
             }
             
+            // Parse phase results
+            const phaseResults = {
+              phase1: { passed: 0, failed: 0, skipped: 0, total: 0 },
+              phase2: { passed: 0, failed: 0, skipped: 0, total: 0 },
+              phase3: { passed: 0, failed: 0, skipped: 0, total: 0 }
+            };
+            
+            testResults.forEach(result => {
+              if (result.Test && result.Package) {
+                let phase = null;
+                if (result.Package.includes('phase1')) phase = 'phase1';
+                else if (result.Package.includes('phase2')) phase = 'phase2';
+                else if (result.Package.includes('phase3')) phase = 'phase3';
+                
+                if (phase) {
+                  if (result.Action === 'pass') {
+                    phaseResults[phase].passed++;
+                    phaseResults[phase].total++;
+                  } else if (result.Action === 'fail') {
+                    phaseResults[phase].failed++;
+                    phaseResults[phase].total++;
+                  } else if (result.Action === 'skip') {
+                    phaseResults[phase].skipped++;
+                    phaseResults[phase].total++;
+                  }
+                }
+              }
+            });
+            
             // Build comment
             let comment = '## 🧪 Scenario Test Results (Simple Mode)\n\n';
             
             // Summary
-            comment += '### Summary\n';
+            comment += '### Overall Summary\n';
             comment += `- Total Tests: ${totalTests}\n`;
             comment += `- ✅ Passed: ${passedTests}\n`;
             comment += `- ❌ Failed: ${failedTests}\n`;
             comment += `- ⏭️ Skipped: ${skippedTests}\n`;
             comment += `- ⏱️ Total Duration: ${formatDuration(totalDuration)}\n\n`;
             
+            // Phase breakdown
+            comment += '### Results by Phase\n';
+            comment += '| Phase | Total | ✅ Passed | ❌ Failed | ⏭️ Skipped |\n';
+            comment += '|-------|-------|-----------|-----------|------------|\n';
+            comment += `| Phase 1: Cluster Operations | ${phaseResults.phase1.total} | ${phaseResults.phase1.passed} | ${phaseResults.phase1.failed} | ${phaseResults.phase1.skipped} |\n`;
+            comment += `| Phase 2: Task Definitions | ${phaseResults.phase2.total} | ${phaseResults.phase2.passed} | ${phaseResults.phase2.failed} | ${phaseResults.phase2.skipped} |\n`;
+            comment += `| Phase 3: Advanced Features | ${phaseResults.phase3.total} | ${phaseResults.phase3.passed} | ${phaseResults.phase3.failed} | ${phaseResults.phase3.skipped} |\n`;
+            comment += '\n';
+            
             if (failedTests === 0 && totalTests > 0) {
               comment += '### ✅ All tests passed!\n\n';
             } else if (failedTests > 0) {
-              comment += '### ❌ Some tests failed\n\n';
+              comment += '### ❌ Failed Tests\n\n';
               
-              comment += '<details>\n<summary>Failed Tests</summary>\n\n';
+              // Group failures by package
+              const failuresByPackage = {};
               failures.forEach(failure => {
-                comment += `**${failure.package} - ${failure.name}**\n`;
-                if (failure.output) {
-                  comment += '```\n' + failure.output + '\n```\n';
+                const pkgName = failure.package.split('/').pop(); // Get last part of package name
+                if (!failuresByPackage[pkgName]) {
+                  failuresByPackage[pkgName] = [];
                 }
+                failuresByPackage[pkgName].push(failure);
+              });
+              
+              // List all failed tests first for quick overview
+              comment += '#### Failed Test List:\n';
+              Object.keys(failuresByPackage).sort().forEach(pkg => {
+                comment += `\n**${pkg}:**\n`;
+                failuresByPackage[pkg].forEach(failure => {
+                  comment += `- ❌ ${failure.name}\n`;
+                });
+              });
+              comment += '\n';
+              
+              // Then provide detailed output in collapsible sections
+              comment += '<details>\n<summary>Detailed Failure Output</summary>\n\n';
+              Object.keys(failuresByPackage).sort().forEach(pkg => {
+                comment += `### ${pkg}\n\n`;
+                failuresByPackage[pkg].forEach(failure => {
+                  comment += `<details>\n<summary>${failure.name}</summary>\n\n`;
+                  if (failure.output) {
+                    // Limit output to last 50 lines to avoid huge comments
+                    const lines = failure.output.split('\n');
+                    const outputToShow = lines.length > 50 
+                      ? '... (truncated)\n' + lines.slice(-50).join('\n')
+                      : failure.output;
+                    comment += '```\n' + outputToShow + '\n```\n';
+                  }
+                  comment += '</details>\n\n';
+                });
               });
               comment += '</details>\n\n';
             }
