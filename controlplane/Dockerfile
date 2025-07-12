@@ -11,8 +11,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && \
     case "$TARGETARCH" in \
-        arm64) apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu ;; \
-        amd64) apt-get install -y gcc-x86-64-linux-gnu g++-x86-64-linux-gnu ;; \
+        arm64) apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libstdc++-13-dev-arm64-cross ;; \
+        amd64) apt-get install -y gcc-x86-64-linux-gnu g++-x86-64-linux-gnu libstdc++-13-dev-amd64-cross ;; \
     esac
 
 # Copy go mod files for better caching
@@ -43,6 +43,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
     lsb-release \
+    libstdc++6 \
     && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
     && apt-get update \
