@@ -7,9 +7,9 @@ set -e
 # Function to check Docker socket access
 check_docker_access() {
     if [ -S /var/run/docker.sock ]; then
-        # Check if we can access the Docker socket
-        if docker version >/dev/null 2>&1; then
-            echo "✓ Docker socket access confirmed"
+        # Check if we can read the Docker socket
+        if [ -r /var/run/docker.sock ]; then
+            echo "✓ Docker socket found and readable"
             return 0
         else
             echo "⚠️  Docker socket found but cannot access it"

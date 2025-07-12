@@ -1,37 +1,59 @@
-# Build stage for Go application
-FROM golang:1.23-alpine AS builder
-
-# Install build dependencies
-RUN apk add --no-cache git make gcc musl-dev sqlite-dev duckdb
-
+# syntax=docker/dockerfile:1
+# Build stage
+FROM --platform=$BUILDPLATFORM golang:1.24.3 AS builder
 WORKDIR /app
 
-# Copy go mod files
+ARG TARGETOS=linux
+ARG TARGETARCH
+
+# Install cross-compilers with cache
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
+    case "$TARGETARCH" in \
+        arm64) apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu ;; \
+        amd64) apt-get install -y gcc-x86-64-linux-gnu g++-x86-64-linux-gnu ;; \
+    esac
+
+# Copy go mod files for better caching
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download && go mod verify
 
-# Copy source code
-COPY . .
+# Copy source files
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
 
-# Build the application
-RUN make build
+# Build with cache mount
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    case "$TARGETARCH" in \
+        arm64) export CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ ;; \
+        amd64) export CC=x86_64-linux-gnu-gcc CXX=x86_64-linux-gnu-g++ ;; \
+    esac && \
+    CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -ldflags="-s -w" -o controlplane ./cmd/controlplane
 
-# Runtime stage
-FROM alpine:latest
+# Final stage
+FROM debian:stable-slim
 
-# Install runtime dependencies
-RUN apk add --no-cache ca-certificates curl wget duckdb
+# Install required runtime libraries
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    libstdc++6 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN addgroup -g 1000 -S kecs && \
-    adduser -u 1000 -S kecs -G kecs
-
-# Create data directory
-RUN mkdir -p /data && \
+RUN groupadd -g 1000 kecs && \
+    useradd -u 1000 -g kecs -m -s /bin/bash kecs && \
+    mkdir -p /data && \
     chown -R kecs:kecs /data
 
 # Copy binary from builder
-COPY --from=builder /app/bin/kecs /usr/local/bin/kecs
+COPY --from=builder /app/controlplane /usr/local/bin/kecs
+RUN chmod +x /usr/local/bin/kecs
 
 # Expose ports
 EXPOSE 8080 8081
