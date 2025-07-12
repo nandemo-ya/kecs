@@ -43,7 +43,7 @@ jobs:
       - name: Start KECS server
         run: |
           echo "Starting KECS server..."
-          ./bin/kecs server --port 8080 --admin-port 8081 > kecs-test.log 2>&1 &
+          KECS_SECURITY_ACKNOWLEDGED=true ./bin/kecs server --port 8080 --admin-port 8081 > kecs-test.log 2>&1 &
           echo $! > kecs.pid
           
           echo "Waiting for KECS to be ready..."

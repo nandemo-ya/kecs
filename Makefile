@@ -114,7 +114,7 @@ test-scenarios-simple: build
 	@echo "Cleaning up any existing k3d clusters..."
 	@k3d cluster list -o json | jq -r '.[].name' | grep '^kecs-' | xargs -r -I {} k3d cluster delete {} || true
 	@echo "Starting KECS server in background..."
-	@./bin/$(BINARY_NAME) server --port 8080 --admin-port 8081 > kecs-test.log 2>&1 & echo $$! > kecs.pid
+	@KECS_SECURITY_ACKNOWLEDGED=true ./bin/$(BINARY_NAME) server --port 8080 --admin-port 8081 > kecs-test.log 2>&1 & echo $$! > kecs.pid
 	@echo "Waiting for KECS to be ready..."
 	@sleep 5
 	@echo "Running scenario tests with single KECS instance..."
