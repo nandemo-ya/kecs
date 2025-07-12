@@ -1,12 +1,11 @@
-name: Scenario Tests
+name: Scenario Tests (Docker Mode)
 
 on:
-  pull_request:
-    paths:
-      - 'tests/scenarios/**'
-      - 'controlplane/**'
-      - '.github/workflows/scenario-tests.yml'
+  # Disable automatic trigger - use manual dispatch only
   workflow_dispatch:
+  # Or trigger on specific label
+  pull_request:
+    types: [labeled]
 
 permissions:
   contents: read
@@ -16,6 +15,10 @@ permissions:
 jobs:
   test-phases:
     runs-on: [self-hosted, aws-testable, large]
+    # Only run if triggered manually or has the right label
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      contains(github.event.pull_request.labels.*.name, 'test-docker-mode')
     steps:
       - uses: actions/checkout@v4
 
@@ -75,7 +78,21 @@ jobs:
         env:
           KECS_LOG_LEVEL: info
 
-      # Phase 3-4 tests are not yet implemented
+      - name: Run Phase 3 tests (LocalStack Integration)
+        id: test-phase3
+        run: |
+          cd tests/scenarios
+          echo "## Running Phase 3: LocalStack Integration tests ##"
+          ginkgo -v -timeout 30m \
+            --no-color \
+            --junit-report=junit-phase3.xml \
+            --output-dir=. \
+            ./phase3/... | tee test-output-phase3.log
+          
+          # Capture exit code
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        env:
+          KECS_LOG_LEVEL: info
 
       - name: Upload test results
         if: always()
@@ -87,6 +104,8 @@ jobs:
             tests/scenarios/test-output-phase1.log
             tests/scenarios/junit-phase2.xml
             tests/scenarios/test-output-phase2.log
+            tests/scenarios/junit-phase3.xml
+            tests/scenarios/test-output-phase3.log
 
       - name: Test Report - Phase 1
         uses: dorny/test-reporter@v1
@@ -242,12 +261,13 @@ jobs:
               return result;
             }
             
-            // Parse outputs from phase 1 and phase 2
+            // Parse outputs from phase 1, phase 2, and phase 3
             const phase1 = parseTestOutput('tests/scenarios/test-output-phase1.log', 'Phase 1: Cluster Operations');
             const phase2 = parseTestOutput('tests/scenarios/test-output-phase2.log', 'Phase 2: Task Definitions and Services');
+            const phase3 = parseTestOutput('tests/scenarios/test-output-phase3.log', 'Phase 3: LocalStack Integration');
             
             // Combine results
-            const phases = [phase1, phase2].filter(p => p !== null);
+            const phases = [phase1, phase2, phase3].filter(p => p !== null);
             
             let summary = '## 🧪 Scenario Test Results\n\n';
             

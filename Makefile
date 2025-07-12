@@ -108,6 +108,34 @@ deps:
 	cd $(CONTROLPLANE_DIR) && $(GO) mod download
 	cd $(CONTROLPLANE_DIR) && $(GO) mod verify
 
+# Scenario Tests
+.PHONY: test-scenarios-simple
+test-scenarios-simple: build
+	@echo "Cleaning up any existing k3d clusters..."
+	@k3d cluster list -o json | jq -r '.[].name' | grep '^kecs-' | xargs -r -I {} k3d cluster delete {} || true
+	@echo "Starting KECS server in background..."
+	@./bin/$(BINARY_NAME) server --api-port 8080 --admin-port 8081 > kecs-test.log 2>&1 & echo $$! > kecs.pid
+	@echo "Waiting for KECS to be ready..."
+	@sleep 5
+	@echo "Running scenario tests with single KECS instance..."
+	@cd tests/scenarios && \
+		KECS_ENDPOINT=http://localhost:8080 \
+		KECS_ADMIN_ENDPOINT=http://localhost:8081 \
+		KECS_TEST_MODE=simple \
+		go test -v ./phase1 ./phase2 ./phase3 -p 1 -timeout 30m || true
+	@echo "Stopping KECS server..."
+	@if [ -f kecs.pid ]; then kill `cat kecs.pid` || true; rm kecs.pid; fi
+	@echo "Cleaning up k3d clusters..."
+	@k3d cluster list -o json | jq -r '.[].name' | grep '^kecs-' | xargs -r -I {} k3d cluster delete {} || true
+	@echo "Test log available in kecs-test.log"
+
+# Clean up k3d clusters
+.PHONY: clean-k3d
+clean-k3d:
+	@echo "Cleaning up all KECS k3d clusters..."
+	@k3d cluster list -o json | jq -r '.[].name' | grep '^kecs-' | xargs -r -I {} k3d cluster delete {} || true
+	@echo "K3d cleanup complete"
+
 # Build Docker image
 .PHONY: docker-build
 docker-build:
@@ -166,6 +194,8 @@ help:
 	@echo "  fmt            - Format code and organize imports"
 	@echo "  test           - Run tests"
 	@echo "  test-coverage  - Run tests with coverage"
+	@echo "  test-scenarios-simple - Run scenario tests with single KECS instance"
+	@echo "  clean-k3d      - Clean up all KECS k3d clusters"
 	@echo "  vet            - Vet code"
 	@echo "  lint           - Run golangci-lint"
 	@echo "  lint-fix       - Run golangci-lint and fix issues automatically"

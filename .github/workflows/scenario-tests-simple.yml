@@ -1,0 +1,241 @@
+name: Scenario Tests (Simple Mode)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/scenarios/**'
+      - 'controlplane/**'
+      - '.github/workflows/scenario-tests-simple.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  test-simple:
+    runs-on: [self-hosted, aws-testable, large]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: controlplane/go.mod
+
+      - name: Install dependencies
+        run: |
+          cd controlplane
+          go mod download
+          go mod verify
+
+      - name: Build KECS binary
+        run: |
+          cd controlplane
+          go build -o ../bin/kecs ./cmd/controlplane
+          chmod +x ../bin/kecs
+
+      - name: Clean up any existing k3d clusters
+        run: |
+          k3d cluster list -o json | jq -r '.[].name' | grep '^kecs-' | xargs -r -I {} k3d cluster delete {} || true
+
+      - name: Start KECS server
+        run: |
+          echo "Starting KECS server..."
+          ./bin/kecs server --api-port 8080 --admin-port 8081 > kecs-test.log 2>&1 &
+          echo $! > kecs.pid
+          
+          echo "Waiting for KECS to be ready..."
+          for i in {1..30}; do
+            if curl -s http://localhost:8081/health > /dev/null; then
+              echo "KECS is ready!"
+              break
+            fi
+            echo "Waiting for KECS... ($i/30)"
+            sleep 2
+          done
+          
+          # Verify KECS is running
+          if ! curl -s http://localhost:8081/health > /dev/null; then
+            echo "KECS failed to start!"
+            cat kecs-test.log
+            exit 1
+          fi
+
+      - name: Run all scenario tests
+        id: run-tests
+        run: |
+          cd tests/scenarios
+          
+          # Download test dependencies
+          go mod download
+          go mod tidy
+          
+          # Run tests in simple mode
+          export KECS_ENDPOINT=http://localhost:8080
+          export KECS_ADMIN_ENDPOINT=http://localhost:8081
+          export KECS_TEST_MODE=simple
+          export KECS_LOG_LEVEL=info
+          
+          echo "## Running Scenario Tests in Simple Mode ##"
+          go test -v ./phase1 ./phase2 ./phase3 -p 1 -timeout 30m \
+            -json | tee test-output.json
+          
+          # Capture exit code
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Stop KECS server
+        if: always()
+        run: |
+          if [ -f kecs.pid ]; then
+            echo "Stopping KECS server..."
+            kill $(cat kecs.pid) || true
+            rm kecs.pid
+          fi
+
+      - name: Clean up k3d clusters
+        if: always()
+        run: |
+          echo "Cleaning up k3d clusters..."
+          k3d cluster list -o json | jq -r '.[].name' | grep '^kecs-' | xargs -r -I {} k3d cluster delete {} || true
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            kecs-test.log
+            tests/scenarios/test-output.json
+
+      - name: Parse and comment test results
+        uses: actions/github-script@v7
+        if: always() && github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            
+            // Read test output
+            let testResults = [];
+            try {
+              const output = fs.readFileSync('tests/scenarios/test-output.json', 'utf8');
+              const lines = output.split('\n').filter(line => line.trim());
+              testResults = lines.map(line => {
+                try {
+                  return JSON.parse(line);
+                } catch (e) {
+                  return null;
+                }
+              }).filter(r => r !== null);
+            } catch (e) {
+              console.error('Failed to read test output:', e);
+            }
+            
+            // Parse results
+            let totalTests = 0;
+            let passedTests = 0;
+            let failedTests = 0;
+            let skippedTests = 0;
+            let totalDuration = 0;
+            const failures = [];
+            const slowTests = [];
+            
+            testResults.forEach(result => {
+              if (result.Action === 'pass' && result.Test) {
+                passedTests++;
+                totalTests++;
+                if (result.Elapsed && result.Elapsed > 10) {
+                  slowTests.push({
+                    name: result.Test,
+                    package: result.Package,
+                    duration: result.Elapsed
+                  });
+                }
+              } else if (result.Action === 'fail' && result.Test) {
+                failedTests++;
+                totalTests++;
+                failures.push({
+                  name: result.Test,
+                  package: result.Package,
+                  output: result.Output
+                });
+              } else if (result.Action === 'skip' && result.Test) {
+                skippedTests++;
+                totalTests++;
+              }
+              
+              if (result.Action === 'pass' && !result.Test && result.Elapsed) {
+                totalDuration += result.Elapsed;
+              }
+            });
+            
+            // Sort slow tests
+            slowTests.sort((a, b) => b.duration - a.duration);
+            
+            // Format duration
+            function formatDuration(seconds) {
+              if (seconds < 60) {
+                return `${seconds.toFixed(1)}s`;
+              }
+              const minutes = Math.floor(seconds / 60);
+              const secs = (seconds % 60).toFixed(0);
+              return `${minutes}m ${secs}s`;
+            }
+            
+            // Build comment
+            let comment = '## 🧪 Scenario Test Results (Simple Mode)\n\n';
+            
+            // Summary
+            comment += '### Summary\n';
+            comment += `- Total Tests: ${totalTests}\n`;
+            comment += `- ✅ Passed: ${passedTests}\n`;
+            comment += `- ❌ Failed: ${failedTests}\n`;
+            comment += `- ⏭️ Skipped: ${skippedTests}\n`;
+            comment += `- ⏱️ Total Duration: ${formatDuration(totalDuration)}\n\n`;
+            
+            if (failedTests === 0 && totalTests > 0) {
+              comment += '### ✅ All tests passed!\n\n';
+            } else if (failedTests > 0) {
+              comment += '### ❌ Some tests failed\n\n';
+              
+              comment += '<details>\n<summary>Failed Tests</summary>\n\n';
+              failures.forEach(failure => {
+                comment += `**${failure.package} - ${failure.name}**\n`;
+                if (failure.output) {
+                  comment += '```\n' + failure.output + '\n```\n';
+                }
+              });
+              comment += '</details>\n\n';
+            }
+            
+            // Slow tests
+            if (slowTests.length > 0) {
+              comment += '### 🐌 Slow Tests (>10s)\n\n';
+              comment += '| Test | Duration |\n';
+              comment += '|------|----------|\n';
+              slowTests.slice(0, 10).forEach(test => {
+                const shortName = test.name.length > 60 
+                  ? test.name.substring(0, 57) + '...' 
+                  : test.name;
+                comment += `| ${shortName} | ${formatDuration(test.duration)} |\n`;
+              });
+              comment += '\n';
+            }
+            
+            comment += '---\n';
+            comment += '_Running with single KECS instance (simple mode) for better performance and stability._';
+            
+            // Post comment
+            try {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+              console.log('Successfully posted test results to PR');
+            } catch (error) {
+              console.error('Failed to post comment:', error);
+            }
