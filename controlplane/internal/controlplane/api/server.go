@@ -906,14 +906,16 @@ func (s *Server) SetupRoutes() http.Handler {
 
 	// Apply middleware
 	handler := http.Handler(mux)
-	// Add LocalStack proxy middleware if available
-	if s.awsProxyRouter != nil {
-		handler = LocalStackProxyMiddleware(handler, s.awsProxyRouter)
-	}
 	handler = APIProxyMiddleware(handler)
 	handler = SecurityHeadersMiddleware(handler)
 	handler = CORSMiddleware(handler)
 	handler = LoggingMiddleware(handler)
+	
+	// Add LocalStack proxy middleware LAST so it runs FIRST
+	// This ensures AWS API calls are intercepted before reaching ECS handlers
+	if s.awsProxyRouter != nil {
+		handler = LocalStackProxyMiddleware(handler, s.awsProxyRouter)
+	}
 
 	return handler
 }

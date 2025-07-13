@@ -77,7 +77,8 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 func LocalStackProxyMiddleware(next http.Handler, awsProxyRouter *AWSProxyRouter) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check if this request should be proxied to LocalStack
-		if ShouldProxyToLocalStack(r, awsProxyRouter.LocalStackManager) {
+		if awsProxyRouter != nil && awsProxyRouter.LocalStackManager != nil && 
+		   ShouldProxyToLocalStack(r, awsProxyRouter.LocalStackManager) {
 			awsProxyRouter.AWSProxyHandler.ServeHTTP(w, r)
 			return
 		}
