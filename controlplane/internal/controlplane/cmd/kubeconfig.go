@@ -201,6 +201,9 @@ func fixKubeconfig(kubeconfigContent string, k3dClusterName string) (string, err
 
 	// Replace host.docker.internal with 127.0.0.1
 	fixedContent := strings.ReplaceAll(kubeconfigContent, "host.docker.internal", "127.0.0.1")
+	
+	// Also replace 0.0.0.0 with 127.0.0.1
+	fixedContent = strings.ReplaceAll(fixedContent, "0.0.0.0", "127.0.0.1")
 
 	// Get the actual port from docker
 	port, err := getK3dAPIPort(k3dClusterName)
@@ -208,11 +211,22 @@ func fixKubeconfig(kubeconfigContent string, k3dClusterName string) (string, err
 		return "", fmt.Errorf("failed to get API port: %w", err)
 	}
 
+	// Debug: log the port we found
+	fmt.Fprintf(os.Stderr, "DEBUG: Found port %s for cluster %s\n", port, k3dClusterName)
+
 	// Fix the port in the server URL
-	// Handle cases with empty port (just colon) or with port number
-	// Also handle quoted URLs in YAML
-	re := regexp.MustCompile(`(https://127\.0\.0\.1)(:\d*)?(:)?`)
-	fixedContent = re.ReplaceAllString(fixedContent, fmt.Sprintf("https://127.0.0.1:%s", port))
+	// Handle various cases:
+	// 1. Empty port (https://127.0.0.1:)
+	// 2. Port with number (https://127.0.0.1:1234)
+	// 3. No port at all (https://127.0.0.1)
+	// Match patterns and replace with correct port
+	re := regexp.MustCompile(`(https://127\.0\.0\.1)(:\d+)?(:)?`)
+	fixedContent = re.ReplaceAllStringFunc(fixedContent, func(match string) string {
+		// Debug: log what we're replacing
+		fmt.Fprintf(os.Stderr, "DEBUG: Replacing '%s' with 'https://127.0.0.1:%s'\n", match, port)
+		// Always replace with the correct format including port
+		return fmt.Sprintf("https://127.0.0.1:%s", port)
+	})
 
 	return fixedContent, nil
 }
@@ -230,12 +244,18 @@ func getK3dAPIPort(k3dClusterName string) (string, error) {
 	lines := strings.Split(string(output), "\n")
 	lbName := fmt.Sprintf("k3d-%s-serverlb", k3dClusterName)
 	
+	// Debug: log docker ps output
+	fmt.Fprintf(os.Stderr, "DEBUG: Looking for container %s\n", lbName)
+	
 	for _, line := range lines {
 		if strings.HasPrefix(line, lbName) {
+			// Debug: log the line we found
+			fmt.Fprintf(os.Stderr, "DEBUG: Found container line: %s\n", line)
 			// Extract port from format: "0.0.0.0:50715->6443/tcp"
 			re := regexp.MustCompile(`0\.0\.0\.0:(\d+)->6443/tcp`)
 			matches := re.FindStringSubmatch(line)
 			if len(matches) > 1 {
+				fmt.Fprintf(os.Stderr, "DEBUG: Extracted port: %s\n", matches[1])
 				return matches[1], nil
 			}
 		}
