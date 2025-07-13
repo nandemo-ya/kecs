@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strings"
 )
@@ -76,9 +77,17 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 // LocalStackProxyMiddleware intercepts AWS API calls and routes them to LocalStack
 func LocalStackProxyMiddleware(next http.Handler, awsProxyRouter *AWSProxyRouter) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Debug log
+		target := r.Header.Get("X-Amz-Target")
+		if target != "" {
+			log.Printf("[LocalStackProxyMiddleware] Request: Method=%s, Path=%s, X-Amz-Target=%s, Auth=%v",
+				r.Method, r.URL.Path, target, r.Header.Get("Authorization") != "")
+		}
+		
 		// Check if this request should be proxied to LocalStack
 		if awsProxyRouter != nil && awsProxyRouter.LocalStackManager != nil && 
 		   ShouldProxyToLocalStack(r, awsProxyRouter.LocalStackManager) {
+			log.Printf("[LocalStackProxyMiddleware] Proxying to LocalStack: %s %s", r.Method, r.URL.Path)
 			awsProxyRouter.AWSProxyHandler.ServeHTTP(w, r)
 			return
 		}
