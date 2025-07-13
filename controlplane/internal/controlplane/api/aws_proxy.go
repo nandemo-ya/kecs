@@ -25,13 +25,15 @@ func NewAWSProxyHandler(localStackManager localstack.Manager) (*AWSProxyHandler,
 		localStackManager: localStackManager,
 	}
 
-	// Initialize the reverse proxy when LocalStack is ready
-	if localStackManager != nil && localStackManager.IsHealthy() {
-		endpoint, err := localStackManager.GetEndpoint()
-		if err == nil {
-			if err := handler.updateProxyTarget(endpoint); err != nil {
-				klog.Warningf("Failed to initialize proxy target: %v", err)
-			}
+	// Initialize the reverse proxy with Traefik endpoint
+	// TODO: Get this from LocalStack manager configuration properly
+	if localStackManager != nil {
+		// Use Traefik proxy endpoint for now
+		endpoint := "http://localhost:8090"
+		klog.Infof("Using Traefik endpoint for LocalStack proxy: %s", endpoint)
+		
+		if err := handler.updateProxyTarget(endpoint); err != nil {
+			klog.Warningf("Failed to initialize proxy target: %v", err)
 		}
 	}
 
@@ -83,11 +85,11 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Update proxy target if needed
 	if h.reverseProxy == nil {
-		endpoint, err := h.localStackManager.GetEndpoint()
-		if err != nil {
-			http.Error(w, "Failed to get LocalStack endpoint", http.StatusInternalServerError)
-			return
-		}
+		// Use Traefik proxy endpoint
+		// TODO: Get this from configuration properly
+		endpoint := "http://localhost:8090"
+		klog.Infof("Initializing proxy with Traefik endpoint: %s", endpoint)
+		
 		if err := h.updateProxyTarget(endpoint); err != nil {
 			http.Error(w, "Failed to initialize proxy", http.StatusInternalServerError)
 			return
