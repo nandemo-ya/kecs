@@ -73,6 +73,10 @@ health:
   readinessPath: /ready
   livenessPath: /live
 
+# Feature flags
+features:
+  traefik: false  # Disabled for unit tests
+
 # LocalStack configuration
 localstack:
   enabled: false  # Disabled by default in tests to avoid external dependencies

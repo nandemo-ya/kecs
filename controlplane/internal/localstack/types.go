@@ -98,6 +98,7 @@ type ResourceLimits struct {
 type HealthChecker interface {
 	CheckHealth(ctx context.Context) (*HealthStatus, error)
 	WaitForHealthy(ctx context.Context, timeout time.Duration) error
+	UpdateEndpoint(endpoint string)
 }
 
 // HealthStatus represents the health check result

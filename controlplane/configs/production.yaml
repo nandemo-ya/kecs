@@ -76,6 +76,10 @@ health:
   readinessPath: /ready
   livenessPath: /live
 
+# Feature flags
+features:
+  traefik: true  # Enable Traefik proxy for LocalStack access from host mode
+
 # LocalStack configuration
 localstack:
   enabled: true  # LocalStack is enabled by default for AWS service dependencies

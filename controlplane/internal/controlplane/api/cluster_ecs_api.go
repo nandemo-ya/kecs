@@ -844,9 +844,10 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		if appConfig.LocalStack.Enabled {
 			config.Enabled = true
 		}
-		if appConfig.LocalStack.UseTraefik {
+		// Check features.traefik configuration
+		if appConfig.Features.Traefik {
 			config.UseTraefik = true
-			log.Printf("Traefik is enabled for LocalStack")
+			log.Printf("Traefik is enabled for LocalStack via features.traefik")
 		}
 		// Set container mode
 		if appConfig.Features.ContainerMode {

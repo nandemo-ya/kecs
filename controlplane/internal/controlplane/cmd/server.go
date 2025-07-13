@@ -152,6 +152,8 @@ func runServer() {
 	if cfg.LocalStack.Enabled {
 		fmt.Println("LocalStack integration is enabled")
 		localstackConfig = &cfg.LocalStack
+		// Set UseTraefik from features configuration
+		localstackConfig.UseTraefik = cfg.Features.Traefik
 	}
 
 	apiServer, err := api.NewServer(cfg.Server.Port, kubeconfig, storage, localstackConfig)

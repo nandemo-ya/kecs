@@ -6,6 +6,9 @@ server:
   dataDir: ~/.kecs/data
   logLevel: info
 
+features:
+  traefik: true  # Enable Traefik proxy for LocalStack access from host mode
+
 localstack:
   enabled: true
   services:
@@ -16,7 +19,7 @@ localstack:
   persistence: true
   image: localstack/localstack
   version: latest
-  namespace: kecs-system
+  namespace: aws-services
   port: 4566
   edgePort: 4566
   resources:

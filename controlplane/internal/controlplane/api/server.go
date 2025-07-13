@@ -777,9 +777,10 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 		if appConfig.LocalStack.Enabled {
 			config.Enabled = true
 		}
-		if appConfig.LocalStack.UseTraefik {
+		// Check features.traefik configuration
+		if appConfig.Features.Traefik {
 			config.UseTraefik = true
-			log.Printf("Traefik is enabled for LocalStack recovery")
+			log.Printf("Traefik is enabled for LocalStack recovery via features.traefik")
 		}
 		// Set container mode
 		if appConfig.Features.ContainerMode {

@@ -129,7 +129,9 @@ func (m *localStackManager) Start(ctx context.Context) error {
 		healthEndpoint = fmt.Sprintf("http://localhost:%d", m.config.Port)
 		klog.Warningf("Host mode without Traefik: health checks may fail. Using: %s", healthEndpoint)
 	}
-	m.healthChecker = NewHealthChecker(healthEndpoint)
+	
+	// Update the health checker with the correct endpoint
+	m.healthChecker.UpdateEndpoint(healthEndpoint)
 
 	// Wait for LocalStack to output "Ready." in logs
 	klog.Info("Waiting for LocalStack to be ready...")
