@@ -2,6 +2,8 @@
 
 KECS provides built-in integration with LocalStack to emulate AWS services locally, enabling comprehensive testing and development without requiring AWS credentials or incurring costs.
 
+> **Note**: As of KECS v1.0, LocalStack is enabled by default when creating clusters. This provides immediate access to essential AWS services like IAM, Systems Manager Parameter Store, and Secrets Manager that are commonly required for ECS workloads.
+
 ## Overview
 
 LocalStack integration in KECS provides:
@@ -20,7 +22,7 @@ LocalStack integration is configured in the KECS configuration file:
 ```yaml
 # LocalStack configuration in production.yaml or development.yaml
 localstack:
-  enabled: true  # Enable LocalStack integration
+  enabled: true  # Enabled by default since v1.0
   services:
     - iam
     - logs
@@ -343,6 +345,32 @@ localstack:
 3. **Use Persistence**: Enable persistence for development continuity
 4. **Test Locally**: Verify LocalStack connectivity before deploying applications
 5. **Clean Up**: Stop LocalStack when not in use to free resources
+
+## Disabling LocalStack
+
+While LocalStack is enabled by default, you can disable it in specific scenarios:
+
+### For Unit Tests
+```bash
+# Set environment variable
+export KECS_LOCALSTACK_ENABLED=false
+
+# Or use test configuration
+kecs server --config configs/test.yaml
+```
+
+### For Production without LocalStack
+```yaml
+# In your custom configuration file
+localstack:
+  enabled: false
+```
+
+### Via Command Line
+```bash
+# Explicitly disable LocalStack
+kecs server --localstack-enabled=false
+```
 
 ## Limitations
 

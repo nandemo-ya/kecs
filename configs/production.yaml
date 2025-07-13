@@ -7,13 +7,12 @@ server:
   logLevel: info
 
 localstack:
-  enabled: false
+  enabled: true
   services:
     - iam
-    - cloudwatchlogs
+    - logs
     - ssm
     - secretsmanager
-    - elbv2
   persistence: true
   image: localstack/localstack
   version: latest

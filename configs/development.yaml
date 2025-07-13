@@ -10,7 +10,7 @@ localstack:
   enabled: true
   services:
     - iam
-    - cloudwatchlogs
+    - logs
     - ssm
     - secretsmanager
     - elbv2
