@@ -47,6 +47,7 @@ type FeaturesConfig struct {
 	AutoRecoverState        bool `yaml:"autoRecoverState" mapstructure:"autoRecoverState"`
 	SecurityAcknowledged    bool `yaml:"securityAcknowledged" mapstructure:"securityAcknowledged"`
 	SkipSecurityDisclaimer  bool `yaml:"skipSecurityDisclaimer" mapstructure:"skipSecurityDisclaimer"`
+	Traefik                 bool `yaml:"traefik" mapstructure:"traefik"`
 }
 
 // AWSConfig represents AWS-related configuration
