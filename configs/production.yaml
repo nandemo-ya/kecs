@@ -6,6 +6,9 @@ server:
   dataDir: ~/.kecs/data
   logLevel: info
 
+features:
+  traefik: true  # Enable Traefik proxy for LocalStack access from host mode
+
 localstack:
   enabled: true
   services:

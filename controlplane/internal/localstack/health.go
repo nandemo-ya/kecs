@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -14,6 +15,7 @@ import (
 type healthChecker struct {
 	endpoint   string
 	httpClient *http.Client
+	mu         sync.RWMutex
 }
 
 // NewHealthChecker creates a new health checker instance
@@ -26,9 +28,22 @@ func NewHealthChecker(endpoint string) HealthChecker {
 	}
 }
 
+// UpdateEndpoint updates the health check endpoint
+func (hc *healthChecker) UpdateEndpoint(endpoint string) {
+	hc.mu.Lock()
+	defer hc.mu.Unlock()
+	hc.endpoint = endpoint
+	klog.Infof("Updated health check endpoint to: %s", endpoint)
+}
+
 // CheckHealth performs a health check on LocalStack
 func (hc *healthChecker) CheckHealth(ctx context.Context) (*HealthStatus, error) {
-	healthURL := fmt.Sprintf("%s%s", hc.endpoint, HealthCheckPath)
+	hc.mu.RLock()
+	endpoint := hc.endpoint
+	hc.mu.RUnlock()
+	
+	healthURL := fmt.Sprintf("%s%s", endpoint, HealthCheckPath)
+	klog.V(2).Infof("Performing health check on LocalStack at: %s", healthURL)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
 	if err != nil {
@@ -37,6 +52,7 @@ func (hc *healthChecker) CheckHealth(ctx context.Context) (*HealthStatus, error)
 
 	resp, err := hc.httpClient.Do(req)
 	if err != nil {
+		klog.Warningf("Failed to connect to LocalStack at %s: %v", healthURL, err)
 		return &HealthStatus{
 			Healthy:   false,
 			Message:   fmt.Sprintf("failed to connect to LocalStack: %v", err),
