@@ -48,7 +48,7 @@ You can also enable LocalStack using command line flags:
 
 ```bash
 # Start KECS with LocalStack enabled
-kecs server --localstack-enabled --config configs/production.yaml
+kecs server --localstack-enabled --config controlplane/configs/production.yaml
 
 # Or without a config file (uses defaults)
 kecs server --localstack-enabled
@@ -66,7 +66,7 @@ When starting the KECS server with LocalStack enabled:
 
 ```bash
 # Using config file
-kecs server --config configs/development.yaml
+kecs server --config controlplane/configs/development.yaml
 
 # Using command line flag
 kecs server --localstack-enabled
@@ -356,7 +356,7 @@ While LocalStack is enabled by default, you can disable it in specific scenarios
 export KECS_LOCALSTACK_ENABLED=false
 
 # Or use test configuration
-kecs server --config configs/test.yaml
+kecs server --config controlplane/configs/test.yaml
 ```
 
 ### For Production without LocalStack
