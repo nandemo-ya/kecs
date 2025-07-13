@@ -141,9 +141,11 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 
 	// Initialize LocalStack manager if configured
 	if localStackConfig != nil && localStackConfig.Enabled {
+		log.Printf("LocalStack config is enabled, initializing...")
 		// Get Kubernetes client for LocalStack
 		var kubeClient k8s.Interface
 		if s.taskManager != nil {
+			log.Printf("TaskManager is available, getting kubernetes client...")
 			// Get the kubernetes client from task manager
 			kubeConfig, err := kubernetes.GetKubeConfig()
 			if err != nil {
@@ -154,9 +156,12 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					log.Printf("Warning: Failed to create kubernetes client for LocalStack: %v", err)
 				}
 			}
+		} else {
+			log.Printf("TaskManager is nil, skipping kubernetes client creation")
 		}
 
 		if kubeClient != nil {
+			log.Printf("KubeClient created successfully, proceeding with LocalStack initialization...")
 			// Check if Traefik is enabled
 			if apiconfig.GetBool("features.traefik") {
 				localStackConfig.UseTraefik = true
@@ -184,6 +189,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					log.Printf("Warning: Failed to initialize AWS proxy router: %v", err)
 				} else {
 					s.awsProxyRouter = awsProxyRouter
+					log.Printf("AWS proxy router initialized successfully")
 				}
 
 				// Create LocalStack event integration
@@ -278,6 +284,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					}
 				}
 			}
+		} else {
+			log.Printf("KubeClient is nil, cannot initialize LocalStack manager and AWS proxy router")
 		}
 	}
 
@@ -822,6 +830,21 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 		return fmt.Errorf("failed to create LocalStack manager: %w", err)
 	}
 	
+	// Update the server's LocalStack manager
+	s.localStackManager = clusterLocalStackManager
+	
+	// Re-initialize AWS proxy router with the new LocalStack manager
+	if s.localStackManager != nil {
+		log.Printf("Re-initializing AWS proxy router after LocalStack recovery...")
+		awsProxyRouter, err := NewAWSProxyRouter(s.localStackManager)
+		if err != nil {
+			log.Printf("Warning: Failed to re-initialize AWS proxy router: %v", err)
+		} else {
+			s.awsProxyRouter = awsProxyRouter
+			log.Printf("AWS proxy router re-initialized successfully")
+		}
+	}
+	
 	// Check if LocalStack is already running in this cluster
 	if clusterLocalStackManager.IsRunning() {
 		log.Printf("LocalStack is already running in cluster %s", cluster.Name)
@@ -914,7 +937,10 @@ func (s *Server) SetupRoutes() http.Handler {
 	// Add LocalStack proxy middleware LAST so it runs FIRST
 	// This ensures AWS API calls are intercepted before reaching ECS handlers
 	if s.awsProxyRouter != nil {
+		log.Printf("Adding LocalStackProxyMiddleware to handler chain")
 		handler = LocalStackProxyMiddleware(handler, s.awsProxyRouter)
+	} else {
+		log.Printf("WARNING: awsProxyRouter is nil, LocalStackProxyMiddleware not added")
 	}
 
 	return handler

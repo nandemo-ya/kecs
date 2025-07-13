@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
@@ -56,6 +57,12 @@ func ShouldProxyToLocalStack(r *http.Request, localStackManager localstack.Manag
 	// Check if this is an AWS API call (not ECS)
 	isAWS := isAWSAPIRequest(r)
 	isECS := isECSRequest(r)
+	
+	// Debug log
+	if r.Header.Get("X-Amz-Target") != "" {
+		log.Printf("ShouldProxyToLocalStack: healthy=%v, isAWS=%v, isECS=%v, X-Amz-Target=%s", 
+			healthy, isAWS, isECS, r.Header.Get("X-Amz-Target"))
+	}
 	
 	if !healthy || !isAWS || isECS {
 		return false
