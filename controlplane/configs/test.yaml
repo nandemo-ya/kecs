@@ -1,4 +1,5 @@
-# Production configuration for KECS Control Plane
+# Test configuration for KECS Control Plane
+# This configuration is used for unit tests and CI environments
 
 # Server configuration
 server:
@@ -12,12 +13,8 @@ server:
 # WebSocket configuration
 websocket:
   allowedOrigins:
-    # Development
     - "http://localhost:3000"
     - "http://localhost:8080"
-    # Production - replace with actual domains
-    # - "https://app.example.com"
-    # - "*.example.com"
   allowCredentials: true
   
 # Security configuration
@@ -25,7 +22,7 @@ security:
   cors:
     enabled: true
     allowedOrigins:
-      - "*"  # In production, specify actual domains
+      - "*"
     allowedMethods:
       - GET
       - POST
@@ -49,24 +46,24 @@ security:
 storage:
   type: duckdb
   duckdb:
-    path: "/data/kecs.db"
-    inMemory: false
+    path: ":memory:"  # Use in-memory DB for tests
+    inMemory: true
     readOnly: false
 
 # Kubernetes configuration
 kubernetes:
-  inCluster: true  # Use in-cluster config when running in Kubernetes
-  kubeconfig: ""   # Empty for in-cluster
+  inCluster: false
+  kubeconfig: ""
 
 # Logging configuration
 logging:
-  level: info
-  format: json
+  level: debug
+  format: text
   output: stdout
 
 # Metrics configuration
 metrics:
-  enabled: true
+  enabled: false  # Disable metrics in tests
   path: /metrics
   
 # Health check configuration
@@ -78,22 +75,22 @@ health:
 
 # LocalStack configuration
 localstack:
-  enabled: true  # LocalStack is enabled by default for AWS service dependencies
+  enabled: false  # Disabled by default in tests to avoid external dependencies
   services:
     - iam
     - logs
     - ssm
     - secretsmanager
-  persistence: true
+  persistence: false
   image: "localstack/localstack"
   version: "latest"
   namespace: "aws-services"
   port: 4566
   edgePort: 4566
   resources:
-    memory: "2Gi"
-    cpu: "1000m"
-    storageSize: "10Gi"
+    memory: "1Gi"
+    cpu: "500m"
+    storageSize: "1Gi"
   environment:
     DEFAULT_REGION: "us-east-1"
     DOCKER_HOST: "unix:///var/run/docker.sock"
@@ -107,9 +104,6 @@ localstack:
   
 # AWS Proxy configuration  
 proxy:
-  mode: "environment"  # Options: environment, sidecar, ebpf, disabled
+  mode: "disabled"  # Disable proxy in tests
   localstackEndpoint: "http://localstack.aws-services.svc.cluster.local:4566"
-  fallbackEnabled: true
-  fallbackOrder:
-    - sidecar
-    - environment
+  fallbackEnabled: false

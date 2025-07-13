@@ -70,6 +70,7 @@ KECS (Kubernetes-based ECS Compatible Service) is a standalone service that prov
 - **Container-based Background Execution**: Run KECS in containers with simple commands
 - **Multiple Instance Support**: Run multiple KECS instances with different configurations
 - **CI/CD Integration**: Easily integrates with CI/CD pipelines
+- **Built-in LocalStack Integration**: Automatically provides local AWS services (IAM, SSM, Secrets Manager, etc.) for ECS workloads
 
 ## Quick Start
 
