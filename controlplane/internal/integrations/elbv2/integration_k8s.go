@@ -104,9 +104,9 @@ func (i *k8sIntegration) DeleteLoadBalancer(ctx context.Context, arn string) err
 	return nil
 }
 
-// CreateTargetGroup creates a virtual target group
+// CreateTargetGroup creates a virtual target group and Kubernetes resources
 func (i *k8sIntegration) CreateTargetGroup(ctx context.Context, name string, port int32, protocol string, vpcId string) (*TargetGroup, error) {
-	klog.V(2).Infof("Creating virtual target group: %s", name)
+	klog.V(2).Infof("Creating target group with Kubernetes resources: %s", name)
 
 	// Generate ARN
 	arn := fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:targetgroup/%s/%s",
@@ -127,13 +127,18 @@ func (i *k8sIntegration) CreateTargetGroup(ctx context.Context, name string, por
 		HealthyThresholdCount:   2,
 	}
 
+	// Deploy Kubernetes resources for target group
+	if err := i.deployTargetGroupResources(ctx, name, arn, port, protocol); err != nil {
+		return nil, fmt.Errorf("failed to deploy target group resources: %w", err)
+	}
+
 	// Store in memory with lock
 	i.mu.Lock()
 	i.targetGroups[arn] = tg
 	i.targetHealth[arn] = make(map[string]*TargetHealth)
 	i.mu.Unlock()
 
-	klog.V(2).Infof("Created virtual target group: %s", arn)
+	klog.V(2).Infof("Created target group: %s with Kubernetes resources", arn)
 	return tg, nil
 }
 
@@ -213,19 +218,26 @@ func (i *k8sIntegration) DeregisterTargets(ctx context.Context, targetGroupArn s
 	return nil
 }
 
-// CreateListener creates a virtual listener
+// CreateListener creates a virtual listener and updates Traefik configuration
 func (i *k8sIntegration) CreateListener(ctx context.Context, loadBalancerArn string, port int32, protocol string, targetGroupArn string) (*Listener, error) {
-	klog.V(2).Infof("Creating virtual listener on port %d for load balancer: %s", port, loadBalancerArn)
+	klog.V(2).Infof("Creating listener on port %d for load balancer: %s", port, loadBalancerArn)
 
 	i.mu.RLock()
-	if _, exists := i.loadBalancers[loadBalancerArn]; !exists {
+	lb, exists := i.loadBalancers[loadBalancerArn]
+	if !exists {
 		i.mu.RUnlock()
 		return nil, fmt.Errorf("load balancer not found: %s", loadBalancerArn)
 	}
+	lbName := lb.Name
 
-	if _, exists := i.targetGroups[targetGroupArn]; !exists {
+	tg, exists := i.targetGroups[targetGroupArn]
+	if !exists && targetGroupArn != "" {
 		i.mu.RUnlock()
 		return nil, fmt.Errorf("target group not found: %s", targetGroupArn)
+	}
+	var targetGroupName string
+	if tg != nil {
+		targetGroupName = tg.Name
 	}
 	i.mu.RUnlock()
 
@@ -248,12 +260,17 @@ func (i *k8sIntegration) CreateListener(ctx context.Context, loadBalancerArn str
 		},
 	}
 
+	// Update Traefik configuration with new listener
+	if err := i.updateTraefikConfigForListener(ctx, lbName, arn, port, protocol, targetGroupName); err != nil {
+		return nil, fmt.Errorf("failed to update Traefik configuration: %w", err)
+	}
+
 	// Store in memory with lock
 	i.mu.Lock()
 	i.listeners[arn] = listener
 	i.mu.Unlock()
 
-	klog.V(2).Infof("Created virtual listener: %s", arn)
+	klog.V(2).Infof("Created listener: %s with Traefik configuration", arn)
 	return listener, nil
 }
 
@@ -616,4 +633,97 @@ func mustParseResource(s string) resource.Quantity {
 		panic(err)
 	}
 	return q
+}
+
+// deployTargetGroupResources deploys Kubernetes resources for a target group
+func (i *k8sIntegration) deployTargetGroupResources(ctx context.Context, tgName, tgArn string, port int32, protocol string) error {
+	if i.kubeClient == nil {
+		klog.V(2).Infof("No kubeClient available, skipping target group resources deployment for: %s", tgName)
+		return nil
+	}
+
+	namespace := "kecs-system"
+	serviceName := fmt.Sprintf("tg-%s", tgName)
+
+	// Create a Service for the target group
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"kecs.io/elbv2-target-group-name": tgName,
+				"kecs.io/elbv2-target-group-arn":  tgArn,
+				"kecs.io/elbv2-target-group-protocol": protocol,
+			},
+			Labels: map[string]string{
+				"kecs.io/elbv2-target-group-name": tgName,
+				"kecs.io/component":               "target-group",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Selector: map[string]string{
+				"kecs.io/elbv2-target-group-name": tgName,
+			},
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "main",
+					Port:       port,
+					TargetPort: intstr.FromInt(int(port)),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+		},
+	}
+
+	// Create the service
+	_, err := i.kubeClient.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create Service for target group: %w", err)
+	}
+
+	klog.V(2).Infof("Created Service %s for target group %s", serviceName, tgName)
+	return nil
+}
+
+// updateTraefikConfigForListener updates Traefik configuration for a new listener
+func (i *k8sIntegration) updateTraefikConfigForListener(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
+	if i.kubeClient == nil {
+		klog.V(2).Infof("No kubeClient available, skipping Traefik config update for listener: %s", listenerArn)
+		return nil
+	}
+
+	namespace := "kecs-system"
+	traefikName := fmt.Sprintf("traefik-elbv2-%s", lbName)
+	
+	// Update the ConfigMap with new listener configuration
+	cm, err := i.kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, fmt.Sprintf("%s-config", traefikName), metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get ConfigMap: %w", err)
+	}
+
+	// Update the traefik.yml to include the new listener port
+	traefikYaml := cm.Data["traefik.yml"]
+	if !strings.Contains(traefikYaml, fmt.Sprintf(":%d", port)) {
+		// Add new entrypoint for the listener
+		newEntry := fmt.Sprintf(`
+  listener%d:
+    address: ":%d"`, port, port)
+		
+		// Insert after the existing entryPoints
+		traefikYaml = strings.Replace(traefikYaml, "entryPoints:", "entryPoints:"+newEntry, 1)
+		cm.Data["traefik.yml"] = traefikYaml
+		
+		// Update ConfigMap
+		_, err = i.kubeClient.CoreV1().ConfigMaps(namespace).Update(ctx, cm, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to update ConfigMap: %w", err)
+		}
+	}
+
+	// TODO: Create IngressRoute CRD for routing rules
+	// For now, we're just updating the entrypoint
+
+	klog.V(2).Infof("Updated Traefik configuration for listener on port %d", port)
+	return nil
 }

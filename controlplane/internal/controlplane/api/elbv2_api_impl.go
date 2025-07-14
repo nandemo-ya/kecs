@@ -279,6 +279,11 @@ func (api *ELBv2APIImpl) CreateTargetGroup(ctx context.Context, input *generated
 		return nil, err
 	}
 
+	// Create target group in Kubernetes
+	if _, err := api.elbv2Integration.CreateTargetGroup(ctx, input.Name, *input.Port, string(*input.Protocol), *input.VpcId); err != nil {
+		return nil, fmt.Errorf("failed to create target group in Kubernetes: %w", err)
+	}
+
 	// Create response
 	output := &generated_elbv2.CreateTargetGroupOutput{
 		TargetGroups: []generated_elbv2.TargetGroup{
@@ -368,6 +373,26 @@ func (api *ELBv2APIImpl) RegisterTargets(ctx context.Context, input *generated_e
 		return nil, err
 	}
 
+	// Convert to elbv2.Target type for integration
+	var integrationTargets []elbv2.Target
+	for _, t := range input.Targets {
+		if t.Id != "" {
+			port := int32(80)
+			if t.Port != nil {
+				port = *t.Port
+			}
+			integrationTargets = append(integrationTargets, elbv2.Target{
+				Id:   t.Id,
+				Port: port,
+			})
+		}
+	}
+
+	// Register targets in Kubernetes
+	if err := api.elbv2Integration.RegisterTargets(ctx, input.TargetGroupArn, integrationTargets); err != nil {
+		return nil, fmt.Errorf("failed to register targets in Kubernetes: %w", err)
+	}
+
 	return &generated_elbv2.RegisterTargetsOutput{}, nil
 }
 
@@ -404,6 +429,26 @@ func (api *ELBv2APIImpl) DeregisterTargets(ctx context.Context, input *generated
 	// Deregister all targets (remove from storage)
 	if err := api.storage.ELBv2Store().DeregisterTargets(ctx, input.TargetGroupArn, targetIDs); err != nil {
 		return nil, err
+	}
+
+	// Convert to elbv2.Target type for integration
+	var integrationTargets []elbv2.Target
+	for _, t := range input.Targets {
+		if t.Id != "" {
+			port := int32(80)
+			if t.Port != nil {
+				port = *t.Port
+			}
+			integrationTargets = append(integrationTargets, elbv2.Target{
+				Id:   t.Id,
+				Port: port,
+			})
+		}
+	}
+
+	// Deregister targets in Kubernetes
+	if err := api.elbv2Integration.DeregisterTargets(ctx, input.TargetGroupArn, integrationTargets); err != nil {
+		return nil, fmt.Errorf("failed to deregister targets in Kubernetes: %w", err)
 	}
 
 	return &generated_elbv2.DeregisterTargetsOutput{}, nil
@@ -501,6 +546,17 @@ func (api *ELBv2APIImpl) CreateListener(ctx context.Context, input *generated_el
 
 	if err := api.storage.ELBv2Store().CreateListener(ctx, dbListener); err != nil {
 		return nil, err
+	}
+
+	// Get default target group ARN from DefaultActions
+	var targetGroupArn string
+	if len(input.DefaultActions) > 0 && input.DefaultActions[0].TargetGroupArn != nil {
+		targetGroupArn = *input.DefaultActions[0].TargetGroupArn
+	}
+
+	// Create listener in Kubernetes
+	if _, err := api.elbv2Integration.CreateListener(ctx, input.LoadBalancerArn, *input.Port, string(*input.Protocol), targetGroupArn); err != nil {
+		return nil, fmt.Errorf("failed to create listener in Kubernetes: %w", err)
 	}
 
 	// Create response
