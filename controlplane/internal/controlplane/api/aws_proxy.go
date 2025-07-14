@@ -25,15 +25,31 @@ func NewAWSProxyHandler(localStackManager localstack.Manager) (*AWSProxyHandler,
 		localStackManager: localStackManager,
 	}
 
-	// Initialize the reverse proxy with Traefik endpoint
-	// TODO: Get this from LocalStack manager configuration properly
+	// Initialize the reverse proxy with the endpoint from LocalStack manager
 	if localStackManager != nil {
-		// Use Traefik proxy endpoint for now
-		endpoint := "http://localhost:8091"
-		klog.Infof("Using Traefik endpoint for LocalStack proxy: %s", endpoint)
-		
-		if err := handler.updateProxyTarget(endpoint); err != nil {
-			klog.Warningf("Failed to initialize proxy target: %v", err)
+		// Get the configuration from LocalStack manager
+		config := localStackManager.GetConfig()
+		if config != nil && config.UseTraefik && config.ProxyEndpoint != "" {
+			// Use the proxy endpoint from configuration
+			endpoint := config.ProxyEndpoint
+			klog.Infof("Using Traefik endpoint from LocalStack config: %s", endpoint)
+			
+			if err := handler.updateProxyTarget(endpoint); err != nil {
+				klog.Warningf("Failed to initialize proxy target: %v", err)
+			}
+		} else {
+			// Fallback to getting endpoint from manager
+			endpoint, err := localStackManager.GetEndpoint()
+			if err != nil {
+				klog.Warningf("Failed to get LocalStack endpoint: %v", err)
+				// Use default as last resort
+				endpoint = "http://localhost:4566"
+			}
+			klog.Infof("Using LocalStack endpoint: %s", endpoint)
+			
+			if err := handler.updateProxyTarget(endpoint); err != nil {
+				klog.Warningf("Failed to initialize proxy target: %v", err)
+			}
 		}
 	}
 
@@ -90,10 +106,25 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Update proxy target if needed
 	if h.reverseProxy == nil {
-		// Use Traefik proxy endpoint
-		// TODO: Get this from configuration properly
-		endpoint := "http://localhost:8091"
-		klog.Infof("Initializing proxy with Traefik endpoint: %s", endpoint)
+		// Get the configuration from LocalStack manager
+		config := h.localStackManager.GetConfig()
+		var endpoint string
+		
+		if config != nil && config.UseTraefik && config.ProxyEndpoint != "" {
+			// Use the proxy endpoint from configuration
+			endpoint = config.ProxyEndpoint
+			klog.Infof("Initializing proxy with Traefik endpoint from config: %s", endpoint)
+		} else {
+			// Fallback to getting endpoint from manager
+			var err error
+			endpoint, err = h.localStackManager.GetEndpoint()
+			if err != nil {
+				klog.Warningf("Failed to get LocalStack endpoint: %v", err)
+				// Use default as last resort
+				endpoint = "http://localhost:4566"
+			}
+			klog.Infof("Initializing proxy with LocalStack endpoint: %s", endpoint)
+		}
 		
 		if err := h.updateProxyTarget(endpoint); err != nil {
 			http.Error(w, "Failed to initialize proxy", http.StatusInternalServerError)
@@ -188,40 +219,3 @@ func (h *AWSProxyHandler) HealthCheck() (bool, error) {
 	return h.localStackManager.IsHealthy(), nil
 }
 
-// isAWSAPICall checks if the request is for an AWS API
-func isAWSAPICall(r *http.Request) bool {
-	path := r.URL.Path
-
-	// Check for AWS API path patterns
-	awsAPIPrefixes := []string{
-		"/api/v1/s3/",
-		"/api/v1/iam/",
-		"/api/v1/logs/",
-		"/api/v1/ssm/",
-		"/api/v1/secretsmanager/",
-		"/api/v1/elbv2/",
-		"/api/v1/rds/",
-		"/api/v1/dynamodb/",
-	}
-
-	for _, prefix := range awsAPIPrefixes {
-		if strings.HasPrefix(path, prefix) {
-			return true
-		}
-	}
-
-	// Check for AWS SDK headers
-	if r.Header.Get("X-Amz-Target") != "" ||
-		strings.Contains(r.Header.Get("Authorization"), "AWS4-HMAC-SHA256") {
-		return true
-	}
-
-	return false
-}
-
-// isECSAPICall checks if the request is for the ECS API
-func isECSAPICall(r *http.Request) bool {
-	// ECS API calls go through the main KECS API
-	return strings.HasPrefix(r.URL.Path, "/v1/") ||
-		r.Header.Get("X-Amz-Target") == "AmazonEC2ContainerServiceV20141113"
-}
