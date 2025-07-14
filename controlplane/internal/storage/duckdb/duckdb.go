@@ -26,6 +26,7 @@ type DuckDBStorage struct {
 	taskSetStore           *taskSetStore
 	containerInstanceStore *containerInstanceStore
 	attributeStore         *attributeStore
+	elbv2Store             *elbv2Store
 }
 
 // NewDuckDBStorage creates a new DuckDB storage instance
@@ -63,6 +64,7 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 	s.taskSetStore = &taskSetStore{db: db}
 	s.containerInstanceStore = &containerInstanceStore{db: db}
 	s.attributeStore = &attributeStore{db: db}
+	s.elbv2Store = &elbv2Store{db: db}
 
 	return s, nil
 }
@@ -114,6 +116,11 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 	// Create attributes table
 	if err := s.createAttributesTable(ctx); err != nil {
 		return fmt.Errorf("failed to create attributes table: %w", err)
+	}
+
+	// Create ELBv2 tables
+	if err := s.createELBv2Tables(ctx); err != nil {
+		return fmt.Errorf("failed to create ELBv2 tables: %w", err)
 	}
 
 	// Initialize prepared statements for common queries
@@ -172,6 +179,11 @@ func (s *DuckDBStorage) ContainerInstanceStore() storage.ContainerInstanceStore 
 // AttributeStore returns the attribute store
 func (s *DuckDBStorage) AttributeStore() storage.AttributeStore {
 	return s.attributeStore
+}
+
+// ELBv2Store returns the ELBv2 store
+func (s *DuckDBStorage) ELBv2Store() storage.ELBv2Store {
+	return s.elbv2Store
 }
 
 // BeginTx starts a new transaction
@@ -642,6 +654,127 @@ func (s *DuckDBStorage) createAttributesTable(ctx context.Context) error {
 		"CREATE INDEX IF NOT EXISTS idx_attributes_region ON attributes(region)",
 		"CREATE INDEX IF NOT EXISTS idx_attributes_account_id ON attributes(account_id)",
 		"CREATE INDEX IF NOT EXISTS idx_attributes_created_at ON attributes(created_at)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
+	return nil
+}
+
+
+// createELBv2Tables creates all ELBv2-related tables
+func (s *DuckDBStorage) createELBv2Tables(ctx context.Context) error {
+	// Create load balancers table
+	lbQuery := `
+	CREATE TABLE IF NOT EXISTS elbv2_load_balancers (
+		arn VARCHAR PRIMARY KEY,
+		name VARCHAR NOT NULL UNIQUE,
+		dns_name VARCHAR NOT NULL,
+		canonical_hosted_zone_id VARCHAR,
+		state VARCHAR NOT NULL,
+		type VARCHAR NOT NULL,
+		scheme VARCHAR NOT NULL,
+		vpc_id VARCHAR,
+		subnets TEXT,
+		availability_zones TEXT,
+		security_groups TEXT,
+		ip_address_type VARCHAR,
+		tags TEXT,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		created_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL
+	)`
+
+	if _, err := s.db.ExecContext(ctx, lbQuery); err != nil {
+		return fmt.Errorf("failed to create load balancers table: %w", err)
+	}
+
+	// Create target groups table
+	tgQuery := `
+	CREATE TABLE IF NOT EXISTS elbv2_target_groups (
+		arn VARCHAR PRIMARY KEY,
+		name VARCHAR NOT NULL UNIQUE,
+		protocol VARCHAR NOT NULL,
+		port INTEGER NOT NULL,
+		vpc_id VARCHAR,
+		target_type VARCHAR NOT NULL,
+		health_check_enabled BOOLEAN NOT NULL,
+		health_check_protocol VARCHAR,
+		health_check_port VARCHAR,
+		health_check_path VARCHAR,
+		health_check_interval_seconds INTEGER,
+		health_check_timeout_seconds INTEGER,
+		healthy_threshold_count INTEGER,
+		unhealthy_threshold_count INTEGER,
+		matcher VARCHAR,
+		load_balancer_arns TEXT,
+		tags TEXT,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		created_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL
+	)`
+
+	if _, err := s.db.ExecContext(ctx, tgQuery); err != nil {
+		return fmt.Errorf("failed to create target groups table: %w", err)
+	}
+
+	// Create listeners table
+	listenerQuery := `
+	CREATE TABLE IF NOT EXISTS elbv2_listeners (
+		arn VARCHAR PRIMARY KEY,
+		load_balancer_arn VARCHAR NOT NULL,
+		port INTEGER NOT NULL,
+		protocol VARCHAR NOT NULL,
+		default_actions TEXT,
+		ssl_policy VARCHAR,
+		certificates TEXT,
+		alpn_policy TEXT,
+		tags TEXT,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		created_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL
+	)`
+
+	if _, err := s.db.ExecContext(ctx, listenerQuery); err != nil {
+		return fmt.Errorf("failed to create listeners table: %w", err)
+	}
+
+	// Create targets table
+	targetsQuery := `
+	CREATE TABLE IF NOT EXISTS elbv2_targets (
+		target_group_arn VARCHAR NOT NULL,
+		id VARCHAR NOT NULL,
+		port INTEGER NOT NULL,
+		availability_zone VARCHAR,
+		health_state VARCHAR NOT NULL,
+		health_reason VARCHAR,
+		health_description VARCHAR,
+		registered_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL,
+		PRIMARY KEY (target_group_arn, id)
+	)`
+
+	if _, err := s.db.ExecContext(ctx, targetsQuery); err != nil {
+		return fmt.Errorf("failed to create targets table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_lb_name ON elbv2_load_balancers(name)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_lb_region ON elbv2_load_balancers(region)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_lb_state ON elbv2_load_balancers(state)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_tg_name ON elbv2_target_groups(name)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_tg_region ON elbv2_target_groups(region)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_listener_lb ON elbv2_listeners(load_balancer_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_targets_tg ON elbv2_targets(target_group_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_targets_health ON elbv2_targets(health_state)",
 	}
 
 	for _, idx := range indexes {

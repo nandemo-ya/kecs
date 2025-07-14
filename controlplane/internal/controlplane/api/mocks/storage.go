@@ -21,6 +21,7 @@ type MockStorage struct {
 	taskSetStore           storage.TaskSetStore
 	containerInstanceStore storage.ContainerInstanceStore
 	attributeStore         storage.AttributeStore
+	elbv2Store            storage.ELBv2Store
 }
 
 func NewMockStorage() *MockStorage {
@@ -67,6 +68,10 @@ func (m *MockStorage) AttributeStore() storage.AttributeStore {
 	return m.attributeStore
 }
 
+func (m *MockStorage) ELBv2Store() storage.ELBv2Store {
+	return m.elbv2Store
+}
+
 func (m *MockStorage) BeginTx(ctx context.Context) (storage.Transaction, error) {
 	return nil, nil
 }
@@ -109,6 +114,11 @@ func (m *MockStorage) SetContainerInstanceStore(store storage.ContainerInstanceS
 // SetAttributeStore sets the attribute store
 func (m *MockStorage) SetAttributeStore(store storage.AttributeStore) {
 	m.attributeStore = store
+}
+
+// SetELBv2Store sets the ELBv2 store
+func (m *MockStorage) SetELBv2Store(store storage.ELBv2Store) {
+	m.elbv2Store = store
 }
 
 // MockClusterStore implements storage.ClusterStore for testing

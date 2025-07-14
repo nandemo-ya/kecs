@@ -84,6 +84,11 @@ func (s *CachedStorage) AttributeStore() storage.AttributeStore {
 	return s.backend.AttributeStore()
 }
 
+// ELBv2Store returns the ELBv2 store (no caching)
+func (s *CachedStorage) ELBv2Store() storage.ELBv2Store {
+	return s.backend.ELBv2Store()
+}
+
 // BeginTx starts a new transaction
 func (s *CachedStorage) BeginTx(ctx context.Context) (storage.Transaction, error) {
 	return s.backend.BeginTx(ctx)

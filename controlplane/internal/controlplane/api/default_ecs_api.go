@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/s3"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
@@ -24,6 +25,7 @@ type DefaultECSAPI struct {
 	ssmIntegration            ssm.Integration
 	secretsManagerIntegration secretsmanager.Integration
 	s3Integration             s3.Integration
+	elbv2Integration          elbv2.Integration
 	serviceDiscoveryManager   servicediscovery.Manager
 	localStackManager         localstack.Manager
 	localStackConfig          *localstack.Config
@@ -63,6 +65,11 @@ func (api *DefaultECSAPI) SetSecretsManagerIntegration(secretsManagerIntegration
 // SetS3Integration sets the S3 integration for the ECS API
 func (api *DefaultECSAPI) SetS3Integration(s3Integration s3.Integration) {
 	api.s3Integration = s3Integration
+}
+
+// SetELBv2Integration sets the ELBv2 integration for the ECS API
+func (api *DefaultECSAPI) SetELBv2Integration(elbv2Integration elbv2.Integration) {
+	api.elbv2Integration = elbv2Integration
 }
 
 // SetServiceDiscoveryManager sets the service discovery manager for the ECS API
