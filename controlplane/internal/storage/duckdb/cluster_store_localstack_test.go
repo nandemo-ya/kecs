@@ -53,11 +53,11 @@ func TestClusterStore_LocalStackState(t *testing.T) {
 
 		// Create cluster with LocalStack state
 		cluster := &storage.Cluster{
-			ARN:                               "arn:aws:ecs:us-east-1:123456789012:cluster/test-localstack",
+			ARN:                               "arn:aws:ecs:us-east-1:000000000000:cluster/test-localstack",
 			Name:                              "test-localstack",
 			Status:                            "ACTIVE",
 			Region:                            "us-east-1",
-			AccountID:                         "123456789012",
+			AccountID:                         "000000000000",
 			K8sClusterName:                    "kecs-test-localstack",
 			RegisteredContainerInstancesCount: 0,
 			RunningTasksCount:                 0,
@@ -129,11 +129,11 @@ func TestClusterStore_LocalStackState(t *testing.T) {
 	t.Run("list_clusters_with_localstack_state", func(t *testing.T) {
 		// Create another cluster without LocalStack
 		cluster2 := &storage.Cluster{
-			ARN:                               "arn:aws:ecs:us-east-1:123456789012:cluster/test-no-localstack",
+			ARN:                               "arn:aws:ecs:us-east-1:000000000000:cluster/test-no-localstack",
 			Name:                              "test-no-localstack",
 			Status:                            "ACTIVE",
 			Region:                            "us-east-1",
-			AccountID:                         "123456789012",
+			AccountID:                         "000000000000",
 			K8sClusterName:                    "kecs-test-no-localstack",
 			RegisteredContainerInstancesCount: 0,
 			RunningTasksCount:                 0,

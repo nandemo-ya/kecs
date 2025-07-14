@@ -325,7 +325,7 @@ func (s *taskDefinitionStore) GetByARN(ctx context.Context, arn string) (*storag
 		return nil, fmt.Errorf("invalid task definition ARN: %s", arn)
 	}
 
-	// For an ARN like "arn:aws:ecs:us-east-1:123456789012:task-definition/nginx-fargate:2"
+	// For an ARN like "arn:aws:ecs:us-east-1:000000000000:task-definition/nginx-fargate:2"
 	// parts[5] = "task-definition/nginx-fargate"
 	// parts[6] = "2" (revision)
 	taskDefPart := parts[5]

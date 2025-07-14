@@ -102,7 +102,7 @@ func InitConfig() error {
 	
 	// AWS defaults
 	v.SetDefault("aws.defaultRegion", "us-east-1")
-	v.SetDefault("aws.accountID", "123456789012")
+	v.SetDefault("aws.accountID", "000000000000")
 	v.SetDefault("aws.proxyImage", "")
 	
 	// LocalStack defaults

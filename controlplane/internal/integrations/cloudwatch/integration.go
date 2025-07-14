@@ -155,7 +155,7 @@ func (i *integration) DeleteLogGroup(groupName string) error {
 // GetLogGroupForTask returns the log group name for a task
 func (i *integration) GetLogGroupForTask(taskArn string) string {
 	// Extract task family from ARN
-	// Example: arn:aws:ecs:us-east-1:123456789012:task/default/1234567890
+	// Example: arn:aws:ecs:us-east-1:000000000000:task/default/1234567890
 	parts := strings.Split(taskArn, "/")
 	if len(parts) >= 2 {
 		// For ECS tasks, we typically use the task definition family name

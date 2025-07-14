@@ -245,7 +245,7 @@ var _ = Describe("CloudWatch Integration", func() {
 
 	Describe("GetLogGroupForTask", func() {
 		It("should return log group name for task", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/1234567890"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/1234567890"
 			groupName := integration.GetLogGroupForTask(taskArn)
 			Expect(groupName).To(Equal("/ecs/kecs-tasks"))
 		})
@@ -253,7 +253,7 @@ var _ = Describe("CloudWatch Integration", func() {
 
 	Describe("GetLogStreamForContainer", func() {
 		It("should return log stream name for container", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/1234567890"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/1234567890"
 			streamName := integration.GetLogStreamForContainer(taskArn, "my-container")
 			Expect(streamName).To(Equal("my-container/1234567890"))
 		})
@@ -261,7 +261,7 @@ var _ = Describe("CloudWatch Integration", func() {
 
 	Describe("ConfigureContainerLogging", func() {
 		It("should configure awslogs driver", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/1234567890"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/1234567890"
 			options := map[string]string{
 				"awslogs-group":         "/ecs/my-app",
 				"awslogs-region":        "us-east-1",
@@ -279,7 +279,7 @@ var _ = Describe("CloudWatch Integration", func() {
 		})
 
 		It("should use default log group if not specified", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/1234567890"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/1234567890"
 			options := map[string]string{}
 
 			logConfig, err := integration.ConfigureContainerLogging(taskArn, "my-container", "awslogs", options)
@@ -289,7 +289,7 @@ var _ = Describe("CloudWatch Integration", func() {
 		})
 
 		It("should error on unsupported log driver", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/1234567890"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/1234567890"
 			_, err := integration.ConfigureContainerLogging(taskArn, "my-container", "json-file", nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("unsupported log driver"))

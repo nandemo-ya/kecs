@@ -21,7 +21,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 		ecsAPI    *api.DefaultECSAPI
 		store     storage.Storage
 		region    = "us-east-1"
-		accountID = "123456789012"
+		accountID = "000000000000"
 	)
 
 	BeforeEach(func() {

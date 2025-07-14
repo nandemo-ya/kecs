@@ -32,7 +32,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		region = "us-east-1"
-		accountID = "123456789012"
+		accountID = "000000000000"
 		clusterName = "test-cluster"
 		serviceName = "test-service"
 		clusterARN = fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", region, accountID, clusterName)
@@ -60,7 +60,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 			req = &generated.CreateTaskSetRequest{
 				Cluster:        clusterName,
 				Service:        serviceName,
-				TaskDefinition: "arn:aws:ecs:us-east-1:123456789012:task-definition/my-app:1",
+				TaskDefinition: "arn:aws:ecs:us-east-1:000000000000:task-definition/my-app:1",
 				LaunchType:     (*generated.LaunchType)(ptr.String("EC2")),
 				Scale: &generated.Scale{
 					Value: ptr.Float64(100.0),
@@ -204,7 +204,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 				ServiceARN:           serviceARN,
 				ClusterARN:           clusterARN,
 				Status:               "ACTIVE",
-				TaskDefinition:       "arn:aws:ecs:us-east-1:123456789012:task-definition/my-app:1",
+				TaskDefinition:       "arn:aws:ecs:us-east-1:000000000000:task-definition/my-app:1",
 				LaunchType:           "EC2",
 				StabilityStatus:      "STEADY_STATE",
 				ComputedDesiredCount: 3,
@@ -221,7 +221,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 				ServiceARN:           serviceARN,
 				ClusterARN:           clusterARN,
 				Status:               "DRAINING",
-				TaskDefinition:       "arn:aws:ecs:us-east-1:123456789012:task-definition/my-app:2",
+				TaskDefinition:       "arn:aws:ecs:us-east-1:000000000000:task-definition/my-app:2",
 				LaunchType:           "FARGATE",
 				StabilityStatus:      "STABILIZING",
 				ComputedDesiredCount: 0,
@@ -314,7 +314,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 				ServiceARN:           serviceARN,
 				ClusterARN:           clusterARN,
 				Status:               "ACTIVE",
-				TaskDefinition:       "arn:aws:ecs:us-east-1:123456789012:task-definition/my-app:1",
+				TaskDefinition:       "arn:aws:ecs:us-east-1:000000000000:task-definition/my-app:1",
 				LaunchType:           "EC2",
 				StabilityStatus:      "STEADY_STATE",
 				ComputedDesiredCount: 3,

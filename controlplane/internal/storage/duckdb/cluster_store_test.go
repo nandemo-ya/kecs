@@ -22,11 +22,11 @@ func TestClusterStore_ListWithPagination(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		clusters[i] = &storage.Cluster{
 			ID:        uuid.New().String(),
-			ARN:       fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-%02d", i),
+			ARN:       fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:cluster/test-cluster-%02d", i),
 			Name:      fmt.Sprintf("test-cluster-%02d", i),
 			Status:    "ACTIVE",
 			Region:    "us-east-1",
-			AccountID: "123456789012",
+			AccountID: "000000000000",
 		}
 		err := store.ClusterStore().Create(ctx, clusters[i])
 		require.NoError(t, err)

@@ -72,9 +72,9 @@ aws:
   # Can be set via KECS_DEFAULT_REGION environment variable
   defaultRegion: us-east-1
   
-  # AWS account ID (default: 123456789012)
+  # AWS account ID (default: 000000000000 - LocalStack standard)
   # Can be set via KECS_ACCOUNT_ID environment variable
-  accountID: "123456789012"
+  accountID: "000000000000"
   
   # Custom AWS proxy image for sidecar mode
   # Can be set via KECS_AWS_PROXY_IMAGE environment variable

@@ -37,7 +37,7 @@ curl -X POST http://localhost:8080/v1/CreateCluster \
 ```json
 {
   "cluster": {
-    "clusterArn": "arn:aws:ecs:ap-northeast-1:123456789012:cluster/my-first-cluster",
+    "clusterArn": "arn:aws:ecs:ap-northeast-1:000000000000:cluster/my-first-cluster",
     "clusterName": "my-first-cluster",
     "status": "ACTIVE"
   }

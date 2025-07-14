@@ -45,17 +45,17 @@ var _ = Describe("Service Discovery Integration", func() {
 		fakeClient := fake.NewSimpleClientset()
 
 		// Create service discovery manager
-		serviceDiscoveryMgr = servicediscovery.NewManager(fakeClient, "us-east-1", "123456789012")
+		serviceDiscoveryMgr = servicediscovery.NewManager(fakeClient, "us-east-1", "000000000000")
 
 		// Create ECS API with service discovery
-		ecsAPI = NewDefaultECSAPIWithConfig(store, "us-east-1", "123456789012").(*DefaultECSAPI)
+		ecsAPI = NewDefaultECSAPIWithConfig(store, "us-east-1", "000000000000").(*DefaultECSAPI)
 		ecsAPI.SetServiceDiscoveryManager(serviceDiscoveryMgr)
 
 		// Create test server
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			target := r.Header.Get("X-Amz-Target")
 			if target != "" && contains(target, "ServiceDiscovery") {
-				serviceDiscoveryAPI := NewServiceDiscoveryAPI(serviceDiscoveryMgr, "us-east-1", "123456789012")
+				serviceDiscoveryAPI := NewServiceDiscoveryAPI(serviceDiscoveryMgr, "us-east-1", "000000000000")
 				serviceDiscoveryAPI.HandleServiceDiscoveryRequest(w, r)
 			} else {
 				router := generated.NewRouter(ecsAPI)
@@ -151,7 +151,7 @@ var _ = Describe("Service Discovery Integration", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 			// Create service with service registry
-			serviceArn := "arn:aws:servicediscovery:us-east-1:123456789012:service/" + serviceID
+			serviceArn := "arn:aws:servicediscovery:us-east-1:000000000000:service/" + serviceID
 			createServiceReq := generated.CreateServiceRequest{
 				Cluster:        ptr.String("test-cluster"),
 				ServiceName:    "test-service",

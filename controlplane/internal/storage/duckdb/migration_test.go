@@ -85,8 +85,8 @@ func TestMigration_LocalStackStateColumn(t *testing.T) {
 				id, arn, name, status, region, account_id,
 				created_at, updated_at
 			) VALUES (
-				'test-id', 'arn:aws:ecs:us-east-1:123456789012:cluster/test',
-				'test', 'ACTIVE', 'us-east-1', '123456789012',
+				'test-id', 'arn:aws:ecs:us-east-1:000000000000:cluster/test',
+				'test', 'ACTIVE', 'us-east-1', '000000000000',
 				CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 			)
 		`)

@@ -71,7 +71,7 @@ var _ = Describe("LocalStack Dashboard Integration", func() {
 			taskDef := &storage.TaskDefinition{
 				Family:               "my-task",
 				Revision:             1,
-				ARN:                  "arn:aws:ecs:us-east-1:123456789012:task-definition/my-task:1",
+				ARN:                  "arn:aws:ecs:us-east-1:000000000000:task-definition/my-task:1",
 				ContainerDefinitions: `[{"name":"app","image":"nginx:latest","environment":[{"name":"AWS_REGION","value":"us-east-1"}]}]`,
 			}
 			_, err := mockTaskDefStore.Register(ctx, taskDef)
@@ -81,8 +81,8 @@ var _ = Describe("LocalStack Dashboard Integration", func() {
 			// Setup test service
 			testService := &storage.Service{
 				ServiceName:       "my-service",
-				ClusterARN:        "arn:aws:ecs:us-east-1:123456789012:cluster/test",
-				TaskDefinitionARN: "arn:aws:ecs:us-east-1:123456789012:task-definition/my-task:1",
+				ClusterARN:        "arn:aws:ecs:us-east-1:000000000000:cluster/test",
+				TaskDefinitionARN: "arn:aws:ecs:us-east-1:000000000000:task-definition/my-task:1",
 			}
 			err = mockServiceStore.Create(ctx, testService)
 			Expect(err).NotTo(HaveOccurred())
@@ -176,13 +176,13 @@ var _ = Describe("LocalStack Dashboard Integration", func() {
 				{
 					Family:               "api-task",
 					Revision:             1,
-					ARN:                  "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:1",
+					ARN:                  "arn:aws:ecs:us-east-1:000000000000:task-definition/api-task:1",
 					ContainerDefinitions: `[{"name":"api","image":"myapp:latest","environment":[{"name":"AWS_REGION","value":"us-east-1"},{"name":"S3_BUCKET","value":"my-bucket"},{"name":"DYNAMODB_TABLE","value":"my-table"}]}]`,
 				},
 				{
 					Family:               "worker-task",
 					Revision:             1,
-					ARN:                  "arn:aws:ecs:us-east-1:123456789012:task-definition/worker-task:1",
+					ARN:                  "arn:aws:ecs:us-east-1:000000000000:task-definition/worker-task:1",
 					ContainerDefinitions: `[{"name":"worker","image":"worker:latest","environment":[{"name":"AWS_REGION","value":"us-east-1"},{"name":"SQS_QUEUE","value":"my-queue"},{"name":"SNS_TOPIC","value":"my-topic"}]}]`,
 				},
 			}
@@ -197,13 +197,13 @@ var _ = Describe("LocalStack Dashboard Integration", func() {
 			services := []*storage.Service{
 				{
 					ServiceName:       "api-service",
-					ClusterARN:        "arn:aws:ecs:us-east-1:123456789012:cluster/test",
-					TaskDefinitionARN: "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:1",
+					ClusterARN:        "arn:aws:ecs:us-east-1:000000000000:cluster/test",
+					TaskDefinitionARN: "arn:aws:ecs:us-east-1:000000000000:task-definition/api-task:1",
 				},
 				{
 					ServiceName:       "worker-service",
-					ClusterARN:        "arn:aws:ecs:us-east-1:123456789012:cluster/test",
-					TaskDefinitionARN: "arn:aws:ecs:us-east-1:123456789012:task-definition/worker-task:1",
+					ClusterARN:        "arn:aws:ecs:us-east-1:000000000000:cluster/test",
+					TaskDefinitionARN: "arn:aws:ecs:us-east-1:000000000000:task-definition/worker-task:1",
 				},
 			}
 

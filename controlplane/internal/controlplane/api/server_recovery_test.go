@@ -35,10 +35,10 @@ var _ = Describe("Server State Recovery", func() {
 			ID:             "1",
 			Name:           "test-cluster-1",
 			K8sClusterName: "kecs-test-cluster-1",
-			ARN:            "arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-1",
+			ARN:            "arn:aws:ecs:us-east-1:000000000000:cluster/test-cluster-1",
 			Status:         "ACTIVE",
 			Region:         "us-east-1",
-			AccountID:      "123456789012",
+			AccountID:      "000000000000",
 			CreatedAt:      time.Now(),
 			UpdatedAt:      time.Now(),
 		}
@@ -49,10 +49,10 @@ var _ = Describe("Server State Recovery", func() {
 			ID:             "2",
 			Name:           "test-cluster-2",
 			K8sClusterName: "", // No k8s cluster name, should be skipped
-			ARN:            "arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-2",
+			ARN:            "arn:aws:ecs:us-east-1:000000000000:cluster/test-cluster-2",
 			Status:         "ACTIVE",
 			Region:         "us-east-1",
-			AccountID:      "123456789012",
+			AccountID:      "000000000000",
 			CreatedAt:      time.Now(),
 			UpdatedAt:      time.Now(),
 		}

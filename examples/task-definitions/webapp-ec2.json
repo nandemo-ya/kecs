@@ -55,7 +55,7 @@
       "expression": "attribute:ecs.instance-type =~ t3.*"
     }
   ],
-  "taskRoleArn": "arn:aws:iam::123456789012:role/webappTaskRole",
+  "taskRoleArn": "arn:aws:iam::000000000000:role/webappTaskRole",
   "tags": [
     {
       "key": "Environment",
