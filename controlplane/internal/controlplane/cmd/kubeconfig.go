@@ -15,6 +15,7 @@ import (
 var (
 	kubeconfigOutputPath string
 	kubeconfigRaw        bool
+	kubeconfigHostAccess bool
 )
 
 // kubeconfigCmd represents the kubeconfig command
@@ -51,13 +52,17 @@ Examples:
   kecs kubeconfig get test-cluster -o ~/.kube/kecs-test-cluster
 
   # Get raw k3d kubeconfig without fixes
-  kecs kubeconfig get test-cluster --raw`,
+  kecs kubeconfig get test-cluster --raw
+
+  # Get host-compatible kubeconfig when KECS runs in container mode
+  kecs kubeconfig get test-cluster --host-access`,
 		Args: cobra.ExactArgs(1),
 		RunE: runGetKubeconfig,
 	}
 
 	cmd.Flags().StringVarP(&kubeconfigOutputPath, "output", "o", "", "Write kubeconfig to file instead of stdout")
 	cmd.Flags().BoolVar(&kubeconfigRaw, "raw", false, "Get raw k3d kubeconfig without applying fixes")
+	cmd.Flags().BoolVar(&kubeconfigHostAccess, "host-access", false, "Get host-compatible kubeconfig (for container mode)")
 
 	return cmd
 }
@@ -77,6 +82,47 @@ func listKubeconfigCmd() *cobra.Command {
 func runGetKubeconfig(cmd *cobra.Command, args []string) error {
 	clusterName := args[0]
 	k3dClusterName := fmt.Sprintf("kecs-%s", clusterName)
+
+	// If host-access is requested, try to read the pre-generated host kubeconfig
+	if kubeconfigHostAccess {
+		// Check if running in container mode by looking for KECS_DATA_DIR
+		dataDir := os.Getenv("KECS_DATA_DIR")
+		if dataDir != "" {
+			hostKubeconfigPath := filepath.Join(dataDir, "kubeconfig", fmt.Sprintf("%s.host.config", k3dClusterName))
+			if content, err := os.ReadFile(hostKubeconfigPath); err == nil {
+				kubeconfig := string(content)
+				// Output kubeconfig
+				if kubeconfigOutputPath != "" {
+					// Expand ~ to home directory
+					if strings.HasPrefix(kubeconfigOutputPath, "~/") {
+						home, err := os.UserHomeDir()
+						if err != nil {
+							return fmt.Errorf("failed to get home directory: %w", err)
+						}
+						kubeconfigOutputPath = filepath.Join(home, kubeconfigOutputPath[2:])
+					}
+
+					// Create directory if needed
+					dir := filepath.Dir(kubeconfigOutputPath)
+					if err := os.MkdirAll(dir, 0755); err != nil {
+						return fmt.Errorf("failed to create directory: %w", err)
+					}
+
+					// Write to file
+					if err := os.WriteFile(kubeconfigOutputPath, []byte(kubeconfig), 0600); err != nil {
+						return fmt.Errorf("failed to write kubeconfig: %w", err)
+					}
+					fmt.Fprintf(cmd.OutOrStdout(), "Kubeconfig written to: %s\n", kubeconfigOutputPath)
+				} else {
+					// Print to stdout
+					fmt.Fprint(cmd.OutOrStdout(), kubeconfig)
+				}
+				return nil
+			}
+		}
+		// If we can't find the host kubeconfig, fall through to the regular process
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Host-compatible kubeconfig not found, falling back to regular kubeconfig\n")
+	}
 
 	// Check if k3d cluster exists
 	if !k3dClusterExists(k3dClusterName) {

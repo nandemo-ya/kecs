@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/k3d-io/k3d/v5/pkg/client"
 	"github.com/k3d-io/k3d/v5/pkg/config/v1alpha5"
@@ -229,10 +230,18 @@ func (k *K3dClusterManager) DeleteCluster(ctx context.Context, clusterName strin
 		return fmt.Errorf("failed to delete k3d cluster: %w", err)
 	}
 
-	// Clean up kubeconfig file
+	// Clean up kubeconfig files
 	kubeconfigPath := k.GetKubeconfigPath(clusterName)
 	if kubeconfigPath != "" {
 		os.Remove(kubeconfigPath)
+	}
+	
+	// Also remove host kubeconfig if in container mode
+	if k.config.ContainerMode {
+		hostKubeconfigPath := k.GetHostKubeconfigPath(clusterName)
+		if hostKubeconfigPath != "" {
+			os.Remove(hostKubeconfigPath)
+		}
 	}
 
 	log.Printf("Successfully deleted k3d cluster %s", normalizedName)
@@ -425,6 +434,24 @@ func (k *K3dClusterManager) GetKubeconfigPath(clusterName string) string {
 	return filepath.Join(homeDir, ".kube", "config")
 }
 
+// GetHostKubeconfigPath returns the path to the host-compatible kubeconfig file
+func (k *K3dClusterManager) GetHostKubeconfigPath(clusterName string) string {
+	if k.config.ContainerMode {
+		kubeconfigPath := k.config.KubeconfigPath
+		if kubeconfigPath == "" {
+			kubeconfigPath = config.GetString("kubernetes.kubeconfigPath")
+			if kubeconfigPath == "" {
+				kubeconfigPath = "/kecs/kubeconfig"
+			}
+		}
+		os.MkdirAll(kubeconfigPath, 0755)
+		normalizedName := k.normalizeClusterName(clusterName)
+		return filepath.Join(kubeconfigPath, fmt.Sprintf("%s.host.config", normalizedName))
+	}
+	// For non-container mode, there's no separate host kubeconfig
+	return k.GetKubeconfigPath(clusterName)
+}
+
 // GetClusterInfo returns information about the cluster
 func (k *K3dClusterManager) GetClusterInfo(ctx context.Context, clusterName string) (*ClusterInfo, error) {
 	normalizedName := k.normalizeClusterName(clusterName)
@@ -482,6 +509,23 @@ func (k *K3dClusterManager) writeKubeconfig(ctx context.Context, cluster *k3d.Cl
 	kubecfg, err := client.KubeconfigGet(ctx, k.runtime, cluster)
 	if err != nil {
 		return fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	// In container mode, also write a host-compatible kubeconfig
+	if k.config.ContainerMode {
+		// First write the internal kubeconfig
+		if err := client.KubeconfigWrite(ctx, kubecfg, kubeconfigPath); err != nil {
+			log.Printf("Failed to write internal kubeconfig: %v", err)
+			// Continue to try manual creation
+		}
+		
+		// Create a host-compatible version
+		hostKubeconfigPath := strings.TrimSuffix(kubeconfigPath, ".config") + ".host.config"
+		if err := k.writeHostKubeconfig(ctx, cluster, kubecfg, hostKubeconfigPath); err != nil {
+			log.Printf("Failed to write host kubeconfig: %v", err)
+		} else {
+			log.Printf("Created host-compatible kubeconfig at %s", hostKubeconfigPath)
+		}
 	}
 
 	// Write kubeconfig to file
@@ -546,6 +590,45 @@ func (k *K3dClusterManager) copyFile(src, dst string) error {
 		return err
 	}
 	return os.Chmod(dst, sourceInfo.Mode())
+}
+
+// writeHostKubeconfig writes a host-compatible kubeconfig file
+func (k *K3dClusterManager) writeHostKubeconfig(ctx context.Context, cluster *k3d.Cluster, kubecfg *clientcmdapi.Config, path string) error {
+	// Create a copy of the kubeconfig
+	hostKubeconfig := kubecfg.DeepCopy()
+	
+	// Get the loadbalancer node to find the exposed port
+	var loadbalancerNode *k3d.Node
+	nodes, err := client.NodeList(ctx, k.runtime)
+	if err != nil {
+		return fmt.Errorf("failed to list nodes: %w", err)
+	}
+	
+	for _, node := range nodes {
+		if node.Role == k3d.LoadBalancerRole && strings.HasPrefix(node.Name, fmt.Sprintf("k3d-%s-", cluster.Name)) {
+			loadbalancerNode = node
+			break
+		}
+	}
+	
+	if loadbalancerNode != nil {
+		// Get the actual port mapping from Docker
+		apiPort, err := k.getLoadBalancerAPIPort(ctx, loadbalancerNode.Name)
+		if err != nil {
+			log.Printf("Failed to get loadbalancer port: %v", err)
+		} else if apiPort != "" {
+			// Update the server URL to use localhost
+			for clusterName, clusterConfig := range hostKubeconfig.Clusters {
+				newServer := fmt.Sprintf("https://localhost:%s", apiPort)
+				log.Printf("Host kubeconfig: updating server URL from %s to %s", clusterConfig.Server, newServer)
+				clusterConfig.Server = newServer
+				hostKubeconfig.Clusters[clusterName] = clusterConfig
+			}
+		}
+	}
+	
+	// Write the host kubeconfig file
+	return clientcmd.WriteToFile(*hostKubeconfig, path)
 }
 
 // getLoadBalancerAPIPort gets the host port for the API from the loadbalancer container
