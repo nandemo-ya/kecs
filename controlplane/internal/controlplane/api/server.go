@@ -42,11 +42,9 @@ type Server struct {
 	taskManager               *kubernetes.TaskManager
 	region                    string
 	accountID                 string
-	webSocketHub              *WebSocketHub
 	testModeWorker            *TestModeTaskWorker
 	localStackManager         localstack.Manager
 	awsProxyRouter            *AWSProxyRouter
-	localStackEvents          *LocalStackEventIntegration
 	iamIntegration            iam.Integration
 	cloudWatchIntegration     cloudwatch.Integration
 	ssmIntegration            ssm.Integration
@@ -59,24 +57,6 @@ type Server struct {
 
 // NewServer creates a new API server instance
 func NewServer(port int, kubeconfig string, storage storage.Storage, localStackConfig *localstack.Config) (*Server, error) {
-	// Create WebSocket configuration
-	wsConfig := &WebSocketConfig{
-		AllowedOrigins: []string{
-			"http://localhost:3000",                  // React development server
-			"http://localhost:8080",                  // API server
-			fmt.Sprintf("http://localhost:%d", port), // Dynamic port
-		},
-		AllowCredentials: true,
-	}
-
-	// Add environment-specific origins
-	allowedOrigins := apiconfig.GetStringSlice("server.allowedOrigins")
-	for _, origin := range allowedOrigins {
-		origin = strings.TrimSpace(origin)
-		if origin != "" {
-			wsConfig.AllowedOrigins = append(wsConfig.AllowedOrigins, origin)
-		}
-	}
 
 	// Initialize cluster manager first
 	var clusterManager kubernetes.ClusterManager
@@ -113,7 +93,6 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		ecsAPI:         nil,              // Will be set after IAM integration
 		storage:        storage,
 		clusterManager: clusterManager,
-		webSocketHub:   NewWebSocketHubWithConfig(wsConfig),
 	}
 
 	// Initialize task manager
@@ -196,12 +175,6 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					log.Printf("AWS proxy router initialized successfully")
 				}
 
-				// Create LocalStack event integration
-				s.localStackEvents = NewLocalStackEventIntegration(
-					localStackManager,
-					s.webSocketHub,
-					DefaultLocalStackEventConfig(),
-				)
 
 				// Initialize IAM integration if LocalStack is available
 				if kubeClient != nil {
@@ -386,9 +359,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
-	// Start WebSocket hub
 	ctx := context.Background()
-	go s.webSocketHub.Run(ctx)
 
 	// Recover state if enabled and not in test mode
 	if !apiconfig.GetBool("features.testMode") && apiconfig.GetBool("features.autoRecoverState") {
@@ -411,12 +382,6 @@ func (s *Server) Start() error {
 		if err := s.localStackManager.Start(ctx); err != nil {
 			log.Printf("Failed to start LocalStack manager: %v", err)
 		} else {
-			// Start LocalStack event integration after LocalStack is running
-			if s.localStackEvents != nil {
-				if err := s.localStackEvents.Start(ctx); err != nil {
-					log.Printf("Failed to start LocalStack event integration: %v", err)
-				}
-			}
 		}
 	}
 
@@ -456,12 +421,6 @@ func (s *Server) Stop(ctx context.Context) error {
 		s.testModeWorker.Stop()
 	}
 
-	// Stop LocalStack event integration if running
-	if s.localStackEvents != nil {
-		if err := s.localStackEvents.Stop(ctx); err != nil {
-			log.Printf("Error stopping LocalStack event integration: %v", err)
-		}
-	}
 
 	// Stop LocalStack manager if running
 	if s.localStackManager != nil {
@@ -974,12 +933,6 @@ func (s *Server) SetupRoutes() http.Handler {
 	mux.HandleFunc("/api/localstack/status", s.GetLocalStackStatus)
 	mux.HandleFunc("/localstack/dashboard", s.GetLocalStackDashboard)
 
-	// WebSocket endpoints
-	mux.HandleFunc("/ws", s.HandleWebSocket(s.webSocketHub))
-	mux.HandleFunc("/ws/logs", s.HandleWebSocket(s.webSocketHub))
-	mux.HandleFunc("/ws/metrics", s.HandleWebSocket(s.webSocketHub))
-	mux.HandleFunc("/ws/notifications", s.HandleWebSocket(s.webSocketHub))
-	mux.HandleFunc("/ws/tasks", s.HandleWebSocket(s.webSocketHub))
 
 
 	// Apply middleware
