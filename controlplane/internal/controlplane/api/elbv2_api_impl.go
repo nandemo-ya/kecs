@@ -937,8 +937,8 @@ func (api *ELBv2APIImpl) convertToTargetGroup(tg *storage.ELBv2TargetGroup) gene
 
 // convertToListener converts storage listener to API response format
 func (api *ELBv2APIImpl) convertToListener(listener *storage.ELBv2Listener) generated_elbv2.Listener {
-	// Convert default actions
-	var defaultActions []generated_elbv2.Action
+	// Convert default actions - ensure we always have a non-nil slice
+	defaultActions := make([]generated_elbv2.Action, 0)
 	// TODO: Parse and convert stored default actions JSON
 
 	return generated_elbv2.Listener{
