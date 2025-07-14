@@ -344,7 +344,7 @@ curl -X POST http://localhost:8080/v1/StopTask \
   -H "X-Amz-Target: AmazonEC2ContainerServiceV20141113.StopTask" \
   -d '{
     "cluster": "production",
-    "task": "arn:aws:ecs:us-east-1:123456789012:task/production/1234567890abcdef",
+    "task": "arn:aws:ecs:us-east-1:000000000000:task/production/1234567890abcdef",
     "reason": "Manual stop for maintenance"
   }'
 ```
@@ -454,8 +454,8 @@ curl -X POST http://localhost:8080/v1/DescribeTasks \
   -d '{
     "cluster": "production",
     "tasks": [
-      "arn:aws:ecs:us-east-1:123456789012:task/production/1234567890abcdef",
-      "arn:aws:ecs:us-east-1:123456789012:task/production/fedcba0987654321"
+      "arn:aws:ecs:us-east-1:000000000000:task/production/1234567890abcdef",
+      "arn:aws:ecs:us-east-1:000000000000:task/production/fedcba0987654321"
     ],
     "include": ["TAGS"]
   }'

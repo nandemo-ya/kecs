@@ -35,11 +35,11 @@ var _ = Describe("Cluster Pagination", func() {
 		for i := 0; i < 250; i++ {
 			cluster := &storage.Cluster{
 				ID:        fmt.Sprintf("cluster-id-%03d", i), // Use predictable IDs for consistent sorting
-				ARN:       fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-%03d", i),
+				ARN:       fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:cluster/test-cluster-%03d", i),
 				Name:      fmt.Sprintf("test-cluster-%03d", i),
 				Status:    "ACTIVE",
 				Region:    "us-east-1",
-				AccountID: "123456789012",
+				AccountID: "000000000000",
 				CreatedAt: time.Now().Add(time.Duration(-i) * time.Hour),
 				UpdatedAt: time.Now(),
 			}
@@ -48,7 +48,7 @@ var _ = Describe("Cluster Pagination", func() {
 		}
 
 		// Create ECS API instance
-		ecsAPI = api.NewDefaultECSAPIWithConfig(mockStorage, "us-east-1", "123456789012")
+		ecsAPI = api.NewDefaultECSAPIWithConfig(mockStorage, "us-east-1", "000000000000")
 	})
 
 	Describe("ListClusters", func() {
@@ -76,7 +76,7 @@ var _ = Describe("Cluster Pagination", func() {
 
 				// Verify ARNs are in expected order
 				for i := 0; i < 5; i++ {
-					expectedARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-%03d", i)
+					expectedARN := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:cluster/test-cluster-%03d", i)
 					Expect(resp.ClusterArns[i]).To(Equal(expectedARN))
 				}
 			})
@@ -104,7 +104,7 @@ var _ = Describe("Cluster Pagination", func() {
 
 				// Verify different results
 				Expect(resp2.ClusterArns[0]).NotTo(Equal(resp1.ClusterArns[0]))
-				expectedARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-%03d", 10)
+				expectedARN := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:cluster/test-cluster-%03d", 10)
 				Expect(resp2.ClusterArns[0]).To(Equal(expectedARN))
 			})
 
@@ -182,7 +182,7 @@ var _ = Describe("Cluster Pagination", func() {
 
 				// Verify order is consistent
 				for i := 0; i < 250; i++ {
-					expectedARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster-%03d", i)
+					expectedARN := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:cluster/test-cluster-%03d", i)
 					Expect(allClusters[i]).To(Equal(expectedARN))
 				}
 

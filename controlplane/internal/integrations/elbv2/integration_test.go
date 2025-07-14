@@ -103,7 +103,7 @@ var _ = Describe("ELBv2 Integration", func() {
 			Enabled:           true,
 			LocalStackManager: localstackManager,
 			Region:            "us-east-1",
-			AccountID:         "123456789012",
+			AccountID:         "000000000000",
 		}
 
 		// Create integration using K8s implementation

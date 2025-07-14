@@ -194,7 +194,7 @@ No automatic configuration - applications must manually configure AWS SDK endpoi
 ```json
 {
   "family": "my-app",
-  "taskDefinitionArn": "arn:aws:ecs:us-east-1:123456789012:task-definition/my-app:1",
+  "taskDefinitionArn": "arn:aws:ecs:us-east-1:000000000000:task-definition/my-app:1",
   "containerDefinitions": [
     {
       "name": "app",

@@ -475,7 +475,7 @@ export KECS_AUTO_RECOVER_STATE=true  # Auto-recover k3d clusters on startup (def
 
 # Default AWS region and account settings
 export KECS_DEFAULT_REGION=us-east-1  # Default AWS region for KECS (default: us-east-1)
-export KECS_ACCOUNT_ID=123456789012   # AWS account ID for KECS (default: 123456789012)
+export KECS_ACCOUNT_ID=000000000000   # AWS account ID for KECS (default: 000000000000)
 ```
 
 ### Environment Variable Mapping

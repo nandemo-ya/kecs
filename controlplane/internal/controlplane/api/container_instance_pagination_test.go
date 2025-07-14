@@ -42,11 +42,11 @@ var _ = Describe("ContainerInstance Pagination", func() {
 		// Create test cluster
 		cluster = &storage.Cluster{
 			ID:        uuid.New().String(),
-			ARN:       "arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster",
+			ARN:       "arn:aws:ecs:us-east-1:000000000000:cluster/test-cluster",
 			Name:      "test-cluster",
 			Status:    "ACTIVE",
 			Region:    "us-east-1",
-			AccountID: "123456789012",
+			AccountID: "000000000000",
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
@@ -57,7 +57,7 @@ var _ = Describe("ContainerInstance Pagination", func() {
 		for i := 0; i < 15; i++ {
 			instance := &storage.ContainerInstance{
 				ID:                fmt.Sprintf("instance-%02d", i),
-				ARN:               fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:container-instance/test-cluster/i-%02d", i),
+				ARN:               fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:container-instance/test-cluster/i-%02d", i),
 				ClusterARN:        cluster.ARN,
 				EC2InstanceID:     fmt.Sprintf("i-1234567890abcdef%d", i),
 				Status:            "ACTIVE",
@@ -76,7 +76,7 @@ var _ = Describe("ContainerInstance Pagination", func() {
 		}
 
 		// Create ECS API instance
-		ecsAPI = api.NewDefaultECSAPIWithConfig(mockStorage, "us-east-1", "123456789012")
+		ecsAPI = api.NewDefaultECSAPIWithConfig(mockStorage, "us-east-1", "000000000000")
 	})
 
 	Describe("ListContainerInstances", func() {

@@ -19,7 +19,7 @@ import (
 type mockIAMClient struct{}
 
 func (m *mockIAMClient) CreateRole(ctx context.Context, params *iamapi.CreateRoleRequest) (*iamapi.CreateRoleResponse, error) {
-	arn := "arn:aws:iam::123456789012:role/" + params.RoleName
+	arn := "arn:aws:iam::000000000000:role/" + params.RoleName
 	return &iamapi.CreateRoleResponse{
 		Role: iamapi.Role{
 			RoleName:   params.RoleName,
@@ -175,7 +175,7 @@ var _ = Describe("IAM Integration", func() {
 
 	Describe("CreateTaskRole", func() {
 		It("should create IAM role and ServiceAccount", func() {
-			taskDefArn := "arn:aws:ecs:us-east-1:123456789012:task-definition/my-task:1"
+			taskDefArn := "arn:aws:ecs:us-east-1:000000000000:task-definition/my-task:1"
 			roleName := "my-task-role"
 			trustPolicy := `{
 				"Version": "2012-10-17",
@@ -199,7 +199,7 @@ var _ = Describe("IAM Integration", func() {
 		})
 
 		It("should add prefix to role name if not present", func() {
-			taskDefArn := "arn:aws:ecs:us-east-1:123456789012:task-definition/my-task:1"
+			taskDefArn := "arn:aws:ecs:us-east-1:000000000000:task-definition/my-task:1"
 			roleName := "unprefixed-role"
 			trustPolicy := `{"Version": "2012-10-17", "Statement": []}`
 
@@ -217,7 +217,7 @@ var _ = Describe("IAM Integration", func() {
 	Describe("GetServiceAccountForRole", func() {
 		It("should return ServiceAccount name for existing role", func() {
 			// First create a role
-			taskDefArn := "arn:aws:ecs:us-east-1:123456789012:task-definition/my-task:1"
+			taskDefArn := "arn:aws:ecs:us-east-1:000000000000:task-definition/my-task:1"
 			roleName := "test-role"
 			trustPolicy := `{"Version": "2012-10-17", "Statement": []}`
 
@@ -249,7 +249,7 @@ var _ = Describe("IAM Integration", func() {
 	Describe("CreateInlinePolicy", func() {
 		It("should create inline policy without RBAC", func() {
 			// First create a role
-			taskDefArn := "arn:aws:ecs:us-east-1:123456789012:task-definition/my-task:1"
+			taskDefArn := "arn:aws:ecs:us-east-1:000000000000:task-definition/my-task:1"
 			roleName := "test-role"
 			trustPolicy := `{"Version": "2012-10-17", "Statement": []}`
 
@@ -279,7 +279,7 @@ var _ = Describe("IAM Integration", func() {
 	Describe("DeleteRole", func() {
 		It("should delete IAM role and ServiceAccount", func() {
 			// First create a role
-			taskDefArn := "arn:aws:ecs:us-east-1:123456789012:task-definition/my-task:1"
+			taskDefArn := "arn:aws:ecs:us-east-1:000000000000:task-definition/my-task:1"
 			roleName := "test-role"
 			trustPolicy := `{"Version": "2012-10-17", "Statement": []}`
 

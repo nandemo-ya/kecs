@@ -27,4 +27,4 @@ kubernetes:
 
 aws:
   defaultRegion: us-east-1
-  accountID: "123456789012"
+  accountID: "000000000000"

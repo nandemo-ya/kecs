@@ -67,7 +67,7 @@ curl -X POST http://localhost:8080/v1/ListClusters \
 ```json
 {
   "clusterArns": [
-    "arn:aws:ecs:us-east-1:123456789012:cluster/default"
+    "arn:aws:ecs:us-east-1:000000000000:cluster/default"
   ],
   "nextToken": null
 }

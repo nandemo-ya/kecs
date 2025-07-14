@@ -36,7 +36,7 @@ var _ = Describe("CloudWatch Integration Complete", func() {
 
 	Describe("Task Logging Configuration", func() {
 		It("should configure CloudWatch logging for a task", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/task-123"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/task-123"
 			containerName := "my-app"
 			logDriver := "awslogs"
 			options := map[string]string{
@@ -61,7 +61,7 @@ var _ = Describe("CloudWatch Integration Complete", func() {
 		})
 
 		It("should create log group if not specified", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/task-456"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/task-456"
 			containerName := "nginx"
 			logDriver := "awslogs"
 			options := map[string]string{} // No group specified
@@ -79,7 +79,7 @@ var _ = Describe("CloudWatch Integration Complete", func() {
 		})
 
 		It("should reject non-awslogs drivers", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/task-789"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/task-789"
 			containerName := "app"
 			logDriver := "json-file"
 			options := map[string]string{}
@@ -93,7 +93,7 @@ var _ = Describe("CloudWatch Integration Complete", func() {
 
 	Describe("Log Stream Management", func() {
 		It("should create unique log streams for containers", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/task-abc123"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/task-abc123"
 
 			// Get stream names for different containers
 			stream1 := integration.GetLogStreamForContainer(taskArn, "web")
@@ -123,7 +123,7 @@ var _ = Describe("CloudWatch Integration Complete", func() {
 
 	Describe("FluentBit Configuration", func() {
 		It("should generate valid FluentBit configuration", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/task-xyz"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/task-xyz"
 			containerName := "app"
 			options := map[string]string{
 				"awslogs-group":  "/ecs/my-service",

@@ -57,7 +57,7 @@
       "secrets": [
         {
           "name": "POSTGRES_PASSWORD",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:db-password"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:000000000000:secret:db-password"
         }
       ],
       "healthCheck": {
@@ -89,13 +89,13 @@
       "secrets": [
         {
           "name": "DD_API_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:datadog-api-key"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:000000000000:secret:datadog-api-key"
         }
       ]
     }
   ],
-  "executionRoleArn": "arn:aws:iam::123456789012:role/ecsTaskExecutionRole",
-  "taskRoleArn": "arn:aws:iam::123456789012:role/multiContainerTaskRole",
+  "executionRoleArn": "arn:aws:iam::000000000000:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::000000000000:role/multiContainerTaskRole",
   "tags": [
     {
       "key": "Environment",

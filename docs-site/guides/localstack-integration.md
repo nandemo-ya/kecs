@@ -88,7 +88,7 @@ KECS automatically maps ECS task roles to Kubernetes ServiceAccounts:
 ```json
 {
   "family": "webapp",
-  "taskRoleArn": "arn:aws:iam::123456789012:role/webapp-task-role",
+  "taskRoleArn": "arn:aws:iam::000000000000:role/webapp-task-role",
   "containerDefinitions": [
     {
       "name": "app",
@@ -171,7 +171,7 @@ aws secretsmanager create-secret \
       "secrets": [
         {
           "name": "DB_PASSWORD",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:000000000000:secret:prod/db/password"
         }
       ]
     }
@@ -199,7 +199,7 @@ aws ssm put-parameter \
       "secrets": [
         {
           "name": "DB_HOST",
-          "valueFrom": "arn:aws:ssm:us-east-1:123456789012:parameter/myapp/database/host"
+          "valueFrom": "arn:aws:ssm:us-east-1:000000000000:parameter/myapp/database/host"
         }
       ]
     }
@@ -313,7 +313,7 @@ aws servicediscovery create-private-dns-namespace \
   "serviceName": "api",
   "serviceRegistries": [
     {
-      "registryArn": "arn:aws:servicediscovery:us-east-1:123456789012:service/srv-12345",
+      "registryArn": "arn:aws:servicediscovery:us-east-1:000000000000:service/srv-12345",
       "containerName": "api",
       "containerPort": 8080
     }

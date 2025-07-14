@@ -103,7 +103,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 
 		// Verify response
 		assert.NotNil(t, listResp.ClusterArns)
-		assert.Contains(t, listResp.ClusterArns, "arn:aws:ecs:us-east-1:123456789012:cluster/test-cluster")
+		assert.Contains(t, listResp.ClusterArns, "arn:aws:ecs:us-east-1:000000000000:cluster/test-cluster")
 	})
 
 	t.Run("DescribeClusters", func(t *testing.T) {
@@ -205,7 +205,7 @@ func TestGeneratedTypesJSONCompatibility(t *testing.T) {
 
 	t.Run("ClusterResponse", func(t *testing.T) {
 		cluster := &generated.Cluster{
-			ClusterArn:  stringPtr("arn:aws:ecs:us-east-1:123456789012:cluster/test"),
+			ClusterArn:  stringPtr("arn:aws:ecs:us-east-1:000000000000:cluster/test"),
 			ClusterName: stringPtr("test"),
 			Status:      stringPtr("ACTIVE"),
 		}
@@ -219,7 +219,7 @@ func TestGeneratedTypesJSONCompatibility(t *testing.T) {
 		err = json.Unmarshal(data, &jsonMap)
 		require.NoError(t, err)
 
-		assert.Equal(t, "arn:aws:ecs:us-east-1:123456789012:cluster/test", jsonMap["clusterArn"])
+		assert.Equal(t, "arn:aws:ecs:us-east-1:000000000000:cluster/test", jsonMap["clusterArn"])
 		assert.Equal(t, "test", jsonMap["clusterName"])
 		assert.Equal(t, "ACTIVE", jsonMap["status"])
 	})

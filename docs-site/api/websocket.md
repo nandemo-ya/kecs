@@ -197,7 +197,7 @@ Available event types for subscription:
     "eventType": "cluster",
     "action": "CREATE|UPDATE|DELETE",
     "cluster": {
-      "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/production",
+      "clusterArn": "arn:aws:ecs:us-east-1:000000000000:cluster/production",
       "clusterName": "production",
       "status": "ACTIVE|PROVISIONING|DEPROVISIONING|FAILED|INACTIVE",
       "registeredContainerInstancesCount": 5,
@@ -220,9 +220,9 @@ Available event types for subscription:
     "eventType": "service",
     "action": "CREATE|UPDATE|DELETE|DEPLOYMENT_START|DEPLOYMENT_COMPLETE|DEPLOYMENT_FAILED",
     "service": {
-      "serviceArn": "arn:aws:ecs:us-east-1:123456789012:service/production/web-api",
+      "serviceArn": "arn:aws:ecs:us-east-1:000000000000:service/production/web-api",
       "serviceName": "web-api",
-      "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/production",
+      "clusterArn": "arn:aws:ecs:us-east-1:000000000000:cluster/production",
       "status": "ACTIVE|DRAINING|INACTIVE",
       "desiredCount": 3,
       "runningCount": 3,
@@ -255,15 +255,15 @@ Available event types for subscription:
     "eventType": "task",
     "action": "START|STOP|STATUS_CHANGE",
     "task": {
-      "taskArn": "arn:aws:ecs:us-east-1:123456789012:task/production/1234567890abcdef",
-      "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/production",
-      "taskDefinitionArn": "arn:aws:ecs:us-east-1:123456789012:task-definition/webapp:1",
+      "taskArn": "arn:aws:ecs:us-east-1:000000000000:task/production/1234567890abcdef",
+      "clusterArn": "arn:aws:ecs:us-east-1:000000000000:cluster/production",
+      "taskDefinitionArn": "arn:aws:ecs:us-east-1:000000000000:task-definition/webapp:1",
       "lastStatus": "PENDING|RUNNING|STOPPED",
       "desiredStatus": "RUNNING|STOPPED",
       "stoppedReason": "Essential container exited",
       "containers": [
         {
-          "containerArn": "arn:aws:ecs:us-east-1:123456789012:container/...",
+          "containerArn": "arn:aws:ecs:us-east-1:000000000000:container/...",
           "name": "webapp",
           "lastStatus": "RUNNING",
           "exitCode": null,
@@ -286,7 +286,7 @@ Available event types for subscription:
     "eventType": "deployment",
     "action": "PROGRESS",
     "deployment": {
-      "serviceArn": "arn:aws:ecs:us-east-1:123456789012:service/production/web-api",
+      "serviceArn": "arn:aws:ecs:us-east-1:000000000000:service/production/web-api",
       "deploymentId": "deploy-001",
       "status": "IN_PROGRESS",
       "taskDefinition": "webapp:2",
@@ -318,7 +318,7 @@ Execute commands on running containers (ECS Exec).
   "action": "execute",
   "payload": {
     "cluster": "production",
-    "task": "arn:aws:ecs:us-east-1:123456789012:task/production/1234567890abcdef",
+    "task": "arn:aws:ecs:us-east-1:000000000000:task/production/1234567890abcdef",
     "container": "webapp",
     "command": "/bin/bash",
     "interactive": true
@@ -353,7 +353,7 @@ Request real-time metrics for resources.
   "action": "get_metrics",
   "payload": {
     "resource": "service",
-    "resourceArn": "arn:aws:ecs:us-east-1:123456789012:service/production/web-api",
+    "resourceArn": "arn:aws:ecs:us-east-1:000000000000:service/production/web-api",
     "metrics": ["CPUUtilization", "MemoryUtilization"],
     "period": 60,
     "statistics": ["Average", "Maximum"]
@@ -369,7 +369,7 @@ Request real-time metrics for resources.
   "type": "metrics",
   "timestamp": "2024-01-01T00:00:00.000Z",
   "payload": {
-    "resourceArn": "arn:aws:ecs:us-east-1:123456789012:service/production/web-api",
+    "resourceArn": "arn:aws:ecs:us-east-1:000000000000:service/production/web-api",
     "metrics": {
       "CPUUtilization": {
         "Average": 45.2,

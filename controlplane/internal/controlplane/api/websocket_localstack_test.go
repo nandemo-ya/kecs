@@ -30,11 +30,11 @@ var _ = Describe("WebSocket LocalStack Integration", func() {
 				Service:   "ecs",
 				EventType: localstack.EventTypeTaskStateChange,
 				Region:    "us-east-1",
-				Account:   "123456789012",
+				Account:   "000000000000",
 				Time:      time.Now(),
 				Detail: map[string]interface{}{
-					"clusterArn":    "arn:aws:ecs:us-east-1:123456789012:cluster/test",
-					"taskArn":       "arn:aws:ecs:us-east-1:123456789012:task/test/abc123",
+					"clusterArn":    "arn:aws:ecs:us-east-1:000000000000:cluster/test",
+					"taskArn":       "arn:aws:ecs:us-east-1:000000000000:task/test/abc123",
 					"lastStatus":    "RUNNING",
 					"desiredStatus": "RUNNING",
 				},
@@ -49,11 +49,11 @@ var _ = Describe("WebSocket LocalStack Integration", func() {
 				Service:   "ecs",
 				EventType: localstack.EventTypeServiceAction,
 				Region:    "us-east-1",
-				Account:   "123456789012",
+				Account:   "000000000000",
 				Time:      time.Now(),
 				Detail: map[string]interface{}{
-					"clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/test",
-					"serviceArn": "arn:aws:ecs:us-east-1:123456789012:service/test/web-service",
+					"clusterArn": "arn:aws:ecs:us-east-1:000000000000:cluster/test",
+					"serviceArn": "arn:aws:ecs:us-east-1:000000000000:service/test/web-service",
 				},
 			}
 
@@ -66,10 +66,10 @@ var _ = Describe("WebSocket LocalStack Integration", func() {
 				Service:   "ecs",
 				EventType: localstack.EventTypeClusterStateChange,
 				Region:    "us-east-1",
-				Account:   "123456789012",
+				Account:   "000000000000",
 				Time:      time.Now(),
 				Detail: map[string]interface{}{
-					"clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/test",
+					"clusterArn": "arn:aws:ecs:us-east-1:000000000000:cluster/test",
 				},
 			}
 
@@ -82,7 +82,7 @@ var _ = Describe("WebSocket LocalStack Integration", func() {
 				Service:   "s3",
 				EventType: "S3 Bucket Created",
 				Region:    "us-east-1",
-				Account:   "123456789012",
+				Account:   "000000000000",
 				Time:      time.Now(),
 				Detail: map[string]interface{}{
 					"bucketName": "test-bucket",
