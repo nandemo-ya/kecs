@@ -195,12 +195,17 @@ func LoadConfig(configPath string) (*Config, error) {
 	}
 	
 	if configPath != "" {
+		// Check if the config file exists before trying to read it
+		if _, err := os.Stat(configPath); err != nil {
+			if os.IsNotExist(err) {
+				return nil, fmt.Errorf("config file does not exist: %s", configPath)
+			}
+			return nil, fmt.Errorf("failed to access config file: %w", err)
+		}
+		
 		v.SetConfigFile(configPath)
 		if err := v.ReadInConfig(); err != nil {
-			if !os.IsNotExist(err) {
-				return nil, fmt.Errorf("failed to read config file: %w", err)
-			}
-			// Config file doesn't exist, continue with defaults and env vars
+			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
 	} else {
 		// Look for config file in standard locations
