@@ -3,12 +3,25 @@ package api
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+)
+
+// Target health states
+const (
+	TargetHealthStateInitial     = "initial"
+	TargetHealthStateHealthy     = "healthy"
+	TargetHealthStateUnhealthy   = "unhealthy"
+	TargetHealthStateUnused      = "unused"
+	TargetHealthStateRegistering = "registering"
+	TargetHealthStateDeregistering = "deregistering"
+	TargetHealthStateDraining    = "draining"
+	TargetHealthStateUnavailable = "unavailable"
 )
 
 // ELBv2APIImpl implements the generated ElasticLoadBalancing_v10API interface
@@ -115,6 +128,11 @@ func (api *ELBv2APIImpl) CreateLoadBalancer(ctx context.Context, input *generate
 
 	if err := api.storage.ELBv2Store().CreateLoadBalancer(ctx, dbLB); err != nil {
 		return nil, err
+	}
+
+	// Deploy Traefik for this load balancer
+	if _, err := api.elbv2Integration.CreateLoadBalancer(ctx, input.Name, subnets, securityGroups); err != nil {
+		return nil, fmt.Errorf("failed to deploy Traefik for load balancer: %w", err)
 	}
 
 	// Create response
@@ -336,7 +354,9 @@ func (api *ELBv2APIImpl) RegisterTargets(ctx context.Context, input *generated_e
 			ID:               target.Id,
 			Port:             port,
 			AvailabilityZone: az,
-			HealthState:      "healthy",
+			HealthState:      TargetHealthStateRegistering,
+			HealthReason:     "Target.RegistrationInProgress",
+			HealthDescription: "Target registration is in progress",
 			RegisteredAt:     time.Now(),
 			UpdatedAt:        time.Now(),
 		}
@@ -357,7 +377,22 @@ func (api *ELBv2APIImpl) DeregisterTargets(ctx context.Context, input *generated
 		return nil, fmt.Errorf("TargetGroupArn is required")
 	}
 
-	// Build target IDs array
+	// Mark targets as deregistering first
+	for _, target := range input.Targets {
+		if target.Id == "" {
+			continue
+		}
+		
+		// Update target health to deregistering
+		targetHealth := &storage.ELBv2TargetHealth{
+			State:       TargetHealthStateDeregistering,
+			Reason:      "Target.DeregistrationInProgress",
+			Description: "Target deregistration is in progress",
+		}
+		api.storage.ELBv2Store().UpdateTargetHealth(ctx, input.TargetGroupArn, target.Id, targetHealth)
+	}
+
+	// Build target IDs array for final removal
 	var targetIDs []string
 	for _, target := range input.Targets {
 		if target.Id == "" {
@@ -366,7 +401,7 @@ func (api *ELBv2APIImpl) DeregisterTargets(ctx context.Context, input *generated
 		targetIDs = append(targetIDs, target.Id)
 	}
 
-	// Deregister all targets
+	// Deregister all targets (remove from storage)
 	if err := api.storage.ELBv2Store().DeregisterTargets(ctx, input.TargetGroupArn, targetIDs); err != nil {
 		return nil, err
 	}
@@ -387,7 +422,16 @@ func (api *ELBv2APIImpl) DescribeTargetHealth(ctx context.Context, input *genera
 
 	var targetHealthDescriptions []generated_elbv2.TargetHealthDescription
 	for _, target := range targets {
-		healthy := generated_elbv2.TargetHealthStateEnumHEALTHY
+		// Perform health check and update target health
+		healthState := api.performHealthCheck(ctx, target)
+		
+		// Update target health in storage
+		targetHealth := &storage.ELBv2TargetHealth{
+			State:       healthState,
+			Reason:      api.getHealthReason(healthState),
+			Description: api.getHealthDescription(healthState),
+		}
+		api.storage.ELBv2Store().UpdateTargetHealth(ctx, input.TargetGroupArn, target.ID, targetHealth)
 		
 		// Convert port to pointer
 		port := target.Port
@@ -397,6 +441,9 @@ func (api *ELBv2APIImpl) DescribeTargetHealth(ctx context.Context, input *genera
 			azPtr = &az
 		}
 
+		// Convert health state to generated enum
+		healthStateEnum := api.convertHealthStateToEnum(healthState)
+
 		targetHealthDescriptions = append(targetHealthDescriptions, generated_elbv2.TargetHealthDescription{
 			Target: &generated_elbv2.TargetDescription{
 				Id:               target.ID,
@@ -404,7 +451,8 @@ func (api *ELBv2APIImpl) DescribeTargetHealth(ctx context.Context, input *genera
 				AvailabilityZone: azPtr,
 			},
 			TargetHealth: &generated_elbv2.TargetHealth{
-				State: &healthy,
+				State:       &healthStateEnum,
+				Description: &targetHealth.Description,
 			},
 		})
 	}
@@ -546,7 +594,39 @@ func (api *ELBv2APIImpl) DescribeListenerCertificates(ctx context.Context, input
 }
 
 func (api *ELBv2APIImpl) DescribeListeners(ctx context.Context, input *generated_elbv2.DescribeListenersInput) (*generated_elbv2.DescribeListenersOutput, error) {
-	return &generated_elbv2.DescribeListenersOutput{}, nil
+	var listeners []*storage.ELBv2Listener
+	var err error
+
+	// If specific listener ARNs are provided
+	if input.ListenerArns != nil && len(input.ListenerArns) > 0 {
+		for _, arn := range input.ListenerArns {
+			listener, getErr := api.storage.ELBv2Store().GetListener(ctx, arn)
+			if getErr != nil {
+				return nil, getErr
+			}
+			if listener != nil {
+				listeners = append(listeners, listener)
+			}
+		}
+	} else if input.LoadBalancerArn != nil {
+		// Get listeners for a specific load balancer
+		listeners, err = api.storage.ELBv2Store().ListListeners(ctx, *input.LoadBalancerArn)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("LoadBalancerArn or ListenerArns must be specified")
+	}
+
+	// Convert to response format
+	var responseListeners []generated_elbv2.Listener
+	for _, listener := range listeners {
+		responseListeners = append(responseListeners, api.convertToListener(listener))
+	}
+
+	return &generated_elbv2.DescribeListenersOutput{
+		Listeners: responseListeners,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) DescribeLoadBalancerAttributes(ctx context.Context, input *generated_elbv2.DescribeLoadBalancerAttributesInput) (*generated_elbv2.DescribeLoadBalancerAttributesOutput, error) {
@@ -570,7 +650,55 @@ func (api *ELBv2APIImpl) DescribeTargetGroupAttributes(ctx context.Context, inpu
 }
 
 func (api *ELBv2APIImpl) DescribeTargetGroups(ctx context.Context, input *generated_elbv2.DescribeTargetGroupsInput) (*generated_elbv2.DescribeTargetGroupsOutput, error) {
-	return &generated_elbv2.DescribeTargetGroupsOutput{}, nil
+	var targetGroups []*storage.ELBv2TargetGroup
+	var err error
+
+	// If specific ARNs are provided, get those target groups
+	if input.TargetGroupArns != nil && len(input.TargetGroupArns) > 0 {
+		for _, arn := range input.TargetGroupArns {
+			tg, getErr := api.storage.ELBv2Store().GetTargetGroup(ctx, arn)
+			if getErr != nil {
+				return nil, getErr
+			}
+			if tg != nil {
+				targetGroups = append(targetGroups, tg)
+			}
+		}
+	} else if input.LoadBalancerArn != nil {
+		// Get target groups for a specific load balancer
+		// TODO: Implement LoadBalancer -> TargetGroup relationship
+		targetGroups, err = api.storage.ELBv2Store().ListTargetGroups(ctx, api.region)
+		if err != nil {
+			return nil, err
+		}
+	} else if input.Names != nil && len(input.Names) > 0 {
+		// Get target groups by names
+		for _, name := range input.Names {
+			tg, getErr := api.storage.ELBv2Store().GetTargetGroupByName(ctx, name)
+			if getErr != nil {
+				return nil, getErr
+			}
+			if tg != nil {
+				targetGroups = append(targetGroups, tg)
+			}
+		}
+	} else {
+		// List all target groups in the region
+		targetGroups, err = api.storage.ELBv2Store().ListTargetGroups(ctx, api.region)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Convert to response format
+	var responseTargetGroups []generated_elbv2.TargetGroup
+	for _, tg := range targetGroups {
+		responseTargetGroups = append(responseTargetGroups, api.convertToTargetGroup(tg))
+	}
+
+	return &generated_elbv2.DescribeTargetGroupsOutput{
+		TargetGroups: responseTargetGroups,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) DescribeTrustStoreAssociations(ctx context.Context, input *generated_elbv2.DescribeTrustStoreAssociationsInput) (*generated_elbv2.DescribeTrustStoreAssociationsOutput, error) {
@@ -689,5 +817,140 @@ func convertToLoadBalancer(lb *storage.ELBv2LoadBalancer) generated_elbv2.LoadBa
 		IpAddressType:         (*generated_elbv2.IpAddressType)(&lb.IpAddressType),
 		SecurityGroups:        lb.SecurityGroups,
 		AvailabilityZones:     []generated_elbv2.AvailabilityZone{},
+	}
+}
+
+// performHealthCheck performs a health check on a target
+func (api *ELBv2APIImpl) performHealthCheck(ctx context.Context, target *storage.ELBv2Target) string {
+	// TODO: Get target group configuration for health check settings
+	
+	// For now, perform a simple HTTP health check
+	// In production, this should be configurable (HTTP, HTTPS, TCP, etc.)
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+	
+	// Construct health check URL
+	url := fmt.Sprintf("http://%s:%d/health", target.ID, target.Port)
+	
+	resp, err := client.Get(url)
+	if err != nil {
+		return TargetHealthStateUnhealthy
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return TargetHealthStateHealthy
+	}
+	
+	return TargetHealthStateUnhealthy
+}
+
+// getHealthReason returns the reason for the health state
+func (api *ELBv2APIImpl) getHealthReason(healthState string) string {
+	switch healthState {
+	case TargetHealthStateHealthy:
+		return "Target.ResponseCodeMismatch"
+	case TargetHealthStateUnhealthy:
+		return "Target.FailedHealthChecks"
+	case TargetHealthStateInitial:
+		return "Target.NotRegistered"
+	case TargetHealthStateRegistering:
+		return "Target.RegistrationInProgress"
+	case TargetHealthStateDeregistering:
+		return "Target.DeregistrationInProgress"
+	default:
+		return "Target.InvalidState"
+	}
+}
+
+// getHealthDescription returns the description for the health state
+func (api *ELBv2APIImpl) getHealthDescription(healthState string) string {
+	switch healthState {
+	case TargetHealthStateHealthy:
+		return "Health checks succeeded"
+	case TargetHealthStateUnhealthy:
+		return "Health checks failed"
+	case TargetHealthStateInitial:
+		return "Target registration is in progress"
+	case TargetHealthStateRegistering:
+		return "Target registration is in progress"
+	case TargetHealthStateDeregistering:
+		return "Target deregistration is in progress"
+	default:
+		return "Target is in an invalid state"
+	}
+}
+
+// convertHealthStateToEnum converts internal health state to generated enum
+func (api *ELBv2APIImpl) convertHealthStateToEnum(healthState string) generated_elbv2.TargetHealthStateEnum {
+	switch healthState {
+	case TargetHealthStateHealthy:
+		return generated_elbv2.TargetHealthStateEnumHEALTHY
+	case TargetHealthStateUnhealthy:
+		return generated_elbv2.TargetHealthStateEnumUNHEALTHY
+	case TargetHealthStateInitial:
+		return generated_elbv2.TargetHealthStateEnumINITIAL
+	case TargetHealthStateRegistering:
+		return generated_elbv2.TargetHealthStateEnumUNUSED
+	case TargetHealthStateDeregistering:
+		return generated_elbv2.TargetHealthStateEnumDRAINING
+	default:
+		return generated_elbv2.TargetHealthStateEnumUNAVAILABLE
+	}
+}
+
+// updateLoadBalancerToActive updates a load balancer state to active
+func (api *ELBv2APIImpl) updateLoadBalancerToActive(ctx context.Context, arn string) error {
+	lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, arn)
+	if err != nil {
+		return err
+	}
+	
+	if lb == nil {
+		return fmt.Errorf("load balancer not found: %s", arn)
+	}
+	
+	if lb.State != "provisioning" {
+		return nil // Already active or in another state
+	}
+	
+	lb.State = "active"
+	lb.UpdatedAt = time.Now()
+	
+	return api.storage.ELBv2Store().UpdateLoadBalancer(ctx, lb)
+}
+
+// convertToTargetGroup converts storage target group to API response format
+func (api *ELBv2APIImpl) convertToTargetGroup(tg *storage.ELBv2TargetGroup) generated_elbv2.TargetGroup {
+	return generated_elbv2.TargetGroup{
+		TargetGroupArn:       &tg.ARN,
+		TargetGroupName:      &tg.Name,
+		Protocol:             (*generated_elbv2.ProtocolEnum)(&tg.Protocol),
+		Port:                 &tg.Port,
+		VpcId:                &tg.VpcID,
+		HealthCheckPath:      &tg.HealthCheckPath,
+		HealthCheckProtocol:  (*generated_elbv2.ProtocolEnum)(&tg.HealthCheckProtocol),
+		HealthCheckPort:      &tg.HealthCheckPort,
+		HealthyThresholdCount: &tg.HealthyThresholdCount,
+		UnhealthyThresholdCount: &tg.UnhealthyThresholdCount,
+		HealthCheckTimeoutSeconds: &tg.HealthCheckTimeoutSeconds,
+		HealthCheckIntervalSeconds: &tg.HealthCheckIntervalSeconds,
+		TargetType:           (*generated_elbv2.TargetTypeEnum)(&tg.TargetType),
+	}
+}
+
+// convertToListener converts storage listener to API response format
+func (api *ELBv2APIImpl) convertToListener(listener *storage.ELBv2Listener) generated_elbv2.Listener {
+	// Convert default actions - ensure we always have a non-nil slice
+	defaultActions := make([]generated_elbv2.Action, 0)
+	// TODO: Parse and convert stored default actions JSON
+
+	return generated_elbv2.Listener{
+		ListenerArn:      &listener.ARN,
+		LoadBalancerArn:  &listener.LoadBalancerArn,
+		Port:             &listener.Port,
+		Protocol:         (*generated_elbv2.ProtocolEnum)(&listener.Protocol),
+		DefaultActions:   defaultActions,
 	}
 }
