@@ -72,6 +72,11 @@ func (m *MemoryStorage) AttributeStore() storage.AttributeStore {
 	return nil // Not implemented for tests
 }
 
+// ELBv2Store returns the ELBv2 store
+func (m *MemoryStorage) ELBv2Store() storage.ELBv2Store {
+	return nil // Not implemented for tests
+}
+
 // BeginTx begins a transaction
 func (m *MemoryStorage) BeginTx(ctx context.Context) (storage.Transaction, error) {
 	return &memoryTransaction{}, nil

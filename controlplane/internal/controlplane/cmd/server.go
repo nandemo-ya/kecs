@@ -37,7 +37,7 @@ var (
 		Long: `Start the KECS Control Plane server that provides Amazon ECS compatible APIs.
 The server connects to a Kubernetes cluster and translates ECS API calls to Kubernetes resources.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			runServer()
+			runServer(cmd)
 		},
 	}
 )
@@ -58,7 +58,7 @@ func init() {
 	serverCmd.Flags().StringVar(&configFile, "config", "", "Path to configuration file")
 }
 
-func runServer() {
+func runServer(cmd *cobra.Command) {
 	// Log mode status for debugging
 	if config.GetBool("features.testMode") {
 		fmt.Println("KECS_TEST_MODE is enabled - running in test mode")
@@ -74,8 +74,8 @@ func runServer() {
 	}
 
 	// Override config with command line flags
-	if port != 0 {
-		cfg.Server.Port = port
+	if portFlag, _ := cmd.Parent().PersistentFlags().GetInt("port"); portFlag != 0 {
+		cfg.Server.Port = portFlag
 	}
 	if adminPort != 0 {
 		cfg.Server.AdminPort = adminPort
@@ -83,8 +83,8 @@ func runServer() {
 	if dataDir != "" {
 		cfg.Server.DataDir = dataDir
 	}
-	if logLevel != "" {
-		cfg.Server.LogLevel = logLevel
+	if logLevelFlag, _ := cmd.Parent().PersistentFlags().GetString("log-level"); logLevelFlag != "" {
+		cfg.Server.LogLevel = logLevelFlag
 	}
 	if localstackEnabled {
 		cfg.LocalStack.Enabled = true

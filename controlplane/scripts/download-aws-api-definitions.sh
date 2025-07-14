@@ -17,6 +17,7 @@ mkdir -p "$CODEGEN_DIR"
 
 SERVICES=(
     "cloudwatch-logs"
+    "elastic-load-balancing-v2"
     "iam"
     "s3"
     "secretsmanager"

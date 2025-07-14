@@ -17,8 +17,10 @@ import (
 
 	apiconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/iam"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/s3"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
@@ -50,6 +52,8 @@ type Server struct {
 	ssmIntegration            ssm.Integration
 	secretsManagerIntegration secretsmanager.Integration
 	s3Integration             s3.Integration
+	elbv2Integration          elbv2.Integration
+	elbv2Router               *generated_elbv2.Router
 	serviceDiscoveryAPI       *ServiceDiscoveryAPI
 }
 
@@ -283,6 +287,18 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 						log.Println("S3 integration initialized successfully")
 					}
 				}
+
+				// Initialize ELBv2 integration
+				if clusterManager != nil {
+					elbv2Integration := elbv2.NewK8sIntegration(s.region, s.accountID)
+					s.elbv2Integration = elbv2Integration
+					
+					// Initialize ELBv2 API and router
+					elbv2API := NewELBv2API(storage, elbv2Integration, s.region, s.accountID)
+					s.elbv2Router = generated_elbv2.NewRouter(elbv2API)
+					
+					log.Println("ELBv2 integration and API initialized successfully")
+				}
 			}
 		} else {
 			log.Printf("KubeClient is nil, cannot initialize LocalStack manager and AWS proxy router")
@@ -312,6 +328,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 		if s.s3Integration != nil {
 			defaultAPI.SetS3Integration(s.s3Integration)
+		}
+		if s.elbv2Integration != nil {
+			defaultAPI.SetELBv2Integration(s.elbv2Integration)
 		}
 		if s.localStackManager != nil {
 			defaultAPI.SetLocalStackManager(s.localStackManager)
@@ -413,6 +432,19 @@ func (s *Server) Start() error {
 
 	log.Printf("Starting API server on port %d", s.port)
 	return s.httpServer.ListenAndServe()
+}
+
+// handleELBv2Request handles ELBv2 API requests using the generated router
+func (s *Server) handleELBv2Request(w http.ResponseWriter, r *http.Request) {
+	if s.elbv2Router == nil {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, `{"__type":"ServiceUnavailable","message":"ELBv2 API not available"}`)
+		return
+	}
+	
+	// Use the generated router to handle the request
+	s.elbv2Router.Route(w, r)
 }
 
 // Stop gracefully stops the HTTP server
@@ -922,6 +954,11 @@ func (s *Server) SetupRoutes() http.Handler {
 		target := r.Header.Get("X-Amz-Target")
 		if target != "" && strings.Contains(target, "ServiceDiscovery") && s.serviceDiscoveryAPI != nil {
 			s.serviceDiscoveryAPI.HandleServiceDiscoveryRequest(w, r)
+			return
+		}
+		// Check if it's an ELBv2 request
+		if target != "" && strings.Contains(target, "ElasticLoadBalancing") {
+			s.handleELBv2Request(w, r)
 			return
 		}
 		// Otherwise handle as ECS request
