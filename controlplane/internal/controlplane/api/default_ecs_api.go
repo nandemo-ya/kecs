@@ -27,6 +27,7 @@ type DefaultECSAPI struct {
 	serviceDiscoveryManager   servicediscovery.Manager
 	localStackManager         localstack.Manager
 	localStackConfig          *localstack.Config
+	localStackUpdateCallback  func(localstack.Manager) // Callback when LocalStack manager is updated
 }
 
 // NewDefaultECSAPI creates a new default ECS API implementation with storage
@@ -77,6 +78,11 @@ func (api *DefaultECSAPI) SetLocalStackManager(localStackManager localstack.Mana
 // SetLocalStackConfig sets the LocalStack configuration for the ECS API
 func (api *DefaultECSAPI) SetLocalStackConfig(config *localstack.Config) {
 	api.localStackConfig = config
+}
+
+// SetLocalStackUpdateCallback sets the callback function to be called when LocalStack manager is updated
+func (api *DefaultECSAPI) SetLocalStackUpdateCallback(callback func(localstack.Manager)) {
+	api.localStackUpdateCallback = callback
 }
 
 // NewDefaultECSAPIWithConfig creates a new default ECS API implementation with custom region and accountID

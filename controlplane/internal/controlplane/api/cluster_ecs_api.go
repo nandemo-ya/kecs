@@ -819,6 +819,8 @@ func extractClusterNameFromARN(identifier string) string {
 
 // deployLocalStackIfEnabled deploys LocalStack to the k3d cluster if enabled
 func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
+	log.Printf("deployLocalStackIfEnabled called for cluster %s", cluster.Name)
+	
 	// Skip if cluster manager is not available
 	if api.clusterManager == nil {
 		log.Printf("Cluster manager not available, cannot deploy LocalStack for cluster %s", cluster.Name)
@@ -833,7 +835,11 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		// Create a copy of the config to avoid modifying the shared instance
 		configCopy := *api.localStackConfig
 		config = &configCopy
-		log.Printf("Using LocalStack config from API: Enabled=%v, UseTraefik=%v", config.Enabled, config.UseTraefik)
+		// Ensure container mode is set if running in container
+		if apiconfig.GetBool("features.containerMode") {
+			config.ContainerMode = true
+		}
+		log.Printf("Using LocalStack config from API: Enabled=%v, UseTraefik=%v, ContainerMode=%v", config.Enabled, config.UseTraefik, config.ContainerMode)
 	} else if api.localStackManager != nil {
 		config = api.localStackManager.GetConfig()
 	} else {
@@ -864,8 +870,15 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 	// If Traefik is enabled, get the dynamic port from cluster manager
 	if config.UseTraefik && api.clusterManager != nil {
 		if port, exists := api.clusterManager.GetTraefikPort(cluster.K8sClusterName); exists {
-			config.ProxyEndpoint = fmt.Sprintf("http://localhost:%d", port)
-			log.Printf("Using dynamic Traefik port %d for LocalStack proxy endpoint: %s", port, config.ProxyEndpoint)
+			// In container mode, use k3d node hostname with NodePort
+			if config.ContainerMode {
+				k3dNodeName := fmt.Sprintf("k3d-%s-server-0", cluster.K8sClusterName)
+				config.ProxyEndpoint = fmt.Sprintf("http://%s:30890", k3dNodeName)
+				log.Printf("Container mode: Using k3d node %s with NodePort 30890 for LocalStack proxy endpoint: %s", k3dNodeName, config.ProxyEndpoint)
+			} else {
+				config.ProxyEndpoint = fmt.Sprintf("http://localhost:%d", port)
+				log.Printf("Using dynamic Traefik port %d for LocalStack proxy endpoint: %s", port, config.ProxyEndpoint)
+			}
 		} else {
 			log.Printf("Warning: Traefik is enabled but no port found for cluster %s", cluster.K8sClusterName)
 		}
@@ -873,6 +886,16 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		log.Printf("Traefik disabled or cluster manager not available. UseTraefik=%v, clusterManager=%v", config.UseTraefik, api.clusterManager != nil)
 	}
 
+	// Set lazy loading for faster startup in container mode
+	if config.ContainerMode {
+		// Use lazy loading to avoid timeout issues
+		if config.Environment == nil {
+			config.Environment = make(map[string]string)
+		}
+		config.Environment["EAGER_SERVICE_LOADING"] = "0"
+		log.Printf("Container mode: Disabled eager service loading for faster LocalStack startup")
+	}
+	
 	// Wait a bit for the k3d cluster to be fully ready
 	time.Sleep(5 * time.Second)
 
@@ -917,18 +940,33 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 
 	// Wait for LocalStack to be ready
 	log.Printf("Waiting for LocalStack to be ready in cluster %s...", cluster.Name)
-	if err := clusterLocalStackManager.WaitForReady(ctx, 2*time.Minute); err != nil {
-		log.Printf("LocalStack failed to become ready in cluster %s: %v", cluster.Name, err)
-		// Update LocalStack state to failed
-		api.updateLocalStackState(cluster, "failed", err.Error())
-		return
+	err = clusterLocalStackManager.WaitForReady(ctx, 2*time.Minute)
+	if err != nil {
+		log.Printf("LocalStack health check failed in cluster %s: %v", cluster.Name, err)
+		// In container mode with DNS issues, we might still be able to use LocalStack
+		if config.ContainerMode && clusterLocalStackManager.IsRunning() {
+			log.Printf("LocalStack is running despite health check failure, continuing...")
+			// Update state with warning
+			api.updateLocalStackState(cluster, "running", "Health check failed but pod is running")
+		} else {
+			// Update LocalStack state to failed
+			api.updateLocalStackState(cluster, "failed", err.Error())
+			return
+		}
+	} else {
+		log.Printf("LocalStack successfully deployed in cluster %s", cluster.Name)
+		// Update LocalStack state to running
+		api.updateLocalStackState(cluster, "running", "")
 	}
-
-	log.Printf("LocalStack successfully deployed in cluster %s", cluster.Name)
 	
-	// Update LocalStack state to running
-	// Note: WaitForReady might have returned nil despite DNS issues
-	api.updateLocalStackState(cluster, "running", "")
+	// Update the global LocalStack manager reference and notify server to re-initialize AWS proxy router
+	api.localStackManager = clusterLocalStackManager
+	
+	// Call the update callback if set
+	if api.localStackUpdateCallback != nil {
+		log.Printf("Notifying server about LocalStack manager update")
+		api.localStackUpdateCallback(clusterLocalStackManager)
+	}
 }
 
 // updateLocalStackState updates the LocalStack deployment state in storage

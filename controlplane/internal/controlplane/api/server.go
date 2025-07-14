@@ -320,6 +320,24 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		if localStackConfig != nil {
 			defaultAPI.SetLocalStackConfig(localStackConfig)
 		}
+		
+		// Set callback to re-initialize AWS proxy router when LocalStack manager is updated
+		defaultAPI.SetLocalStackUpdateCallback(func(newManager localstack.Manager) {
+			log.Printf("LocalStack manager updated, re-initializing AWS proxy router...")
+			s.localStackManager = newManager
+			
+			// Re-initialize AWS proxy router with the new LocalStack manager
+			if s.localStackManager != nil {
+				awsProxyRouter, err := NewAWSProxyRouter(s.localStackManager)
+				if err != nil {
+					log.Printf("Warning: Failed to re-initialize AWS proxy router: %v", err)
+				} else {
+					s.awsProxyRouter = awsProxyRouter
+					log.Printf("AWS proxy router re-initialized successfully")
+					log.Printf("LocalStackProxyMiddleware will now use the updated awsProxyRouter")
+				}
+			}
+		})
 
 		// Initialize Service Discovery if we have kubernetes client
 		if localStackConfig != nil && localStackConfig.Enabled {
@@ -936,12 +954,8 @@ func (s *Server) SetupRoutes() http.Handler {
 	
 	// Add LocalStack proxy middleware LAST so it runs FIRST
 	// This ensures AWS API calls are intercepted before reaching ECS handlers
-	if s.awsProxyRouter != nil {
-		log.Printf("Adding LocalStackProxyMiddleware to handler chain")
-		handler = LocalStackProxyMiddleware(handler, s.awsProxyRouter)
-	} else {
-		log.Printf("WARNING: awsProxyRouter is nil, LocalStackProxyMiddleware not added")
-	}
+	// Pass the server instance so the middleware can dynamically check awsProxyRouter
+	handler = LocalStackProxyMiddleware(handler, s)
 
 	return handler
 }

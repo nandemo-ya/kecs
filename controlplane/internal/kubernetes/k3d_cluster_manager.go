@@ -3,8 +3,8 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -125,11 +125,20 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 	}
 
 	// Create cluster configuration with minimal required fields
+	// In container mode, check if KECS network is specified
+	networkName := fmt.Sprintf("k3d-%s", normalizedName)
+	if k.config.ContainerMode {
+		if kecsNetwork := config.GetString("docker.network"); kecsNetwork != "" {
+			log.Printf("Using KECS Docker network: %s", kecsNetwork)
+			networkName = kecsNetwork
+		}
+	}
+	
 	cluster := &k3d.Cluster{
 		Name:  normalizedName,
 		Nodes: []*k3d.Node{serverNode},
 		Network: k3d.ClusterNetwork{
-			Name: fmt.Sprintf("k3d-%s", normalizedName),
+			Name: networkName,
 			IPAM: k3d.IPAM{
 				Managed: false,
 			},
@@ -292,27 +301,22 @@ func (k *K3dClusterManager) GetKubeClient(clusterName string) (kubernetes.Interf
 		} else if apiPort != "" {
 			// Update the server URL with the correct port
 			for clusterName, clusterConfig := range kubeconfigObj.Clusters {
-				// When running in container mode, we need to use host.docker.internal
-				// to connect to services on the Docker host
+				// When running in container mode, we need to connect to k3d containers directly
 				host := "127.0.0.1"
 				if k.config.ContainerMode {
-					// Try to use host.docker.internal for Docker Desktop environments
-					// This works on Mac and Windows Docker Desktop
-					host = "host.docker.internal"
-					
-					// For Linux, we might need to use the default gateway
-					if _, err := os.Stat("/.dockerenv"); err == nil {
-						// We're in a container, check if host.docker.internal resolves
-						if _, err := net.LookupHost("host.docker.internal"); err != nil {
-							// host.docker.internal doesn't resolve, try to get gateway
-							log.Printf("host.docker.internal not available, using fallback")
-							// For now, we'll still use host.docker.internal and let it fail
-							// A more robust solution would detect the gateway IP
-						}
-					}
+					// In container mode, connect directly to the k3d server container
+					// using its container name within the same Docker network
+					k3dServerName := fmt.Sprintf("k3d-%s-server-0", normalizedName)
+					host = k3dServerName
+					log.Printf("Container mode: using direct container connection to %s", k3dServerName)
 				}
 				
-				newServer := fmt.Sprintf("https://%s:%s", host, apiPort)
+				// In container mode with direct connection, use the internal port 6443
+				port := apiPort
+				if k.config.ContainerMode {
+					port = "6443" // k3d server internal port
+				}
+				newServer := fmt.Sprintf("https://%s:%s", host, port)
 				log.Printf("Updating server URL from %s to %s", clusterConfig.Server, newServer)
 				clusterConfig.Server = newServer
 				kubeconfigObj.Clusters[clusterName] = clusterConfig
@@ -482,11 +486,66 @@ func (k *K3dClusterManager) writeKubeconfig(ctx context.Context, cluster *k3d.Cl
 
 	// Write kubeconfig to file
 	if err := client.KubeconfigWrite(ctx, kubecfg, kubeconfigPath); err != nil {
+		// In container mode, k3d might fail to create symlinks
+		// Try to find the actual kubeconfig file and create a symlink manually
+		if k.config.ContainerMode {
+			log.Printf("k3d kubeconfig write failed, attempting to create symlink manually: %v", err)
+			
+			kubeconfigDir := filepath.Dir(kubeconfigPath)
+			pattern := filepath.Join(kubeconfigDir, "*.config.k3d_*")
+			matches, globErr := filepath.Glob(pattern)
+			if globErr == nil && len(matches) > 0 {
+				// Found k3d-generated kubeconfig file, create symlink
+				actualFile := matches[0]
+				log.Printf("Found k3d kubeconfig at %s, creating symlink to %s", actualFile, kubeconfigPath)
+				
+				// Remove existing file/link if it exists
+				os.Remove(kubeconfigPath)
+				
+				// Create symlink
+				if linkErr := os.Symlink(filepath.Base(actualFile), kubeconfigPath); linkErr != nil {
+					log.Printf("Failed to create symlink, copying file instead: %v", linkErr)
+					// If symlink fails, copy the file instead
+					if copyErr := k.copyFile(actualFile, kubeconfigPath); copyErr != nil {
+						return fmt.Errorf("failed to copy kubeconfig file: %w", copyErr)
+					}
+				}
+				log.Printf("Successfully created kubeconfig at %s", kubeconfigPath)
+				return nil
+			}
+		}
 		return fmt.Errorf("failed to write kubeconfig: %w", err)
 	}
 
 	log.Printf("Wrote kubeconfig for cluster %s to %s", cluster.Name, kubeconfigPath)
 	return nil
+}
+
+// copyFile copies a file from src to dst
+func (k *K3dClusterManager) copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	// Copy file permissions
+	sourceInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	return os.Chmod(dst, sourceInfo.Mode())
 }
 
 // getLoadBalancerAPIPort gets the host port for the API from the loadbalancer container
@@ -592,27 +651,22 @@ func (k *K3dClusterManager) getRESTConfig(clusterName string) (*rest.Config, err
 		} else if apiPort != "" {
 			// Update the server URL with the correct port
 			for clusterName, clusterConfig := range kubeconfigObj.Clusters {
-				// When running in container mode, we need to use host.docker.internal
-				// to connect to services on the Docker host
+				// When running in container mode, we need to connect to k3d containers directly
 				host := "127.0.0.1"
 				if k.config.ContainerMode {
-					// Try to use host.docker.internal for Docker Desktop environments
-					// This works on Mac and Windows Docker Desktop
-					host = "host.docker.internal"
-					
-					// For Linux, we might need to use the default gateway
-					if _, err := os.Stat("/.dockerenv"); err == nil {
-						// We're in a container, check if host.docker.internal resolves
-						if _, err := net.LookupHost("host.docker.internal"); err != nil {
-							// host.docker.internal doesn't resolve, try to get gateway
-							log.Printf("host.docker.internal not available, using fallback")
-							// For now, we'll still use host.docker.internal and let it fail
-							// A more robust solution would detect the gateway IP
-						}
-					}
+					// In container mode, connect directly to the k3d server container
+					// using its container name within the same Docker network
+					k3dServerName := fmt.Sprintf("k3d-%s-server-0", normalizedName)
+					host = k3dServerName
+					log.Printf("Container mode: using direct container connection to %s", k3dServerName)
 				}
 				
-				newServer := fmt.Sprintf("https://%s:%s", host, apiPort)
+				// In container mode with direct connection, use the internal port 6443
+				port := apiPort
+				if k.config.ContainerMode {
+					port = "6443" // k3d server internal port
+				}
+				newServer := fmt.Sprintf("https://%s:%s", host, port)
 				log.Printf("Updating server URL from %s to %s", clusterConfig.Server, newServer)
 				clusterConfig.Server = newServer
 				kubeconfigObj.Clusters[clusterName] = clusterConfig
@@ -628,6 +682,7 @@ func (k *K3dClusterManager) getRESTConfig(clusterName string) (*rest.Config, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to get client config: %w", err)
 	}
+
 
 	return config, nil
 }
@@ -711,11 +766,20 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 	}
 
 	// Create minimal cluster configuration
+	// In container mode, check if KECS network is specified
+	networkName := fmt.Sprintf("k3d-%s", normalizedName)
+	if k.config.ContainerMode {
+		if kecsNetwork := config.GetString("docker.network"); kecsNetwork != "" {
+			log.Printf("Using KECS Docker network: %s", kecsNetwork)
+			networkName = kecsNetwork
+		}
+	}
+	
 	cluster := &k3d.Cluster{
 		Name:  normalizedName,
 		Nodes: []*k3d.Node{serverNode},
 		Network: k3d.ClusterNetwork{
-			Name: fmt.Sprintf("k3d-%s", normalizedName),
+			Name: networkName,
 			IPAM: k3d.IPAM{
 				Managed: false, // Don't manage IPAM
 			},

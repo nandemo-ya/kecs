@@ -190,6 +190,24 @@ func runStart(cmd *cobra.Command, args []string) error {
 		"KECS_KUBECONFIG_PATH=/data/kubeconfig", // Store kubeconfig in data directory
 		"KECS_TEST_MODE=false", // Disable test mode for normal operation
 	}
+	
+	// Pass through LocalStack and feature-related environment variables from host
+	passThruEnvVars := []string{
+		"KECS_LOCALSTACK_ENABLED",
+		"KECS_LOCALSTACK_SERVICES",
+		"KECS_LOCALSTACK_USE_TRAEFIK",
+		"KECS_FEATURES_TRAEFIK",
+		"KECS_FEATURES_CONTAINER_MODE",
+		"KECS_LOCALSTACK_PORT",
+		"KECS_LOCALSTACK_ENDPOINT",
+		"KECS_LOCALSTACK_PROXY_ENDPOINT",
+	}
+	
+	for _, envVar := range passThruEnvVars {
+		if value := os.Getenv(envVar); value != "" {
+			env = append(env, fmt.Sprintf("%s=%s", envVar, value))
+		}
+	}
 
 	// Add config file if specified
 	configMount := []runtime.Mount{}
@@ -211,12 +229,27 @@ func runStart(cmd *cobra.Command, args []string) error {
 	// This allows the container to access the Docker socket
 	groupAdd := []string{"0"}
 
+	// Create dedicated KECS network for k3d clusters to join
+	kecsNetworkName := fmt.Sprintf("kecs-%s", startContainerName)
+	fmt.Printf("Creating dedicated network '%s' for KECS and k3d clusters...\n", kecsNetworkName)
+	if err := createDockerNetwork(kecsNetworkName); err != nil {
+		fmt.Printf("Warning: Failed to create KECS network: %v\n", err)
+		// Continue without the network
+	}
+	
+	// Use the KECS network
+	networks := []string{kecsNetworkName}
+	
+	// Also pass the network name via environment variable for k3d to use
+	env = append(env, fmt.Sprintf("KECS_DOCKER_NETWORK=%s", kecsNetworkName))
+
 	// Create container configuration
 	containerConfig := &runtime.ContainerConfig{
-		Name:  startContainerName,
-		Image: imageName,
-		Cmd:   []string{"server"}, // Run the server command
-		Env:   env,
+		Name:     startContainerName,
+		Image:    imageName,
+		Cmd:      []string{"server"}, // Run the server command
+		Env:      env,
+		Networks: networks, // Join k3d networks if they exist
 		Labels: map[string]string{
 			"com.kecs.managed": "true",
 			"com.kecs.name":    startContainerName,
@@ -441,4 +474,27 @@ func findAvailablePorts(startApiPort, startAdminPort int, usedPorts map[int]stri
 	}
 	
 	return ports, nil
+}
+
+// createDockerNetwork creates a Docker network if it doesn't exist
+func createDockerNetwork(networkName string) error {
+	// Check if network already exists
+	cmd := exec.Command("docker", "network", "ls", "--filter", fmt.Sprintf("name=%s", networkName), "--format", "{{.Name}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to check network existence: %w", err)
+	}
+	
+	if strings.TrimSpace(string(output)) == networkName {
+		// Network already exists
+		return nil
+	}
+	
+	// Create the network
+	cmd = exec.Command("docker", "network", "create", networkName)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to create network: %w", err)
+	}
+	
+	return nil
 }

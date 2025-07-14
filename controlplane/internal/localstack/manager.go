@@ -36,16 +36,18 @@ func NewManager(config *Config, kubeClient kubernetes.Interface, kubeConfig *res
 	
 	// Determine health check endpoint based on runtime configuration
 	var healthEndpoint string
-	if config.ContainerMode {
-		// In container mode, we can use cluster-internal DNS since KECS will be in the same network
-		healthEndpoint = fmt.Sprintf("http://localstack.%s.svc.cluster.local:%d", config.Namespace, config.Port)
-		klog.Infof("Container mode: using cluster-internal endpoint for health checker: %s", healthEndpoint)
-	} else if config.UseTraefik && config.ProxyEndpoint != "" {
-		// In host mode with Traefik, use the proxy endpoint
+	if config.UseTraefik && config.ProxyEndpoint != "" {
+		// When using Traefik, always use the proxy endpoint for health checks
+		// This works for both host mode and container mode
 		healthEndpoint = config.ProxyEndpoint
-		klog.Infof("Host mode with Traefik: using proxy endpoint for health checker: %s", healthEndpoint)
+		klog.Infof("Using Traefik proxy endpoint for health checker: %s", healthEndpoint)
+	} else if config.ContainerMode {
+		// In container mode without Traefik, we can't use cluster-internal DNS
+		// Fall back to NodePort or other external access method
+		healthEndpoint = fmt.Sprintf("http://localhost:%d", config.Port)
+		klog.Infof("Container mode without Traefik: using localhost endpoint for health checker: %s", healthEndpoint)
 	} else {
-		// Fallback to NodePort or other external access method
+		// Host mode without Traefik
 		healthEndpoint = fmt.Sprintf("http://localhost:%d", config.Port)
 		klog.Infof("Host mode: using localhost endpoint for health checker: %s", healthEndpoint)
 	}
@@ -116,18 +118,19 @@ func (m *localStackManager) Start(ctx context.Context) error {
 
 	// Update health checker endpoint based on runtime configuration
 	var healthEndpoint string
-	if m.config.ContainerMode {
-		// In container mode, use cluster-internal endpoint
-		healthEndpoint = endpoint
-		klog.Infof("Container mode: using cluster-internal endpoint for runtime health checks: %s", healthEndpoint)
-	} else if m.config.UseTraefik && m.config.ProxyEndpoint != "" {
-		// In host mode with Traefik, use the proxy endpoint
+	if m.config.UseTraefik && m.config.ProxyEndpoint != "" {
+		// When using Traefik, always use the proxy endpoint
 		healthEndpoint = m.config.ProxyEndpoint
-		klog.Infof("Host mode with Traefik: using proxy endpoint for runtime health checks: %s", healthEndpoint)
-	} else {
-		// Fallback - this would need NodePort or other external access
+		klog.Infof("Using Traefik proxy endpoint for runtime health checks: %s", healthEndpoint)
+	} else if m.config.ContainerMode {
+		// In container mode without Traefik, we can't use cluster-internal endpoint
+		// This configuration is not ideal - should use Traefik
 		healthEndpoint = fmt.Sprintf("http://localhost:%d", m.config.Port)
-		klog.Warningf("Host mode without Traefik: health checks may fail. Using: %s", healthEndpoint)
+		klog.Warningf("Container mode without Traefik: health checks may fail. Using: %s", healthEndpoint)
+	} else {
+		// Host mode without Traefik
+		healthEndpoint = fmt.Sprintf("http://localhost:%d", m.config.Port)
+		klog.Infof("Host mode without Traefik: using localhost endpoint: %s", healthEndpoint)
 	}
 	
 	// Update the health checker with the correct endpoint
