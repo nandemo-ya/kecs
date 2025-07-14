@@ -78,11 +78,11 @@ health:
 
 # Feature flags
 features:
-  traefik: true  # Enable Traefik proxy for LocalStack access from host mode
+  traefik: false  # Disable Traefik for now
 
 # LocalStack configuration
 localstack:
-  enabled: true  # LocalStack is enabled by default for AWS service dependencies
+  enabled: false  # Disable LocalStack for this test
   services:
     - iam
     - logs
@@ -111,9 +111,9 @@ localstack:
   
 # AWS Proxy configuration  
 proxy:
-  mode: "environment"  # Options: environment, sidecar, ebpf, disabled
+  mode: "disabled"  # Options: environment, sidecar, ebpf, disabled
   localstackEndpoint: "http://localstack.aws-services.svc.cluster.local:4566"
-  fallbackEnabled: true
+  fallbackEnabled: false
   fallbackOrder:
     - sidecar
     - environment
