@@ -37,11 +37,37 @@ var _ = Describe("Config", func() {
 
 	Describe("LoadConfig", func() {
 		Context("when config file does not exist", func() {
-			It("should return default configuration", func() {
-				cfg, err := config.LoadConfig(filepath.Join(tempDir, "nonexistent.yaml"))
+			It("should return error", func() {
+				nonExistentPath := filepath.Join(tempDir, "nonexistent.yaml")
+				_, err := config.LoadConfig(nonExistentPath)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("config file does not exist"))
+				Expect(err.Error()).To(ContainSubstring(nonExistentPath))
+			})
+		})
+
+		Context("when config file is not accessible", func() {
+			It("should return error", func() {
+				configPath := filepath.Join(tempDir, "noaccess.yaml")
+				err := os.WriteFile(configPath, []byte("test"), 0644)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(cfg).NotTo(BeNil())
-				Expect(cfg.Server.Port).To(Equal(8080))
+				
+				// Make file inaccessible
+				err = os.Chmod(configPath, 0000)
+				Expect(err).NotTo(HaveOccurred())
+				
+				_, err = config.LoadConfig(configPath)
+				Expect(err).To(HaveOccurred())
+				// The error can be either "failed to access config file" or "failed to read config file"
+				// depending on when the permission error is caught
+				Expect(err.Error()).To(Or(
+					ContainSubstring("failed to access config file"),
+					ContainSubstring("failed to read config file"),
+				))
+				Expect(err.Error()).To(ContainSubstring("permission denied"))
+				
+				// Restore permissions for cleanup
+				os.Chmod(configPath, 0644)
 			})
 		})
 
