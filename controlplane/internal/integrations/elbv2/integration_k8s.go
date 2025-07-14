@@ -7,6 +7,12 @@ import (
 	"sync"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
 
@@ -15,6 +21,7 @@ import (
 type k8sIntegration struct {
 	region    string
 	accountID string
+	kubeClient kubernetes.Interface
 
 	// In-memory storage for load balancers and target groups
 	// In production, this should be persisted
@@ -30,6 +37,7 @@ func NewK8sIntegration(region, accountID string) Integration {
 	return &k8sIntegration{
 		region:        region,
 		accountID:     accountID,
+		kubeClient:    nil, // Will be set later when needed
 		loadBalancers: make(map[string]*LoadBalancer),
 		targetGroups:  make(map[string]*TargetGroup),
 		listeners:     make(map[string]*Listener),
@@ -37,9 +45,9 @@ func NewK8sIntegration(region, accountID string) Integration {
 	}
 }
 
-// CreateLoadBalancer creates a virtual load balancer (no actual AWS resources)
+// CreateLoadBalancer creates a virtual load balancer and deploys Traefik
 func (i *k8sIntegration) CreateLoadBalancer(ctx context.Context, name string, subnets []string, securityGroups []string) (*LoadBalancer, error) {
-	klog.V(2).Infof("Creating virtual load balancer: %s", name)
+	klog.V(2).Infof("Creating load balancer with Traefik deployment: %s", name)
 
 	// Generate ARN
 	arn := fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:loadbalancer/app/%s/%s",
@@ -67,12 +75,17 @@ func (i *k8sIntegration) CreateLoadBalancer(ctx context.Context, name string, su
 		})
 	}
 
+	// Deploy Traefik for this load balancer
+	if err := i.deployTraefikForLoadBalancer(ctx, name, arn); err != nil {
+		return nil, fmt.Errorf("failed to deploy Traefik for load balancer %s: %w", name, err)
+	}
+
 	// Store in memory with lock
 	i.mu.Lock()
 	i.loadBalancers[arn] = lb
 	i.mu.Unlock()
 
-	klog.V(2).Infof("Created virtual load balancer: %s with DNS: %s", arn, lb.DNSName)
+	klog.V(2).Infof("Created load balancer: %s with DNS: %s and Traefik deployment", arn, lb.DNSName)
 	return lb, nil
 }
 
@@ -313,4 +326,294 @@ func getResourceName(arn string) string {
 		return parts[len(parts)-2]
 	}
 	return "unknown"
+}
+
+// deployTraefikForLoadBalancer deploys Traefik resources for a load balancer
+func (i *k8sIntegration) deployTraefikForLoadBalancer(ctx context.Context, lbName, lbArn string) error {
+	if i.kubeClient == nil {
+		// If no kubeClient is available, just log and continue
+		klog.V(2).Infof("No kubeClient available, skipping Traefik deployment for load balancer: %s", lbName)
+		return nil
+	}
+
+	namespace := "kecs-system"
+	traefikName := fmt.Sprintf("traefik-elbv2-%s", lbName)
+
+	// Create namespace if it doesn't exist
+	if err := i.createNamespaceIfNotExists(ctx, namespace); err != nil {
+		return fmt.Errorf("failed to create namespace: %w", err)
+	}
+
+	// Create ServiceAccount
+	if err := i.createServiceAccount(ctx, namespace, traefikName, lbName, lbArn); err != nil {
+		return fmt.Errorf("failed to create ServiceAccount: %w", err)
+	}
+
+	// Create ConfigMap
+	if err := i.createConfigMap(ctx, namespace, traefikName, lbName, lbArn); err != nil {
+		return fmt.Errorf("failed to create ConfigMap: %w", err)
+	}
+
+	// Create Deployment
+	if err := i.createDeployment(ctx, namespace, traefikName, lbName, lbArn); err != nil {
+		return fmt.Errorf("failed to create Deployment: %w", err)
+	}
+
+	// Create Service
+	if err := i.createService(ctx, namespace, traefikName, lbName, lbArn); err != nil {
+		return fmt.Errorf("failed to create Service: %w", err)
+	}
+
+	klog.V(2).Infof("Successfully deployed Traefik resources for load balancer: %s", lbName)
+	return nil
+}
+
+// createNamespaceIfNotExists creates the namespace if it doesn't exist
+func (i *k8sIntegration) createNamespaceIfNotExists(ctx context.Context, namespace string) error {
+	_, err := i.kubeClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	if err != nil {
+		// Namespace doesn't exist, create it
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		}
+		_, err = i.kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to create namespace %s: %w", namespace, err)
+		}
+	}
+	return nil
+}
+
+// createServiceAccount creates a ServiceAccount for Traefik with load balancer annotations
+func (i *k8sIntegration) createServiceAccount(ctx context.Context, namespace, traefikName, lbName, lbArn string) error {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      traefikName,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"kecs.io/elbv2-load-balancer-name": lbName,
+				"kecs.io/elbv2-load-balancer-arn":  lbArn,
+				"kecs.io/elbv2-proxy-type":         "load-balancer",
+			},
+			Labels: map[string]string{
+				"app":                              traefikName,
+				"kecs.io/elbv2-load-balancer-name": lbName,
+				"kecs.io/component":                "elbv2-proxy",
+			},
+		},
+	}
+
+	_, err := i.kubeClient.CoreV1().ServiceAccounts(namespace).Create(ctx, sa, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create ServiceAccount: %w", err)
+	}
+	return nil
+}
+
+// createConfigMap creates a ConfigMap for Traefik configuration
+func (i *k8sIntegration) createConfigMap(ctx context.Context, namespace, traefikName, lbName, lbArn string) error {
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-config", traefikName),
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"kecs.io/elbv2-load-balancer-name": lbName,
+				"kecs.io/elbv2-load-balancer-arn":  lbArn,
+				"kecs.io/elbv2-proxy-type":         "load-balancer",
+			},
+			Labels: map[string]string{
+				"app":                              traefikName,
+				"kecs.io/elbv2-load-balancer-name": lbName,
+				"kecs.io/component":                "elbv2-proxy",
+			},
+		},
+		Data: map[string]string{
+			"traefik.yml": `
+api:
+  dashboard: true
+  debug: true
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+providers:
+  kubernetesIngress: {}
+log:
+  level: INFO
+`,
+		},
+	}
+
+	_, err := i.kubeClient.CoreV1().ConfigMaps(namespace).Create(ctx, cm, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create ConfigMap: %w", err)
+	}
+	return nil
+}
+
+// createDeployment creates a Deployment for Traefik
+func (i *k8sIntegration) createDeployment(ctx context.Context, namespace, traefikName, lbName, lbArn string) error {
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      traefikName,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"kecs.io/elbv2-load-balancer-name": lbName,
+				"kecs.io/elbv2-load-balancer-arn":  lbArn,
+				"kecs.io/elbv2-proxy-type":         "load-balancer",
+			},
+			Labels: map[string]string{
+				"app":                              traefikName,
+				"kecs.io/elbv2-load-balancer-name": lbName,
+				"kecs.io/component":                "elbv2-proxy",
+			},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &[]int32{1}[0],
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": traefikName,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":                              traefikName,
+						"kecs.io/elbv2-load-balancer-name": lbName,
+						"kecs.io/component":                "elbv2-proxy",
+					},
+					Annotations: map[string]string{
+						"kecs.io/elbv2-load-balancer-name": lbName,
+						"kecs.io/elbv2-load-balancer-arn":  lbArn,
+						"kecs.io/elbv2-proxy-type":         "load-balancer",
+					},
+				},
+				Spec: corev1.PodSpec{
+					ServiceAccountName: traefikName,
+					Containers: []corev1.Container{
+						{
+							Name:  "traefik",
+							Image: "traefik:v3.0",
+							Args: []string{
+								"--configfile=/config/traefik.yml",
+							},
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "web",
+									ContainerPort: 80,
+								},
+								{
+									Name:          "websecure",
+									ContainerPort: 443,
+								},
+								{
+									Name:          "dashboard",
+									ContainerPort: 8080,
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "config",
+									MountPath: "/config",
+									ReadOnly:  true,
+								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceMemory: mustParseResource("128Mi"),
+									corev1.ResourceCPU:    mustParseResource("500m"),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceMemory: mustParseResource("64Mi"),
+									corev1.ResourceCPU:    mustParseResource("100m"),
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "config",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: fmt.Sprintf("%s-config", traefikName),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := i.kubeClient.AppsV1().Deployments(namespace).Create(ctx, deployment, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create Deployment: %w", err)
+	}
+	return nil
+}
+
+// createService creates a Service for Traefik
+func (i *k8sIntegration) createService(ctx context.Context, namespace, traefikName, lbName, lbArn string) error {
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      traefikName,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"kecs.io/elbv2-load-balancer-name": lbName,
+				"kecs.io/elbv2-load-balancer-arn":  lbArn,
+				"kecs.io/elbv2-proxy-type":         "load-balancer",
+			},
+			Labels: map[string]string{
+				"app":                              traefikName,
+				"kecs.io/elbv2-load-balancer-name": lbName,
+				"kecs.io/component":                "elbv2-proxy",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeNodePort,
+			Selector: map[string]string{
+				"app": traefikName,
+			},
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "web",
+					Port:       80,
+					TargetPort: intstr.FromInt(80),
+					NodePort:   30080,
+				},
+				{
+					Name:       "websecure",
+					Port:       443,
+					TargetPort: intstr.FromInt(443),
+					NodePort:   30443,
+				},
+				{
+					Name:       "dashboard",
+					Port:       8080,
+					TargetPort: intstr.FromInt(8080),
+					NodePort:   30808,
+				},
+			},
+		},
+	}
+
+	_, err := i.kubeClient.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create Service: %w", err)
+	}
+	return nil
+}
+
+// Helper function to parse resource requirements
+func mustParseResource(s string) resource.Quantity {
+	q, err := resource.ParseQuantity(s)
+	if err != nil {
+		panic(err)
+	}
+	return q
 }

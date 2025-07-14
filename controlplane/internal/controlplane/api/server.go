@@ -261,21 +261,24 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					}
 				}
 
-				// Initialize ELBv2 integration
-				if clusterManager != nil {
-					elbv2Integration := elbv2.NewK8sIntegration(s.region, s.accountID)
-					s.elbv2Integration = elbv2Integration
-					
-					// Initialize ELBv2 API and router
-					elbv2API := NewELBv2API(storage, elbv2Integration, s.region, s.accountID)
-					s.elbv2Router = generated_elbv2.NewRouter(elbv2API)
-					
-					log.Println("ELBv2 integration and API initialized successfully")
-				}
 			}
 		} else {
 			log.Printf("KubeClient is nil, cannot initialize LocalStack manager and AWS proxy router")
 		}
+	}
+
+	// Initialize ELBv2 integration (independent of LocalStack)
+	if clusterManager != nil {
+		elbv2Integration := elbv2.NewK8sIntegration(s.region, s.accountID)
+		s.elbv2Integration = elbv2Integration
+		
+		// Initialize ELBv2 API and router
+		elbv2API := NewELBv2API(storage, elbv2Integration, s.region, s.accountID)
+		s.elbv2Router = generated_elbv2.NewRouter(elbv2API)
+		
+		log.Println("ELBv2 integration and API initialized successfully")
+	} else {
+		log.Printf("ClusterManager is nil, cannot initialize ELBv2 integration")
 	}
 
 	// Create ECS API with integrations

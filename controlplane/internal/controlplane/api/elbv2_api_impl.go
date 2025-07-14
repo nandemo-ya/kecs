@@ -130,6 +130,11 @@ func (api *ELBv2APIImpl) CreateLoadBalancer(ctx context.Context, input *generate
 		return nil, err
 	}
 
+	// Deploy Traefik for this load balancer
+	if _, err := api.elbv2Integration.CreateLoadBalancer(ctx, input.Name, subnets, securityGroups); err != nil {
+		return nil, fmt.Errorf("failed to deploy Traefik for load balancer: %w", err)
+	}
+
 	// Create response
 	state := generated_elbv2.LoadBalancerStateEnumPROVISIONING
 	output := &generated_elbv2.CreateLoadBalancerOutput{

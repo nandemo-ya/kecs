@@ -421,7 +421,8 @@ func (k *K3dClusterManager) GetKubeconfigPath(clusterName string) string {
 		if kubeconfigPath == "" {
 			kubeconfigPath = config.GetString("kubernetes.kubeconfigPath")
 			if kubeconfigPath == "" {
-				kubeconfigPath = "/kecs/kubeconfig"
+				// Use a temporary directory that's writable in container mode
+				kubeconfigPath = filepath.Join(os.TempDir(), "kecs", "kubeconfig")
 			}
 		}
 		os.MkdirAll(kubeconfigPath, 0755)
@@ -441,7 +442,8 @@ func (k *K3dClusterManager) GetHostKubeconfigPath(clusterName string) string {
 		if kubeconfigPath == "" {
 			kubeconfigPath = config.GetString("kubernetes.kubeconfigPath")
 			if kubeconfigPath == "" {
-				kubeconfigPath = "/kecs/kubeconfig"
+				// Use a temporary directory that's writable in container mode
+				kubeconfigPath = filepath.Join(os.TempDir(), "kecs", "kubeconfig")
 			}
 		}
 		os.MkdirAll(kubeconfigPath, 0755)

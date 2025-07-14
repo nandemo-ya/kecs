@@ -367,7 +367,7 @@ func (p *ConnectionPool) InitializeCommonStatements(ctx context.Context) error {
 		"SELECT * FROM clusters WHERE name = ?",
 		"SELECT * FROM clusters WHERE region = ? AND account_id = ?",
 		"SELECT * FROM services WHERE cluster_arn = ?",
-		"SELECT * FROM tasks WHERE cluster_arn = ? AND status = ?",
+		"SELECT * FROM tasks WHERE cluster_arn = ? AND last_status = ?",
 		"SELECT * FROM task_definitions WHERE family = ? ORDER BY revision DESC LIMIT 1",
 	}
 
