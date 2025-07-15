@@ -618,6 +618,100 @@ func (api *ELBv2APIImpl) AddListenerCertificates(ctx context.Context, input *gen
 }
 
 func (api *ELBv2APIImpl) AddTags(ctx context.Context, input *generated_elbv2.AddTagsInput) (*generated_elbv2.AddTagsOutput, error) {
+	if len(input.ResourceArns) == 0 {
+		return nil, fmt.Errorf("ResourceArns is required")
+	}
+	if len(input.Tags) == 0 {
+		return nil, fmt.Errorf("Tags is required")
+	}
+
+	// Convert tags to map format
+	tagMap := make(map[string]string)
+	for _, tag := range input.Tags {
+		if tag.Value != nil {
+			tagMap[tag.Key] = *tag.Value
+		} else {
+			tagMap[tag.Key] = ""
+		}
+	}
+
+	// Process each resource
+	for _, resourceArn := range input.ResourceArns {
+		// Determine resource type from ARN
+		if strings.Contains(resourceArn, ":loadbalancer/") {
+			// Load balancer
+			lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, resourceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get load balancer %s: %w", resourceArn, err)
+			}
+			if lb == nil {
+				return nil, fmt.Errorf("load balancer not found: %s", resourceArn)
+			}
+
+			// Merge tags
+			if lb.Tags == nil {
+				lb.Tags = make(map[string]string)
+			}
+			for k, v := range tagMap {
+				lb.Tags[k] = v
+			}
+
+			// Update load balancer
+			if err := api.storage.ELBv2Store().UpdateLoadBalancer(ctx, lb); err != nil {
+				return nil, fmt.Errorf("failed to update load balancer tags: %w", err)
+			}
+
+		} else if strings.Contains(resourceArn, ":targetgroup/") {
+			// Target group
+			tg, err := api.storage.ELBv2Store().GetTargetGroup(ctx, resourceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get target group %s: %w", resourceArn, err)
+			}
+			if tg == nil {
+				return nil, fmt.Errorf("target group not found: %s", resourceArn)
+			}
+
+			// Merge tags
+			if tg.Tags == nil {
+				tg.Tags = make(map[string]string)
+			}
+			for k, v := range tagMap {
+				tg.Tags[k] = v
+			}
+
+			// Update target group
+			if err := api.storage.ELBv2Store().UpdateTargetGroup(ctx, tg); err != nil {
+				return nil, fmt.Errorf("failed to update target group tags: %w", err)
+			}
+
+		} else if strings.Contains(resourceArn, ":listener/") {
+			// Listener
+			listener, err := api.storage.ELBv2Store().GetListener(ctx, resourceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get listener %s: %w", resourceArn, err)
+			}
+			if listener == nil {
+				return nil, fmt.Errorf("listener not found: %s", resourceArn)
+			}
+
+			// Merge tags
+			if listener.Tags == nil {
+				listener.Tags = make(map[string]string)
+			}
+			for k, v := range tagMap {
+				listener.Tags[k] = v
+			}
+
+			// Update listener
+			if err := api.storage.ELBv2Store().UpdateListener(ctx, listener); err != nil {
+				return nil, fmt.Errorf("failed to update listener tags: %w", err)
+			}
+
+		} else {
+			return nil, fmt.Errorf("unsupported resource type: %s", resourceArn)
+		}
+	}
+
 	return &generated_elbv2.AddTagsOutput{}, nil
 }
 
@@ -710,7 +804,76 @@ func (api *ELBv2APIImpl) DescribeSSLPolicies(ctx context.Context, input *generat
 }
 
 func (api *ELBv2APIImpl) DescribeTags(ctx context.Context, input *generated_elbv2.DescribeTagsInput) (*generated_elbv2.DescribeTagsOutput, error) {
-	return &generated_elbv2.DescribeTagsOutput{}, nil
+	if len(input.ResourceArns) == 0 {
+		return nil, fmt.Errorf("ResourceArns is required")
+	}
+
+	var tagDescriptions []generated_elbv2.TagDescription
+
+	// Process each resource
+	for _, resourceArn := range input.ResourceArns {
+		// Determine resource type from ARN
+		var tags map[string]string
+		var found bool
+
+		if strings.Contains(resourceArn, ":loadbalancer/") {
+			// Load balancer
+			lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, resourceArn)
+			if err != nil {
+				// Skip resources that are not found
+				continue
+			}
+			if lb != nil {
+				tags = lb.Tags
+				found = true
+			}
+
+		} else if strings.Contains(resourceArn, ":targetgroup/") {
+			// Target group
+			tg, err := api.storage.ELBv2Store().GetTargetGroup(ctx, resourceArn)
+			if err != nil {
+				// Skip resources that are not found
+				continue
+			}
+			if tg != nil {
+				tags = tg.Tags
+				found = true
+			}
+
+		} else if strings.Contains(resourceArn, ":listener/") {
+			// Listener
+			listener, err := api.storage.ELBv2Store().GetListener(ctx, resourceArn)
+			if err != nil {
+				// Skip resources that are not found
+				continue
+			}
+			if listener != nil {
+				tags = listener.Tags
+				found = true
+			}
+		}
+
+		// Add tag description if resource was found
+		if found {
+			// Convert map to Tag slice
+			var tagList []generated_elbv2.Tag
+			for k, v := range tags {
+				tagList = append(tagList, generated_elbv2.Tag{
+					Key:   k,
+					Value: utils.Ptr(v),
+				})
+			}
+
+			tagDescriptions = append(tagDescriptions, generated_elbv2.TagDescription{
+				ResourceArn: &resourceArn,
+				Tags:        tagList,
+			})
+		}
+	}
+
+	return &generated_elbv2.DescribeTagsOutput{
+		TagDescriptions: tagDescriptions,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) DescribeTargetGroupAttributes(ctx context.Context, input *generated_elbv2.DescribeTargetGroupAttributesInput) (*generated_elbv2.DescribeTargetGroupAttributesOutput, error) {
@@ -968,6 +1131,87 @@ func (api *ELBv2APIImpl) RemoveListenerCertificates(ctx context.Context, input *
 }
 
 func (api *ELBv2APIImpl) RemoveTags(ctx context.Context, input *generated_elbv2.RemoveTagsInput) (*generated_elbv2.RemoveTagsOutput, error) {
+	if len(input.ResourceArns) == 0 {
+		return nil, fmt.Errorf("ResourceArns is required")
+	}
+	if len(input.TagKeys) == 0 {
+		return nil, fmt.Errorf("TagKeys is required")
+	}
+
+	// Process each resource
+	for _, resourceArn := range input.ResourceArns {
+		// Determine resource type from ARN
+		if strings.Contains(resourceArn, ":loadbalancer/") {
+			// Load balancer
+			lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, resourceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get load balancer %s: %w", resourceArn, err)
+			}
+			if lb == nil {
+				return nil, fmt.Errorf("load balancer not found: %s", resourceArn)
+			}
+
+			// Remove tags
+			if lb.Tags != nil {
+				for _, key := range input.TagKeys {
+					delete(lb.Tags, key)
+				}
+			}
+
+			// Update load balancer
+			if err := api.storage.ELBv2Store().UpdateLoadBalancer(ctx, lb); err != nil {
+				return nil, fmt.Errorf("failed to update load balancer tags: %w", err)
+			}
+
+		} else if strings.Contains(resourceArn, ":targetgroup/") {
+			// Target group
+			tg, err := api.storage.ELBv2Store().GetTargetGroup(ctx, resourceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get target group %s: %w", resourceArn, err)
+			}
+			if tg == nil {
+				return nil, fmt.Errorf("target group not found: %s", resourceArn)
+			}
+
+			// Remove tags
+			if tg.Tags != nil {
+				for _, key := range input.TagKeys {
+					delete(tg.Tags, key)
+				}
+			}
+
+			// Update target group
+			if err := api.storage.ELBv2Store().UpdateTargetGroup(ctx, tg); err != nil {
+				return nil, fmt.Errorf("failed to update target group tags: %w", err)
+			}
+
+		} else if strings.Contains(resourceArn, ":listener/") {
+			// Listener
+			listener, err := api.storage.ELBv2Store().GetListener(ctx, resourceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get listener %s: %w", resourceArn, err)
+			}
+			if listener == nil {
+				return nil, fmt.Errorf("listener not found: %s", resourceArn)
+			}
+
+			// Remove tags
+			if listener.Tags != nil {
+				for _, key := range input.TagKeys {
+					delete(listener.Tags, key)
+				}
+			}
+
+			// Update listener
+			if err := api.storage.ELBv2Store().UpdateListener(ctx, listener); err != nil {
+				return nil, fmt.Errorf("failed to update listener tags: %w", err)
+			}
+
+		} else {
+			return nil, fmt.Errorf("unsupported resource type: %s", resourceArn)
+		}
+	}
+
 	return &generated_elbv2.RemoveTagsOutput{}, nil
 }
 

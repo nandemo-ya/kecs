@@ -903,6 +903,230 @@ var _ = Describe("ELBv2APIImpl", func() {
 			})
 		})
 	})
+
+	Describe("Tag Management Operations", func() {
+		Context("AddTags", func() {
+			It("should add tags to load balancer", func() {
+				lbArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/test-lb/123456"
+				existingLB := &storage.ELBv2LoadBalancer{
+					ARN:  lbArn,
+					Name: "test-lb",
+					Tags: map[string]string{
+						"Environment": "test",
+					},
+				}
+
+				input := &generated_elbv2.AddTagsInput{
+					ResourceArns: []string{lbArn},
+					Tags: []generated_elbv2.Tag{
+						{Key: "Application", Value: utils.Ptr("web")},
+						{Key: "Team", Value: utils.Ptr("platform")},
+					},
+				}
+
+				// Mock get load balancer
+				mockStore.On("GetLoadBalancer", ctx, lbArn).Return(existingLB, nil).Once()
+
+				// Mock update load balancer
+				mockStore.On("UpdateLoadBalancer", ctx, mock.MatchedBy(func(lb *storage.ELBv2LoadBalancer) bool {
+					return lb.Tags["Environment"] == "test" &&
+						lb.Tags["Application"] == "web" &&
+						lb.Tags["Team"] == "platform"
+				})).Return(nil).Once()
+
+				output, err := api.AddTags(ctx, input)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).NotTo(BeNil())
+
+				mockStore.AssertExpectations(GinkgoT())
+			})
+
+			It("should add tags to target group", func() {
+				tgArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/test-tg/123456"
+				existingTG := &storage.ELBv2TargetGroup{
+					ARN:  tgArn,
+					Name: "test-tg",
+					Tags: nil, // No existing tags
+				}
+
+				input := &generated_elbv2.AddTagsInput{
+					ResourceArns: []string{tgArn},
+					Tags: []generated_elbv2.Tag{
+						{Key: "Application", Value: utils.Ptr("api")},
+					},
+				}
+
+				// Mock get target group
+				mockStore.On("GetTargetGroup", ctx, tgArn).Return(existingTG, nil).Once()
+
+				// Mock update target group
+				mockStore.On("UpdateTargetGroup", ctx, mock.MatchedBy(func(tg *storage.ELBv2TargetGroup) bool {
+					return tg.Tags["Application"] == "api"
+				})).Return(nil).Once()
+
+				output, err := api.AddTags(ctx, input)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).NotTo(BeNil())
+
+				mockStore.AssertExpectations(GinkgoT())
+			})
+
+			It("should fail when resource not found", func() {
+				lbArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/missing-lb/123456"
+				input := &generated_elbv2.AddTagsInput{
+					ResourceArns: []string{lbArn},
+					Tags: []generated_elbv2.Tag{
+						{Key: "Application", Value: utils.Ptr("web")},
+					},
+				}
+
+				// Mock get load balancer - not found
+				mockStore.On("GetLoadBalancer", ctx, lbArn).Return(nil, nil).Once()
+
+				output, err := api.AddTags(ctx, input)
+
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("load balancer not found"))
+				Expect(output).To(BeNil())
+
+				mockStore.AssertExpectations(GinkgoT())
+			})
+		})
+
+		Context("RemoveTags", func() {
+			It("should remove tags from load balancer", func() {
+				lbArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/test-lb/123456"
+				existingLB := &storage.ELBv2LoadBalancer{
+					ARN:  lbArn,
+					Name: "test-lb",
+					Tags: map[string]string{
+						"Environment": "test",
+						"Application": "web",
+						"Team":        "platform",
+					},
+				}
+
+				input := &generated_elbv2.RemoveTagsInput{
+					ResourceArns: []string{lbArn},
+					TagKeys:      []string{"Application", "Team"},
+				}
+
+				// Mock get load balancer
+				mockStore.On("GetLoadBalancer", ctx, lbArn).Return(existingLB, nil).Once()
+
+				// Mock update load balancer
+				mockStore.On("UpdateLoadBalancer", ctx, mock.MatchedBy(func(lb *storage.ELBv2LoadBalancer) bool {
+					_, hasApp := lb.Tags["Application"]
+					_, hasTeam := lb.Tags["Team"]
+					return lb.Tags["Environment"] == "test" && !hasApp && !hasTeam
+				})).Return(nil).Once()
+
+				output, err := api.RemoveTags(ctx, input)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).NotTo(BeNil())
+
+				mockStore.AssertExpectations(GinkgoT())
+			})
+		})
+
+		Context("DescribeTags", func() {
+			It("should describe tags for multiple resources", func() {
+				lbArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/test-lb/123456"
+				tgArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/test-tg/123456"
+
+				lb := &storage.ELBv2LoadBalancer{
+					ARN:  lbArn,
+					Name: "test-lb",
+					Tags: map[string]string{
+						"Environment": "test",
+						"Application": "web",
+					},
+				}
+
+				tg := &storage.ELBv2TargetGroup{
+					ARN:  tgArn,
+					Name: "test-tg",
+					Tags: map[string]string{
+						"Environment": "test",
+						"Service":     "api",
+					},
+				}
+
+				input := &generated_elbv2.DescribeTagsInput{
+					ResourceArns: []string{lbArn, tgArn},
+				}
+
+				// Mock get load balancer
+				mockStore.On("GetLoadBalancer", ctx, lbArn).Return(lb, nil).Once()
+
+				// Mock get target group
+				mockStore.On("GetTargetGroup", ctx, tgArn).Return(tg, nil).Once()
+
+				output, err := api.DescribeTags(ctx, input)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).NotTo(BeNil())
+				Expect(output.TagDescriptions).To(HaveLen(2))
+
+				// Check load balancer tags
+				var lbTags []generated_elbv2.Tag
+				for _, td := range output.TagDescriptions {
+					if *td.ResourceArn == lbArn {
+						lbTags = td.Tags
+						break
+					}
+				}
+				Expect(lbTags).To(HaveLen(2))
+
+				// Check target group tags
+				var tgTags []generated_elbv2.Tag
+				for _, td := range output.TagDescriptions {
+					if *td.ResourceArn == tgArn {
+						tgTags = td.Tags
+						break
+					}
+				}
+				Expect(tgTags).To(HaveLen(2))
+
+				mockStore.AssertExpectations(GinkgoT())
+			})
+
+			It("should skip non-existent resources", func() {
+				lbArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/test-lb/123456"
+				missingArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/missing-lb/123456"
+
+				lb := &storage.ELBv2LoadBalancer{
+					ARN:  lbArn,
+					Name: "test-lb",
+					Tags: map[string]string{
+						"Environment": "test",
+					},
+				}
+
+				input := &generated_elbv2.DescribeTagsInput{
+					ResourceArns: []string{lbArn, missingArn},
+				}
+
+				// Mock get load balancer - found
+				mockStore.On("GetLoadBalancer", ctx, lbArn).Return(lb, nil).Once()
+
+				// Mock get load balancer - not found
+				mockStore.On("GetLoadBalancer", ctx, missingArn).Return(nil, fmt.Errorf("not found")).Once()
+
+				output, err := api.DescribeTags(ctx, input)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).NotTo(BeNil())
+				Expect(output.TagDescriptions).To(HaveLen(1))
+				Expect(*output.TagDescriptions[0].ResourceArn).To(Equal(lbArn))
+
+				mockStore.AssertExpectations(GinkgoT())
+			})
+		})
+	})
 })
 
 // Helper functions
