@@ -11,7 +11,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
@@ -22,6 +25,7 @@ type k8sIntegration struct {
 	region    string
 	accountID string
 	kubeClient kubernetes.Interface
+	dynamicClient dynamic.Interface
 
 	// In-memory storage for load balancers and target groups
 	// In production, this should be persisted
@@ -38,6 +42,7 @@ func NewK8sIntegration(region, accountID string) Integration {
 		region:        region,
 		accountID:     accountID,
 		kubeClient:    nil, // Will be set later when needed
+		dynamicClient: nil, // Will be set later when needed
 		loadBalancers: make(map[string]*LoadBalancer),
 		targetGroups:  make(map[string]*TargetGroup),
 		listeners:     make(map[string]*Listener),
@@ -279,13 +284,30 @@ func (i *k8sIntegration) DeleteListener(ctx context.Context, arn string) error {
 	klog.V(2).Infof("Deleting virtual listener: %s", arn)
 
 	i.mu.Lock()
-	defer i.mu.Unlock()
-
-	if _, exists := i.listeners[arn]; !exists {
+	listener, exists := i.listeners[arn]
+	if !exists {
+		i.mu.Unlock()
 		return fmt.Errorf("listener not found: %s", arn)
 	}
-
+	
+	// Get load balancer info for IngressRoute deletion
+	lb, lbExists := i.loadBalancers[listener.LoadBalancerArn]
+	var lbName string
+	if lbExists {
+		lbName = lb.Name
+	}
+	
 	delete(i.listeners, arn)
+	i.mu.Unlock()
+
+	// Delete IngressRoute CRD if we have the necessary info
+	if lbName != "" && i.dynamicClient != nil {
+		if err := i.deleteIngressRoute(ctx, lbName, listener.Port); err != nil {
+			klog.V(2).Infof("Failed to delete IngressRoute for listener %s: %v", arn, err)
+			// Don't fail the operation if IngressRoute deletion fails
+		}
+	}
+
 	return nil
 }
 
@@ -721,9 +743,176 @@ func (i *k8sIntegration) updateTraefikConfigForListener(ctx context.Context, lbN
 		}
 	}
 
-	// TODO: Create IngressRoute CRD for routing rules
-	// For now, we're just updating the entrypoint
+	// Create or update IngressRoute CRD for routing rules
+	if targetGroupName != "" {
+		if err := i.updateIngressRoute(ctx, lbName, listenerArn, port, protocol, targetGroupName); err != nil {
+			return fmt.Errorf("failed to create/update IngressRoute: %w", err)
+		}
+	}
 
 	klog.V(2).Infof("Updated Traefik configuration for listener on port %d", port)
+	return nil
+}
+
+// createIngressRoute creates a Traefik IngressRoute CRD for routing to target groups
+func (i *k8sIntegration) createIngressRoute(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
+	if i.dynamicClient == nil {
+		klog.V(2).Infof("No dynamicClient available, skipping IngressRoute creation")
+		return nil
+	}
+
+	namespace := "kecs-system"
+	// Generate a safe name for the IngressRoute
+	ingressRouteName := fmt.Sprintf("listener-%s-%d", sanitizeName(lbName), port)
+
+	// Create the IngressRoute unstructured object
+	ingressRoute := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "traefik.io/v1alpha1",
+			"kind":       "IngressRoute",
+			"metadata": map[string]interface{}{
+				"name":      ingressRouteName,
+				"namespace": namespace,
+				"annotations": map[string]interface{}{
+					"kecs.io/elbv2-listener-arn":      listenerArn,
+					"kecs.io/elbv2-load-balancer":     lbName,
+					"kecs.io/elbv2-target-group":      targetGroupName,
+				},
+				"labels": map[string]interface{}{
+					"kecs.io/elbv2-load-balancer": lbName,
+					"kecs.io/component":           "elbv2-listener",
+				},
+			},
+			"spec": map[string]interface{}{
+				"entryPoints": []string{fmt.Sprintf("listener%d", port)},
+				"routes": []interface{}{
+					map[string]interface{}{
+						"match": "PathPrefix(`/`)", // Default catch-all route
+						"kind":  "Rule",
+						"services": []interface{}{
+							map[string]interface{}{
+								"name": fmt.Sprintf("tg-%s", targetGroupName),
+								"port": port,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Define the GVR for IngressRoute
+	gvr := schema.GroupVersionResource{
+		Group:    "traefik.io",
+		Version:  "v1alpha1",
+		Resource: "ingressroutes",
+	}
+
+	// Create the IngressRoute
+	_, err := i.dynamicClient.Resource(gvr).Namespace(namespace).Create(ctx, ingressRoute, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create IngressRoute: %w", err)
+	}
+
+	klog.V(2).Infof("Created IngressRoute %s for listener on port %d routing to target group %s", ingressRouteName, port, targetGroupName)
+	return nil
+}
+
+// sanitizeName converts a name to be suitable for Kubernetes resource names
+func sanitizeName(name string) string {
+	// Replace non-alphanumeric characters with hyphens
+	result := strings.ToLower(name)
+	result = strings.ReplaceAll(result, "_", "-")
+	result = strings.ReplaceAll(result, " ", "-")
+	// Remove any non-alphanumeric characters except hyphens
+	return result
+}
+
+// deleteIngressRoute deletes a Traefik IngressRoute CRD
+func (i *k8sIntegration) deleteIngressRoute(ctx context.Context, lbName string, port int32) error {
+	if i.dynamicClient == nil {
+		klog.V(2).Infof("No dynamicClient available, skipping IngressRoute deletion")
+		return nil
+	}
+
+	namespace := "kecs-system"
+	ingressRouteName := fmt.Sprintf("listener-%s-%d", sanitizeName(lbName), port)
+
+	// Define the GVR for IngressRoute
+	gvr := schema.GroupVersionResource{
+		Group:    "traefik.io",
+		Version:  "v1alpha1",
+		Resource: "ingressroutes",
+	}
+
+	// Delete the IngressRoute
+	err := i.dynamicClient.Resource(gvr).Namespace(namespace).Delete(ctx, ingressRouteName, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete IngressRoute: %w", err)
+	}
+
+	klog.V(2).Infof("Deleted IngressRoute %s", ingressRouteName)
+	return nil
+}
+
+// updateIngressRoute updates an existing Traefik IngressRoute CRD
+func (i *k8sIntegration) updateIngressRoute(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
+	if i.dynamicClient == nil {
+		klog.V(2).Infof("No dynamicClient available, skipping IngressRoute update")
+		return nil
+	}
+
+	namespace := "kecs-system"
+	ingressRouteName := fmt.Sprintf("listener-%s-%d", sanitizeName(lbName), port)
+
+	// Define the GVR for IngressRoute
+	gvr := schema.GroupVersionResource{
+		Group:    "traefik.io",
+		Version:  "v1alpha1",
+		Resource: "ingressroutes",
+	}
+
+	// Try to get existing IngressRoute
+	existingRoute, err := i.dynamicClient.Resource(gvr).Namespace(namespace).Get(ctx, ingressRouteName, metav1.GetOptions{})
+	if err != nil {
+		// If not found, create a new one
+		return i.createIngressRoute(ctx, lbName, listenerArn, port, protocol, targetGroupName)
+	}
+
+	// Update the existing IngressRoute
+	existingRoute.Object["spec"] = map[string]interface{}{
+		"entryPoints": []string{fmt.Sprintf("listener%d", port)},
+		"routes": []interface{}{
+			map[string]interface{}{
+				"match": "PathPrefix(`/`)", // Default catch-all route
+				"kind":  "Rule",
+				"services": []interface{}{
+					map[string]interface{}{
+						"name": fmt.Sprintf("tg-%s", targetGroupName),
+						"port": port,
+					},
+				},
+			},
+		},
+	}
+
+	// Update annotations
+	metadata, ok := existingRoute.Object["metadata"].(map[string]interface{})
+	if ok {
+		annotations, ok := metadata["annotations"].(map[string]interface{})
+		if !ok {
+			annotations = make(map[string]interface{})
+			metadata["annotations"] = annotations
+		}
+		annotations["kecs.io/elbv2-target-group"] = targetGroupName
+		annotations["kecs.io/elbv2-listener-arn"] = listenerArn
+	}
+
+	_, err = i.dynamicClient.Resource(gvr).Namespace(namespace).Update(ctx, existingRoute, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update IngressRoute: %w", err)
+	}
+
+	klog.V(2).Infof("Updated IngressRoute %s for listener on port %d routing to target group %s", ingressRouteName, port, targetGroupName)
 	return nil
 }

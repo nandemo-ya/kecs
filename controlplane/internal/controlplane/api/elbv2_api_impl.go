@@ -602,7 +602,15 @@ func (api *ELBv2APIImpl) DeleteListener(ctx context.Context, input *generated_el
 		return nil, fmt.Errorf("listener %s not found", input.ListenerArn)
 	}
 
-	// Delete listener
+	// Delete from Kubernetes integration first if available
+	if api.elbv2Integration != nil {
+		if err := api.elbv2Integration.DeleteListener(ctx, input.ListenerArn); err != nil {
+			klog.V(2).Infof("Failed to delete listener from Kubernetes: %v", err)
+			// Don't fail the operation if K8s deletion fails
+		}
+	}
+
+	// Delete listener from storage
 	if err := api.storage.ELBv2Store().DeleteListener(ctx, input.ListenerArn); err != nil {
 		return nil, err
 	}
