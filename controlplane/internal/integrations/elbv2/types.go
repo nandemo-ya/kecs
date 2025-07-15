@@ -42,6 +42,12 @@ type Integration interface {
 	CheckTargetHealthWithK8s(ctx context.Context, targetIP string, targetPort int32, targetGroupArn string) (string, error)
 }
 
+// RuleSyncable is an optional interface that integrations can implement to support rule syncing
+type RuleSyncable interface {
+	// SyncRulesToListener synchronizes ELBv2 rules to the underlying implementation
+	SyncRulesToListener(ctx context.Context, storage interface{}, listenerArn string, lbName string, port int32) error
+}
+
 // LoadBalancer represents an Application Load Balancer
 type LoadBalancer struct {
 	Arn               string

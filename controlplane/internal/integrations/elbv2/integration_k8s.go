@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -27,6 +28,7 @@ type k8sIntegration struct {
 	accountID string
 	kubeClient kubernetes.Interface
 	dynamicClient dynamic.Interface
+	ruleManager   *RuleManager
 
 	// In-memory storage for load balancers and target groups
 	// In production, this should be persisted
@@ -39,7 +41,7 @@ type k8sIntegration struct {
 
 // NewK8sIntegration creates a new Kubernetes-based ELBv2 integration
 func NewK8sIntegration(region, accountID string) Integration {
-	return &k8sIntegration{
+	integration := &k8sIntegration{
 		region:        region,
 		accountID:     accountID,
 		kubeClient:    nil, // Will be set later when needed
@@ -49,6 +51,8 @@ func NewK8sIntegration(region, accountID string) Integration {
 		listeners:     make(map[string]*Listener),
 		targetHealth:  make(map[string]map[string]*TargetHealth),
 	}
+	// RuleManager will be initialized when dynamicClient is set
+	return integration
 }
 
 // CreateLoadBalancer creates a virtual load balancer and deploys Traefik
@@ -891,6 +895,7 @@ func (i *k8sIntegration) createIngressRoute(ctx context.Context, lbName, listene
 					map[string]interface{}{
 						"match": "PathPrefix(`/`)", // Default catch-all route
 						"kind":  "Rule",
+						"priority": 50000, // Very low priority for default rule
 						"services": []interface{}{
 							map[string]interface{}{
 								"name": fmt.Sprintf("tg-%s", targetGroupName),
@@ -1017,4 +1022,26 @@ func (i *k8sIntegration) updateIngressRoute(ctx context.Context, lbName, listene
 
 	klog.V(2).Infof("Updated IngressRoute %s for listener on port %d routing to target group %s", ingressRouteName, port, targetGroupName)
 	return nil
+}
+
+// SyncRulesToListener synchronizes ELBv2 rules to Traefik IngressRoute
+func (i *k8sIntegration) SyncRulesToListener(ctx context.Context, storageInstance interface{}, listenerArn string, lbName string, port int32) error {
+	// Initialize rule manager if not already done
+	if i.ruleManager == nil && i.dynamicClient != nil {
+		i.ruleManager = NewRuleManager(i.dynamicClient)
+	}
+	
+	if i.ruleManager == nil {
+		klog.V(2).Infof("No rule manager available, skipping rule sync")
+		return nil
+	}
+	
+	// Cast storage to the correct type
+	storageImpl, ok := storageInstance.(storage.Storage)
+	if !ok {
+		return fmt.Errorf("invalid storage type")
+	}
+	
+	// Sync rules using the rule manager
+	return i.ruleManager.SyncRulesForListener(ctx, storageImpl, listenerArn, lbName, port)
 }
