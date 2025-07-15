@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -14,15 +15,17 @@ import (
 
 // RuleManager manages the synchronization between ELBv2 rules and Traefik IngressRoute rules
 type RuleManager struct {
-	dynamicClient dynamic.Interface
-	converter     *RuleConverter
+	dynamicClient    dynamic.Interface
+	converter        *RuleConverter
+	weightedManager  *WeightedRoutingManager
 }
 
 // NewRuleManager creates a new rule manager
 func NewRuleManager(dynamicClient dynamic.Interface) *RuleManager {
 	return &RuleManager{
-		dynamicClient: dynamicClient,
-		converter:     NewRuleConverter(),
+		dynamicClient:    dynamicClient,
+		converter:        NewRuleConverter(),
+		weightedManager:  NewWeightedRoutingManager(),
 	}
 }
 
@@ -159,34 +162,58 @@ func (r *RuleManager) convertRuleToRoute(rule *storage.ELBv2Rule, storageInstanc
 		return nil, fmt.Errorf("failed to parse actions: %w", err)
 	}
 
-	// Extract target group
-	targetGroupArn, err := r.converter.ExtractTargetGroupFromActions(actions)
+	// Create target group resolver for weighted routing
+	resolver := &storageTargetGroupResolver{
+		store: storageInstance.ELBv2Store(),
+		ctx:   ctx,
+	}
+
+	// Convert actions to weighted services
+	services, err := r.weightedManager.ConvertActionsToWeightedServices(actions, resolver)
 	if err != nil {
-		// Rule doesn't have a forward action, skip it
+		klog.V(2).Infof("Failed to convert actions for rule %s: %v", rule.ARN, err)
+		return nil, nil
+	}
+
+	if len(services) == 0 {
 		klog.V(2).Infof("Rule %s has no forward action, skipping", rule.ARN)
 		return nil, nil
 	}
 
-	// Get target group details
-	targetGroup, err := storageInstance.ELBv2Store().GetTargetGroup(ctx, targetGroupArn)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get target group %s: %w", targetGroupArn, err)
+	// Convert weighted services to Traefik service format
+	traefikServices := make([]interface{}, 0, len(services))
+	for _, service := range services {
+		svc := map[string]interface{}{
+			"name": service.Name,
+			"port": service.Port,
+		}
+		
+		// Add weight if multiple services or weight is not 100
+		if len(services) > 1 || service.Weight != 100 {
+			svc["weight"] = service.Weight
+		}
+		
+		// Add sticky configuration if present
+		if service.Sticky != nil && service.Sticky.Cookie != nil {
+			svc["sticky"] = map[string]interface{}{
+				"cookie": map[string]interface{}{
+					"name":     service.Sticky.Cookie.Name,
+					"secure":   service.Sticky.Cookie.Secure,
+					"httpOnly": service.Sticky.Cookie.HTTPOnly,
+					"sameSite": service.Sticky.Cookie.SameSite,
+				},
+			}
+		}
+		
+		traefikServices = append(traefikServices, svc)
 	}
-
-	// Extract target group name from ARN
-	targetGroupName := extractNameFromArn(targetGroupArn, "targetgroup")
 
 	// Build Traefik route
 	route := map[string]interface{}{
 		"match":    match,
 		"kind":     "Rule",
 		"priority": int(rule.Priority),
-		"services": []interface{}{
-			map[string]interface{}{
-				"name": fmt.Sprintf("tg-%s", targetGroupName),
-				"port": targetGroup.Port,
-			},
-		},
+		"services": traefikServices,
 	}
 
 	// Add middleware for advanced features (future enhancement)
@@ -237,4 +264,27 @@ func GetListenerInfoFromArn(listenerArn string) (lbName string, port int32, err 
 	port = 80 // Default port
 	
 	return lbName, port, nil
+}
+
+// storageTargetGroupResolver implements TargetGroupResolver using storage
+type storageTargetGroupResolver struct {
+	store storage.ELBv2Store
+	ctx   context.Context
+}
+
+func (s *storageTargetGroupResolver) GetTargetGroupInfo(arn string) (*generated_elbv2.TargetGroup, error) {
+	tg, err := s.store.GetTargetGroup(s.ctx, arn)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert storage TargetGroup to generated TargetGroup
+	protocol := generated_elbv2.ProtocolEnum(tg.Protocol)
+	return &generated_elbv2.TargetGroup{
+		TargetGroupArn:  &tg.ARN,
+		TargetGroupName: &tg.Name,
+		Port:            &tg.Port,
+		Protocol:        &protocol,
+		VpcId:           &tg.VpcID,
+	}, nil
 }
