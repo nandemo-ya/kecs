@@ -2,14 +2,20 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
+	"k8s.io/klog/v2"
 )
 
 // Target health states
@@ -142,11 +148,11 @@ func (api *ELBv2APIImpl) CreateLoadBalancer(ctx context.Context, input *generate
 			{
 				LoadBalancerArn:           &arn,
 				DNSName:                   &dnsName,
-				CanonicalHostedZoneId:     ptrString("Z215JYRZR1TBD5"),
+				CanonicalHostedZoneId:     utils.Ptr("Z215JYRZR1TBD5"),
 				CreatedTime:               &now,
 				LoadBalancerName:          &input.Name,
 				Scheme:                    (*generated_elbv2.LoadBalancerSchemeEnum)(&scheme),
-				VpcId:                     ptrString("vpc-default"),
+				VpcId:                     utils.Ptr("vpc-default"),
 				State:                     &generated_elbv2.LoadBalancerState{Code: &state},
 				Type:                      (*generated_elbv2.LoadBalancerTypeEnum)(&lbType),
 				IpAddressType:             (*generated_elbv2.IpAddressType)(&ipAddressType),
@@ -293,13 +299,13 @@ func (api *ELBv2APIImpl) CreateTargetGroup(ctx context.Context, input *generated
 				Protocol:                    input.Protocol,
 				Port:                        input.Port,
 				VpcId:                       input.VpcId,
-				HealthCheckPath:             ptrString("/"),
+				HealthCheckPath:             utils.Ptr("/"),
 				HealthCheckProtocol:         (*generated_elbv2.ProtocolEnum)(&healthCheckProtocol),
-				HealthCheckPort:             ptrString("traffic-port"),
-				HealthyThresholdCount:       ptrInt32(2),
-				UnhealthyThresholdCount:     ptrInt32(5),
-				HealthCheckTimeoutSeconds:   ptrInt32(5),
-				HealthCheckIntervalSeconds:  ptrInt32(30),
+				HealthCheckPort:             utils.Ptr("traffic-port"),
+				HealthyThresholdCount:       utils.Ptr(int32(2)),
+				UnhealthyThresholdCount:     utils.Ptr(int32(5)),
+				HealthCheckTimeoutSeconds:   utils.Ptr(int32(5)),
+				HealthCheckIntervalSeconds:  utils.Ptr(int32(30)),
 				LoadBalancerArns:            []string{},
 			},
 		},
@@ -460,6 +466,12 @@ func (api *ELBv2APIImpl) DescribeTargetHealth(ctx context.Context, input *genera
 		return nil, fmt.Errorf("TargetGroupArn is required")
 	}
 
+	// Get target group for health check configuration
+	targetGroup, err := api.storage.ELBv2Store().GetTargetGroup(ctx, input.TargetGroupArn)
+	if err != nil {
+		return nil, err
+	}
+
 	targets, err := api.storage.ELBv2Store().ListTargets(ctx, input.TargetGroupArn)
 	if err != nil {
 		return nil, err
@@ -468,7 +480,7 @@ func (api *ELBv2APIImpl) DescribeTargetHealth(ctx context.Context, input *genera
 	var targetHealthDescriptions []generated_elbv2.TargetHealthDescription
 	for _, target := range targets {
 		// Perform health check and update target health
-		healthState := api.performHealthCheck(ctx, target)
+		healthState := api.performHealthCheck(ctx, target, targetGroup)
 		
 		// Update target health in storage
 		targetHealth := &storage.ELBv2TargetHealth{
@@ -590,7 +602,15 @@ func (api *ELBv2APIImpl) DeleteListener(ctx context.Context, input *generated_el
 		return nil, fmt.Errorf("listener %s not found", input.ListenerArn)
 	}
 
-	// Delete listener
+	// Delete from Kubernetes integration first if available
+	if api.elbv2Integration != nil {
+		if err := api.elbv2Integration.DeleteListener(ctx, input.ListenerArn); err != nil {
+			klog.V(2).Infof("Failed to delete listener from Kubernetes: %v", err)
+			// Don't fail the operation if K8s deletion fails
+		}
+	}
+
+	// Delete listener from storage
 	if err := api.storage.ELBv2Store().DeleteListener(ctx, input.ListenerArn); err != nil {
 		return nil, err
 	}
@@ -606,6 +626,100 @@ func (api *ELBv2APIImpl) AddListenerCertificates(ctx context.Context, input *gen
 }
 
 func (api *ELBv2APIImpl) AddTags(ctx context.Context, input *generated_elbv2.AddTagsInput) (*generated_elbv2.AddTagsOutput, error) {
+	if len(input.ResourceArns) == 0 {
+		return nil, fmt.Errorf("ResourceArns is required")
+	}
+	if len(input.Tags) == 0 {
+		return nil, fmt.Errorf("Tags is required")
+	}
+
+	// Convert tags to map format
+	tagMap := make(map[string]string)
+	for _, tag := range input.Tags {
+		if tag.Value != nil {
+			tagMap[tag.Key] = *tag.Value
+		} else {
+			tagMap[tag.Key] = ""
+		}
+	}
+
+	// Process each resource
+	for _, resourceArn := range input.ResourceArns {
+		// Determine resource type from ARN
+		if strings.Contains(resourceArn, ":loadbalancer/") {
+			// Load balancer
+			lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, resourceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get load balancer %s: %w", resourceArn, err)
+			}
+			if lb == nil {
+				return nil, fmt.Errorf("load balancer not found: %s", resourceArn)
+			}
+
+			// Merge tags
+			if lb.Tags == nil {
+				lb.Tags = make(map[string]string)
+			}
+			for k, v := range tagMap {
+				lb.Tags[k] = v
+			}
+
+			// Update load balancer
+			if err := api.storage.ELBv2Store().UpdateLoadBalancer(ctx, lb); err != nil {
+				return nil, fmt.Errorf("failed to update load balancer tags: %w", err)
+			}
+
+		} else if strings.Contains(resourceArn, ":targetgroup/") {
+			// Target group
+			tg, err := api.storage.ELBv2Store().GetTargetGroup(ctx, resourceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get target group %s: %w", resourceArn, err)
+			}
+			if tg == nil {
+				return nil, fmt.Errorf("target group not found: %s", resourceArn)
+			}
+
+			// Merge tags
+			if tg.Tags == nil {
+				tg.Tags = make(map[string]string)
+			}
+			for k, v := range tagMap {
+				tg.Tags[k] = v
+			}
+
+			// Update target group
+			if err := api.storage.ELBv2Store().UpdateTargetGroup(ctx, tg); err != nil {
+				return nil, fmt.Errorf("failed to update target group tags: %w", err)
+			}
+
+		} else if strings.Contains(resourceArn, ":listener/") {
+			// Listener
+			listener, err := api.storage.ELBv2Store().GetListener(ctx, resourceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get listener %s: %w", resourceArn, err)
+			}
+			if listener == nil {
+				return nil, fmt.Errorf("listener not found: %s", resourceArn)
+			}
+
+			// Merge tags
+			if listener.Tags == nil {
+				listener.Tags = make(map[string]string)
+			}
+			for k, v := range tagMap {
+				listener.Tags[k] = v
+			}
+
+			// Update listener
+			if err := api.storage.ELBv2Store().UpdateListener(ctx, listener); err != nil {
+				return nil, fmt.Errorf("failed to update listener tags: %w", err)
+			}
+
+		} else {
+			return nil, fmt.Errorf("unsupported resource type: %s", resourceArn)
+		}
+	}
+
 	return &generated_elbv2.AddTagsOutput{}, nil
 }
 
@@ -698,7 +812,76 @@ func (api *ELBv2APIImpl) DescribeSSLPolicies(ctx context.Context, input *generat
 }
 
 func (api *ELBv2APIImpl) DescribeTags(ctx context.Context, input *generated_elbv2.DescribeTagsInput) (*generated_elbv2.DescribeTagsOutput, error) {
-	return &generated_elbv2.DescribeTagsOutput{}, nil
+	if len(input.ResourceArns) == 0 {
+		return nil, fmt.Errorf("ResourceArns is required")
+	}
+
+	var tagDescriptions []generated_elbv2.TagDescription
+
+	// Process each resource
+	for _, resourceArn := range input.ResourceArns {
+		// Determine resource type from ARN
+		var tags map[string]string
+		var found bool
+
+		if strings.Contains(resourceArn, ":loadbalancer/") {
+			// Load balancer
+			lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, resourceArn)
+			if err != nil {
+				// Skip resources that are not found
+				continue
+			}
+			if lb != nil {
+				tags = lb.Tags
+				found = true
+			}
+
+		} else if strings.Contains(resourceArn, ":targetgroup/") {
+			// Target group
+			tg, err := api.storage.ELBv2Store().GetTargetGroup(ctx, resourceArn)
+			if err != nil {
+				// Skip resources that are not found
+				continue
+			}
+			if tg != nil {
+				tags = tg.Tags
+				found = true
+			}
+
+		} else if strings.Contains(resourceArn, ":listener/") {
+			// Listener
+			listener, err := api.storage.ELBv2Store().GetListener(ctx, resourceArn)
+			if err != nil {
+				// Skip resources that are not found
+				continue
+			}
+			if listener != nil {
+				tags = listener.Tags
+				found = true
+			}
+		}
+
+		// Add tag description if resource was found
+		if found {
+			// Convert map to Tag slice
+			var tagList []generated_elbv2.Tag
+			for k, v := range tags {
+				tagList = append(tagList, generated_elbv2.Tag{
+					Key:   k,
+					Value: utils.Ptr(v),
+				})
+			}
+
+			tagDescriptions = append(tagDescriptions, generated_elbv2.TagDescription{
+				ResourceArn: &resourceArn,
+				Tags:        tagList,
+			})
+		}
+	}
+
+	return &generated_elbv2.DescribeTagsOutput{
+		TagDescriptions: tagDescriptions,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) DescribeTargetGroupAttributes(ctx context.Context, input *generated_elbv2.DescribeTargetGroupAttributesInput) (*generated_elbv2.DescribeTargetGroupAttributesOutput, error) {
@@ -790,7 +973,73 @@ func (api *ELBv2APIImpl) ModifyIpPools(ctx context.Context, input *generated_elb
 }
 
 func (api *ELBv2APIImpl) ModifyListener(ctx context.Context, input *generated_elbv2.ModifyListenerInput) (*generated_elbv2.ModifyListenerOutput, error) {
-	return &generated_elbv2.ModifyListenerOutput{}, nil
+	if input.ListenerArn == "" {
+		return nil, fmt.Errorf("ListenerArn is required")
+	}
+
+	// Get existing listener
+	listener, err := api.storage.ELBv2Store().GetListener(ctx, input.ListenerArn)
+	if err != nil {
+		return nil, err
+	}
+	if listener == nil {
+		return nil, fmt.Errorf("listener not found: %s", input.ListenerArn)
+	}
+
+	// Update listener fields
+	now := time.Now()
+	if input.Port != nil {
+		listener.Port = *input.Port
+	}
+	if input.Protocol != nil {
+		listener.Protocol = string(*input.Protocol)
+	}
+	if input.SslPolicy != nil {
+		listener.SslPolicy = *input.SslPolicy
+	}
+	if input.DefaultActions != nil {
+		// Convert actions to JSON for storage
+		actionsJSON, err := json.Marshal(input.DefaultActions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal default actions: %w", err)
+		}
+		listener.DefaultActions = string(actionsJSON)
+	}
+	listener.UpdatedAt = now
+
+	// Update in storage
+	if err := api.storage.ELBv2Store().UpdateListener(ctx, listener); err != nil {
+		return nil, fmt.Errorf("failed to update listener: %w", err)
+	}
+
+	// Update Kubernetes resources if integration is available
+	if api.elbv2Integration != nil {
+		// Get target group ARN from default actions if available
+		var targetGroupArn string
+		if input.DefaultActions != nil && len(input.DefaultActions) > 0 {
+			for _, action := range input.DefaultActions {
+				if action.Type == generated_elbv2.ActionTypeEnum("forward") && action.TargetGroupArn != nil {
+					targetGroupArn = *action.TargetGroupArn
+					break
+				}
+			}
+		}
+
+		// Update listener in Kubernetes
+		if _, err := api.elbv2Integration.CreateListener(ctx, listener.LoadBalancerArn, listener.Port, listener.Protocol, targetGroupArn); err != nil {
+			klog.V(2).Infof("Failed to update listener in Kubernetes: %v", err)
+			// Don't fail the operation if K8s update fails
+		}
+	}
+
+	// Return updated listener
+	output := &generated_elbv2.ModifyListenerOutput{
+		Listeners: []generated_elbv2.Listener{
+			api.convertToListener(listener),
+		},
+	}
+
+	return output, nil
 }
 
 func (api *ELBv2APIImpl) ModifyListenerAttributes(ctx context.Context, input *generated_elbv2.ModifyListenerAttributesInput) (*generated_elbv2.ModifyListenerAttributesOutput, error) {
@@ -806,7 +1055,75 @@ func (api *ELBv2APIImpl) ModifyRule(ctx context.Context, input *generated_elbv2.
 }
 
 func (api *ELBv2APIImpl) ModifyTargetGroup(ctx context.Context, input *generated_elbv2.ModifyTargetGroupInput) (*generated_elbv2.ModifyTargetGroupOutput, error) {
-	return &generated_elbv2.ModifyTargetGroupOutput{}, nil
+	if input.TargetGroupArn == "" {
+		return nil, fmt.Errorf("TargetGroupArn is required")
+	}
+
+	// Get existing target group
+	targetGroup, err := api.storage.ELBv2Store().GetTargetGroup(ctx, input.TargetGroupArn)
+	if err != nil {
+		return nil, err
+	}
+	if targetGroup == nil {
+		return nil, fmt.Errorf("target group not found: %s", input.TargetGroupArn)
+	}
+
+	// Update target group fields
+	now := time.Now()
+	if input.HealthCheckEnabled != nil {
+		targetGroup.HealthCheckEnabled = *input.HealthCheckEnabled
+	}
+	if input.HealthCheckPath != nil {
+		targetGroup.HealthCheckPath = *input.HealthCheckPath
+	}
+	if input.HealthCheckPort != nil {
+		targetGroup.HealthCheckPort = *input.HealthCheckPort
+	}
+	if input.HealthCheckProtocol != nil {
+		targetGroup.HealthCheckProtocol = string(*input.HealthCheckProtocol)
+	}
+	if input.HealthCheckIntervalSeconds != nil {
+		targetGroup.HealthCheckIntervalSeconds = *input.HealthCheckIntervalSeconds
+	}
+	if input.HealthCheckTimeoutSeconds != nil {
+		targetGroup.HealthCheckTimeoutSeconds = *input.HealthCheckTimeoutSeconds
+	}
+	if input.HealthyThresholdCount != nil {
+		targetGroup.HealthyThresholdCount = *input.HealthyThresholdCount
+	}
+	if input.UnhealthyThresholdCount != nil {
+		targetGroup.UnhealthyThresholdCount = *input.UnhealthyThresholdCount
+	}
+	if input.Matcher != nil {
+		// Convert matcher to JSON for storage
+		matcherJSON, err := json.Marshal(input.Matcher)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal matcher: %w", err)
+		}
+		targetGroup.Matcher = string(matcherJSON)
+	}
+	targetGroup.UpdatedAt = now
+
+	// Update in storage
+	if err := api.storage.ELBv2Store().UpdateTargetGroup(ctx, targetGroup); err != nil {
+		return nil, fmt.Errorf("failed to update target group: %w", err)
+	}
+
+	// Update Kubernetes resources if integration is available
+	if api.elbv2Integration != nil {
+		// For now, we log a message about K8s update
+		// In the future, we might need to update Service annotations or other K8s resources
+		klog.V(2).Infof("Target group %s updated, Kubernetes resources may need manual update", targetGroup.ARN)
+	}
+
+	// Return updated target group
+	output := &generated_elbv2.ModifyTargetGroupOutput{
+		TargetGroups: []generated_elbv2.TargetGroup{
+			api.convertToTargetGroup(targetGroup),
+		},
+	}
+
+	return output, nil
 }
 
 func (api *ELBv2APIImpl) ModifyTargetGroupAttributes(ctx context.Context, input *generated_elbv2.ModifyTargetGroupAttributesInput) (*generated_elbv2.ModifyTargetGroupAttributesOutput, error) {
@@ -822,6 +1139,87 @@ func (api *ELBv2APIImpl) RemoveListenerCertificates(ctx context.Context, input *
 }
 
 func (api *ELBv2APIImpl) RemoveTags(ctx context.Context, input *generated_elbv2.RemoveTagsInput) (*generated_elbv2.RemoveTagsOutput, error) {
+	if len(input.ResourceArns) == 0 {
+		return nil, fmt.Errorf("ResourceArns is required")
+	}
+	if len(input.TagKeys) == 0 {
+		return nil, fmt.Errorf("TagKeys is required")
+	}
+
+	// Process each resource
+	for _, resourceArn := range input.ResourceArns {
+		// Determine resource type from ARN
+		if strings.Contains(resourceArn, ":loadbalancer/") {
+			// Load balancer
+			lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, resourceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get load balancer %s: %w", resourceArn, err)
+			}
+			if lb == nil {
+				return nil, fmt.Errorf("load balancer not found: %s", resourceArn)
+			}
+
+			// Remove tags
+			if lb.Tags != nil {
+				for _, key := range input.TagKeys {
+					delete(lb.Tags, key)
+				}
+			}
+
+			// Update load balancer
+			if err := api.storage.ELBv2Store().UpdateLoadBalancer(ctx, lb); err != nil {
+				return nil, fmt.Errorf("failed to update load balancer tags: %w", err)
+			}
+
+		} else if strings.Contains(resourceArn, ":targetgroup/") {
+			// Target group
+			tg, err := api.storage.ELBv2Store().GetTargetGroup(ctx, resourceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get target group %s: %w", resourceArn, err)
+			}
+			if tg == nil {
+				return nil, fmt.Errorf("target group not found: %s", resourceArn)
+			}
+
+			// Remove tags
+			if tg.Tags != nil {
+				for _, key := range input.TagKeys {
+					delete(tg.Tags, key)
+				}
+			}
+
+			// Update target group
+			if err := api.storage.ELBv2Store().UpdateTargetGroup(ctx, tg); err != nil {
+				return nil, fmt.Errorf("failed to update target group tags: %w", err)
+			}
+
+		} else if strings.Contains(resourceArn, ":listener/") {
+			// Listener
+			listener, err := api.storage.ELBv2Store().GetListener(ctx, resourceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get listener %s: %w", resourceArn, err)
+			}
+			if listener == nil {
+				return nil, fmt.Errorf("listener not found: %s", resourceArn)
+			}
+
+			// Remove tags
+			if listener.Tags != nil {
+				for _, key := range input.TagKeys {
+					delete(listener.Tags, key)
+				}
+			}
+
+			// Update listener
+			if err := api.storage.ELBv2Store().UpdateListener(ctx, listener); err != nil {
+				return nil, fmt.Errorf("failed to update listener tags: %w", err)
+			}
+
+		} else {
+			return nil, fmt.Errorf("unsupported resource type: %s", resourceArn)
+		}
+	}
+
 	return &generated_elbv2.RemoveTagsOutput{}, nil
 }
 
@@ -845,14 +1243,6 @@ func (api *ELBv2APIImpl) SetSubnets(ctx context.Context, input *generated_elbv2.
 	return &generated_elbv2.SetSubnetsOutput{}, nil
 }
 
-// Helper functions
-func ptrString(s string) *string {
-	return &s
-}
-
-func ptrInt32(i int32) *int32 {
-	return &i
-}
 
 func convertToLoadBalancer(lb *storage.ELBv2LoadBalancer) generated_elbv2.LoadBalancer {
 	state := generated_elbv2.LoadBalancerStateEnumACTIVE
@@ -877,29 +1267,146 @@ func convertToLoadBalancer(lb *storage.ELBv2LoadBalancer) generated_elbv2.LoadBa
 }
 
 // performHealthCheck performs a health check on a target
-func (api *ELBv2APIImpl) performHealthCheck(ctx context.Context, target *storage.ELBv2Target) string {
-	// TODO: Get target group configuration for health check settings
-	
-	// For now, perform a simple HTTP health check
-	// In production, this should be configurable (HTTP, HTTPS, TCP, etc.)
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-	
-	// Construct health check URL
-	url := fmt.Sprintf("http://%s:%d/health", target.ID, target.Port)
-	
-	resp, err := client.Get(url)
-	if err != nil {
-		return TargetHealthStateUnhealthy
-	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+func (api *ELBv2APIImpl) performHealthCheck(ctx context.Context, target *storage.ELBv2Target, targetGroup *storage.ELBv2TargetGroup) string {
+	// Use target group configuration for health check settings
+	if targetGroup == nil || !targetGroup.HealthCheckEnabled {
+		// If health check is disabled or target group is nil, consider target healthy
 		return TargetHealthStateHealthy
 	}
 	
+	// Determine health check port
+	healthCheckPort := target.Port
+	if targetGroup.HealthCheckPort != "" && targetGroup.HealthCheckPort != "traffic-port" {
+		// Parse the health check port if it's not "traffic-port"
+		fmt.Sscanf(targetGroup.HealthCheckPort, "%d", &healthCheckPort)
+	}
+	
+	// Try Kubernetes-based health check first if integration is available
+	if api.elbv2Integration != nil {
+		healthState, err := api.elbv2Integration.CheckTargetHealthWithK8s(ctx, target.ID, healthCheckPort, targetGroup.ARN)
+		if err != nil {
+			klog.V(2).Infof("Kubernetes health check failed for target %s: %v, falling back to legacy check", target.ID, err)
+		} else {
+			klog.V(2).Infof("Kubernetes health check for target %s returned: %s", target.ID, healthState)
+			return healthState
+		}
+	}
+	
+	// Fallback to legacy HTTP/TCP health check
+	return api.performLegacyHealthCheck(ctx, target, targetGroup)
+}
+
+// performLegacyHealthCheck performs the original HTTP/TCP-based health check
+func (api *ELBv2APIImpl) performLegacyHealthCheck(ctx context.Context, target *storage.ELBv2Target, targetGroup *storage.ELBv2TargetGroup) string {
+	// Set timeout based on health check timeout
+	timeout := time.Duration(targetGroup.HealthCheckTimeoutSeconds) * time.Second
+	if timeout == 0 {
+		timeout = 5 * time.Second // Default timeout
+	}
+	
+	client := &http.Client{
+		Timeout: timeout,
+	}
+	
+	// Determine health check port
+	healthCheckPort := target.Port
+	if targetGroup.HealthCheckPort != "" && targetGroup.HealthCheckPort != "traffic-port" {
+		// Parse the health check port if it's not "traffic-port"
+		fmt.Sscanf(targetGroup.HealthCheckPort, "%d", &healthCheckPort)
+	}
+	
+	// Construct health check URL based on protocol
+	var url string
+	protocol := targetGroup.HealthCheckProtocol
+	if protocol == "" {
+		protocol = targetGroup.Protocol // Use target group protocol if health check protocol not specified
+	}
+	
+	path := targetGroup.HealthCheckPath
+	if path == "" {
+		path = "/" // Default path
+	}
+	
+	switch protocol {
+	case "HTTP":
+		url = fmt.Sprintf("http://%s:%d%s", target.ID, healthCheckPort, path)
+	case "HTTPS":
+		url = fmt.Sprintf("https://%s:%d%s", target.ID, healthCheckPort, path)
+	case "TCP", "TLS", "UDP", "TCP_UDP":
+		// For TCP-based health checks, we'll do a simple connection check
+		// This is a simplified implementation
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", target.ID, healthCheckPort), timeout)
+		if err != nil {
+			return TargetHealthStateUnhealthy
+		}
+		conn.Close()
+		return TargetHealthStateHealthy
+	default:
+		// Default to HTTP
+		url = fmt.Sprintf("http://%s:%d%s", target.ID, healthCheckPort, path)
+	}
+	
+	// For HTTP/HTTPS health checks
+	if protocol == "HTTP" || protocol == "HTTPS" {
+		resp, err := client.Get(url)
+		if err != nil {
+			return TargetHealthStateUnhealthy
+		}
+		defer resp.Body.Close()
+		
+		// Check if response matches expected status codes
+		if targetGroup.Matcher != "" {
+			// Parse matcher (e.g., "200", "200-299", "200,202,301")
+			if MatchesHealthCheckResponse(resp.StatusCode, targetGroup.Matcher) {
+				return TargetHealthStateHealthy
+			}
+		} else {
+			// Default: 200-299 is healthy
+			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				return TargetHealthStateHealthy
+			}
+		}
+	}
+	
 	return TargetHealthStateUnhealthy
+}
+
+// MatchesHealthCheckResponse checks if the status code matches the expected matcher pattern
+func MatchesHealthCheckResponse(statusCode int, matcher string) bool {
+	// Remove any whitespace
+	matcher = strings.TrimSpace(matcher)
+	
+	// Handle comma-separated values (e.g., "200,202,301")
+	if strings.Contains(matcher, ",") {
+		codes := strings.Split(matcher, ",")
+		for _, code := range codes {
+			code = strings.TrimSpace(code)
+			if expected, err := strconv.Atoi(code); err == nil && statusCode == expected {
+				return true
+			}
+		}
+		return false
+	}
+	
+	// Handle range (e.g., "200-299")
+	if strings.Contains(matcher, "-") {
+		parts := strings.Split(matcher, "-")
+		if len(parts) == 2 {
+			min, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+			max, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+			if err1 == nil && err2 == nil {
+				return statusCode >= min && statusCode <= max
+			}
+		}
+		return false
+	}
+	
+	// Handle single value (e.g., "200")
+	if expected, err := strconv.Atoi(matcher); err == nil {
+		return statusCode == expected
+	}
+	
+	return false
 }
 
 // getHealthReason returns the reason for the health state
