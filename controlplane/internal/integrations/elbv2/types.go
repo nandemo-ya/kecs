@@ -37,6 +37,9 @@ type Integration interface {
 
 	// GetTargetHealth gets the health status of targets
 	GetTargetHealth(ctx context.Context, targetGroupArn string) ([]TargetHealth, error)
+	
+	// CheckTargetHealthWithK8s performs health check using Kubernetes pod status
+	CheckTargetHealthWithK8s(ctx context.Context, targetIP string, targetPort int32, targetGroupArn string) (string, error)
 }
 
 // LoadBalancer represents an Application Load Balancer

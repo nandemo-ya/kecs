@@ -1274,6 +1274,30 @@ func (api *ELBv2APIImpl) performHealthCheck(ctx context.Context, target *storage
 		return TargetHealthStateHealthy
 	}
 	
+	// Determine health check port
+	healthCheckPort := target.Port
+	if targetGroup.HealthCheckPort != "" && targetGroup.HealthCheckPort != "traffic-port" {
+		// Parse the health check port if it's not "traffic-port"
+		fmt.Sscanf(targetGroup.HealthCheckPort, "%d", &healthCheckPort)
+	}
+	
+	// Try Kubernetes-based health check first if integration is available
+	if api.elbv2Integration != nil {
+		healthState, err := api.elbv2Integration.CheckTargetHealthWithK8s(ctx, target.ID, healthCheckPort, targetGroup.ARN)
+		if err != nil {
+			klog.V(2).Infof("Kubernetes health check failed for target %s: %v, falling back to legacy check", target.ID, err)
+		} else {
+			klog.V(2).Infof("Kubernetes health check for target %s returned: %s", target.ID, healthState)
+			return healthState
+		}
+	}
+	
+	// Fallback to legacy HTTP/TCP health check
+	return api.performLegacyHealthCheck(ctx, target, targetGroup)
+}
+
+// performLegacyHealthCheck performs the original HTTP/TCP-based health check
+func (api *ELBv2APIImpl) performLegacyHealthCheck(ctx context.Context, target *storage.ELBv2Target, targetGroup *storage.ELBv2TargetGroup) string {
 	// Set timeout based on health check timeout
 	timeout := time.Duration(targetGroup.HealthCheckTimeoutSeconds) * time.Second
 	if timeout == 0 {
