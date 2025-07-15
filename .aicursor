@@ -1,9 +1,0 @@
-{
-  "knowledge_base": {
-    "include": [
-      "docs/adr/records/**/*.md"
-    ],
-    "exclude": []
-  },
-  "project_description": "KECS (Kubernetes-based ECS Compatible Service) - A standalone, AWS-independent implementation of the Amazon ECS API that runs on Kubernetes"
-}
