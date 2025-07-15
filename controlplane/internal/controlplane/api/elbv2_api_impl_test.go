@@ -292,6 +292,32 @@ func (m *mockELBv2Store) DeleteTargetHealth(ctx context.Context, targetGroupArn 
 	return args.Error(0)
 }
 
+func (m *mockELBv2Store) GetTargetGroupsByLoadBalancer(ctx context.Context, loadBalancerArn string) ([]*storage.ELBv2TargetGroup, error) {
+	args := m.Called(ctx, loadBalancerArn)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*storage.ELBv2TargetGroup), args.Error(1)
+}
+
+func (m *mockELBv2Store) GetLoadBalancersByTargetGroup(ctx context.Context, targetGroupArn string) ([]*storage.ELBv2LoadBalancer, error) {
+	args := m.Called(ctx, targetGroupArn)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*storage.ELBv2LoadBalancer), args.Error(1)
+}
+
+func (m *mockELBv2Store) AssociateTargetGroupWithLoadBalancer(ctx context.Context, targetGroupArn, loadBalancerArn string) error {
+	args := m.Called(ctx, targetGroupArn, loadBalancerArn)
+	return args.Error(0)
+}
+
+func (m *mockELBv2Store) DisassociateTargetGroupFromLoadBalancer(ctx context.Context, targetGroupArn, loadBalancerArn string) error {
+	args := m.Called(ctx, targetGroupArn, loadBalancerArn)
+	return args.Error(0)
+}
+
 type mockStorage struct {
 	mock.Mock
 	elbv2Store storage.ELBv2Store

@@ -180,6 +180,26 @@ func (api *ELBv2APIImpl) DeleteLoadBalancer(ctx context.Context, input *generate
 		return nil, fmt.Errorf("load balancer %s not found", input.LoadBalancerArn)
 	}
 
+	// Delete all listeners first (cascade operation)
+	listeners, err := api.storage.ELBv2Store().ListListeners(ctx, input.LoadBalancerArn)
+	if err != nil {
+		klog.V(2).Infof("Failed to list listeners for load balancer %s: %v", input.LoadBalancerArn, err)
+	} else {
+		for _, listener := range listeners {
+			if err := api.storage.ELBv2Store().DeleteListener(ctx, listener.ARN); err != nil {
+				klog.V(2).Infof("Failed to delete listener %s: %v", listener.ARN, err)
+			}
+		}
+	}
+
+	// Delete from Kubernetes integration if available
+	if api.elbv2Integration != nil {
+		if err := api.elbv2Integration.DeleteLoadBalancer(ctx, input.LoadBalancerArn); err != nil {
+			klog.V(2).Infof("Failed to delete load balancer from Kubernetes: %v", err)
+			// Don't fail the operation if K8s deletion fails
+		}
+	}
+
 	// Delete load balancer
 	if err := api.storage.ELBv2Store().DeleteLoadBalancer(ctx, input.LoadBalancerArn); err != nil {
 		return nil, err
@@ -329,7 +349,20 @@ func (api *ELBv2APIImpl) DeleteTargetGroup(ctx context.Context, input *generated
 		return nil, fmt.Errorf("target group %s not found", input.TargetGroupArn)
 	}
 
-	// Delete target group
+	// Check if target group is associated with any load balancers
+	if len(existingTG.LoadBalancerArns) > 0 {
+		return nil, fmt.Errorf("target group is in use by one or more load balancers")
+	}
+
+	// Delete from Kubernetes integration if available
+	if api.elbv2Integration != nil {
+		if err := api.elbv2Integration.DeleteTargetGroup(ctx, input.TargetGroupArn); err != nil {
+			klog.V(2).Infof("Failed to delete target group from Kubernetes: %v", err)
+			// Don't fail the operation if K8s deletion fails
+		}
+	}
+
+	// Delete target group (this will also delete associated targets)
 	if err := api.storage.ELBv2Store().DeleteTargetGroup(ctx, input.TargetGroupArn); err != nil {
 		return nil, err
 	}
@@ -564,6 +597,30 @@ func (api *ELBv2APIImpl) CreateListener(ctx context.Context, input *generated_el
 	var targetGroupArn string
 	if len(input.DefaultActions) > 0 && input.DefaultActions[0].TargetGroupArn != nil {
 		targetGroupArn = *input.DefaultActions[0].TargetGroupArn
+		
+		// Associate target group with load balancer
+		if err := api.storage.ELBv2Store().AssociateTargetGroupWithLoadBalancer(ctx, targetGroupArn, input.LoadBalancerArn); err != nil {
+			klog.V(2).Infof("Failed to associate target group %s with load balancer %s: %v", targetGroupArn, input.LoadBalancerArn, err)
+			// Don't fail the operation if association fails
+		}
+	}
+
+	// Update listener in storage with DefaultActions
+	if targetGroupArn != "" {
+		// Encode default actions as JSON
+		actions := []map[string]interface{}{
+			{
+				"Type":           "forward",
+				"TargetGroupArn": targetGroupArn,
+			},
+		}
+		actionsJSON, _ := json.Marshal(actions)
+		dbListener.DefaultActions = string(actionsJSON)
+		
+		// Update the listener
+		if err := api.storage.ELBv2Store().UpdateListener(ctx, dbListener); err != nil {
+			klog.V(2).Infof("Failed to update listener with default actions: %v", err)
+		}
 	}
 
 	// Create listener in Kubernetes
@@ -600,6 +657,20 @@ func (api *ELBv2APIImpl) DeleteListener(ctx context.Context, input *generated_el
 	}
 	if existingListener == nil {
 		return nil, fmt.Errorf("listener %s not found", input.ListenerArn)
+	}
+
+	// Parse default actions to find target groups
+	var actions []map[string]interface{}
+	if err := json.Unmarshal([]byte(existingListener.DefaultActions), &actions); err == nil {
+		// Disassociate target groups from load balancer
+		for _, action := range actions {
+			if targetGroupArn, ok := action["TargetGroupArn"].(string); ok && targetGroupArn != "" {
+				if err := api.storage.ELBv2Store().DisassociateTargetGroupFromLoadBalancer(ctx, targetGroupArn, existingListener.LoadBalancerArn); err != nil {
+					klog.V(2).Infof("Failed to disassociate target group %s from load balancer %s: %v", targetGroupArn, existingListener.LoadBalancerArn, err)
+					// Don't fail the operation if disassociation fails
+				}
+			}
+		}
 	}
 
 	// Delete from Kubernetes integration first if available

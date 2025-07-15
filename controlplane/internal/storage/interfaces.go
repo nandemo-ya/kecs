@@ -869,6 +869,12 @@ type ELBv2Store interface {
 	UpdateListener(ctx context.Context, listener *ELBv2Listener) error
 	DeleteListener(ctx context.Context, arn string) error
 
+	// Relationship operations
+	GetTargetGroupsByLoadBalancer(ctx context.Context, loadBalancerArn string) ([]*ELBv2TargetGroup, error)
+	GetLoadBalancersByTargetGroup(ctx context.Context, targetGroupArn string) ([]*ELBv2LoadBalancer, error)
+	AssociateTargetGroupWithLoadBalancer(ctx context.Context, targetGroupArn, loadBalancerArn string) error
+	DisassociateTargetGroupFromLoadBalancer(ctx context.Context, targetGroupArn, loadBalancerArn string) error
+
 	// Target operations
 	RegisterTargets(ctx context.Context, targetGroupArn string, targets []*ELBv2Target) error
 	DeregisterTargets(ctx context.Context, targetGroupArn string, targetIDs []string) error

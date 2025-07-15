@@ -582,3 +582,119 @@ func (s *elbv2Store) UpdateTargetHealth(ctx context.Context, targetGroupArn, tar
 	}
 	return err
 }
+
+// GetTargetGroupsByLoadBalancer retrieves all target groups associated with a load balancer
+func (s *elbv2Store) GetTargetGroupsByLoadBalancer(ctx context.Context, loadBalancerArn string) ([]*storage.ELBv2TargetGroup, error) {
+	// First get all listeners for this load balancer
+	listeners, err := s.ListListeners(ctx, loadBalancerArn)
+	if err != nil {
+		return nil, err
+	}
+
+	// Collect unique target group ARNs from listeners
+	targetGroupMap := make(map[string]bool)
+	for _, listener := range listeners {
+		// Parse default actions to find target groups
+		var actions []map[string]interface{}
+		if err := json.Unmarshal([]byte(listener.DefaultActions), &actions); err != nil {
+			continue
+		}
+		
+		for _, action := range actions {
+			if targetGroupArn, ok := action["TargetGroupArn"].(string); ok && targetGroupArn != "" {
+				targetGroupMap[targetGroupArn] = true
+			}
+		}
+	}
+
+	// Fetch target groups
+	var targetGroups []*storage.ELBv2TargetGroup
+	for targetGroupArn := range targetGroupMap {
+		tg, err := s.GetTargetGroup(ctx, targetGroupArn)
+		if err != nil {
+			klog.V(2).Infof("Failed to get target group %s: %v", targetGroupArn, err)
+			continue
+		}
+		if tg != nil {
+			targetGroups = append(targetGroups, tg)
+		}
+	}
+
+	return targetGroups, nil
+}
+
+// GetLoadBalancersByTargetGroup retrieves all load balancers associated with a target group
+func (s *elbv2Store) GetLoadBalancersByTargetGroup(ctx context.Context, targetGroupArn string) ([]*storage.ELBv2LoadBalancer, error) {
+	// Get the target group to access LoadBalancerArns
+	tg, err := s.GetTargetGroup(ctx, targetGroupArn)
+	if err != nil {
+		return nil, err
+	}
+	if tg == nil {
+		return nil, fmt.Errorf("target group not found: %s", targetGroupArn)
+	}
+
+	// Fetch load balancers from stored ARNs
+	var loadBalancers []*storage.ELBv2LoadBalancer
+	for _, lbArn := range tg.LoadBalancerArns {
+		lb, err := s.GetLoadBalancer(ctx, lbArn)
+		if err != nil {
+			klog.V(2).Infof("Failed to get load balancer %s: %v", lbArn, err)
+			continue
+		}
+		if lb != nil {
+			loadBalancers = append(loadBalancers, lb)
+		}
+	}
+
+	return loadBalancers, nil
+}
+
+// AssociateTargetGroupWithLoadBalancer associates a target group with a load balancer
+func (s *elbv2Store) AssociateTargetGroupWithLoadBalancer(ctx context.Context, targetGroupArn, loadBalancerArn string) error {
+	// Get the target group
+	tg, err := s.GetTargetGroup(ctx, targetGroupArn)
+	if err != nil {
+		return err
+	}
+	if tg == nil {
+		return fmt.Errorf("target group not found: %s", targetGroupArn)
+	}
+
+	// Check if already associated
+	for _, arn := range tg.LoadBalancerArns {
+		if arn == loadBalancerArn {
+			return nil // Already associated
+		}
+	}
+
+	// Add the load balancer ARN
+	tg.LoadBalancerArns = append(tg.LoadBalancerArns, loadBalancerArn)
+
+	// Update the target group
+	return s.UpdateTargetGroup(ctx, tg)
+}
+
+// DisassociateTargetGroupFromLoadBalancer disassociates a target group from a load balancer
+func (s *elbv2Store) DisassociateTargetGroupFromLoadBalancer(ctx context.Context, targetGroupArn, loadBalancerArn string) error {
+	// Get the target group
+	tg, err := s.GetTargetGroup(ctx, targetGroupArn)
+	if err != nil {
+		return err
+	}
+	if tg == nil {
+		return fmt.Errorf("target group not found: %s", targetGroupArn)
+	}
+
+	// Remove the load balancer ARN
+	var newArns []string
+	for _, arn := range tg.LoadBalancerArns {
+		if arn != loadBalancerArn {
+			newArns = append(newArns, arn)
+		}
+	}
+	tg.LoadBalancerArns = newArns
+
+	// Update the target group
+	return s.UpdateTargetGroup(ctx, tg)
+}
