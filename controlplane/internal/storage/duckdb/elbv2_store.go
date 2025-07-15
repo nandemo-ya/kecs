@@ -582,3 +582,113 @@ func (s *elbv2Store) UpdateTargetHealth(ctx context.Context, targetGroupArn, tar
 	}
 	return err
 }
+
+// Rule operations
+
+// CreateRule creates a new rule
+func (s *elbv2Store) CreateRule(ctx context.Context, rule *storage.ELBv2Rule) error {
+	query := `
+		INSERT INTO elbv2_rules (
+			arn, listener_arn, priority, conditions, actions,
+			is_default, tags, region, account_id, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	tagsJSON, _ := json.Marshal(rule.Tags)
+
+	_, err := s.db.ExecContext(ctx, query,
+		rule.ARN, rule.ListenerArn, rule.Priority, rule.Conditions, rule.Actions,
+		rule.IsDefault, string(tagsJSON), rule.Region, rule.AccountID, rule.CreatedAt, rule.UpdatedAt,
+	)
+	return err
+}
+
+// GetRule retrieves a rule by ARN
+func (s *elbv2Store) GetRule(ctx context.Context, ruleArn string) (*storage.ELBv2Rule, error) {
+	query := `
+		SELECT arn, listener_arn, priority, conditions, actions,
+			is_default, tags, region, account_id, created_at, updated_at
+		FROM elbv2_rules
+		WHERE arn = ?
+	`
+
+	var rule storage.ELBv2Rule
+	var tagsJSON string
+
+	err := s.db.QueryRowContext(ctx, query, ruleArn).Scan(
+		&rule.ARN, &rule.ListenerArn, &rule.Priority, &rule.Conditions, &rule.Actions,
+		&rule.IsDefault, &tagsJSON, &rule.Region, &rule.AccountID, &rule.CreatedAt, &rule.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("rule not found: %s", ruleArn)
+	} else if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal JSON fields
+	json.Unmarshal([]byte(tagsJSON), &rule.Tags)
+
+	return &rule, nil
+}
+
+// ListRules lists all rules for a listener
+func (s *elbv2Store) ListRules(ctx context.Context, listenerArn string) ([]*storage.ELBv2Rule, error) {
+	query := `
+		SELECT arn, listener_arn, priority, conditions, actions,
+			is_default, tags, region, account_id, created_at, updated_at
+		FROM elbv2_rules
+		WHERE listener_arn = ?
+		ORDER BY priority ASC
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, listenerArn)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rules []*storage.ELBv2Rule
+	for rows.Next() {
+		var rule storage.ELBv2Rule
+		var tagsJSON string
+
+		err := rows.Scan(
+			&rule.ARN, &rule.ListenerArn, &rule.Priority, &rule.Conditions, &rule.Actions,
+			&rule.IsDefault, &tagsJSON, &rule.Region, &rule.AccountID, &rule.CreatedAt, &rule.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Unmarshal JSON fields
+		json.Unmarshal([]byte(tagsJSON), &rule.Tags)
+
+		rules = append(rules, &rule)
+	}
+
+	return rules, nil
+}
+
+// UpdateRule updates a rule
+func (s *elbv2Store) UpdateRule(ctx context.Context, rule *storage.ELBv2Rule) error {
+	query := `
+		UPDATE elbv2_rules
+		SET conditions = ?, actions = ?, tags = ?, updated_at = ?
+		WHERE arn = ?
+	`
+
+	tagsJSON, _ := json.Marshal(rule.Tags)
+	rule.UpdatedAt = time.Now()
+
+	_, err := s.db.ExecContext(ctx, query,
+		rule.Conditions, rule.Actions, string(tagsJSON), rule.UpdatedAt, rule.ARN,
+	)
+	return err
+}
+
+// DeleteRule deletes a rule
+func (s *elbv2Store) DeleteRule(ctx context.Context, ruleArn string) error {
+	query := `DELETE FROM elbv2_rules WHERE arn = ?`
+	_, err := s.db.ExecContext(ctx, query, ruleArn)
+	return err
+}

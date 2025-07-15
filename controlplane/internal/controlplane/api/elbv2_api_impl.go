@@ -728,7 +728,101 @@ func (api *ELBv2APIImpl) AddTrustStoreRevocations(ctx context.Context, input *ge
 }
 
 func (api *ELBv2APIImpl) CreateRule(ctx context.Context, input *generated_elbv2.CreateRuleInput) (*generated_elbv2.CreateRuleOutput, error) {
-	return &generated_elbv2.CreateRuleOutput{}, nil
+	if input.ListenerArn == "" {
+		return nil, fmt.Errorf("ListenerArn is required")
+	}
+	if input.Priority == 0 {
+		return nil, fmt.Errorf("Priority is required")
+	}
+	if len(input.Conditions) == 0 {
+		return nil, fmt.Errorf("Conditions is required")
+	}
+	if len(input.Actions) == 0 {
+		return nil, fmt.Errorf("Actions is required")
+	}
+
+	// Verify listener exists
+	listener, err := api.storage.ELBv2Store().GetListener(ctx, input.ListenerArn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get listener %s: %w", input.ListenerArn, err)
+	}
+	if listener == nil {
+		return nil, fmt.Errorf("listener not found: %s", input.ListenerArn)
+	}
+
+	// Check if priority is already used
+	existingRules, err := api.storage.ELBv2Store().ListRules(ctx, input.ListenerArn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list existing rules: %w", err)
+	}
+	for _, rule := range existingRules {
+		if rule.Priority == input.Priority {
+			return nil, fmt.Errorf("priority %d is already in use", input.Priority)
+		}
+	}
+
+	// Generate ARN - extract load balancer name from ARN
+	lbName := "unknown"
+	if parts := strings.Split(listener.LoadBalancerArn, "/"); len(parts) >= 3 {
+		lbName = parts[2]
+	}
+	ruleArn := fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:listener-rule/app/%s/%s/%s",
+		api.region, api.accountID, lbName, uuid.New().String()[:8], uuid.New().String()[:8])
+
+	// Marshal conditions and actions
+	conditionsJSON, err := json.Marshal(input.Conditions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal conditions: %w", err)
+	}
+	actionsJSON, err := json.Marshal(input.Actions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal actions: %w", err)
+	}
+
+	// Create rule
+	now := time.Now()
+	rule := &storage.ELBv2Rule{
+		ARN:         ruleArn,
+		ListenerArn: input.ListenerArn,
+		Priority:    input.Priority,
+		Conditions:  string(conditionsJSON),
+		Actions:     string(actionsJSON),
+		IsDefault:   false,
+		Tags:        make(map[string]string),
+		Region:      api.region,
+		AccountID:   api.accountID,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	// Add tags if provided
+	if input.Tags != nil {
+		for _, tag := range input.Tags {
+			if tag.Key != "" && tag.Value != nil {
+				rule.Tags[tag.Key] = *tag.Value
+			}
+		}
+	}
+
+	// Save to storage
+	if err := api.storage.ELBv2Store().CreateRule(ctx, rule); err != nil {
+		return nil, fmt.Errorf("failed to create rule: %w", err)
+	}
+
+	// Return created rule
+	output := &generated_elbv2.CreateRuleOutput{
+		Rules: []generated_elbv2.Rule{
+			{
+				RuleArn:     &ruleArn,
+				Priority:    utils.Ptr(fmt.Sprintf("%d", rule.Priority)),
+				Conditions:  input.Conditions,
+				Actions:     input.Actions,
+				IsDefault:   utils.Ptr(false),
+			},
+		},
+	}
+
+	return output, nil
 }
 
 func (api *ELBv2APIImpl) CreateTrustStore(ctx context.Context, input *generated_elbv2.CreateTrustStoreInput) (*generated_elbv2.CreateTrustStoreOutput, error) {
@@ -736,6 +830,29 @@ func (api *ELBv2APIImpl) CreateTrustStore(ctx context.Context, input *generated_
 }
 
 func (api *ELBv2APIImpl) DeleteRule(ctx context.Context, input *generated_elbv2.DeleteRuleInput) (*generated_elbv2.DeleteRuleOutput, error) {
+	if input.RuleArn == "" {
+		return nil, fmt.Errorf("RuleArn is required")
+	}
+
+	// Check if rule exists
+	rule, err := api.storage.ELBv2Store().GetRule(ctx, input.RuleArn)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return nil, fmt.Errorf("rule not found: %s", input.RuleArn)
+		}
+		return nil, fmt.Errorf("failed to get rule: %w", err)
+	}
+
+	// Cannot delete default rule
+	if rule.IsDefault {
+		return nil, fmt.Errorf("cannot delete default rule")
+	}
+
+	// Delete rule from storage
+	if err := api.storage.ELBv2Store().DeleteRule(ctx, input.RuleArn); err != nil {
+		return nil, fmt.Errorf("failed to delete rule: %w", err)
+	}
+
 	return &generated_elbv2.DeleteRuleOutput{}, nil
 }
 
@@ -1051,7 +1168,76 @@ func (api *ELBv2APIImpl) ModifyLoadBalancerAttributes(ctx context.Context, input
 }
 
 func (api *ELBv2APIImpl) ModifyRule(ctx context.Context, input *generated_elbv2.ModifyRuleInput) (*generated_elbv2.ModifyRuleOutput, error) {
-	return &generated_elbv2.ModifyRuleOutput{}, nil
+	if input.RuleArn == "" {
+		return nil, fmt.Errorf("RuleArn is required")
+	}
+
+	// Get existing rule
+	rule, err := api.storage.ELBv2Store().GetRule(ctx, input.RuleArn)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return nil, fmt.Errorf("rule not found: %s", input.RuleArn)
+		}
+		return nil, fmt.Errorf("failed to get rule: %w", err)
+	}
+
+	// Cannot modify default rule
+	if rule.IsDefault {
+		return nil, fmt.Errorf("cannot modify default rule")
+	}
+
+	// Update conditions if provided
+	if input.Conditions != nil {
+		conditionsJSON, err := json.Marshal(input.Conditions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal conditions: %w", err)
+		}
+		rule.Conditions = string(conditionsJSON)
+	}
+
+	// Update actions if provided
+	if input.Actions != nil {
+		actionsJSON, err := json.Marshal(input.Actions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal actions: %w", err)
+		}
+		rule.Actions = string(actionsJSON)
+	}
+
+	// Update rule in storage
+	if err := api.storage.ELBv2Store().UpdateRule(ctx, rule); err != nil {
+		return nil, fmt.Errorf("failed to update rule: %w", err)
+	}
+
+	// Return updated rule
+	var conditions []generated_elbv2.RuleCondition
+	var actions []generated_elbv2.Action
+	
+	if input.Conditions != nil {
+		conditions = input.Conditions
+	} else {
+		json.Unmarshal([]byte(rule.Conditions), &conditions)
+	}
+	
+	if input.Actions != nil {
+		actions = input.Actions
+	} else {
+		json.Unmarshal([]byte(rule.Actions), &actions)
+	}
+
+	output := &generated_elbv2.ModifyRuleOutput{
+		Rules: []generated_elbv2.Rule{
+			{
+				RuleArn:     &rule.ARN,
+				Priority:    utils.Ptr(fmt.Sprintf("%d", rule.Priority)),
+				Conditions:  conditions,
+				Actions:     actions,
+				IsDefault:   utils.Ptr(rule.IsDefault),
+			},
+		},
+	}
+
+	return output, nil
 }
 
 func (api *ELBv2APIImpl) ModifyTargetGroup(ctx context.Context, input *generated_elbv2.ModifyTargetGroupInput) (*generated_elbv2.ModifyTargetGroupOutput, error) {
