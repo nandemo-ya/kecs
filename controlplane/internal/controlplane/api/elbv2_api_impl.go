@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -10,6 +11,8 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
+	"k8s.io/klog/v2"
 )
 
 // Target health states
@@ -142,11 +145,11 @@ func (api *ELBv2APIImpl) CreateLoadBalancer(ctx context.Context, input *generate
 			{
 				LoadBalancerArn:           &arn,
 				DNSName:                   &dnsName,
-				CanonicalHostedZoneId:     ptrString("Z215JYRZR1TBD5"),
+				CanonicalHostedZoneId:     utils.Ptr("Z215JYRZR1TBD5"),
 				CreatedTime:               &now,
 				LoadBalancerName:          &input.Name,
 				Scheme:                    (*generated_elbv2.LoadBalancerSchemeEnum)(&scheme),
-				VpcId:                     ptrString("vpc-default"),
+				VpcId:                     utils.Ptr("vpc-default"),
 				State:                     &generated_elbv2.LoadBalancerState{Code: &state},
 				Type:                      (*generated_elbv2.LoadBalancerTypeEnum)(&lbType),
 				IpAddressType:             (*generated_elbv2.IpAddressType)(&ipAddressType),
@@ -293,13 +296,13 @@ func (api *ELBv2APIImpl) CreateTargetGroup(ctx context.Context, input *generated
 				Protocol:                    input.Protocol,
 				Port:                        input.Port,
 				VpcId:                       input.VpcId,
-				HealthCheckPath:             ptrString("/"),
+				HealthCheckPath:             utils.Ptr("/"),
 				HealthCheckProtocol:         (*generated_elbv2.ProtocolEnum)(&healthCheckProtocol),
-				HealthCheckPort:             ptrString("traffic-port"),
-				HealthyThresholdCount:       ptrInt32(2),
-				UnhealthyThresholdCount:     ptrInt32(5),
-				HealthCheckTimeoutSeconds:   ptrInt32(5),
-				HealthCheckIntervalSeconds:  ptrInt32(30),
+				HealthCheckPort:             utils.Ptr("traffic-port"),
+				HealthyThresholdCount:       utils.Ptr(int32(2)),
+				UnhealthyThresholdCount:     utils.Ptr(int32(5)),
+				HealthCheckTimeoutSeconds:   utils.Ptr(int32(5)),
+				HealthCheckIntervalSeconds:  utils.Ptr(int32(30)),
 				LoadBalancerArns:            []string{},
 			},
 		},
@@ -790,7 +793,73 @@ func (api *ELBv2APIImpl) ModifyIpPools(ctx context.Context, input *generated_elb
 }
 
 func (api *ELBv2APIImpl) ModifyListener(ctx context.Context, input *generated_elbv2.ModifyListenerInput) (*generated_elbv2.ModifyListenerOutput, error) {
-	return &generated_elbv2.ModifyListenerOutput{}, nil
+	if input.ListenerArn == "" {
+		return nil, fmt.Errorf("ListenerArn is required")
+	}
+
+	// Get existing listener
+	listener, err := api.storage.ELBv2Store().GetListener(ctx, input.ListenerArn)
+	if err != nil {
+		return nil, err
+	}
+	if listener == nil {
+		return nil, fmt.Errorf("listener not found: %s", input.ListenerArn)
+	}
+
+	// Update listener fields
+	now := time.Now()
+	if input.Port != nil {
+		listener.Port = *input.Port
+	}
+	if input.Protocol != nil {
+		listener.Protocol = string(*input.Protocol)
+	}
+	if input.SslPolicy != nil {
+		listener.SslPolicy = *input.SslPolicy
+	}
+	if input.DefaultActions != nil {
+		// Convert actions to JSON for storage
+		actionsJSON, err := json.Marshal(input.DefaultActions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal default actions: %w", err)
+		}
+		listener.DefaultActions = string(actionsJSON)
+	}
+	listener.UpdatedAt = now
+
+	// Update in storage
+	if err := api.storage.ELBv2Store().UpdateListener(ctx, listener); err != nil {
+		return nil, fmt.Errorf("failed to update listener: %w", err)
+	}
+
+	// Update Kubernetes resources if integration is available
+	if api.elbv2Integration != nil {
+		// Get target group ARN from default actions if available
+		var targetGroupArn string
+		if input.DefaultActions != nil && len(input.DefaultActions) > 0 {
+			for _, action := range input.DefaultActions {
+				if action.Type == generated_elbv2.ActionTypeEnum("forward") && action.TargetGroupArn != nil {
+					targetGroupArn = *action.TargetGroupArn
+					break
+				}
+			}
+		}
+
+		// Update listener in Kubernetes
+		if _, err := api.elbv2Integration.CreateListener(ctx, listener.LoadBalancerArn, listener.Port, listener.Protocol, targetGroupArn); err != nil {
+			klog.V(2).Infof("Failed to update listener in Kubernetes: %v", err)
+			// Don't fail the operation if K8s update fails
+		}
+	}
+
+	// Return updated listener
+	output := &generated_elbv2.ModifyListenerOutput{
+		Listeners: []generated_elbv2.Listener{
+			api.convertToListener(listener),
+		},
+	}
+
+	return output, nil
 }
 
 func (api *ELBv2APIImpl) ModifyListenerAttributes(ctx context.Context, input *generated_elbv2.ModifyListenerAttributesInput) (*generated_elbv2.ModifyListenerAttributesOutput, error) {
@@ -806,7 +875,75 @@ func (api *ELBv2APIImpl) ModifyRule(ctx context.Context, input *generated_elbv2.
 }
 
 func (api *ELBv2APIImpl) ModifyTargetGroup(ctx context.Context, input *generated_elbv2.ModifyTargetGroupInput) (*generated_elbv2.ModifyTargetGroupOutput, error) {
-	return &generated_elbv2.ModifyTargetGroupOutput{}, nil
+	if input.TargetGroupArn == "" {
+		return nil, fmt.Errorf("TargetGroupArn is required")
+	}
+
+	// Get existing target group
+	targetGroup, err := api.storage.ELBv2Store().GetTargetGroup(ctx, input.TargetGroupArn)
+	if err != nil {
+		return nil, err
+	}
+	if targetGroup == nil {
+		return nil, fmt.Errorf("target group not found: %s", input.TargetGroupArn)
+	}
+
+	// Update target group fields
+	now := time.Now()
+	if input.HealthCheckEnabled != nil {
+		targetGroup.HealthCheckEnabled = *input.HealthCheckEnabled
+	}
+	if input.HealthCheckPath != nil {
+		targetGroup.HealthCheckPath = *input.HealthCheckPath
+	}
+	if input.HealthCheckPort != nil {
+		targetGroup.HealthCheckPort = *input.HealthCheckPort
+	}
+	if input.HealthCheckProtocol != nil {
+		targetGroup.HealthCheckProtocol = string(*input.HealthCheckProtocol)
+	}
+	if input.HealthCheckIntervalSeconds != nil {
+		targetGroup.HealthCheckIntervalSeconds = *input.HealthCheckIntervalSeconds
+	}
+	if input.HealthCheckTimeoutSeconds != nil {
+		targetGroup.HealthCheckTimeoutSeconds = *input.HealthCheckTimeoutSeconds
+	}
+	if input.HealthyThresholdCount != nil {
+		targetGroup.HealthyThresholdCount = *input.HealthyThresholdCount
+	}
+	if input.UnhealthyThresholdCount != nil {
+		targetGroup.UnhealthyThresholdCount = *input.UnhealthyThresholdCount
+	}
+	if input.Matcher != nil {
+		// Convert matcher to JSON for storage
+		matcherJSON, err := json.Marshal(input.Matcher)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal matcher: %w", err)
+		}
+		targetGroup.Matcher = string(matcherJSON)
+	}
+	targetGroup.UpdatedAt = now
+
+	// Update in storage
+	if err := api.storage.ELBv2Store().UpdateTargetGroup(ctx, targetGroup); err != nil {
+		return nil, fmt.Errorf("failed to update target group: %w", err)
+	}
+
+	// Update Kubernetes resources if integration is available
+	if api.elbv2Integration != nil {
+		// For now, we log a message about K8s update
+		// In the future, we might need to update Service annotations or other K8s resources
+		klog.V(2).Infof("Target group %s updated, Kubernetes resources may need manual update", targetGroup.ARN)
+	}
+
+	// Return updated target group
+	output := &generated_elbv2.ModifyTargetGroupOutput{
+		TargetGroups: []generated_elbv2.TargetGroup{
+			api.convertToTargetGroup(targetGroup),
+		},
+	}
+
+	return output, nil
 }
 
 func (api *ELBv2APIImpl) ModifyTargetGroupAttributes(ctx context.Context, input *generated_elbv2.ModifyTargetGroupAttributesInput) (*generated_elbv2.ModifyTargetGroupAttributesOutput, error) {
@@ -845,14 +982,6 @@ func (api *ELBv2APIImpl) SetSubnets(ctx context.Context, input *generated_elbv2.
 	return &generated_elbv2.SetSubnetsOutput{}, nil
 }
 
-// Helper functions
-func ptrString(s string) *string {
-	return &s
-}
-
-func ptrInt32(i int32) *int32 {
-	return &i
-}
 
 func convertToLoadBalancer(lb *storage.ELBv2LoadBalancer) generated_elbv2.LoadBalancer {
 	state := generated_elbv2.LoadBalancerStateEnumACTIVE

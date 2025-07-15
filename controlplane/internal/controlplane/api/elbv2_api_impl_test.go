@@ -11,6 +11,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 )
 
 // Mock implementations for testing
@@ -385,9 +386,9 @@ var _ = Describe("ELBv2APIImpl", func() {
 			It("should successfully create with k8s resources", func() {
 				input := &generated_elbv2.CreateTargetGroupInput{
 					Name:     "test-tg",
-					Port:     ptrInt32(80),
+					Port:     utils.Ptr(int32(80)),
 					Protocol: ptrProtocol("HTTP"),
-					VpcId:    ptrString("vpc-12345"),
+					VpcId:    utils.Ptr("vpc-12345"),
 				}
 				
 				// Mock storage check - target group doesn't exist
@@ -422,9 +423,9 @@ var _ = Describe("ELBv2APIImpl", func() {
 			It("should fail when k8s integration fails", func() {
 				input := &generated_elbv2.CreateTargetGroupInput{
 					Name:     "test-tg-fail",
-					Port:     ptrInt32(8080),
+					Port:     utils.Ptr(int32(8080)),
 					Protocol: ptrProtocol("HTTP"),
-					VpcId:    ptrString("vpc-12345"),
+					VpcId:    utils.Ptr("vpc-12345"),
 				}
 				
 				mockStore.On("GetTargetGroupByName", ctx, "test-tg-fail").Return(nil, nil).Once()
@@ -457,7 +458,7 @@ var _ = Describe("ELBv2APIImpl", func() {
 				loadBalancerArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/test-lb/123456"
 				input := &generated_elbv2.CreateListenerInput{
 					LoadBalancerArn: loadBalancerArn,
-					Port:            ptrInt32(80),
+					Port:            utils.Ptr(int32(80)),
 					Protocol:        ptrProtocol("HTTP"),
 					DefaultActions: []generated_elbv2.Action{
 						{
@@ -505,7 +506,7 @@ var _ = Describe("ELBv2APIImpl", func() {
 				loadBalancerArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/test-lb-fail/123456"
 				input := &generated_elbv2.CreateListenerInput{
 					LoadBalancerArn: loadBalancerArn,
-					Port:            ptrInt32(443),
+					Port:            utils.Ptr(int32(443)),
 					Protocol:        ptrProtocol("HTTPS"),
 					DefaultActions: []generated_elbv2.Action{
 						{
@@ -552,11 +553,11 @@ var _ = Describe("ELBv2APIImpl", func() {
 					Targets: []generated_elbv2.TargetDescription{
 						{
 							Id:   "10.0.1.10",
-							Port: ptrInt32(80),
+							Port: utils.Ptr(int32(80)),
 						},
 						{
 							Id:   "10.0.1.11",
-							Port: ptrInt32(80),
+							Port: utils.Ptr(int32(80)),
 						},
 					},
 				}
@@ -594,7 +595,7 @@ var _ = Describe("ELBv2APIImpl", func() {
 					Targets: []generated_elbv2.TargetDescription{
 						{
 							Id:   "10.0.1.10",
-							Port: ptrInt32(80),
+							Port: utils.Ptr(int32(80)),
 						},
 					},
 				}
@@ -622,6 +623,145 @@ var _ = Describe("ELBv2APIImpl", func() {
 				
 				mockStore.AssertExpectations(GinkgoT())
 				mockIntegration.AssertExpectations(GinkgoT())
+			})
+		})
+	})
+
+	Describe("Phase 3: ModifyListener", func() {
+		Context("when modifying a listener", func() {
+			It("should successfully update listener properties", func() {
+				listenerArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/test-lb/123456/789"
+				targetGroupArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/new-tg/123456"
+				input := &generated_elbv2.ModifyListenerInput{
+					ListenerArn: listenerArn,
+					Port:        utils.Ptr(int32(8080)),
+					Protocol:    ptrProtocol("HTTP"),
+					DefaultActions: []generated_elbv2.Action{
+						{
+							Type:           generated_elbv2.ActionTypeEnum("forward"),
+							TargetGroupArn: &targetGroupArn,
+						},
+					},
+				}
+				
+				// Mock get existing listener
+				existingListener := &storage.ELBv2Listener{
+					ARN:             listenerArn,
+					LoadBalancerArn: "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/test-lb/123456",
+					Port:            80,
+					Protocol:        "HTTP",
+				}
+				mockStore.On("GetListener", ctx, listenerArn).Return(existingListener, nil).Once()
+				
+				// Mock update listener
+				mockStore.On("UpdateListener", ctx, mock.MatchedBy(func(l *storage.ELBv2Listener) bool {
+					return l.Port == 8080 && l.Protocol == "HTTP"
+				})).Return(nil).Once()
+				
+				// Mock Kubernetes integration update
+				mockIntegration.On("CreateListener", ctx, existingListener.LoadBalancerArn, int32(8080), "HTTP", targetGroupArn).
+					Return(&elbv2.Listener{
+						Arn:             listenerArn,
+						LoadBalancerArn: existingListener.LoadBalancerArn,
+						Port:            8080,
+						Protocol:        "HTTP",
+					}, nil).Once()
+				
+				output, err := api.ModifyListener(ctx, input)
+				
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).NotTo(BeNil())
+				Expect(output.Listeners).To(HaveLen(1))
+				Expect(*output.Listeners[0].Port).To(Equal(int32(8080)))
+				
+				mockStore.AssertExpectations(GinkgoT())
+				mockIntegration.AssertExpectations(GinkgoT())
+			})
+			
+			It("should fail when listener not found", func() {
+				listenerArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/test-lb/123456/999"
+				input := &generated_elbv2.ModifyListenerInput{
+					ListenerArn: listenerArn,
+					Port:        utils.Ptr(int32(8080)),
+				}
+				
+				mockStore.On("GetListener", ctx, listenerArn).Return(nil, nil).Once()
+				
+				output, err := api.ModifyListener(ctx, input)
+				
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("listener not found"))
+				Expect(output).To(BeNil())
+				
+				mockStore.AssertExpectations(GinkgoT())
+			})
+		})
+	})
+
+	Describe("Phase 3: ModifyTargetGroup", func() {
+		Context("when modifying a target group", func() {
+			It("should successfully update health check properties", func() {
+				targetGroupArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/test-tg/123456"
+				input := &generated_elbv2.ModifyTargetGroupInput{
+					TargetGroupArn:             targetGroupArn,
+					HealthCheckPath:            utils.Ptr("/healthz"),
+					HealthCheckIntervalSeconds: utils.Ptr(int32(10)),
+					HealthyThresholdCount:      utils.Ptr(int32(3)),
+					UnhealthyThresholdCount:    utils.Ptr(int32(2)),
+					Matcher: &generated_elbv2.Matcher{
+						HttpCode: utils.Ptr("200-299"),
+					},
+				}
+				
+				// Mock get existing target group
+				existingTG := &storage.ELBv2TargetGroup{
+					ARN:                        targetGroupArn,
+					Name:                       "test-tg",
+					Port:                       80,
+					Protocol:                   "HTTP",
+					VpcID:                      "vpc-12345",
+					HealthCheckPath:            "/health",
+					HealthCheckIntervalSeconds: 30,
+					HealthyThresholdCount:      5,
+					UnhealthyThresholdCount:    2,
+				}
+				mockStore.On("GetTargetGroup", ctx, targetGroupArn).Return(existingTG, nil).Once()
+				
+				// Mock update target group
+				mockStore.On("UpdateTargetGroup", ctx, mock.MatchedBy(func(tg *storage.ELBv2TargetGroup) bool {
+					return tg.HealthCheckPath == "/healthz" && 
+						   tg.HealthCheckIntervalSeconds == 10 &&
+						   tg.HealthyThresholdCount == 3 &&
+						   tg.UnhealthyThresholdCount == 2
+				})).Return(nil).Once()
+				
+				output, err := api.ModifyTargetGroup(ctx, input)
+				
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).NotTo(BeNil())
+				Expect(output.TargetGroups).To(HaveLen(1))
+				Expect(*output.TargetGroups[0].HealthCheckPath).To(Equal("/healthz"))
+				Expect(*output.TargetGroups[0].HealthCheckIntervalSeconds).To(Equal(int32(10)))
+				
+				mockStore.AssertExpectations(GinkgoT())
+			})
+			
+			It("should fail when target group not found", func() {
+				targetGroupArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/missing-tg/123456"
+				input := &generated_elbv2.ModifyTargetGroupInput{
+					TargetGroupArn:  targetGroupArn,
+					HealthCheckPath: utils.Ptr("/healthz"),
+				}
+				
+				mockStore.On("GetTargetGroup", ctx, targetGroupArn).Return(nil, nil).Once()
+				
+				output, err := api.ModifyTargetGroup(ctx, input)
+				
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("target group not found"))
+				Expect(output).To(BeNil())
+				
+				mockStore.AssertExpectations(GinkgoT())
 			})
 		})
 	})
