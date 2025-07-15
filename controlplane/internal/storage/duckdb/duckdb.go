@@ -765,6 +765,26 @@ func (s *DuckDBStorage) createELBv2Tables(ctx context.Context) error {
 		return fmt.Errorf("failed to create targets table: %w", err)
 	}
 
+	// Create ELBv2 rules table
+	rulesQuery := `
+	CREATE TABLE IF NOT EXISTS elbv2_rules (
+		arn VARCHAR PRIMARY KEY,
+		listener_arn VARCHAR NOT NULL,
+		priority INTEGER NOT NULL,
+		conditions TEXT NOT NULL,
+		actions TEXT NOT NULL,
+		is_default BOOLEAN NOT NULL DEFAULT FALSE,
+		tags TEXT,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		created_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL
+	)`
+
+	if _, err := s.db.ExecContext(ctx, rulesQuery); err != nil {
+		return fmt.Errorf("failed to create rules table: %w", err)
+	}
+
 	// Create indexes
 	indexes := []string{
 		"CREATE INDEX IF NOT EXISTS idx_elbv2_lb_name ON elbv2_load_balancers(name)",
@@ -775,6 +795,8 @@ func (s *DuckDBStorage) createELBv2Tables(ctx context.Context) error {
 		"CREATE INDEX IF NOT EXISTS idx_elbv2_listener_lb ON elbv2_listeners(load_balancer_arn)",
 		"CREATE INDEX IF NOT EXISTS idx_elbv2_targets_tg ON elbv2_targets(target_group_arn)",
 		"CREATE INDEX IF NOT EXISTS idx_elbv2_targets_health ON elbv2_targets(health_state)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_rules_listener ON elbv2_rules(listener_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_rules_priority ON elbv2_rules(listener_arn, priority)",
 	}
 
 	for _, idx := range indexes {

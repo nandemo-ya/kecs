@@ -292,6 +292,38 @@ func (m *mockELBv2Store) DeleteTargetHealth(ctx context.Context, targetGroupArn 
 	return args.Error(0)
 }
 
+// Rule operations
+func (m *mockELBv2Store) CreateRule(ctx context.Context, rule *storage.ELBv2Rule) error {
+	args := m.Called(ctx, rule)
+	return args.Error(0)
+}
+
+func (m *mockELBv2Store) GetRule(ctx context.Context, ruleArn string) (*storage.ELBv2Rule, error) {
+	args := m.Called(ctx, ruleArn)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*storage.ELBv2Rule), args.Error(1)
+}
+
+func (m *mockELBv2Store) ListRules(ctx context.Context, listenerArn string) ([]*storage.ELBv2Rule, error) {
+	args := m.Called(ctx, listenerArn)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*storage.ELBv2Rule), args.Error(1)
+}
+
+func (m *mockELBv2Store) UpdateRule(ctx context.Context, rule *storage.ELBv2Rule) error {
+	args := m.Called(ctx, rule)
+	return args.Error(0)
+}
+
+func (m *mockELBv2Store) DeleteRule(ctx context.Context, ruleArn string) error {
+	args := m.Called(ctx, ruleArn)
+	return args.Error(0)
+}
+
 type mockStorage struct {
 	mock.Mock
 	elbv2Store storage.ELBv2Store

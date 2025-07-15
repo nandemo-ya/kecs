@@ -874,6 +874,13 @@ type ELBv2Store interface {
 	DeregisterTargets(ctx context.Context, targetGroupArn string, targetIDs []string) error
 	ListTargets(ctx context.Context, targetGroupArn string) ([]*ELBv2Target, error)
 	UpdateTargetHealth(ctx context.Context, targetGroupArn, targetID string, health *ELBv2TargetHealth) error
+
+	// Rule operations
+	CreateRule(ctx context.Context, rule *ELBv2Rule) error
+	GetRule(ctx context.Context, ruleArn string) (*ELBv2Rule, error)
+	ListRules(ctx context.Context, listenerArn string) ([]*ELBv2Rule, error)
+	UpdateRule(ctx context.Context, rule *ELBv2Rule) error
+	DeleteRule(ctx context.Context, ruleArn string) error
 }
 
 // ELBv2LoadBalancer represents a stored load balancer
@@ -957,4 +964,19 @@ type ELBv2TargetHealth struct {
 	State       string `json:"state"`
 	Reason      string `json:"reason"`
 	Description string `json:"description"`
+}
+
+// ELBv2Rule represents a stored listener rule
+type ELBv2Rule struct {
+	ARN         string            `json:"arn"`
+	ListenerArn string            `json:"listenerArn"`
+	Priority    int32             `json:"priority"`
+	Conditions  string            `json:"conditions"` // JSON encoded conditions
+	Actions     string            `json:"actions"`    // JSON encoded actions
+	IsDefault   bool              `json:"isDefault"`
+	Tags        map[string]string `json:"tags"`
+	Region      string            `json:"region"`
+	AccountID   string            `json:"accountId"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
