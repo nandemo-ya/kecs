@@ -3,6 +3,7 @@ package elbv2
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -348,6 +349,107 @@ func (i *k8sIntegration) GetTargetHealth(ctx context.Context, targetGroupArn str
 	}
 
 	return results, nil
+}
+
+// CheckTargetHealthWithK8s performs health check using Kubernetes pod status
+func (i *k8sIntegration) CheckTargetHealthWithK8s(ctx context.Context, targetIP string, targetPort int32, targetGroupArn string) (string, error) {
+	klog.V(2).Infof("Checking target health with Kubernetes for %s:%d", targetIP, targetPort)
+	
+	if i.kubeClient == nil {
+		klog.V(2).Infof("No kubeClient available, falling back to basic connectivity check")
+		return i.performBasicConnectivityCheck(targetIP, targetPort)
+	}
+	
+	// Find pod by IP address
+	pod, err := i.findPodByIP(ctx, targetIP)
+	if err != nil {
+		klog.V(2).Infof("Failed to find pod with IP %s: %v", targetIP, err)
+		// Fallback to basic connectivity check if pod not found
+		return i.performBasicConnectivityCheck(targetIP, targetPort)
+	}
+	
+	if pod == nil {
+		klog.V(2).Infof("No pod found with IP %s, performing basic connectivity check", targetIP)
+		return i.performBasicConnectivityCheck(targetIP, targetPort)
+	}
+	
+	// Check pod readiness status
+	return i.checkPodReadiness(pod, targetPort)
+}
+
+// findPodByIP finds a pod by its IP address across all namespaces
+func (i *k8sIntegration) findPodByIP(ctx context.Context, targetIP string) (*corev1.Pod, error) {
+	// List pods across all namespaces
+	pods, err := i.kubeClient.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pods: %w", err)
+	}
+	
+	for _, pod := range pods.Items {
+		if pod.Status.PodIP == targetIP {
+			return &pod, nil
+		}
+	}
+	
+	return nil, nil // Pod not found
+}
+
+// checkPodReadiness checks if a pod is ready and healthy
+func (i *k8sIntegration) checkPodReadiness(pod *corev1.Pod, targetPort int32) (string, error) {
+	// Check pod phase first
+	if pod.Status.Phase != corev1.PodRunning {
+		klog.V(2).Infof("Pod %s/%s is not running (phase: %s)", pod.Namespace, pod.Name, pod.Status.Phase)
+		return "unhealthy", nil
+	}
+	
+	// Check pod readiness conditions
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady {
+			if condition.Status == corev1.ConditionTrue {
+				klog.V(2).Infof("Pod %s/%s is ready", pod.Namespace, pod.Name)
+				
+				// Additionally check if the target port is exposed by the pod
+				if i.isPodPortExposed(pod, targetPort) {
+					return "healthy", nil
+				} else {
+					klog.V(2).Infof("Pod %s/%s does not expose target port %d", pod.Namespace, pod.Name, targetPort)
+					return "unhealthy", nil
+				}
+			} else {
+				klog.V(2).Infof("Pod %s/%s is not ready (reason: %s)", pod.Namespace, pod.Name, condition.Reason)
+				return "unhealthy", nil
+			}
+		}
+	}
+	
+	// If no readiness condition found, consider it unhealthy
+	klog.V(2).Infof("Pod %s/%s has no readiness condition", pod.Namespace, pod.Name)
+	return "unhealthy", nil
+}
+
+// isPodPortExposed checks if a pod exposes the given port
+func (i *k8sIntegration) isPodPortExposed(pod *corev1.Pod, targetPort int32) bool {
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			if port.ContainerPort == targetPort {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// performBasicConnectivityCheck performs a basic TCP connectivity check
+func (i *k8sIntegration) performBasicConnectivityCheck(targetIP string, targetPort int32) (string, error) {
+	timeout := 5 * time.Second
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", targetIP, targetPort), timeout)
+	if err != nil {
+		klog.V(2).Infof("Basic connectivity check failed for %s:%d: %v", targetIP, targetPort, err)
+		return "unhealthy", nil
+	}
+	conn.Close()
+	klog.V(2).Infof("Basic connectivity check passed for %s:%d", targetIP, targetPort)
+	return "healthy", nil
 }
 
 // Helper functions

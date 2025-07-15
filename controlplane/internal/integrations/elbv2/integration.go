@@ -75,3 +75,7 @@ func (n *noOpIntegration) GetLoadBalancer(ctx context.Context, arn string) (*Loa
 func (n *noOpIntegration) GetTargetHealth(ctx context.Context, targetGroupArn string) ([]TargetHealth, error) {
 	return nil, fmt.Errorf("ELBv2 integration is disabled")
 }
+
+func (n *noOpIntegration) CheckTargetHealthWithK8s(ctx context.Context, targetIP string, targetPort int32, targetGroupArn string) (string, error) {
+	return "", fmt.Errorf("ELBv2 integration is disabled")
+}

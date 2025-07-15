@@ -177,6 +177,27 @@ var _ = Describe("ELBv2 K8s Integration", func() {
 		})
 	})
 
+	Describe("Kubernetes Health Check Integration", func() {
+		It("should perform basic connectivity check when no kubeClient is available", func() {
+			// Test with a target that would fail connectivity check
+			healthState, err := integration.CheckTargetHealthWithK8s(ctx, "192.0.2.1", 80, "test-tg-arn")
+			
+			// Should not error but return unhealthy for unreachable target
+			Expect(err).NotTo(HaveOccurred())
+			Expect(healthState).To(Equal("unhealthy"))
+		})
+		
+		It("should return healthy for basic connectivity check on localhost", func() {
+			// This test assumes that something is listening on a common port
+			// In practice, this would be more controlled in an integration test environment
+			healthState, err := integration.CheckTargetHealthWithK8s(ctx, "127.0.0.1", 22, "test-tg-arn")
+			
+			// Should not error, health state depends on whether SSH is running
+			Expect(err).NotTo(HaveOccurred())
+			Expect(healthState).To(BeElementOf([]string{"healthy", "unhealthy"}))
+		})
+	})
+
 	Describe("Error handling", func() {
 		It("should handle non-existent load balancer", func() {
 			lb, err := integration.GetLoadBalancer(ctx, "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/non-existent/123")

@@ -85,6 +85,11 @@ func (m *mockELBv2Integration) GetTargetHealth(ctx context.Context, targetGroupA
 	return args.Get(0).([]elbv2.TargetHealth), args.Error(1)
 }
 
+func (m *mockELBv2Integration) CheckTargetHealthWithK8s(ctx context.Context, targetIP string, targetPort int32, targetGroupArn string) (string, error) {
+	args := m.Called(ctx, targetIP, targetPort, targetGroupArn)
+	return args.String(0), args.Error(1)
+}
+
 type mockELBv2Store struct {
 	mock.Mock
 }
