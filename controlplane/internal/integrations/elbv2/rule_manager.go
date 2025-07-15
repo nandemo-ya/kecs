@@ -18,14 +18,16 @@ type RuleManager struct {
 	dynamicClient    dynamic.Interface
 	converter        *RuleConverter
 	weightedManager  *WeightedRoutingManager
+	priorityManager  *PriorityManager
 }
 
 // NewRuleManager creates a new rule manager
-func NewRuleManager(dynamicClient dynamic.Interface) *RuleManager {
+func NewRuleManager(dynamicClient dynamic.Interface, store storage.ELBv2Store) *RuleManager {
 	return &RuleManager{
 		dynamicClient:    dynamicClient,
 		converter:        NewRuleConverter(),
 		weightedManager:  NewWeightedRoutingManager(),
+		priorityManager:  NewPriorityManager(store),
 	}
 }
 
@@ -287,4 +289,39 @@ func (s *storageTargetGroupResolver) GetTargetGroupInfo(arn string) (*generated_
 		Protocol:        &protocol,
 		VpcId:           &tg.VpcID,
 	}, nil
+}
+
+// GetNextAvailablePriority finds the next available priority in a range for a listener
+func (r *RuleManager) GetNextAvailablePriority(ctx context.Context, listenerArn string, priorityRange PriorityRange) (int32, error) {
+	return r.priorityManager.GetNextAvailablePriority(ctx, listenerArn, priorityRange)
+}
+
+// ValidatePriority checks if a priority is valid and available for a listener
+func (r *RuleManager) ValidatePriority(ctx context.Context, listenerArn string, priority int32, excludeRuleArn string) error {
+	return r.priorityManager.ValidatePriority(ctx, listenerArn, priority, excludeRuleArn)
+}
+
+// SetRulePriorities updates priorities for multiple rules atomically
+func (r *RuleManager) SetRulePriorities(ctx context.Context, priorities []RulePriorityUpdate) error {
+	return r.priorityManager.SetRulePriorities(ctx, priorities)
+}
+
+// AnalyzeRulePriorities analyzes rule priority distribution for a listener
+func (r *RuleManager) AnalyzeRulePriorities(ctx context.Context, listenerArn string) (*PriorityAnalysis, error) {
+	return r.priorityManager.AnalyzeRulePriorities(ctx, listenerArn)
+}
+
+// OptimizePriorities suggests optimized priority assignments for rules
+func (r *RuleManager) OptimizePriorities(ctx context.Context, listenerArn string) ([]RulePriorityUpdate, error) {
+	return r.priorityManager.OptimizePriorities(ctx, listenerArn)
+}
+
+// ReorderRulesForClarity reorders rules to improve clarity and maintainability
+func (r *RuleManager) ReorderRulesForClarity(ctx context.Context, listenerArn string, gapSize int32) ([]RulePriorityUpdate, error) {
+	return r.priorityManager.ReorderRulesForClarity(ctx, listenerArn, gapSize)
+}
+
+// FindPriorityForConditions suggests an appropriate priority for given conditions
+func (r *RuleManager) FindPriorityForConditions(ctx context.Context, listenerArn string, conditions []generated_elbv2.RuleCondition) (int32, error) {
+	return r.priorityManager.FindPriorityForConditions(ctx, listenerArn, conditions)
 }
