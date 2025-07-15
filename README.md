@@ -338,7 +338,6 @@ KECS supports multiple container runtimes:
 #### Containerd
 - k3s/k3d environments
 - Rancher Desktop (containerd mode)
-- Kind clusters
 - Standard Kubernetes nodes
 
 #### Auto-detection
@@ -413,7 +412,6 @@ KECS is a development tool that requires elevated permissions:
 | Tool | Purpose | Required Permissions |
 |------|---------|---------------------|
 | Docker Desktop | Container runtime | Root/Admin privileges |
-| kind | Local Kubernetes | Docker socket access |
 | k3d | Local k3s clusters | Docker socket access |
 | LocalStack | AWS service emulation | Network ports |
 | **KECS** | ECS emulation | Docker socket + Network ports |
