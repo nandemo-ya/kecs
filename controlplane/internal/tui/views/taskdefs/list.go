@@ -28,6 +28,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/components/search"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/keys"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/styles"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/common"
 )
 
 // Model represents the task definition list view model
@@ -215,7 +216,8 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.table.SetHeight(msg.Height - 10)
+		// Use SetSize method to handle size changes properly
+		m.SetSize(msg.Width, msg.Height)
 		return m, nil
 	}
 
@@ -239,13 +241,11 @@ func (m *Model) View() string {
 	}
 
 	if m.loading && len(m.taskDefs) == 0 {
-		return styles.Content.Render("Loading task definitions...")
+		return m.renderFullScreen("Loading task definitions...")
 	}
 
 	if m.err != nil {
-		return styles.Content.Render(
-			styles.Error.Render("Error: " + m.err.Error()),
-		)
+		return m.renderFullScreen(styles.Error.Render("Error: " + m.err.Error()))
 	}
 
 	if m.showDetails {
@@ -259,7 +259,34 @@ func (m *Model) View() string {
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
-	m.table.SetHeight(height - 10)
+	// Use common layout helper for consistent table height calculation
+	tableHeight := common.CalculateTableHeight(height, true, true)
+	m.table.SetHeight(tableHeight)
+	
+	// Update table columns based on available width
+	m.updateTableColumns()
+}
+
+// updateTableColumns updates table column widths based on available space
+func (m *Model) updateTableColumns() {
+	if m.width == 0 {
+		return // No width set yet
+	}
+	
+	// Calculate available width (account for borders and padding)
+	availableWidth := m.width - 4
+	
+	// Define minimum column widths and distribution weights
+	minWidths := []int{20, 5, 10, 12, 6, 6, 20} // Family, Rev, Status, Compatibility, CPU, Memory, Containers
+	distribution := []int{25, 5, 10, 15, 5, 5, 35} // Distribution weights for extra space
+	
+	// Use common layout helper for consistent column width distribution
+	widths := common.DistributeColumnWidths(availableWidth, minWidths, distribution)
+	
+	// Create table columns with calculated widths
+	titles := []string{"Family", "Rev", "Status", "Compatibility", "CPU", "Memory", "Containers"}
+	columns := common.CreateTableColumns(titles, widths)
+	m.table.SetColumns(columns)
 }
 
 // updateTable updates the table with current task definitions
@@ -301,7 +328,7 @@ func (m *Model) updateTable() {
 // renderDetails renders the task definition detail view
 func (m *Model) renderDetails() string {
 	if m.selectedARN == "" {
-		return styles.Content.Render("No task definition selected")
+		return m.renderFullScreen("No task definition selected")
 	}
 
 	// Find the selected task definition
@@ -314,7 +341,7 @@ func (m *Model) renderDetails() string {
 	}
 
 	if taskDef == nil {
-		return styles.Content.Render("Task definition not found")
+		return m.renderFullScreen("Task definition not found")
 	}
 
 	var content strings.Builder
@@ -428,7 +455,8 @@ func (m *Model) renderDetails() string {
 
 	content.WriteString(styles.Info.Render("Press ESC to go back"))
 
-	return styles.Content.Render(content.String())
+	// Use common layout helper for consistent detail view rendering
+	return common.RenderListView(m.width, m.height, content.String())
 }
 
 // fetchTaskDefs fetches the list of task definitions
@@ -561,5 +589,11 @@ func (m *Model) renderList() string {
 		content.WriteString(styles.Info.Render(fmt.Sprintf("Showing %d of %d task definitions", len(m.filtered), len(m.taskDefs))))
 	}
 
-	return styles.Content.Render(content.String())
+	// Use common layout helper for consistent list view rendering
+	return common.RenderListView(m.width, m.height, content.String())
+}
+
+// renderFullScreen renders content centered in the full available space
+func (m *Model) renderFullScreen(content string) string {
+	return common.RenderFullScreen(m.width, m.height, content)
 }

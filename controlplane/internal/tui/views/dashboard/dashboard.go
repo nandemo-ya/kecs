@@ -17,6 +17,7 @@ package dashboard
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -98,21 +99,39 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 // View implements tea.Model
 func (m *Model) View() string {
 	if m.loading && m.stats.LastUpdateTime.IsZero() {
-		return styles.Content.Render("Loading dashboard...")
+		return m.renderFullWidth("Loading dashboard...")
 	}
 
 	if m.err != nil {
-		return styles.Content.Render(
-			styles.Error.Render("Error: " + m.err.Error()),
-		)
+		return m.renderFullWidth(styles.Error.Render("Error: " + m.err.Error()))
 	}
 
-	// Create stat boxes
-	clusterBox := m.createStatBox("Clusters", m.stats.Clusters, styles.StatusRunning)
-	serviceBox := m.createStatBox("Services", m.stats.Services, styles.StatusRunning)
-	runningTaskBox := m.createStatBox("Running Tasks", m.stats.RunningTasks, styles.StatusRunning)
-	pendingTaskBox := m.createStatBox("Pending Tasks", m.stats.PendingTasks, styles.StatusPending)
-	taskDefBox := m.createStatBox("Task Definitions", m.stats.TaskDefs, styles.Info)
+	// Calculate box dimensions based on available space
+	// Leave some padding and account for borders
+	availableWidth := m.width - 4
+	availableHeight := m.height - 8 // Space for rows, padding, and update info
+	
+	// Calculate box width: divide by number of columns with some spacing
+	boxWidth := (availableWidth / 3) - 2
+	if boxWidth < 20 {
+		boxWidth = 20 // Minimum width
+	}
+	
+	// Calculate box height
+	boxHeight := (availableHeight / 2) - 1
+	if boxHeight < 6 {
+		boxHeight = 6 // Minimum height
+	}
+	if boxHeight > 10 {
+		boxHeight = 10 // Maximum height to keep it reasonable
+	}
+
+	// Create stat boxes with dynamic sizing
+	clusterBox := m.createStatBoxDynamic("Clusters", m.stats.Clusters, styles.StatusRunning, boxWidth, boxHeight)
+	serviceBox := m.createStatBoxDynamic("Services", m.stats.Services, styles.StatusRunning, boxWidth, boxHeight)
+	runningTaskBox := m.createStatBoxDynamic("Running Tasks", m.stats.RunningTasks, styles.StatusRunning, boxWidth, boxHeight)
+	pendingTaskBox := m.createStatBoxDynamic("Pending Tasks", m.stats.PendingTasks, styles.StatusPending, boxWidth, boxHeight)
+	taskDefBox := m.createStatBoxDynamic("Task Definitions", m.stats.TaskDefs, styles.Info, boxWidth, boxHeight)
 
 	// Arrange boxes in a grid
 	row1 := lipgloss.JoinHorizontal(
@@ -126,6 +145,7 @@ func (m *Model) View() string {
 		lipgloss.Top,
 		pendingTaskBox,
 		taskDefBox,
+		strings.Repeat(" ", boxWidth+2), // Add empty space to balance the row
 	)
 
 	// Add last update time
@@ -141,7 +161,14 @@ func (m *Model) View() string {
 		updateInfo,
 	)
 
-	return styles.Content.Render(content)
+	// Center the content in the available space
+	return lipgloss.Place(
+		m.width,
+		m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		content,
+	)
 }
 
 // SetSize sets the size of the dashboard
@@ -150,16 +177,25 @@ func (m *Model) SetSize(width, height int) {
 	m.height = height
 }
 
-// createStatBox creates a styled box for displaying a statistic
+// createStatBox creates a styled box for displaying a statistic (legacy method for compatibility)
 func (m *Model) createStatBox(title string, value int, valueStyle lipgloss.Style) string {
+	return m.createStatBoxDynamic(title, value, valueStyle, 25, 6)
+}
+
+// createStatBoxDynamic creates a styled box with dynamic dimensions
+func (m *Model) createStatBoxDynamic(title string, value int, valueStyle lipgloss.Style, width, height int) string {
 	box := styles.InactivePanel.
-		Width(25).
-		Height(6).
+		Width(width).
+		Height(height).
 		Padding(1).
 		Margin(0, 1, 1, 0)
 
 	titleStr := styles.ListTitle.Render(title)
 	valueStr := valueStyle.Render(fmt.Sprintf("%d", value))
+
+	// Calculate inner dimensions
+	innerWidth := width - 2  // Account for borders
+	innerHeight := height - 2 // Account for borders
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Center,
@@ -168,7 +204,18 @@ func (m *Model) createStatBox(title string, value int, valueStyle lipgloss.Style
 		valueStr,
 	)
 
-	return box.Render(lipgloss.Place(23, 4, lipgloss.Center, lipgloss.Center, content))
+	return box.Render(lipgloss.Place(innerWidth, innerHeight, lipgloss.Center, lipgloss.Center, content))
+}
+
+// renderFullWidth renders content centered in the full available space
+func (m *Model) renderFullWidth(content string) string {
+	return lipgloss.Place(
+		m.width,
+		m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		styles.Content.Render(content),
+	)
 }
 
 // fetchStats fetches the latest statistics

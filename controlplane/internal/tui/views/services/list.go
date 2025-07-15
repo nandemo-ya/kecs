@@ -28,6 +28,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/components/search"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/keys"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/styles"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/common"
 )
 
 // Model represents the service list view model
@@ -261,7 +262,8 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.table.SetHeight(msg.Height - 10)
+		// Use SetSize method to handle size changes properly
+		m.SetSize(msg.Width, msg.Height)
 		return m, nil
 	}
 
@@ -289,13 +291,11 @@ func (m *Model) View() string {
 	}
 
 	if m.loading && len(m.services) == 0 {
-		return styles.Content.Render("Loading services...")
+		return m.renderFullScreen("Loading services...")
 	}
 
 	if m.err != nil {
-		return styles.Content.Render(
-			styles.Error.Render("Error: " + m.err.Error()),
-		)
+		return m.renderFullScreen(styles.Error.Render("Error: " + m.err.Error()))
 	}
 
 	if m.showDetails {
@@ -309,7 +309,34 @@ func (m *Model) View() string {
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
-	m.table.SetHeight(height - 10)
+	// Use common layout helper for consistent table height calculation
+	tableHeight := common.CalculateTableHeight(height, true, true)
+	m.table.SetHeight(tableHeight)
+	
+	// Update table columns based on available width
+	m.updateTableColumns()
+}
+
+// updateTableColumns updates table column widths based on available space
+func (m *Model) updateTableColumns() {
+	if m.width == 0 {
+		return // No width set yet
+	}
+	
+	// Calculate available width (account for borders and padding)
+	availableWidth := m.width - 4
+	
+	// Define minimum column widths and distribution weights
+	minWidths := []int{20, 10, 8, 8, 8, 20, 15} // Name, Status, Desired, Running, Pending, TaskDef, Cluster
+	distribution := []int{25, 10, 5, 5, 5, 30, 20} // Distribution weights for extra space
+	
+	// Use common layout helper for consistent column width distribution
+	widths := common.DistributeColumnWidths(availableWidth, minWidths, distribution)
+	
+	// Create table columns with calculated widths
+	titles := []string{"Name", "Status", "Desired", "Running", "Pending", "Task Definition", "Cluster"}
+	columns := common.CreateTableColumns(titles, widths)
+	m.table.SetColumns(columns)
 }
 
 // updateTable updates the table with current services
@@ -336,7 +363,7 @@ func (m *Model) updateTable() {
 // renderDetails renders the service detail view
 func (m *Model) renderDetails() string {
 	if m.selectedARN == "" {
-		return styles.Content.Render("No service selected")
+		return m.renderFullScreen("No service selected")
 	}
 
 	// Find the selected service in the full services list
@@ -349,7 +376,7 @@ func (m *Model) renderDetails() string {
 	}
 
 	if service == nil {
-		return styles.Content.Render("Service not found")
+		return m.renderFullScreen("Service not found")
 	}
 
 	var content strings.Builder
@@ -409,7 +436,8 @@ func (m *Model) renderDetails() string {
 
 	content.WriteString(styles.Info.Render("Press ESC to go back"))
 
-	return styles.Content.Render(content.String())
+	// Use common layout helper for consistent detail view rendering
+	return common.RenderListView(m.width, m.height, content.String())
 }
 
 // fetchClusters fetches the list of clusters
@@ -609,5 +637,11 @@ func (m *Model) renderList() string {
 		content.WriteString(styles.Info.Render(fmt.Sprintf("Showing %d of %d services", len(m.filtered), len(m.services))))
 	}
 
-	return styles.Content.Render(content.String())
+	// Use common layout helper for consistent list view rendering
+	return common.RenderListView(m.width, m.height, content.String())
+}
+
+// renderFullScreen renders content centered in the full available space
+func (m *Model) renderFullScreen(content string) string {
+	return common.RenderFullScreen(m.width, m.height, content)
 }
