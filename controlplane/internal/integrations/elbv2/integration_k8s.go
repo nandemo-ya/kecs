@@ -1026,20 +1026,20 @@ func (i *k8sIntegration) updateIngressRoute(ctx context.Context, lbName, listene
 
 // SyncRulesToListener synchronizes ELBv2 rules to Traefik IngressRoute
 func (i *k8sIntegration) SyncRulesToListener(ctx context.Context, storageInstance interface{}, listenerArn string, lbName string, port int32) error {
+	// Cast storage to the correct type
+	storageImpl, ok := storageInstance.(storage.Storage)
+	if !ok {
+		return fmt.Errorf("invalid storage type")
+	}
+	
 	// Initialize rule manager if not already done
 	if i.ruleManager == nil && i.dynamicClient != nil {
-		i.ruleManager = NewRuleManager(i.dynamicClient)
+		i.ruleManager = NewRuleManager(i.dynamicClient, storageImpl.ELBv2Store())
 	}
 	
 	if i.ruleManager == nil {
 		klog.V(2).Infof("No rule manager available, skipping rule sync")
 		return nil
-	}
-	
-	// Cast storage to the correct type
-	storageImpl, ok := storageInstance.(storage.Storage)
-	if !ok {
-		return fmt.Errorf("invalid storage type")
 	}
 	
 	// Sync rules using the rule manager
