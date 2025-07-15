@@ -19,6 +19,7 @@ type RuleManager struct {
 	converter        *RuleConverter
 	weightedManager  *WeightedRoutingManager
 	priorityManager  *PriorityManager
+	conditionalManager *ConditionalRoutingManager
 }
 
 // NewRuleManager creates a new rule manager
@@ -28,6 +29,7 @@ func NewRuleManager(dynamicClient dynamic.Interface, store storage.ELBv2Store) *
 		converter:        NewRuleConverter(),
 		weightedManager:  NewWeightedRoutingManager(),
 		priorityManager:  NewPriorityManager(store),
+		conditionalManager: NewConditionalRoutingManager(store),
 	}
 }
 
@@ -324,4 +326,29 @@ func (r *RuleManager) ReorderRulesForClarity(ctx context.Context, listenerArn st
 // FindPriorityForConditions suggests an appropriate priority for given conditions
 func (r *RuleManager) FindPriorityForConditions(ctx context.Context, listenerArn string, conditions []generated_elbv2.RuleCondition) (int32, error) {
 	return r.priorityManager.FindPriorityForConditions(ctx, listenerArn, conditions)
+}
+
+// CreateConditionalRoute creates a rule with complex conditional logic
+func (r *RuleManager) CreateConditionalRoute(ctx context.Context, listenerArn string, route ConditionalRoute) (*storage.ELBv2Rule, error) {
+	return r.conditionalManager.CreateConditionalRoute(ctx, listenerArn, route)
+}
+
+// CreateIfThenElseRoutes creates a set of if-then-else routing rules
+func (r *RuleManager) CreateIfThenElseRoutes(ctx context.Context, listenerArn string, routes []ConditionalRoute) ([]*storage.ELBv2Rule, error) {
+	return r.conditionalManager.CreateIfThenElseRoutes(ctx, listenerArn, routes)
+}
+
+// CreateCanaryRoute creates a canary deployment route with conditions
+func (r *RuleManager) CreateCanaryRoute(ctx context.Context, listenerArn string, config CanaryConfig) (*storage.ELBv2Rule, error) {
+	return r.conditionalManager.CreateCanaryRoute(ctx, listenerArn, config)
+}
+
+// CreateMultiStageRoute creates a multi-stage feature rollout
+func (r *RuleManager) CreateMultiStageRoute(ctx context.Context, listenerArn string, stages []StageConfig) ([]*storage.ELBv2Rule, error) {
+	return r.conditionalManager.CreateMultiStageRoute(ctx, listenerArn, stages)
+}
+
+// AnalyzeConditionalRoutes analyzes the effectiveness of conditional routes
+func (r *RuleManager) AnalyzeConditionalRoutes(ctx context.Context, listenerArn string) (*ConditionalRoutingAnalysis, error) {
+	return r.conditionalManager.AnalyzeConditionalRoutes(ctx, listenerArn)
 }
