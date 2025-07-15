@@ -249,7 +249,11 @@ func (m *mockELBv2Store) GetTargets(ctx context.Context, targetGroupArn string) 
 }
 
 func (m *mockELBv2Store) ListTargets(ctx context.Context, targetGroupArn string) ([]*storage.ELBv2Target, error) {
-	return m.GetTargets(ctx, targetGroupArn)
+	args := m.Called(ctx, targetGroupArn)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*storage.ELBv2Target), args.Error(1)
 }
 
 func (m *mockELBv2Store) SaveTargetHealth(ctx context.Context, targetGroupArn string, targetId string, health *storage.ELBv2TargetHealth) error {
@@ -761,6 +765,140 @@ var _ = Describe("ELBv2APIImpl", func() {
 				Expect(err.Error()).To(ContainSubstring("target group not found"))
 				Expect(output).To(BeNil())
 				
+				mockStore.AssertExpectations(GinkgoT())
+			})
+		})
+	})
+
+	Describe("MatchesHealthCheckResponse", func() {
+		It("should match single status code", func() {
+			Expect(MatchesHealthCheckResponse(200, "200")).To(BeTrue())
+			Expect(MatchesHealthCheckResponse(201, "200")).To(BeFalse())
+		})
+
+		It("should match status code range", func() {
+			Expect(MatchesHealthCheckResponse(200, "200-299")).To(BeTrue())
+			Expect(MatchesHealthCheckResponse(250, "200-299")).To(BeTrue())
+			Expect(MatchesHealthCheckResponse(299, "200-299")).To(BeTrue())
+			Expect(MatchesHealthCheckResponse(300, "200-299")).To(BeFalse())
+			Expect(MatchesHealthCheckResponse(199, "200-299")).To(BeFalse())
+		})
+
+		It("should match comma-separated status codes", func() {
+			Expect(MatchesHealthCheckResponse(200, "200,202,301")).To(BeTrue())
+			Expect(MatchesHealthCheckResponse(202, "200,202,301")).To(BeTrue())
+			Expect(MatchesHealthCheckResponse(301, "200,202,301")).To(BeTrue())
+			Expect(MatchesHealthCheckResponse(201, "200,202,301")).To(BeFalse())
+			Expect(MatchesHealthCheckResponse(404, "200,202,301")).To(BeFalse())
+		})
+
+		It("should handle whitespace in matchers", func() {
+			Expect(MatchesHealthCheckResponse(200, " 200 ")).To(BeTrue())
+			Expect(MatchesHealthCheckResponse(250, " 200 - 299 ")).To(BeTrue())
+			Expect(MatchesHealthCheckResponse(202, " 200 , 202 , 301 ")).To(BeTrue())
+		})
+
+		It("should handle invalid matchers", func() {
+			Expect(MatchesHealthCheckResponse(200, "abc")).To(BeFalse())
+			Expect(MatchesHealthCheckResponse(200, "")).To(BeFalse())
+			Expect(MatchesHealthCheckResponse(200, "200-")).To(BeFalse())
+			Expect(MatchesHealthCheckResponse(200, "-299")).To(BeFalse())
+		})
+	})
+
+	Describe("DescribeTargetHealth with proper health check configuration", func() {
+		Context("when describing target health", func() {
+			It("should use target group health check configuration", func() {
+				targetGroupArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/test-tg/123456"
+				targetGroup := &storage.ELBv2TargetGroup{
+					ARN:                        targetGroupArn,
+					Name:                       "test-tg",
+					Protocol:                   "HTTP",
+					Port:                       80,
+					HealthCheckEnabled:         true,
+					HealthCheckProtocol:        "HTTP",
+					HealthCheckPath:            "/healthz",
+					HealthCheckPort:            "8080",
+					HealthCheckIntervalSeconds: 30,
+					HealthCheckTimeoutSeconds:  5,
+					HealthyThresholdCount:      3,
+					UnhealthyThresholdCount:    2,
+					Matcher:                    "200-299",
+				}
+
+				targets := []*storage.ELBv2Target{
+					{
+						TargetGroupArn: targetGroupArn,
+						ID:             "10.0.1.10",
+						Port:           80,
+					},
+				}
+
+				// Mock get target group
+				mockStore.On("GetTargetGroup", ctx, targetGroupArn).Return(targetGroup, nil).Once()
+
+				// Mock list targets
+				mockStore.On("ListTargets", ctx, targetGroupArn).Return(targets, nil).Once()
+
+				// Mock update target health
+				mockStore.On("UpdateTargetHealth", ctx, targetGroupArn, "10.0.1.10", mock.MatchedBy(func(h *storage.ELBv2TargetHealth) bool {
+					// The health state will depend on the actual health check result
+					return h.State != "" && h.Reason != "" && h.Description != ""
+				})).Return(nil).Once()
+
+				input := &generated_elbv2.DescribeTargetHealthInput{
+					TargetGroupArn: targetGroupArn,
+				}
+
+				output, err := api.DescribeTargetHealth(ctx, input)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).NotTo(BeNil())
+				Expect(output.TargetHealthDescriptions).To(HaveLen(1))
+				Expect(output.TargetHealthDescriptions[0].Target.Id).To(Equal("10.0.1.10"))
+
+				mockStore.AssertExpectations(GinkgoT())
+			})
+
+			It("should handle disabled health checks", func() {
+				targetGroupArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/test-tg/123456"
+				targetGroup := &storage.ELBv2TargetGroup{
+					ARN:                targetGroupArn,
+					Name:               "test-tg",
+					Protocol:           "HTTP",
+					Port:               80,
+					HealthCheckEnabled: false, // Health check disabled
+				}
+
+				targets := []*storage.ELBv2Target{
+					{
+						TargetGroupArn: targetGroupArn,
+						ID:             "10.0.1.10",
+						Port:           80,
+					},
+				}
+
+				// Mock get target group
+				mockStore.On("GetTargetGroup", ctx, targetGroupArn).Return(targetGroup, nil).Once()
+
+				// Mock list targets
+				mockStore.On("ListTargets", ctx, targetGroupArn).Return(targets, nil).Once()
+
+				// Mock update target health - should be healthy when health check is disabled
+				mockStore.On("UpdateTargetHealth", ctx, targetGroupArn, "10.0.1.10", mock.MatchedBy(func(h *storage.ELBv2TargetHealth) bool {
+					return h.State == "healthy"
+				})).Return(nil).Once()
+
+				input := &generated_elbv2.DescribeTargetHealthInput{
+					TargetGroupArn: targetGroupArn,
+				}
+
+				output, err := api.DescribeTargetHealth(ctx, input)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output).NotTo(BeNil())
+				Expect(output.TargetHealthDescriptions).To(HaveLen(1))
+
 				mockStore.AssertExpectations(GinkgoT())
 			})
 		})

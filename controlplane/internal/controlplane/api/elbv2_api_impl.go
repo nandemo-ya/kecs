@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -463,6 +466,12 @@ func (api *ELBv2APIImpl) DescribeTargetHealth(ctx context.Context, input *genera
 		return nil, fmt.Errorf("TargetGroupArn is required")
 	}
 
+	// Get target group for health check configuration
+	targetGroup, err := api.storage.ELBv2Store().GetTargetGroup(ctx, input.TargetGroupArn)
+	if err != nil {
+		return nil, err
+	}
+
 	targets, err := api.storage.ELBv2Store().ListTargets(ctx, input.TargetGroupArn)
 	if err != nil {
 		return nil, err
@@ -471,7 +480,7 @@ func (api *ELBv2APIImpl) DescribeTargetHealth(ctx context.Context, input *genera
 	var targetHealthDescriptions []generated_elbv2.TargetHealthDescription
 	for _, target := range targets {
 		// Perform health check and update target health
-		healthState := api.performHealthCheck(ctx, target)
+		healthState := api.performHealthCheck(ctx, target, targetGroup)
 		
 		// Update target health in storage
 		targetHealth := &storage.ELBv2TargetHealth{
@@ -1006,29 +1015,122 @@ func convertToLoadBalancer(lb *storage.ELBv2LoadBalancer) generated_elbv2.LoadBa
 }
 
 // performHealthCheck performs a health check on a target
-func (api *ELBv2APIImpl) performHealthCheck(ctx context.Context, target *storage.ELBv2Target) string {
-	// TODO: Get target group configuration for health check settings
-	
-	// For now, perform a simple HTTP health check
-	// In production, this should be configurable (HTTP, HTTPS, TCP, etc.)
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-	
-	// Construct health check URL
-	url := fmt.Sprintf("http://%s:%d/health", target.ID, target.Port)
-	
-	resp, err := client.Get(url)
-	if err != nil {
-		return TargetHealthStateUnhealthy
-	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+func (api *ELBv2APIImpl) performHealthCheck(ctx context.Context, target *storage.ELBv2Target, targetGroup *storage.ELBv2TargetGroup) string {
+	// Use target group configuration for health check settings
+	if targetGroup == nil || !targetGroup.HealthCheckEnabled {
+		// If health check is disabled or target group is nil, consider target healthy
 		return TargetHealthStateHealthy
 	}
 	
+	// Set timeout based on health check timeout
+	timeout := time.Duration(targetGroup.HealthCheckTimeoutSeconds) * time.Second
+	if timeout == 0 {
+		timeout = 5 * time.Second // Default timeout
+	}
+	
+	client := &http.Client{
+		Timeout: timeout,
+	}
+	
+	// Determine health check port
+	healthCheckPort := target.Port
+	if targetGroup.HealthCheckPort != "" && targetGroup.HealthCheckPort != "traffic-port" {
+		// Parse the health check port if it's not "traffic-port"
+		fmt.Sscanf(targetGroup.HealthCheckPort, "%d", &healthCheckPort)
+	}
+	
+	// Construct health check URL based on protocol
+	var url string
+	protocol := targetGroup.HealthCheckProtocol
+	if protocol == "" {
+		protocol = targetGroup.Protocol // Use target group protocol if health check protocol not specified
+	}
+	
+	path := targetGroup.HealthCheckPath
+	if path == "" {
+		path = "/" // Default path
+	}
+	
+	switch protocol {
+	case "HTTP":
+		url = fmt.Sprintf("http://%s:%d%s", target.ID, healthCheckPort, path)
+	case "HTTPS":
+		url = fmt.Sprintf("https://%s:%d%s", target.ID, healthCheckPort, path)
+	case "TCP", "TLS", "UDP", "TCP_UDP":
+		// For TCP-based health checks, we'll do a simple connection check
+		// This is a simplified implementation
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", target.ID, healthCheckPort), timeout)
+		if err != nil {
+			return TargetHealthStateUnhealthy
+		}
+		conn.Close()
+		return TargetHealthStateHealthy
+	default:
+		// Default to HTTP
+		url = fmt.Sprintf("http://%s:%d%s", target.ID, healthCheckPort, path)
+	}
+	
+	// For HTTP/HTTPS health checks
+	if protocol == "HTTP" || protocol == "HTTPS" {
+		resp, err := client.Get(url)
+		if err != nil {
+			return TargetHealthStateUnhealthy
+		}
+		defer resp.Body.Close()
+		
+		// Check if response matches expected status codes
+		if targetGroup.Matcher != "" {
+			// Parse matcher (e.g., "200", "200-299", "200,202,301")
+			if MatchesHealthCheckResponse(resp.StatusCode, targetGroup.Matcher) {
+				return TargetHealthStateHealthy
+			}
+		} else {
+			// Default: 200-299 is healthy
+			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				return TargetHealthStateHealthy
+			}
+		}
+	}
+	
 	return TargetHealthStateUnhealthy
+}
+
+// MatchesHealthCheckResponse checks if the status code matches the expected matcher pattern
+func MatchesHealthCheckResponse(statusCode int, matcher string) bool {
+	// Remove any whitespace
+	matcher = strings.TrimSpace(matcher)
+	
+	// Handle comma-separated values (e.g., "200,202,301")
+	if strings.Contains(matcher, ",") {
+		codes := strings.Split(matcher, ",")
+		for _, code := range codes {
+			code = strings.TrimSpace(code)
+			if expected, err := strconv.Atoi(code); err == nil && statusCode == expected {
+				return true
+			}
+		}
+		return false
+	}
+	
+	// Handle range (e.g., "200-299")
+	if strings.Contains(matcher, "-") {
+		parts := strings.Split(matcher, "-")
+		if len(parts) == 2 {
+			min, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+			max, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+			if err1 == nil && err2 == nil {
+				return statusCode >= min && statusCode <= max
+			}
+		}
+		return false
+	}
+	
+	// Handle single value (e.g., "200")
+	if expected, err := strconv.Atoi(matcher); err == nil {
+		return statusCode == expected
+	}
+	
+	return false
 }
 
 // getHealthReason returns the reason for the health state
