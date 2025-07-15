@@ -809,6 +809,29 @@ func (api *ELBv2APIImpl) CreateRule(ctx context.Context, input *generated_elbv2.
 		return nil, fmt.Errorf("failed to create rule: %w", err)
 	}
 
+	// Sync rule to Kubernetes IngressRoute if integration is available
+	if api.elbv2Integration != nil {
+		// Check if the integration supports rule syncing
+		if ruleSyncable, ok := api.elbv2Integration.(elbv2.RuleSyncable); ok {
+			// Get listener details to find load balancer name and port
+			listener, _ := api.storage.ELBv2Store().GetListener(ctx, rule.ListenerArn)
+			if listener != nil {
+				// Extract load balancer name from listener's load balancer ARN
+				lbName := "unknown"
+				if parts := strings.Split(listener.LoadBalancerArn, "/"); len(parts) >= 3 {
+					lbName = parts[2]
+				}
+				// TODO: Get actual port from listener - for now use port 80
+				port := int32(80)
+				
+				// Sync rules to IngressRoute
+				if err := ruleSyncable.SyncRulesToListener(ctx, api.storage, rule.ListenerArn, lbName, port); err != nil {
+					klog.V(2).Infof("Failed to sync rules to IngressRoute: %v", err)
+				}
+			}
+		}
+	}
+
 	// Return created rule
 	output := &generated_elbv2.CreateRuleOutput{
 		Rules: []generated_elbv2.Rule{
@@ -848,9 +871,35 @@ func (api *ELBv2APIImpl) DeleteRule(ctx context.Context, input *generated_elbv2.
 		return nil, fmt.Errorf("cannot delete default rule")
 	}
 
+	// Get listener ARN before deleting the rule
+	listenerArn := rule.ListenerArn
+	
 	// Delete rule from storage
 	if err := api.storage.ELBv2Store().DeleteRule(ctx, input.RuleArn); err != nil {
 		return nil, fmt.Errorf("failed to delete rule: %w", err)
+	}
+
+	// Sync rules to Kubernetes IngressRoute if integration is available
+	if api.elbv2Integration != nil {
+		// Check if the integration supports rule syncing
+		if ruleSyncable, ok := api.elbv2Integration.(elbv2.RuleSyncable); ok {
+			// Get listener details to find load balancer name and port
+			listener, _ := api.storage.ELBv2Store().GetListener(ctx, listenerArn)
+			if listener != nil {
+				// Extract load balancer name from listener's load balancer ARN
+				lbName := "unknown"
+				if parts := strings.Split(listener.LoadBalancerArn, "/"); len(parts) >= 3 {
+					lbName = parts[2]
+				}
+				// TODO: Get actual port from listener - for now use port 80
+				port := int32(80)
+				
+				// Sync rules to IngressRoute
+				if err := ruleSyncable.SyncRulesToListener(ctx, api.storage, listenerArn, lbName, port); err != nil {
+					klog.V(2).Infof("Failed to sync rules to IngressRoute after delete: %v", err)
+				}
+			}
+		}
 	}
 
 	return &generated_elbv2.DeleteRuleOutput{}, nil
