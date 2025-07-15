@@ -845,6 +845,9 @@ var _ = Describe("ELBv2APIImpl", func() {
 				// Mock list targets
 				mockStore.On("ListTargets", ctx, targetGroupArn).Return(targets, nil).Once()
 
+				// Mock Kubernetes health check
+				mockIntegration.On("CheckTargetHealthWithK8s", ctx, "10.0.1.10", int32(8080), targetGroupArn).Return("healthy", nil).Once()
+
 				// Mock update target health
 				mockStore.On("UpdateTargetHealth", ctx, targetGroupArn, "10.0.1.10", mock.MatchedBy(func(h *storage.ELBv2TargetHealth) bool {
 					// The health state will depend on the actual health check result
@@ -888,6 +891,8 @@ var _ = Describe("ELBv2APIImpl", func() {
 
 				// Mock list targets
 				mockStore.On("ListTargets", ctx, targetGroupArn).Return(targets, nil).Once()
+
+				// No need to mock CheckTargetHealthWithK8s since health check is disabled
 
 				// Mock update target health - should be healthy when health check is disabled
 				mockStore.On("UpdateTargetHealth", ctx, targetGroupArn, "10.0.1.10", mock.MatchedBy(func(h *storage.ELBv2TargetHealth) bool {
