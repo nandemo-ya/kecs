@@ -74,9 +74,37 @@ KECS (Kubernetes-based ECS Compatible Service) is a standalone service that prov
 
 ## Quick Start
 
-### Running KECS in a Container
+### Running KECS (New Architecture v2)
 
-The easiest way to run KECS is using the container-based execution:
+The new architecture runs KECS control plane inside a k3d cluster, providing better integration and a unified AWS API endpoint:
+
+```bash
+# Start KECS with new architecture
+kecs start-v2
+
+# This creates a k3d cluster with:
+# - KECS control plane (ECS/ELBv2 APIs)
+# - LocalStack (other AWS services)
+# - Traefik gateway (unified routing)
+
+# Check status
+kecs cluster info
+
+# Stop KECS
+kecs stop-v2
+```
+
+All AWS APIs are accessible through port 4566:
+```bash
+export AWS_ENDPOINT_URL=http://localhost:4566
+aws ecs list-clusters         # → KECS
+aws elbv2 describe-load-balancers  # → KECS  
+aws s3 ls                     # → LocalStack
+```
+
+### Running KECS in a Container (Legacy)
+
+For the traditional container-based execution:
 
 ```bash
 # Start KECS in a container
