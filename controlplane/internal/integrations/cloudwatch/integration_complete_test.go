@@ -143,7 +143,7 @@ var _ = Describe("CloudWatch Integration Complete", func() {
 			// Verify specific settings
 			Expect(config).To(ContainSubstring("region              us-west-2"))
 			Expect(config).To(ContainSubstring("log_group_name      /ecs/my-service"))
-			Expect(config).To(ContainSubstring("endpoint            http://localstack.aws-services.svc.cluster.local:4566"))
+			Expect(config).To(ContainSubstring("endpoint            http://localstack.kecs-system.svc.cluster.local:4566"))
 		})
 	})
 })

@@ -58,7 +58,7 @@ Output includes version information:
 LocalStack Status:
   Running: true
   Healthy: true
-  Endpoint: http://localstack.aws-services.svc.cluster.local:4566
+  Endpoint: http://localstack.kecs-system.svc.cluster.local:4566
   Version: 4.5
 ```
 

@@ -23,7 +23,7 @@ func main() {
 	// Parse command line flags
 	var (
 		port               = flag.Int("port", 4566, "Port to listen on")
-		localStackEndpoint = flag.String("localstack-endpoint", getEnvOrDefault("LOCALSTACK_ENDPOINT", "http://localstack.aws-services.svc.cluster.local:4566"), "LocalStack endpoint URL")
+		localStackEndpoint = flag.String("localstack-endpoint", getEnvOrDefault("LOCALSTACK_ENDPOINT", "http://localstack.kecs-system.svc.cluster.local:4566"), "LocalStack endpoint URL")
 		debug              = flag.Bool("debug", getEnvOrDefaultBool("DEBUG", false), "Enable debug logging")
 		version            = flag.Bool("version", false, "Show version information")
 	)

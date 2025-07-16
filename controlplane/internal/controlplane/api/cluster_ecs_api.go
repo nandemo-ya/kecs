@@ -979,7 +979,7 @@ func (api *DefaultECSAPI) updateLocalStackState(cluster *storage.Cluster, status
 		Deployed: true,
 		Status:   status,
 		DeployedAt: &now,
-		Namespace: "aws-services",
+		Namespace: "kecs-system",
 	}
 	
 	// Add error message if status is failed

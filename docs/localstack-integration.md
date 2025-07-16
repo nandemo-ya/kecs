@@ -31,7 +31,7 @@ localstack:
     - elbv2
   persistence: true
   image: "localstack/localstack:latest"
-  namespace: "aws-services"
+  namespace: "kecs-system"
   port: 4566
   edgePort: 4566
   resources:
@@ -90,7 +90,7 @@ Configure how ECS tasks connect to LocalStack:
 # AWS Proxy configuration  
 proxy:
   mode: "environment"  # Options: environment, sidecar, disabled
-  localstackEndpoint: "http://localstack.aws-services.svc.cluster.local:4566"
+  localstackEndpoint: "http://localstack.kecs-system.svc.cluster.local:4566"
   fallbackEnabled: true
   fallbackOrder:
     - sidecar
@@ -135,7 +135,7 @@ kecs localstack status
 LocalStack Status:
   Running: true
   Healthy: true
-  Endpoint: http://localstack.aws-services.svc.cluster.local:4566
+  Endpoint: http://localstack.kecs-system.svc.cluster.local:4566
   Uptime: 2h30m
 
 Enabled Services:
@@ -147,11 +147,11 @@ Enabled Services:
 
 Service Health:
   SERVICE         HEALTHY  ENDPOINT
-  iam             true     http://localstack.aws-services.svc.cluster.local:4566
-  logs            true     http://localstack.aws-services.svc.cluster.local:4566
-  ssm             true     http://localstack.aws-services.svc.cluster.local:4566
-  secretsmanager  true     http://localstack.aws-services.svc.cluster.local:4566
-  elbv2           true     http://localstack.aws-services.svc.cluster.local:4566
+  iam             true     http://localstack.kecs-system.svc.cluster.local:4566
+  logs            true     http://localstack.kecs-system.svc.cluster.local:4566
+  ssm             true     http://localstack.kecs-system.svc.cluster.local:4566
+  secretsmanager  true     http://localstack.kecs-system.svc.cluster.local:4566
+  elbv2           true     http://localstack.kecs-system.svc.cluster.local:4566
 ```
 
 ## Proxy Modes
@@ -242,8 +242,8 @@ If you need to deploy LocalStack manually:
 kubectl apply -f deployments/kubernetes/localstack/
 
 # Check deployment
-kubectl -n aws-services get pods
-kubectl -n aws-services get svc
+kubectl -n kecs-system get pods
+kubectl -n kecs-system get svc
 ```
 
 ## Troubleshooting
@@ -252,31 +252,31 @@ kubectl -n aws-services get svc
 
 1. Check pod status:
    ```bash
-   kubectl -n aws-services describe pod -l app=localstack
+   kubectl -n kecs-system describe pod -l app=localstack
    ```
 
 2. Check logs:
    ```bash
-   kubectl -n aws-services logs -l app=localstack
+   kubectl -n kecs-system logs -l app=localstack
    ```
 
 3. Verify resources:
    ```bash
-   kubectl -n aws-services get pvc
-   kubectl -n aws-services get events
+   kubectl -n kecs-system get pvc
+   kubectl -n kecs-system get events
    ```
 
 ### Connection Issues
 
 1. Verify service endpoint:
    ```bash
-   kubectl -n aws-services get svc localstack
+   kubectl -n kecs-system get svc localstack
    ```
 
 2. Test connectivity from a pod:
    ```bash
    kubectl run test --rm -it --image=curlimages/curl -- \
-     curl http://localstack.aws-services.svc.cluster.local:4566/_localstack/health
+     curl http://localstack.kecs-system.svc.cluster.local:4566/_localstack/health
    ```
 
 3. Check proxy configuration:

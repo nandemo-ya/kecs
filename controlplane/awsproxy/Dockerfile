@@ -31,7 +31,7 @@ FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=builder /aws-proxy /aws-proxy
 
 # Set default environment variables
-ENV LOCALSTACK_ENDPOINT=http://localstack.aws-services.svc.cluster.local:4566
+ENV LOCALSTACK_ENDPOINT=http://localstack.kecs-system.svc.cluster.local:4566
 ENV DEBUG=false
 
 # Expose port

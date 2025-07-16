@@ -105,7 +105,7 @@ data:
         localstack:
           loadBalancer:
             servers:
-              - address: "localstack.aws-services.svc.cluster.local:4566"
+              - address: "localstack.kecs-system.svc.cluster.local:4566"
 ---
 apiVersion: apps/v1
 kind: Deployment

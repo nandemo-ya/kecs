@@ -92,7 +92,7 @@ localstack:
   persistence: false
   image: "localstack/localstack"
   version: "latest"
-  namespace: "aws-services"
+  namespace: "kecs-system"
   port: 4566
   edgePort: 4566
   resources:
@@ -113,5 +113,5 @@ localstack:
 # AWS Proxy configuration  
 proxy:
   mode: "disabled"  # Disable proxy in tests
-  localstackEndpoint: "http://localstack.aws-services.svc.cluster.local:4566"
+  localstackEndpoint: "http://localstack.kecs-system.svc.cluster.local:4566"
   fallbackEnabled: false

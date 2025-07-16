@@ -40,9 +40,9 @@ func TestClusterStore_LocalStackState(t *testing.T) {
 			Deployed:    true,
 			Status:      "running",
 			Version:     "2.3.0",
-			Namespace:   "aws-services",
+			Namespace:   "kecs-system",
 			PodName:     "localstack-0",
-			Endpoint:    "http://localstack.aws-services.svc.cluster.local:4566",
+			Endpoint:    "http://localstack.kecs-system.svc.cluster.local:4566",
 			DeployedAt:  &now,
 			HealthStatus: "healthy",
 		}
@@ -83,9 +83,9 @@ func TestClusterStore_LocalStackState(t *testing.T) {
 		assert.True(t, retrievedState.Deployed)
 		assert.Equal(t, "running", retrievedState.Status)
 		assert.Equal(t, "2.3.0", retrievedState.Version)
-		assert.Equal(t, "aws-services", retrievedState.Namespace)
+		assert.Equal(t, "kecs-system", retrievedState.Namespace)
 		assert.Equal(t, "localstack-0", retrievedState.PodName)
-		assert.Equal(t, "http://localstack.aws-services.svc.cluster.local:4566", retrievedState.Endpoint)
+		assert.Equal(t, "http://localstack.kecs-system.svc.cluster.local:4566", retrievedState.Endpoint)
 		assert.Equal(t, "healthy", retrievedState.HealthStatus)
 	})
 
@@ -184,9 +184,9 @@ func TestLocalStackState_Serialization(t *testing.T) {
 			Deployed:         true,
 			Status:          "running",
 			Version:         "2.3.0",
-			Namespace:       "aws-services",
+			Namespace:       "kecs-system",
 			PodName:         "localstack-0",
-			Endpoint:        "http://localstack.aws-services.svc.cluster.local:4566",
+			Endpoint:        "http://localstack.kecs-system.svc.cluster.local:4566",
 			DeployedAt:      &now,
 			LastHealthCheck: &lastCheck,
 			HealthStatus:    "healthy",

@@ -160,7 +160,7 @@ type ProxyConfig struct {
 
 // Constants for LocalStack
 const (
-	DefaultNamespace     = "aws-services"
+	DefaultNamespace     = "kecs-system"
 	DefaultImage         = "localstack/localstack"
 	DefaultVersion       = "latest"
 	DefaultPort          = 4566

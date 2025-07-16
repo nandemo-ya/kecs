@@ -133,7 +133,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: localstack
-  namespace: aws-services
+  namespace: kecs-system
 spec:
   replicas: 1
   selector:
