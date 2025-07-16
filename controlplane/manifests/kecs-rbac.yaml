@@ -31,6 +31,10 @@ rules:
 - apiGroups: [""]
   resources: ["configmaps", "secrets"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# PersistentVolumeClaim management for LocalStack and other services
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 # Deployment management for future use
 - apiGroups: ["apps"]
   resources: ["deployments", "replicasets"]

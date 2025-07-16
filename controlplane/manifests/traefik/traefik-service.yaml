@@ -18,6 +18,7 @@ spec:
   - name: aws
     port: 4566
     targetPort: aws
+    nodePort: 30890
     protocol: TCP
 ---
 apiVersion: v1
