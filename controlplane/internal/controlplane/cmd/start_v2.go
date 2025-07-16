@@ -142,7 +142,7 @@ func createK3dCluster(ctx context.Context, clusterName string, cfg *config.Confi
 	clusterConfig := &kubernetes.ClusterManagerConfig{
 		Provider:      "k3d",
 		ContainerMode: false,
-		EnableTraefik: false, // We'll deploy our own Traefik
+		EnableTraefik: true, // Enable Traefik for the new architecture
 		TraefikPort:   startV2ApiPort, // Use the API port for Traefik
 		VolumeMounts: []kubernetes.VolumeMount{
 			{
@@ -239,10 +239,37 @@ func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Con
 
 	// Deploy control plane using kubectl apply
 	// We'll use the manifests we created
-	manifestsDir := filepath.Join(os.Getenv("GOPATH"), "src/github.com/nandemo-ya/kecs/controlplane/manifests")
-	if manifestsDir == "" {
-		// Fallback to relative path from current directory
+	manifestsDir := ""
+	
+	// Try to find manifests directory
+	// 1. Try relative path from current directory
+	if _, err := os.Stat("manifests"); err == nil {
+		manifestsDir = "manifests"
+	} else if _, err := os.Stat("controlplane/manifests"); err == nil {
 		manifestsDir = "controlplane/manifests"
+	} else if gopath := os.Getenv("GOPATH"); gopath != "" {
+		// 2. Try GOPATH
+		gopathManifests := filepath.Join(gopath, "src/github.com/nandemo-ya/kecs/controlplane/manifests")
+		if _, err := os.Stat(gopathManifests); err == nil {
+			manifestsDir = gopathManifests
+		}
+	}
+	
+	// 3. Try to find the executable path and work from there
+	if manifestsDir == "" {
+		execPath, err := os.Executable()
+		if err == nil {
+			execDir := filepath.Dir(execPath)
+			// Check if we're in bin directory
+			if filepath.Base(execDir) == "bin" {
+				// Go up one level and look for controlplane/manifests
+				parentDir := filepath.Dir(execDir)
+				possiblePath := filepath.Join(parentDir, "controlplane/manifests")
+				if _, err := os.Stat(possiblePath); err == nil {
+					manifestsDir = possiblePath
+				}
+			}
+		}
 	}
 
 	// Check if manifests directory exists
@@ -355,20 +382,47 @@ func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.C
 	}
 
 	// Deploy Traefik using kubectl apply
-	manifestsDir := filepath.Join(os.Getenv("GOPATH"), "src/github.com/nandemo-ya/kecs/controlplane/manifests/traefik")
-	if manifestsDir == "" {
-		// Fallback to relative path from current directory
-		manifestsDir = "controlplane/manifests/traefik"
+	traefikManifestsDir := ""
+	
+	// Try to find Traefik manifests directory
+	// 1. Try relative path from current directory
+	if _, err := os.Stat("manifests/traefik"); err == nil {
+		traefikManifestsDir = "manifests/traefik"
+	} else if _, err := os.Stat("controlplane/manifests/traefik"); err == nil {
+		traefikManifestsDir = "controlplane/manifests/traefik"
+	} else if gopath := os.Getenv("GOPATH"); gopath != "" {
+		// 2. Try GOPATH
+		gopathManifests := filepath.Join(gopath, "src/github.com/nandemo-ya/kecs/controlplane/manifests/traefik")
+		if _, err := os.Stat(gopathManifests); err == nil {
+			traefikManifestsDir = gopathManifests
+		}
+	}
+	
+	// 3. Try to find the executable path and work from there
+	if traefikManifestsDir == "" {
+		execPath, err := os.Executable()
+		if err == nil {
+			execDir := filepath.Dir(execPath)
+			// Check if we're in bin directory
+			if filepath.Base(execDir) == "bin" {
+				// Go up one level and look for controlplane/manifests/traefik
+				parentDir := filepath.Dir(execDir)
+				possiblePath := filepath.Join(parentDir, "controlplane/manifests/traefik")
+				if _, err := os.Stat(possiblePath); err == nil {
+					traefikManifestsDir = possiblePath
+				}
+			}
+		}
 	}
 
 	// Check if manifests directory exists
-	if _, err := os.Stat(manifestsDir); os.IsNotExist(err) {
-		return fmt.Errorf("traefik manifests directory not found: %s", manifestsDir)
+	if _, err := os.Stat(traefikManifestsDir); os.IsNotExist(err) {
+		return fmt.Errorf("traefik manifests directory not found: %s", traefikManifestsDir)
 	}
 
 	// Apply Traefik manifests
 	fmt.Println("Applying Traefik gateway manifests...")
-	cmd := exec.Command("kubectl", "apply", "-k", manifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
+	cmd := exec.Command("kubectl", "apply", "-k", traefikManifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	
