@@ -1,0 +1,84 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: aws-headers
+  namespace: kecs-system
+  labels:
+    app: traefik
+    kecs.dev/component: "gateway"
+    kecs.dev/type: "middleware"
+spec:
+  headers:
+    customRequestHeaders:
+      # Preserve original host header for AWS signature validation
+      X-Forwarded-Host: "localhost:4566"
+      # Add KECS identification
+      X-KECS-Gateway: "true"
+      X-KECS-Version: "v2"
+    # Pass through AWS headers
+    accessControlAllowHeaders:
+    - "*"
+    accessControlAllowMethods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "DELETE"
+    - "OPTIONS"
+    - "HEAD"
+    - "PATCH"
+    accessControlAllowOriginList:
+    - "*"
+    accessControlMaxAge: 100
+    addVaryHeader: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: aws-auth
+  namespace: kecs-system
+  labels:
+    app: traefik
+    kecs.dev/component: "gateway"
+    kecs.dev/type: "middleware"
+spec:
+  # For now, we pass through AWS auth headers
+  # In the future, we can add validation here
+  headers:
+    # Preserve AWS authentication headers
+    customRequestHeaders:
+      Authorization: "{{ .Authorization }}"
+      X-Amz-Date: "{{ .X-Amz-Date }}"
+      X-Amz-Security-Token: "{{ .X-Amz-Security-Token }}"
+      X-Amz-Content-SHA256: "{{ .X-Amz-Content-SHA256 }}"
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-prefix
+  namespace: kecs-system
+  labels:
+    app: traefik
+    kecs.dev/component: "gateway"
+    kecs.dev/type: "middleware"
+spec:
+  stripPrefix:
+    prefixes:
+    - "/aws"
+    forceSlash: false
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit
+  namespace: kecs-system
+  labels:
+    app: traefik
+    kecs.dev/component: "gateway"
+    kecs.dev/type: "middleware"
+spec:
+  rateLimit:
+    average: 100
+    burst: 200
+    period: 1s
+    sourceCriterion:
+      requestHost: true

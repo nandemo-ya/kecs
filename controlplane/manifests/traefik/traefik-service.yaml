@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: kecs-system
+  labels:
+    app: traefik
+    kecs.dev/component: "gateway"
+spec:
+  type: LoadBalancer
+  selector:
+    app: traefik
+  ports:
+  - name: web
+    port: 80
+    targetPort: web
+    protocol: TCP
+  - name: aws
+    port: 4566
+    targetPort: aws
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-dashboard
+  namespace: kecs-system
+  labels:
+    app: traefik
+    kecs.dev/component: "gateway"
+    kecs.dev/service: "dashboard"
+spec:
+  type: ClusterIP
+  selector:
+    app: traefik
+  ports:
+  - name: admin
+    port: 8080
+    targetPort: admin
+    protocol: TCP
