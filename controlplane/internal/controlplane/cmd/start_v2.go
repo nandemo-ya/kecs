@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
 var (
@@ -277,11 +279,66 @@ func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Con
 }
 
 func deployLocalStack(ctx context.Context, clusterName string, cfg *config.Config) error {
-	// TODO: Implement LocalStack deployment
-	// This will use the existing LocalStack manager but deploy to kecs-system namespace
-	fmt.Println("LocalStack deployment not yet implemented")
-	fmt.Println("TODO: Deploy LocalStack to kecs-system namespace")
-	return nil
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	// Get Kubernetes client and config
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
+	}
+
+	// Configure LocalStack for in-cluster deployment
+	localstackConfig := &localstack.Config{
+		Enabled:       true,
+		UseTraefik:    cfg.Features.Traefik,
+		Namespace:     "kecs-system",
+		Services:      cfg.LocalStack.Services,
+		Port:          4566,
+		EdgePort:      4566,
+		ProxyEndpoint: "http://traefik.kecs-system.svc.cluster.local:4566",
+		ContainerMode: false, // We're deploying in k8s, not standalone container
+		Image:         "localstack/localstack:latest",
+		Debug:         cfg.Server.LogLevel == "debug",
+	}
+
+	// Create LocalStack manager
+	lsManager, err := localstack.NewManager(localstackConfig, kubeClient, kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create LocalStack manager: %w", err)
+	}
+
+	// Deploy LocalStack
+	fmt.Println("Deploying LocalStack...")
+	if err := lsManager.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start LocalStack: %w", err)
+	}
+
+	// Wait for LocalStack to be ready
+	fmt.Print("Waiting for LocalStack to be ready...")
+	for i := 0; i < 60; i++ { // Wait up to 5 minutes
+		if lsManager.IsHealthy() {
+			fmt.Println(" ready!")
+			status, err := lsManager.GetStatus()
+			if err == nil {
+				fmt.Printf("LocalStack running: %v\n", status.Running)
+				fmt.Printf("LocalStack services: %v\n", status.EnabledServices)
+			}
+			return nil
+		}
+		time.Sleep(5 * time.Second)
+		fmt.Print(".")
+	}
+
+	return fmt.Errorf("LocalStack did not become ready in time")
 }
 
 func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.Config, apiPort int) error {
@@ -357,7 +414,96 @@ func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.C
 }
 
 func waitForComponents(ctx context.Context, clusterName string) error {
-	// TODO: Implement readiness checks for all components
-	fmt.Println("Component readiness checks not yet implemented")
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	// Get Kubernetes client
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	namespace := "kecs-system"
+	components := []struct {
+		name       string
+		deployment string
+		required   bool
+	}{
+		{"KECS Control Plane", "kecs-controlplane", true},
+		{"Traefik Gateway", "traefik", true},
+		{"LocalStack", "localstack", false}, // Optional based on config
+	}
+
+	fmt.Println("Checking component readiness...")
+	
+	allReady := true
+	for _, comp := range components {
+		fmt.Printf("  %s: ", comp.name)
+		
+		// Check deployment
+		deployment, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, comp.deployment, metav1.GetOptions{})
+		if err != nil {
+			if comp.required {
+				fmt.Printf("❌ Not found\n")
+				allReady = false
+			} else {
+				fmt.Printf("⏭️  Skipped (optional)\n")
+			}
+			continue
+		}
+
+		// Check if deployment is ready
+		if deployment.Status.ReadyReplicas >= 1 {
+			fmt.Printf("✅ Ready (%d/%d replicas)\n", deployment.Status.ReadyReplicas, *deployment.Spec.Replicas)
+		} else {
+			fmt.Printf("⏳ Not ready (0/%d replicas)\n", *deployment.Spec.Replicas)
+			if comp.required {
+				allReady = false
+			}
+		}
+
+		// Check service endpoint
+		service, err := kubeClient.CoreV1().Services(namespace).Get(ctx, comp.deployment, metav1.GetOptions{})
+		if err == nil && len(service.Spec.Ports) > 0 {
+			fmt.Printf("    Service: %s:%d\n", service.Name, service.Spec.Ports[0].Port)
+		}
+	}
+
+	if !allReady {
+		return fmt.Errorf("some required components are not ready")
+	}
+
+	// Check API connectivity
+	fmt.Print("\nChecking API connectivity...")
+	
+	// Test KECS control plane health endpoint
+	adminEndpoint := fmt.Sprintf("http://localhost:%d/health", startV2AdminPort)
+	if err := checkEndpointHealth(adminEndpoint, 30*time.Second); err != nil {
+		fmt.Printf(" ❌\n")
+		return fmt.Errorf("KECS admin API not accessible: %w", err)
+	}
+	fmt.Printf(" ✅\n")
+
 	return nil
+}
+
+func checkEndpointHealth(endpoint string, timeout time.Duration) error {
+	client := &http.Client{Timeout: 5 * time.Second}
+	deadline := time.Now().Add(timeout)
+	
+	for time.Now().Before(deadline) {
+		resp, err := client.Get(endpoint)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
+		}
+		time.Sleep(2 * time.Second)
+	}
+	
+	return fmt.Errorf("endpoint %s did not become healthy within %v", endpoint, timeout)
 }
