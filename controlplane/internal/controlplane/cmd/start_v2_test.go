@@ -1,4 +1,4 @@
-package cmd_test
+package cmd
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -96,11 +95,3 @@ var _ = Describe("Start V2 Command Integration Tests", func() {
 		})
 	})
 })
-
-func TestStartV2Integration(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration tests in short mode")
-	}
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Start V2 Integration Test Suite")
-}
