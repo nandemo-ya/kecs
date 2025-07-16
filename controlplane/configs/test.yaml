@@ -1,5 +1,6 @@
 # Test configuration for KECS Control Plane
 # This configuration is used for unit tests and CI environments
+# LocalStack and Traefik are disabled by default for faster test execution
 
 # Server configuration
 server:
@@ -75,11 +76,14 @@ health:
 
 # Feature flags
 features:
-  traefik: false  # Disabled for unit tests
+  traefik: false  # Disabled for testing (default is true)
+  testMode: true  # Enable test mode
+  autoRecoverState: false  # Disable state recovery for clean test runs
 
 # LocalStack configuration
 localstack:
-  enabled: false  # Disabled by default in tests to avoid external dependencies
+  enabled: false  # Disabled for testing (default is true)
+  useTraefik: false  # Disabled for testing (default is true)
   services:
     - iam
     - logs

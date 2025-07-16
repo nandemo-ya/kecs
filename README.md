@@ -280,6 +280,31 @@ kecs instances stop-all
 
 Stops all running KECS instances.
 
+### Configuration
+
+#### Default Configuration Changes
+
+As of the latest version, KECS has updated its default configuration:
+
+- **LocalStack**: Now **enabled by default** to provide AWS service emulation
+- **Traefik**: Now **enabled by default** for advanced routing capabilities
+
+To disable these features (e.g., for testing or lightweight deployments):
+
+```bash
+# Via environment variables
+export KECS_LOCALSTACK_ENABLED=false
+export KECS_FEATURES_TRAEFIK=false
+
+# Or via configuration file
+localstack:
+  enabled: false
+features:
+  traefik: false
+```
+
+For more details, see the [Configuration Guide](docs/configuration.md).
+
 ### Configuration File
 
 KECS supports YAML configuration files for managing multiple instances:
