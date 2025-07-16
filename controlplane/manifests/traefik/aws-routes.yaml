@@ -1,0 +1,74 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ecs-routes
+  namespace: kecs-system
+  labels:
+    app: traefik
+    kecs.dev/component: "gateway"
+    kecs.dev/service: "ecs"
+spec:
+  entryPoints:
+  - aws
+  routes:
+  # ECS API routes to KECS control plane
+  - match: PathPrefix(`/`) && Headers(`X-Amz-Target`, `AmazonEC2ContainerServiceV20141113.`)
+    kind: Rule
+    priority: 100
+    services:
+    - name: kecs-api
+      port: 80
+      namespace: kecs-system
+    middlewares:
+    - name: aws-headers
+      namespace: kecs-system
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: elbv2-routes
+  namespace: kecs-system
+  labels:
+    app: traefik
+    kecs.dev/component: "gateway"
+    kecs.dev/service: "elbv2"
+spec:
+  entryPoints:
+  - aws
+  routes:
+  # ELBv2 API routes to KECS control plane
+  - match: PathPrefix(`/`) && Headers(`X-Amz-Target`, `ElasticLoadBalancingV2.`)
+    kind: Rule
+    priority: 90
+    services:
+    - name: kecs-api
+      port: 80
+      namespace: kecs-system
+    middlewares:
+    - name: aws-headers
+      namespace: kecs-system
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: localstack-routes
+  namespace: kecs-system
+  labels:
+    app: traefik
+    kecs.dev/component: "gateway"
+    kecs.dev/service: "localstack"
+spec:
+  entryPoints:
+  - aws
+  routes:
+  # Default route to LocalStack for other AWS services
+  - match: PathPrefix(`/`)
+    kind: Rule
+    priority: 10
+    services:
+    - name: localstack
+      port: 4566
+      namespace: kecs-system
+    middlewares:
+    - name: aws-headers
+      namespace: kecs-system

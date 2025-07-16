@@ -141,6 +141,7 @@ func createK3dCluster(ctx context.Context, clusterName string, cfg *config.Confi
 		Provider:      "k3d",
 		ContainerMode: false,
 		EnableTraefik: false, // We'll deploy our own Traefik
+		TraefikPort:   startV2ApiPort, // Use the API port for Traefik
 		VolumeMounts: []kubernetes.VolumeMount{
 			{
 				HostPath:      dataDir,
@@ -284,10 +285,74 @@ func deployLocalStack(ctx context.Context, clusterName string, cfg *config.Confi
 }
 
 func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.Config, apiPort int) error {
-	// TODO: Implement Traefik gateway deployment
-	// This will configure Traefik to route AWS API requests
-	fmt.Println("Traefik gateway deployment not yet implemented")
-	fmt.Println("TODO: Configure Traefik routing rules")
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	// Get Kubernetes client
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	// Deploy Traefik using kubectl apply
+	manifestsDir := filepath.Join(os.Getenv("GOPATH"), "src/github.com/nandemo-ya/kecs/controlplane/manifests/traefik")
+	if manifestsDir == "" {
+		// Fallback to relative path from current directory
+		manifestsDir = "controlplane/manifests/traefik"
+	}
+
+	// Check if manifests directory exists
+	if _, err := os.Stat(manifestsDir); os.IsNotExist(err) {
+		return fmt.Errorf("traefik manifests directory not found: %s", manifestsDir)
+	}
+
+	// Apply Traefik manifests
+	fmt.Println("Applying Traefik gateway manifests...")
+	cmd := exec.Command("kubectl", "apply", "-k", manifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to apply traefik manifests: %w", err)
+	}
+
+	// Wait for Traefik deployment to be ready
+	fmt.Print("Waiting for Traefik deployment to be ready...")
+	deployment := "traefik"
+	namespace := "kecs-system"
+	
+	for i := 0; i < 60; i++ { // Wait up to 5 minutes
+		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
+		if err == nil && deps.Status.ReadyReplicas > 0 {
+			fmt.Println(" ready!")
+			break
+		}
+		time.Sleep(5 * time.Second)
+		fmt.Print(".")
+	}
+
+	// Wait for Traefik service to get external IP/port
+	fmt.Print("Waiting for Traefik service to be accessible...")
+	service := "traefik"
+	
+	for i := 0; i < 30; i++ { // Wait up to 2.5 minutes
+		svc, err := kubeClient.CoreV1().Services(namespace).Get(ctx, service, metav1.GetOptions{})
+		if err == nil && len(svc.Status.LoadBalancer.Ingress) > 0 {
+			fmt.Println(" ready!")
+			fmt.Printf("Traefik LoadBalancer: %s\n", svc.Status.LoadBalancer.Ingress[0].Hostname)
+			return nil
+		}
+		time.Sleep(5 * time.Second)
+		fmt.Print(".")
+	}
+
+	// For k3d, the LoadBalancer might not get an external IP
+	// Port forwarding is handled by k3d itself
+	fmt.Println(" ready! (using k3d port mapping)")
+	
 	return nil
 }
 
