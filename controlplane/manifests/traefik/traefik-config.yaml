@@ -19,6 +19,8 @@ data:
         address: ":4566"
       metrics:
         address: ":8082"
+      traefik:
+        address: ":8080"
     
     providers:
       kubernetesCRD:
@@ -48,4 +50,4 @@ data:
         addServicesLabels: true
     
     ping:
-      entryPoint: web
+      entryPoint: traefik

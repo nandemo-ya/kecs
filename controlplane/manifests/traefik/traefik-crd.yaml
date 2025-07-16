@@ -6,7 +6,6 @@ metadata:
     kecs.dev/component: "gateway"
 spec:
   group: traefik.io
-  version: v1alpha1
   names:
     kind: IngressRoute
     plural: ingressroutes
@@ -69,7 +68,6 @@ metadata:
     kecs.dev/component: "gateway"
 spec:
   group: traefik.io
-  version: v1alpha1
   names:
     kind: Middleware
     plural: middlewares
