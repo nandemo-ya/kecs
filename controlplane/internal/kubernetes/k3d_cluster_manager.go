@@ -433,6 +433,8 @@ func (k *K3dClusterManager) WaitForClusterReady(clusterName string, timeout time
 
 // GetKubeconfigPath returns the path to the kubeconfig file for the cluster
 func (k *K3dClusterManager) GetKubeconfigPath(clusterName string) string {
+	normalizedName := k.normalizeClusterName(clusterName)
+	
 	if k.config.ContainerMode {
 		kubeconfigPath := k.config.KubeconfigPath
 		if kubeconfigPath == "" {
@@ -443,13 +445,32 @@ func (k *K3dClusterManager) GetKubeconfigPath(clusterName string) string {
 			}
 		}
 		os.MkdirAll(kubeconfigPath, 0755)
-		normalizedName := k.normalizeClusterName(clusterName)
 		return filepath.Join(kubeconfigPath, fmt.Sprintf("%s.config", normalizedName))
 	}
 
-	// For non-container mode, use k3d's default kubeconfig location
+	// For non-container mode (including new architecture), check multiple locations
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".kube", "config")
+	
+	// Try ~/.config/kubeconfig-<cluster>.yaml (k3d v5 default)
+	configPath := filepath.Join(homeDir, ".config", fmt.Sprintf("kubeconfig-%s.yaml", normalizedName))
+	if _, err := os.Stat(configPath); err == nil {
+		return configPath
+	}
+	
+	// Try ~/.k3d/kubeconfig-<cluster>.yaml (older k3d versions)
+	k3dConfigPath := filepath.Join(homeDir, ".k3d", fmt.Sprintf("kubeconfig-%s.yaml", normalizedName))
+	if _, err := os.Stat(k3dConfigPath); err == nil {
+		return k3dConfigPath
+	}
+	
+	// Try default kubeconfig location
+	defaultConfig := filepath.Join(homeDir, ".kube", "config")
+	if _, err := os.Stat(defaultConfig); err == nil {
+		return defaultConfig
+	}
+	
+	// Return the expected path even if it doesn't exist yet
+	return configPath
 }
 
 // GetHostKubeconfigPath returns the path to the host-compatible kubeconfig file

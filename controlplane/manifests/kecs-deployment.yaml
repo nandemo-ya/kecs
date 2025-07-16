@@ -29,8 +29,9 @@ spec:
         fsGroup: 65532
       containers:
       - name: controlplane
-        image: ghcr.io/nandemo-ya/kecs-controlplane:v2
-        imagePullPolicy: Always
+        image: ghcr.io/nandemo-ya/kecs:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/controlplane", "server"]
         ports:
         - name: api
           containerPort: 8080
@@ -45,6 +46,12 @@ spec:
           value: "/data"
         - name: KECS_CONFIG_FILE
           value: "/config/config.yaml"
+        - name: KECS_SKIP_DOCKER_CHECK
+          value: "true"
+        - name: KECS_KUBERNETES_MODE
+          value: "true"
+        - name: KECS_SECURITY_ACKNOWLEDGED
+          value: "true"
         - name: POD_NAME
           valueFrom:
             fieldRef:
