@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -221,11 +222,57 @@ func createKecsSystemNamespace(ctx context.Context, clusterName string) error {
 }
 
 func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Config, dataDir string) error {
-	// TODO: Implement control plane deployment
-	// This will create Deployment, Service, ConfigMap for the control plane
-	fmt.Println("Control plane deployment not yet implemented")
-	fmt.Println("TODO: Create Kubernetes manifests for control plane")
-	return nil
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	// Get Kubernetes client
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	// Deploy control plane using kubectl apply
+	// We'll use the manifests we created
+	manifestsDir := filepath.Join(os.Getenv("GOPATH"), "src/github.com/nandemo-ya/kecs/controlplane/manifests")
+	if manifestsDir == "" {
+		// Fallback to relative path from current directory
+		manifestsDir = "controlplane/manifests"
+	}
+
+	// Check if manifests directory exists
+	if _, err := os.Stat(manifestsDir); os.IsNotExist(err) {
+		return fmt.Errorf("manifests directory not found: %s", manifestsDir)
+	}
+
+	// Apply manifests using kubectl
+	fmt.Println("Applying control plane manifests...")
+	cmd := exec.Command("kubectl", "apply", "-k", manifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to apply manifests: %w", err)
+	}
+
+	// Wait for deployment to be ready
+	fmt.Print("Waiting for control plane deployment to be ready...")
+	deployment := "kecs-controlplane"
+	namespace := "kecs-system"
+	
+	for i := 0; i < 60; i++ { // Wait up to 5 minutes
+		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
+		if err == nil && deps.Status.ReadyReplicas > 0 {
+			fmt.Println(" ready!")
+			return nil
+		}
+		time.Sleep(5 * time.Second)
+		fmt.Print(".")
+	}
+
+	return fmt.Errorf("control plane deployment did not become ready in time")
 }
 
 func deployLocalStack(ctx context.Context, clusterName string, cfg *config.Config) error {

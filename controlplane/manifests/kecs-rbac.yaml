@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kecs-controlplane
+  namespace: kecs-system
+  labels:
+    app: kecs-controlplane
+    kecs.dev/component: "controlplane"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kecs-controlplane
+  labels:
+    app: kecs-controlplane
+    kecs.dev/component: "controlplane"
+rules:
+# Namespace management for ECS clusters
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Pod management for ECS tasks
+- apiGroups: [""]
+  resources: ["pods", "pods/status", "pods/log"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Service management for ECS services
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# ConfigMap and Secret management
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Deployment management for future use
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Job management for ECS tasks
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Ingress management for ALB/ELBv2
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Event recording
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kecs-controlplane
+  labels:
+    app: kecs-controlplane
+    kecs.dev/component: "controlplane"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kecs-controlplane
+subjects:
+- kind: ServiceAccount
+  name: kecs-controlplane
+  namespace: kecs-system

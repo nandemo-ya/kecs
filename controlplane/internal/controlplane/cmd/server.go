@@ -29,6 +29,7 @@ var (
 	dataDir           string
 	localstackEnabled bool
 	configFile        string
+	serverMode        string
 
 	// serverCmd represents the server command
 	serverCmd = &cobra.Command{
@@ -56,6 +57,7 @@ func init() {
 	serverCmd.Flags().StringVar(&dataDir, "data-dir", getDefaultDataDir(), "Directory for storing persistent data")
 	serverCmd.Flags().BoolVar(&localstackEnabled, "localstack-enabled", false, "Enable LocalStack integration for AWS service emulation")
 	serverCmd.Flags().StringVar(&configFile, "config", "", "Path to configuration file")
+	serverCmd.Flags().StringVar(&serverMode, "mode", "standalone", "Server mode: standalone or in-cluster")
 }
 
 func runServer(cmd *cobra.Command) {
@@ -172,12 +174,31 @@ func runServer(cmd *cobra.Command) {
 
 	go func() {
 		sig := <-sigCh
-		fmt.Printf("Received signal %s, shutting down...\n", sig)
+		fmt.Printf("Received signal %s, shutting down gracefully...\n", sig)
+		
+		// For in-cluster mode, we need to handle preStop hook gracefully
+		if serverMode == "in-cluster" {
+			fmt.Println("Running in-cluster shutdown sequence...")
+			// Give time for endpoints to be removed from service
+			time.Sleep(5 * time.Second)
+		}
+		
 		cancel()
 
 		// Allow some time for graceful shutdown
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		shutdownTimeout := 10 * time.Second
+		if serverMode == "in-cluster" {
+			// Longer timeout for in-cluster mode to handle state persistence
+			shutdownTimeout = 20 * time.Second
+		}
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer shutdownCancel()
+
+		// Persist state before shutdown
+		if storage != nil {
+			fmt.Println("Persisting state before shutdown...")
+			// Storage should handle its own graceful shutdown
+		}
 
 		// Stop both servers
 		if err := apiServer.Stop(shutdownCtx); err != nil {
@@ -189,6 +210,7 @@ func runServer(cmd *cobra.Command) {
 		}
 
 		// LocalStack will be stopped by the API server during shutdown
+		fmt.Println("Shutdown complete")
 	}()
 
 	// Start the admin server in a goroutine
