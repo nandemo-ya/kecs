@@ -222,7 +222,7 @@ func (i *integration) generateFluentBitConfig(logGroupName, logStreamPrefix stri
 
 	endpoint := i.config.LocalStackEndpoint
 	if endpoint == "" {
-		endpoint = "http://localstack.aws-services.svc.cluster.local:4566"
+		endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 	}
 
 	// FluentBit configuration for CloudWatch

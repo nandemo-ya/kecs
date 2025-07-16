@@ -22,7 +22,7 @@ var _ = Describe("LocalStack Configuration", func() {
 			Expect(config.Persistence).To(BeTrue())
 			Expect(config.Image).To(Equal("localstack/localstack"))
 			Expect(config.Version).To(Equal("latest"))
-			Expect(config.Namespace).To(Equal("aws-services"))
+			Expect(config.Namespace).To(Equal("kecs-system"))
 			Expect(config.Port).To(Equal(4566))
 			Expect(config.EdgePort).To(Equal(4566))
 		})

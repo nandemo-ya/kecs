@@ -184,7 +184,7 @@ func (b *bodyReadCloser) Close() error {
 // TODO: Implement LocalStack HTTP client that uses generated types
 func createLocalStackConfig(endpoint, region string) error {
 	if endpoint == "" {
-		endpoint = "http://localstack.aws-services.svc.cluster.local:4566"
+		endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 	}
 	// Implementation needed for LocalStack HTTP client
 	return fmt.Errorf("LocalStack configuration not implemented with generated types")

@@ -9,7 +9,7 @@ Proposed
 The current KECS architecture runs the control plane as a standalone process (either in a container or directly on the host) that manages k3d clusters. This design has revealed a significant limitation:
 
 **Problem**: Application containers running inside KECS clusters cannot access KECS control plane APIs (ECS, ELBv2) while they can access LocalStack APIs. This is because:
-- LocalStack runs inside the k3d cluster (in `aws-services` namespace)
+- LocalStack runs inside the k3d cluster (in `kecs-system` namespace)
 - KECS control plane runs outside the k3d cluster
 - Applications that need to call ECS APIs from within containers face networking complexity
 
