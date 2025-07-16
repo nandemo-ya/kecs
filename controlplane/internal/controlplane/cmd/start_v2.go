@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -94,30 +95,57 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create kecs-system namespace: %w", err)
 	}
 
-	// Step 3: Deploy KECS control plane
-	fmt.Printf("\n=== Step 3: Deploying KECS control plane ===\n")
-	if err := deployControlPlane(ctx, startV2ClusterName, cfg, startV2DataDir); err != nil {
-		return fmt.Errorf("failed to deploy control plane: %w", err)
-	}
-
-	// Step 4: Deploy LocalStack (if enabled)
-	if cfg.LocalStack.Enabled {
-		fmt.Printf("\n=== Step 4: Deploying LocalStack ===\n")
-		if err := deployLocalStack(ctx, startV2ClusterName, cfg); err != nil {
-			return fmt.Errorf("failed to deploy LocalStack: %w", err)
+	// Step 3: Deploy KECS control plane and LocalStack in parallel
+	fmt.Printf("\n=== Step 3: Deploying KECS components in parallel ===\n")
+	
+	var wg sync.WaitGroup
+	errChan := make(chan error, 2)
+	
+	// Deploy Control Plane
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		fmt.Println("  • Deploying KECS control plane...")
+		if err := deployControlPlane(ctx, startV2ClusterName, cfg, startV2DataDir); err != nil {
+			errChan <- fmt.Errorf("failed to deploy control plane: %w", err)
+			return
 		}
+		fmt.Println("  ✓ KECS control plane deployed")
+	}()
+	
+	// Deploy LocalStack (if enabled)
+	if cfg.LocalStack.Enabled {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			fmt.Println("  • Deploying LocalStack...")
+			if err := deployLocalStack(ctx, startV2ClusterName, cfg); err != nil {
+				errChan <- fmt.Errorf("failed to deploy LocalStack: %w", err)
+				return
+			}
+			fmt.Println("  ✓ LocalStack deployed")
+		}()
+	}
+	
+	// Wait for parallel deployments to complete
+	wg.Wait()
+	close(errChan)
+	
+	// Check for errors from parallel deployments
+	for err := range errChan {
+		return err
 	}
 
-	// Step 5: Deploy Traefik gateway (if enabled)
+	// Step 4: Deploy Traefik gateway (if enabled) - must be after control plane and LocalStack
 	if cfg.Features.Traefik {
-		fmt.Printf("\n=== Step 5: Deploying Traefik AWS API gateway ===\n")
+		fmt.Printf("\n=== Step 4: Deploying Traefik AWS API gateway ===\n")
 		if err := deployTraefikGateway(ctx, startV2ClusterName, cfg, startV2ApiPort); err != nil {
 			return fmt.Errorf("failed to deploy Traefik gateway: %w", err)
 		}
 	}
 
-	// Step 6: Wait for all components to be ready
-	fmt.Printf("\n=== Step 6: Waiting for all components to be ready ===\n")
+	// Step 5: Wait for all components to be ready
+	fmt.Printf("\n=== Step 5: Waiting for all components to be ready ===\n")
 	if err := waitForComponents(ctx, startV2ClusterName); err != nil {
 		return fmt.Errorf("components did not become ready: %w", err)
 	}
