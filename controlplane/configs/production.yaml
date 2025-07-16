@@ -78,11 +78,12 @@ health:
 
 # Feature flags
 features:
-  traefik: false  # Disable Traefik for now
+  traefik: true  # Traefik is now enabled by default
 
 # LocalStack configuration
 localstack:
-  enabled: false  # Disable LocalStack for this test
+  enabled: true  # LocalStack is now enabled by default
+  useTraefik: true  # Use Traefik for LocalStack routing
   services:
     - iam
     - logs

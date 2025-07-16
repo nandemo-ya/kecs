@@ -98,7 +98,7 @@ func InitConfig() error {
 	v.SetDefault("features.autoRecoverState", true)
 	v.SetDefault("features.securityAcknowledged", false)
 	v.SetDefault("features.skipSecurityDisclaimer", false)
-	v.SetDefault("features.traefik", false)
+	v.SetDefault("features.traefik", true) // Enable Traefik by default
 	
 	// AWS defaults
 	v.SetDefault("aws.defaultRegion", "us-east-1")
@@ -106,8 +106,8 @@ func InitConfig() error {
 	v.SetDefault("aws.proxyImage", "")
 	
 	// LocalStack defaults
-	v.SetDefault("localstack.enabled", false)
-	v.SetDefault("localstack.useTraefik", false)
+	v.SetDefault("localstack.enabled", true) // Enable LocalStack by default
+	v.SetDefault("localstack.useTraefik", true) // Enable Traefik for LocalStack by default
 	
 	// Enable environment variable support
 	v.SetEnvPrefix("KECS")

@@ -31,7 +31,33 @@ var _ = Describe("Config", func() {
 			Expect(cfg).NotTo(BeNil())
 			Expect(cfg.Server.Port).To(Equal(8080))
 			Expect(cfg.Server.AdminPort).To(Equal(8081))
+			// LocalStack and Traefik are now enabled by default
+			Expect(cfg.LocalStack.Enabled).To(BeTrue())
+			Expect(cfg.LocalStack.UseTraefik).To(BeTrue())
+			Expect(cfg.Features.Traefik).To(BeTrue())
+		})
+
+		It("should allow disabling LocalStack and Traefik via environment variables", func() {
+			// Reset config
+			config.ResetConfig()
+			
+			// Set environment variables to disable features
+			os.Setenv("KECS_LOCALSTACK_ENABLED", "false")
+			os.Setenv("KECS_LOCALSTACK_USE_TRAEFIK", "false")
+			os.Setenv("KECS_FEATURES_TRAEFIK", "false")
+			defer func() {
+				os.Unsetenv("KECS_LOCALSTACK_ENABLED")
+				os.Unsetenv("KECS_LOCALSTACK_USE_TRAEFIK")
+				os.Unsetenv("KECS_FEATURES_TRAEFIK")
+				config.ResetConfig()
+			}()
+			
+			cfg := config.DefaultConfig()
+			Expect(cfg).NotTo(BeNil())
+			// Features should be disabled via environment variables
 			Expect(cfg.LocalStack.Enabled).To(BeFalse())
+			Expect(cfg.LocalStack.UseTraefik).To(BeFalse())
+			Expect(cfg.Features.Traefik).To(BeFalse())
 		})
 	})
 

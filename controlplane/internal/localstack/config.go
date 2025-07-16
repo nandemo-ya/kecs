@@ -9,7 +9,7 @@ import (
 // DefaultConfig returns the default LocalStack configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Enabled:     false,
+		Enabled:     true, // Enable LocalStack by default
 		Services:    DefaultServices,
 		Persistence: true,
 		Image:       DefaultImage,
@@ -34,6 +34,7 @@ func DefaultConfig() *Config {
 		Debug:           false,
 		DataDir:         "/var/lib/localstack",
 		CustomEndpoints: make(map[string]string),
+		UseTraefik:      true, // Enable Traefik for LocalStack by default
 	}
 }
 
