@@ -85,12 +85,29 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 		return nil
 	}
 
+	// Determine k3s image
+	k3sImage := "rancher/k3s:v1.31.4-k3s1"
+	if k.config.K3dImage != "" {
+		k3sImage = k.config.K3dImage
+	}
+
 	// Create server node
 	serverNode := &k3d.Node{
 		Name:    fmt.Sprintf("k3d-%s-server-0", normalizedName),
 		Role:    k3d.ServerRole,
-		Image:   "rancher/k3s:v1.31.4-k3s1",
+		Image:   k3sImage,
 		Restart: true,
+	}
+	
+	// Add volume mounts if specified
+	if len(k.config.VolumeMounts) > 0 {
+		volumes := []string{}
+		for _, mount := range k.config.VolumeMounts {
+			// k3d expects volume format as "hostPath:containerPath"
+			volumes = append(volumes, fmt.Sprintf("%s:%s", mount.HostPath, mount.ContainerPath))
+		}
+		serverNode.Volumes = volumes
+		log.Printf("Adding volume mounts: %v", volumes)
 	}
 	
 	// Add port mapping for Traefik if enabled
@@ -802,11 +819,17 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		k3sArgs = append(k3sArgs, "--disable=coredns")
 	}
 
+	// Determine k3s image
+	k3sImage := "rancher/k3s:v1.31.4-k3s1"
+	if k.config.K3dImage != "" {
+		k3sImage = k.config.K3dImage
+	}
+
 	// Create server node with optimizations
 	serverNode := &k3d.Node{
 		Name:  fmt.Sprintf("k3d-%s-server-0", normalizedName),
 		Role:  k3d.ServerRole,
-		Image: "rancher/k3s:v1.31.4-k3s1",
+		Image: k3sImage,
 		Restart: false, // Don't restart automatically in test scenarios
 		K3sNodeLabels: map[string]string{
 			"kecs.io/cluster": normalizedName,
@@ -816,6 +839,17 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 			"K3S_KUBECONFIG_MODE=666", // Ensure kubeconfig is readable
 		},
 		Memory: "512M", // Limit memory usage for faster startup
+	}
+	
+	// Add volume mounts if specified
+	if len(k.config.VolumeMounts) > 0 {
+		volumes := []string{}
+		for _, mount := range k.config.VolumeMounts {
+			// k3d expects volume format as "hostPath:containerPath"
+			volumes = append(volumes, fmt.Sprintf("%s:%s", mount.HostPath, mount.ContainerPath))
+		}
+		serverNode.Volumes = volumes
+		log.Printf("Adding volume mounts to optimized cluster: %v", volumes)
 	}
 	
 	// Add port mapping for Traefik if enabled (even in optimized mode)
