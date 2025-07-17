@@ -17,6 +17,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 )
 
@@ -61,10 +62,11 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to generate instance name: %w", err)
 		}
 		startV2InstanceName = generatedName
-		fmt.Printf("Generated KECS instance name: %s\n", startV2InstanceName)
+		progress.Info("Generated KECS instance name: %s", startV2InstanceName)
 	}
 
-	fmt.Printf("Starting KECS instance '%s'...\n", startV2InstanceName)
+	// Show header
+	progress.SectionHeader(fmt.Sprintf("Creating KECS instance '%s'", startV2InstanceName))
 
 	// Load configuration
 	cfg, err := config.LoadConfig(startV2ConfigFile)
@@ -95,19 +97,35 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	// Step 1: Create k3d cluster for KECS instance
-	fmt.Printf("\n=== Step 1: Creating infrastructure for KECS instance '%s' ===\n", startV2InstanceName)
+	spinner := progress.NewSpinner("Creating k3d cluster")
+	spinner.Start()
+	
 	if err := createK3dCluster(ctx, startV2InstanceName, cfg, startV2DataDir); err != nil {
+		spinner.Fail("Failed to create k3d cluster")
 		return fmt.Errorf("failed to create k3d cluster: %w", err)
 	}
+	spinner.Success("k3d cluster created")
 
 	// Step 2: Create kecs-system namespace
-	fmt.Printf("\n=== Step 2: Creating kecs-system namespace ===\n")
+	spinner = progress.NewSpinner("Creating kecs-system namespace")
+	spinner.Start()
 	if err := createKecsSystemNamespace(ctx, startV2InstanceName); err != nil {
+		spinner.Fail("Failed to create namespace")
 		return fmt.Errorf("failed to create kecs-system namespace: %w", err)
 	}
+	spinner.Success("kecs-system namespace created")
 
 	// Step 3: Deploy KECS control plane and LocalStack in parallel
-	fmt.Printf("\n=== Step 3: Deploying KECS components in parallel ===\n")
+	progress.Info("Deploying KECS components")
+	
+	// Create parallel tracker for component deployment
+	parallelTracker := progress.NewParallelTracker("Deploying components")
+	
+	// Add tasks
+	parallelTracker.AddTask("controlplane", "Control Plane", 100)
+	if cfg.LocalStack.Enabled {
+		parallelTracker.AddTask("localstack", "LocalStack", 100)
+	}
 	
 	var wg sync.WaitGroup
 	errChan := make(chan error, 2)
@@ -116,12 +134,13 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		fmt.Println("  • Deploying KECS control plane...")
-		if err := deployControlPlane(ctx, startV2InstanceName, cfg, startV2DataDir); err != nil {
+		parallelTracker.StartTask("controlplane")
+		if err := deployControlPlaneWithProgress(ctx, startV2InstanceName, cfg, startV2DataDir, parallelTracker); err != nil {
+			parallelTracker.FailTask("controlplane", err)
 			errChan <- fmt.Errorf("failed to deploy control plane: %w", err)
 			return
 		}
-		fmt.Println("  ✓ KECS control plane deployed")
+		parallelTracker.CompleteTask("controlplane")
 	}()
 	
 	// Deploy LocalStack (if enabled)
@@ -129,17 +148,19 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			fmt.Println("  • Deploying LocalStack...")
-			if err := deployLocalStack(ctx, startV2InstanceName, cfg); err != nil {
+			parallelTracker.StartTask("localstack")
+			if err := deployLocalStackWithProgress(ctx, startV2InstanceName, cfg, parallelTracker); err != nil {
+				parallelTracker.FailTask("localstack", err)
 				errChan <- fmt.Errorf("failed to deploy LocalStack: %w", err)
 				return
 			}
-			fmt.Println("  ✓ LocalStack deployed")
+			parallelTracker.CompleteTask("localstack")
 		}()
 	}
 	
 	// Wait for parallel deployments to complete
 	wg.Wait()
+	parallelTracker.Stop()
 	close(errChan)
 	
 	// Check for errors from parallel deployments
@@ -149,20 +170,29 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 
 	// Step 4: Deploy Traefik gateway (if enabled) - must be after control plane and LocalStack
 	if cfg.Features.Traefik {
-		fmt.Printf("\n=== Step 4: Deploying Traefik AWS API gateway ===\n")
+		spinner = progress.NewSpinner("Deploying Traefik gateway")
+		spinner.Start()
 		if err := deployTraefikGateway(ctx, startV2InstanceName, cfg, startV2ApiPort); err != nil {
+			spinner.Fail("Failed to deploy Traefik")
 			return fmt.Errorf("failed to deploy Traefik gateway: %w", err)
 		}
+		spinner.Success("Traefik gateway deployed")
 	}
 
 	// Step 5: Wait for all components to be ready
-	fmt.Printf("\n=== Step 5: Waiting for all components to be ready ===\n")
+	spinner = progress.NewSpinner("Waiting for all components to be ready")
+	spinner.Start()
 	if err := waitForComponents(ctx, startV2InstanceName); err != nil {
+		spinner.Fail("Components failed to become ready")
 		return fmt.Errorf("components did not become ready: %w", err)
 	}
+	spinner.Success("All components are ready")
 
-	fmt.Printf("\n✅ KECS instance '%s' is ready!\n", startV2InstanceName)
-	fmt.Printf("\nEndpoints:\n")
+	// Show success summary
+	progress.Success("KECS instance '%s' is ready!", startV2InstanceName)
+	
+	fmt.Println()
+	progress.Info("Endpoints:")
 	fmt.Printf("  AWS API: http://localhost:%d\n", startV2ApiPort)
 	fmt.Printf("  Admin API: http://localhost:%d\n", startV2AdminPort)
 	fmt.Printf("  Data directory: %s\n", startV2DataDir)
@@ -171,8 +201,10 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 		fmt.Printf("\nLocalStack services: %v\n", cfg.LocalStack.Services)
 	}
 
-	fmt.Printf("\nTo stop this instance: kecs stop-v2 --instance %s\n", startV2InstanceName)
-	fmt.Printf("To get kubeconfig: kecs kubeconfig get %s\n", startV2InstanceName)
+	fmt.Println()
+	progress.Info("Next steps:")
+	fmt.Printf("  To stop this instance: kecs stop-v2 --instance %s\n", startV2InstanceName)
+	fmt.Printf("  To get kubeconfig: kecs kubeconfig get %s\n", startV2InstanceName)
 
 	return nil
 }
@@ -601,4 +633,156 @@ func checkEndpointHealth(endpoint string, timeout time.Duration) error {
 	}
 	
 	return fmt.Errorf("endpoint %s did not become healthy within %v", endpoint, timeout)
+}
+
+// deployControlPlaneWithProgress wraps deployControlPlane with progress reporting
+func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg *config.Config, dataDir string, tracker *progress.ParallelTracker) error {
+	// Update progress during deployment
+	tracker.UpdateTask("controlplane", 20, "Preparing manifests")
+	
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	tracker.UpdateTask("controlplane", 30, "Getting Kubernetes client")
+	
+	// Get Kubernetes client
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	tracker.UpdateTask("controlplane", 40, "Locating manifests")
+	
+	// Find manifests directory
+	manifestsDir := ""
+	if _, err := os.Stat("manifests"); err == nil {
+		manifestsDir = "manifests"
+	} else if _, err := os.Stat("controlplane/manifests"); err == nil {
+		manifestsDir = "controlplane/manifests"
+	} else if gopath := os.Getenv("GOPATH"); gopath != "" {
+		gopathManifests := filepath.Join(gopath, "src/github.com/nandemo-ya/kecs/controlplane/manifests")
+		if _, err := os.Stat(gopathManifests); err == nil {
+			manifestsDir = gopathManifests
+		}
+	}
+	
+	// Try to find the executable path
+	if manifestsDir == "" {
+		execPath, err := os.Executable()
+		if err == nil {
+			execDir := filepath.Dir(execPath)
+			if filepath.Base(execDir) == "bin" {
+				parentDir := filepath.Dir(execDir)
+				possiblePath := filepath.Join(parentDir, "controlplane/manifests")
+				if _, err := os.Stat(possiblePath); err == nil {
+					manifestsDir = possiblePath
+				}
+			}
+		}
+	}
+
+	if _, err := os.Stat(manifestsDir); os.IsNotExist(err) {
+		return fmt.Errorf("manifests directory not found: %s", manifestsDir)
+	}
+
+	tracker.UpdateTask("controlplane", 60, "Applying manifests")
+	
+	// Apply manifests
+	cmd := exec.Command("kubectl", "apply", "-k", manifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to apply manifests: %w", err)
+	}
+
+	tracker.UpdateTask("controlplane", 80, "Waiting for deployment")
+	
+	// Wait for deployment to be ready
+	deployment := "kecs-controlplane"
+	namespace := "kecs-system"
+	
+	for i := 0; i < 60; i++ { // Wait up to 5 minutes
+		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
+		if err == nil && deps.Status.ReadyReplicas > 0 {
+			tracker.UpdateTask("controlplane", 100, "Ready")
+			return nil
+		}
+		time.Sleep(5 * time.Second)
+		progress := 80 + (i * 20 / 60)
+		tracker.UpdateTask("controlplane", progress, fmt.Sprintf("Waiting for pods (%d/60s)", i*5))
+	}
+
+	return fmt.Errorf("control plane deployment did not become ready in time")
+}
+
+// deployLocalStackWithProgress wraps deployLocalStack with progress reporting
+func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *config.Config, tracker *progress.ParallelTracker) error {
+	tracker.UpdateTask("localstack", 10, "Initializing")
+	
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	tracker.UpdateTask("localstack", 20, "Getting Kubernetes client")
+	
+	// Get Kubernetes client and config
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
+	}
+
+	tracker.UpdateTask("localstack", 30, "Configuring LocalStack")
+	
+	// Configure LocalStack
+	localstackConfig := &localstack.Config{
+		Enabled:       true,
+		UseTraefik:    cfg.Features.Traefik,
+		Namespace:     "kecs-system",
+		Services:      cfg.LocalStack.Services,
+		Port:          4566,
+		EdgePort:      4566,
+		ProxyEndpoint: "http://traefik.kecs-system.svc.cluster.local:4566",
+		ContainerMode: false,
+		Image:         cfg.LocalStack.Image,
+		Version:       cfg.LocalStack.Version,
+		Debug:         cfg.Server.LogLevel == "debug",
+	}
+
+	tracker.UpdateTask("localstack", 40, "Creating LocalStack manager")
+	
+	// Create LocalStack manager
+	lsManager, err := localstack.NewManager(localstackConfig, kubeClient, kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create LocalStack manager: %w", err)
+	}
+
+	tracker.UpdateTask("localstack", 50, "Starting LocalStack")
+	
+	// Deploy LocalStack
+	if err := lsManager.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start LocalStack: %w", err)
+	}
+
+	tracker.UpdateTask("localstack", 70, "Waiting for LocalStack to be ready")
+	
+	// Wait for LocalStack to be ready
+	for i := 0; i < 60; i++ { // Wait up to 5 minutes
+		if lsManager.IsHealthy() {
+			tracker.UpdateTask("localstack", 100, "Ready")
+			return nil
+		}
+		time.Sleep(5 * time.Second)
+		progress := 70 + (i * 30 / 60)
+		tracker.UpdateTask("localstack", progress, fmt.Sprintf("Health check (%d/60s)", i*5))
+	}
+
+	return fmt.Errorf("LocalStack did not become ready in time")
 }

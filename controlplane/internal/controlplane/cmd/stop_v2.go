@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 )
 
 var (
@@ -35,11 +36,16 @@ func runStopV2(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("instance name is required. Use --instance flag to specify the instance to stop")
 	}
 
-	fmt.Printf("Stopping KECS instance '%s'...\n", stopV2InstanceName)
+	// Show header
+	progress.SectionHeader(fmt.Sprintf("Stopping KECS instance '%s'", stopV2InstanceName))
 
 	// Create k3d cluster manager
+	spinner := progress.NewSpinner("Checking instance status")
+	spinner.Start()
+	
 	manager, err := kubernetes.NewK3dClusterManager(nil)
 	if err != nil {
+		spinner.Fail("Failed to create cluster manager")
 		return fmt.Errorf("failed to create cluster manager: %w", err)
 	}
 
@@ -48,32 +54,63 @@ func runStopV2(cmd *cobra.Command, args []string) error {
 	// Check if cluster exists
 	exists, err := manager.ClusterExists(ctx, stopV2InstanceName)
 	if err != nil {
+		spinner.Fail("Failed to check instance")
 		return fmt.Errorf("failed to check cluster existence: %w", err)
 	}
 
 	if !exists {
-		fmt.Printf("KECS instance '%s' does not exist\n", stopV2InstanceName)
+		spinner.Stop()
+		progress.Warning("KECS instance '%s' does not exist", stopV2InstanceName)
 		return nil
 	}
+	spinner.Success("Instance found")
 
-	// Delete the cluster
-	if err := manager.DeleteCluster(ctx, stopV2InstanceName); err != nil {
+	// Create progress tracker for deletion
+	tracker := progress.NewTracker(progress.Options{
+		Description:     "Deleting k3d cluster",
+		Total:           100,
+		ShowElapsedTime: true,
+		Width:           40,
+	})
+
+	// Start deletion in background
+	errChan := make(chan error, 1)
+	go func() {
+		tracker.Update(30)
+		if err := manager.DeleteCluster(ctx, stopV2InstanceName); err != nil {
+			errChan <- err
+			return
+		}
+		tracker.Update(100)
+		errChan <- nil
+	}()
+
+	// Wait for deletion
+	err = <-errChan
+	if err != nil {
+		tracker.FinishWithMessage("Failed to delete cluster")
 		return fmt.Errorf("failed to delete cluster: %w", err)
 	}
+	tracker.FinishWithMessage("Cluster deleted successfully")
 
-	fmt.Printf("Successfully stopped and deleted KECS instance '%s'\n", stopV2InstanceName)
+	progress.Success("KECS instance '%s' has been stopped", stopV2InstanceName)
 
 	// Delete data if requested
 	if stopV2DeleteData {
 		home, _ := os.UserHomeDir()
 		dataDir := filepath.Join(home, ".kecs", "instances", stopV2InstanceName, "data")
 		
-		fmt.Printf("Deleting data directory: %s\n", dataDir)
+		spinner = progress.NewSpinner(fmt.Sprintf("Deleting data directory: %s", dataDir))
+		spinner.Start()
+		
 		if err := os.RemoveAll(dataDir); err != nil {
-			fmt.Printf("Warning: Failed to delete data directory: %v\n", err)
+			spinner.Fail("Failed to delete data directory")
+			progress.Warning("Failed to delete data directory: %v", err)
+		} else {
+			spinner.Success("Data directory deleted")
 		}
 	} else {
-		fmt.Println("Instance data preserved. Use --delete-data to remove it.")
+		progress.Info("Instance data preserved. Use --delete-data to remove it.")
 	}
 
 	return nil
