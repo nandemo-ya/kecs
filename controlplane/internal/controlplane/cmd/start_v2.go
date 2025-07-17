@@ -373,7 +373,8 @@ func deployLocalStack(ctx context.Context, clusterName string, cfg *config.Confi
 		EdgePort:      4566,
 		ProxyEndpoint: "http://traefik.kecs-system.svc.cluster.local:4566",
 		ContainerMode: false, // We're deploying in k8s, not standalone container
-		Image:         "localstack/localstack:latest",
+		Image:         cfg.LocalStack.Image,
+		Version:       cfg.LocalStack.Version,
 		Debug:         cfg.Server.LogLevel == "debug",
 	}
 

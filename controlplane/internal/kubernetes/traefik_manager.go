@@ -51,6 +51,7 @@ func (tm *TraefikManager) Deploy(ctx context.Context) error {
 	var ingressRoutes []*unstructured.Unstructured
 	var otherResources []*unstructured.Unstructured
 
+	klog.Info("Parsing Traefik manifests...")
 	// Parse the manifest into individual resources
 	decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(traefikManifest), 4096)
 	
@@ -77,7 +78,9 @@ func (tm *TraefikManager) Deploy(ctx context.Context) error {
 	}
 
 	// Apply non-IngressRoute resources first
-	for _, obj := range otherResources {
+	klog.Infof("Applying %d Traefik resources...", len(otherResources))
+	for i, obj := range otherResources {
+		klog.V(2).Infof("Applying resource %d/%d: %s %s", i+1, len(otherResources), obj.GetKind(), obj.GetName())
 		if err := tm.applyResource(ctx, obj); err != nil {
 			// Log error but continue with other resources
 			klog.Warningf("Failed to apply resource %s/%s: %v", 
@@ -86,6 +89,7 @@ func (tm *TraefikManager) Deploy(ctx context.Context) error {
 	}
 
 	// Wait for Traefik to be ready
+	klog.Info("Waiting for Traefik deployment to be ready...")
 	if err := tm.WaitForReady(ctx, 2*time.Minute); err != nil {
 		return err
 	}
@@ -96,12 +100,17 @@ func (tm *TraefikManager) Deploy(ctx context.Context) error {
 	}
 
 	// Now apply IngressRoute resources
-	for _, obj := range ingressRoutes {
-		if err := tm.applyResource(ctx, obj); err != nil {
-			klog.Warningf("Failed to apply IngressRoute %s: %v", obj.GetName(), err)
+	if len(ingressRoutes) > 0 {
+		klog.Infof("Applying %d IngressRoute resources...", len(ingressRoutes))
+		for i, obj := range ingressRoutes {
+			klog.V(2).Infof("Applying IngressRoute %d/%d: %s", i+1, len(ingressRoutes), obj.GetName())
+			if err := tm.applyResource(ctx, obj); err != nil {
+				klog.Warningf("Failed to apply IngressRoute %s: %v", obj.GetName(), err)
+			}
 		}
 	}
 
+	klog.Info("Traefik deployment completed successfully")
 	return nil
 }
 
@@ -166,11 +175,11 @@ func (tm *TraefikManager) WaitForReady(ctx context.Context, timeout time.Duratio
 			}
 
 			if deployment.Status.ReadyReplicas == *deployment.Spec.Replicas {
-				klog.Info("Traefik is ready")
+				klog.Info("Traefik deployment is ready")
 				return nil
 			}
 
-			klog.V(4).Infof("Waiting for Traefik to be ready: %d/%d replicas ready",
+			klog.Infof("Waiting for Traefik deployment: %d/%d replicas ready",
 				deployment.Status.ReadyReplicas, *deployment.Spec.Replicas)
 		}
 	}

@@ -108,6 +108,8 @@ func InitConfig() error {
 	// LocalStack defaults
 	v.SetDefault("localstack.enabled", true) // Enable LocalStack by default
 	v.SetDefault("localstack.useTraefik", true) // Enable Traefik for LocalStack by default
+	v.SetDefault("localstack.image", "localstack/localstack")
+	v.SetDefault("localstack.version", "latest")
 	
 	// Enable environment variable support
 	v.SetEnvPrefix("KECS")
