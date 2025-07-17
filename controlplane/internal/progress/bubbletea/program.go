@@ -5,10 +5,12 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"k8s.io/klog/v2"
 )
 
 // Program wraps the Bubble Tea program for progress tracking
@@ -58,19 +60,23 @@ func (p *Program) Start() error {
 	p.started = true
 	p.mu.Unlock()
 	
-	// Redirect log output
+	// Redirect log output first
 	p.logCapture.Start()
+	
+	// Also capture stderr for external tools
+	p.logCapture.StartStderrCapture()
 	
 	// Run the program in a goroutine
 	go func() {
 		if _, err := p.program.Run(); err != nil {
-			log.Printf("Error running progress display: %v", err)
+			// Don't use log here as it might be captured
+			fmt.Fprintf(os.Stderr, "Error running progress display: %v\n", err)
 		}
 		close(p.done)
 	}()
 	
-	// Give it a moment to initialize
-	time.Sleep(100 * time.Millisecond)
+	// Wait a bit longer to ensure the TUI is fully initialized
+	time.Sleep(300 * time.Millisecond)
 	
 	return nil
 }
@@ -84,8 +90,9 @@ func (p *Program) Stop() {
 		return
 	}
 	
-	// Restore log output
+	// Restore log output and stderr
 	p.logCapture.Stop()
+	p.logCapture.StopStderrCapture()
 	
 	// Send quit message
 	p.program.Send(tea.Quit())
@@ -161,10 +168,14 @@ func (p *Program) Log(level, format string, args ...interface{}) {
 
 // logCapture captures log output and sends it to the program
 type logCapture struct {
-	program      *tea.Program
-	originalOut  io.Writer
-	buffer       []logEntry
-	mu           sync.Mutex
+	program        *tea.Program
+	originalOut    io.Writer
+	buffer         []logEntry
+	mu             sync.Mutex
+	stderrPipe     *os.File
+	originalStderr *os.File
+	stderrReader   *os.File
+	stderrStop     chan struct{}
 }
 
 type logEntry struct {
@@ -177,14 +188,93 @@ func (lc *logCapture) Start() {
 	lc.originalOut = log.Writer()
 	log.SetOutput(lc)
 	
-	// Also redirect stdout/stderr for external commands
-	// Note: This is simplified - in production you'd want more robust handling
+	// Set environment variables to suppress k3d logs
+	os.Setenv("K3D_LOG_LEVEL", "panic")
+	os.Setenv("DOCKER_CLI_HINTS", "false")
+	
+	// Redirect klog output to our writer
+	klog.SetOutput(lc)
 }
 
 // Stop stops capturing and restores original output
 func (lc *logCapture) Stop() {
 	if lc.originalOut != nil {
 		log.SetOutput(lc.originalOut)
+		// Flush klog before restoring
+		klog.Flush()
+		// Also restore klog to stderr
+		klog.SetOutput(os.Stderr)
+	}
+}
+
+// StartStderrCapture starts capturing stderr output
+func (lc *logCapture) StartStderrCapture() {
+	lc.mu.Lock()
+	defer lc.mu.Unlock()
+	
+	// Create a pipe to capture stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		return
+	}
+	
+	lc.originalStderr = os.Stderr
+	lc.stderrReader = r
+	lc.stderrPipe = w
+	lc.stderrStop = make(chan struct{})
+	
+	// Redirect stderr to our pipe
+	os.Stderr = w
+	
+	// Start a goroutine to read from the pipe
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			select {
+			case <-lc.stderrStop:
+				return
+			default:
+				n, err := r.Read(buf)
+				if err != nil {
+					return
+				}
+				if n > 0 && lc.program != nil {
+					// Send stderr output as log message
+					message := strings.TrimRight(string(buf[:n]), "\n\r")
+					if message != "" {
+						lc.program.Send(AddLogMsg{
+							Level:   "INFO",
+							Message: message,
+						})
+					}
+				}
+			}
+		}
+	}()
+}
+
+// StopStderrCapture stops capturing stderr and restores original
+func (lc *logCapture) StopStderrCapture() {
+	lc.mu.Lock()
+	defer lc.mu.Unlock()
+	
+	if lc.stderrStop != nil {
+		close(lc.stderrStop)
+	}
+	
+	if lc.originalStderr != nil {
+		os.Stderr = lc.originalStderr
+		lc.originalStderr = nil
+	}
+	
+	if lc.stderrPipe != nil {
+		lc.stderrPipe.Close()
+		lc.stderrPipe = nil
+	}
+	
+	if lc.stderrReader != nil {
+		lc.stderrReader.Close()
+		lc.stderrReader = nil
 	}
 }
 
@@ -196,12 +286,28 @@ func (lc *logCapture) Write(p []byte) (n int, err error) {
 	if lc.program != nil {
 		// Determine log level from content
 		level := "INFO"
-		if contains(message, "error", "ERROR", "Error") {
-			level = "ERROR"
-		} else if contains(message, "warn", "WARN", "Warn", "warning", "WARNING") {
-			level = "WARN"
-		} else if contains(message, "debug", "DEBUG", "Debug") {
-			level = "DEBUG"
+		
+		// Check for klog format (I0717, E0717, W0717, etc.)
+		if len(message) > 0 {
+			switch message[0] {
+			case 'I':
+				level = "INFO"
+			case 'E':
+				level = "ERROR"
+			case 'W':
+				level = "WARN"
+			case 'F':
+				level = "FATAL"
+			default:
+				// Fallback to content-based detection
+				if contains(message, "error", "ERROR", "Error") {
+					level = "ERROR"
+				} else if contains(message, "warn", "WARN", "Warn", "warning", "WARNING") {
+					level = "WARN"
+				} else if contains(message, "debug", "DEBUG", "Debug") {
+					level = "DEBUG"
+				}
+			}
 		}
 		
 		lc.program.Send(AddLogMsg{

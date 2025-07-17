@@ -3,12 +3,14 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
@@ -16,40 +18,76 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress/bubbletea"
+	"github.com/sirupsen/logrus"
 )
 
 // runStartV2WithBubbleTea is an alternative implementation using Bubble Tea
 func runStartV2WithBubbleTea(ctx context.Context, instanceName string, cfg *config.Config, dataDir string) error {
-	// Show header
-	progress.SectionHeader(fmt.Sprintf("Creating KECS instance '%s'", instanceName))
-
-	// Step 1: Create k3d cluster
-	spinner := progress.NewSpinner("Creating k3d cluster")
-	spinner.Start()
+	// Set environment variables to suppress external tool logs before starting
+	originalK3dLogLevel := os.Getenv("K3D_LOG_LEVEL")
+	os.Setenv("K3D_LOG_LEVEL", "panic") // Only show critical errors
 	
-	if err := createK3dCluster(ctx, instanceName, cfg, dataDir); err != nil {
-		spinner.Fail("Failed to create k3d cluster")
-		return fmt.Errorf("failed to create k3d cluster: %w", err)
-	}
-	spinner.Success("k3d cluster created")
-
-	// Step 2: Create kecs-system namespace
-	spinner = progress.NewSpinner("Creating kecs-system namespace")
-	spinner.Start()
-	if err := createKecsSystemNamespace(ctx, instanceName); err != nil {
-		spinner.Fail("Failed to create namespace")
-		return fmt.Errorf("failed to create kecs-system namespace: %w", err)
-	}
-	spinner.Success("kecs-system namespace created")
-
-	// Step 3: Deploy components using Bubble Tea
-	err := bubbletea.RunWithBubbleTea(ctx, "Deploying components", func(tracker *bubbletea.Adapter) error {
-		// Add tasks
+	// Also suppress other potential loggers
+	os.Setenv("DOCKER_CLI_HINTS", "false")
+	os.Setenv("LOGRUS_LEVEL", "panic")
+	
+	// Configure logrus immediately to discard output
+	logrus.SetLevel(logrus.PanicLevel)
+	originalLogrusOut := logrus.StandardLogger().Out
+	logrus.SetOutput(io.Discard)
+	
+	defer func() {
+		if originalK3dLogLevel != "" {
+			os.Setenv("K3D_LOG_LEVEL", originalK3dLogLevel)
+		} else {
+			os.Unsetenv("K3D_LOG_LEVEL")
+		}
+		os.Unsetenv("DOCKER_CLI_HINTS")
+		os.Unsetenv("LOGRUS_LEVEL")
+		
+		// Restore logrus
+		logrus.SetOutput(originalLogrusOut)
+		logrus.SetLevel(logrus.InfoLevel)
+	}()
+	
+	// Use Bubble Tea for the entire process with silent start
+	return bubbletea.RunWithBubbleTeaSilent(ctx, fmt.Sprintf("Creating KECS instance '%s'", instanceName), func(tracker *bubbletea.Adapter) error {
+		// Log the generated name if it was auto-generated
+		if instanceName != "" {
+			tracker.Log(progress.LogLevelInfo, "KECS instance name: %s", instanceName)
+		}
+		
+		// Add all tasks upfront so they're visible immediately
+		tracker.AddTask("k3d-cluster", "k3d cluster", 100)
+		tracker.AddTask("namespace", "kecs-system namespace", 100)
 		tracker.AddTask("controlplane", "Control Plane", 100)
 		if cfg.LocalStack.Enabled {
 			tracker.AddTask("localstack", "LocalStack", 100)
 		}
-		
+		if cfg.Features.Traefik {
+			tracker.AddTask("traefik", "Traefik gateway", 100)
+		}
+		tracker.AddTask("wait-ready", "Waiting for components", 100)
+
+		// Step 1: Create k3d cluster
+		tracker.StartTask("k3d-cluster")
+		tracker.UpdateTask("k3d-cluster", 10, "Creating cluster...")
+		if err := createK3dClusterWithProgress(ctx, instanceName, cfg, dataDir, tracker); err != nil {
+			tracker.FailTask("k3d-cluster", err)
+			return fmt.Errorf("failed to create k3d cluster: %w", err)
+		}
+		tracker.CompleteTask("k3d-cluster")
+
+		// Step 2: Create kecs-system namespace
+		tracker.StartTask("namespace")
+		tracker.UpdateTask("namespace", 10, "Creating namespace...")
+		if err := createKecsSystemNamespaceWithProgress(ctx, instanceName, tracker); err != nil {
+			tracker.FailTask("namespace", err)
+			return fmt.Errorf("failed to create kecs-system namespace: %w", err)
+		}
+		tracker.CompleteTask("namespace")
+
+		// Step 3: Deploy Control Plane and LocalStack in parallel
 		var wg sync.WaitGroup
 		errChan := make(chan error, 2)
 		
@@ -89,52 +127,159 @@ func runStartV2WithBubbleTea(ctx context.Context, instanceName string, cfg *conf
 		for err := range errChan {
 			return err
 		}
+
+		// Step 4: Deploy Traefik gateway (if enabled)
+		if cfg.Features.Traefik {
+			tracker.StartTask("traefik")
+			tracker.UpdateTask("traefik", 10, "Deploying gateway...")
+			if err := deployTraefikGatewayWithProgress(ctx, instanceName, cfg, startV2ApiPort, tracker); err != nil {
+				tracker.FailTask("traefik", err)
+				return fmt.Errorf("failed to deploy Traefik gateway: %w", err)
+			}
+			tracker.CompleteTask("traefik")
+		}
+
+		// Step 5: Wait for all components to be ready
+		tracker.StartTask("wait-ready")
+		tracker.UpdateTask("wait-ready", 10, "Checking components...")
+		if err := waitForComponentsWithProgress(ctx, instanceName, tracker); err != nil {
+			tracker.FailTask("wait-ready", err)
+			return fmt.Errorf("components did not become ready: %w", err)
+		}
+		tracker.CompleteTask("wait-ready")
+
+		// All done - show success in logs
+		tracker.Log(progress.LogLevelInfo, "🎉 KECS instance '%s' is ready!", instanceName)
+		tracker.Log(progress.LogLevelInfo, "")
+		tracker.Log(progress.LogLevelInfo, "Endpoints:")
+		tracker.Log(progress.LogLevelInfo, "  AWS API: http://localhost:%d", startV2ApiPort)
+		tracker.Log(progress.LogLevelInfo, "  Admin API: http://localhost:%d", startV2AdminPort)
+		tracker.Log(progress.LogLevelInfo, "  Data directory: %s", dataDir)
+		
+		if cfg.LocalStack.Enabled {
+			tracker.Log(progress.LogLevelInfo, "")
+			tracker.Log(progress.LogLevelInfo, "LocalStack services: %v", cfg.LocalStack.Services)
+		}
+		
+		tracker.Log(progress.LogLevelInfo, "")
+		tracker.Log(progress.LogLevelInfo, "Next steps:")
+		tracker.Log(progress.LogLevelInfo, "  To stop this instance: kecs stop-v2 --instance %s", instanceName)
+		tracker.Log(progress.LogLevelInfo, "  To get kubeconfig: kecs kubeconfig get %s", instanceName)
 		
 		return nil
 	})
-	
-	if err != nil {
-		return err
-	}
+}
 
-	// Step 4: Deploy Traefik gateway (if enabled)
-	if cfg.Features.Traefik {
-		spinner = progress.NewSpinner("Deploying Traefik gateway")
-		spinner.Start()
-		if err := deployTraefikGateway(ctx, instanceName, cfg, startV2ApiPort); err != nil {
-			spinner.Fail("Failed to deploy Traefik")
-			return fmt.Errorf("failed to deploy Traefik gateway: %w", err)
+// createK3dClusterWithProgress wraps createK3dCluster with progress reporting
+func createK3dClusterWithProgress(ctx context.Context, clusterName string, cfg *config.Config, dataDir string, tracker *bubbletea.Adapter) error {
+	tracker.UpdateTask("k3d-cluster", 30, "Initializing cluster manager...")
+	
+	// Suppress k3d logs temporarily
+	originalLogLevel := os.Getenv("K3D_LOG_LEVEL")
+	os.Setenv("K3D_LOG_LEVEL", "error")
+	defer func() {
+		if originalLogLevel != "" {
+			os.Setenv("K3D_LOG_LEVEL", originalLogLevel)
+		} else {
+			os.Unsetenv("K3D_LOG_LEVEL")
 		}
-		spinner.Success("Traefik gateway deployed")
-	}
-
-	// Step 5: Wait for all components to be ready
-	spinner = progress.NewSpinner("Waiting for all components to be ready")
-	spinner.Start()
-	if err := waitForComponents(ctx, instanceName); err != nil {
-		spinner.Fail("Components failed to become ready")
-		return fmt.Errorf("components did not become ready: %w", err)
-	}
-	spinner.Success("All components are ready")
-
-	// Show success summary
-	progress.Success("KECS instance '%s' is ready!", instanceName)
+	}()
 	
-	fmt.Println()
-	progress.Info("Endpoints:")
-	fmt.Printf("  AWS API: http://localhost:%d\n", startV2ApiPort)
-	fmt.Printf("  Admin API: http://localhost:%d\n", startV2AdminPort)
-	fmt.Printf("  Data directory: %s\n", dataDir)
-
-	if cfg.LocalStack.Enabled {
-		fmt.Printf("\nLocalStack services: %v\n", cfg.LocalStack.Services)
+	// Create k3d cluster manager configuration
+	clusterConfig := &kubernetes.ClusterManagerConfig{
+		Provider:      "k3d",
+		ContainerMode: false,
+		EnableTraefik: true,
+		TraefikPort:   startV2ApiPort,
+		VolumeMounts: []kubernetes.VolumeMount{
+			{
+				HostPath:      dataDir,
+				ContainerPath: "/data",
+			},
+		},
 	}
 
-	fmt.Println()
-	progress.Info("Next steps:")
-	fmt.Printf("  To stop this instance: kecs stop-v2 --instance %s\n", instanceName)
-	fmt.Printf("  To get kubeconfig: kecs kubeconfig get %s\n", instanceName)
+	// Create k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(clusterConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
 
+	tracker.UpdateTask("k3d-cluster", 50, "Checking if cluster exists...")
+
+	// Check if cluster already exists
+	exists, err := manager.ClusterExists(ctx, clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to check cluster existence: %w", err)
+	}
+
+	if exists {
+		tracker.Log(progress.LogLevelInfo, "k3d cluster '%s' already exists, using existing cluster", clusterName)
+		tracker.UpdateTask("k3d-cluster", 100, "Using existing cluster")
+		return nil
+	}
+
+	tracker.UpdateTask("k3d-cluster", 70, "Creating k3d cluster...")
+
+	// Create the cluster
+	if err := manager.CreateCluster(ctx, clusterName); err != nil {
+		return fmt.Errorf("failed to create cluster: %w", err)
+	}
+
+	tracker.UpdateTask("k3d-cluster", 90, "Waiting for cluster to be ready...")
+
+	// Wait for cluster to be ready
+	if err := manager.WaitForClusterReady(clusterName, 5*time.Minute); err != nil {
+		return fmt.Errorf("cluster did not become ready: %w", err)
+	}
+
+	tracker.UpdateTask("k3d-cluster", 100, "Cluster is ready!")
+	return nil
+}
+
+// createKecsSystemNamespaceWithProgress wraps createKecsSystemNamespace with progress reporting
+func createKecsSystemNamespaceWithProgress(ctx context.Context, clusterName string, tracker *bubbletea.Adapter) error {
+	tracker.UpdateTask("namespace", 30, "Getting Kubernetes client...")
+	
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	// Get Kubernetes client
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	tracker.UpdateTask("namespace", 60, "Creating namespace...")
+
+	// Create kecs-system namespace directly
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kecs-system",
+			Labels: map[string]string{
+				"kecs.dev/managed": "true",
+				"kecs.dev/type":    "system",
+			},
+		},
+	}
+
+	_, err = kubeClient.CoreV1().Namespaces().Get(ctx, "kecs-system", metav1.GetOptions{})
+	if err == nil {
+		tracker.Log(progress.LogLevelInfo, "kecs-system namespace already exists")
+		tracker.UpdateTask("namespace", 100, "Namespace already exists")
+		return nil
+	}
+
+	_, err = kubeClient.CoreV1().Namespaces().Create(ctx, namespace, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create kecs-system namespace: %w", err)
+	}
+
+	tracker.UpdateTask("namespace", 100, "Namespace created")
+	tracker.Log(progress.LogLevelInfo, "Created kecs-system namespace")
 	return nil
 }
 
@@ -315,4 +460,188 @@ func deployLocalStackWithBubbleTeaProgress(ctx context.Context, clusterName stri
 	}
 
 	return fmt.Errorf("LocalStack did not become ready in time")
+}
+
+// deployTraefikGatewayWithProgress wraps deployTraefikGateway with progress reporting
+func deployTraefikGatewayWithProgress(ctx context.Context, clusterName string, cfg *config.Config, apiPort int, tracker *bubbletea.Adapter) error {
+	tracker.UpdateTask("traefik", 20, "Getting cluster manager")
+	
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	tracker.UpdateTask("traefik", 30, "Getting Kubernetes client")
+	
+	// Get Kubernetes client
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	tracker.UpdateTask("traefik", 40, "Locating Traefik manifests")
+	
+	// Find Traefik manifests directory
+	traefikManifestsDir := ""
+	if _, err := os.Stat("manifests/traefik"); err == nil {
+		traefikManifestsDir = "manifests/traefik"
+	} else if _, err := os.Stat("controlplane/manifests/traefik"); err == nil {
+		traefikManifestsDir = "controlplane/manifests/traefik"
+	} else if gopath := os.Getenv("GOPATH"); gopath != "" {
+		gopathManifests := filepath.Join(gopath, "src/github.com/nandemo-ya/kecs/controlplane/manifests/traefik")
+		if _, err := os.Stat(gopathManifests); err == nil {
+			traefikManifestsDir = gopathManifests
+		}
+	}
+
+	if traefikManifestsDir == "" {
+		execPath, err := os.Executable()
+		if err == nil {
+			execDir := filepath.Dir(execPath)
+			if filepath.Base(execDir) == "bin" {
+				parentDir := filepath.Dir(execDir)
+				possiblePath := filepath.Join(parentDir, "controlplane/manifests/traefik")
+				if _, err := os.Stat(possiblePath); err == nil {
+					traefikManifestsDir = possiblePath
+				}
+			}
+		}
+	}
+
+	if _, err := os.Stat(traefikManifestsDir); os.IsNotExist(err) {
+		return fmt.Errorf("traefik manifests directory not found: %s", traefikManifestsDir)
+	}
+
+	tracker.UpdateTask("traefik", 60, "Applying Traefik manifests")
+	
+	// Apply Traefik manifests
+	cmd := exec.Command("kubectl", "apply", "-k", traefikManifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to apply traefik manifests: %w", err)
+	}
+
+	tracker.UpdateTask("traefik", 80, "Waiting for Traefik deployment")
+	
+	// Wait for Traefik deployment to be ready
+	deployment := "traefik"
+	namespace := "kecs-system"
+	
+	for i := 0; i < 60; i++ { // Wait up to 5 minutes
+		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
+		if err == nil && deps.Status.ReadyReplicas > 0 {
+			tracker.Log(progress.LogLevelInfo, "Traefik deployment is ready!")
+			break
+		}
+		time.Sleep(5 * time.Second)
+		
+		progress := 80 + (i * 15 / 60) // Progress from 80% to 95%
+		tracker.UpdateTask("traefik", progress, fmt.Sprintf("Waiting for pods (%ds/300s)", (i+1)*5))
+	}
+
+	tracker.UpdateTask("traefik", 95, "Waiting for Traefik service")
+	
+	// Wait for Traefik service to get external IP/port
+	service := "traefik"
+	
+	for i := 0; i < 30; i++ { // Wait up to 2.5 minutes
+		svc, err := kubeClient.CoreV1().Services(namespace).Get(ctx, service, metav1.GetOptions{})
+		if err == nil && len(svc.Status.LoadBalancer.Ingress) > 0 {
+			tracker.Log(progress.LogLevelInfo, "Traefik service is ready!")
+			tracker.Log(progress.LogLevelInfo, "Traefik LoadBalancer: %s", svc.Status.LoadBalancer.Ingress[0].Hostname)
+			tracker.UpdateTask("traefik", 100, "Service ready")
+			return nil
+		}
+		time.Sleep(5 * time.Second)
+	}
+
+	// For k3d, the LoadBalancer might not get an external IP
+	tracker.Log(progress.LogLevelInfo, "Traefik service is ready! (using k3d port mapping)")
+	tracker.UpdateTask("traefik", 100, "Ready with k3d port mapping")
+	
+	return nil
+}
+
+// waitForComponentsWithProgress wraps waitForComponents with progress reporting
+func waitForComponentsWithProgress(ctx context.Context, clusterName string, tracker *bubbletea.Adapter) error {
+	tracker.UpdateTask("wait-ready", 20, "Getting cluster manager")
+	
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	tracker.UpdateTask("wait-ready", 30, "Getting Kubernetes client")
+	
+	// Get Kubernetes client
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	namespace := "kecs-system"
+	components := []struct {
+		name       string
+		deployment string
+		required   bool
+	}{
+		{"KECS Control Plane", "kecs-controlplane", true},
+		{"Traefik Gateway", "traefik", true},
+		{"LocalStack", "localstack", false}, // Optional based on config
+	}
+
+	tracker.UpdateTask("wait-ready", 50, "Checking component readiness")
+	tracker.Log(progress.LogLevelInfo, "Checking component readiness...")
+	
+	allReady := true
+	for _, comp := range components {
+		// Check deployment
+		deployment, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, comp.deployment, metav1.GetOptions{})
+		if err != nil {
+			if comp.required {
+				tracker.Log(progress.LogLevelError, "  %s: ❌ Not found", comp.name)
+				allReady = false
+			} else {
+				tracker.Log(progress.LogLevelInfo, "  %s: ⏭️  Skipped (optional)", comp.name)
+			}
+			continue
+		}
+
+		// Check if deployment is ready
+		if deployment.Status.ReadyReplicas >= 1 {
+			tracker.Log(progress.LogLevelInfo, "  %s: ✅ Ready (%d/%d replicas)", comp.name, deployment.Status.ReadyReplicas, *deployment.Spec.Replicas)
+		} else {
+			tracker.Log(progress.LogLevelWarning, "  %s: ⏳ Not ready (0/%d replicas)", comp.name, *deployment.Spec.Replicas)
+			if comp.required {
+				allReady = false
+			}
+		}
+
+		// Check service endpoint
+		service, err := kubeClient.CoreV1().Services(namespace).Get(ctx, comp.deployment, metav1.GetOptions{})
+		if err == nil && len(service.Spec.Ports) > 0 {
+			tracker.Log(progress.LogLevelInfo, "    Service: %s:%d", service.Name, service.Spec.Ports[0].Port)
+		}
+	}
+
+	if !allReady {
+		return fmt.Errorf("some required components are not ready")
+	}
+
+	tracker.UpdateTask("wait-ready", 80, "Checking API connectivity")
+	
+	// Check API connectivity
+	tracker.Log(progress.LogLevelInfo, "Checking API connectivity...")
+	
+	// Test KECS control plane health endpoint
+	adminEndpoint := fmt.Sprintf("http://localhost:%d/health", startV2AdminPort)
+	if err := checkEndpointHealth(adminEndpoint, 30*time.Second); err != nil {
+		tracker.Log(progress.LogLevelError, "❌ KECS admin API not accessible")
+		return fmt.Errorf("KECS admin API not accessible: %w", err)
+	}
+	tracker.Log(progress.LogLevelInfo, "✅ API connectivity verified")
+	
+	tracker.UpdateTask("wait-ready", 100, "All components ready")
+	return nil
 }

@@ -30,12 +30,17 @@ func NewAdapter(title string) *Adapter {
 
 // Start begins the progress display
 func (a *Adapter) Start() error {
-	return a.program.Start()
+	if a.program != nil {
+		return a.program.Start()
+	}
+	return nil
 }
 
 // Stop stops the progress display
 func (a *Adapter) Stop() {
-	a.program.Stop()
+	if a.program != nil {
+		a.program.Stop()
+	}
 }
 
 // AddTask adds a new task to track
@@ -44,27 +49,49 @@ func (a *Adapter) AddTask(id, name string, total int) {
 	a.tasks[id] = struct{ total int }{total: total}
 	a.mu.Unlock()
 	
-	a.program.AddTask(id, name, float64(total))
+	if a.program != nil {
+		a.program.AddTask(id, name, float64(total))
+	} else {
+		// Fallback to console output
+		fmt.Printf("• %s\n", name)
+	}
 }
 
 // StartTask marks a task as running
 func (a *Adapter) StartTask(id string) {
-	a.program.UpdateTask(id, 0, "Starting...")
+	if a.program != nil {
+		a.program.UpdateTask(id, 0, "Starting...")
+	}
 }
 
 // UpdateTask updates the progress of a task
 func (a *Adapter) UpdateTask(id string, progress int, message string) {
-	a.program.UpdateTask(id, float64(progress), message)
+	if a.program != nil {
+		a.program.UpdateTask(id, float64(progress), message)
+	} else {
+		// Fallback to console output
+		fmt.Printf("  ↳ %s (%d%%)\n", message, progress)
+	}
 }
 
 // CompleteTask marks a task as completed
 func (a *Adapter) CompleteTask(id string) {
-	a.program.CompleteTask(id)
+	if a.program != nil {
+		a.program.CompleteTask(id)
+	} else {
+		// Fallback to console output
+		fmt.Printf("  ✓ Completed\n")
+	}
 }
 
 // FailTask marks a task as failed
 func (a *Adapter) FailTask(id string, err error) {
-	a.program.FailTask(id, err)
+	if a.program != nil {
+		a.program.FailTask(id, err)
+	} else {
+		// Fallback to console output
+		fmt.Printf("  ✗ Failed: %v\n", err)
+	}
 }
 
 // Log adds a log entry
@@ -79,7 +106,21 @@ func (a *Adapter) Log(level progress.LogLevel, format string, args ...interface{
 		levelStr = "ERROR"
 	}
 	
-	a.program.Log(levelStr, format, args...)
+	if a.program != nil {
+		a.program.Log(levelStr, format, args...)
+	} else {
+		// Fallback to console output
+		prefix := ""
+		switch level {
+		case progress.LogLevelError:
+			prefix = "ERROR: "
+		case progress.LogLevelWarning:
+			prefix = "WARN: "
+		case progress.LogLevelDebug:
+			prefix = "DEBUG: "
+		}
+		fmt.Printf(prefix+format+"\n", args...)
+	}
 }
 
 // Summary returns a summary of all tasks (not implemented for Bubble Tea)
@@ -108,7 +149,9 @@ func RunWithBubbleTea(ctx context.Context, title string, fn func(*Adapter) error
 	}
 	
 	// Mark as complete
-	adapter.program.Complete()
+	if adapter.program != nil {
+		adapter.program.Complete()
+	}
 	
 	return nil
 }
