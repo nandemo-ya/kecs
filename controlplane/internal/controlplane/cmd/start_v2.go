@@ -17,11 +17,12 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 )
 
 var (
 	// Start v2 flags (new architecture)
-	startV2ClusterName string
+	startV2InstanceName string
 	startV2DataDir     string
 	startV2ApiPort     int
 	startV2AdminPort   int
@@ -42,7 +43,7 @@ This provides a unified AWS API endpoint accessible from all containers.`,
 func init() {
 	RootCmd.AddCommand(startV2Cmd)
 
-	startV2Cmd.Flags().StringVar(&startV2ClusterName, "name", "kecs", "Cluster name")
+	startV2Cmd.Flags().StringVar(&startV2InstanceName, "instance", "", "KECS instance name (auto-generated if not specified)")
 	startV2Cmd.Flags().StringVar(&startV2DataDir, "data-dir", "", "Data directory (default: ~/.kecs/data)")
 	startV2Cmd.Flags().IntVar(&startV2ApiPort, "api-port", 4566, "AWS API port (Traefik gateway)")
 	startV2Cmd.Flags().IntVar(&startV2AdminPort, "admin-port", 8081, "Admin API port")
@@ -53,7 +54,17 @@ func init() {
 }
 
 func runStartV2(cmd *cobra.Command, args []string) error {
-	fmt.Println("Starting KECS with control plane in k3d cluster (new architecture)...")
+	// Generate instance name if not provided
+	if startV2InstanceName == "" {
+		generatedName, err := utils.GenerateRandomName()
+		if err != nil {
+			return fmt.Errorf("failed to generate instance name: %w", err)
+		}
+		startV2InstanceName = generatedName
+		fmt.Printf("Generated KECS instance name: %s\n", startV2InstanceName)
+	}
+
+	fmt.Printf("Starting KECS instance '%s'...\n", startV2InstanceName)
 
 	// Load configuration
 	cfg, err := config.LoadConfig(startV2ConfigFile)
@@ -72,7 +83,7 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 	// Set up data directory
 	if startV2DataDir == "" {
 		home, _ := os.UserHomeDir()
-		startV2DataDir = filepath.Join(home, ".kecs", "data")
+		startV2DataDir = filepath.Join(home, ".kecs", "instances", startV2InstanceName, "data")
 	}
 
 	// Ensure data directory exists
@@ -83,15 +94,15 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), startV2Timeout)
 	defer cancel()
 
-	// Step 1: Create k3d cluster
-	fmt.Printf("\n=== Step 1: Creating k3d cluster '%s' ===\n", startV2ClusterName)
-	if err := createK3dCluster(ctx, startV2ClusterName, cfg, startV2DataDir); err != nil {
+	// Step 1: Create k3d cluster for KECS instance
+	fmt.Printf("\n=== Step 1: Creating infrastructure for KECS instance '%s' ===\n", startV2InstanceName)
+	if err := createK3dCluster(ctx, startV2InstanceName, cfg, startV2DataDir); err != nil {
 		return fmt.Errorf("failed to create k3d cluster: %w", err)
 	}
 
 	// Step 2: Create kecs-system namespace
 	fmt.Printf("\n=== Step 2: Creating kecs-system namespace ===\n")
-	if err := createKecsSystemNamespace(ctx, startV2ClusterName); err != nil {
+	if err := createKecsSystemNamespace(ctx, startV2InstanceName); err != nil {
 		return fmt.Errorf("failed to create kecs-system namespace: %w", err)
 	}
 
@@ -106,7 +117,7 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 	go func() {
 		defer wg.Done()
 		fmt.Println("  • Deploying KECS control plane...")
-		if err := deployControlPlane(ctx, startV2ClusterName, cfg, startV2DataDir); err != nil {
+		if err := deployControlPlane(ctx, startV2InstanceName, cfg, startV2DataDir); err != nil {
 			errChan <- fmt.Errorf("failed to deploy control plane: %w", err)
 			return
 		}
@@ -119,7 +130,7 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 		go func() {
 			defer wg.Done()
 			fmt.Println("  • Deploying LocalStack...")
-			if err := deployLocalStack(ctx, startV2ClusterName, cfg); err != nil {
+			if err := deployLocalStack(ctx, startV2InstanceName, cfg); err != nil {
 				errChan <- fmt.Errorf("failed to deploy LocalStack: %w", err)
 				return
 			}
@@ -139,18 +150,18 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 	// Step 4: Deploy Traefik gateway (if enabled) - must be after control plane and LocalStack
 	if cfg.Features.Traefik {
 		fmt.Printf("\n=== Step 4: Deploying Traefik AWS API gateway ===\n")
-		if err := deployTraefikGateway(ctx, startV2ClusterName, cfg, startV2ApiPort); err != nil {
+		if err := deployTraefikGateway(ctx, startV2InstanceName, cfg, startV2ApiPort); err != nil {
 			return fmt.Errorf("failed to deploy Traefik gateway: %w", err)
 		}
 	}
 
 	// Step 5: Wait for all components to be ready
 	fmt.Printf("\n=== Step 5: Waiting for all components to be ready ===\n")
-	if err := waitForComponents(ctx, startV2ClusterName); err != nil {
+	if err := waitForComponents(ctx, startV2InstanceName); err != nil {
 		return fmt.Errorf("components did not become ready: %w", err)
 	}
 
-	fmt.Printf("\n✅ KECS started successfully!\n")
+	fmt.Printf("\n✅ KECS instance '%s' is ready!\n", startV2InstanceName)
 	fmt.Printf("\nEndpoints:\n")
 	fmt.Printf("  AWS API: http://localhost:%d\n", startV2ApiPort)
 	fmt.Printf("  Admin API: http://localhost:%d\n", startV2AdminPort)
@@ -160,7 +171,8 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 		fmt.Printf("\nLocalStack services: %v\n", cfg.LocalStack.Services)
 	}
 
-	fmt.Printf("\nTo stop KECS: kecs stop-v2 --name %s\n", startV2ClusterName)
+	fmt.Printf("\nTo stop this instance: kecs stop-v2 --instance %s\n", startV2InstanceName)
+	fmt.Printf("To get kubeconfig: kecs kubeconfig get %s\n", startV2InstanceName)
 
 	return nil
 }
