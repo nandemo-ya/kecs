@@ -113,9 +113,33 @@ kecs tui
 6. **Log Viewing**: Integrated task log viewer
 7. **Help System**: Context-sensitive help
 
+### Future Enhancement: Deployment Monitoring
+
+As part of Phase 2 of the CLI progress visualization improvements (see ADR-0019), the TUI will be extended with:
+
+1. **Deployments View** (6th view)
+   - Real-time monitoring of `start-v2` and `stop-v2` operations
+   - Instance lifecycle management
+   - Deployment logs and progress tracking
+   - Integration with the progress visualization system
+
+2. **Instance Management Features**
+   - List all KECS instances with their status
+   - Create new instances (equivalent to `start-v2`)
+   - Stop/delete instances (equivalent to `stop-v2`)
+   - View deployment history and logs
+
+3. **Enhanced Status Indicators**
+   - Real-time progress bars for ongoing deployments
+   - Component health status (Control Plane, LocalStack, Traefik)
+   - Resource utilization metrics
+
+This will provide a unified interface for both resource management and deployment operations, eliminating the need to switch between CLI and TUI for different tasks.
+
 ## References
 
 - [Bubbletea](https://github.com/charmbracelet/bubbletea)
 - [k9s](https://k9scli.io/) - Inspiration for TUI design
 - [lazydocker](https://github.com/jesseduffield/lazydocker) - Another excellent TUI example
 - [ADR-0005](./0005-web-ui.md) - Original Web UI decision (superseded)
+- [ADR-0019](./0019-cli-progress-visualization.md) - CLI progress visualization improvements
