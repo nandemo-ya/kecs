@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
+	"github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
 )
 
@@ -72,6 +73,20 @@ func RunWithBubbleTeaSilent(ctx context.Context, title string, fn func(*Adapter)
 	defer func() {
 		klog.Flush()
 		klog.SetOutput(os.Stderr)
+	}()
+	
+	// Set environment to suppress logrus output from k3d
+	// This is needed because k3d uses logrus internally
+	os.Setenv("LOGRUS_LEVEL", "panic")
+	defer os.Unsetenv("LOGRUS_LEVEL")
+	
+	// Also configure logrus directly
+	originalLogrusOut := logrus.StandardLogger().Out
+	logrus.SetOutput(silentLogWriter)
+	logrus.SetLevel(logrus.PanicLevel)
+	defer func() {
+		logrus.SetOutput(originalLogrusOut)
+		logrus.SetLevel(logrus.InfoLevel)
 	}()
 	
 	// Create and start the program

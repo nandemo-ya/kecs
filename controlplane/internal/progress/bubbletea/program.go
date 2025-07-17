@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -62,6 +63,9 @@ func (p *Program) Start() error {
 	// Redirect log output first
 	p.logCapture.Start()
 	
+	// Also capture stderr for external tools
+	p.logCapture.StartStderrCapture()
+	
 	// Run the program in a goroutine
 	go func() {
 		if _, err := p.program.Run(); err != nil {
@@ -86,8 +90,9 @@ func (p *Program) Stop() {
 		return
 	}
 	
-	// Restore log output
+	// Restore log output and stderr
 	p.logCapture.Stop()
+	p.logCapture.StopStderrCapture()
 	
 	// Send quit message
 	p.program.Send(tea.Quit())
@@ -163,10 +168,14 @@ func (p *Program) Log(level, format string, args ...interface{}) {
 
 // logCapture captures log output and sends it to the program
 type logCapture struct {
-	program      *tea.Program
-	originalOut  io.Writer
-	buffer       []logEntry
-	mu           sync.Mutex
+	program        *tea.Program
+	originalOut    io.Writer
+	buffer         []logEntry
+	mu             sync.Mutex
+	stderrPipe     *os.File
+	originalStderr *os.File
+	stderrReader   *os.File
+	stderrStop     chan struct{}
 }
 
 type logEntry struct {
@@ -195,6 +204,77 @@ func (lc *logCapture) Stop() {
 		klog.Flush()
 		// Also restore klog to stderr
 		klog.SetOutput(os.Stderr)
+	}
+}
+
+// StartStderrCapture starts capturing stderr output
+func (lc *logCapture) StartStderrCapture() {
+	lc.mu.Lock()
+	defer lc.mu.Unlock()
+	
+	// Create a pipe to capture stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		return
+	}
+	
+	lc.originalStderr = os.Stderr
+	lc.stderrReader = r
+	lc.stderrPipe = w
+	lc.stderrStop = make(chan struct{})
+	
+	// Redirect stderr to our pipe
+	os.Stderr = w
+	
+	// Start a goroutine to read from the pipe
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			select {
+			case <-lc.stderrStop:
+				return
+			default:
+				n, err := r.Read(buf)
+				if err != nil {
+					return
+				}
+				if n > 0 && lc.program != nil {
+					// Send stderr output as log message
+					message := strings.TrimRight(string(buf[:n]), "\n\r")
+					if message != "" {
+						lc.program.Send(AddLogMsg{
+							Level:   "INFO",
+							Message: message,
+						})
+					}
+				}
+			}
+		}
+	}()
+}
+
+// StopStderrCapture stops capturing stderr and restores original
+func (lc *logCapture) StopStderrCapture() {
+	lc.mu.Lock()
+	defer lc.mu.Unlock()
+	
+	if lc.stderrStop != nil {
+		close(lc.stderrStop)
+	}
+	
+	if lc.originalStderr != nil {
+		os.Stderr = lc.originalStderr
+		lc.originalStderr = nil
+	}
+	
+	if lc.stderrPipe != nil {
+		lc.stderrPipe.Close()
+		lc.stderrPipe = nil
+	}
+	
+	if lc.stderrReader != nil {
+		lc.stderrReader.Close()
+		lc.stderrReader = nil
 	}
 }
 

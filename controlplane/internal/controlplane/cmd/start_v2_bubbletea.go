@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress/bubbletea"
+	"github.com/sirupsen/logrus"
 )
 
 // runStartV2WithBubbleTea is an alternative implementation using Bubble Tea
@@ -27,6 +29,12 @@ func runStartV2WithBubbleTea(ctx context.Context, instanceName string, cfg *conf
 	
 	// Also suppress other potential loggers
 	os.Setenv("DOCKER_CLI_HINTS", "false")
+	os.Setenv("LOGRUS_LEVEL", "panic")
+	
+	// Configure logrus immediately to discard output
+	logrus.SetLevel(logrus.PanicLevel)
+	originalLogrusOut := logrus.StandardLogger().Out
+	logrus.SetOutput(io.Discard)
 	
 	defer func() {
 		if originalK3dLogLevel != "" {
@@ -35,6 +43,11 @@ func runStartV2WithBubbleTea(ctx context.Context, instanceName string, cfg *conf
 			os.Unsetenv("K3D_LOG_LEVEL")
 		}
 		os.Unsetenv("DOCKER_CLI_HINTS")
+		os.Unsetenv("LOGRUS_LEVEL")
+		
+		// Restore logrus
+		logrus.SetOutput(originalLogrusOut)
+		logrus.SetLevel(logrus.InfoLevel)
 	}()
 	
 	// Use Bubble Tea for the entire process with silent start
