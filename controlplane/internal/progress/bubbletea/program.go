@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"k8s.io/klog/v2"
 )
 
 // Program wraps the Bubble Tea program for progress tracking
@@ -181,12 +182,17 @@ func (lc *logCapture) Start() {
 	// Set environment variables to suppress k3d logs
 	os.Setenv("K3D_LOG_LEVEL", "panic")
 	os.Setenv("DOCKER_CLI_HINTS", "false")
+	
+	// Redirect klog output to our writer
+	klog.SetOutput(lc)
 }
 
 // Stop stops capturing and restores original output
 func (lc *logCapture) Stop() {
 	if lc.originalOut != nil {
 		log.SetOutput(lc.originalOut)
+		// Also restore klog to stderr
+		klog.SetOutput(os.Stderr)
 	}
 }
 
@@ -198,12 +204,28 @@ func (lc *logCapture) Write(p []byte) (n int, err error) {
 	if lc.program != nil {
 		// Determine log level from content
 		level := "INFO"
-		if contains(message, "error", "ERROR", "Error") {
-			level = "ERROR"
-		} else if contains(message, "warn", "WARN", "Warn", "warning", "WARNING") {
-			level = "WARN"
-		} else if contains(message, "debug", "DEBUG", "Debug") {
-			level = "DEBUG"
+		
+		// Check for klog format (I0717, E0717, W0717, etc.)
+		if len(message) > 0 {
+			switch message[0] {
+			case 'I':
+				level = "INFO"
+			case 'E':
+				level = "ERROR"
+			case 'W':
+				level = "WARN"
+			case 'F':
+				level = "FATAL"
+			default:
+				// Fallback to content-based detection
+				if contains(message, "error", "ERROR", "Error") {
+					level = "ERROR"
+				} else if contains(message, "warn", "WARN", "Warn", "warning", "WARNING") {
+					level = "WARN"
+				} else if contains(message, "debug", "DEBUG", "Debug") {
+					level = "DEBUG"
+				}
+			}
 		}
 		
 		lc.program.Send(AddLogMsg{
