@@ -54,7 +54,7 @@ func (tm *TraefikManager) Deploy(ctx context.Context) error {
 	klog.Info("Parsing Traefik manifests...")
 	// Parse the manifest into individual resources
 	decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(traefikManifest), 4096)
-	
+
 	for {
 		var rawObj unstructured.Unstructured
 		if err := decoder.Decode(&rawObj); err != nil {
@@ -83,7 +83,7 @@ func (tm *TraefikManager) Deploy(ctx context.Context) error {
 		klog.V(2).Infof("Applying resource %d/%d: %s %s", i+1, len(otherResources), obj.GetKind(), obj.GetName())
 		if err := tm.applyResource(ctx, obj); err != nil {
 			// Log error but continue with other resources
-			klog.Warningf("Failed to apply resource %s/%s: %v", 
+			klog.Warningf("Failed to apply resource %s/%s: %v",
 				obj.GetKind(), obj.GetName(), err)
 		}
 	}
@@ -195,7 +195,7 @@ func (tm *TraefikManager) GetProxyEndpoint() string {
 // ensureTraefikCRDs waits for Traefik CRDs to be available
 func (tm *TraefikManager) ensureTraefikCRDs(ctx context.Context) error {
 	klog.Info("Waiting for Traefik CRDs to be available...")
-	
+
 	// Wait up to 30 seconds for CRDs to be available
 	deadline := time.Now().Add(30 * time.Second)
 	ticker := time.NewTicker(2 * time.Second)
