@@ -91,12 +91,27 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 		k3sImage = k.config.K3dImage
 	}
 
+	// K3s args for minimal setup - disable unnecessary components
+	k3sArgs := []string{
+		"--disable=traefik",        // Disable Traefik ingress controller
+		"--disable=servicelb",      // Disable the default service load balancer
+		"--disable=metrics-server", // Disable metrics server
+		"--disable-network-policy", // Disable network policy controller
+	}
+
 	// Create server node
 	serverNode := &k3d.Node{
 		Name:    fmt.Sprintf("k3d-%s-server-0", normalizedName),
 		Role:    k3d.ServerRole,
 		Image:   k3sImage,
 		Restart: true,
+		Args:    k3sArgs,
+		K3sNodeLabels: map[string]string{
+			"kecs.io/cluster": normalizedName,
+		},
+		Env: []string{
+			"K3S_KUBECONFIG_MODE=666", // Ensure kubeconfig is readable
+		},
 	}
 	
 	// Add volume mounts if specified
@@ -831,7 +846,6 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		"--disable=servicelb",      // Disable the default service load balancer
 		"--disable=metrics-server", // Disable metrics server
 		"--disable-network-policy", // Disable network policy controller
-		"--disable=local-storage",  // Disable local storage provisioner
 	}
 	
 	// Optionally disable CoreDNS based on configuration
