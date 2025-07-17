@@ -32,6 +32,7 @@ var (
 	startV2NoLocalStack bool
 	startV2NoTraefik   bool
 	startV2Timeout     time.Duration
+	startV2UseBubbleTea bool
 )
 
 var startV2Cmd = &cobra.Command{
@@ -53,6 +54,7 @@ func init() {
 	startV2Cmd.Flags().BoolVar(&startV2NoLocalStack, "no-localstack", false, "Disable LocalStack deployment")
 	startV2Cmd.Flags().BoolVar(&startV2NoTraefik, "no-traefik", false, "Disable Traefik deployment")
 	startV2Cmd.Flags().DurationVar(&startV2Timeout, "timeout", 10*time.Minute, "Timeout for cluster creation")
+	startV2Cmd.Flags().BoolVar(&startV2UseBubbleTea, "bubbletea", false, "Use Bubble Tea for progress display (experimental)")
 }
 
 func runStartV2(cmd *cobra.Command, args []string) error {
@@ -96,6 +98,11 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), startV2Timeout)
 	defer cancel()
+
+	// Use Bubble Tea if flag is set
+	if startV2UseBubbleTea {
+		return runStartV2WithBubbleTea(ctx, startV2InstanceName, cfg, startV2DataDir)
+	}
 
 	// Step 1: Create k3d cluster for KECS instance
 	spinner := progress.NewSpinner("Creating k3d cluster")
