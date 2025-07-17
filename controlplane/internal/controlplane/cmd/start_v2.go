@@ -701,16 +701,21 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 	// Wait for deployment to be ready
 	deployment := "kecs-controlplane"
 	namespace := "kecs-system"
+	maxWaitTime := 60 // 5 minutes (60 * 5 seconds)
 	
-	for i := 0; i < 60; i++ { // Wait up to 5 minutes
+	for i := 0; i < maxWaitTime; i++ {
 		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
 		if err == nil && deps.Status.ReadyReplicas > 0 {
 			tracker.UpdateTask("controlplane", 100, "Ready")
 			return nil
 		}
+		
+		// Calculate progress from 80% to 99% (never reach 100% until actually ready)
+		progress := 80 + ((i + 1) * 19 / maxWaitTime)
+		waitTime := (i + 1) * 5
+		tracker.UpdateTask("controlplane", progress, fmt.Sprintf("Waiting for pods (%ds/300s)", waitTime))
+		
 		time.Sleep(5 * time.Second)
-		progress := 80 + (i * 20 / 60)
-		tracker.UpdateTask("controlplane", progress, fmt.Sprintf("Waiting for pods (%d/60s)", i*5))
 	}
 
 	return fmt.Errorf("control plane deployment did not become ready in time")
@@ -771,17 +776,40 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 		return fmt.Errorf("failed to start LocalStack: %w", err)
 	}
 
+	// Give LocalStack a moment to initialize before checking health
+	// This prevents the progress from jumping due to the initial health status
+	tracker.UpdateTask("localstack", 60, "LocalStack started, initializing...")
+	time.Sleep(3 * time.Second)
+
 	tracker.UpdateTask("localstack", 70, "Waiting for LocalStack to be ready")
 	
 	// Wait for LocalStack to be ready
-	for i := 0; i < 60; i++ { // Wait up to 5 minutes
-		if lsManager.IsHealthy() {
+	maxWaitTime := 60 // 5 minutes (60 * 5 seconds)
+	for i := 0; i < maxWaitTime; i++ {
+		// Check if LocalStack deployment is ready
+		status, err := lsManager.GetStatus()
+		if err == nil && status.Running && status.Healthy {
 			tracker.UpdateTask("localstack", 100, "Ready")
 			return nil
 		}
+		
+		// Calculate progress from 70% to 99% (never reach 100% until actually ready)
+		progress := 70 + ((i + 1) * 29 / maxWaitTime)
+		waitTime := (i + 1) * 5
+		
+		// Provide more detailed status message
+		statusMsg := fmt.Sprintf("Health check (%ds/300s)", waitTime)
+		if status != nil {
+			if !status.Running {
+				statusMsg = fmt.Sprintf("Starting LocalStack pod (%ds/300s)", waitTime)
+			} else if !status.Healthy {
+				statusMsg = fmt.Sprintf("Waiting for LocalStack services (%ds/300s)", waitTime)
+			}
+		}
+		
+		tracker.UpdateTask("localstack", progress, statusMsg)
+		
 		time.Sleep(5 * time.Second)
-		progress := 70 + (i * 30 / 60)
-		tracker.UpdateTask("localstack", progress, fmt.Sprintf("Health check (%d/60s)", i*5))
 	}
 
 	return fmt.Errorf("LocalStack did not become ready in time")
