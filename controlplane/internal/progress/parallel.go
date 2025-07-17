@@ -19,6 +19,7 @@ type ParallelTracker struct {
 	updateChan chan struct{}
 	stopChan   chan struct{}
 	wg         sync.WaitGroup
+	logCapture *LogCapture
 }
 
 // Task represents a single task in parallel execution
@@ -91,6 +92,12 @@ func NewParallelTracker(title string) *ParallelTracker {
 	pt.wg.Add(1)
 	go pt.renderLoop()
 
+	return pt
+}
+
+// WithLogCapture enables log capture for this tracker
+func (pt *ParallelTracker) WithLogCapture(logCapture *LogCapture) *ParallelTracker {
+	pt.logCapture = logCapture
 	return pt
 }
 
@@ -168,6 +175,18 @@ func (pt *ParallelTracker) Stop() {
 	close(pt.stopChan)
 	pt.wg.Wait()
 	pt.area.Stop()
+	
+	// Flush any captured logs
+	if pt.logCapture != nil {
+		pt.logCapture.Flush()
+	}
+}
+
+// Log adds a log entry if log capture is enabled
+func (pt *ParallelTracker) Log(level LogLevel, format string, args ...interface{}) {
+	if pt.logCapture != nil {
+		pt.logCapture.Log(level, format, args...)
+	}
 }
 
 // triggerUpdate triggers a render update

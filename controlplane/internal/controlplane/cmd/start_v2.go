@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -118,8 +119,17 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 	// Step 3: Deploy KECS control plane and LocalStack in parallel
 	progress.Info("Deploying KECS components")
 	
-	// Create parallel tracker for component deployment
-	parallelTracker := progress.NewParallelTracker("Deploying components")
+	// Create log capture for deployment phase
+	logCapture := progress.NewLogCapture(os.Stdout, progress.LogLevelInfo)
+	
+	// Redirect standard log output to our capture
+	logRedirector := progress.NewLogRedirector(logCapture, progress.LogLevelInfo)
+	logRedirector.RedirectStandardLog()
+	defer logRedirector.Restore()
+	
+	// Create parallel tracker for component deployment with log capture
+	parallelTracker := progress.NewParallelTracker("Deploying components").
+		WithLogCapture(logCapture)
 	
 	// Add tasks
 	parallelTracker.AddTask("controlplane", "Control Plane", 100)
@@ -237,7 +247,7 @@ func createK3dCluster(ctx context.Context, clusterName string, cfg *config.Confi
 	}
 
 	if exists {
-		fmt.Printf("k3d cluster '%s' already exists, using existing cluster\n", clusterName)
+		log.Printf("k3d cluster '%s' already exists, using existing cluster", clusterName)
 		return nil
 	}
 
@@ -247,11 +257,11 @@ func createK3dCluster(ctx context.Context, clusterName string, cfg *config.Confi
 	}
 
 	// Wait for cluster to be ready
-	fmt.Print("Waiting for cluster to be ready...")
+	log.Print("Waiting for cluster to be ready...")
 	if err := manager.WaitForClusterReady(clusterName, 5*time.Minute); err != nil {
 		return fmt.Errorf("cluster did not become ready: %w", err)
 	}
-	fmt.Println(" ready!")
+	log.Println("Cluster is ready!")
 
 	return nil
 }
@@ -283,7 +293,7 @@ func createKecsSystemNamespace(ctx context.Context, clusterName string) error {
 
 	_, err = kubeClient.CoreV1().Namespaces().Get(ctx, "kecs-system", metav1.GetOptions{})
 	if err == nil {
-		fmt.Println("kecs-system namespace already exists")
+		log.Println("kecs-system namespace already exists")
 		return nil
 	}
 
@@ -292,7 +302,7 @@ func createKecsSystemNamespace(ctx context.Context, clusterName string) error {
 		return fmt.Errorf("failed to create kecs-system namespace: %w", err)
 	}
 
-	fmt.Println("Created kecs-system namespace")
+	log.Println("Created kecs-system namespace")
 	return nil
 }
 
@@ -350,8 +360,9 @@ func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Con
 	}
 
 	// Apply manifests using kubectl
-	fmt.Println("Applying control plane manifests...")
+	log.Println("Applying control plane manifests...")
 	cmd := exec.Command("kubectl", "apply", "-k", manifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
+	// Note: Output will be captured by the log redirector if active
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	
@@ -417,25 +428,24 @@ func deployLocalStack(ctx context.Context, clusterName string, cfg *config.Confi
 	}
 
 	// Deploy LocalStack
-	fmt.Println("Deploying LocalStack...")
+	log.Println("Deploying LocalStack...")
 	if err := lsManager.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start LocalStack: %w", err)
 	}
 
 	// Wait for LocalStack to be ready
-	fmt.Print("Waiting for LocalStack to be ready...")
+	log.Print("Waiting for LocalStack to be ready...")
 	for i := 0; i < 60; i++ { // Wait up to 5 minutes
 		if lsManager.IsHealthy() {
-			fmt.Println(" ready!")
+			log.Println("LocalStack is ready!")
 			status, err := lsManager.GetStatus()
 			if err == nil {
-				fmt.Printf("LocalStack running: %v\n", status.Running)
-				fmt.Printf("LocalStack services: %v\n", status.EnabledServices)
+				log.Printf("LocalStack running: %v", status.Running)
+				log.Printf("LocalStack services: %v", status.EnabledServices)
 			}
 			return nil
 		}
 		time.Sleep(5 * time.Second)
-		fmt.Print(".")
 	}
 
 	return fmt.Errorf("LocalStack did not become ready in time")
@@ -494,8 +504,9 @@ func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.C
 	}
 
 	// Apply Traefik manifests
-	fmt.Println("Applying Traefik gateway manifests...")
+	log.Println("Applying Traefik gateway manifests...")
 	cmd := exec.Command("kubectl", "apply", "-k", traefikManifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
+	// Note: Output will be captured by the log redirector if active
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	
@@ -504,38 +515,36 @@ func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.C
 	}
 
 	// Wait for Traefik deployment to be ready
-	fmt.Print("Waiting for Traefik deployment to be ready...")
+	log.Print("Waiting for Traefik deployment to be ready...")
 	deployment := "traefik"
 	namespace := "kecs-system"
 	
 	for i := 0; i < 60; i++ { // Wait up to 5 minutes
 		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
 		if err == nil && deps.Status.ReadyReplicas > 0 {
-			fmt.Println(" ready!")
+			log.Println("Traefik deployment is ready!")
 			break
 		}
 		time.Sleep(5 * time.Second)
-		fmt.Print(".")
 	}
 
 	// Wait for Traefik service to get external IP/port
-	fmt.Print("Waiting for Traefik service to be accessible...")
+	log.Print("Waiting for Traefik service to be accessible...")
 	service := "traefik"
 	
 	for i := 0; i < 30; i++ { // Wait up to 2.5 minutes
 		svc, err := kubeClient.CoreV1().Services(namespace).Get(ctx, service, metav1.GetOptions{})
 		if err == nil && len(svc.Status.LoadBalancer.Ingress) > 0 {
-			fmt.Println(" ready!")
-			fmt.Printf("Traefik LoadBalancer: %s\n", svc.Status.LoadBalancer.Ingress[0].Hostname)
+			log.Println("Traefik service is ready!")
+			log.Printf("Traefik LoadBalancer: %s", svc.Status.LoadBalancer.Ingress[0].Hostname)
 			return nil
 		}
 		time.Sleep(5 * time.Second)
-		fmt.Print(".")
 	}
 
 	// For k3d, the LoadBalancer might not get an external IP
 	// Port forwarding is handled by k3d itself
-	fmt.Println(" ready! (using k3d port mapping)")
+	log.Println("Traefik service is ready! (using k3d port mapping)")
 	
 	return nil
 }
@@ -564,29 +573,27 @@ func waitForComponents(ctx context.Context, clusterName string) error {
 		{"LocalStack", "localstack", false}, // Optional based on config
 	}
 
-	fmt.Println("Checking component readiness...")
+	log.Println("Checking component readiness...")
 	
 	allReady := true
 	for _, comp := range components {
-		fmt.Printf("  %s: ", comp.name)
-		
 		// Check deployment
 		deployment, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, comp.deployment, metav1.GetOptions{})
 		if err != nil {
 			if comp.required {
-				fmt.Printf("❌ Not found\n")
+				log.Printf("  %s: ❌ Not found", comp.name)
 				allReady = false
 			} else {
-				fmt.Printf("⏭️  Skipped (optional)\n")
+				log.Printf("  %s: ⏭️  Skipped (optional)", comp.name)
 			}
 			continue
 		}
 
 		// Check if deployment is ready
 		if deployment.Status.ReadyReplicas >= 1 {
-			fmt.Printf("✅ Ready (%d/%d replicas)\n", deployment.Status.ReadyReplicas, *deployment.Spec.Replicas)
+			log.Printf("  %s: ✅ Ready (%d/%d replicas)", comp.name, deployment.Status.ReadyReplicas, *deployment.Spec.Replicas)
 		} else {
-			fmt.Printf("⏳ Not ready (0/%d replicas)\n", *deployment.Spec.Replicas)
+			log.Printf("  %s: ⏳ Not ready (0/%d replicas)", comp.name, *deployment.Spec.Replicas)
 			if comp.required {
 				allReady = false
 			}
@@ -595,7 +602,7 @@ func waitForComponents(ctx context.Context, clusterName string) error {
 		// Check service endpoint
 		service, err := kubeClient.CoreV1().Services(namespace).Get(ctx, comp.deployment, metav1.GetOptions{})
 		if err == nil && len(service.Spec.Ports) > 0 {
-			fmt.Printf("    Service: %s:%d\n", service.Name, service.Spec.Ports[0].Port)
+			log.Printf("    Service: %s:%d", service.Name, service.Spec.Ports[0].Port)
 		}
 	}
 
@@ -604,15 +611,15 @@ func waitForComponents(ctx context.Context, clusterName string) error {
 	}
 
 	// Check API connectivity
-	fmt.Print("\nChecking API connectivity...")
+	log.Print("Checking API connectivity...")
 	
 	// Test KECS control plane health endpoint
 	adminEndpoint := fmt.Sprintf("http://localhost:%d/health", startV2AdminPort)
 	if err := checkEndpointHealth(adminEndpoint, 30*time.Second); err != nil {
-		fmt.Printf(" ❌\n")
+		log.Printf("❌ KECS admin API not accessible")
 		return fmt.Errorf("KECS admin API not accessible: %w", err)
 	}
-	fmt.Printf(" ✅\n")
+	log.Printf("✅ API connectivity verified")
 
 	return nil
 }
