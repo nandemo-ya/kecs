@@ -117,8 +117,6 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 	spinner.Success("kecs-system namespace created")
 
 	// Step 3: Deploy KECS control plane and LocalStack in parallel
-	progress.Info("Deploying KECS components")
-	
 	// Create log capture for deployment phase
 	logCapture := progress.NewLogCapture(os.Stdout, progress.LogLevelInfo)
 	

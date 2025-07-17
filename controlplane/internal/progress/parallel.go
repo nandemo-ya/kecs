@@ -88,6 +88,9 @@ func NewParallelTracker(title string) *ParallelTracker {
 	area, _ := pterm.DefaultArea.Start()
 	pt.area = area
 
+	// Initial render to show the title immediately
+	pt.render()
+
 	// Start the render loop
 	pt.wg.Add(1)
 	go pt.renderLoop()
@@ -225,7 +228,13 @@ func (pt *ParallelTracker) render() {
 
 	// Title with elapsed time
 	elapsed := time.Since(pt.startTime).Round(time.Second)
-	output.WriteString(pterm.DefaultHeader.Sprintf("%s (%s)", pt.title, elapsed))
+	
+	// Simple title without box styling
+	titleLine := fmt.Sprintf("🚀 %s (%s)", pt.title, elapsed)
+	output.WriteString(titleLine)
+	output.WriteString("\n")
+	// Use a fixed width separator to avoid length changes
+	output.WriteString(strings.Repeat("─", 50))
 	output.WriteString("\n\n")
 
 	// Render each task
