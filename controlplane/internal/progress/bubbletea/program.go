@@ -191,6 +191,8 @@ func (lc *logCapture) Start() {
 func (lc *logCapture) Stop() {
 	if lc.originalOut != nil {
 		log.SetOutput(lc.originalOut)
+		// Flush klog before restoring
+		klog.Flush()
 		// Also restore klog to stderr
 		klog.SetOutput(os.Stderr)
 	}

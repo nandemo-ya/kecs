@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"sync"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
+	"k8s.io/klog/v2"
 )
 
 // silentWriter is a writer that discards all output until activated
@@ -64,6 +66,13 @@ func RunWithBubbleTeaSilent(ctx context.Context, title string, fn func(*Adapter)
 	// Temporarily redirect all log output
 	log.SetOutput(silentLogWriter)
 	defer log.SetOutput(originalLogWriter)
+	
+	// Also redirect klog immediately
+	klog.SetOutput(silentLogWriter)
+	defer func() {
+		klog.Flush()
+		klog.SetOutput(os.Stderr)
+	}()
 	
 	// Create and start the program
 	adapter := NewAdapter(title)
