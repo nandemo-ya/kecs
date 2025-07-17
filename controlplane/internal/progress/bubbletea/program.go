@@ -178,8 +178,9 @@ func (lc *logCapture) Start() {
 	lc.originalOut = log.Writer()
 	log.SetOutput(lc)
 	
-	// Also redirect stdout/stderr for external commands
-	// Note: This is simplified - in production you'd want more robust handling
+	// Set environment variables to suppress k3d logs
+	os.Setenv("K3D_LOG_LEVEL", "panic")
+	os.Setenv("DOCKER_CLI_HINTS", "false")
 }
 
 // Stop stops capturing and restores original output
