@@ -36,6 +36,7 @@ var (
 	startConfigFile    string
 	startAutoPort      bool
 	startRuntime       string
+	startSkipPull      bool
 )
 
 var startCmd = &cobra.Command{
@@ -59,6 +60,7 @@ func init() {
 	startCmd.Flags().StringVar(&startConfigFile, "config", "", "Path to configuration file")
 	startCmd.Flags().BoolVar(&startAutoPort, "auto-port", false, "Automatically find available ports")
 	startCmd.Flags().StringVar(&startRuntime, "runtime", "", "Container runtime to use (docker, containerd, or auto)")
+	startCmd.Flags().BoolVar(&startSkipPull, "skip-pull", false, "Skip pulling image if it exists locally")
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
@@ -170,8 +172,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 		imageName = "kecs:local"
 	}
 
-	// Pull image if not local build
-	if !startLocalBuild {
+	// Pull image if not local build and not skipping pull
+	if !startLocalBuild && !startSkipPull {
 		fmt.Printf("Pulling image %s...\n", imageName)
 		reader, err := rt.PullImage(ctx, imageName, runtime.PullImageOptions{})
 		if err != nil {
@@ -179,6 +181,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 		}
 		defer reader.Close()
 		io.Copy(io.Discard, reader)
+	} else if startSkipPull {
+		fmt.Printf("Skipping image pull, using local image %s\n", imageName)
 	}
 
 	// Prepare environment variables

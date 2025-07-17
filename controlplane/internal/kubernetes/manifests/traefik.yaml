@@ -7,7 +7,7 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: traefik-elbv2-proxy-elbv2-proxy
+  name: traefik
   namespace: kecs-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -68,7 +68,7 @@ roleRef:
   name: traefik-elbv2-proxy
 subjects:
 - kind: ServiceAccount
-  name: traefik-elbv2-proxy-elbv2-proxy
+  name: traefik
   namespace: kecs-system
 ---
 apiVersion: v1
@@ -105,28 +105,28 @@ data:
         localstack:
           loadBalancer:
             servers:
-              - address: "localstack.kecs-system.svc.cluster.local:4566"
+              - address: "localstack:4566"
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: traefik-elbv2-proxy-elbv2-proxy
+  name: traefik
   namespace: kecs-system
   labels:
-    app: traefik-elbv2-proxy
+    app: traefik
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: traefik-elbv2-proxy
+      app: traefik
   template:
     metadata:
       labels:
-        app: traefik-elbv2-proxy
+        app: traefik
     spec:
-      serviceAccountName: traefik-elbv2-proxy
+      serviceAccountName: traefik
       containers:
-      - name: traefik-elbv2-proxy
+      - name: traefik
         image: traefik:v3.0
         args:
           - --configfile=/config/traefik.yml
@@ -158,12 +158,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: traefik-elbv2-proxy-elbv2-proxy
+  name: traefik
   namespace: kecs-system
 spec:
   type: NodePort
   selector:
-    app: traefik-elbv2-proxy-elbv2-proxy
+    app: traefik-elbv2-proxy
   ports:
     - name: web
       port: 80
