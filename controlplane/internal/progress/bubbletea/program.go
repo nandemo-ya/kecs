@@ -58,19 +58,20 @@ func (p *Program) Start() error {
 	p.started = true
 	p.mu.Unlock()
 	
-	// Redirect log output
+	// Redirect log output first
 	p.logCapture.Start()
 	
 	// Run the program in a goroutine
 	go func() {
 		if _, err := p.program.Run(); err != nil {
-			log.Printf("Error running progress display: %v", err)
+			// Don't use log here as it might be captured
+			fmt.Fprintf(os.Stderr, "Error running progress display: %v\n", err)
 		}
 		close(p.done)
 	}()
 	
-	// Give it a moment to initialize
-	time.Sleep(100 * time.Millisecond)
+	// Wait a bit longer to ensure the TUI is fully initialized
+	time.Sleep(300 * time.Millisecond)
 	
 	return nil
 }

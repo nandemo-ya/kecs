@@ -65,11 +65,16 @@ func runStartV2(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to generate instance name: %w", err)
 		}
 		startV2InstanceName = generatedName
-		progress.Info("Generated KECS instance name: %s", startV2InstanceName)
+		// Only show info message if not using Bubble Tea
+		if !startV2UseBubbleTea {
+			progress.Info("Generated KECS instance name: %s", startV2InstanceName)
+		}
 	}
 
-	// Show header
-	progress.SectionHeader(fmt.Sprintf("Creating KECS instance '%s'", startV2InstanceName))
+	// Only show header if not using Bubble Tea
+	if !startV2UseBubbleTea {
+		progress.SectionHeader(fmt.Sprintf("Creating KECS instance '%s'", startV2InstanceName))
+	}
 
 	// Load configuration
 	cfg, err := config.LoadConfig(startV2ConfigFile)
