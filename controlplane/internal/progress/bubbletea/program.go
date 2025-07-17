@@ -1,0 +1,259 @@
+package bubbletea
+
+import (
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"sync"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+// Program wraps the Bubble Tea program for progress tracking
+type Program struct {
+	program     *tea.Program
+	model       Model
+	logCapture  *logCapture
+	mu          sync.Mutex
+	started     bool
+	done        chan struct{}
+}
+
+// NewProgram creates a new progress tracking program
+func NewProgram(title string) *Program {
+	model := New(title)
+	
+	// Create log capture
+	lc := &logCapture{
+		program: nil, // Will be set after program creation
+		buffer:  make([]logEntry, 0),
+	}
+	
+	// Create the program with full screen mode
+	teaProgram := tea.NewProgram(
+		model,
+		tea.WithAltScreen(),       // Use alternate screen buffer
+		tea.WithMouseCellMotion(), // Enable mouse support
+	)
+	
+	lc.program = teaProgram
+	
+	return &Program{
+		program:    teaProgram,
+		model:      model,
+		logCapture: lc,
+		done:       make(chan struct{}),
+	}
+}
+
+// Start begins the progress display
+func (p *Program) Start() error {
+	p.mu.Lock()
+	if p.started {
+		p.mu.Unlock()
+		return nil
+	}
+	p.started = true
+	p.mu.Unlock()
+	
+	// Redirect log output
+	p.logCapture.Start()
+	
+	// Run the program in a goroutine
+	go func() {
+		if _, err := p.program.Run(); err != nil {
+			log.Printf("Error running progress display: %v", err)
+		}
+		close(p.done)
+	}()
+	
+	// Give it a moment to initialize
+	time.Sleep(100 * time.Millisecond)
+	
+	return nil
+}
+
+// Stop stops the progress display
+func (p *Program) Stop() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	
+	if !p.started {
+		return
+	}
+	
+	// Restore log output
+	p.logCapture.Stop()
+	
+	// Send quit message
+	p.program.Send(tea.Quit())
+	
+	// Wait for program to finish
+	<-p.done
+}
+
+// AddTask adds a new task to track
+func (p *Program) AddTask(id, name string, total float64) {
+	if p.program != nil {
+		p.program.Send(AddTaskMsg{
+			ID:    id,
+			Name:  name,
+			Total: total,
+		})
+	}
+}
+
+// UpdateTask updates a task's progress
+func (p *Program) UpdateTask(id string, progress float64, message string) {
+	if p.program != nil {
+		p.program.Send(UpdateTaskMsg{
+			ID:       id,
+			Progress: progress,
+			Message:  message,
+			Status:   TaskStatusRunning,
+		})
+	}
+}
+
+// CompleteTask marks a task as completed
+func (p *Program) CompleteTask(id string) {
+	if p.program != nil {
+		p.program.Send(UpdateTaskMsg{
+			ID:       id,
+			Progress: 100,
+			Message:  "Completed",
+			Status:   TaskStatusCompleted,
+		})
+	}
+}
+
+// FailTask marks a task as failed
+func (p *Program) FailTask(id string, err error) {
+	if p.program != nil {
+		p.program.Send(UpdateTaskMsg{
+			ID:       id,
+			Progress: 0,
+			Message:  err.Error(),
+			Status:   TaskStatusFailed,
+		})
+	}
+}
+
+// Complete marks the entire operation as complete
+func (p *Program) Complete() {
+	if p.program != nil {
+		p.program.Send(CompleteMsg{})
+	}
+}
+
+// Log adds a log entry
+func (p *Program) Log(level, format string, args ...interface{}) {
+	message := fmt.Sprintf(format, args...)
+	if p.program != nil {
+		p.program.Send(AddLogMsg{
+			Level:   level,
+			Message: message,
+		})
+	}
+}
+
+// logCapture captures log output and sends it to the program
+type logCapture struct {
+	program      *tea.Program
+	originalOut  io.Writer
+	buffer       []logEntry
+	mu           sync.Mutex
+}
+
+type logEntry struct {
+	timestamp time.Time
+	message   string
+}
+
+// Start begins capturing log output
+func (lc *logCapture) Start() {
+	lc.originalOut = log.Writer()
+	log.SetOutput(lc)
+	
+	// Also redirect stdout/stderr for external commands
+	// Note: This is simplified - in production you'd want more robust handling
+}
+
+// Stop stops capturing and restores original output
+func (lc *logCapture) Stop() {
+	if lc.originalOut != nil {
+		log.SetOutput(lc.originalOut)
+	}
+}
+
+// Write implements io.Writer
+func (lc *logCapture) Write(p []byte) (n int, err error) {
+	message := string(p)
+	
+	// Send to the program as a log message
+	if lc.program != nil {
+		// Determine log level from content
+		level := "INFO"
+		if contains(message, "error", "ERROR", "Error") {
+			level = "ERROR"
+		} else if contains(message, "warn", "WARN", "Warn", "warning", "WARNING") {
+			level = "WARN"
+		} else if contains(message, "debug", "DEBUG", "Debug") {
+			level = "DEBUG"
+		}
+		
+		lc.program.Send(AddLogMsg{
+			Level:   level,
+			Message: message,
+		})
+	}
+	
+	// Also write to original output for debugging
+	if lc.originalOut != nil && os.Getenv("KECS_DEBUG") != "" {
+		lc.originalOut.Write(p)
+	}
+	
+	return len(p), nil
+}
+
+// contains checks if a string contains any of the given substrings
+func contains(s string, substrs ...string) bool {
+	for _, substr := range substrs {
+		if len(s) >= len(substr) {
+			// Simple substring check
+			for i := 0; i <= len(s)-len(substr); i++ {
+				if s[i:i+len(substr)] == substr {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// Helper functions for common operations
+
+// RunWithProgress runs a function with progress tracking
+func RunWithProgress(title string, fn func(*Program) error) error {
+	prog := NewProgram(title)
+	
+	if err := prog.Start(); err != nil {
+		return fmt.Errorf("failed to start progress display: %w", err)
+	}
+	defer prog.Stop()
+	
+	// Run the function
+	if err := fn(prog); err != nil {
+		return err
+	}
+	
+	// Mark as complete
+	prog.Complete()
+	
+	// Give user a moment to see the final state
+	time.Sleep(1 * time.Second)
+	
+	return nil
+}
