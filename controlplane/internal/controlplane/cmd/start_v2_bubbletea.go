@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress/bubbletea"
@@ -285,7 +285,7 @@ func createKecsSystemNamespaceWithProgress(ctx context.Context, clusterName stri
 // deployControlPlaneWithBubbleTeaProgress wraps deployControlPlane with Bubble Tea progress reporting
 func deployControlPlaneWithBubbleTeaProgress(ctx context.Context, clusterName string, cfg *config.Config, dataDir string, tracker *bubbletea.Adapter) error {
 	// Update progress during deployment
-	tracker.UpdateTask("controlplane", 20, "Preparing manifests")
+	tracker.UpdateTask("controlplane", 20, "Preparing resources")
 	
 	// Get k3d cluster manager
 	manager, err := kubernetes.NewK3dClusterManager(nil)
@@ -295,61 +295,42 @@ func deployControlPlaneWithBubbleTeaProgress(ctx context.Context, clusterName st
 
 	tracker.UpdateTask("controlplane", 30, "Getting Kubernetes client")
 	
-	// Get Kubernetes client and config
+	// Get Kubernetes client
 	kubeClient, err := manager.GetKubeClient(clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
+
+	tracker.UpdateTask("controlplane", 40, "Creating deployer")
 	
-	kubeConfig, err := manager.GetKubeConfig(clusterName)
-	if err != nil {
-		return fmt.Errorf("failed to get kubernetes config: %w", err)
+	// Create resource deployer
+	deployer := kubernetes.NewResourceDeployer(kubeClient)
+	
+	// Configure control plane
+	controlPlaneConfig := &resources.ControlPlaneConfig{
+		Image:           "ghcr.io/nandemo-ya/kecs:latest",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		CPURequest:      "100m",
+		MemoryRequest:   "128Mi",
+		CPULimit:        "1000m",
+		MemoryLimit:     "1Gi",
+		StorageSize:     "10Gi",
+		APIPort:         80,
+		AdminPort:       int32(startV2AdminPort),
+		LogLevel:        cfg.Server.LogLevel,
+		ExtraEnvVars: []corev1.EnvVar{
+			{
+				Name:  "KECS_SKIP_SECURITY_DISCLAIMER",
+				Value: "true",
+			},
+		},
 	}
 
-	tracker.UpdateTask("controlplane", 40, "Locating manifests")
+	tracker.UpdateTask("controlplane", 60, "Deploying resources")
 	
-	// Find manifests directory
-	manifestsDir := ""
-	if _, err := os.Stat("manifests"); err == nil {
-		manifestsDir = "manifests"
-	} else if _, err := os.Stat("controlplane/manifests"); err == nil {
-		manifestsDir = "controlplane/manifests"
-	} else if gopath := os.Getenv("GOPATH"); gopath != "" {
-		gopathManifests := filepath.Join(gopath, "src/github.com/nandemo-ya/kecs/controlplane/manifests")
-		if _, err := os.Stat(gopathManifests); err == nil {
-			manifestsDir = gopathManifests
-		}
-	}
-	
-	// Try to find the executable path
-	if manifestsDir == "" {
-		execPath, err := os.Executable()
-		if err == nil {
-			execDir := filepath.Dir(execPath)
-			if filepath.Base(execDir) == "bin" {
-				parentDir := filepath.Dir(execDir)
-				possiblePath := filepath.Join(parentDir, "controlplane/manifests")
-				if _, err := os.Stat(possiblePath); err == nil {
-					manifestsDir = possiblePath
-				}
-			}
-		}
-	}
-
-	if _, err := os.Stat(manifestsDir); os.IsNotExist(err) {
-		return fmt.Errorf("manifests directory not found: %s", manifestsDir)
-	}
-
-	tracker.UpdateTask("controlplane", 60, "Applying manifests")
-	
-	// Apply manifests using Kubernetes SDK
-	applier, err := kubernetes.NewManifestApplierWithConfig(kubeConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create manifest applier: %w", err)
-	}
-	
-	if err := applier.ApplyManifestsFromDirectory(ctx, manifestsDir); err != nil {
-		return fmt.Errorf("failed to apply manifests: %w", err)
+	// Deploy control plane resources programmatically
+	if err := deployer.DeployControlPlane(ctx, controlPlaneConfig); err != nil {
+		return fmt.Errorf("failed to deploy control plane: %w", err)
 	}
 
 	tracker.UpdateTask("controlplane", 80, "Waiting for deployment")
@@ -492,50 +473,38 @@ func deployTraefikGatewayWithProgress(ctx context.Context, clusterName string, c
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes config: %w", err)
 	}
-
-	tracker.UpdateTask("traefik", 40, "Locating Traefik manifests")
 	
-	// Find Traefik manifests directory
-	traefikManifestsDir := ""
-	if _, err := os.Stat("manifests/traefik"); err == nil {
-		traefikManifestsDir = "manifests/traefik"
-	} else if _, err := os.Stat("controlplane/manifests/traefik"); err == nil {
-		traefikManifestsDir = "controlplane/manifests/traefik"
-	} else if gopath := os.Getenv("GOPATH"); gopath != "" {
-		gopathManifests := filepath.Join(gopath, "src/github.com/nandemo-ya/kecs/controlplane/manifests/traefik")
-		if _, err := os.Stat(gopathManifests); err == nil {
-			traefikManifestsDir = gopathManifests
-		}
-	}
-
-	if traefikManifestsDir == "" {
-		execPath, err := os.Executable()
-		if err == nil {
-			execDir := filepath.Dir(execPath)
-			if filepath.Base(execDir) == "bin" {
-				parentDir := filepath.Dir(execDir)
-				possiblePath := filepath.Join(parentDir, "controlplane/manifests/traefik")
-				if _, err := os.Stat(possiblePath); err == nil {
-					traefikManifestsDir = possiblePath
-				}
-			}
-		}
-	}
-
-	if _, err := os.Stat(traefikManifestsDir); os.IsNotExist(err) {
-		return fmt.Errorf("traefik manifests directory not found: %s", traefikManifestsDir)
-	}
-
-	tracker.UpdateTask("traefik", 60, "Applying Traefik manifests")
+	tracker.UpdateTask("traefik", 40, "Creating deployer")
 	
-	// Apply Traefik manifests using Kubernetes SDK
-	applier, err := kubernetes.NewManifestApplierWithConfig(kubeConfig)
+	// Create resource deployer with config
+	deployer, err := kubernetes.NewResourceDeployerWithConfig(kubeClient, kubeConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create manifest applier: %w", err)
+		return fmt.Errorf("failed to create resource deployer: %w", err)
 	}
 	
-	if err := applier.ApplyManifestsFromDirectory(ctx, traefikManifestsDir); err != nil {
-		return fmt.Errorf("failed to apply traefik manifests: %w", err)
+	// Configure Traefik
+	traefikConfig := &resources.TraefikConfig{
+		Image:           "traefik:v3.2",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		CPURequest:      "100m",
+		MemoryRequest:   "128Mi",
+		CPULimit:        "500m",
+		MemoryLimit:     "512Mi",
+		WebPort:         80,
+		WebNodePort:     30080,
+		AWSPort:         4566,
+		AWSNodePort:     int32(apiPort),
+		LogLevel:        "INFO",
+		AccessLog:       true,
+		Metrics:         true,
+		Debug:           cfg.Server.LogLevel == "debug",
+	}
+
+	tracker.UpdateTask("traefik", 60, "Deploying Traefik resources")
+	
+	// Deploy Traefik resources programmatically
+	if err := deployer.DeployTraefik(ctx, traefikConfig); err != nil {
+		return fmt.Errorf("failed to deploy Traefik: %w", err)
 	}
 
 	tracker.UpdateTask("traefik", 80, "Waiting for Traefik deployment")
