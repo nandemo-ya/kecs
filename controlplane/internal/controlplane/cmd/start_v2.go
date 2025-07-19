@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
@@ -323,14 +322,18 @@ func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Con
 		return fmt.Errorf("failed to create cluster manager: %w", err)
 	}
 
-	// Get Kubernetes client
+	// Get Kubernetes client and config
 	kubeClient, err := manager.GetKubeClient(clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
 
-	// Deploy control plane using kubectl apply
-	// We'll use the manifests we created
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
+	}
+
+	// Deploy control plane using Kubernetes SDK
 	manifestsDir := ""
 	
 	// Try to find manifests directory
@@ -369,14 +372,14 @@ func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Con
 		return fmt.Errorf("manifests directory not found: %s", manifestsDir)
 	}
 
-	// Apply manifests using kubectl
+	// Apply manifests using Kubernetes SDK
 	log.Println("Applying control plane manifests...")
-	cmd := exec.Command("kubectl", "apply", "-k", manifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
-	// Note: Output will be captured by the log redirector if active
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	applier, err := kubernetes.NewManifestApplierWithConfig(kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create manifest applier: %w", err)
+	}
 	
-	if err := cmd.Run(); err != nil {
+	if err := applier.ApplyManifestsFromDirectory(ctx, manifestsDir); err != nil {
 		return fmt.Errorf("failed to apply manifests: %w", err)
 	}
 
@@ -468,13 +471,18 @@ func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.C
 		return fmt.Errorf("failed to create cluster manager: %w", err)
 	}
 
-	// Get Kubernetes client
+	// Get Kubernetes client and config
 	kubeClient, err := manager.GetKubeClient(clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
 
-	// Deploy Traefik using kubectl apply
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
+	}
+
+	// Deploy Traefik using Kubernetes SDK
 	traefikManifestsDir := ""
 	
 	// Try to find Traefik manifests directory
@@ -513,14 +521,14 @@ func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.C
 		return fmt.Errorf("traefik manifests directory not found: %s", traefikManifestsDir)
 	}
 
-	// Apply Traefik manifests
+	// Apply Traefik manifests using Kubernetes SDK
 	log.Println("Applying Traefik gateway manifests...")
-	cmd := exec.Command("kubectl", "apply", "-k", traefikManifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
-	// Note: Output will be captured by the log redirector if active
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	applier, err := kubernetes.NewManifestApplierWithConfig(kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create manifest applier: %w", err)
+	}
 	
-	if err := cmd.Run(); err != nil {
+	if err := applier.ApplyManifestsFromDirectory(ctx, traefikManifestsDir); err != nil {
 		return fmt.Errorf("failed to apply traefik manifests: %w", err)
 	}
 
@@ -665,10 +673,15 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 
 	tracker.UpdateTask("controlplane", 30, "Getting Kubernetes client")
 	
-	// Get Kubernetes client
+	// Get Kubernetes client and config
 	kubeClient, err := manager.GetKubeClient(clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+	
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
 	}
 
 	tracker.UpdateTask("controlplane", 40, "Locating manifests")
@@ -707,9 +720,13 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 
 	tracker.UpdateTask("controlplane", 60, "Applying manifests")
 	
-	// Apply manifests
-	cmd := exec.Command("kubectl", "apply", "-k", manifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
-	if err := cmd.Run(); err != nil {
+	// Apply manifests using Kubernetes SDK
+	applier, err := kubernetes.NewManifestApplierWithConfig(kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create manifest applier: %w", err)
+	}
+	
+	if err := applier.ApplyManifestsFromDirectory(ctx, manifestsDir); err != nil {
 		return fmt.Errorf("failed to apply manifests: %w", err)
 	}
 

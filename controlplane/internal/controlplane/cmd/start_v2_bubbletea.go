@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
@@ -296,10 +295,15 @@ func deployControlPlaneWithBubbleTeaProgress(ctx context.Context, clusterName st
 
 	tracker.UpdateTask("controlplane", 30, "Getting Kubernetes client")
 	
-	// Get Kubernetes client
+	// Get Kubernetes client and config
 	kubeClient, err := manager.GetKubeClient(clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+	
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
 	}
 
 	tracker.UpdateTask("controlplane", 40, "Locating manifests")
@@ -338,9 +342,13 @@ func deployControlPlaneWithBubbleTeaProgress(ctx context.Context, clusterName st
 
 	tracker.UpdateTask("controlplane", 60, "Applying manifests")
 	
-	// Apply manifests
-	cmd := exec.Command("kubectl", "apply", "-k", manifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
-	if err := cmd.Run(); err != nil {
+	// Apply manifests using Kubernetes SDK
+	applier, err := kubernetes.NewManifestApplierWithConfig(kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create manifest applier: %w", err)
+	}
+	
+	if err := applier.ApplyManifestsFromDirectory(ctx, manifestsDir); err != nil {
 		return fmt.Errorf("failed to apply manifests: %w", err)
 	}
 
@@ -474,10 +482,15 @@ func deployTraefikGatewayWithProgress(ctx context.Context, clusterName string, c
 
 	tracker.UpdateTask("traefik", 30, "Getting Kubernetes client")
 	
-	// Get Kubernetes client
+	// Get Kubernetes client and config
 	kubeClient, err := manager.GetKubeClient(clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+	
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
 	}
 
 	tracker.UpdateTask("traefik", 40, "Locating Traefik manifests")
@@ -515,9 +528,13 @@ func deployTraefikGatewayWithProgress(ctx context.Context, clusterName string, c
 
 	tracker.UpdateTask("traefik", 60, "Applying Traefik manifests")
 	
-	// Apply Traefik manifests
-	cmd := exec.Command("kubectl", "apply", "-k", traefikManifestsDir, "--kubeconfig", manager.GetKubeconfigPath(clusterName))
-	if err := cmd.Run(); err != nil {
+	// Apply Traefik manifests using Kubernetes SDK
+	applier, err := kubernetes.NewManifestApplierWithConfig(kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create manifest applier: %w", err)
+	}
+	
+	if err := applier.ApplyManifestsFromDirectory(ctx, traefikManifestsDir); err != nil {
 		return fmt.Errorf("failed to apply traefik manifests: %w", err)
 	}
 
