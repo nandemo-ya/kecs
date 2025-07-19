@@ -125,33 +125,34 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 		log.Printf("Adding volume mounts: %v", volumes)
 	}
 	
-	// Add port mapping for Traefik if enabled
-	if k.config.EnableTraefik {
+	// Add port mapping for HTTP access (needed regardless of Traefik deployment)
+	// This maps host port to NodePort 30890 for accessing services in the cluster
+	{
 		// Lock for thread-safe port allocation
 		k.portMutex.Lock()
 		
-		// Determine Traefik port
-		traefikPort := k.config.TraefikPort
-		if traefikPort == 0 {
+		// Determine port for HTTP access
+		httpPort := k.config.TraefikPort
+		if httpPort == 0 {
 			// Find available port starting from 8090
 			port, err := k.findAvailablePort(8090)
 			if err != nil {
 				k.portMutex.Unlock()
-				return fmt.Errorf("failed to find available port for Traefik: %w", err)
+				return fmt.Errorf("failed to find available port for HTTP access: %w", err)
 			}
-			traefikPort = port
+			httpPort = port
 		}
 		
 		// Store the port for this cluster
-		k.traefikPorts[normalizedName] = traefikPort
+		k.traefikPorts[normalizedName] = httpPort
 		k.portMutex.Unlock()
 		
-		log.Printf("Adding port mapping for Traefik: %d/tcp", traefikPort)
+		log.Printf("Adding port mapping for HTTP access: %d/tcp -> NodePort 30890", httpPort)
 		serverNode.Ports = nat.PortMap{
 			"30890/tcp": []nat.PortBinding{
 				{
 					HostIP:   "0.0.0.0",
-					HostPort: fmt.Sprintf("%d", traefikPort),
+					HostPort: fmt.Sprintf("%d", httpPort),
 				},
 			},
 		}
@@ -214,19 +215,8 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 
 	log.Printf("Successfully created k3d cluster %s", normalizedName)
 	
-	// Deploy Traefik if enabled
-	log.Printf("Traefik enabled: %v", k.config.EnableTraefik)
-	if k.config.EnableTraefik {
-		log.Printf("Deploying Traefik to cluster %s...", normalizedName)
-		if err := k.deployTraefik(ctx, clusterName); err != nil {
-			log.Printf("Warning: Failed to deploy Traefik: %v", err)
-			// Continue without Traefik
-		} else {
-			log.Printf("Successfully deployed Traefik to cluster %s", normalizedName)
-		}
-	} else {
-		log.Printf("Traefik is disabled, skipping deployment")
-	}
+	// Note: Traefik deployment is now handled by start_v2.go using the new architecture
+	// The old TraefikManager is deprecated and should not be used
 	
 	return nil
 }

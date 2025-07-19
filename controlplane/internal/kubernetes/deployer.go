@@ -103,12 +103,8 @@ func (d *ResourceDeployer) DeployControlPlane(ctx context.Context, config *resou
 func (d *ResourceDeployer) DeployTraefik(ctx context.Context, config *resources.TraefikConfig) error {
 	klog.Info("Deploying Traefik gateway resources")
 	
-	// Deploy Traefik CRDs first if we have extClient
-	if d.extClient != nil {
-		if err := d.deployTraefikCRDs(ctx); err != nil {
-			return fmt.Errorf("failed to deploy Traefik CRDs: %w", err)
-		}
-	}
+	// Skip CRD deployment - using file-based configuration instead
+	// CRDs are not needed with file provider
 	
 	// Create resources
 	res := resources.CreateTraefikResources(config)
@@ -147,12 +143,8 @@ func (d *ResourceDeployer) DeployTraefik(ctx context.Context, config *resources.
 		return fmt.Errorf("failed to create deployment: %w", err)
 	}
 	
-	// Deploy IngressRoutes if we have the necessary clients
-	if d.config != nil {
-		if err := d.deployTraefikRoutes(ctx); err != nil {
-			return fmt.Errorf("failed to deploy Traefik routes: %w", err)
-		}
-	}
+	// Skip IngressRoute deployment - using file-based configuration
+	// Routes are defined in the dynamic ConfigMap instead
 	
 	klog.Info("Traefik resources deployed successfully")
 	return nil

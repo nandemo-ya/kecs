@@ -129,16 +129,7 @@ func createTraefikClusterRole() *rbacv1.ClusterRole {
 				Resources: []string{"ingresses", "ingressclasses"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
-			// Traefik CRDs
-			{
-				APIGroups: []string{"traefik.io", "traefik.containo.us"},
-				Resources: []string{
-					"middlewares", "middlewaretcps", "ingressroutes", "traefikservices",
-					"ingressroutetcps", "ingressrouteudps", "tlsoptions", "tlsstores",
-					"serverstransports", "serverstransporttcps",
-				},
-				Verbs: []string{"get", "list", "watch"},
-			},
+			// Traefik CRDs - removed as we use file-based configuration
 		},
 	}
 }
