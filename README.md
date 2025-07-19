@@ -74,13 +74,13 @@ KECS (Kubernetes-based ECS Compatible Service) is a standalone service that prov
 
 ## Quick Start
 
-### Running KECS (New Architecture v2)
+### Running KECS
 
-The new architecture runs KECS control plane inside a k3d cluster, providing better integration and a unified AWS API endpoint:
+KECS runs its control plane inside a k3d cluster, providing better integration and a unified AWS API endpoint:
 
 ```bash
-# Start KECS with new architecture
-kecs start-v2
+# Start KECS
+kecs start
 
 # This creates a k3d cluster with:
 # - KECS control plane (ECS/ELBv2 APIs)
@@ -91,7 +91,7 @@ kecs start-v2
 kecs cluster info
 
 # Stop KECS
-kecs stop-v2
+kecs stop
 ```
 
 All AWS APIs are accessible through port 4566:
@@ -102,38 +102,23 @@ aws elbv2 describe-load-balancers  # → KECS
 aws s3 ls                     # → LocalStack
 ```
 
-### Running KECS in a Container (Legacy)
-
-For the traditional container-based execution:
-
-```bash
-# Start KECS in a container
-kecs start
-
-# Check status
-kecs status
-
-# View logs
-kecs logs -f
-
-# Stop KECS
-kecs stop
-```
-
 ### Running Multiple Instances
 
 KECS supports running multiple instances with different configurations:
 
 ```bash
-# Start with custom name and ports
-kecs start --name dev --api-port 8080 --admin-port 8081
-kecs start --name staging --api-port 8090 --admin-port 8091
+# Start with custom instance name and ports
+kecs start --instance dev --api-port 8080 --admin-port 8081
+kecs start --instance staging --api-port 8090 --admin-port 8091
 
-# Or use auto-port assignment
-kecs start --name test --auto-port
+# Or use auto-generated instance name
+kecs start  # Generates a random instance name
 
-# List all instances
-kecs instances list
+# Stop a specific instance
+kecs stop --instance dev
+
+# Stop instance with interactive selection
+kecs stop  # Shows a list to select from
 ```
 
 ## Installation
@@ -195,118 +180,6 @@ docker run -v /var/run/docker.sock:/var/run/docker.sock \
 kecs server
 ```
 
-### Container Commands
-
-KECS provides container-based execution similar to tools like kind and k3d, supporting both Docker and containerd runtimes:
-
-#### Start Command
-
-Starts KECS server in a container:
-
-```bash
-kecs start [flags]
-
-Flags:
-  --name string        Container name (default "kecs-server")
-  --image string       Container image to use (default "ghcr.io/nandemo-ya/kecs:latest")
-  --api-port int       API server port (default 8080)
-  --admin-port int     Admin server port (default 8081)
-  --data-dir string    Data directory (default "~/.kecs/data")
-  -d, --detach         Run container in background (default true)
-  --local-build        Build and use local image
-  --config string      Path to configuration file
-  --auto-port          Automatically find available ports
-  --runtime string     Container runtime to use (docker, containerd, or auto)
-```
-
-Examples:
-
-```bash
-# Start with default settings (auto-detects runtime)
-kecs start
-
-# Start with custom ports
-kecs start --api-port 9080 --admin-port 9081
-
-# Start with local build
-kecs start --local-build
-
-# Start using configuration file
-kecs start --config ~/.kecs/instances.yaml staging
-
-# Use specific runtime
-kecs start --runtime docker
-kecs start --runtime containerd
-
-# Works with k3d/k3s environments
-kecs start --runtime containerd  # Automatically uses k3s socket
-```
-
-#### Stop Command
-
-Stops and removes KECS container:
-
-```bash
-kecs stop [flags]
-
-Flags:
-  --name string     Container name (default "kecs-server")
-  -f, --force       Force stop without graceful shutdown
-```
-
-#### Status Command
-
-Shows KECS container status:
-
-```bash
-kecs status [flags]
-
-Flags:
-  --name string     Container name (empty for all KECS containers)
-  -a, --all         Show all containers including stopped ones
-```
-
-#### Logs Command
-
-Displays logs from KECS container:
-
-```bash
-kecs logs [flags]
-
-Flags:
-  --name string        Container name (default "kecs-server")
-  -f, --follow         Follow log output
-  --tail string        Number of lines to show from the end (default "all")
-  -t, --timestamps     Show timestamps
-```
-
-### Multiple Instances Management
-
-KECS supports running multiple instances with the `instances` command:
-
-#### List Instances
-
-```bash
-kecs instances list [--config file]
-```
-
-Shows all configured and running instances with their status, ports, and configuration.
-
-#### Start All Instances
-
-```bash
-kecs instances start-all [--config file]
-```
-
-Starts all instances marked with `autoStart: true` in the configuration file.
-
-#### Stop All Instances
-
-```bash
-kecs instances stop-all
-```
-
-Stops all running KECS instances.
 
 ### Configuration
 
@@ -333,75 +206,10 @@ features:
 
 For more details, see the [Configuration Guide](docs/configuration.md).
 
-### Configuration File
 
-KECS supports YAML configuration files for managing multiple instances:
+### Server Mode
 
-```yaml
-# ~/.kecs/instances.yaml
-defaultInstance: dev
-
-instances:
-  - name: dev
-    image: ghcr.io/nandemo-ya/kecs:latest
-    ports:
-      api: 8080
-      admin: 8081
-    dataDir: ~/.kecs/instances/dev/data
-    autoStart: true
-    env:
-      KECS_LOG_LEVEL: debug
-    labels:
-      environment: development
-
-  - name: staging
-    image: ghcr.io/nandemo-ya/kecs:latest
-    ports:
-      api: 8090
-      admin: 8091
-    dataDir: ~/.kecs/instances/staging/data
-    autoStart: true
-    env:
-      KECS_LOG_LEVEL: info
-    labels:
-      environment: staging
-
-  - name: test
-    image: ghcr.io/nandemo-ya/kecs:latest
-    ports:
-      api: 8100
-      admin: 8101
-    dataDir: ~/.kecs/instances/test/data
-    autoStart: false
-    env:
-      KECS_TEST_MODE: "true"
-    labels:
-      environment: test
-```
-
-### Container Runtime Support
-
-KECS supports multiple container runtimes:
-
-#### Docker
-- Docker Desktop
-- Docker Engine
-- Default runtime for most environments
-
-#### Containerd
-- k3s/k3d environments
-- Rancher Desktop (containerd mode)
-- Standard Kubernetes nodes
-
-#### Auto-detection
-KECS automatically detects the available runtime:
-1. Checks for Docker first (backward compatibility)
-2. Falls back to containerd if Docker is not available
-3. Automatically finds k3s containerd socket at `/run/k3s/containerd/containerd.sock`
-
-### Traditional Server Mode
-
-You can also run KECS directly without containers:
+You can also run KECS server directly (useful for development):
 
 ```bash
 # Run the server
@@ -409,9 +217,6 @@ kecs server
 
 # Or with custom configuration
 kecs server --port 8080 --admin-port 8081
-
-# Run server (API-only mode)
-kecs server
 ```
 
 ### Docker Deployment
@@ -423,12 +228,6 @@ kecs server
 docker compose up
 ```
 
-#### Using KECS CLI
-
-```bash
-# Start API container
-kecs start --name kecs-api --api-port 8080
-```
 
 #### Building Docker Images
 

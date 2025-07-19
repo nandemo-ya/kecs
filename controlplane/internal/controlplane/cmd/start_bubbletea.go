@@ -20,8 +20,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// runStartV2WithBubbleTea is an alternative implementation using Bubble Tea
-func runStartV2WithBubbleTea(ctx context.Context, instanceName string, cfg *config.Config, dataDir string) error {
+// runStartWithBubbleTea is an alternative implementation using Bubble Tea
+func runStartWithBubbleTea(ctx context.Context, instanceName string, cfg *config.Config, dataDir string) error {
 	// Set environment variables to suppress external tool logs before starting
 	originalK3dLogLevel := os.Getenv("K3D_LOG_LEVEL")
 	os.Setenv("K3D_LOG_LEVEL", "panic") // Only show critical errors
@@ -131,7 +131,7 @@ func runStartV2WithBubbleTea(ctx context.Context, instanceName string, cfg *conf
 		if cfg.Features.Traefik {
 			tracker.StartTask("traefik")
 			tracker.UpdateTask("traefik", 10, "Deploying gateway...")
-			if err := deployTraefikGatewayWithProgress(ctx, instanceName, cfg, startV2ApiPort, tracker); err != nil {
+			if err := deployTraefikGatewayWithProgress(ctx, instanceName, cfg, startApiPort, tracker); err != nil {
 				tracker.FailTask("traefik", err)
 				return fmt.Errorf("failed to deploy Traefik gateway: %w", err)
 			}
@@ -151,8 +151,8 @@ func runStartV2WithBubbleTea(ctx context.Context, instanceName string, cfg *conf
 		tracker.Log(progress.LogLevelInfo, "🎉 KECS instance '%s' is ready!", instanceName)
 		tracker.Log(progress.LogLevelInfo, "")
 		tracker.Log(progress.LogLevelInfo, "Endpoints:")
-		tracker.Log(progress.LogLevelInfo, "  AWS API: http://localhost:%d", startV2ApiPort)
-		tracker.Log(progress.LogLevelInfo, "  Admin API: http://localhost:%d", startV2AdminPort)
+		tracker.Log(progress.LogLevelInfo, "  AWS API: http://localhost:%d", startApiPort)
+		tracker.Log(progress.LogLevelInfo, "  Admin API: http://localhost:%d", startAdminPort)
 		tracker.Log(progress.LogLevelInfo, "  Data directory: %s", dataDir)
 		
 		if cfg.LocalStack.Enabled {
@@ -162,7 +162,7 @@ func runStartV2WithBubbleTea(ctx context.Context, instanceName string, cfg *conf
 		
 		tracker.Log(progress.LogLevelInfo, "")
 		tracker.Log(progress.LogLevelInfo, "Next steps:")
-		tracker.Log(progress.LogLevelInfo, "  To stop this instance: kecs stop-v2 --instance %s", instanceName)
+		tracker.Log(progress.LogLevelInfo, "  To stop this instance: kecs stop --instance %s", instanceName)
 		tracker.Log(progress.LogLevelInfo, "  To get kubeconfig: kecs kubeconfig get %s", instanceName)
 		
 		return nil
@@ -189,7 +189,7 @@ func createK3dClusterWithProgress(ctx context.Context, clusterName string, cfg *
 		Provider:      "k3d",
 		ContainerMode: false,
 		EnableTraefik: false, // Disable old Traefik deployment (we use our own)
-		TraefikPort:   startV2ApiPort,
+		TraefikPort:   startApiPort,
 		VolumeMounts: []kubernetes.VolumeMount{
 			{
 				HostPath:      dataDir,
@@ -316,7 +316,7 @@ func deployControlPlaneWithBubbleTeaProgress(ctx context.Context, clusterName st
 		MemoryLimit:     "1Gi",
 		StorageSize:     "10Gi",
 		APIPort:         80,
-		AdminPort:       int32(startV2AdminPort),
+		AdminPort:       int32(startAdminPort),
 		LogLevel:        cfg.Server.LogLevel,
 		ExtraEnvVars: []corev1.EnvVar{
 			{

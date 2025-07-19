@@ -31,7 +31,6 @@ import (
 type K3dClusterManager struct {
 	runtime         runtimes.Runtime
 	config          *ClusterManagerConfig
-	traefikManager  *TraefikManager
 	portForwarder   *PortForwarder
 	traefikPorts    map[string]int // cluster name -> traefik port mapping
 	portMutex       sync.Mutex     // protects port allocation
@@ -722,36 +721,7 @@ func (k *K3dClusterManager) getLoadBalancerAPIPort(ctx context.Context, containe
 	return "", fmt.Errorf("no port mapping found for 6443/tcp")
 }
 
-// deployTraefik deploys Traefik reverse proxy to the cluster
-func (k *K3dClusterManager) deployTraefik(ctx context.Context, clusterName string) error {
-	// Get Kubernetes client for the cluster
-	kubeClient, err := k.GetKubeClient(clusterName)
-	if err != nil {
-		return fmt.Errorf("failed to get kubernetes client: %w", err)
-	}
-
-	// Get REST config
-	restConfig, err := k.getRESTConfig(clusterName)
-	if err != nil {
-		return fmt.Errorf("failed to get REST config: %w", err)
-	}
-
-	// Create Traefik manager
-	traefikManager, err := NewTraefikManager(kubeClient, restConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create Traefik manager: %w", err)
-	}
-
-	// Deploy Traefik
-	if err := traefikManager.Deploy(ctx); err != nil {
-		return fmt.Errorf("failed to deploy Traefik: %w", err)
-	}
-
-	// Store Traefik manager for later use
-	k.traefikManager = traefikManager
-
-	return nil
-}
+// deployTraefik method has been removed - Traefik deployment is now handled by ResourceDeployer
 
 // getRESTConfig returns the REST config for a cluster
 func (k *K3dClusterManager) getRESTConfig(clusterName string) (*rest.Config, error) {
@@ -1013,16 +983,7 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		log.Printf("Cluster %s creation initiated asynchronously", normalizedName)
 	}
 	
-	// Deploy Traefik if enabled (even in optimized mode)
-	if k.config.EnableTraefik && waitForServer {
-		log.Printf("Deploying Traefik to optimized cluster %s...", normalizedName)
-		if err := k.deployTraefik(ctx, clusterName); err != nil {
-			log.Printf("Warning: Failed to deploy Traefik: %v", err)
-			// Continue without Traefik
-		} else {
-			log.Printf("Successfully deployed Traefik to optimized cluster %s", normalizedName)
-		}
-	}
+	// Traefik deployment is now handled by ResourceDeployer in the start command
 
 	return nil
 }
