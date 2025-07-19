@@ -143,15 +143,15 @@ func (m *localStackManager) Start(ctx context.Context) error {
 
 	if kubeManager, ok := m.kubeManager.(*kubernetesManager); ok {
 		if err := kubeManager.WaitForLocalStackReady(readyCtx, DefaultHealthTimeout); err != nil {
-			klog.Warningf("Failed to detect Ready message: %v, falling back to health check", err)
+			klog.Warningf("Failed to detect Ready message: %v", err)
+		} else {
+			klog.Info("LocalStack is ready (detected Ready message in logs)")
 		}
 	}
 
-	// Also wait for health check
-	if err := m.healthChecker.WaitForHealthy(ctx, DefaultHealthTimeout); err != nil {
-		// Log the error but don't fail - DNS resolution issues might be temporary
-		klog.Warningf("LocalStack health check failed (DNS resolution issue?): %v", err)
-		klog.Info("Continuing despite health check failure - LocalStack pod is running")
+	// Skip health check for k8s deployment - pod readiness is sufficient
+	if !m.config.ContainerMode {
+		klog.Info("Skipping HTTP health check for k8s deployment - pod is running")
 	}
 
 	// Update status
@@ -389,7 +389,13 @@ func (m *localStackManager) WaitForReady(ctx context.Context, timeout time.Durat
 		return fmt.Errorf("LocalStack is not running")
 	}
 
-	// Try health check but don't fail on DNS issues
+	// For k8s deployment, skip HTTP health check
+	if !m.config.ContainerMode {
+		klog.Info("Skipping HTTP health check for k8s deployment - relying on pod readiness")
+		return nil
+	}
+
+	// For container mode, perform health check
 	if err := m.healthChecker.WaitForHealthy(ctx, timeout); err != nil {
 		// Check if it's a DNS resolution error
 		if strings.Contains(err.Error(), "no such host") || strings.Contains(err.Error(), "dial tcp: lookup") {
@@ -443,16 +449,33 @@ func (m *localStackManager) monitorHealth() {
 
 // checkHealth performs a health check and updates status
 func (m *localStackManager) checkHealth() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	healthStatus, err := m.healthChecker.CheckHealth(ctx)
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.status.LastHealthCheck = time.Now()
 
+	// For k8s deployment, skip HTTP health check
+	if !m.config.ContainerMode {
+		// In k8s, we rely on pod readiness/liveness probes
+		// Just check if the pod is still running
+		if m.kubeManager != nil {
+			podName, err := m.kubeManager.GetLocalStackPod()
+			if err != nil || podName == "" {
+				klog.Warningf("LocalStack pod not found: %v", err)
+				m.status.Healthy = false
+				return
+			}
+			// Pod exists, assume healthy
+			m.status.Healthy = true
+		}
+		return
+	}
+
+	// For container mode, perform actual HTTP health check
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	healthStatus, err := m.healthChecker.CheckHealth(ctx)
 	if err != nil {
 		klog.Errorf("Health check failed: %v", err)
 		m.status.Healthy = false

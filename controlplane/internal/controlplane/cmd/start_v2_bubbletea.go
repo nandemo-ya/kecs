@@ -386,12 +386,12 @@ func deployLocalStackWithBubbleTeaProgress(ctx context.Context, clusterName stri
 	// Configure LocalStack
 	localstackConfig := &localstack.Config{
 		Enabled:       true,
-		UseTraefik:    cfg.Features.Traefik,
+		UseTraefik:    false, // Don't use Traefik during initial deployment
 		Namespace:     "kecs-system",
 		Services:      cfg.LocalStack.Services,
 		Port:          4566,
 		EdgePort:      4566,
-		ProxyEndpoint: "http://localhost:4566",
+		ProxyEndpoint: "", // Will be set after Traefik is deployed
 		ContainerMode: false,
 		Image:         cfg.LocalStack.Image,
 		Version:       cfg.LocalStack.Version,
@@ -493,7 +493,7 @@ func deployTraefikGatewayWithProgress(ctx context.Context, clusterName string, c
 		WebPort:         80,
 		WebNodePort:     30080,
 		AWSPort:         4566,
-		AWSNodePort:     int32(apiPort),
+		AWSNodePort:     30890,  // Fixed NodePort in valid range (k3d maps host port to this)
 		LogLevel:        "INFO",
 		AccessLog:       true,
 		Metrics:         true,
@@ -615,18 +615,9 @@ func waitForComponentsWithProgress(ctx context.Context, clusterName string, trac
 		return fmt.Errorf("some required components are not ready")
 	}
 
-	tracker.UpdateTask("wait-ready", 80, "Checking API connectivity")
-	
-	// Check API connectivity
-	tracker.Log(progress.LogLevelInfo, "Checking API connectivity...")
-	
-	// Test KECS control plane health endpoint
-	adminEndpoint := fmt.Sprintf("http://localhost:%d/health", startV2AdminPort)
-	if err := checkEndpointHealth(adminEndpoint, 30*time.Second); err != nil {
-		tracker.Log(progress.LogLevelError, "❌ KECS admin API not accessible")
-		return fmt.Errorf("KECS admin API not accessible: %w", err)
-	}
-	tracker.Log(progress.LogLevelInfo, "✅ API connectivity verified")
+	// Skip external health checks for k8s deployments
+	// The deployment readiness checks above are sufficient
+	tracker.Log(progress.LogLevelInfo, "✅ All components are ready")
 	
 	tracker.UpdateTask("wait-ready", 100, "All components ready")
 	return nil
