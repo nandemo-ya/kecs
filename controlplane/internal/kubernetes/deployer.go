@@ -126,9 +126,13 @@ func (d *ResourceDeployer) DeployTraefik(ctx context.Context, config *resources.
 		return fmt.Errorf("failed to create cluster role binding: %w", err)
 	}
 	
-	// Deploy ConfigMap
+	// Deploy ConfigMaps
 	if err := d.applyConfigMap(ctx, res.ConfigMap); err != nil {
 		return fmt.Errorf("failed to create config map: %w", err)
+	}
+	
+	if err := d.applyConfigMap(ctx, res.DynamicConfigMap); err != nil {
+		return fmt.Errorf("failed to create dynamic config map: %w", err)
 	}
 	
 	// Deploy Services

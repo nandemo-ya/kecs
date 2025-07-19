@@ -26,6 +26,7 @@ type TraefikResources struct {
 	ClusterRole        *rbacv1.ClusterRole
 	ClusterRoleBinding *rbacv1.ClusterRoleBinding
 	ConfigMap          *corev1.ConfigMap
+	DynamicConfigMap   *corev1.ConfigMap  // Dynamic routing configuration
 	Services           []*corev1.Service
 	Deployment         *appsv1.Deployment
 }
@@ -85,6 +86,7 @@ func CreateTraefikResources(config *TraefikConfig) *TraefikResources {
 		ClusterRole:        createTraefikClusterRole(),
 		ClusterRoleBinding: createTraefikClusterRoleBinding(),
 		ConfigMap:          createTraefikConfigMap(config),
+		DynamicConfigMap:   createTraefikDynamicConfigMap(),
 		Services:           createTraefikServices(config),
 		Deployment:         createTraefikDeployment(config),
 	}
@@ -171,25 +173,25 @@ func createTraefikConfigMap(config *TraefikConfig) *corev1.ConfigMap {
 	accessLogConfig := ""
 	if config.AccessLog {
 		accessLogConfig = `
-    accessLog:
-      format: json
-      fields:
-        defaultMode: keep
-        headers:
-          defaultMode: keep
-          names:
-            X-Amz-Target: keep
-            Authorization: redact`
+accessLog:
+  format: json
+  fields:
+    defaultMode: keep
+    headers:
+      defaultMode: keep
+      names:
+        X-Amz-Target: keep
+        Authorization: redact`
 	}
 
 	metricsConfig := ""
 	if config.Metrics {
 		metricsConfig = `
-    metrics:
-      prometheus:
-        entryPoint: metrics
-        addEntryPointsLabels: true
-        addServicesLabels: true`
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addServicesLabels: true`
 	}
 
 	return &corev1.ConfigMap{
@@ -217,9 +219,9 @@ entryPoints:
     address: ":8080"
 
 providers:
-  kubernetesCRD:
-    allowCrossNamespace: true
-    allowExternalNameServices: true
+  file:
+    filename: /dynamic/dynamic.yaml
+    watch: true
   kubernetesIngress:
     allowExternalNameServices: true
 
@@ -269,7 +271,7 @@ func createTraefikServices(config *TraefikConfig) []*corev1.Service {
 						NodePort:   config.AWSNodePort,
 					},
 				},
-				Type: corev1.ServiceTypeLoadBalancer,
+				Type: corev1.ServiceTypeNodePort,
 			},
 		},
 		// Dashboard service
@@ -442,6 +444,11 @@ func createTraefikDeployment(config *TraefikConfig) *appsv1.Deployment {
 									MountPath: "/config",
 									ReadOnly:  true,
 								},
+								{
+									Name:      "dynamic",
+									MountPath: "/dynamic",
+									ReadOnly:  true,
+								},
 							},
 						},
 					},
@@ -456,9 +463,60 @@ func createTraefikDeployment(config *TraefikConfig) *appsv1.Deployment {
 								},
 							},
 						},
+						{
+							Name: "dynamic",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "traefik-dynamic-config",
+									},
+								},
+							},
+						},
 					},
 				},
 			},
+		},
+	}
+}
+
+// createTraefikDynamicConfigMap creates the dynamic configuration for routing
+func createTraefikDynamicConfigMap() *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "traefik-dynamic-config",
+			Namespace: ControlPlaneNamespace,
+			Labels: map[string]string{
+				LabelManagedBy: "true",
+				LabelComponent: "gateway",
+			},
+		},
+		Data: map[string]string{
+			"dynamic.yaml": `http:
+  routers:
+    # ECS API routing
+    ecs-api:
+      entryPoints:
+        - aws
+      rule: "PathPrefix(` + "`/v1`" + `)"
+      service: ecs-api
+      priority: 10
+    # LocalStack routing (catch-all)
+    localstack:
+      entryPoints:
+        - aws
+      rule: "PathPrefix(` + "`/`" + `)"
+      service: localstack
+      priority: 1
+  services:
+    ecs-api:
+      loadBalancer:
+        servers:
+          - url: "http://kecs-api:80"
+    localstack:
+      loadBalancer:
+        servers:
+          - url: "http://localstack:4566"`,
 		},
 	}
 }
