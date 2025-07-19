@@ -234,7 +234,7 @@ func createK3dCluster(ctx context.Context, clusterName string, cfg *config.Confi
 	clusterConfig := &kubernetes.ClusterManagerConfig{
 		Provider:      "k3d",
 		ContainerMode: false,
-		EnableTraefik: true, // Enable Traefik for the new architecture
+		EnableTraefik: false, // Disable old Traefik deployment (we use our own)
 		TraefikPort:   startV2ApiPort, // Use the API port for Traefik
 		VolumeMounts: []kubernetes.VolumeMount{
 			{
@@ -410,7 +410,7 @@ func deployLocalStack(ctx context.Context, clusterName string, cfg *config.Confi
 		Services:      cfg.LocalStack.Services,
 		Port:          4566,
 		EdgePort:      4566,
-		ProxyEndpoint: "http://traefik.kecs-system.svc.cluster.local:4566",
+		ProxyEndpoint: "http://localhost:4566",
 		ContainerMode: false, // We're deploying in k8s, not standalone container
 		Image:         cfg.LocalStack.Image,
 		Version:       cfg.LocalStack.Version,
@@ -740,7 +740,7 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 		Services:      cfg.LocalStack.Services,
 		Port:          4566,
 		EdgePort:      4566,
-		ProxyEndpoint: "http://traefik.kecs-system.svc.cluster.local:4566",
+		ProxyEndpoint: "http://localhost:4566",
 		ContainerMode: false,
 		Image:         cfg.LocalStack.Image,
 		Version:       cfg.LocalStack.Version,

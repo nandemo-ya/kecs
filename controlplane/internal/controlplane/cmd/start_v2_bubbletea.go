@@ -188,7 +188,7 @@ func createK3dClusterWithProgress(ctx context.Context, clusterName string, cfg *
 	clusterConfig := &kubernetes.ClusterManagerConfig{
 		Provider:      "k3d",
 		ContainerMode: false,
-		EnableTraefik: true,
+		EnableTraefik: false, // Disable old Traefik deployment (we use our own)
 		TraefikPort:   startV2ApiPort,
 		VolumeMounts: []kubernetes.VolumeMount{
 			{
@@ -391,7 +391,7 @@ func deployLocalStackWithBubbleTeaProgress(ctx context.Context, clusterName stri
 		Services:      cfg.LocalStack.Services,
 		Port:          4566,
 		EdgePort:      4566,
-		ProxyEndpoint: "http://traefik.kecs-system.svc.cluster.local:4566",
+		ProxyEndpoint: "http://localhost:4566",
 		ContainerMode: false,
 		Image:         cfg.LocalStack.Image,
 		Version:       cfg.LocalStack.Version,
