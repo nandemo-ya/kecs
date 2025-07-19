@@ -3,502 +3,793 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io"
-	"net"
+	"log"
 	"net/http"
 	"os"
-	"os/exec"
-	"os/signal"
 	"path/filepath"
-	"strings"
-	"syscall"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/runtime"
-)
-
-const (
-	defaultContainerName = "kecs-server"
-	defaultImage         = "ghcr.io/nandemo-ya/kecs:latest"
-	healthCheckTimeout   = 30 * time.Second
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
+	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 )
 
 var (
-	startContainerName string
-	startImageName     string
-	startApiPort       int
-	startAdminPort     int
-	startDataDir       string
-	startDetach        bool
-	startLocalBuild    bool
-	startConfigFile    string
-	startAutoPort      bool
-	startRuntime       string
-	startSkipPull      bool
+	// Start flags
+	startInstanceName string
+	startDataDir     string
+	startApiPort     int
+	startAdminPort   int
+	startConfigFile  string
+	startNoLocalStack bool
+	startNoTraefik   bool
+	startTimeout     time.Duration
+	startUseBubbleTea bool
 )
 
 var startCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start KECS server in a container",
-	Long: `Start KECS server in a container running in the background.
-This command supports both Docker and containerd runtimes.`,
+	Short: "Start KECS with control plane in k3d cluster",
+	Long: `Start KECS by creating a k3d cluster and deploying the control plane inside it.
+This provides a unified AWS API endpoint accessible from all containers.`,
 	RunE: runStart,
 }
 
 func init() {
 	RootCmd.AddCommand(startCmd)
 
-	startCmd.Flags().StringVar(&startContainerName, "name", defaultContainerName, "Container name")
-	startCmd.Flags().StringVar(&startImageName, "image", defaultImage, "Docker image to use")
-	startCmd.Flags().IntVar(&startApiPort, "api-port", 8080, "API server port")
-	startCmd.Flags().IntVar(&startAdminPort, "admin-port", 8081, "Admin server port")
+	startCmd.Flags().StringVar(&startInstanceName, "instance", "", "KECS instance name (auto-generated if not specified)")
 	startCmd.Flags().StringVar(&startDataDir, "data-dir", "", "Data directory (default: ~/.kecs/data)")
-	startCmd.Flags().BoolVarP(&startDetach, "detach", "d", true, "Run container in background")
-	startCmd.Flags().BoolVar(&startLocalBuild, "local-build", false, "Build and use local image")
-	startCmd.Flags().StringVar(&startConfigFile, "config", "", "Path to configuration file")
-	startCmd.Flags().BoolVar(&startAutoPort, "auto-port", false, "Automatically find available ports")
-	startCmd.Flags().StringVar(&startRuntime, "runtime", "", "Container runtime to use (docker, containerd, or auto)")
-	startCmd.Flags().BoolVar(&startSkipPull, "skip-pull", false, "Skip pulling image if it exists locally")
+	startCmd.Flags().IntVar(&startApiPort, "api-port", 4566, "AWS API port (Traefik gateway)")
+	startCmd.Flags().IntVar(&startAdminPort, "admin-port", 8081, "Admin API port")
+	startCmd.Flags().StringVar(&startConfigFile, "config", "", "Configuration file path")
+	startCmd.Flags().BoolVar(&startNoLocalStack, "no-localstack", false, "Disable LocalStack deployment")
+	startCmd.Flags().BoolVar(&startNoTraefik, "no-traefik", false, "Disable Traefik deployment")
+	startCmd.Flags().DurationVar(&startTimeout, "timeout", 10*time.Minute, "Timeout for cluster creation")
+	startCmd.Flags().BoolVar(&startUseBubbleTea, "bubbletea", false, "Use Bubble Tea for progress display (experimental)")
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
-	ctx := context.Background()
-
-	// Get runtime manager
-	manager := runtime.GetDefaultManager()
-	
-	// Set runtime if specified
-	if startRuntime != "" {
-		switch startRuntime {
-		case "docker":
-			if err := manager.UseDocker(); err != nil {
-				return fmt.Errorf("failed to use Docker runtime: %w", err)
-			}
-		case "containerd":
-			if err := manager.UseContainerd(""); err != nil {
-				return fmt.Errorf("failed to use containerd runtime: %w", err)
-			}
-		case "auto":
-			if err := manager.AutoDetect(); err != nil {
-				return fmt.Errorf("failed to auto-detect runtime: %w", err)
-			}
-		default:
-			return fmt.Errorf("unknown runtime: %s", startRuntime)
+	// Generate instance name if not provided
+	if startInstanceName == "" {
+		generatedName, err := utils.GenerateRandomName()
+		if err != nil {
+			return fmt.Errorf("failed to generate instance name: %w", err)
+		}
+		startInstanceName = generatedName
+		// Only show info message if not using Bubble Tea
+		if !startUseBubbleTea {
+			progress.Info("Generated KECS instance name: %s", startInstanceName)
 		}
 	}
 
-	// Get runtime
-	rt, err := manager.GetRuntime()
+	// Only show header if not using Bubble Tea
+	if !startUseBubbleTea {
+		progress.SectionHeader(fmt.Sprintf("Creating KECS instance '%s'", startInstanceName))
+	}
+
+	// Load configuration
+	cfg, err := config.LoadConfig(startConfigFile)
 	if err != nil {
-		return fmt.Errorf("failed to get container runtime: %w", err)
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	fmt.Printf("Using container runtime: %s\n", rt.Name())
-
-	// Check if container already exists
-	containers, err := rt.ListContainers(ctx, runtime.ListContainersOptions{
-		All:   true,
-		Names: []string{startContainerName},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to list containers: %w", err)
+	// Override with flags
+	if startNoLocalStack {
+		cfg.LocalStack.Enabled = false
 	}
-
-	if len(containers) > 0 {
-		container := containers[0]
-		if container.State == "running" {
-			fmt.Printf("KECS server '%s' is already running\n", startContainerName)
-			fmt.Printf("API endpoint: http://localhost:%d\n", startApiPort)
-			fmt.Printf("Admin endpoint: http://localhost:%d\n", startAdminPort)
-			return nil
-		}
-
-		// Remove the stopped container
-		fmt.Printf("Removing existing container '%s'...\n", startContainerName)
-		if err := rt.RemoveContainer(ctx, container.ID, true); err != nil {
-			return fmt.Errorf("failed to remove existing container: %w", err)
-		}
+	if startNoTraefik {
+		cfg.Features.Traefik = false
 	}
 
 	// Set up data directory
 	if startDataDir == "" {
 		home, _ := os.UserHomeDir()
-		startDataDir = filepath.Join(home, ".kecs", "data")
+		startDataDir = filepath.Join(home, ".kecs", "instances", startInstanceName, "data")
 	}
 
-	// Expand tilde in path
-	if strings.HasPrefix(startDataDir, "~") {
-		home, _ := os.UserHomeDir()
-		startDataDir = filepath.Join(home, startDataDir[1:])
-	}
-
-	// Convert to absolute path
-	absDataDir, err := filepath.Abs(startDataDir)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path: %w", err)
-	}
-
-	// Create data directory if it doesn't exist
-	if err := os.MkdirAll(absDataDir, 0755); err != nil {
+	// Ensure data directory exists
+	if err := os.MkdirAll(startDataDir, 0755); err != nil {
 		return fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	// Auto-assign ports if requested
-	if startAutoPort {
-		// Try to find available ports starting from the specified ones
-		availablePorts, err := findAvailablePorts(startApiPort, startAdminPort, make(map[int]string))
-		if err != nil {
-			return fmt.Errorf("failed to find available ports: %w", err)
-		}
-		startApiPort = availablePorts[0]
-		startAdminPort = availablePorts[1]
-		fmt.Printf("Auto-assigned ports - API: %d, Admin: %d\n", startApiPort, startAdminPort)
-	} else {
-		// Check if ports are available
-		if err := checkPortsAvailable(startApiPort, startAdminPort); err != nil {
-			return err
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), startTimeout)
+	defer cancel()
+
+	// Use Bubble Tea if flag is set
+	if startUseBubbleTea {
+		return runStartWithBubbleTea(ctx, startInstanceName, cfg, startDataDir)
 	}
 
-	// Build local image if requested
-	imageName := startImageName
-	if startLocalBuild {
-		fmt.Println("Building local image...")
-		if err := buildLocalImage(); err != nil {
-			return fmt.Errorf("failed to build local image: %w", err)
-		}
-		imageName = "kecs:local"
+	// Step 1: Create k3d cluster for KECS instance
+	spinner := progress.NewSpinner("Creating k3d cluster")
+	spinner.Start()
+	
+	if err := createK3dCluster(ctx, startInstanceName, cfg, startDataDir); err != nil {
+		spinner.Fail("Failed to create k3d cluster")
+		return fmt.Errorf("failed to create k3d cluster: %w", err)
 	}
+	spinner.Success("k3d cluster created")
 
-	// Pull image if not local build and not skipping pull
-	if !startLocalBuild && !startSkipPull {
-		fmt.Printf("Pulling image %s...\n", imageName)
-		reader, err := rt.PullImage(ctx, imageName, runtime.PullImageOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to pull image: %w", err)
-		}
-		defer reader.Close()
-		io.Copy(io.Discard, reader)
-	} else if startSkipPull {
-		fmt.Printf("Skipping image pull, using local image %s\n", imageName)
+	// Step 2: Create kecs-system namespace
+	spinner = progress.NewSpinner("Creating kecs-system namespace")
+	spinner.Start()
+	if err := createKecsSystemNamespace(ctx, startInstanceName); err != nil {
+		spinner.Fail("Failed to create namespace")
+		return fmt.Errorf("failed to create kecs-system namespace: %w", err)
 	}
+	spinner.Success("kecs-system namespace created")
 
-	// Prepare environment variables
-	env := []string{
-		"KECS_CONTAINER_MODE=true",
-		fmt.Sprintf("KECS_DATA_DIR=%s", "/data"),
-		"KECS_LOG_LEVEL=info",
-		"KECS_SECURITY_ACKNOWLEDGED=true",  // Skip security disclaimer in container
-		"KECS_KUBECONFIG_PATH=/data/kubeconfig", // Store kubeconfig in data directory
-		"KECS_TEST_MODE=false", // Disable test mode for normal operation
+	// Step 3: Deploy KECS control plane and LocalStack in parallel
+	// Create log capture for deployment phase
+	logCapture := progress.NewLogCapture(os.Stdout, progress.LogLevelInfo)
+	
+	// Redirect standard log output to our capture
+	logRedirector := progress.NewLogRedirector(logCapture, progress.LogLevelInfo)
+	logRedirector.RedirectStandardLog()
+	defer logRedirector.Restore()
+	
+	// Create parallel tracker for component deployment with log capture
+	parallelTracker := progress.NewParallelTracker("Deploying components").
+		WithLogCapture(logCapture)
+	
+	// Add tasks
+	parallelTracker.AddTask("controlplane", "Control Plane", 100)
+	if cfg.LocalStack.Enabled {
+		parallelTracker.AddTask("localstack", "LocalStack", 100)
 	}
 	
-	// Pass through LocalStack and feature-related environment variables from host
-	passThruEnvVars := []string{
-		"KECS_LOCALSTACK_ENABLED",
-		"KECS_LOCALSTACK_SERVICES",
-		"KECS_LOCALSTACK_USE_TRAEFIK",
-		"KECS_FEATURES_TRAEFIK",
-		"KECS_FEATURES_CONTAINER_MODE",
-		"KECS_LOCALSTACK_PORT",
-		"KECS_LOCALSTACK_ENDPOINT",
-		"KECS_LOCALSTACK_PROXY_ENDPOINT",
+	var wg sync.WaitGroup
+	errChan := make(chan error, 2)
+	
+	// Deploy Control Plane
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		parallelTracker.StartTask("controlplane")
+		if err := deployControlPlaneWithProgress(ctx, startInstanceName, cfg, startDataDir, parallelTracker); err != nil {
+			parallelTracker.FailTask("controlplane", err)
+			errChan <- fmt.Errorf("failed to deploy control plane: %w", err)
+			return
+		}
+		parallelTracker.CompleteTask("controlplane")
+	}()
+	
+	// Deploy LocalStack (if enabled)
+	if cfg.LocalStack.Enabled {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			parallelTracker.StartTask("localstack")
+			if err := deployLocalStackWithProgress(ctx, startInstanceName, cfg, parallelTracker); err != nil {
+				parallelTracker.FailTask("localstack", err)
+				errChan <- fmt.Errorf("failed to deploy LocalStack: %w", err)
+				return
+			}
+			parallelTracker.CompleteTask("localstack")
+		}()
 	}
 	
-	for _, envVar := range passThruEnvVars {
-		if value := os.Getenv(envVar); value != "" {
-			env = append(env, fmt.Sprintf("%s=%s", envVar, value))
-		}
-	}
-
-	// Add config file if specified
-	configMount := []runtime.Mount{}
-	if startConfigFile != "" {
-		absConfigPath, err := filepath.Abs(startConfigFile)
-		if err != nil {
-			return fmt.Errorf("failed to get absolute config path: %w", err)
-		}
-		env = append(env, "KECS_CONFIG_FILE=/config/kecs.yaml")
-		configMount = append(configMount, runtime.Mount{
-			Type:   "bind",
-			Source: absConfigPath,
-			Target: "/config/kecs.yaml",
-			ReadOnly: true,
-		})
-	}
-
-	// Add docker socket group (typically 0/root on most systems)
-	// This allows the container to access the Docker socket
-	groupAdd := []string{"0"}
-
-	// Create dedicated KECS network for k3d clusters to join
-	kecsNetworkName := fmt.Sprintf("kecs-%s", startContainerName)
-	fmt.Printf("Creating dedicated network '%s' for KECS and k3d clusters...\n", kecsNetworkName)
-	if err := createDockerNetwork(kecsNetworkName); err != nil {
-		fmt.Printf("Warning: Failed to create KECS network: %v\n", err)
-		// Continue without the network
-	}
+	// Wait for parallel deployments to complete
+	wg.Wait()
+	parallelTracker.Stop()
+	close(errChan)
 	
-	// Use the KECS network
-	networks := []string{kecsNetworkName}
+	// Check for errors from parallel deployments
+	for err := range errChan {
+		return err
+	}
+
+	// Step 4: Deploy Traefik gateway (if enabled) - must be after control plane and LocalStack
+	if cfg.Features.Traefik {
+		spinner = progress.NewSpinner("Deploying Traefik gateway")
+		spinner.Start()
+		if err := deployTraefikGateway(ctx, startInstanceName, cfg, startApiPort); err != nil {
+			spinner.Fail("Failed to deploy Traefik")
+			return fmt.Errorf("failed to deploy Traefik gateway: %w", err)
+		}
+		spinner.Success("Traefik gateway deployed")
+	}
+
+	// Step 5: Wait for all components to be ready
+	spinner = progress.NewSpinner("Waiting for all components to be ready")
+	spinner.Start()
+	if err := waitForComponents(ctx, startInstanceName); err != nil {
+		spinner.Fail("Components failed to become ready")
+		return fmt.Errorf("components did not become ready: %w", err)
+	}
+	spinner.Success("All components are ready")
+
+	// Show success summary
+	progress.Success("KECS instance '%s' is ready!", startInstanceName)
 	
-	// Also pass the network name via environment variable for k3d to use
-	env = append(env, fmt.Sprintf("KECS_DOCKER_NETWORK=%s", kecsNetworkName))
+	fmt.Println()
+	progress.Info("Endpoints:")
+	fmt.Printf("  AWS API: http://localhost:%d\n", startApiPort)
+	fmt.Printf("  Admin API: http://localhost:%d\n", startAdminPort)
+	fmt.Printf("  Data directory: %s\n", startDataDir)
 
-	// Create container configuration
-	containerConfig := &runtime.ContainerConfig{
-		Name:     startContainerName,
-		Image:    imageName,
-		Cmd:      []string{"server"}, // Run the server command
-		Env:      env,
-		Networks: networks, // Join k3d networks if they exist
-		Labels: map[string]string{
-			"com.kecs.managed": "true",
-			"com.kecs.name":    startContainerName,
-		},
-		GroupAdd: groupAdd,
-		Ports: []runtime.PortBinding{
-			{
-				ContainerPort: 8080,
-				HostPort:      uint16(startApiPort),
-				Protocol:      "tcp",
-				HostIP:        "0.0.0.0",
-			},
-			{
-				ContainerPort: 8081,
-				HostPort:      uint16(startAdminPort),
-				Protocol:      "tcp",
-				HostIP:        "0.0.0.0",
-			},
-		},
-		Mounts: append([]runtime.Mount{
-			{
-				Type:   "bind",
-				Source: absDataDir,
-				Target: "/data",
-			},
-			{
-				Type:   "bind",
-				Source: "/var/run/docker.sock",
-				Target: "/var/run/docker.sock",
-			},
-		}, configMount...),
-		RestartPolicy: runtime.RestartPolicy{
-			Name: "unless-stopped",
-		},
-		HealthCheck: &runtime.HealthCheck{
-			Test:        []string{"CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"},
-			Interval:    30 * time.Second,
-			Timeout:     10 * time.Second,
-			StartPeriod: 10 * time.Second,
-			Retries:     3,
-		},
+	if cfg.LocalStack.Enabled {
+		fmt.Printf("\nLocalStack services: %v\n", cfg.LocalStack.Services)
 	}
 
-	// Create the container
-	fmt.Printf("Creating KECS server container...\n")
-	container, err := rt.CreateContainer(ctx, containerConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create container: %w", err)
-	}
-
-	// Start the container
-	fmt.Printf("Starting KECS server...\n")
-	if err := rt.StartContainer(ctx, container.ID); err != nil {
-		return fmt.Errorf("failed to start container: %w", err)
-	}
-
-	fmt.Printf("KECS server '%s' started successfully\n", startContainerName)
-	fmt.Printf("API endpoint: http://localhost:%d\n", startApiPort)
-	fmt.Printf("Admin endpoint: http://localhost:%d\n", startAdminPort)
-	fmt.Printf("Data directory: %s\n", absDataDir)
-
-	// Wait for server to be ready
-	fmt.Print("Waiting for server to be ready...")
-	if err := waitForServerReady(fmt.Sprintf("http://localhost:%d/health", startAdminPort), healthCheckTimeout); err != nil {
-		fmt.Println(" timeout!")
-		fmt.Println("Server may still be starting. Check logs with: kecs logs")
-		return nil
-	}
-	fmt.Println(" ready!")
-
-	// If not detached, wait for signals
-	if !startDetach {
-		fmt.Println("\nRunning in foreground mode. Press Ctrl+C to stop...")
-
-		// Set up signal handling
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-		// Wait for signal
-		<-sigChan
-
-		fmt.Println("\nReceived interrupt signal, stopping container...")
-		timeout := 10
-		if err := rt.StopContainer(ctx, container.ID, &timeout); err != nil {
-			return fmt.Errorf("failed to stop container: %w", err)
-		}
-
-		if err := rt.RemoveContainer(ctx, container.ID, false); err != nil {
-			return fmt.Errorf("failed to remove container: %w", err)
-		}
-
-		fmt.Println("Container stopped and removed")
-	}
+	fmt.Println()
+	progress.Info("Next steps:")
+	fmt.Printf("  To stop this instance: kecs stop --instance %s\n", startInstanceName)
+	fmt.Printf("  To get kubeconfig: kecs kubeconfig get %s\n", startInstanceName)
 
 	return nil
 }
 
-func buildLocalImage() error {
-	// Determine the path to the controlplane directory
-	execPath, err := os.Executable()
+func createK3dCluster(ctx context.Context, clusterName string, cfg *config.Config, dataDir string) error {
+	// Create k3d cluster manager configuration
+	clusterConfig := &kubernetes.ClusterManagerConfig{
+		Provider:      "k3d",
+		ContainerMode: false,
+		EnableTraefik: false, // Disable old Traefik deployment (we use our own)
+		TraefikPort:   startApiPort, // Use the API port for Traefik
+		VolumeMounts: []kubernetes.VolumeMount{
+			{
+				HostPath:      dataDir,
+				ContainerPath: "/data",
+			},
+		},
+	}
+
+	// Create k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(clusterConfig)
 	if err != nil {
-		// Fallback: try to find the directory relative to current directory
-		if _, err := os.Stat("Dockerfile"); err == nil {
-			// We're already in the controlplane directory
-			cmd := exec.Command("docker", "build", "-t", "kecs:local", ".")
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			return cmd.Run()
-		}
-		// Try parent directory
-		if _, err := os.Stat("controlplane/Dockerfile"); err == nil {
-			cmd := exec.Command("docker", "build", "-t", "kecs:local", "controlplane")
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			return cmd.Run()
-		}
-		return fmt.Errorf("cannot find Dockerfile")
+		return fmt.Errorf("failed to create cluster manager: %w", err)
 	}
 
-	// Navigate from the binary location to find the source directory
-	dir := filepath.Dir(execPath)
-	for {
-		// Check if we found the controlplane directory
-		dockerfilePath := filepath.Join(dir, "controlplane", "Dockerfile")
-		if _, err := os.Stat(dockerfilePath); err == nil {
-			cmd := exec.Command("docker", "build", "-t", "kecs:local", filepath.Join(dir, "controlplane"))
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			return cmd.Run()
-		}
-
-		// Check if we're in the controlplane directory
-		dockerfilePath = filepath.Join(dir, "Dockerfile")
-		if _, err := os.Stat(dockerfilePath); err == nil {
-			cmd := exec.Command("docker", "build", "-t", "kecs:local", dir)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			return cmd.Run()
-		}
-
-		// Move up one directory
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			// We've reached the root
-			break
-		}
-		dir = parent
+	// Check if cluster already exists
+	exists, err := manager.ClusterExists(ctx, clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to check cluster existence: %w", err)
 	}
 
-	return fmt.Errorf("cannot find Dockerfile in any parent directory")
+	if exists {
+		log.Printf("k3d cluster '%s' already exists, using existing cluster", clusterName)
+		return nil
+	}
+
+	// Create the cluster
+	if err := manager.CreateCluster(ctx, clusterName); err != nil {
+		return fmt.Errorf("failed to create cluster: %w", err)
+	}
+
+	// Wait for cluster to be ready
+	log.Print("Waiting for cluster to be ready...")
+	if err := manager.WaitForClusterReady(clusterName, 5*time.Minute); err != nil {
+		return fmt.Errorf("cluster did not become ready: %w", err)
+	}
+	log.Println("Cluster is ready!")
+
+	return nil
 }
 
-// Helper functions
+func createKecsSystemNamespace(ctx context.Context, clusterName string) error {
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
 
-func waitForServerReady(url string, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
+	// Get Kubernetes client
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	// Create kecs-system namespace directly
+	// We don't use the NamespaceManager here as it's designed for ECS cluster namespaces
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kecs-system",
+			Labels: map[string]string{
+				"kecs.dev/managed": "true",
+				"kecs.dev/type":    "system",
+			},
+		},
+	}
+
+	_, err = kubeClient.CoreV1().Namespaces().Get(ctx, "kecs-system", metav1.GetOptions{})
+	if err == nil {
+		log.Println("kecs-system namespace already exists")
+		return nil
+	}
+
+	_, err = kubeClient.CoreV1().Namespaces().Create(ctx, namespace, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create kecs-system namespace: %w", err)
+	}
+
+	log.Println("Created kecs-system namespace")
+	return nil
+}
+
+func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Config, dataDir string) error {
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	// Get Kubernetes client and config
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+	
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
+	}
+
+	// Create resource deployer with config
+	deployer, err := kubernetes.NewResourceDeployerWithConfig(kubeClient, kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create resource deployer: %w", err)
+	}
+
+	// Configure control plane
+	controlPlaneConfig := &resources.ControlPlaneConfig{
+		Image:           "ghcr.io/nandemo-ya/kecs:latest",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		CPURequest:      "100m",
+		MemoryRequest:   "128Mi",
+		CPULimit:        "1000m",
+		MemoryLimit:     "1Gi",
+		StorageSize:     "10Gi",
+		APIPort:         80,
+		AdminPort:       int32(startAdminPort),
+		LogLevel:        cfg.Server.LogLevel,
+		ExtraEnvVars: []corev1.EnvVar{
+			{
+				Name:  "KECS_SKIP_SECURITY_DISCLAIMER",
+				Value: "true",
+			},
+		},
+	}
+
+	// Deploy control plane resources programmatically
+	log.Println("Deploying control plane resources...")
+	if err := deployer.DeployControlPlane(ctx, controlPlaneConfig); err != nil {
+		return fmt.Errorf("failed to deploy control plane: %w", err)
+	}
+
+	// Wait for deployment to be ready
+	fmt.Print("Waiting for control plane deployment to be ready...")
+	deployment := "kecs-controlplane"
+	namespace := "kecs-system"
+	
+	for i := 0; i < 60; i++ { // Wait up to 5 minutes
+		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
+		if err == nil && deps.Status.ReadyReplicas > 0 {
+			fmt.Println(" ready!")
+			return nil
+		}
+		time.Sleep(5 * time.Second)
+		fmt.Print(".")
+	}
+
+	return fmt.Errorf("control plane deployment did not become ready in time")
+}
+
+func deployLocalStack(ctx context.Context, clusterName string, cfg *config.Config) error {
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	// Get Kubernetes client and config
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
+	}
+
+	// Configure LocalStack for in-cluster deployment
+	localstackConfig := &localstack.Config{
+		Enabled:       true,
+		UseTraefik:    false, // Don't use Traefik during initial deployment
+		Namespace:     "kecs-system",
+		Services:      cfg.LocalStack.Services,
+		Port:          4566,
+		EdgePort:      4566,
+		ProxyEndpoint: "", // Will be set after Traefik is deployed
+		ContainerMode: false, // We're deploying in k8s, not standalone container
+		Image:         cfg.LocalStack.Image,
+		Version:       cfg.LocalStack.Version,
+		Debug:         cfg.Server.LogLevel == "debug",
+	}
+
+	// Create LocalStack manager
+	lsManager, err := localstack.NewManager(localstackConfig, kubeClient, kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create LocalStack manager: %w", err)
+	}
+
+	// Deploy LocalStack
+	log.Println("Deploying LocalStack...")
+	if err := lsManager.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start LocalStack: %w", err)
+	}
+
+	// Wait for LocalStack to be ready
+	log.Print("Waiting for LocalStack to be ready...")
+	for i := 0; i < 60; i++ { // Wait up to 5 minutes
+		if lsManager.IsHealthy() {
+			log.Println("LocalStack is ready!")
+			status, err := lsManager.GetStatus()
+			if err == nil {
+				log.Printf("LocalStack running: %v", status.Running)
+				log.Printf("LocalStack services: %v", status.EnabledServices)
+			}
+			return nil
+		}
+		time.Sleep(5 * time.Second)
+	}
+
+	return fmt.Errorf("LocalStack did not become ready in time")
+}
+
+func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.Config, apiPort int) error {
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	// Get Kubernetes client and config
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+	
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
+	}
+
+	// Create resource deployer with config
+	deployer, err := kubernetes.NewResourceDeployerWithConfig(kubeClient, kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create resource deployer: %w", err)
+	}
+
+	// Configure Traefik
+	traefikConfig := &resources.TraefikConfig{
+		Image:           "traefik:v3.2",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		CPURequest:      "100m",
+		MemoryRequest:   "128Mi",
+		CPULimit:        "500m",
+		MemoryLimit:     "512Mi",
+		WebPort:         80,
+		WebNodePort:     30080,
+		AWSPort:         4566,
+		AWSNodePort:     30890,  // Fixed NodePort in valid range (k3d maps host port to this)
+		LogLevel:        "INFO",
+		AccessLog:       true,
+		Metrics:         true,
+		Debug:           cfg.Server.LogLevel == "debug",
+	}
+
+	// Deploy Traefik resources programmatically
+	log.Println("Deploying Traefik gateway resources...")
+	if err := deployer.DeployTraefik(ctx, traefikConfig); err != nil {
+		return fmt.Errorf("failed to deploy Traefik: %w", err)
+	}
+
+	// Wait for Traefik deployment to be ready
+	log.Print("Waiting for Traefik deployment to be ready...")
+	deployment := "traefik"
+	namespace := "kecs-system"
+	
+	for i := 0; i < 60; i++ { // Wait up to 5 minutes
+		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
+		if err == nil && deps.Status.ReadyReplicas > 0 {
+			log.Println("Traefik deployment is ready!")
+			break
+		}
+		time.Sleep(5 * time.Second)
+	}
+
+	// Wait for Traefik service to get external IP/port
+	log.Print("Waiting for Traefik service to be accessible...")
+	service := "traefik"
+	
+	for i := 0; i < 30; i++ { // Wait up to 2.5 minutes
+		svc, err := kubeClient.CoreV1().Services(namespace).Get(ctx, service, metav1.GetOptions{})
+		if err == nil && len(svc.Status.LoadBalancer.Ingress) > 0 {
+			log.Println("Traefik service is ready!")
+			log.Printf("Traefik LoadBalancer: %s", svc.Status.LoadBalancer.Ingress[0].Hostname)
+			return nil
+		}
+		time.Sleep(5 * time.Second)
+	}
+
+	// For k3d, the LoadBalancer might not get an external IP
+	// Port forwarding is handled by k3d itself
+	log.Println("Traefik service is ready! (using k3d port mapping)")
+	
+	return nil
+}
+
+func waitForComponents(ctx context.Context, clusterName string) error {
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	// Get Kubernetes client
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	namespace := "kecs-system"
+	components := []struct {
+		name       string
+		deployment string
+		required   bool
+	}{
+		{"KECS Control Plane", "kecs-controlplane", true},
+		{"Traefik Gateway", "traefik", true},
+		{"LocalStack", "localstack", false}, // Optional based on config
+	}
+
+	log.Println("Checking component readiness...")
+	
+	allReady := true
+	for _, comp := range components {
+		// Check deployment
+		deployment, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, comp.deployment, metav1.GetOptions{})
+		if err != nil {
+			if comp.required {
+				log.Printf("  %s: ❌ Not found", comp.name)
+				allReady = false
+			} else {
+				log.Printf("  %s: ⏭️  Skipped (optional)", comp.name)
+			}
+			continue
+		}
+
+		// Check if deployment is ready
+		if deployment.Status.ReadyReplicas >= 1 {
+			log.Printf("  %s: ✅ Ready (%d/%d replicas)", comp.name, deployment.Status.ReadyReplicas, *deployment.Spec.Replicas)
+		} else {
+			log.Printf("  %s: ⏳ Not ready (0/%d replicas)", comp.name, *deployment.Spec.Replicas)
+			if comp.required {
+				allReady = false
+			}
+		}
+
+		// Check service endpoint
+		service, err := kubeClient.CoreV1().Services(namespace).Get(ctx, comp.deployment, metav1.GetOptions{})
+		if err == nil && len(service.Spec.Ports) > 0 {
+			log.Printf("    Service: %s:%d", service.Name, service.Spec.Ports[0].Port)
+		}
+	}
+
+	if !allReady {
+		return fmt.Errorf("some required components are not ready")
+	}
+
+	// Skip external health checks for k8s deployments
+	// The deployment readiness checks above are sufficient
+	log.Printf("✅ All components are ready")
+
+	return nil
+}
+
+func checkEndpointHealth(endpoint string, timeout time.Duration) error {
 	client := &http.Client{Timeout: 5 * time.Second}
-
+	deadline := time.Now().Add(timeout)
+	
 	for time.Now().Before(deadline) {
-		resp, err := client.Get(url)
+		resp, err := client.Get(endpoint)
 		if err == nil {
 			resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
-
-	return fmt.Errorf("server did not become ready within %v", timeout)
+	
+	return fmt.Errorf("endpoint %s did not become healthy within %v", endpoint, timeout)
 }
 
-func checkPortsAvailable(apiPort, adminPort int) error {
-	ports := []int{apiPort, adminPort}
-	for _, port := range ports {
-		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-		if err != nil {
-			return fmt.Errorf("port %d is already in use", port)
-		}
-		ln.Close()
-	}
-	return nil
-}
-
-func findAvailablePorts(startApiPort, startAdminPort int, usedPorts map[int]string) ([]int, error) {
-	var ports []int
+// deployControlPlaneWithProgress wraps deployControlPlane with progress reporting
+func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg *config.Config, dataDir string, tracker *progress.ParallelTracker) error {
+	// Update progress during deployment
+	tracker.UpdateTask("controlplane", 20, "Preparing resources")
 	
-	// Try to find available API port
-	apiPort := startApiPort
-	for i := 0; i < 100; i++ {
-		if _, used := usedPorts[apiPort]; !used {
-			ln, err := net.Listen("tcp", fmt.Sprintf(":%d", apiPort))
-			if err == nil {
-				ln.Close()
-				ports = append(ports, apiPort)
-				break
-			}
-		}
-		apiPort++
-	}
-	
-	if len(ports) == 0 {
-		return nil, fmt.Errorf("no available API port found starting from %d", startApiPort)
-	}
-	
-	// Try to find available admin port
-	adminPort := startAdminPort
-	for i := 0; i < 100; i++ {
-		if _, used := usedPorts[adminPort]; !used && adminPort != ports[0] {
-			ln, err := net.Listen("tcp", fmt.Sprintf(":%d", adminPort))
-			if err == nil {
-				ln.Close()
-				ports = append(ports, adminPort)
-				break
-			}
-		}
-		adminPort++
-	}
-	
-	if len(ports) == 1 {
-		return nil, fmt.Errorf("no available admin port found starting from %d", startAdminPort)
-	}
-	
-	return ports, nil
-}
-
-// createDockerNetwork creates a Docker network if it doesn't exist
-func createDockerNetwork(networkName string) error {
-	// Check if network already exists
-	cmd := exec.Command("docker", "network", "ls", "--filter", fmt.Sprintf("name=%s", networkName), "--format", "{{.Name}}")
-	output, err := cmd.Output()
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
 	if err != nil {
-		return fmt.Errorf("failed to check network existence: %w", err)
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	tracker.UpdateTask("controlplane", 30, "Getting Kubernetes client")
+	
+	// Get Kubernetes client and config
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
 	
-	if strings.TrimSpace(string(output)) == networkName {
-		// Network already exists
-		return nil
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
+	}
+
+	tracker.UpdateTask("controlplane", 40, "Creating deployer")
+	
+	// Create resource deployer with config
+	deployer, err := kubernetes.NewResourceDeployerWithConfig(kubeClient, kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create resource deployer: %w", err)
 	}
 	
-	// Create the network
-	cmd = exec.Command("docker", "network", "create", networkName)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to create network: %w", err)
+	// Configure control plane
+	controlPlaneConfig := &resources.ControlPlaneConfig{
+		Image:           "ghcr.io/nandemo-ya/kecs:latest",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		CPURequest:      "100m",
+		MemoryRequest:   "128Mi",
+		CPULimit:        "1000m",
+		MemoryLimit:     "1Gi",
+		StorageSize:     "10Gi",
+		APIPort:         80,
+		AdminPort:       int32(startAdminPort),
+		LogLevel:        cfg.Server.LogLevel,
+		ExtraEnvVars: []corev1.EnvVar{
+			{
+				Name:  "KECS_SKIP_SECURITY_DISCLAIMER",
+				Value: "true",
+			},
+		},
 	}
+
+	tracker.UpdateTask("controlplane", 60, "Deploying resources")
 	
-	return nil
+	// Deploy control plane resources programmatically
+	if err := deployer.DeployControlPlane(ctx, controlPlaneConfig); err != nil {
+		return fmt.Errorf("failed to deploy control plane: %w", err)
+	}
+
+	tracker.UpdateTask("controlplane", 80, "Waiting for deployment")
+	
+	// Wait for deployment to be ready
+	deployment := "kecs-controlplane"
+	namespace := "kecs-system"
+	maxWaitTime := 60 // 5 minutes (60 * 5 seconds)
+	
+	for i := 0; i < maxWaitTime; i++ {
+		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
+		if err == nil && deps.Status.ReadyReplicas > 0 {
+			tracker.UpdateTask("controlplane", 100, "Ready")
+			return nil
+		}
+		
+		// Calculate progress from 80% to 99% (never reach 100% until actually ready)
+		progress := 80 + ((i + 1) * 19 / maxWaitTime)
+		waitTime := (i + 1) * 5
+		tracker.UpdateTask("controlplane", progress, fmt.Sprintf("Waiting for pods (%ds/300s)", waitTime))
+		
+		time.Sleep(5 * time.Second)
+	}
+
+	return fmt.Errorf("control plane deployment did not become ready in time")
+}
+
+// deployLocalStackWithProgress wraps deployLocalStack with progress reporting
+func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *config.Config, tracker *progress.ParallelTracker) error {
+	tracker.UpdateTask("localstack", 10, "Initializing")
+	
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	tracker.UpdateTask("localstack", 20, "Getting Kubernetes client")
+	
+	// Get Kubernetes client and config
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
+	}
+
+	tracker.UpdateTask("localstack", 30, "Configuring LocalStack")
+	
+	// Configure LocalStack
+	localstackConfig := &localstack.Config{
+		Enabled:       true,
+		UseTraefik:    false, // Don't use Traefik during initial deployment
+		Namespace:     "kecs-system",
+		Services:      cfg.LocalStack.Services,
+		Port:          4566,
+		EdgePort:      4566,
+		ProxyEndpoint: "", // Will be set after Traefik is deployed
+		ContainerMode: false,
+		Image:         cfg.LocalStack.Image,
+		Version:       cfg.LocalStack.Version,
+		Debug:         cfg.Server.LogLevel == "debug",
+	}
+
+	tracker.UpdateTask("localstack", 40, "Creating LocalStack manager")
+	
+	// Create LocalStack manager
+	lsManager, err := localstack.NewManager(localstackConfig, kubeClient, kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create LocalStack manager: %w", err)
+	}
+
+	tracker.UpdateTask("localstack", 50, "Starting LocalStack")
+	
+	// Deploy LocalStack
+	if err := lsManager.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start LocalStack: %w", err)
+	}
+
+	// Give LocalStack a moment to initialize before checking health
+	// This prevents the progress from jumping due to the initial health status
+	tracker.UpdateTask("localstack", 60, "LocalStack started, initializing...")
+	time.Sleep(3 * time.Second)
+
+	tracker.UpdateTask("localstack", 70, "Waiting for LocalStack to be ready")
+	
+	// Wait for LocalStack to be ready
+	maxWaitTime := 60 // 5 minutes (60 * 5 seconds)
+	for i := 0; i < maxWaitTime; i++ {
+		// Check if LocalStack deployment is ready
+		status, err := lsManager.GetStatus()
+		if err == nil && status.Running && status.Healthy {
+			tracker.UpdateTask("localstack", 100, "Ready")
+			return nil
+		}
+		
+		// Calculate progress from 70% to 99% (never reach 100% until actually ready)
+		progress := 70 + ((i + 1) * 29 / maxWaitTime)
+		waitTime := (i + 1) * 5
+		
+		// Provide more detailed status message
+		statusMsg := fmt.Sprintf("Health check (%ds/300s)", waitTime)
+		if status != nil {
+			if !status.Running {
+				statusMsg = fmt.Sprintf("Starting LocalStack pod (%ds/300s)", waitTime)
+			} else if !status.Healthy {
+				statusMsg = fmt.Sprintf("Waiting for LocalStack services (%ds/300s)", waitTime)
+			}
+		}
+		
+		tracker.UpdateTask("localstack", progress, statusMsg)
+		
+		time.Sleep(5 * time.Second)
+	}
+
+	return fmt.Errorf("LocalStack did not become ready in time")
 }
