@@ -71,7 +71,7 @@ func DefaultTraefikConfig() *TraefikConfig {
 		AWSNodePort:     30890,
 		LogLevel:        "INFO",
 		AccessLog:       true,
-		Metrics:         true,
+		Metrics:         false,
 	}
 }
 
@@ -175,15 +175,8 @@ accessLog:
         Authorization: redact`
 	}
 
+	// Metrics are disabled for security
 	metricsConfig := ""
-	if config.Metrics {
-		metricsConfig = `
-metrics:
-  prometheus:
-    entryPoint: metrics
-    addEntryPointsLabels: true
-    addServicesLabels: true`
-	}
 
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -196,7 +189,7 @@ metrics:
 		},
 		Data: map[string]string{
 			"traefik.yaml": fmt.Sprintf(`api:
-  dashboard: true
+  dashboard: false
   debug: %v
 
 entryPoints:
@@ -204,10 +197,6 @@ entryPoints:
     address: ":80"
   aws:
     address: ":%d"
-  metrics:
-    address: ":8082"
-  traefik:
-    address: ":8080"
 
 providers:
   file:
