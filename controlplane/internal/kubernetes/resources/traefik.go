@@ -17,7 +17,6 @@ const (
 	TraefikServiceAccount = "traefik"
 	TraefikConfigMap      = "traefik-config"
 	TraefikService        = "traefik"
-	TraefikDashboard      = "traefik-dashboard"
 )
 
 // TraefikResources contains all resources needed for Traefik
@@ -71,7 +70,7 @@ func DefaultTraefikConfig() *TraefikConfig {
 		AWSNodePort:     30890,
 		LogLevel:        "INFO",
 		AccessLog:       true,
-		Metrics:         true,
+		Metrics:         false,
 	}
 }
 
@@ -175,15 +174,8 @@ accessLog:
         Authorization: redact`
 	}
 
+	// Metrics are disabled for security
 	metricsConfig := ""
-	if config.Metrics {
-		metricsConfig = `
-metrics:
-  prometheus:
-    entryPoint: metrics
-    addEntryPointsLabels: true
-    addServicesLabels: true`
-	}
 
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -196,7 +188,7 @@ metrics:
 		},
 		Data: map[string]string{
 			"traefik.yaml": fmt.Sprintf(`api:
-  dashboard: true
+  dashboard: false
   debug: %v
 
 entryPoints:
@@ -204,10 +196,6 @@ entryPoints:
     address: ":80"
   aws:
     address: ":%d"
-  metrics:
-    address: ":8082"
-  traefik:
-    address: ":8080"
 
 providers:
   file:
@@ -221,9 +209,6 @@ log:
   format: json
 %s
 %s
-
-ping:
-  entryPoint: traefik
 `, config.Debug, config.AWSPort, config.LogLevel, accessLogConfig, metricsConfig),
 		},
 	}
@@ -263,33 +248,6 @@ func createTraefikServices(config *TraefikConfig) []*corev1.Service {
 					},
 				},
 				Type: corev1.ServiceTypeNodePort,
-			},
-		},
-		// Dashboard service
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      TraefikDashboard,
-				Namespace: ControlPlaneNamespace,
-				Labels: map[string]string{
-					LabelManagedBy: "true",
-					LabelComponent: "gateway",
-					LabelApp:       TraefikName,
-					LabelType:      "dashboard",
-				},
-			},
-			Spec: corev1.ServiceSpec{
-				Selector: map[string]string{
-					LabelApp: TraefikName,
-				},
-				Ports: []corev1.ServicePort{
-					{
-						Name:       "admin",
-						Port:       8080,
-						TargetPort: intstr.FromString("admin"),
-						Protocol:   corev1.ProtocolTCP,
-					},
-				},
-				Type: corev1.ServiceTypeClusterIP,
 			},
 		},
 	}
@@ -379,16 +337,6 @@ func createTraefikDeployment(config *TraefikConfig) *appsv1.Deployment {
 									ContainerPort: config.AWSPort,
 									Protocol:      corev1.ProtocolTCP,
 								},
-								{
-									Name:          "admin",
-									ContainerPort: 8080,
-									Protocol:      corev1.ProtocolTCP,
-								},
-								{
-									Name:          "metrics",
-									ContainerPort: 8082,
-									Protocol:      corev1.ProtocolTCP,
-								},
 							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
@@ -400,26 +348,7 @@ func createTraefikDeployment(config *TraefikConfig) *appsv1.Deployment {
 									corev1.ResourceMemory: resource.MustParse(config.MemoryLimit),
 								},
 							},
-							LivenessProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/ping",
-										Port: intstr.FromString("admin"),
-									},
-								},
-								InitialDelaySeconds: 10,
-								PeriodSeconds:       30,
-							},
-							ReadinessProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/ping",
-										Port: intstr.FromString("admin"),
-									},
-								},
-								InitialDelaySeconds: 5,
-								PeriodSeconds:       10,
-							},
+							// Probes removed since admin endpoint is disabled
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},

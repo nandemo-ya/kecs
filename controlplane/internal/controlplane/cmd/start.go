@@ -485,7 +485,7 @@ func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.C
 		AWSNodePort:     30890,  // Fixed NodePort in valid range (k3d maps host port to this)
 		LogLevel:        "INFO",
 		AccessLog:       true,
-		Metrics:         true,
+		Metrics:         false,
 		Debug:           cfg.Server.LogLevel == "debug",
 	}
 
