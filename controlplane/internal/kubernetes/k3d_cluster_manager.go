@@ -298,6 +298,24 @@ func (k *K3dClusterManager) ClusterExists(ctx context.Context, clusterName strin
 	return false, nil
 }
 
+// ListClusters returns a list of all k3d clusters
+func (k *K3dClusterManager) ListClusters(ctx context.Context) ([]string, error) {
+	clusters, err := client.ClusterList(ctx, k.runtime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list clusters: %w", err)
+	}
+
+	var clusterNames []string
+	for _, cluster := range clusters {
+		// Only include KECS clusters (those with kecs- prefix)
+		if strings.HasPrefix(cluster.Name, "kecs-") {
+			clusterNames = append(clusterNames, cluster.Name)
+		}
+	}
+
+	return clusterNames, nil
+}
+
 // GetKubeClient returns a Kubernetes client for the specified cluster
 func (k *K3dClusterManager) GetKubeClient(clusterName string) (kubernetes.Interface, error) {
 	normalizedName := k.normalizeClusterName(clusterName)

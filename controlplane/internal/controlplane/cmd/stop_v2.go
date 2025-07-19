@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
@@ -32,24 +33,50 @@ func init() {
 }
 
 func runStopV2(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	
+	// Create k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	// If instance name is not provided, show selection
 	if stopV2InstanceName == "" {
-		return fmt.Errorf("instance name is required. Use --instance flag to specify the instance to stop")
+		spinner := progress.NewSpinner("Fetching KECS instances")
+		spinner.Start()
+		
+		// Get list of clusters
+		clusters, err := manager.ListClusters(ctx)
+		if err != nil {
+			spinner.Fail("Failed to list instances")
+			return fmt.Errorf("failed to list instances: %w", err)
+		}
+		spinner.Stop()
+		
+		if len(clusters) == 0 {
+			progress.Warning("No KECS instances found")
+			return nil
+		}
+		
+		// Show selection prompt
+		selectedInstance, err := pterm.DefaultInteractiveSelect.
+			WithOptions(clusters).
+			WithDefaultText("Select KECS instance to stop").
+			Show()
+		if err != nil {
+			return fmt.Errorf("failed to select instance: %w", err)
+		}
+		
+		stopV2InstanceName = selectedInstance
 	}
 
 	// Show header
 	progress.SectionHeader(fmt.Sprintf("Stopping KECS instance '%s'", stopV2InstanceName))
 
-	// Create k3d cluster manager
+	// Check instance status
 	spinner := progress.NewSpinner("Checking instance status")
 	spinner.Start()
-	
-	manager, err := kubernetes.NewK3dClusterManager(nil)
-	if err != nil {
-		spinner.Fail("Failed to create cluster manager")
-		return fmt.Errorf("failed to create cluster manager: %w", err)
-	}
-
-	ctx := context.Background()
 
 	// Check if cluster exists
 	exists, err := manager.ClusterExists(ctx, stopV2InstanceName)
