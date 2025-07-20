@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	k8s "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	apiconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
@@ -872,21 +873,39 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		log.Printf("Container mode: Disabled eager service loading for faster LocalStack startup")
 	}
 	
-	// Wait a bit for the k3d cluster to be fully ready
-	time.Sleep(5 * time.Second)
+	// Try to create Kubernetes client
+	// First, try in-cluster config (when running inside Kubernetes)
+	var kubeClient k8s.Interface
+	var kubeConfig *rest.Config
+	
+	// Try in-cluster config first
+	inClusterClient, err := kubernetes.GetInClusterClient()
+	if err == nil {
+		kubeClient = inClusterClient
+		// For in-cluster config, we need to get the config separately
+		kubeConfig, err = rest.InClusterConfig()
+		if err != nil {
+			log.Printf("Failed to get in-cluster config: %v", err)
+			return
+		}
+	} else {
+		// If in-cluster fails, try using cluster manager (for local development)
+		log.Printf("In-cluster config failed (expected in local development): %v", err)
+		
+		// Get Kubernetes client for the specific k3d cluster
+		client, err := api.clusterManager.GetKubeClient(cluster.K8sClusterName)
+		if err != nil {
+			log.Printf("Failed to get Kubernetes client: %v", err)
+			return
+		}
+		kubeClient = client
 
-	// Get Kubernetes client for the specific k3d cluster
-	kubeClient, err := api.clusterManager.GetKubeClient(cluster.K8sClusterName)
-	if err != nil {
-		log.Printf("Failed to get Kubernetes client for cluster %s: %v", cluster.K8sClusterName, err)
-		return
-	}
-
-	// Get kube config
-	kubeConfig, err := api.clusterManager.GetKubeConfig(cluster.K8sClusterName)
-	if err != nil {
-		log.Printf("Failed to get kube config for cluster %s: %v", cluster.Name, err)
-		return
+		// Get kube config
+		kubeConfig, err = api.clusterManager.GetKubeConfig(cluster.K8sClusterName)
+		if err != nil {
+			log.Printf("Failed to get kube config: %v", err)
+			return
+		}
 	}
 
 	// Create a new LocalStack manager with the cluster-specific client
