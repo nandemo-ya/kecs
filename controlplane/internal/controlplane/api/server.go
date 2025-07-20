@@ -432,31 +432,11 @@ func (s *Server) Stop(ctx context.Context) error {
 		}
 	}
 
-	// Clean up k3d clusters if not in test mode and environment variable allows
-	if !apiconfig.GetBool("features.testMode") && !apiconfig.GetBool("kubernetes.keepClustersOnShutdown") {
-		if s.clusterManager != nil && s.storage != nil {
-			log.Println("Cleaning up k3d clusters...")
-
-			// Get all clusters from storage
-			clusters, err := s.storage.ClusterStore().List(ctx)
-			if err != nil {
-				log.Printf("Error listing clusters for cleanup: %v", err)
-			} else {
-				// Delete each k3d cluster
-				for _, cluster := range clusters {
-					if cluster.K8sClusterName != "" {
-						log.Printf("Deleting k3d cluster %s...", cluster.K8sClusterName)
-						if err := s.clusterManager.DeleteCluster(ctx, cluster.K8sClusterName); err != nil {
-							log.Printf("Error deleting k3d cluster %s: %v", cluster.K8sClusterName, err)
-							// Continue with other clusters even if one fails
-						}
-					}
-				}
-				log.Println("k3d cluster cleanup completed")
-			}
-		}
-	} else if apiconfig.GetBool("kubernetes.keepClustersOnShutdown") {
-		log.Println("KECS_KEEP_CLUSTERS_ON_SHUTDOWN is set, keeping k3d clusters")
+	// In the new architecture, the KECS instance (k3d cluster) is managed by the CLI,
+	// not by the API server. We don't clean up k3d clusters here anymore.
+	// Namespaces will be cleaned up when the KECS instance is stopped.
+	if apiconfig.GetBool("kubernetes.keepClustersOnShutdown") {
+		log.Println("KECS_KEEP_CLUSTERS_ON_SHUTDOWN is set (legacy setting, no longer needed)")
 	}
 
 	return s.httpServer.Shutdown(ctx)
@@ -492,35 +472,10 @@ func (s *Server) RecoverState(ctx context.Context) error {
 			continue
 		}
 
-		// Check if k3d cluster exists
-		exists, err := s.clusterManager.ClusterExists(ctx, cluster.K8sClusterName)
-		if err != nil {
-			log.Printf("Failed to check if k3d cluster %s exists: %v", cluster.K8sClusterName, err)
-			failedCount++
-			continue
-		}
-
-		if exists {
-			log.Printf("K3d cluster %s already exists, skipping recovery", cluster.K8sClusterName)
-			skippedCount++
-			continue
-		}
-
-		// Recreate k3d cluster
-		log.Printf("Recovering k3d cluster %s for ECS cluster %s...", cluster.K8sClusterName, cluster.Name)
-		if err := s.clusterManager.CreateCluster(ctx, cluster.K8sClusterName); err != nil {
-			log.Printf("Failed to recreate k3d cluster %s: %v", cluster.K8sClusterName, err)
-			failedCount++
-			continue
-		}
-
-		// Wait for cluster to be ready
-		log.Printf("Waiting for k3d cluster %s to be ready...", cluster.K8sClusterName)
-		if err := s.clusterManager.WaitForClusterReady(cluster.K8sClusterName, 60*time.Second); err != nil {
-			log.Printf("K3d cluster %s did not become ready: %v", cluster.K8sClusterName, err)
-			failedCount++
-			continue
-		}
+		// In the new architecture, we don't recreate k3d clusters
+		// The KECS instance (k3d cluster) should already exist
+		// We only need to ensure namespaces exist
+		log.Printf("Ensuring namespace exists for ECS cluster %s", cluster.Name)
 
 		// Recover LocalStack if it was deployed
 		if err := s.recoverLocalStackForCluster(ctx, cluster); err != nil {
