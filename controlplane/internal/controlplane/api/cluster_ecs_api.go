@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -66,8 +67,22 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 	// Generate ARN
 	arn := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", api.region, api.accountID, clusterName)
 
-	// Generate a deterministic k8s cluster name based on ECS cluster name
-	k8sClusterName := fmt.Sprintf("kecs-%s", clusterName)
+	// In the new design, all ECS clusters share the same k3d cluster (the KECS instance)
+	// We need to determine the KECS instance name
+	var k8sClusterName string
+	
+	// Try to get the KECS instance name from the existing k3d clusters
+	if api.clusterManager != nil {
+		// For now, we'll use a simple approach - look for a k3d cluster
+		// In a real implementation, this should be passed from the server configuration
+		k8sClusterName = api.getKecsInstanceName()
+	}
+	
+	if k8sClusterName == "" {
+		// Fallback to a default name if we can't determine the instance name
+		k8sClusterName = "kecs-default"
+		log.Printf("Warning: Could not determine KECS instance name, using default: %s", k8sClusterName)
+	}
 
 	// Create cluster object
 	cluster := &storage.Cluster{
@@ -665,40 +680,25 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 	}, nil
 }
 
-// createK8sClusterAndNamespace creates a k3d cluster and namespace for the ECS cluster
+// createK8sClusterAndNamespace creates a namespace for the ECS cluster in the existing KECS instance
 func (api *DefaultECSAPI) createK8sClusterAndNamespace(cluster *storage.Cluster) {
 	ctx := context.Background()
 
-	// Skip cluster creation if clusterManager is nil (test mode)
-	clusterManager := api.getClusterManager()
-	if clusterManager == nil {
-		log.Printf("Skipping k3d cluster creation for %s (clusterManager is nil)", cluster.Name)
-		return
-	}
+	// In the new design, we use the existing KECS instance's k3d cluster
+	// ECS clusters are represented as Kubernetes namespaces
+	log.Printf("Creating namespace for ECS cluster %s in k3d cluster %s", cluster.Name, cluster.K8sClusterName)
 
-	// Check if cluster already exists
-	exists, err := clusterManager.ClusterExists(ctx, cluster.K8sClusterName)
-	if err != nil {
-		log.Printf("Failed to check if k3d cluster %s exists: %v", cluster.K8sClusterName, err)
-		return
-	}
-
-	if !exists {
-		// Cluster doesn't exist, create it
-		log.Printf("k3d cluster %s doesn't exist, creating...", cluster.K8sClusterName)
-		if err := clusterManager.CreateCluster(ctx, cluster.K8sClusterName); err != nil {
-			log.Printf("Failed to create k3d cluster %s for ECS cluster %s: %v", cluster.K8sClusterName, cluster.Name, err)
+	// Check if the k3d cluster exists (it should be the KECS instance)
+	if api.clusterManager != nil {
+		exists, err := api.clusterManager.ClusterExists(ctx, cluster.K8sClusterName)
+		if err != nil {
+			log.Printf("Failed to check if k3d cluster %s exists: %v", cluster.K8sClusterName, err)
 			return
 		}
-
-		// Wait for the k3d cluster to be ready before proceeding
-		log.Printf("Waiting for k3d cluster %s to be ready...", cluster.K8sClusterName)
-		if err := clusterManager.WaitForClusterReady(cluster.K8sClusterName, 60*time.Second); err != nil {
-			log.Printf("k3d cluster %s is not ready after 60s: %v", cluster.K8sClusterName, err)
-			// Continue anyway - the namespace creation might fail but can be retried
+		if !exists {
+			log.Printf("Error: KECS instance k3d cluster %s does not exist", cluster.K8sClusterName)
+			return
 		}
-	} else {
-		log.Printf("Reusing existing k3d cluster %s for ECS cluster %s", cluster.K8sClusterName, cluster.Name)
 	}
 
 	// Create namespace
@@ -719,10 +719,10 @@ func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 		return
 	}
 
-	// Get Kubernetes client
+	// Get Kubernetes client for the KECS instance
 	kubeClient, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
 	if err != nil {
-		log.Printf("Failed to get kubernetes client for %s: %v", cluster.K8sClusterName, err)
+		log.Printf("Failed to get kubernetes client for KECS instance %s: %v", cluster.K8sClusterName, err)
 		return
 	}
 
@@ -733,76 +733,63 @@ func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 		return
 	}
 
-	log.Printf("Successfully created namespace for ECS cluster %s in k8s cluster %s", cluster.Name, cluster.K8sClusterName)
+	log.Printf("Successfully created namespace %s for ECS cluster %s in KECS instance %s", cluster.Name, cluster.Name, cluster.K8sClusterName)
 }
 
-// ensureK8sClusterExists ensures that a k3d cluster exists for an existing ECS cluster
+// ensureK8sClusterExists ensures that the namespace exists for an existing ECS cluster
 func (api *DefaultECSAPI) ensureK8sClusterExists(cluster *storage.Cluster) {
+	// In the new design, we only need to ensure the namespace exists
+	// The k3d cluster is managed by the KECS instance itself
+	log.Printf("Ensuring namespace exists for ECS cluster %s in KECS instance %s", cluster.Name, cluster.K8sClusterName)
+	
+	// Check if the k3d cluster exists
 	ctx := context.Background()
-
-	// Skip cluster creation if clusterManager is nil (test mode)
-	clusterManager := api.getClusterManager()
-	if clusterManager == nil {
-		return
-	}
-
-	// Check if cluster exists, create if it doesn't
-	exists, err := clusterManager.ClusterExists(ctx, cluster.K8sClusterName)
-	if err != nil {
-		log.Printf("Failed to check if k3d cluster %s exists: %v", cluster.K8sClusterName, err)
-		return
-	}
-
-	if !exists {
-		log.Printf("k3d cluster %s for existing ECS cluster %s is missing, recreating...", cluster.K8sClusterName, cluster.Name)
-		if err := clusterManager.CreateCluster(ctx, cluster.K8sClusterName); err != nil {
-			log.Printf("Failed to recreate k3d cluster %s: %v", cluster.K8sClusterName, err)
-			return
-		}
-
-		// Get Kubernetes client and create namespace
-		kubeClient, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
+	if api.clusterManager != nil {
+		exists, err := api.clusterManager.ClusterExists(ctx, cluster.K8sClusterName)
 		if err != nil {
-			log.Printf("Failed to get kubernetes client for %s: %v", cluster.K8sClusterName, err)
+			log.Printf("Failed to check if k3d cluster %s exists: %v", cluster.K8sClusterName, err)
 			return
 		}
-
-		namespaceManager := kubernetes.NewNamespaceManager(kubeClient.(*k8s.Clientset))
-		if err := namespaceManager.CreateNamespace(ctx, cluster.Name, cluster.Region); err != nil {
-			log.Printf("Failed to create namespace for %s: %v", cluster.Name, err)
+		if !exists {
+			log.Printf("Warning: KECS instance k3d cluster %s does not exist, cannot ensure namespace", cluster.K8sClusterName)
 			return
 		}
-		log.Printf("Successfully recreated k3d cluster %s for ECS cluster %s", cluster.K8sClusterName, cluster.Name)
 	}
+	
+	// Check if namespace exists, create if it doesn't
+	api.createNamespaceForCluster(cluster)
 }
 
-// deleteK8sClusterAndNamespace deletes the k3d cluster and namespace for an ECS cluster
+// deleteK8sClusterAndNamespace deletes the namespace for an ECS cluster
 func (api *DefaultECSAPI) deleteK8sClusterAndNamespace(cluster *storage.Cluster) {
 	ctx := context.Background()
 
-	// Skip cluster deletion if clusterManager is nil (test mode)
+	// In the new design, we only delete the namespace
+	// The k3d cluster is managed by the KECS instance itself
+	log.Printf("Deleting namespace %s for ECS cluster %s from KECS instance %s", cluster.Name, cluster.Name, cluster.K8sClusterName)
+
+	// Get cluster manager
 	clusterManager := api.getClusterManager()
 	if clusterManager == nil {
-		log.Printf("Skipping k3d cluster deletion for %s (clusterManager is nil)", cluster.Name)
+		log.Printf("Cannot delete namespace: clusterManager is nil")
 		return
 	}
 
-	// Delete namespace first (while we still have access to the cluster)
+	// Get Kubernetes client for the KECS instance
 	kubeClient, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
-	if err == nil {
-		namespaceManager := kubernetes.NewNamespaceManager(kubeClient.(*k8s.Clientset))
-		if err := namespaceManager.DeleteNamespace(ctx, cluster.Name, cluster.Region); err != nil {
-			log.Printf("Failed to delete namespace for %s: %v", cluster.Name, err)
-		}
-	}
-
-	// Delete the k3d cluster
-	if err := clusterManager.DeleteCluster(ctx, cluster.K8sClusterName); err != nil {
-		log.Printf("Failed to delete k3d cluster %s for ECS cluster %s: %v", cluster.K8sClusterName, cluster.Name, err)
+	if err != nil {
+		log.Printf("Failed to get kubernetes client for KECS instance %s: %v", cluster.K8sClusterName, err)
 		return
 	}
 
-	log.Printf("Successfully deleted k3d cluster %s and namespace for ECS cluster %s", cluster.K8sClusterName, cluster.Name)
+	// Delete namespace
+	namespaceManager := kubernetes.NewNamespaceManager(kubeClient.(*k8s.Clientset))
+	if err := namespaceManager.DeleteNamespace(ctx, cluster.Name, cluster.Region); err != nil {
+		log.Printf("Failed to delete namespace %s: %v", cluster.Name, err)
+		return
+	}
+
+	log.Printf("Successfully deleted namespace %s for ECS cluster %s", cluster.Name, cluster.Name)
 }
 
 // extractClusterNameFromARN extracts cluster name from ARN or returns the input if it's not an ARN
@@ -1002,4 +989,34 @@ func (api *DefaultECSAPI) updateLocalStackState(cluster *storage.Cluster, status
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
 		log.Printf("Failed to update LocalStack state for cluster %s: %v", cluster.Name, err)
 	}
+}
+
+// getKecsInstanceName attempts to determine the KECS instance name (k3d cluster name)
+func (api *DefaultECSAPI) getKecsInstanceName() string {
+	// In the container-based deployment model, there should be a single k3d cluster
+	// that hosts the KECS control plane and all ECS clusters as namespaces
+	
+	// For now, we'll use the environment variable if set
+	if instanceName := os.Getenv("KECS_INSTANCE_NAME"); instanceName != "" {
+		return instanceName
+	}
+	
+	// Otherwise, try to detect from the current environment
+	// When running inside k3d, the hostname typically follows the pattern k3d-<instance>-server-0
+	hostname, err := os.Hostname()
+	if err == nil && strings.HasPrefix(hostname, "k3d-") && strings.HasSuffix(hostname, "-server-0") {
+		// Extract instance name from hostname
+		parts := strings.Split(hostname, "-")
+		if len(parts) >= 3 {
+			// k3d-<instance>-server-0 -> extract <instance>
+			instanceName := strings.Join(parts[1:len(parts)-2], "-")
+			if instanceName != "" {
+				log.Printf("Detected KECS instance name from hostname: %s", instanceName)
+				return instanceName
+			}
+		}
+	}
+	
+	// If we still can't determine it, return empty string
+	return ""
 }

@@ -308,7 +308,7 @@ func deployControlPlaneWithBubbleTeaProgress(ctx context.Context, clusterName st
 	
 	// Configure control plane
 	controlPlaneConfig := &resources.ControlPlaneConfig{
-		Image:           "ghcr.io/nandemo-ya/kecs:latest",
+		Image:           cfg.Server.ControlPlaneImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		CPURequest:      "100m",
 		MemoryRequest:   "128Mi",
@@ -322,6 +322,10 @@ func deployControlPlaneWithBubbleTeaProgress(ctx context.Context, clusterName st
 			{
 				Name:  "KECS_SKIP_SECURITY_DISCLAIMER",
 				Value: "true",
+			},
+			{
+				Name:  "KECS_INSTANCE_NAME",
+				Value: clusterName,
 			},
 		},
 	}

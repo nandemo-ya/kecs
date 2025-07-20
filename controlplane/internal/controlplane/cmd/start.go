@@ -342,7 +342,7 @@ func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Con
 
 	// Configure control plane
 	controlPlaneConfig := &resources.ControlPlaneConfig{
-		Image:           "ghcr.io/nandemo-ya/kecs:latest",
+		Image:           cfg.Server.ControlPlaneImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		CPURequest:      "100m",
 		MemoryRequest:   "128Mi",
@@ -356,6 +356,10 @@ func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Con
 			{
 				Name:  "KECS_SKIP_SECURITY_DISCLAIMER",
 				Value: "true",
+			},
+			{
+				Name:  "KECS_INSTANCE_NAME",
+				Value: clusterName,
 			},
 		},
 	}
@@ -650,7 +654,7 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 	
 	// Configure control plane
 	controlPlaneConfig := &resources.ControlPlaneConfig{
-		Image:           "ghcr.io/nandemo-ya/kecs:latest",
+		Image:           cfg.Server.ControlPlaneImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		CPURequest:      "100m",
 		MemoryRequest:   "128Mi",
@@ -664,6 +668,10 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 			{
 				Name:  "KECS_SKIP_SECURITY_DISCLAIMER",
 				Value: "true",
+			},
+			{
+				Name:  "KECS_INSTANCE_NAME",
+				Value: clusterName,
 			},
 		},
 	}

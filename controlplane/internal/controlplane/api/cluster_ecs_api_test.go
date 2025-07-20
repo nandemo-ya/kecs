@@ -52,11 +52,9 @@ var _ = Describe("Cluster ECS API", func() {
 				cluster, err := mockClusterStore.Get(ctx, "test-cluster")
 				Expect(err).NotTo(HaveOccurred())
 
-				// Verify that the k8s cluster name follows the expected pattern
-				Expect(cluster.K8sClusterName).To(HavePrefix("kecs-"))
-
-				// Should be kecs-<cluster-name>
-				Expect(cluster.K8sClusterName).To(Equal("kecs-test-cluster"))
+				// In the new design, all ECS clusters share the same k3d cluster (KECS instance)
+				// Since we don't have a real KECS instance in tests, it defaults to "kecs-default"
+				Expect(cluster.K8sClusterName).To(Equal("kecs-default"))
 			})
 
 			It("should create different random names for different clusters", func() {
@@ -82,8 +80,10 @@ var _ = Describe("Cluster ECS API", func() {
 				cluster2, err := mockClusterStore.Get(ctx, "test-cluster-2")
 				Expect(err).NotTo(HaveOccurred())
 
-				// Verify the two clusters have different k8s cluster names
-				Expect(cluster1.K8sClusterName).NotTo(Equal(cluster2.K8sClusterName))
+				// In the new design, all ECS clusters share the same k3d cluster (KECS instance)
+				// So both clusters should have the same k8s cluster name
+				Expect(cluster1.K8sClusterName).To(Equal(cluster2.K8sClusterName))
+				Expect(cluster1.K8sClusterName).To(Equal("kecs-default"))
 			})
 		})
 
