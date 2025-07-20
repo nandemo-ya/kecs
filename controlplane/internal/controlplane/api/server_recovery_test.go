@@ -77,17 +77,16 @@ var _ = Describe("Server State Recovery", func() {
 
 	Describe("RecoverState", func() {
 		Context("when clusters need recovery", func() {
-			It("should recreate missing k3d clusters", func() {
+			It("should not recreate k3d clusters (new architecture)", func() {
 				// Ensure clusters don't exist
 				mockClusterMgr.ClusterMap = make(map[string]bool)
 
 				err := server.RecoverState(ctx)
 				Expect(err).To(BeNil())
 
-				// Verify cluster was created
-				Expect(mockClusterMgr.ClusterMap).To(HaveKey("kecs-test-cluster-1"))
-				// Cluster 2 should not be created (no k8s cluster name)
-				Expect(mockClusterMgr.ClusterMap).NotTo(HaveKey("kecs-test-cluster-2"))
+				// In the new architecture, k3d clusters are not created by the API server
+				// They are managed by the CLI
+				Expect(mockClusterMgr.ClusterMap).To(BeEmpty())
 			})
 
 			It("should recover services and reschedule tasks", func() {
@@ -109,9 +108,8 @@ var _ = Describe("Server State Recovery", func() {
 				err := server.RecoverState(ctx)
 				Expect(err).To(BeNil())
 
-				// Only cluster 1 should be created
-				Expect(len(mockClusterMgr.ClusterMap)).To(Equal(1))
-				Expect(mockClusterMgr.ClusterMap).To(HaveKey("kecs-test-cluster-1"))
+				// In the new architecture, no k3d clusters are created
+				Expect(len(mockClusterMgr.ClusterMap)).To(Equal(0))
 			})
 		})
 

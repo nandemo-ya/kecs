@@ -101,7 +101,7 @@ var _ = Describe("Server Shutdown", func() {
 
 	Context("when KECS_TEST_MODE is not set", func() {
 		Context("and KECS_KEEP_CLUSTERS_ON_SHUTDOWN is not set", func() {
-			It("should delete all k3d clusters on shutdown", func() {
+			It("should not delete k3d clusters on shutdown (new architecture)", func() {
 				// Ensure environment variables are not set
 				os.Unsetenv("KECS_TEST_MODE")
 				os.Unsetenv("KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
@@ -121,10 +121,9 @@ var _ = Describe("Server Shutdown", func() {
 				// Debug: Print what was deleted
 				GinkgoWriter.Printf("Deleted clusters: %v\n", mockClusterMgr.DeletedClusters)
 
-				// Verify clusters were deleted
-				Expect(len(mockClusterMgr.DeletedClusters)).To(Equal(2))
-				Expect(mockClusterMgr.DeletedClusters).To(ContainElement("kecs-test-cluster-1"))
-				Expect(mockClusterMgr.DeletedClusters).To(ContainElement("kecs-test-cluster-2"))
+				// In the new architecture, k3d clusters are not deleted by the API server
+				// They are managed by the CLI
+				Expect(len(mockClusterMgr.DeletedClusters)).To(Equal(0))
 			})
 		})
 

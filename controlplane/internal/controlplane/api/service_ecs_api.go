@@ -159,20 +159,10 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		return nil, fmt.Errorf("failed to marshal service connect configuration: %w", err)
 	}
 
-	// Check if k3d cluster exists (but don't wait synchronously to avoid API timeout)
-	if !config.GetBool("features.testMode") {
-		clusterManager := api.getClusterManager()
-		if clusterManager != nil {
-			exists, err := clusterManager.ClusterExists(ctx, cluster.K8sClusterName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to check if k3d cluster exists: %w", err)
-			}
-			if !exists {
-				return nil, fmt.Errorf("k3d cluster %s does not exist yet, please wait for cluster creation to complete", cluster.K8sClusterName)
-			}
-			log.Printf("k3d cluster %s exists, proceeding with service creation", cluster.K8sClusterName)
-		}
-	}
+	// In the new architecture, we use a single KECS instance (k3d cluster)
+	// ECS clusters are represented as Kubernetes namespaces within this instance
+	// So we don't need to check for individual k3d clusters per ECS cluster
+	log.Printf("Creating service in namespace for ECS cluster %s", cluster.Name)
 
 	// Create service converter and manager
 	serviceConverter := converters.NewServiceConverter(api.region, api.accountID)

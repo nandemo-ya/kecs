@@ -682,24 +682,13 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 
 // createK8sClusterAndNamespace creates a namespace for the ECS cluster in the existing KECS instance
 func (api *DefaultECSAPI) createK8sClusterAndNamespace(cluster *storage.Cluster) {
-	ctx := context.Background()
-
 	// In the new design, we use the existing KECS instance's k3d cluster
 	// ECS clusters are represented as Kubernetes namespaces
 	log.Printf("Creating namespace for ECS cluster %s in k3d cluster %s", cluster.Name, cluster.K8sClusterName)
 
-	// Check if the k3d cluster exists (it should be the KECS instance)
-	if api.clusterManager != nil {
-		exists, err := api.clusterManager.ClusterExists(ctx, cluster.K8sClusterName)
-		if err != nil {
-			log.Printf("Failed to check if k3d cluster %s exists: %v", cluster.K8sClusterName, err)
-			return
-		}
-		if !exists {
-			log.Printf("Error: KECS instance k3d cluster %s does not exist", cluster.K8sClusterName)
-			return
-		}
-	}
+	// In the new architecture, the KECS instance (k3d cluster) should already exist
+	// We only need to create namespaces for ECS clusters
+	// The k3d cluster name in storage is just for reference to the KECS instance
 
 	// Create namespace
 	api.createNamespaceForCluster(cluster)
@@ -742,21 +731,7 @@ func (api *DefaultECSAPI) ensureK8sClusterExists(cluster *storage.Cluster) {
 	// The k3d cluster is managed by the KECS instance itself
 	log.Printf("Ensuring namespace exists for ECS cluster %s in KECS instance %s", cluster.Name, cluster.K8sClusterName)
 	
-	// Check if the k3d cluster exists
-	ctx := context.Background()
-	if api.clusterManager != nil {
-		exists, err := api.clusterManager.ClusterExists(ctx, cluster.K8sClusterName)
-		if err != nil {
-			log.Printf("Failed to check if k3d cluster %s exists: %v", cluster.K8sClusterName, err)
-			return
-		}
-		if !exists {
-			log.Printf("Warning: KECS instance k3d cluster %s does not exist, cannot ensure namespace", cluster.K8sClusterName)
-			return
-		}
-	}
-	
-	// Check if namespace exists, create if it doesn't
+	// Just ensure the namespace exists
 	api.createNamespaceForCluster(cluster)
 }
 
