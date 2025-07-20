@@ -86,9 +86,9 @@ func runStartWithBubbleTea(ctx context.Context, instanceName string, cfg *config
 		}
 		tracker.CompleteTask("namespace")
 
-		// Step 3: Deploy Control Plane and LocalStack in parallel
+		// Step 3: Deploy Control Plane, LocalStack, and Traefik in parallel
 		var wg sync.WaitGroup
-		errChan := make(chan error, 2)
+		errChan := make(chan error, 3) // Increased buffer size for potential 3 errors
 		
 		// Deploy Control Plane
 		wg.Add(1)
@@ -118,6 +118,21 @@ func runStartWithBubbleTea(ctx context.Context, instanceName string, cfg *config
 			}()
 		}
 		
+		// Deploy Traefik gateway (if enabled)
+		if cfg.Features.Traefik {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				tracker.StartTask("traefik")
+				if err := deployTraefikGatewayWithProgress(ctx, instanceName, cfg, startApiPort, tracker); err != nil {
+					tracker.FailTask("traefik", err)
+					errChan <- fmt.Errorf("failed to deploy Traefik gateway: %w", err)
+					return
+				}
+				tracker.CompleteTask("traefik")
+			}()
+		}
+		
 		// Wait for parallel deployments to complete
 		wg.Wait()
 		close(errChan)
@@ -127,18 +142,7 @@ func runStartWithBubbleTea(ctx context.Context, instanceName string, cfg *config
 			return err
 		}
 
-		// Step 4: Deploy Traefik gateway (if enabled)
-		if cfg.Features.Traefik {
-			tracker.StartTask("traefik")
-			tracker.UpdateTask("traefik", 10, "Deploying gateway...")
-			if err := deployTraefikGatewayWithProgress(ctx, instanceName, cfg, startApiPort, tracker); err != nil {
-				tracker.FailTask("traefik", err)
-				return fmt.Errorf("failed to deploy Traefik gateway: %w", err)
-			}
-			tracker.CompleteTask("traefik")
-		}
-
-		// Step 5: Wait for all components to be ready
+		// Step 4: Wait for all components to be ready
 		tracker.StartTask("wait-ready")
 		tracker.UpdateTask("wait-ready", 10, "Checking components...")
 		if err := waitForComponentsWithProgress(ctx, instanceName, tracker); err != nil {
