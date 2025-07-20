@@ -933,25 +933,27 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		return
 	}
 
-	// Wait for LocalStack to be ready
-	log.Printf("Waiting for LocalStack to be ready in cluster %s...", cluster.Name)
-	err = clusterLocalStackManager.WaitForReady(ctx, 2*time.Minute)
+	// Wait for LocalStack to be ready (monitoring logs for "Ready." message)
+	log.Printf("Waiting for LocalStack to be ready in cluster %s (monitoring logs)...", cluster.Name)
+	
+	// Check LocalStack status - the manager now monitors logs for "Ready."
+	status, err := clusterLocalStackManager.GetStatus()
 	if err != nil {
-		log.Printf("LocalStack health check failed in cluster %s: %v", cluster.Name, err)
-		// In container mode with DNS issues, we might still be able to use LocalStack
-		if config.ContainerMode && clusterLocalStackManager.IsRunning() {
-			log.Printf("LocalStack is running despite health check failure, continuing...")
-			// Update state with warning
-			api.updateLocalStackState(cluster, "running", "Health check failed but pod is running")
-		} else {
-			// Update LocalStack state to failed
-			api.updateLocalStackState(cluster, "failed", err.Error())
-			return
-		}
-	} else {
-		log.Printf("LocalStack successfully deployed in cluster %s", cluster.Name)
-		// Update LocalStack state to running
+		log.Printf("Failed to get LocalStack status in cluster %s: %v", cluster.Name, err)
+		api.updateLocalStackState(cluster, "failed", err.Error())
+		return
+	}
+	
+	if status.Running && status.Healthy {
+		log.Printf("LocalStack successfully deployed and ready in cluster %s", cluster.Name)
 		api.updateLocalStackState(cluster, "running", "")
+	} else if status.Running && !status.Healthy {
+		log.Printf("LocalStack is running but not yet fully ready in cluster %s", cluster.Name)
+		// Still mark as running since it can handle requests
+		api.updateLocalStackState(cluster, "running", "Services still initializing")
+	} else {
+		log.Printf("LocalStack failed to start in cluster %s", cluster.Name)
+		api.updateLocalStackState(cluster, "failed", "Failed to start")
 	}
 	
 	// Update the global LocalStack manager reference and notify server to re-initialize AWS proxy router

@@ -216,7 +216,7 @@ func (km *kubernetesManager) createDeployment(ctx context.Context, config *Confi
 										Port: intstr.FromInt(config.EdgePort),
 									},
 								},
-								InitialDelaySeconds: 60,
+								InitialDelaySeconds: 120, // Give LocalStack time to fully start
 								PeriodSeconds:       10,
 								TimeoutSeconds:      5,
 								FailureThreshold:    3,
@@ -228,10 +228,10 @@ func (km *kubernetesManager) createDeployment(ctx context.Context, config *Confi
 										Port: intstr.FromInt(config.EdgePort),
 									},
 								},
-								InitialDelaySeconds: 30,
+								InitialDelaySeconds: 10, // Reduced to allow faster detection
 								PeriodSeconds:       5,
 								TimeoutSeconds:      5,
-								FailureThreshold:    3,
+								FailureThreshold:    12, // Increased to allow more time (60 seconds total)
 							},
 						},
 					},
