@@ -873,9 +873,6 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		log.Printf("Container mode: Disabled eager service loading for faster LocalStack startup")
 	}
 	
-	// Wait a bit for the k3d cluster to be fully ready
-	time.Sleep(5 * time.Second)
-
 	// Try to create Kubernetes client
 	// First, try in-cluster config (when running inside Kubernetes)
 	var kubeClient k8s.Interface
