@@ -146,9 +146,12 @@ func runStart(cmd *cobra.Command, args []string) error {
 	if cfg.LocalStack.Enabled {
 		parallelTracker.AddTask("localstack", "LocalStack", 100)
 	}
+	if cfg.Features.Traefik {
+		parallelTracker.AddTask("traefik", "Traefik Gateway", 100)
+	}
 	
 	var wg sync.WaitGroup
-	errChan := make(chan error, 2)
+	errChan := make(chan error, 3) // Increased buffer size for potential 3 errors
 	
 	// Deploy Control Plane
 	wg.Add(1)
@@ -178,6 +181,21 @@ func runStart(cmd *cobra.Command, args []string) error {
 		}()
 	}
 	
+	// Deploy Traefik gateway (if enabled)
+	if cfg.Features.Traefik {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			parallelTracker.StartTask("traefik")
+			if err := deployTraefikWithProgress(ctx, startInstanceName, cfg, startApiPort, parallelTracker); err != nil {
+				parallelTracker.FailTask("traefik", err)
+				errChan <- fmt.Errorf("failed to deploy Traefik gateway: %w", err)
+				return
+			}
+			parallelTracker.CompleteTask("traefik")
+		}()
+	}
+	
 	// Wait for parallel deployments to complete
 	wg.Wait()
 	parallelTracker.Stop()
@@ -186,17 +204,6 @@ func runStart(cmd *cobra.Command, args []string) error {
 	// Check for errors from parallel deployments
 	for err := range errChan {
 		return err
-	}
-
-	// Step 4: Deploy Traefik gateway (if enabled) - must be after control plane and LocalStack
-	if cfg.Features.Traefik {
-		spinner = progress.NewSpinner("Deploying Traefik gateway")
-		spinner.Start()
-		if err := deployTraefikGateway(ctx, startInstanceName, cfg, startApiPort); err != nil {
-			spinner.Fail("Failed to deploy Traefik")
-			return fmt.Errorf("failed to deploy Traefik gateway: %w", err)
-		}
-		spinner.Success("Traefik gateway deployed")
 	}
 
 	// Step 5: Wait for all components to be ready
@@ -800,4 +807,85 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 	}
 
 	return fmt.Errorf("LocalStack did not become ready in time")
+}
+
+func deployTraefikWithProgress(ctx context.Context, clusterName string, cfg *config.Config, apiPort int, tracker *progress.ParallelTracker) error {
+	tracker.UpdateTask("traefik", 10, "Getting cluster manager")
+	
+	// Get k3d cluster manager
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	tracker.UpdateTask("traefik", 20, "Getting Kubernetes client")
+	
+	// Get Kubernetes client and config
+	kubeClient, err := manager.GetKubeClient(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	}
+	
+	kubeConfig, err := manager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes config: %w", err)
+	}
+
+	tracker.UpdateTask("traefik", 30, "Creating resource deployer")
+	
+	// Create resource deployer with config
+	deployer, err := kubernetes.NewResourceDeployerWithConfig(kubeClient, kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create resource deployer: %w", err)
+	}
+
+	tracker.UpdateTask("traefik", 40, "Configuring Traefik")
+	
+	// Configure Traefik
+	traefikConfig := &resources.TraefikConfig{
+		Image:           "traefik:v3.2",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		CPURequest:      "100m",
+		MemoryRequest:   "128Mi",
+		CPULimit:        "500m",
+		MemoryLimit:     "512Mi",
+		WebPort:         80,
+		WebNodePort:     30080,
+		AWSPort:         4566,
+		AWSNodePort:     30890,  // Fixed NodePort in valid range (k3d maps host port to this)
+		Metrics:         false,  // Metrics disabled to reduce overhead
+		LogLevel:        cfg.Server.LogLevel,
+		AccessLog:       cfg.Server.LogLevel == "debug",
+	}
+
+	tracker.UpdateTask("traefik", 50, "Deploying Traefik resources")
+	
+	// Deploy Traefik resources programmatically
+	if err := deployer.DeployTraefik(ctx, traefikConfig); err != nil {
+		return fmt.Errorf("failed to deploy Traefik gateway: %w", err)
+	}
+
+	tracker.UpdateTask("traefik", 70, "Waiting for Traefik to be ready")
+	
+	// Wait for deployment to be ready
+	deployment := "traefik"
+	namespace := "kecs-system"
+	
+	maxWaitTime := 60 // 5 minutes (60 * 5 seconds)
+	for i := 0; i < maxWaitTime; i++ {
+		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
+		if err == nil && deps.Status.ReadyReplicas > 0 {
+			tracker.UpdateTask("traefik", 100, "Ready")
+			return nil
+		}
+		
+		// Calculate progress from 70% to 99%
+		progress := 70 + ((i + 1) * 29 / maxWaitTime)
+		waitTime := (i + 1) * 5
+		tracker.UpdateTask("traefik", progress, fmt.Sprintf("Health check (%ds/300s)", waitTime))
+		
+		time.Sleep(5 * time.Second)
+	}
+	
+	return fmt.Errorf("Traefik deployment did not become ready in time")
 }
