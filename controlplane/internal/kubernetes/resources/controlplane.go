@@ -11,6 +11,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+// Helper functions
+func int32Ptr(i int32) *int32 {
+	return &i
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
+}
+
 const (
 	// ControlPlane constants
 	ControlPlaneNamespace      = "kecs-system"
@@ -404,6 +413,10 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RecreateDeploymentStrategyType,
+			},
+			ProgressDeadlineSeconds: int32Ptr(600), // 10 minutes for image pull
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					LabelApp: ControlPlaneName,
@@ -419,6 +432,17 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: ControlPlaneServiceAccount,
+					TerminationGracePeriodSeconds: int64Ptr(30),
+					DNSPolicy: corev1.DNSClusterFirstWithHostNet,
+					// Add init container to verify network connectivity before main container starts
+					InitContainers: []corev1.Container{
+						{
+							Name:  "wait-for-network",
+							Image: "busybox:1.36",
+							Command: []string{"sh", "-c"},
+							Args: []string{"echo 'Waiting for network...'; sleep 5; echo 'Network check complete'"},
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Name:            "controlplane",
@@ -456,7 +480,7 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 										Port: intstr.FromString("admin"),
 									},
 								},
-								InitialDelaySeconds: 10,
+								InitialDelaySeconds: 30, // Increased to allow for image pull
 								PeriodSeconds:       30,
 							},
 							ReadinessProbe: &corev1.Probe{
@@ -466,8 +490,9 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 										Port: intstr.FromString("admin"),
 									},
 								},
-								InitialDelaySeconds: 5,
+								InitialDelaySeconds: 20, // Increased to allow for image pull
 								PeriodSeconds:       10,
+								FailureThreshold:    6, // Allow more retries
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{

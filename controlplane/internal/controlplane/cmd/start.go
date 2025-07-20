@@ -680,7 +680,7 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 	// Wait for deployment to be ready
 	deployment := "kecs-controlplane"
 	namespace := "kecs-system"
-	maxWaitTime := 60 // 5 minutes (60 * 5 seconds)
+	maxWaitTime := 120 // 10 minutes (120 * 5 seconds) - increased for image pull retries
 	
 	for i := 0; i < maxWaitTime; i++ {
 		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})

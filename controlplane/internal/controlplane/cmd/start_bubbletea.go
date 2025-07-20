@@ -338,7 +338,7 @@ func deployControlPlaneWithBubbleTeaProgress(ctx context.Context, clusterName st
 	// Wait for deployment to be ready
 	deployment := "kecs-controlplane"
 	namespace := "kecs-system"
-	maxWaitTime := 60 // 5 minutes (60 * 5 seconds)
+	maxWaitTime := 120 // 10 minutes (120 * 5 seconds) - increased for image pull retries
 	
 	for i := 0; i < maxWaitTime; i++ {
 		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
@@ -420,7 +420,7 @@ func deployLocalStackWithBubbleTeaProgress(ctx context.Context, clusterName stri
 	tracker.UpdateTask("localstack", 70, "Waiting for LocalStack to be ready")
 	
 	// Wait for LocalStack to be ready
-	maxWaitTime := 60 // 5 minutes (60 * 5 seconds)
+	maxWaitTime := 120 // 10 minutes (120 * 5 seconds) - increased for image pull retries
 	for i := 0; i < maxWaitTime; i++ {
 		// Check if LocalStack deployment is ready
 		status, err := lsManager.GetStatus()
