@@ -36,8 +36,8 @@ func NewProgram(title string) *Program {
 	// Create the program with full screen mode
 	teaProgram := tea.NewProgram(
 		model,
-		tea.WithAltScreen(),       // Use alternate screen buffer
-		tea.WithMouseCellMotion(), // Enable mouse support
+		tea.WithAltScreen(),     // Use alternate screen buffer
+		// No mouse capture - allows text selection while keyboard controls work for scrolling
 	)
 	
 	lc.program = teaProgram
