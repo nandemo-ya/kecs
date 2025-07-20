@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/docker/go-connections/nat"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -26,6 +26,48 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 )
+
+var (
+	k3dLogInitOnce sync.Once
+)
+
+// init is called when the package is imported
+func init() {
+	// Try to suppress k3d logs early if environment is set
+	initK3dLogging()
+}
+
+// initK3dLogging suppresses k3d's logrus output
+func initK3dLogging() {
+	k3dLogInitOnce.Do(func() {
+		// Check if we should suppress logs
+		if os.Getenv("K3D_LOG_LEVEL") == "panic" || os.Getenv("LOGRUS_LEVEL") == "panic" {
+			// Set logrus to panic level for k3d
+			logrus.SetLevel(logrus.PanicLevel)
+			logrus.SetOutput(io.Discard)
+			
+			// Also set the standard logger
+			logger := logrus.StandardLogger()
+			logger.SetLevel(logrus.PanicLevel)
+			logger.SetOutput(io.Discard)
+			
+			// Set a custom formatter that outputs nothing
+			logger.SetFormatter(&logrus.TextFormatter{
+				DisableColors: true,
+				DisableTimestamp: true,
+			})
+		}
+	})
+}
+
+// debugLog logs only if we're not suppressing logs
+func debugLog(format string, args ...interface{}) {
+	// Only log if not in quiet mode
+	if os.Getenv("K3D_LOG_LEVEL") != "panic" && os.Getenv("LOGRUS_LEVEL") != "panic" {
+		// Use fmt.Printf to avoid import issues
+		fmt.Printf("[k3d] "+format+"\n", args...)
+	}
+}
 
 // K3dClusterManager implements ClusterManager interface using k3d
 type K3dClusterManager struct {
@@ -45,10 +87,13 @@ func NewK3dClusterManager(cfg *ClusterManagerConfig) (*K3dClusterManager, error)
 		}
 	}
 
+	// Suppress k3d's logrus output
+	initK3dLogging()
+
 	// Use the Docker runtime from k3d
 	runtime := runtimes.Docker
 
-	log.Printf("Creating K3dClusterManager with config: ContainerMode=%v, EnableTraefik=%v", 
+	debugLog("Creating K3dClusterManager with config: ContainerMode=%v, EnableTraefik=%v", 
 		cfg.ContainerMode, cfg.EnableTraefik)
 
 	return &K3dClusterManager{
@@ -80,7 +125,7 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 	}
 
 	if exists {
-		log.Printf("k3d cluster %s already exists", normalizedName)
+		debugLog("k3d cluster %s already exists", normalizedName)
 		return nil
 	}
 
@@ -121,7 +166,7 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 			volumes = append(volumes, fmt.Sprintf("%s:%s", mount.HostPath, mount.ContainerPath))
 		}
 		serverNode.Volumes = volumes
-		log.Printf("Adding volume mounts: %v", volumes)
+		debugLog("Adding volume mounts: %v", volumes)
 	}
 	
 	// Add port mapping for HTTP access (needed regardless of Traefik deployment)
@@ -146,7 +191,7 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 		k.traefikPorts[normalizedName] = httpPort
 		k.portMutex.Unlock()
 		
-		log.Printf("Adding port mapping for HTTP access: %d/tcp -> NodePort 30890", httpPort)
+		debugLog("Adding port mapping for HTTP access: %d/tcp -> NodePort 30890", httpPort)
 		serverNode.Ports = nat.PortMap{
 			"30890/tcp": []nat.PortBinding{
 				{
@@ -162,7 +207,7 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 	networkName := fmt.Sprintf("k3d-%s", normalizedName)
 	if k.config.ContainerMode {
 		if kecsNetwork := config.GetString("docker.network"); kecsNetwork != "" {
-			log.Printf("Using KECS Docker network: %s", kecsNetwork)
+			debugLog("Using KECS Docker network: %s", kecsNetwork)
 			networkName = kecsNetwork
 		}
 	}
@@ -199,7 +244,7 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 	}
 
 	// Use ClusterRun to create and start the cluster
-	log.Printf("Creating k3d cluster %s...", normalizedName)
+	debugLog("Creating k3d cluster %s...", normalizedName)
 	if err := client.ClusterRun(ctx, k.runtime, clusterConfig); err != nil {
 		return fmt.Errorf("failed to create k3d cluster: %w", err)
 	}
@@ -212,7 +257,7 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 		}
 	}
 
-	log.Printf("Successfully created k3d cluster %s", normalizedName)
+	debugLog("Successfully created k3d cluster %s", normalizedName)
 	
 	// Note: Traefik deployment is now handled by start_v2.go using the new architecture
 	// The old TraefikManager is deprecated and should not be used
@@ -231,7 +276,7 @@ func (k *K3dClusterManager) DeleteCluster(ctx context.Context, clusterName strin
 	}
 
 	if !exists {
-		log.Printf("k3d cluster %s does not exist", normalizedName)
+		debugLog("k3d cluster %s does not exist", normalizedName)
 		return nil
 	}
 
@@ -242,7 +287,7 @@ func (k *K3dClusterManager) DeleteCluster(ctx context.Context, clusterName strin
 	}
 
 	// Delete the cluster
-	log.Printf("Deleting k3d cluster %s...", normalizedName)
+	debugLog("Deleting k3d cluster %s...", normalizedName)
 	deleteOpts := k3d.ClusterDeleteOpts{
 		SkipRegistryCheck: true,
 	}
@@ -265,7 +310,7 @@ func (k *K3dClusterManager) DeleteCluster(ctx context.Context, clusterName strin
 		}
 	}
 
-	log.Printf("Successfully deleted k3d cluster %s", normalizedName)
+	debugLog("Successfully deleted k3d cluster %s", normalizedName)
 	return nil
 }
 
@@ -345,7 +390,7 @@ func (k *K3dClusterManager) GetKubeClient(clusterName string) (kubernetes.Interf
 		// Get the actual port mapping from Docker
 		apiPort, err := k.getLoadBalancerAPIPort(ctx, loadbalancerNode.Name)
 		if err != nil {
-			log.Printf("Failed to get loadbalancer port: %v", err)
+			debugLog("Failed to get loadbalancer port: %v", err)
 		} else if apiPort != "" {
 			// Update the server URL with the correct port
 			for clusterName, clusterConfig := range kubeconfigObj.Clusters {
@@ -356,7 +401,7 @@ func (k *K3dClusterManager) GetKubeClient(clusterName string) (kubernetes.Interf
 					// using its container name within the same Docker network
 					k3dServerName := fmt.Sprintf("k3d-%s-server-0", normalizedName)
 					host = k3dServerName
-					log.Printf("Container mode: using direct container connection to %s", k3dServerName)
+					debugLog("Container mode: using direct container connection to %s", k3dServerName)
 				}
 				
 				// In container mode with direct connection, use the internal port 6443
@@ -365,7 +410,7 @@ func (k *K3dClusterManager) GetKubeClient(clusterName string) (kubernetes.Interf
 					port = "6443" // k3d server internal port
 				}
 				newServer := fmt.Sprintf("https://%s:%s", host, port)
-				log.Printf("Updating server URL from %s to %s", clusterConfig.Server, newServer)
+				debugLog("Updating server URL from %s to %s", clusterConfig.Server, newServer)
 				clusterConfig.Server = newServer
 				kubeconfigObj.Clusters[clusterName] = clusterConfig
 			}
@@ -375,7 +420,7 @@ func (k *K3dClusterManager) GetKubeClient(clusterName string) (kubernetes.Interf
 	// In container mode, write kubeconfig to file for compatibility
 	if k.config.ContainerMode {
 		kubeconfigPath := k.GetKubeconfigPath(clusterName)
-		log.Printf("Writing kubeconfig to %s", kubeconfigPath)
+		debugLog("Writing kubeconfig to %s", kubeconfigPath)
 
 		// Ensure directory exists
 		kubeconfigDir := filepath.Dir(kubeconfigPath)
@@ -422,7 +467,7 @@ func (k *K3dClusterManager) WaitForClusterReady(clusterName string, timeout time
 	startTime := time.Now()
 	normalizedName := k.normalizeClusterName(clusterName)
 
-	log.Printf("Waiting for k3d cluster %s to be ready", normalizedName)
+	debugLog("Waiting for k3d cluster %s to be ready", normalizedName)
 
 	for {
 		if time.Since(startTime) > timeout {
@@ -432,7 +477,7 @@ func (k *K3dClusterManager) WaitForClusterReady(clusterName string, timeout time
 		// Try to create a client and check connectivity
 		client, err := k.GetKubeClient(clusterName)
 		if err != nil {
-			log.Printf("Failed to create client for cluster %s: %v, retrying...", clusterName, err)
+			debugLog("Failed to create client for cluster %s: %v, retrying...", clusterName, err)
 			time.Sleep(2 * time.Second)
 			continue
 		}
@@ -443,12 +488,12 @@ func (k *K3dClusterManager) WaitForClusterReady(clusterName string, timeout time
 		cancel()
 
 		if err != nil {
-			log.Printf("Failed to connect to cluster %s API: %v, retrying...", clusterName, err)
+			debugLog("Failed to connect to cluster %s API: %v, retrying...", clusterName, err)
 			time.Sleep(2 * time.Second)
 			continue
 		}
 
-		log.Printf("k3d cluster %s is ready", clusterName)
+		debugLog("k3d cluster %s is ready", clusterName)
 		return nil
 	}
 }
@@ -577,16 +622,16 @@ func (k *K3dClusterManager) writeKubeconfig(ctx context.Context, cluster *k3d.Cl
 	if k.config.ContainerMode {
 		// First write the internal kubeconfig
 		if err := client.KubeconfigWrite(ctx, kubecfg, kubeconfigPath); err != nil {
-			log.Printf("Failed to write internal kubeconfig: %v", err)
+			debugLog("Failed to write internal kubeconfig: %v", err)
 			// Continue to try manual creation
 		}
 		
 		// Create a host-compatible version
 		hostKubeconfigPath := strings.TrimSuffix(kubeconfigPath, ".config") + ".host.config"
 		if err := k.writeHostKubeconfig(ctx, cluster, kubecfg, hostKubeconfigPath); err != nil {
-			log.Printf("Failed to write host kubeconfig: %v", err)
+			debugLog("Failed to write host kubeconfig: %v", err)
 		} else {
-			log.Printf("Created host-compatible kubeconfig at %s", hostKubeconfigPath)
+			debugLog("Created host-compatible kubeconfig at %s", hostKubeconfigPath)
 		}
 	}
 
@@ -595,7 +640,7 @@ func (k *K3dClusterManager) writeKubeconfig(ctx context.Context, cluster *k3d.Cl
 		// In container mode, k3d might fail to create symlinks
 		// Try to find the actual kubeconfig file and create a symlink manually
 		if k.config.ContainerMode {
-			log.Printf("k3d kubeconfig write failed, attempting to create symlink manually: %v", err)
+			debugLog("k3d kubeconfig write failed, attempting to create symlink manually: %v", err)
 			
 			kubeconfigDir := filepath.Dir(kubeconfigPath)
 			pattern := filepath.Join(kubeconfigDir, "*.config.k3d_*")
@@ -603,27 +648,27 @@ func (k *K3dClusterManager) writeKubeconfig(ctx context.Context, cluster *k3d.Cl
 			if globErr == nil && len(matches) > 0 {
 				// Found k3d-generated kubeconfig file, create symlink
 				actualFile := matches[0]
-				log.Printf("Found k3d kubeconfig at %s, creating symlink to %s", actualFile, kubeconfigPath)
+				debugLog("Found k3d kubeconfig at %s, creating symlink to %s", actualFile, kubeconfigPath)
 				
 				// Remove existing file/link if it exists
 				os.Remove(kubeconfigPath)
 				
 				// Create symlink
 				if linkErr := os.Symlink(filepath.Base(actualFile), kubeconfigPath); linkErr != nil {
-					log.Printf("Failed to create symlink, copying file instead: %v", linkErr)
+					debugLog("Failed to create symlink, copying file instead: %v", linkErr)
 					// If symlink fails, copy the file instead
 					if copyErr := k.copyFile(actualFile, kubeconfigPath); copyErr != nil {
 						return fmt.Errorf("failed to copy kubeconfig file: %w", copyErr)
 					}
 				}
-				log.Printf("Successfully created kubeconfig at %s", kubeconfigPath)
+				debugLog("Successfully created kubeconfig at %s", kubeconfigPath)
 				return nil
 			}
 		}
 		return fmt.Errorf("failed to write kubeconfig: %w", err)
 	}
 
-	log.Printf("Wrote kubeconfig for cluster %s to %s", cluster.Name, kubeconfigPath)
+	debugLog("Wrote kubeconfig for cluster %s to %s", cluster.Name, kubeconfigPath)
 	return nil
 }
 
@@ -677,12 +722,12 @@ func (k *K3dClusterManager) writeHostKubeconfig(ctx context.Context, cluster *k3
 		// Get the actual port mapping from Docker
 		apiPort, err := k.getLoadBalancerAPIPort(ctx, loadbalancerNode.Name)
 		if err != nil {
-			log.Printf("Failed to get loadbalancer port: %v", err)
+			debugLog("Failed to get loadbalancer port: %v", err)
 		} else if apiPort != "" {
 			// Update the server URL to use localhost
 			for clusterName, clusterConfig := range hostKubeconfig.Clusters {
 				newServer := fmt.Sprintf("https://localhost:%s", apiPort)
-				log.Printf("Host kubeconfig: updating server URL from %s to %s", clusterConfig.Server, newServer)
+				debugLog("Host kubeconfig: updating server URL from %s to %s", clusterConfig.Server, newServer)
 				clusterConfig.Server = newServer
 				hostKubeconfig.Clusters[clusterName] = clusterConfig
 			}
@@ -763,7 +808,7 @@ func (k *K3dClusterManager) getRESTConfig(clusterName string) (*rest.Config, err
 		// Get the actual port mapping from Docker
 		apiPort, err := k.getLoadBalancerAPIPort(ctx, loadbalancerNode.Name)
 		if err != nil {
-			log.Printf("Failed to get loadbalancer port: %v", err)
+			debugLog("Failed to get loadbalancer port: %v", err)
 		} else if apiPort != "" {
 			// Update the server URL with the correct port
 			for clusterName, clusterConfig := range kubeconfigObj.Clusters {
@@ -774,7 +819,7 @@ func (k *K3dClusterManager) getRESTConfig(clusterName string) (*rest.Config, err
 					// using its container name within the same Docker network
 					k3dServerName := fmt.Sprintf("k3d-%s-server-0", normalizedName)
 					host = k3dServerName
-					log.Printf("Container mode: using direct container connection to %s", k3dServerName)
+					debugLog("Container mode: using direct container connection to %s", k3dServerName)
 				}
 				
 				// In container mode with direct connection, use the internal port 6443
@@ -783,7 +828,7 @@ func (k *K3dClusterManager) getRESTConfig(clusterName string) (*rest.Config, err
 					port = "6443" // k3d server internal port
 				}
 				newServer := fmt.Sprintf("https://%s:%s", host, port)
-				log.Printf("Updating server URL from %s to %s", clusterConfig.Server, newServer)
+				debugLog("Updating server URL from %s to %s", clusterConfig.Server, newServer)
 				clusterConfig.Server = newServer
 				kubeconfigObj.Clusters[clusterName] = clusterConfig
 			}
@@ -814,7 +859,7 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 	}
 
 	if exists {
-		log.Printf("k3d cluster %s already exists", normalizedName)
+		debugLog("k3d cluster %s already exists", normalizedName)
 		return nil
 	}
 
@@ -862,7 +907,7 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 			volumes = append(volumes, fmt.Sprintf("%s:%s", mount.HostPath, mount.ContainerPath))
 		}
 		serverNode.Volumes = volumes
-		log.Printf("Adding volume mounts to optimized cluster: %v", volumes)
+		debugLog("Adding volume mounts to optimized cluster: %v", volumes)
 	}
 	
 	// Add port mapping for Traefik if enabled (even in optimized mode)
@@ -886,7 +931,7 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		k.traefikPorts[normalizedName] = traefikPort
 		k.portMutex.Unlock()
 		
-		log.Printf("Adding port mapping for Traefik: %d/tcp", traefikPort)
+		debugLog("Adding port mapping for Traefik: %d/tcp", traefikPort)
 		serverNode.Ports = nat.PortMap{
 			"30890/tcp": []nat.PortBinding{
 				{
@@ -902,7 +947,7 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 	networkName := fmt.Sprintf("k3d-%s", normalizedName)
 	if k.config.ContainerMode {
 		if kecsNetwork := config.GetString("docker.network"); kecsNetwork != "" {
-			log.Printf("Using KECS Docker network: %s", kecsNetwork)
+			debugLog("Using KECS Docker network: %s", kecsNetwork)
 			networkName = kecsNetwork
 		}
 	}
@@ -928,7 +973,7 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 	waitForServer := true
 	if config.GetBool("kubernetes.k3dAsync") {
 		waitForServer = false
-		log.Printf("Creating k3d cluster asynchronously (KECS_K3D_ASYNC=true)")
+		debugLog("Creating k3d cluster asynchronously (KECS_K3D_ASYNC=true)")
 	}
 	
 	// Create cluster creation options with shorter timeout
@@ -951,7 +996,7 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 	}
 
 	// Use ClusterRun to create and start the cluster
-	log.Printf("Creating optimized k3d cluster %s...", normalizedName)
+	debugLog("Creating optimized k3d cluster %s...", normalizedName)
 	startTime := time.Now()
 	
 	if err := client.ClusterRun(ctx, k.runtime, clusterConfig); err != nil {
@@ -959,7 +1004,7 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 	}
 
 	creationTime := time.Since(startTime)
-	log.Printf("Successfully created k3d cluster %s in %v", normalizedName, creationTime)
+	debugLog("Successfully created k3d cluster %s in %v", normalizedName, creationTime)
 
 	// Write kubeconfig to custom path if in container mode
 	if k.config.ContainerMode {
@@ -974,13 +1019,13 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		readyCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
 
-		log.Printf("Waiting for optimized cluster %s to be ready...", normalizedName)
+		debugLog("Waiting for optimized cluster %s to be ready...", normalizedName)
 		if err := k.waitForClusterReadyOptimized(readyCtx, normalizedName); err != nil {
-			log.Printf("Warning: cluster may not be fully ready: %v", err)
+			debugLog("Warning: cluster may not be fully ready: %v", err)
 			// Don't fail here, let the caller handle readiness
 		}
 	} else {
-		log.Printf("Cluster %s creation initiated asynchronously", normalizedName)
+		debugLog("Cluster %s creation initiated asynchronously", normalizedName)
 	}
 	
 	// Traefik deployment is now handled by ResourceDeployer in the start command
