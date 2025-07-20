@@ -22,12 +22,13 @@ type Config struct {
 
 // ServerConfig represents server-specific configuration
 type ServerConfig struct {
-	Port           int      `yaml:"port" mapstructure:"port"`
-	AdminPort      int      `yaml:"adminPort" mapstructure:"adminPort"`
-	DataDir        string   `yaml:"dataDir" mapstructure:"dataDir"`
-	LogLevel       string   `yaml:"logLevel" mapstructure:"logLevel"`
-	AllowedOrigins []string `yaml:"allowedOrigins" mapstructure:"allowedOrigins"`
-	Endpoint       string   `yaml:"endpoint" mapstructure:"endpoint"`
+	Port              int      `yaml:"port" mapstructure:"port"`
+	AdminPort         int      `yaml:"adminPort" mapstructure:"adminPort"`
+	DataDir           string   `yaml:"dataDir" mapstructure:"dataDir"`
+	LogLevel          string   `yaml:"logLevel" mapstructure:"logLevel"`
+	AllowedOrigins    []string `yaml:"allowedOrigins" mapstructure:"allowedOrigins"`
+	Endpoint          string   `yaml:"endpoint" mapstructure:"endpoint"`
+	ControlPlaneImage string   `yaml:"controlPlaneImage" mapstructure:"controlPlaneImage"`
 }
 
 // KubernetesConfig represents Kubernetes-related configuration
@@ -83,6 +84,7 @@ func InitConfig() error {
 	v.SetDefault("server.logLevel", "info")
 	v.SetDefault("server.allowedOrigins", []string{})
 	v.SetDefault("server.endpoint", "")
+	v.SetDefault("server.controlPlaneImage", "ghcr.io/nandemo-ya/kecs:latest")
 	
 	// Kubernetes defaults
 	v.SetDefault("kubernetes.kubeconfigPath", "")
@@ -144,6 +146,7 @@ func bindLegacyEnvVars() {
 	v.BindEnv("features.traefik", "KECS_ENABLE_TRAEFIK", "KECS_FEATURES_TRAEFIK")
 	v.BindEnv("localstack.enabled", "KECS_LOCALSTACK_ENABLED")
 	v.BindEnv("localstack.useTraefik", "KECS_LOCALSTACK_USE_TRAEFIK")
+	v.BindEnv("server.controlPlaneImage", "KECS_CONTROLPLANE_IMAGE")
 }
 
 // DefaultConfig returns the default configuration
