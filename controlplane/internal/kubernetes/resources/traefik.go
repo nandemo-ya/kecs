@@ -424,7 +424,7 @@ func createTraefikDynamicConfigMap() *corev1.ConfigMap {
     ecs-api:
       entryPoints:
         - aws
-      rule: "HeadersRegexp(` + "`X-Amz-Target`" + `, ` + "`^AmazonEC2ContainerServiceV[0-9]+\\\\..*`" + `)"
+      rule: "Header(` + "`X-Amz-Target`" + `, ` + "`AmazonEC2ContainerServiceV.*`" + `)"
       service: ecs-api
       priority: 100
     # Legacy ECS API routing for path-based requests
