@@ -32,14 +32,16 @@ var (
 	startNoLocalStack bool
 	startNoTraefik   bool
 	startTimeout     time.Duration
-	startUseBubbleTea bool
+	startVerbose     bool
 )
 
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start KECS with control plane in k3d cluster",
 	Long: `Start KECS by creating a k3d cluster and deploying the control plane inside it.
-This provides a unified AWS API endpoint accessible from all containers.`,
+This provides a unified AWS API endpoint accessible from all containers.
+
+By default, an interactive progress display is shown. Use --verbose for detailed output.`,
 	RunE: runStart,
 }
 
@@ -54,7 +56,7 @@ func init() {
 	startCmd.Flags().BoolVar(&startNoLocalStack, "no-localstack", false, "Disable LocalStack deployment")
 	startCmd.Flags().BoolVar(&startNoTraefik, "no-traefik", false, "Disable Traefik deployment")
 	startCmd.Flags().DurationVar(&startTimeout, "timeout", 10*time.Minute, "Timeout for cluster creation")
-	startCmd.Flags().BoolVar(&startUseBubbleTea, "bubbletea", false, "Use Bubble Tea for progress display (experimental)")
+	startCmd.Flags().BoolVar(&startVerbose, "verbose", false, "Use verbose output instead of interactive progress display")
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
@@ -65,14 +67,14 @@ func runStart(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to generate instance name: %w", err)
 		}
 		startInstanceName = generatedName
-		// Only show info message if not using Bubble Tea
-		if !startUseBubbleTea {
+		// Only show info message if using verbose output
+		if startVerbose {
 			progress.Info("Generated KECS instance name: %s", startInstanceName)
 		}
 	}
 
-	// Only show header if not using Bubble Tea
-	if !startUseBubbleTea {
+	// Only show header if using verbose output
+	if startVerbose {
 		progress.SectionHeader(fmt.Sprintf("Creating KECS instance '%s'", startInstanceName))
 	}
 
@@ -104,8 +106,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), startTimeout)
 	defer cancel()
 
-	// Use Bubble Tea if flag is set
-	if startUseBubbleTea {
+	// Use Bubble Tea by default, unless verbose flag is set
+	if !startVerbose {
 		return runStartWithBubbleTea(ctx, startInstanceName, cfg, startDataDir)
 	}
 
