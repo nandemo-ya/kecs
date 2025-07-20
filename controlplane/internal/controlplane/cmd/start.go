@@ -695,21 +695,45 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 	// Wait for deployment to be ready
 	deployment := "kecs-controlplane"
 	namespace := "kecs-system"
-	maxWaitTime := 120 // 10 minutes (120 * 5 seconds) - increased for image pull retries
+	maxWaitTime := 300 // 5 minutes total
+	checkInterval := 2 // Check every 2 seconds for faster detection
 	
-	for i := 0; i < maxWaitTime; i++ {
+	for elapsed := 0; elapsed < maxWaitTime; elapsed += checkInterval {
 		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
 		if err == nil && deps.Status.ReadyReplicas > 0 {
 			tracker.UpdateTask("controlplane", 100, "Ready")
 			return nil
 		}
 		
-		// Calculate progress from 80% to 99% (never reach 100% until actually ready)
-		progress := 80 + ((i + 1) * 19 / maxWaitTime)
-		waitTime := (i + 1) * 5
-		tracker.UpdateTask("controlplane", progress, fmt.Sprintf("Waiting for pods (%ds/300s)", waitTime))
+		// Check pod status for more detailed progress
+		pods, _ := kubeClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: "app=kecs-controlplane",
+		})
 		
-		time.Sleep(5 * time.Second)
+		statusMsg := fmt.Sprintf("Waiting for pods (%ds/%ds)", elapsed, maxWaitTime)
+		if len(pods.Items) > 0 {
+			pod := &pods.Items[0]
+			if pod.Status.Phase == corev1.PodPending {
+				// Check container statuses for more detail
+				for _, cs := range pod.Status.ContainerStatuses {
+					if cs.State.Waiting != nil {
+						if cs.State.Waiting.Reason == "ContainerCreating" {
+							statusMsg = fmt.Sprintf("Creating container (%ds/%ds)", elapsed, maxWaitTime)
+						} else if cs.State.Waiting.Reason == "PodInitializing" {
+							statusMsg = fmt.Sprintf("Initializing pod (%ds/%ds)", elapsed, maxWaitTime)
+						}
+					}
+				}
+			} else if pod.Status.Phase == corev1.PodRunning {
+				statusMsg = fmt.Sprintf("Pod running, waiting for readiness (%ds/%ds)", elapsed, maxWaitTime)
+			}
+		}
+		
+		// Calculate progress from 80% to 99% (never reach 100% until actually ready)
+		progress := 80 + (elapsed * 19 / maxWaitTime)
+		tracker.UpdateTask("controlplane", progress, statusMsg)
+		
+		time.Sleep(time.Duration(checkInterval) * time.Second)
 	}
 
 	return fmt.Errorf("control plane deployment did not become ready in time")
