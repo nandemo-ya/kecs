@@ -777,7 +777,7 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 
 	tracker.UpdateTask("localstack", 70, "Waiting for LocalStack to be ready")
 	
-	// Wait for LocalStack to be ready
+	// Wait for LocalStack to output "Ready." in logs
 	maxWaitTime := 60 // 5 minutes (60 * 5 seconds)
 	for i := 0; i < maxWaitTime; i++ {
 		// Check if LocalStack deployment is ready
@@ -792,12 +792,13 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 		waitTime := (i + 1) * 5
 		
 		// Provide more detailed status message
-		statusMsg := fmt.Sprintf("Health check (%ds/300s)", waitTime)
+		statusMsg := fmt.Sprintf("Waiting for services (%ds/300s)", waitTime)
 		if status != nil {
 			if !status.Running {
 				statusMsg = fmt.Sprintf("Starting LocalStack pod (%ds/300s)", waitTime)
-			} else if !status.Healthy {
-				statusMsg = fmt.Sprintf("Waiting for LocalStack services (%ds/300s)", waitTime)
+			} else if status.Running && !status.Healthy {
+				// Pod is running but not yet healthy - likely waiting for "Ready." in logs
+				statusMsg = fmt.Sprintf("LocalStack initializing services (%ds/300s)", waitTime)
 			}
 		}
 		

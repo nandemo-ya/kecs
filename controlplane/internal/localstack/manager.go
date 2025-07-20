@@ -137,26 +137,33 @@ func (m *localStackManager) Start(ctx context.Context) error {
 	m.healthChecker.UpdateEndpoint(healthEndpoint)
 
 	// Wait for LocalStack to output "Ready." in logs
-	klog.Info("Waiting for LocalStack to be ready...")
-	readyCtx, readyCancel := context.WithTimeout(ctx, DefaultHealthTimeout)
-	defer readyCancel()
-
-	if kubeManager, ok := m.kubeManager.(*kubernetesManager); ok {
-		if err := kubeManager.WaitForLocalStackReady(readyCtx, DefaultHealthTimeout); err != nil {
-			klog.Warningf("Failed to detect Ready message: %v", err)
-		} else {
-			klog.Info("LocalStack is ready (detected Ready message in logs)")
-		}
-	}
-
-	// Skip health check for k8s deployment - pod readiness is sufficient
+	// For Kubernetes deployment, wait for "Ready." in logs
 	if !m.config.ContainerMode {
-		klog.Info("Skipping HTTP health check for k8s deployment - pod is running")
-	}
+		klog.Info("Waiting for LocalStack to be ready (monitoring logs for Ready message)...")
+		readyCtx, readyCancel := context.WithTimeout(ctx, DefaultHealthTimeout)
+		defer readyCancel()
 
-	// Update status
-	m.status.Running = true
-	m.status.Healthy = true
+		if kubeManager, ok := m.kubeManager.(*kubernetesManager); ok {
+			if err := kubeManager.WaitForLocalStackReady(readyCtx, DefaultHealthTimeout); err != nil {
+				klog.Warningf("Failed to detect Ready message: %v", err)
+				// Don't consider this a failure - LocalStack might still be usable
+				m.status.Running = true
+				m.status.Healthy = false
+			} else {
+				klog.Info("LocalStack is ready (detected Ready message in logs)")
+				m.status.Running = true
+				m.status.Healthy = true
+			}
+		} else {
+			// Fallback to assuming it's ready if pod is running
+			m.status.Running = true
+			m.status.Healthy = true
+		}
+	} else {
+		// For container mode, rely on existing health check
+		m.status.Running = true
+		m.status.Healthy = true
+	}
 	m.status.Endpoint = endpoint
 
 	// Start health monitoring
