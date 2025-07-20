@@ -155,9 +155,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "l":
 			m.showLogs = !m.showLogs
+		case "up", "k":
+			// Scroll up
+			m.logViewport.LineUp(1)
+		case "down", "j":
+			// Scroll down
+			m.logViewport.LineDown(1)
+		case "pgup":
+			// Page up
+			m.logViewport.ViewUp()
+		case "pgdown":
+			// Page down
+			m.logViewport.ViewDown()
+		case "home":
+			// Go to top
+			m.logViewport.GotoTop()
+		case "end":
+			// Go to bottom
+			m.logViewport.GotoBottom()
 		}
 		
-		// Handle viewport scrolling
+		// Handle viewport scrolling for other keys
 		var cmd tea.Cmd
 		m.logViewport, cmd = m.logViewport.Update(msg)
 		cmds = append(cmds, cmd)
@@ -368,7 +386,7 @@ func (m Model) renderLogSection() string {
 func (m Model) renderFooter() string {
 	help := "l: toggle logs • q: quit"
 	if m.showLogs {
-		help = "↑/↓: scroll logs • " + help
+		help = "↑/↓/j/k: scroll • PgUp/PgDn: page • Home/End: top/bottom • " + help
 	}
 	
 	return lipgloss.NewStyle().
