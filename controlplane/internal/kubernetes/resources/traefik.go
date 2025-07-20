@@ -119,7 +119,7 @@ func createTraefikClusterRole() *rbacv1.ClusterRole {
 			// Core resources
 			{
 				APIGroups: []string{""},
-				Resources: []string{"services", "endpoints", "secrets"},
+				Resources: []string{"services", "endpoints", "secrets", "nodes"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			// Discovery resources (for EndpointSlices)
