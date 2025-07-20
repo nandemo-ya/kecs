@@ -119,7 +119,13 @@ func createTraefikClusterRole() *rbacv1.ClusterRole {
 			// Core resources
 			{
 				APIGroups: []string{""},
-				Resources: []string{"services", "endpoints", "secrets"},
+				Resources: []string{"services", "endpoints", "secrets", "nodes"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			// Discovery resources (for EndpointSlices)
+			{
+				APIGroups: []string{"discovery.k8s.io"},
+				Resources: []string{"endpointslices"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			// Extensions
@@ -414,8 +420,15 @@ func createTraefikDynamicConfigMap() *corev1.ConfigMap {
 		Data: map[string]string{
 			"dynamic.yaml": `http:
   routers:
-    # ECS API routing
+    # ECS API routing based on X-Amz-Target header
     ecs-api:
+      entryPoints:
+        - aws
+      rule: "HeaderRegexp(` + "`X-Amz-Target`" + `, ` + "`^AmazonEC2ContainerServiceV20141113\\\\..*`" + `)"
+      service: ecs-api
+      priority: 100
+    # Legacy ECS API routing for path-based requests
+    ecs-api-legacy:
       entryPoints:
         - aws
       rule: "PathPrefix(` + "`/v1`" + `)"
