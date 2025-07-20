@@ -122,6 +122,12 @@ func createTraefikClusterRole() *rbacv1.ClusterRole {
 				Resources: []string{"services", "endpoints", "secrets"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
+			// Discovery resources (for EndpointSlices)
+			{
+				APIGroups: []string{"discovery.k8s.io"},
+				Resources: []string{"endpointslices"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
 			// Extensions
 			{
 				APIGroups: []string{"extensions", "networking.k8s.io"},
