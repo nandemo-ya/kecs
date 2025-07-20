@@ -701,22 +701,29 @@ func (api *DefaultECSAPI) createK8sClusterAndNamespace(cluster *storage.Cluster)
 func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 	ctx := context.Background()
 
-	// Get cluster manager
-	clusterManager := api.getClusterManager()
-	if clusterManager == nil {
-		log.Printf("Cannot create namespace: clusterManager is nil")
-		return
-	}
-
-	// Get Kubernetes client for the KECS instance
-	kubeClient, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
+	// Try to create Kubernetes client
+	// First, try in-cluster config (when running inside Kubernetes)
+	kubeClient, err := kubernetes.GetInClusterClient()
 	if err != nil {
-		log.Printf("Failed to get kubernetes client for KECS instance %s: %v", cluster.K8sClusterName, err)
-		return
+		// If in-cluster fails, try using cluster manager (for local development)
+		log.Printf("In-cluster config failed (expected in local development): %v", err)
+		clusterManager := api.getClusterManager()
+		if clusterManager == nil {
+			log.Printf("Cannot create namespace: no Kubernetes client available (neither in-cluster nor cluster manager)")
+			return
+		}
+
+		// Get Kubernetes client for the KECS instance
+		client, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
+		if err != nil {
+			log.Printf("Failed to get kubernetes client: %v", err)
+			return
+		}
+		kubeClient = client.(*k8s.Clientset)
 	}
 
 	// Create namespace
-	namespaceManager := kubernetes.NewNamespaceManager(kubeClient.(*k8s.Clientset))
+	namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
 	if err := namespaceManager.CreateNamespace(ctx, cluster.Name, cluster.Region); err != nil {
 		log.Printf("Failed to create namespace for %s: %v", cluster.Name, err)
 		return
@@ -743,22 +750,29 @@ func (api *DefaultECSAPI) deleteK8sClusterAndNamespace(cluster *storage.Cluster)
 	// The k3d cluster is managed by the KECS instance itself
 	log.Printf("Deleting namespace %s for ECS cluster %s from KECS instance %s", cluster.Name, cluster.Name, cluster.K8sClusterName)
 
-	// Get cluster manager
-	clusterManager := api.getClusterManager()
-	if clusterManager == nil {
-		log.Printf("Cannot delete namespace: clusterManager is nil")
-		return
-	}
-
-	// Get Kubernetes client for the KECS instance
-	kubeClient, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
+	// Try to create Kubernetes client
+	// First, try in-cluster config (when running inside Kubernetes)
+	kubeClient, err := kubernetes.GetInClusterClient()
 	if err != nil {
-		log.Printf("Failed to get kubernetes client for KECS instance %s: %v", cluster.K8sClusterName, err)
-		return
+		// If in-cluster fails, try using cluster manager (for local development)
+		log.Printf("In-cluster config failed (expected in local development): %v", err)
+		clusterManager := api.getClusterManager()
+		if clusterManager == nil {
+			log.Printf("Cannot delete namespace: no Kubernetes client available (neither in-cluster nor cluster manager)")
+			return
+		}
+
+		// Get Kubernetes client for the KECS instance
+		client, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
+		if err != nil {
+			log.Printf("Failed to get kubernetes client: %v", err)
+			return
+		}
+		kubeClient = client.(*k8s.Clientset)
 	}
 
 	// Delete namespace
-	namespaceManager := kubernetes.NewNamespaceManager(kubeClient.(*k8s.Clientset))
+	namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
 	if err := namespaceManager.DeleteNamespace(ctx, cluster.Name, cluster.Region); err != nil {
 		log.Printf("Failed to delete namespace %s: %v", cluster.Name, err)
 		return
