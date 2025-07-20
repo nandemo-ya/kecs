@@ -416,7 +416,7 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RecreateDeploymentStrategyType,
 			},
-			ProgressDeadlineSeconds: int32Ptr(600), // 10 minutes for image pull
+			ProgressDeadlineSeconds: int32Ptr(300), // 5 minutes should be enough
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					LabelApp: ControlPlaneName,
@@ -440,7 +440,7 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 							Name:  "wait-for-network",
 							Image: "busybox:1.36",
 							Command: []string{"sh", "-c"},
-							Args: []string{"echo 'Waiting for network...'; sleep 5; echo 'Network check complete'"},
+							Args: []string{"echo 'Checking network connectivity...'; nslookup kubernetes.default.svc.cluster.local || true; echo 'Network check complete'"},
 						},
 					},
 					Containers: []corev1.Container{
@@ -473,6 +473,18 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 									corev1.ResourceMemory: resource.MustParse(config.MemoryLimit),
 								},
 							},
+							StartupProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: "/ready",
+										Port: intstr.FromString("admin"),
+									},
+								},
+								InitialDelaySeconds: 5,   // Start checking early
+								PeriodSeconds:       2,   // Check frequently during startup
+								FailureThreshold:    60,  // Allow up to 2 minutes for startup (60 * 2s)
+								SuccessThreshold:    1,
+							},
 							LivenessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
@@ -480,8 +492,9 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 										Port: intstr.FromString("admin"),
 									},
 								},
-								InitialDelaySeconds: 30, // Increased to allow for image pull
+								InitialDelaySeconds: 0,  // No delay needed with startup probe
 								PeriodSeconds:       30,
+								FailureThreshold:    3,
 							},
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
@@ -490,9 +503,10 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 										Port: intstr.FromString("admin"),
 									},
 								},
-								InitialDelaySeconds: 20, // Increased to allow for image pull
-								PeriodSeconds:       10,
-								FailureThreshold:    6, // Allow more retries
+								InitialDelaySeconds: 0,  // No delay needed with startup probe
+								PeriodSeconds:       5,  // Check more frequently for faster detection
+								FailureThreshold:    3,  // Reduced since startup probe handles initial startup
+								SuccessThreshold:    1,
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
