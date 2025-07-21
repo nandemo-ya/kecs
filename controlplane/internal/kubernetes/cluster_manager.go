@@ -81,6 +81,12 @@ type ClusterManagerConfig struct {
 	
 	// K3dImage specifies the k3s image to use
 	K3dImage string `json:"k3dImage,omitempty"`
+	
+	// EnableRegistry enables k3d registry for dev mode
+	EnableRegistry bool `json:"enableRegistry,omitempty"`
+	
+	// RegistryPort specifies the port for the k3d registry (default: 5000)
+	RegistryPort int `json:"registryPort,omitempty"`
 }
 
 // VolumeMount represents a volume mount configuration

@@ -115,6 +115,20 @@ docker-build:
 	$(DOCKER) build -t $(DOCKER_IMAGE):$(VERSION) $(CONTROLPLANE_DIR)
 	$(DOCKER) tag $(DOCKER_IMAGE):$(VERSION) $(DOCKER_IMAGE):latest
 
+# Build Docker image for local k3d registry (dev mode)
+.PHONY: docker-build-dev
+docker-build-dev:
+	@echo "Building Docker image for local k3d registry..."
+	$(DOCKER) build -t localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) $(CONTROLPLANE_DIR)
+	$(DOCKER) tag localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) localhost:5000/nandemo-ya/kecs-controlplane:latest
+
+# Push Docker image to local k3d registry (dev mode)
+.PHONY: docker-push-dev
+docker-push-dev: docker-build-dev
+	@echo "Pushing to k3d registry..."
+	$(DOCKER) push localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION)
+	$(DOCKER) push localhost:5000/nandemo-ya/kecs-controlplane:latest
+
 # Build API-only Docker image
 .PHONY: docker-build-api
 docker-build-api:
@@ -172,6 +186,8 @@ help:
 	@echo "  deps           - Install dependencies"
 	@echo "  docker-build   - Build Docker image"
 	@echo "  docker-push    - Push Docker image"
+	@echo "  docker-build-dev - Build Docker image for k3d registry (dev mode)"
+	@echo "  docker-push-dev - Push Docker image to k3d registry (dev mode)"
 	@echo "  docker-build-awsproxy - Build AWS Proxy Docker image"
 	@echo "  docker-push-awsproxy  - Push AWS Proxy Docker image"
 	@echo "  help           - Show this help message"

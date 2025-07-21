@@ -85,6 +85,16 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 		logging.Info("k3d cluster already exists", "cluster", normalizedName)
 		return nil
 	}
+	
+	// Handle registry for dev mode
+	var registryNode *k3d.Node
+	if k.config.EnableRegistry {
+		registryNode, err = k.ensureRegistry(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to ensure registry: %w", err)
+		}
+		logging.Info("Using k3d registry for dev mode", "registry", registryNode.Name)
+	}
 
 	// Determine k3s image
 	k3sImage := "rancher/k3s:v1.31.4-k3s1"
@@ -206,6 +216,14 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 	logging.Info("Creating k3d cluster", "cluster", normalizedName)
 	if err := client.ClusterRun(ctx, k.runtime, clusterConfig); err != nil {
 		return fmt.Errorf("failed to create k3d cluster: %w", err)
+	}
+	
+	// Connect registry to cluster if enabled
+	if registryNode != nil {
+		logging.Info("Connecting registry to cluster", "cluster", normalizedName)
+		if err := client.RegistryConnectClusters(ctx, k.runtime, registryNode, []*k3d.Cluster{cluster}); err != nil {
+			return fmt.Errorf("failed to connect registry to cluster: %w", err)
+		}
 	}
 
 	// Write kubeconfig to custom path if in container mode
@@ -1071,4 +1089,56 @@ func (k *K3dClusterManager) GetTraefikPort(clusterName string) (int, bool) {
 	normalizedName := k.normalizeClusterName(clusterName)
 	port, exists := k.traefikPorts[normalizedName]
 	return port, exists
+}
+
+// ensureRegistry creates or gets the k3d registry for dev mode
+func (k *K3dClusterManager) ensureRegistry(ctx context.Context) (*k3d.Node, error) {
+	registryName := "k3d-kecs-registry.localhost"
+	registryPort := k.config.RegistryPort
+	if registryPort == 0 {
+		registryPort = 5000
+	}
+	
+	// Check if registry already exists
+	existingRegistry, err := client.RegistryGet(ctx, k.runtime, registryName)
+	if err == nil && existingRegistry != nil {
+		// Registry exists, get the node
+		nodes, err := k.runtime.GetNodesByLabel(ctx, map[string]string{k3d.LabelRole: string(k3d.RegistryRole)})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get registry nodes: %w", err)
+		}
+		
+		for _, node := range nodes {
+			if node.Name == fmt.Sprintf("k3d-%s", registryName) {
+				logging.Info("Using existing k3d registry", "name", registryName)
+				return node, nil
+			}
+		}
+	}
+	
+	// Create new registry
+	logging.Info("Creating k3d registry for dev mode", "name", registryName, "port", registryPort)
+	
+	registry := &k3d.Registry{
+		Host: registryName,
+		ExposureOpts: k3d.ExposureOpts{
+			Host: "0.0.0.0",
+			PortMapping: nat.PortMapping{
+				Port: nat.Port("5000/tcp"),
+				Binding: nat.PortBinding{
+					HostIP:   "0.0.0.0",
+					HostPort: fmt.Sprintf("%d", registryPort),
+				},
+			},
+		},
+	}
+	
+	// Create the registry
+	registryNode, err := client.RegistryCreate(ctx, k.runtime, registry)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create registry: %w", err)
+	}
+	
+	logging.Info("Successfully created k3d registry", "name", registryName, "port", registryPort)
+	return registryNode, nil
 }

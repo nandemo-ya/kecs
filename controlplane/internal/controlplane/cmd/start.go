@@ -33,6 +33,7 @@ var (
 	startNoTraefik    bool
 	startTimeout      time.Duration
 	startVerbose      bool
+	startDevMode      bool
 )
 
 var startCmd = &cobra.Command{
@@ -57,6 +58,7 @@ func init() {
 	startCmd.Flags().BoolVar(&startNoTraefik, "no-traefik", false, "Disable Traefik deployment")
 	startCmd.Flags().DurationVar(&startTimeout, "timeout", 10*time.Minute, "Timeout for cluster creation")
 	startCmd.Flags().BoolVar(&startVerbose, "verbose", false, "Use verbose output instead of interactive progress display")
+	startCmd.Flags().BoolVar(&startDevMode, "dev", false, "Enable dev mode with k3d registry for local development")
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
@@ -235,6 +237,14 @@ func runStart(cmd *cobra.Command, args []string) error {
 	if cfg.LocalStack.Enabled {
 		fmt.Printf("\nLocalStack services: %v\n", cfg.LocalStack.Services)
 	}
+	
+	if startDevMode {
+		fmt.Println()
+		progress.Info("Dev mode enabled:")
+		fmt.Printf("  k3d registry: localhost:5000\n")
+		fmt.Printf("  Control plane image: localhost:5000/nandemo-ya/kecs-controlplane:latest\n")
+		fmt.Printf("  To push updates: make docker-push-dev\n")
+	}
 
 	fmt.Println()
 	progress.Info("Next steps:")
@@ -247,10 +257,12 @@ func runStart(cmd *cobra.Command, args []string) error {
 func createK3dCluster(ctx context.Context, clusterName string, cfg *config.Config, dataDir string) error {
 	// Create k3d cluster manager configuration
 	clusterConfig := &kubernetes.ClusterManagerConfig{
-		Provider:      "k3d",
-		ContainerMode: false,
-		EnableTraefik: false,        // Disable old Traefik deployment (we use our own)
-		TraefikPort:   startApiPort, // Use the API port for Traefik
+		Provider:       "k3d",
+		ContainerMode:  false,
+		EnableTraefik:  false,        // Disable old Traefik deployment (we use our own)
+		TraefikPort:    startApiPort, // Use the API port for Traefik
+		EnableRegistry: startDevMode,  // Enable k3d registry in dev mode
+		RegistryPort:   5000,         // Default registry port
 		VolumeMounts: []kubernetes.VolumeMount{
 			{
 				HostPath:      dataDir,
@@ -356,8 +368,15 @@ func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Con
 	}
 
 	// Configure control plane
+	controlPlaneImage := cfg.Server.ControlPlaneImage
+	if startDevMode {
+		// Use local registry image in dev mode
+		controlPlaneImage = "localhost:5000/nandemo-ya/kecs-controlplane:latest"
+		logging.Info("Dev mode enabled, using local registry image", "image", controlPlaneImage)
+	}
+	
 	controlPlaneConfig := &resources.ControlPlaneConfig{
-		Image:           cfg.Server.ControlPlaneImage,
+		Image:           controlPlaneImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		CPURequest:      "100m",
 		MemoryRequest:   "128Mi",
@@ -668,8 +687,15 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 	}
 
 	// Configure control plane
+	controlPlaneImage := cfg.Server.ControlPlaneImage
+	if startDevMode {
+		// Use local registry image in dev mode
+		controlPlaneImage = "localhost:5000/nandemo-ya/kecs-controlplane:latest"
+		logging.Info("Dev mode enabled, using local registry image", "image", controlPlaneImage)
+	}
+	
 	controlPlaneConfig := &resources.ControlPlaneConfig{
-		Image:           cfg.Server.ControlPlaneImage,
+		Image:           controlPlaneImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		CPURequest:      "100m",
 		MemoryRequest:   "128Mi",
