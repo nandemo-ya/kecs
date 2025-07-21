@@ -86,35 +86,7 @@ aws logs create-log-group \
   --endpoint-url http://localhost:8080
 ```
 
-### 4. Create IAM Roles
-
-```bash
-# Task Execution Role
-aws iam create-role \
-  --role-name ecsTaskExecutionRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "ecs-tasks.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }' \
-  --endpoint-url http://localhost:8080
-
-# Task Role
-aws iam create-role \
-  --role-name ecsTaskRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "ecs-tasks.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }' \
-  --endpoint-url http://localhost:8080
-```
+Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts LocalStack. No need to create it manually.
 
 ### 5. Create Load Balancer Resources
 

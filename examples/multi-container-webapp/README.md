@@ -69,41 +69,7 @@ aws logs create-log-group \
   --endpoint-url http://localhost:8080
 ```
 
-### 4. Create IAM Roles
-
-```bash
-# Task Execution Role
-aws iam create-role \
-  --role-name ecsTaskExecutionRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "ecs-tasks.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }' \
-  --endpoint-url http://localhost:8080
-
-# Attach policy for ECR and CloudWatch Logs
-aws iam attach-role-policy \
-  --role-name ecsTaskExecutionRole \
-  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy \
-  --endpoint-url http://localhost:8080
-
-# Task Role
-aws iam create-role \
-  --role-name ecsTaskRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "ecs-tasks.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }' \
-  --endpoint-url http://localhost:8080
-```
+Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts LocalStack. No need to create it manually.
 
 ## Deployment
 
@@ -282,13 +248,7 @@ aws logs delete-log-group \
   --endpoint-url http://localhost:8080
 
 # Delete IAM roles (if created for this example)
-aws iam detach-role-policy \
-  --role-name ecsTaskExecutionRole \
-  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy \
-  --endpoint-url http://localhost:8080
-
-aws iam delete-role --role-name ecsTaskExecutionRole --endpoint-url http://localhost:8080
-aws iam delete-role --role-name ecsTaskRole --endpoint-url http://localhost:8080
+# Note: ecsTaskExecutionRole is managed by KECS, no need to delete it
 ```
 
 ## Advanced Testing
