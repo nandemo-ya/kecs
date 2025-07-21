@@ -97,6 +97,23 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	serviceARN := fmt.Sprintf("arn:aws:ecs:%s:%s:service/%s/%s", api.region, api.accountID, cluster.Name, req.ServiceName)
 	clusterARN := cluster.ARN
 
+	// Check if service already exists
+	existingService, err := api.storage.ServiceStore().Get(ctx, clusterARN, req.ServiceName)
+	if err == nil && existingService != nil {
+		// Service already exists - return the existing service for idempotency
+		// This helps with client retries and matches common AWS behavior
+		logging.Info("Service already exists, returning existing service", 
+			"service", req.ServiceName, 
+			"cluster", cluster.Name)
+		
+		// Convert storage service to API response
+		responseService := storageServiceToGeneratedService(existingService)
+		
+		return &generated.CreateServiceResponse{
+			Service: responseService,
+		}, nil
+	}
+
 	// Set default values
 	launchType := generated.LaunchTypeFARGATE
 	if req.LaunchType != nil {

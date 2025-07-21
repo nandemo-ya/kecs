@@ -86,11 +86,6 @@ func (sm *ServiceManager) CreateService(
 		return nil
 	}
 
-	// Wait for cluster to be ready (with 60 second timeout)
-	if err := sm.clusterManager.WaitForClusterReady(cluster.K8sClusterName, 60*time.Second); err != nil {
-		return fmt.Errorf("cluster is not ready: %w", err)
-	}
-
 	// Get Kubernetes client for the cluster
 	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.K8sClusterName)
 	if err != nil {
