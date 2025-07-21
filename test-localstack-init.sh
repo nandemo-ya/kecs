@@ -13,7 +13,7 @@ echo "Starting KECS..."
 echo "Waiting for LocalStack to be ready..."
 sleep 30
 
-# Check if IAM roles were created
+# Check if IAM role was created
 echo "Checking for ecsTaskExecutionRole..."
 aws --endpoint-url=http://localhost:4566 iam get-role --role-name ecsTaskExecutionRole || {
     echo "ERROR: ecsTaskExecutionRole not found"
@@ -21,14 +21,7 @@ aws --endpoint-url=http://localhost:4566 iam get-role --role-name ecsTaskExecuti
     exit 1
 }
 
-echo "Checking for ecsTaskRole..."
-aws --endpoint-url=http://localhost:4566 iam get-role --role-name ecsTaskRole || {
-    echo "ERROR: ecsTaskRole not found"
-    ./bin/kecs stop --name test-iam-init
-    exit 1
-}
-
-echo "Success! Both IAM roles were created automatically."
+echo "Success! The ecsTaskExecutionRole was created automatically."
 
 # Cleanup
 echo "Stopping KECS..."

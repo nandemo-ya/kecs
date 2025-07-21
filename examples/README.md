@@ -64,6 +64,12 @@ Each example is self-contained with:
    ```bash
    kecs start
    ```
+   
+   KECS automatically creates the following IAM role in LocalStack on startup:
+   - `ecsTaskExecutionRole` - Used by ECS agent to pull images and write logs
+   
+   This role is created with appropriate policies for local development.
+   Note: Task roles should be created separately based on your specific task requirements.
 
 3. **Configure AWS CLI**
    ```bash
@@ -196,7 +202,8 @@ Modify task definitions for your needs:
 ### Common Issues
 
 1. **Task fails to start**
-   - Check IAM roles exist
+   - The `ecsTaskExecutionRole` is automatically created by KECS
+   - Check if custom task roles are properly created (if used)
    - Verify network configuration
    - Review task definition syntax
 
