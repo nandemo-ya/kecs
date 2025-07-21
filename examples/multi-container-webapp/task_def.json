@@ -1,0 +1,108 @@
+{
+  "family": "multi-container-webapp",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "volumes": [
+    {
+      "name": "shared-data",
+      "host": {}
+    }
+  ],
+  "containerDefinitions": [
+    {
+      "name": "frontend-nginx",
+      "image": "nginx:alpine",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "shared-data",
+          "containerPath": "/usr/share/nginx/html",
+          "readOnly": true
+        }
+      ],
+      "dependsOn": [
+        {
+          "containerName": "backend-api",
+          "condition": "HEALTHY"
+        }
+      ],
+      "environment": [
+        {
+          "name": "API_ENDPOINT",
+          "value": "http://localhost:3000"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/multi-container-webapp",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "frontend"
+        }
+      }
+    },
+    {
+      "name": "backend-api",
+      "image": "node:18-alpine",
+      "essential": true,
+      "command": ["sh", "-c", "echo '{\"status\":\"ok\",\"message\":\"API Running\"}' > /data/status.json && node -e 'require(\"http\").createServer((req,res)=>{res.writeHead(200,{\"Content-Type\":\"application/json\"});res.end(JSON.stringify({status:\"healthy\",timestamp:new Date()}))}).listen(3000,()=>console.log(\"API running on :3000\"))'"],
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "shared-data",
+          "containerPath": "/data"
+        }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -q -O - http://localhost:3000 || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/multi-container-webapp",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "backend"
+        }
+      }
+    },
+    {
+      "name": "sidecar-logger",
+      "image": "busybox:latest",
+      "essential": false,
+      "command": ["sh", "-c", "while true; do echo \"[$(date)] Health check performed\" >> /data/health.log; sleep 60; done"],
+      "mountPoints": [
+        {
+          "sourceVolume": "shared-data",
+          "containerPath": "/data"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/multi-container-webapp",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "sidecar"
+        }
+      }
+    }
+  ],
+  "executionRoleArn": "arn:aws:iam::000000000000:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::000000000000:role/ecsTaskRole"
+}

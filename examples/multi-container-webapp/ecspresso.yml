@@ -1,0 +1,12 @@
+region: us-east-1
+cluster: default
+service: multi-container-webapp
+task_definition: task_def.json
+service_definition: service_def.json
+timeout: 10m
+
+# ecspresso plugins can be added here
+# plugins:
+#   - name: cloudformation
+#     config:
+#       stack_name: webapp-resources

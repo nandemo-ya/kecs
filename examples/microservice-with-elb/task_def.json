@@ -1,0 +1,51 @@
+{
+  "family": "microservice-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "api",
+      "image": "node:18-alpine",
+      "essential": true,
+      "command": [
+        "sh", "-c",
+        "cat > /app/server.js << 'EOF'\nconst http = require('http');\nconst url = require('url');\n\nconst server = http.createServer((req, res) => {\n  const parsedUrl = url.parse(req.url, true);\n  const path = parsedUrl.pathname;\n  \n  res.setHeader('Content-Type', 'application/json');\n  \n  switch(path) {\n    case '/health':\n      res.writeHead(200);\n      res.end(JSON.stringify({ status: 'healthy', service: 'microservice-api' }));\n      break;\n    case '/api/users':\n      res.writeHead(200);\n      res.end(JSON.stringify({ users: [{ id: 1, name: 'John' }, { id: 2, name: 'Jane' }] }));\n      break;\n    case '/api/products':\n      res.writeHead(200);\n      res.end(JSON.stringify({ products: [{ id: 1, name: 'Widget', price: 9.99 }, { id: 2, name: 'Gadget', price: 19.99 }] }));\n      break;\n    case '/api/info':\n      res.writeHead(200);\n      res.end(JSON.stringify({ \n        service: 'microservice-api',\n        version: '1.0.0',\n        instance: process.env.ECS_TASK_ARN || 'local',\n        timestamp: new Date().toISOString()\n      }));\n      break;\n    default:\n      res.writeHead(404);\n      res.end(JSON.stringify({ error: 'Not found' }));\n  }\n});\n\nconst PORT = process.env.PORT || 3000;\nserver.listen(PORT, () => {\n  console.log(`API server running on port ${PORT}`);\n});\nEOF\n&& node /app/server.js"
+      ],
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "PORT",
+          "value": "3000"
+        },
+        {
+          "name": "NODE_ENV",
+          "value": "production"
+        }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -q -O - http://localhost:3000/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/microservice-api",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "api"
+        }
+      }
+    }
+  ],
+  "executionRoleArn": "arn:aws:iam::000000000000:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::000000000000:role/ecsTaskRole"
+}
