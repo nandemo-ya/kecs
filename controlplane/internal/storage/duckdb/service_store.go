@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -296,7 +296,7 @@ func (s *serviceStore) List(ctx context.Context, cluster string, serviceName str
 func (s *serviceStore) Update(ctx context.Context, service *storage.Service) error {
 	service.UpdatedAt = time.Now()
 
-	log.Printf("DEBUG: Updating service ID: %s, ARN: %s, status: %s, desiredCount: %d", service.ID, service.ARN, service.Status, service.DesiredCount)
+	logging.Debug("Updating service", "id", service.ID, "arn", service.ARN, "status", service.Status, "desiredCount", service.DesiredCount)
 
 	// Small delay to avoid DuckDB concurrency issues
 	time.Sleep(50 * time.Millisecond)
@@ -308,7 +308,7 @@ func (s *serviceStore) Update(ctx context.Context, service *storage.Service) err
 	if err != nil {
 		return fmt.Errorf("failed to check service existence: %w", err)
 	}
-	log.Printf("DEBUG: Found %d records with ID %s", count, service.ID)
+	logging.Debug("Found service records", "count", count, "id", service.ID)
 
 	// Update all relevant fields that might change
 	query := `UPDATE services SET 

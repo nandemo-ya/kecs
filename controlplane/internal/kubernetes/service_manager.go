@@ -3,7 +3,6 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -13,6 +12,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -41,7 +41,9 @@ func (sm *ServiceManager) CreateService(
 	// Check if running in test mode
 	if config.GetBool("features.testMode") {
 		// In test mode, simulate service creation
-		log.Printf("TEST MODE: Simulated service creation for %s in namespace %s", storageService.ServiceName, deployment.Namespace)
+		logging.Debug("TEST MODE: Simulated service creation",
+			"serviceName", storageService.ServiceName,
+			"namespace", deployment.Namespace)
 
 		// Update service status to ACTIVE
 		storageService.Status = "ACTIVE"
@@ -70,9 +72,13 @@ func (sm *ServiceManager) CreateService(
 				}
 
 				if err := taskStore.Create(ctx, task); err != nil {
-					log.Printf("TEST MODE: Failed to create task for service %s: %v", storageService.ServiceName, err)
+					logging.Debug("TEST MODE: Failed to create task for service",
+						"serviceName", storageService.ServiceName,
+						"error", err)
 				} else {
-					log.Printf("TEST MODE: Created task %s for service %s", taskID, storageService.ServiceName)
+					logging.Debug("TEST MODE: Created task for service",
+						"taskID", taskID,
+						"serviceName", storageService.ServiceName)
 				}
 			}
 		}
@@ -105,21 +111,26 @@ func (sm *ServiceManager) CreateService(
 	if kubeService != nil {
 		if err := sm.createKubernetesService(ctx, kubeClient, kubeService); err != nil {
 			// Don't fail the entire operation if service creation fails
-			log.Printf("Warning: failed to create kubernetes service: %v", err)
+			logging.Warn("Failed to create kubernetes service",
+				"error", err)
 		}
 	}
 
 	// Update service status to ACTIVE after successful deployment using transaction
 	if err := sm.updateServiceStatusSafely(ctx, cluster, storageService); err != nil {
-		log.Printf("Warning: failed to update service status to ACTIVE: %v", err)
+		logging.Warn("Failed to update service status to ACTIVE",
+			"error", err)
 		// Don't fail the entire operation for status update issues
 	} else {
-		log.Printf("Updated service status to ACTIVE for service %s (ID: %s)",
-			storageService.ServiceName, storageService.ID)
+		logging.Info("Updated service status to ACTIVE",
+			"serviceName", storageService.ServiceName,
+			"serviceID", storageService.ID)
 	}
 
-	log.Printf("Successfully created service %s as deployment %s in namespace %s",
-		storageService.ServiceName, deployment.Name, deployment.Namespace)
+	logging.Info("Successfully created service",
+		"serviceName", storageService.ServiceName,
+		"deploymentName", deployment.Name,
+		"namespace", deployment.Namespace)
 
 	return nil
 }
@@ -135,7 +146,9 @@ func (sm *ServiceManager) UpdateService(
 	// Check if running in test mode
 	if config.GetBool("features.testMode") {
 		// In test mode, simulate service update
-		log.Printf("TEST MODE: Simulated service update for %s in namespace %s", storageService.ServiceName, deployment.Namespace)
+		logging.Debug("TEST MODE: Simulated service update",
+			"serviceName", storageService.ServiceName,
+			"namespace", deployment.Namespace)
 
 		// Update service counts based on replica changes
 		if deployment.Spec.Replicas != nil {
@@ -168,7 +181,8 @@ func (sm *ServiceManager) UpdateService(
 							}
 
 							if err := taskStore.Create(ctx, task); err != nil {
-								log.Printf("TEST MODE: Failed to create task during scale-up: %v", err)
+								logging.Debug("TEST MODE: Failed to create task during scale-up",
+									"error", err)
 							}
 						}
 					} else if newDesiredCount < oldDesiredCount {
@@ -187,9 +201,12 @@ func (sm *ServiceManager) UpdateService(
 									task.LastStatus = "STOPPED"
 									task.StoppedReason = "Service scaled down"
 									if err := taskStore.Update(ctx, task); err != nil {
-										log.Printf("TEST MODE: Failed to stop task %s: %v", task.ARN, err)
+										logging.Debug("TEST MODE: Failed to stop task",
+											"taskARN", task.ARN,
+											"error", err)
 									} else {
-										log.Printf("TEST MODE: Stopped task %s for scale down", task.ARN)
+										logging.Debug("TEST MODE: Stopped task for scale down",
+											"taskARN", task.ARN)
 									}
 								}
 							}
@@ -200,8 +217,10 @@ func (sm *ServiceManager) UpdateService(
 				// Update running count to match desired count
 				storageService.RunningCount = newDesiredCount
 				storageService.PendingCount = 0
-				log.Printf("TEST MODE: Service %s scaled from %d to %d replicas",
-					storageService.ServiceName, oldDesiredCount, newDesiredCount)
+				logging.Debug("TEST MODE: Service scaled",
+					"serviceName", storageService.ServiceName,
+					"oldDesiredCount", oldDesiredCount,
+					"newDesiredCount", newDesiredCount)
 			}
 		}
 
@@ -230,7 +249,8 @@ func (sm *ServiceManager) UpdateService(
 			ctx, kubeService.Name, metav1.GetOptions{})
 		if err != nil {
 			if !errors.IsNotFound(err) {
-				log.Printf("Warning: failed to get existing kubernetes service: %v", err)
+				logging.Warn("Failed to get existing kubernetes service",
+					"error", err)
 			}
 		} else {
 			// Preserve ClusterIP and update other fields
@@ -239,13 +259,16 @@ func (sm *ServiceManager) UpdateService(
 			_, err = kubeClient.CoreV1().Services(kubeService.Namespace).Update(
 				ctx, kubeService, metav1.UpdateOptions{})
 			if err != nil {
-				log.Printf("Warning: failed to update kubernetes service: %v", err)
+				logging.Warn("Failed to update kubernetes service",
+					"error", err)
 			}
 		}
 	}
 
-	log.Printf("Successfully updated service %s deployment %s in namespace %s",
-		storageService.ServiceName, deployment.Name, deployment.Namespace)
+	logging.Info("Successfully updated service",
+		"serviceName", storageService.ServiceName,
+		"deploymentName", deployment.Name,
+		"namespace", deployment.Namespace)
 
 	return nil
 }
@@ -259,7 +282,8 @@ func (sm *ServiceManager) DeleteService(
 	// Check if running in test mode
 	if config.GetBool("features.testMode") {
 		// In test mode, simulate service deletion
-		log.Printf("TEST MODE: Simulated service deletion for %s", storageService.ServiceName)
+		logging.Debug("TEST MODE: Simulated service deletion",
+			"serviceName", storageService.ServiceName)
 
 		// Update service status to INACTIVE
 		storageService.Status = "INACTIVE"
@@ -281,9 +305,12 @@ func (sm *ServiceManager) DeleteService(
 					task.LastStatus = "STOPPED"
 					task.StoppedReason = "Service deleted"
 					if err := taskStore.Update(ctx, task); err != nil {
-						log.Printf("TEST MODE: Failed to stop task %s: %v", task.ARN, err)
+						logging.Debug("TEST MODE: Failed to stop task",
+							"taskARN", task.ARN,
+							"error", err)
 					} else {
-						log.Printf("TEST MODE: Stopped task %s for service deletion", task.ARN)
+						logging.Debug("TEST MODE: Stopped task for service deletion",
+							"taskARN", task.ARN)
 					}
 				}
 			}
@@ -312,7 +339,9 @@ func (sm *ServiceManager) DeleteService(
 	err = kubeClient.AppsV1().Deployments(namespace).Delete(
 		ctx, deploymentName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		log.Printf("Warning: failed to delete deployment %s: %v", deploymentName, err)
+		logging.Warn("Failed to delete deployment",
+			"deploymentName", deploymentName,
+			"error", err)
 	}
 
 	// Delete Service (if exists)
@@ -320,11 +349,14 @@ func (sm *ServiceManager) DeleteService(
 	err = kubeClient.CoreV1().Services(namespace).Delete(
 		ctx, serviceName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		log.Printf("Warning: failed to delete kubernetes service %s: %v", serviceName, err)
+		logging.Warn("Failed to delete kubernetes service",
+			"serviceName", serviceName,
+			"error", err)
 	}
 
-	log.Printf("Successfully deleted service %s deployment and service in namespace %s",
-		storageService.ServiceName, namespace)
+	logging.Info("Successfully deleted service deployment and service",
+		"serviceName", storageService.ServiceName,
+		"namespace", namespace)
 
 	return nil
 }
@@ -338,7 +370,8 @@ func (sm *ServiceManager) GetServiceStatus(
 	// Check if running in test mode
 	if config.GetBool("features.testMode") {
 		// In test mode, return simulated status based on stored service data
-		log.Printf("TEST MODE: Returning simulated status for service %s", storageService.ServiceName)
+		logging.Debug("TEST MODE: Returning simulated status",
+			"serviceName", storageService.ServiceName)
 
 		return &ServiceStatus{
 			Status:       storageService.Status,
@@ -417,7 +450,8 @@ func (sm *ServiceManager) ensureNamespace(ctx context.Context, kubeClient kubern
 			if err != nil {
 				return fmt.Errorf("failed to create namespace: %w", err)
 			}
-			log.Printf("Created namespace: %s", namespace)
+			logging.Info("Created namespace",
+				"namespace", namespace)
 		} else {
 			return fmt.Errorf("failed to get namespace: %w", err)
 		}
@@ -437,12 +471,14 @@ func (sm *ServiceManager) createDeployment(ctx context.Context, kubeClient kuber
 			if err != nil {
 				return fmt.Errorf("failed to update existing deployment: %w", err)
 			}
-			log.Printf("Updated existing deployment: %s", deployment.Name)
+			logging.Info("Updated existing deployment",
+				"deploymentName", deployment.Name)
 		} else {
 			return fmt.Errorf("failed to create deployment: %w", err)
 		}
 	} else {
-		log.Printf("Created deployment: %s", deployment.Name)
+		logging.Info("Created deployment",
+			"deploymentName", deployment.Name)
 	}
 	return nil
 }
@@ -459,19 +495,23 @@ func (sm *ServiceManager) createKubernetesService(ctx context.Context, kubeClien
 			if err != nil {
 				return fmt.Errorf("failed to update existing service: %w", err)
 			}
-			log.Printf("Updated existing kubernetes service: %s", service.Name)
+			logging.Info("Updated existing kubernetes service",
+				"serviceName", service.Name)
 		} else {
 			return fmt.Errorf("failed to create kubernetes service: %w", err)
 		}
 	} else {
-		log.Printf("Created kubernetes service: %s", service.Name)
+		logging.Info("Created kubernetes service",
+			"serviceName", service.Name)
 	}
 	return nil
 }
 
 // updateServiceStatusSafely updates service status with safe error handling
 func (sm *ServiceManager) updateServiceStatusSafely(ctx context.Context, cluster *storage.Cluster, storageService *storage.Service) error {
-	log.Printf("DEBUG: Starting status update for service %s (ID: %s)", storageService.ServiceName, storageService.ID)
+	logging.Debug("Starting status update for service",
+		"serviceName", storageService.ServiceName,
+		"serviceID", storageService.ID)
 
 	// Get fresh service data from storage to avoid conflicts
 	freshService, err := sm.storage.ServiceStore().Get(ctx, cluster.ARN, storageService.ServiceName)
@@ -479,12 +519,16 @@ func (sm *ServiceManager) updateServiceStatusSafely(ctx context.Context, cluster
 		return fmt.Errorf("failed to get fresh service for status update: %w", err)
 	}
 
-	log.Printf("DEBUG: Retrieved fresh service ID: %s, current status: %s", freshService.ID, freshService.Status)
+	logging.Debug("Retrieved fresh service",
+		"serviceID", freshService.ID,
+		"currentStatus", freshService.Status)
 
 	// Update only the status field
 	freshService.Status = "ACTIVE"
 
-	log.Printf("DEBUG: About to update service ID: %s to status: ACTIVE", freshService.ID)
+	logging.Debug("About to update service status",
+		"serviceID", freshService.ID,
+		"newStatus", "ACTIVE")
 
 	// Use a simple approach: since we have the fresh service, just update it
 	return sm.storage.ServiceStore().Update(ctx, freshService)

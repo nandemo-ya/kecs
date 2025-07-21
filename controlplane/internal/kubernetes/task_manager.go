@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
@@ -31,7 +31,7 @@ type TaskManager struct {
 func NewTaskManager(storage storage.Storage) (*TaskManager, error) {
 	// In container mode, defer kubernetes client creation
 	if config.GetBool("features.containerMode") {
-		log.Println("Container mode enabled - deferring kubernetes client initialization")
+		logging.Debug("Container mode enabled - deferring kubernetes client initialization")
 		return &TaskManager{
 			clientset: nil, // Will be initialized later
 			storage:   storage,
@@ -81,7 +81,7 @@ func (tm *TaskManager) InitializeClient() error {
 	}
 
 	tm.clientset = clientset
-	log.Println("TaskManager kubernetes client initialized")
+	logging.Debug("TaskManager kubernetes client initialized")
 	return nil
 }
 
@@ -237,7 +237,7 @@ func (tm *TaskManager) watchPodStatus(ctx context.Context, taskARN, namespace, p
 	})
 	if err != nil {
 		// Log error with more context and don't crash
-		log.Printf("Failed to watch pod %s in namespace %s for task %s: %v", podName, namespace, taskARN, err)
+		logging.Warn("Failed to watch pod for task", "pod", podName, "namespace", namespace, "task", taskARN, "error", err)
 		return
 	}
 	defer watcher.Stop()
@@ -250,7 +250,7 @@ func (tm *TaskManager) watchPodStatus(ctx context.Context, taskARN, namespace, p
 
 		// Update task status
 		if err := tm.UpdateTaskStatus(ctx, taskARN, pod); err != nil {
-			log.Printf("Failed to update task status for task %s (pod %s/%s): %v", taskARN, pod.Namespace, pod.Name, err)
+			logging.Error("Failed to update task status", "task", taskARN, "namespace", pod.Namespace, "pod", pod.Name, "error", err)
 			// Continue processing other events despite this error
 		}
 
@@ -413,8 +413,8 @@ func (tm *TaskManager) CreateServiceDeployment(ctx context.Context, cluster *sto
 		}
 	}
 
-	log.Printf("Created/updated deployment for service %s in namespace %s",
-		service.ServiceName, namespace)
+	logging.Info("Created/updated deployment for service",
+		"service", service.ServiceName, "namespace", namespace)
 
 	return nil
 }

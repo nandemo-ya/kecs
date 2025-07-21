@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -81,7 +81,7 @@ func (s *Server) createBasicPod(taskDef *storage.TaskDefinition, cluster *storag
 		return nil, fmt.Errorf("failed to create pod in kubernetes: %w", err)
 	}
 
-	log.Printf("Successfully created pod %s in namespace %s", createdPod.Name, createdPod.Namespace)
+	logging.Info("Successfully created pod", "pod", createdPod.Name, "namespace", createdPod.Namespace)
 	return createdPod, nil
 }
 

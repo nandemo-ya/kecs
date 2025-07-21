@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -18,12 +17,13 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // CreateCluster implements the CreateCluster operation
 func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.CreateClusterRequest) (*generated.CreateClusterResponse, error) {
-	log.Printf("Creating cluster: %v", req)
+	logging.Info("Creating cluster", "request", req)
 
 	// Default cluster name if not provided
 	clusterName := "default"
@@ -82,7 +82,7 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 	if k8sClusterName == "" {
 		// Fallback to a default name if we can't determine the instance name
 		k8sClusterName = "kecs-default"
-		log.Printf("Warning: Could not determine KECS instance name, using default: %s", k8sClusterName)
+		logging.Warn("Could not determine KECS instance name, using default", "k8sClusterName", k8sClusterName)
 	}
 
 	// Create cluster object
@@ -160,7 +160,7 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListClustersRequest) (*generated.ListClustersResponse, error) {
 	// Debug log the request
 	reqJSON, _ := json.Marshal(req)
-	log.Printf("ListClusters request: %s", string(reqJSON))
+	logging.Debug("ListClusters request", "request", string(reqJSON))
 
 	// Set default limit if not specified
 	limit := 100
@@ -170,9 +170,9 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 		if limit > 100 {
 			limit = 100
 		}
-		log.Printf("ListClusters: MaxResults=%d, effective limit=%d", *req.MaxResults, limit)
+		logging.Debug("ListClusters pagination", "maxResults", *req.MaxResults, "effectiveLimit", limit)
 	} else {
-		log.Printf("ListClusters: No MaxResults specified, using default limit=%d", limit)
+		logging.Debug("ListClusters pagination", "defaultLimit", limit)
 	}
 
 	// Extract next token
@@ -184,11 +184,11 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 	// Get clusters with pagination
 	clusters, newNextToken, err := api.storage.ClusterStore().ListWithPagination(ctx, limit, nextToken)
 	if err != nil {
-		log.Printf("ListClusters: Error from storage: %v", err)
+		logging.Error("ListClusters storage error", "error", err)
 		return nil, fmt.Errorf("failed to list clusters: %w", err)
 	}
 
-	log.Printf("ListClusters: Found %d clusters from storage", len(clusters))
+	logging.Debug("ListClusters results", "count", len(clusters))
 
 	// Build cluster ARNs list
 	clusterArns := make([]string, 0, len(clusters))
@@ -203,14 +203,14 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 	// Set next token if there are more results
 	if newNextToken != "" {
 		response.NextToken = ptr.String(newNextToken)
-		log.Printf("ListClusters: Returning %d clusters with nextToken=%s", len(clusterArns), newNextToken)
+		logging.Debug("ListClusters response", "count", len(clusterArns), "nextToken", newNextToken)
 	} else {
-		log.Printf("ListClusters: Returning %d clusters with no nextToken", len(clusterArns))
+		logging.Debug("ListClusters response", "count", len(clusterArns), "hasNextToken", false)
 	}
 
 	// Debug log the response
 	respJSON, _ := json.Marshal(response)
-	log.Printf("ListClusters response: %s", string(respJSON))
+	logging.Debug("ListClusters response", "response", string(respJSON))
 
 	return response, nil
 }
@@ -427,7 +427,7 @@ func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.Upda
 	if req.ServiceConnectDefaults != nil {
 		// For now, we'll store this in the Configuration field
 		// In a real implementation, this might need a separate field
-		log.Printf("ServiceConnectDefaults update requested but not fully implemented yet")
+		logging.Warn("ServiceConnectDefaults update requested but not fully implemented yet")
 	}
 
 	// Update the cluster
@@ -510,7 +510,7 @@ func (api *DefaultECSAPI) UpdateClusterSettings(ctx context.Context, req *genera
 	var existingSettings []generated.ClusterSetting
 	if cluster.Settings != "" {
 		if err := json.Unmarshal([]byte(cluster.Settings), &existingSettings); err != nil {
-			log.Printf("Failed to unmarshal existing settings: %v", err)
+			logging.Error("Failed to unmarshal existing settings", "error", err)
 			existingSettings = []generated.ClusterSetting{}
 		}
 	}
@@ -685,7 +685,7 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 func (api *DefaultECSAPI) createK8sClusterAndNamespace(cluster *storage.Cluster) {
 	// In the new design, we use the existing KECS instance's k3d cluster
 	// ECS clusters are represented as Kubernetes namespaces
-	log.Printf("Creating namespace for ECS cluster %s in k3d cluster %s", cluster.Name, cluster.K8sClusterName)
+	logging.Info("Creating namespace for ECS cluster", "cluster", cluster.Name, "k8sCluster", cluster.K8sClusterName)
 
 	// In the new architecture, the KECS instance (k3d cluster) should already exist
 	// We only need to create namespaces for ECS clusters
@@ -707,17 +707,17 @@ func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 	kubeClient, err := kubernetes.GetInClusterClient()
 	if err != nil {
 		// If in-cluster fails, try using cluster manager (for local development)
-		log.Printf("In-cluster config failed (expected in local development): %v", err)
+		logging.Debug("In-cluster config failed (expected in local development)", "error", err)
 		clusterManager := api.getClusterManager()
 		if clusterManager == nil {
-			log.Printf("Cannot create namespace: no Kubernetes client available (neither in-cluster nor cluster manager)")
+			logging.Error("Cannot create namespace: no Kubernetes client available (neither in-cluster nor cluster manager)")
 			return
 		}
 
 		// Get Kubernetes client for the KECS instance
 		client, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
 		if err != nil {
-			log.Printf("Failed to get kubernetes client: %v", err)
+			logging.Error("Failed to get kubernetes client", "error", err)
 			return
 		}
 		kubeClient = client.(*k8s.Clientset)
@@ -726,18 +726,18 @@ func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 	// Create namespace
 	namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
 	if err := namespaceManager.CreateNamespace(ctx, cluster.Name, cluster.Region); err != nil {
-		log.Printf("Failed to create namespace for %s: %v", cluster.Name, err)
+		logging.Error("Failed to create namespace", "cluster", cluster.Name, "error", err)
 		return
 	}
 
-	log.Printf("Successfully created namespace %s for ECS cluster %s in KECS instance %s", cluster.Name, cluster.Name, cluster.K8sClusterName)
+	logging.Info("Successfully created namespace", "namespace", cluster.Name, "ecsCluster", cluster.Name, "kecsInstance", cluster.K8sClusterName)
 }
 
 // ensureK8sClusterExists ensures that the namespace exists for an existing ECS cluster
 func (api *DefaultECSAPI) ensureK8sClusterExists(cluster *storage.Cluster) {
 	// In the new design, we only need to ensure the namespace exists
 	// The k3d cluster is managed by the KECS instance itself
-	log.Printf("Ensuring namespace exists for ECS cluster %s in KECS instance %s", cluster.Name, cluster.K8sClusterName)
+	logging.Debug("Ensuring namespace exists", "ecsCluster", cluster.Name, "kecsInstance", cluster.K8sClusterName)
 	
 	// Just ensure the namespace exists
 	api.createNamespaceForCluster(cluster)
@@ -749,24 +749,24 @@ func (api *DefaultECSAPI) deleteK8sClusterAndNamespace(cluster *storage.Cluster)
 
 	// In the new design, we only delete the namespace
 	// The k3d cluster is managed by the KECS instance itself
-	log.Printf("Deleting namespace %s for ECS cluster %s from KECS instance %s", cluster.Name, cluster.Name, cluster.K8sClusterName)
+	logging.Info("Deleting namespace", "namespace", cluster.Name, "ecsCluster", cluster.Name, "kecsInstance", cluster.K8sClusterName)
 
 	// Try to create Kubernetes client
 	// First, try in-cluster config (when running inside Kubernetes)
 	kubeClient, err := kubernetes.GetInClusterClient()
 	if err != nil {
 		// If in-cluster fails, try using cluster manager (for local development)
-		log.Printf("In-cluster config failed (expected in local development): %v", err)
+		logging.Debug("In-cluster config failed (expected in local development)", "error", err)
 		clusterManager := api.getClusterManager()
 		if clusterManager == nil {
-			log.Printf("Cannot delete namespace: no Kubernetes client available (neither in-cluster nor cluster manager)")
+			logging.Error("Cannot delete namespace: no Kubernetes client available (neither in-cluster nor cluster manager)")
 			return
 		}
 
 		// Get Kubernetes client for the KECS instance
 		client, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
 		if err != nil {
-			log.Printf("Failed to get kubernetes client: %v", err)
+			logging.Error("Failed to get kubernetes client", "error", err)
 			return
 		}
 		kubeClient = client.(*k8s.Clientset)
@@ -775,11 +775,11 @@ func (api *DefaultECSAPI) deleteK8sClusterAndNamespace(cluster *storage.Cluster)
 	// Delete namespace
 	namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
 	if err := namespaceManager.DeleteNamespace(ctx, cluster.Name, cluster.Region); err != nil {
-		log.Printf("Failed to delete namespace %s: %v", cluster.Name, err)
+		logging.Error("Failed to delete namespace", "namespace", cluster.Name, "error", err)
 		return
 	}
 
-	log.Printf("Successfully deleted namespace %s for ECS cluster %s", cluster.Name, cluster.Name)
+	logging.Info("Successfully deleted namespace", "namespace", cluster.Name, "ecsCluster", cluster.Name)
 }
 
 // extractClusterNameFromARN extracts cluster name from ARN or returns the input if it's not an ARN
@@ -796,11 +796,11 @@ func extractClusterNameFromARN(identifier string) string {
 
 // deployLocalStackIfEnabled deploys LocalStack to the k3d cluster if enabled
 func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
-	log.Printf("deployLocalStackIfEnabled called for cluster %s", cluster.Name)
+	logging.Debug("deployLocalStackIfEnabled called", "cluster", cluster.Name)
 	
 	// Skip if cluster manager is not available
 	if api.clusterManager == nil {
-		log.Printf("Cluster manager not available, cannot deploy LocalStack for cluster %s", cluster.Name)
+		logging.Warn("Cluster manager not available, cannot deploy LocalStack", "cluster", cluster.Name)
 		return
 	}
 
@@ -816,7 +816,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		if apiconfig.GetBool("features.containerMode") {
 			config.ContainerMode = true
 		}
-		log.Printf("Using LocalStack config from API: Enabled=%v, UseTraefik=%v, ContainerMode=%v", config.Enabled, config.UseTraefik, config.ContainerMode)
+		logging.Debug("Using LocalStack config from API", "enabled", config.Enabled, "useTraefik", config.UseTraefik, "containerMode", config.ContainerMode)
 	} else if api.localStackManager != nil {
 		config = api.localStackManager.GetConfig()
 	} else {
@@ -830,17 +830,17 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		// Check features.traefik configuration
 		if appConfig.Features.Traefik {
 			config.UseTraefik = true
-			log.Printf("Traefik is enabled for LocalStack via features.traefik")
+			logging.Debug("Traefik is enabled for LocalStack via features.traefik")
 		}
 		// Set container mode
 		if appConfig.Features.ContainerMode {
 			config.ContainerMode = true
-			log.Printf("Container mode is enabled for LocalStack")
+			logging.Debug("Container mode is enabled for LocalStack")
 		}
 	}
 	
 	if config == nil || !config.Enabled {
-		log.Printf("LocalStack is not enabled in configuration")
+		logging.Debug("LocalStack is not enabled in configuration")
 		return
 	}
 	
@@ -851,16 +851,16 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 			if config.ContainerMode {
 				k3dNodeName := fmt.Sprintf("k3d-%s-server-0", cluster.K8sClusterName)
 				config.ProxyEndpoint = fmt.Sprintf("http://%s:30890", k3dNodeName)
-				log.Printf("Container mode: Using k3d node %s with NodePort 30890 for LocalStack proxy endpoint: %s", k3dNodeName, config.ProxyEndpoint)
+				logging.Info("Container mode: Using k3d node for LocalStack proxy", "node", k3dNodeName, "port", 30890, "endpoint", config.ProxyEndpoint)
 			} else {
 				config.ProxyEndpoint = fmt.Sprintf("http://localhost:%d", port)
-				log.Printf("Using dynamic Traefik port %d for LocalStack proxy endpoint: %s", port, config.ProxyEndpoint)
+				logging.Info("Using dynamic Traefik port for LocalStack proxy", "port", port, "endpoint", config.ProxyEndpoint)
 			}
 		} else {
-			log.Printf("Warning: Traefik is enabled but no port found for cluster %s", cluster.K8sClusterName)
+			logging.Warn("Traefik is enabled but no port found", "cluster", cluster.K8sClusterName)
 		}
 	} else {
-		log.Printf("Traefik disabled or cluster manager not available. UseTraefik=%v, clusterManager=%v", config.UseTraefik, api.clusterManager != nil)
+		logging.Debug("Traefik disabled or cluster manager not available", "useTraefik", config.UseTraefik, "hasClusterManager", api.clusterManager != nil)
 	}
 
 	// Set lazy loading for faster startup in container mode
@@ -870,7 +870,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 			config.Environment = make(map[string]string)
 		}
 		config.Environment["EAGER_SERVICE_LOADING"] = "0"
-		log.Printf("Container mode: Disabled eager service loading for faster LocalStack startup")
+		logging.Debug("Container mode: Disabled eager service loading for faster LocalStack startup")
 	}
 	
 	// Try to create Kubernetes client
@@ -885,17 +885,17 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		// For in-cluster config, we need to get the config separately
 		kubeConfig, err = rest.InClusterConfig()
 		if err != nil {
-			log.Printf("Failed to get in-cluster config: %v", err)
+			logging.Debug("Failed to get in-cluster config", "error", err)
 			return
 		}
 	} else {
 		// If in-cluster fails, try using cluster manager (for local development)
-		log.Printf("In-cluster config failed (expected in local development): %v", err)
+		logging.Debug("In-cluster config failed (expected in local development)", "error", err)
 		
 		// Get Kubernetes client for the specific k3d cluster
 		client, err := api.clusterManager.GetKubeClient(cluster.K8sClusterName)
 		if err != nil {
-			log.Printf("Failed to get Kubernetes client: %v", err)
+			logging.Error("Failed to get Kubernetes client", "error", err)
 			return
 		}
 		kubeClient = client
@@ -903,7 +903,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		// Get kube config
 		kubeConfig, err = api.clusterManager.GetKubeConfig(cluster.K8sClusterName)
 		if err != nil {
-			log.Printf("Failed to get kube config: %v", err)
+			logging.Error("Failed to get kube config", "error", err)
 			return
 		}
 	}
@@ -911,48 +911,48 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 	// Create a new LocalStack manager with the cluster-specific client
 	clusterLocalStackManager, err := localstack.NewManager(config, kubeClient.(*k8s.Clientset), kubeConfig)
 	if err != nil {
-		log.Printf("Failed to create LocalStack manager for cluster %s: %v", cluster.Name, err)
+		logging.Error("Failed to create LocalStack manager", "cluster", cluster.Name, "error", err)
 		return
 	}
 
 	// Check if LocalStack is already running in this cluster
 	if clusterLocalStackManager.IsRunning() {
-		log.Printf("LocalStack is already running in cluster %s", cluster.Name)
+		logging.Info("LocalStack is already running", "cluster", cluster.Name)
 		return
 	}
 
 	// Start LocalStack in the cluster
-	log.Printf("Starting LocalStack in cluster %s...", cluster.Name)
+	logging.Info("Starting LocalStack", "cluster", cluster.Name)
 	// Update LocalStack state to deploying
 	api.updateLocalStackState(cluster, "deploying", "")
 	
 	if err := clusterLocalStackManager.Start(ctx); err != nil {
-		log.Printf("Failed to start LocalStack in cluster %s: %v", cluster.Name, err)
+		logging.Error("Failed to start LocalStack", "cluster", cluster.Name, "error", err)
 		// Update LocalStack state to failed
 		api.updateLocalStackState(cluster, "failed", err.Error())
 		return
 	}
 
 	// Wait for LocalStack to be ready (monitoring logs for "Ready." message)
-	log.Printf("Waiting for LocalStack to be ready in cluster %s (monitoring logs)...", cluster.Name)
+	logging.Info("Waiting for LocalStack to be ready (monitoring logs)", "cluster", cluster.Name)
 	
 	// Check LocalStack status - the manager now monitors logs for "Ready."
 	status, err := clusterLocalStackManager.GetStatus()
 	if err != nil {
-		log.Printf("Failed to get LocalStack status in cluster %s: %v", cluster.Name, err)
+		logging.Error("Failed to get LocalStack status", "cluster", cluster.Name, "error", err)
 		api.updateLocalStackState(cluster, "failed", err.Error())
 		return
 	}
 	
 	if status.Running && status.Healthy {
-		log.Printf("LocalStack successfully deployed and ready in cluster %s", cluster.Name)
+		logging.Info("LocalStack successfully deployed and ready", "cluster", cluster.Name)
 		api.updateLocalStackState(cluster, "running", "")
 	} else if status.Running && !status.Healthy {
-		log.Printf("LocalStack is running but not yet fully ready in cluster %s", cluster.Name)
+		logging.Info("LocalStack is running but not yet fully ready", "cluster", cluster.Name)
 		// Still mark as running since it can handle requests
 		api.updateLocalStackState(cluster, "running", "Services still initializing")
 	} else {
-		log.Printf("LocalStack failed to start in cluster %s", cluster.Name)
+		logging.Error("LocalStack failed to start", "cluster", cluster.Name)
 		api.updateLocalStackState(cluster, "failed", "Failed to start")
 	}
 	
@@ -961,7 +961,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 	
 	// Call the update callback if set
 	if api.localStackUpdateCallback != nil {
-		log.Printf("Notifying server about LocalStack manager update")
+		logging.Debug("Notifying server about LocalStack manager update")
 		api.localStackUpdateCallback(clusterLocalStackManager)
 	}
 }
@@ -990,14 +990,14 @@ func (api *DefaultECSAPI) updateLocalStackState(cluster *storage.Cluster, status
 	// Serialize state
 	stateJSON, err := storage.SerializeLocalStackState(state)
 	if err != nil {
-		log.Printf("Failed to serialize LocalStack state: %v", err)
+		logging.Error("Failed to serialize LocalStack state", "error", err)
 		return
 	}
 	
 	// Update cluster
 	cluster.LocalStackState = stateJSON
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
-		log.Printf("Failed to update LocalStack state for cluster %s: %v", cluster.Name, err)
+		logging.Error("Failed to update LocalStack state", "cluster", cluster.Name, "error", err)
 	}
 }
 
@@ -1021,7 +1021,7 @@ func (api *DefaultECSAPI) getKecsInstanceName() string {
 			// k3d-<instance>-server-0 -> extract <instance>
 			instanceName := strings.Join(parts[1:len(parts)-2], "-")
 			if instanceName != "" {
-				log.Printf("Detected KECS instance name from hostname: %s", instanceName)
+				logging.Debug("Detected KECS instance name from hostname", "instanceName", instanceName)
 				return instanceName
 			}
 		}

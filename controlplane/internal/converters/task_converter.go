@@ -3,7 +3,6 @@ package converters
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/proxy"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
@@ -279,7 +279,7 @@ func (c *TaskConverter) ConvertTaskToPod(
 		sidecarProxy := c.proxyManager.GetSidecarProxy()
 		if sidecarProxy.ShouldInjectSidecar(pod) {
 			if err := sidecarProxy.InjectSidecar(pod); err != nil {
-				log.Printf("Warning: Failed to inject AWS proxy sidecar: %v", err)
+				logging.Warn("Failed to inject AWS proxy sidecar", "error", err)
 			}
 		}
 	}
@@ -1425,10 +1425,10 @@ func (c *TaskConverter) applyCloudWatchLogsConfiguration(pod *corev1.Pod, contai
 
 			// Create log group and stream
 			if err := c.cloudWatchIntegration.CreateLogGroup(logGroupName); err != nil {
-				log.Printf("Warning: Failed to create log group %s: %v", logGroupName, err)
+				logging.Warn("Failed to create log group", "logGroup", logGroupName, "error", err)
 			}
 			if err := c.cloudWatchIntegration.CreateLogStream(logGroupName, logStreamName); err != nil {
-				log.Printf("Warning: Failed to create log stream %s/%s: %v", logGroupName, logStreamName, err)
+				logging.Warn("Failed to create log stream", "logGroup", logGroupName, "logStream", logStreamName, "error", err)
 			}
 		}
 	}

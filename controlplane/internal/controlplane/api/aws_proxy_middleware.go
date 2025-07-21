@@ -1,11 +1,11 @@
 package api
 
 import (
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // AWSProxyRouter routes AWS API calls to appropriate handlers
@@ -60,8 +60,8 @@ func ShouldProxyToLocalStack(r *http.Request, localStackManager localstack.Manag
 	
 	// Debug log
 	if r.Header.Get("X-Amz-Target") != "" {
-		log.Printf("ShouldProxyToLocalStack: healthy=%v, isAWS=%v, isECS=%v, X-Amz-Target=%s", 
-			healthy, isAWS, isECS, r.Header.Get("X-Amz-Target"))
+		logging.Debug("ShouldProxyToLocalStack",
+			"healthy", healthy, "isAWS", isAWS, "isECS", isECS, "target", r.Header.Get("X-Amz-Target"))
 	}
 	
 	if !healthy || !isAWS || isECS {
