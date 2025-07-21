@@ -13,9 +13,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
-	"k8s.io/klog/v2"
 )
 
 // Target health states
@@ -605,7 +605,7 @@ func (api *ELBv2APIImpl) DeleteListener(ctx context.Context, input *generated_el
 	// Delete from Kubernetes integration first if available
 	if api.elbv2Integration != nil {
 		if err := api.elbv2Integration.DeleteListener(ctx, input.ListenerArn); err != nil {
-			klog.V(2).Infof("Failed to delete listener from Kubernetes: %v", err)
+			logging.Debug("Failed to delete listener from Kubernetes", "error", err)
 			// Don't fail the operation if K8s deletion fails
 		}
 	}
@@ -826,7 +826,7 @@ func (api *ELBv2APIImpl) CreateRule(ctx context.Context, input *generated_elbv2.
 				
 				// Sync rules to IngressRoute
 				if err := ruleSyncable.SyncRulesToListener(ctx, api.storage, rule.ListenerArn, lbName, port); err != nil {
-					klog.V(2).Infof("Failed to sync rules to IngressRoute: %v", err)
+					logging.Debug("Failed to sync rules to IngressRoute", "error", err)
 				}
 			}
 		}
@@ -896,7 +896,7 @@ func (api *ELBv2APIImpl) DeleteRule(ctx context.Context, input *generated_elbv2.
 				
 				// Sync rules to IngressRoute
 				if err := ruleSyncable.SyncRulesToListener(ctx, api.storage, listenerArn, lbName, port); err != nil {
-					klog.V(2).Infof("Failed to sync rules to IngressRoute after delete: %v", err)
+					logging.Debug("Failed to sync rules to IngressRoute after delete", "error", err)
 				}
 			}
 		}
@@ -1193,7 +1193,7 @@ func (api *ELBv2APIImpl) ModifyListener(ctx context.Context, input *generated_el
 
 		// Update listener in Kubernetes
 		if _, err := api.elbv2Integration.CreateListener(ctx, listener.LoadBalancerArn, listener.Port, listener.Protocol, targetGroupArn); err != nil {
-			klog.V(2).Infof("Failed to update listener in Kubernetes: %v", err)
+			logging.Debug("Failed to update listener in Kubernetes", "error", err)
 			// Don't fail the operation if K8s update fails
 		}
 	}
@@ -1348,7 +1348,7 @@ func (api *ELBv2APIImpl) ModifyTargetGroup(ctx context.Context, input *generated
 	if api.elbv2Integration != nil {
 		// For now, we log a message about K8s update
 		// In the future, we might need to update Service annotations or other K8s resources
-		klog.V(2).Infof("Target group %s updated, Kubernetes resources may need manual update", targetGroup.ARN)
+		logging.Debug("Target group updated, Kubernetes resources may need manual update", "targetGroupArn", targetGroup.ARN)
 	}
 
 	// Return updated target group
@@ -1520,9 +1520,9 @@ func (api *ELBv2APIImpl) performHealthCheck(ctx context.Context, target *storage
 	if api.elbv2Integration != nil {
 		healthState, err := api.elbv2Integration.CheckTargetHealthWithK8s(ctx, target.ID, healthCheckPort, targetGroup.ARN)
 		if err != nil {
-			klog.V(2).Infof("Kubernetes health check failed for target %s: %v, falling back to legacy check", target.ID, err)
+			logging.Debug("Kubernetes health check failed for target, falling back to legacy check", "targetId", target.ID, "error", err)
 		} else {
-			klog.V(2).Infof("Kubernetes health check for target %s returned: %s", target.ID, healthState)
+			logging.Debug("Kubernetes health check for target returned", "targetId", target.ID, "healthState", healthState)
 			return healthState
 		}
 	}

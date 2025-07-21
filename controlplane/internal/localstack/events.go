@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // Event represents a LocalStack event
@@ -91,7 +91,7 @@ func (em *eventMonitor) Start(ctx context.Context) error {
 		return fmt.Errorf("event monitor is already running")
 	}
 
-	klog.Info("Starting LocalStack event monitoring")
+	logging.Info("Starting LocalStack event monitoring")
 	em.isRunning = true
 
 	// Start event polling in a goroutine
@@ -106,7 +106,7 @@ func (em *eventMonitor) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	klog.Info("Stopping LocalStack event monitoring")
+	logging.Info("Stopping LocalStack event monitoring")
 	close(em.stopCh)
 	em.isRunning = false
 
@@ -116,7 +116,7 @@ func (em *eventMonitor) Stop(ctx context.Context) error {
 // Subscribe subscribes an event processor to events
 func (em *eventMonitor) Subscribe(processor EventProcessor) {
 	em.processors = append(em.processors, processor)
-	klog.V(2).Infof("Subscribed event processor with filter: %+v", processor.GetFilter())
+	logging.Debug("Subscribed event processor", "filter", processor.GetFilter())
 }
 
 // Unsubscribe unsubscribes an event processor
@@ -124,7 +124,7 @@ func (em *eventMonitor) Unsubscribe(processor EventProcessor) {
 	for i, p := range em.processors {
 		if p == processor {
 			em.processors = append(em.processors[:i], em.processors[i+1:]...)
-			klog.V(2).Info("Unsubscribed event processor")
+			logging.Debug("Unsubscribed event processor")
 			break
 		}
 	}
@@ -151,7 +151,7 @@ func (em *eventMonitor) pollEvents(ctx context.Context) {
 func (em *eventMonitor) fetchAndProcessEvents(ctx context.Context) {
 	// Check if LocalStack is healthy
 	if !em.manager.IsHealthy() {
-		klog.V(4).Info("LocalStack is not healthy, skipping event fetch")
+		logging.Debug("LocalStack is not healthy, skipping event fetch")
 		return
 	}
 
@@ -169,7 +169,7 @@ func (em *eventMonitor) simulateECSEvents(ctx context.Context) {
 	// 2. Query for ECS-related events
 	// 3. Parse the events and convert them to our Event struct
 
-	klog.V(5).Info("Simulating LocalStack events (placeholder)")
+	logging.Debug("Simulating LocalStack events (placeholder)")
 
 	// Example: Simulate a task state change event
 	event := &Event{
@@ -190,7 +190,7 @@ func (em *eventMonitor) simulateECSEvents(ctx context.Context) {
 	for _, processor := range em.processors {
 		if em.shouldProcessEvent(event, processor.GetFilter()) {
 			if err := processor.ProcessEvent(ctx, event); err != nil {
-				klog.Errorf("Failed to process event with processor: %v", err)
+				logging.Error("Failed to process event with processor", "error", err)
 			}
 		}
 	}

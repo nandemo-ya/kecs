@@ -8,7 +8,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 
 	iamapi "github.com/nandemo-ya/kecs/controlplane/internal/iam/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
@@ -140,7 +140,7 @@ func (i *integration) CreateTaskRole(taskDefArn, roleName string, trustPolicy st
 		TaskDefinitionArn:  taskDefArn,
 	}
 
-	klog.Infof("Created IAM role %s and ServiceAccount %s for task definition %s", roleName, serviceAccountName, taskDefArn)
+	logging.Info("Created IAM role and ServiceAccount for task definition", "roleName", roleName, "serviceAccount", serviceAccountName, "taskDefArn", taskDefArn)
 	return nil
 }
 
@@ -194,7 +194,7 @@ func (i *integration) CreateTaskExecutionRole(roleName string) error {
 		PolicyArn: "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
 	})
 	if err != nil {
-		klog.Warningf("Failed to attach managed policy (this may be normal in LocalStack): %v", err)
+		logging.Warn("Failed to attach managed policy (this may be normal in LocalStack)", "error", err)
 		// Create a custom policy instead
 		return i.createExecutionRolePolicy(roleName)
 	}
@@ -214,7 +214,7 @@ func (i *integration) AttachPolicyToRole(roleName, policyArn string) error {
 		return fmt.Errorf("failed to attach policy: %w", err)
 	}
 
-	klog.Infof("Attached policy %s to role %s", policyArn, roleName)
+	logging.Info("Attached policy to role", "policyArn", policyArn, "roleName", roleName)
 	return nil
 }
 
@@ -231,7 +231,7 @@ func (i *integration) CreateInlinePolicy(roleName, policyName, policyDocument st
 		return fmt.Errorf("failed to create inline policy: %w", err)
 	}
 
-	klog.Infof("Created inline policy %s for role %s", policyName, roleName)
+	logging.Info("Created inline policy for role", "policyName", policyName, "roleName", roleName)
 	return nil
 }
 
@@ -257,7 +257,7 @@ func (i *integration) DeleteRole(roleName string) error {
 	if mapping != nil {
 		err := i.kubeClient.CoreV1().ServiceAccounts(mapping.Namespace).Delete(ctx, mapping.ServiceAccountName, metav1.DeleteOptions{})
 		if err != nil {
-			klog.Warningf("Failed to delete ServiceAccount: %v", err)
+			logging.Warn("Failed to delete ServiceAccount", "error", err)
 		}
 
 		delete(i.roleMappings, roleName)

@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // RuleManager manages the synchronization between ELBv2 rules and Traefik IngressRoute rules
@@ -36,7 +36,7 @@ func NewRuleManager(dynamicClient dynamic.Interface, store storage.ELBv2Store) *
 // SyncRulesForListener synchronizes all rules for a listener to Traefik IngressRoute
 func (r *RuleManager) SyncRulesForListener(ctx context.Context, storage storage.Storage, listenerArn string, lbName string, port int32) error {
 	if r.dynamicClient == nil {
-		klog.V(2).Infof("No dynamicClient available, skipping rule sync")
+		logging.Debug("No dynamicClient available, skipping rule sync")
 		return nil
 	}
 
@@ -83,7 +83,7 @@ func (r *RuleManager) SyncRulesForListener(ctx context.Context, storage storage.
 		return fmt.Errorf("failed to update IngressRoute: %w", err)
 	}
 
-	klog.V(2).Infof("Successfully synced %d rules for listener %s", len(rules), listenerArn)
+	logging.Debug("Successfully synced rules for listener", "ruleCount", len(rules), "listenerArn", listenerArn)
 	return nil
 }
 
@@ -121,7 +121,7 @@ func (r *RuleManager) convertRulesToRoutes(rules []*storage.ELBv2Rule, storageIn
 	for _, rule := range sortedRules {
 		route, err := r.convertRuleToRoute(rule, storageInstance, ctx)
 		if err != nil {
-			klog.Errorf("Failed to convert rule %s: %v", rule.ARN, err)
+			logging.Error("Failed to convert rule", "ruleArn", rule.ARN, "error", err)
 			continue
 		}
 		if route != nil {
@@ -175,12 +175,12 @@ func (r *RuleManager) convertRuleToRoute(rule *storage.ELBv2Rule, storageInstanc
 	// Convert actions to weighted services
 	services, err := r.weightedManager.ConvertActionsToWeightedServices(actions, resolver)
 	if err != nil {
-		klog.V(2).Infof("Failed to convert actions for rule %s: %v", rule.ARN, err)
+		logging.Debug("Failed to convert actions for rule", "ruleArn", rule.ARN, "error", err)
 		return nil, nil
 	}
 
 	if len(services) == 0 {
-		klog.V(2).Infof("Rule %s has no forward action, skipping", rule.ARN)
+		logging.Debug("Rule has no forward action, skipping", "ruleArn", rule.ARN)
 		return nil, nil
 	}
 

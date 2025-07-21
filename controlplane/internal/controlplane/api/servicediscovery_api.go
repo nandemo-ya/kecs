@@ -6,8 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"k8s.io/klog/v2"
-
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
 )
 
@@ -128,7 +127,7 @@ func (api *ServiceDiscoveryAPI) handleCreatePrivateDnsNamespace(w http.ResponseW
 	// Create namespace
 	namespace, err := api.manager.CreatePrivateDnsNamespace(r.Context(), req.Name, req.Vpc, req.Properties)
 	if err != nil {
-		klog.Errorf("Failed to create namespace: %v", err)
+		logging.Error("Failed to create namespace", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -153,7 +152,7 @@ func (api *ServiceDiscoveryAPI) handleCreateService(w http.ResponseWriter, r *ht
 	// Create service
 	service, err := api.manager.CreateService(r.Context(), req.Name, req.NamespaceId, req.DnsConfig, req.HealthCheckConfig)
 	if err != nil {
-		klog.Errorf("Failed to create service: %v", err)
+		logging.Error("Failed to create service", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -177,7 +176,7 @@ func (api *ServiceDiscoveryAPI) handleRegisterInstance(w http.ResponseWriter, r 
 	// Register instance
 	instance, err := api.manager.RegisterInstance(r.Context(), req.ServiceId, req.InstanceId, req.Attributes)
 	if err != nil {
-		klog.Errorf("Failed to register instance: %v", err)
+		logging.Error("Failed to register instance", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -201,7 +200,7 @@ func (api *ServiceDiscoveryAPI) handleDeregisterInstance(w http.ResponseWriter, 
 
 	// Deregister instance
 	if err := api.manager.DeregisterInstance(r.Context(), req.ServiceId, req.InstanceId); err != nil {
-		klog.Errorf("Failed to deregister instance: %v", err)
+		logging.Error("Failed to deregister instance", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -226,7 +225,7 @@ func (api *ServiceDiscoveryAPI) handleDiscoverInstances(w http.ResponseWriter, r
 	// Discover instances
 	resp, err := api.manager.DiscoverInstances(r.Context(), &req)
 	if err != nil {
-		klog.Errorf("Failed to discover instances: %v", err)
+		logging.Error("Failed to discover instances", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

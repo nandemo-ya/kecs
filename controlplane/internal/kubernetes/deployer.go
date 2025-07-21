@@ -15,9 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
-
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // ResourceDeployer handles deployment of Kubernetes resources
@@ -50,7 +49,7 @@ func NewResourceDeployerWithConfig(client kubernetes.Interface, config *rest.Con
 
 // DeployControlPlane deploys all control plane resources
 func (d *ResourceDeployer) DeployControlPlane(ctx context.Context, config *resources.ControlPlaneConfig) error {
-	klog.Info("Deploying KECS control plane resources")
+	logging.Info("Deploying KECS control plane resources")
 	
 	// Create resources
 	res := resources.CreateControlPlaneResources(config)
@@ -95,13 +94,13 @@ func (d *ResourceDeployer) DeployControlPlane(ctx context.Context, config *resou
 		return fmt.Errorf("failed to create deployment: %w", err)
 	}
 	
-	klog.Info("Control plane resources deployed successfully")
+	logging.Info("Control plane resources deployed successfully")
 	return nil
 }
 
 // DeployTraefik deploys all Traefik resources
 func (d *ResourceDeployer) DeployTraefik(ctx context.Context, config *resources.TraefikConfig) error {
-	klog.Info("Deploying Traefik gateway resources")
+	logging.Info("Deploying Traefik gateway resources")
 	
 	// Skip CRD deployment - using file-based configuration instead
 	// CRDs are not needed with file provider
@@ -146,13 +145,13 @@ func (d *ResourceDeployer) DeployTraefik(ctx context.Context, config *resources.
 	// Skip IngressRoute deployment - using file-based configuration
 	// Routes are defined in the dynamic ConfigMap instead
 	
-	klog.Info("Traefik resources deployed successfully")
+	logging.Info("Traefik resources deployed successfully")
 	return nil
 }
 
 // WaitForDeploymentReady waits for a deployment to become ready
 func (d *ResourceDeployer) WaitForDeploymentReady(ctx context.Context, namespace, name string, timeout time.Duration) error {
-	klog.Infof("Waiting for deployment %s/%s to be ready", namespace, name)
+	logging.Info("Waiting for deployment to be ready", "namespace", namespace, "name", name)
 	
 	return wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
 		deployment, err := d.client.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
@@ -178,7 +177,7 @@ func (d *ResourceDeployer) applyNamespace(ctx context.Context, ns *corev1.Namesp
 			if err != nil {
 				return err
 			}
-			klog.Infof("Created namespace %s", ns.Name)
+			logging.Info("Created namespace", "name", ns.Name)
 			return nil
 		}
 		return err
@@ -190,7 +189,7 @@ func (d *ResourceDeployer) applyNamespace(ctx context.Context, ns *corev1.Namesp
 	if err != nil {
 		return err
 	}
-	klog.Infof("Updated namespace %s", ns.Name)
+	logging.Info("Updated namespace", "name", ns.Name)
 	return nil
 }
 
@@ -203,7 +202,7 @@ func (d *ResourceDeployer) applyServiceAccount(ctx context.Context, sa *corev1.S
 			if err != nil {
 				return err
 			}
-			klog.Infof("Created service account %s/%s", sa.Namespace, sa.Name)
+			logging.Info("Created service account", "namespace", sa.Namespace, "name", sa.Name)
 			return nil
 		}
 		return err
@@ -215,7 +214,7 @@ func (d *ResourceDeployer) applyServiceAccount(ctx context.Context, sa *corev1.S
 	if err != nil {
 		return err
 	}
-	klog.Infof("Updated service account %s/%s", sa.Namespace, sa.Name)
+	logging.Info("Updated service account", "namespace", sa.Namespace, "name", sa.Name)
 	return nil
 }
 
@@ -228,7 +227,7 @@ func (d *ResourceDeployer) applyClusterRole(ctx context.Context, cr *rbacv1.Clus
 			if err != nil {
 				return err
 			}
-			klog.Infof("Created cluster role %s", cr.Name)
+			logging.Info("Created cluster role", "name", cr.Name)
 			return nil
 		}
 		return err
@@ -241,7 +240,7 @@ func (d *ResourceDeployer) applyClusterRole(ctx context.Context, cr *rbacv1.Clus
 	if err != nil {
 		return err
 	}
-	klog.Infof("Updated cluster role %s", cr.Name)
+	logging.Info("Updated cluster role", "name", cr.Name)
 	return nil
 }
 
@@ -254,7 +253,7 @@ func (d *ResourceDeployer) applyClusterRoleBinding(ctx context.Context, crb *rba
 			if err != nil {
 				return err
 			}
-			klog.Infof("Created cluster role binding %s", crb.Name)
+			logging.Info("Created cluster role binding", "name", crb.Name)
 			return nil
 		}
 		return err
@@ -268,7 +267,7 @@ func (d *ResourceDeployer) applyClusterRoleBinding(ctx context.Context, crb *rba
 	if err != nil {
 		return err
 	}
-	klog.Infof("Updated cluster role binding %s", crb.Name)
+	logging.Info("Updated cluster role binding", "name", crb.Name)
 	return nil
 }
 
@@ -281,7 +280,7 @@ func (d *ResourceDeployer) applyConfigMap(ctx context.Context, cm *corev1.Config
 			if err != nil {
 				return err
 			}
-			klog.Infof("Created config map %s/%s", cm.Namespace, cm.Name)
+			logging.Info("Created config map", "namespace", cm.Namespace, "name", cm.Name)
 			return nil
 		}
 		return err
@@ -294,7 +293,7 @@ func (d *ResourceDeployer) applyConfigMap(ctx context.Context, cm *corev1.Config
 	if err != nil {
 		return err
 	}
-	klog.Infof("Updated config map %s/%s", cm.Namespace, cm.Name)
+	logging.Info("Updated config map", "namespace", cm.Namespace, "name", cm.Name)
 	return nil
 }
 
@@ -307,7 +306,7 @@ func (d *ResourceDeployer) applyService(ctx context.Context, svc *corev1.Service
 			if err != nil {
 				return err
 			}
-			klog.Infof("Created service %s/%s", svc.Namespace, svc.Name)
+			logging.Info("Created service", "namespace", svc.Namespace, "name", svc.Name)
 			return nil
 		}
 		return err
@@ -332,7 +331,7 @@ func (d *ResourceDeployer) applyService(ctx context.Context, svc *corev1.Service
 	if err != nil {
 		return err
 	}
-	klog.Infof("Updated service %s/%s", svc.Namespace, svc.Name)
+	logging.Info("Updated service", "namespace", svc.Namespace, "name", svc.Name)
 	return nil
 }
 
@@ -345,14 +344,14 @@ func (d *ResourceDeployer) applyPVC(ctx context.Context, pvc *corev1.PersistentV
 			if err != nil {
 				return err
 			}
-			klog.Infof("Created PVC %s/%s", pvc.Namespace, pvc.Name)
+			logging.Info("Created PVC", "namespace", pvc.Namespace, "name", pvc.Name)
 			return nil
 		}
 		return err
 	}
 	
 	// PVCs are mostly immutable, so we don't update
-	klog.V(2).Infof("PVC %s/%s already exists, skipping update", pvc.Namespace, pvc.Name)
+	logging.Debug("PVC already exists, skipping update", "namespace", pvc.Namespace, "name", pvc.Name)
 	return nil
 }
 
@@ -365,7 +364,7 @@ func (d *ResourceDeployer) applyDeployment(ctx context.Context, deploy *appsv1.D
 			if err != nil {
 				return err
 			}
-			klog.Infof("Created deployment %s/%s", deploy.Namespace, deploy.Name)
+			logging.Info("Created deployment", "namespace", deploy.Namespace, "name", deploy.Name)
 			return nil
 		}
 		return err
@@ -378,13 +377,13 @@ func (d *ResourceDeployer) applyDeployment(ctx context.Context, deploy *appsv1.D
 	if err != nil {
 		return err
 	}
-	klog.Infof("Updated deployment %s/%s", deploy.Namespace, deploy.Name)
+	logging.Info("Updated deployment", "namespace", deploy.Namespace, "name", deploy.Name)
 	return nil
 }
 
 // deployTraefikCRDs deploys Traefik CRDs
 func (d *ResourceDeployer) deployTraefikCRDs(ctx context.Context) error {
-	klog.Info("Deploying Traefik CRDs")
+	logging.Info("Deploying Traefik CRDs")
 	
 	// Create IngressRoute CRD
 	ingressRouteCRD := &apiextensionsv1.CustomResourceDefinition{
@@ -475,7 +474,7 @@ func (d *ResourceDeployer) deployTraefikCRDs(ctx context.Context) error {
 		return fmt.Errorf("failed to create IngressRoute CRD: %w", err)
 	}
 	
-	klog.Info("Traefik CRDs deployed successfully")
+	logging.Info("Traefik CRDs deployed successfully")
 	return nil
 }
 
@@ -488,7 +487,7 @@ func (d *ResourceDeployer) applyCRD(ctx context.Context, crd *apiextensionsv1.Cu
 			if err != nil {
 				return err
 			}
-			klog.Infof("Created CRD %s", crd.Name)
+			logging.Info("Created CRD", "name", crd.Name)
 			return nil
 		}
 		return err
@@ -501,17 +500,17 @@ func (d *ResourceDeployer) applyCRD(ctx context.Context, crd *apiextensionsv1.Cu
 	if err != nil {
 		return err
 	}
-	klog.Infof("Updated CRD %s", crd.Name)
+	logging.Info("Updated CRD", "name", crd.Name)
 	return nil
 }
 
 // deployTraefikRoutes deploys Traefik IngressRoute resources
 func (d *ResourceDeployer) deployTraefikRoutes(ctx context.Context) error {
-	klog.Info("Deploying Traefik routes")
+	logging.Info("Deploying Traefik routes")
 	
 	// For now, we'll skip the actual IngressRoute deployment as it requires dynamic client
 	// This can be implemented later with unstructured resources
-	klog.Info("Traefik routes deployment skipped (requires dynamic client)")
+	logging.Info("Traefik routes deployment skipped (requires dynamic client)")
 	
 	return nil
 }

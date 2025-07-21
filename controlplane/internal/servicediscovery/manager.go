@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // Manager manages service discovery operations
@@ -106,7 +106,7 @@ func (m *manager) CreatePrivateDnsNamespace(ctx context.Context, name, vpc strin
 	}
 	m.dnsToK8sNamespace[name] = k8sNamespace
 
-	klog.Infof("Created private DNS namespace: %s (ID: %s)", name, namespaceID)
+	logging.Info("Created private DNS namespace", "name", name, "id", namespaceID)
 
 	return namespace, nil
 }
@@ -155,7 +155,7 @@ func (m *manager) DeleteNamespace(ctx context.Context, namespaceID string) error
 	delete(m.namespaces, namespaceID)
 	delete(m.dnsToK8sNamespace, namespace.Name)
 
-	klog.Infof("Deleted namespace: %s", namespaceID)
+	logging.Info("Deleted namespace", "namespaceID", namespaceID)
 
 	return nil
 }
@@ -200,7 +200,7 @@ func (m *manager) CreateService(ctx context.Context, name, namespaceID string, d
 	// Update namespace service count
 	namespace.ServiceCount++
 
-	klog.Infof("Created service: %s in namespace %s (ID: %s)", name, namespaceID, serviceID)
+	logging.Info("Created service in namespace", "name", name, "namespaceID", namespaceID, "serviceID", serviceID)
 
 	return service, nil
 }
@@ -241,7 +241,7 @@ func (m *manager) DeleteService(ctx context.Context, serviceID string) error {
 	delete(m.services, serviceID)
 	delete(m.instances, serviceID)
 
-	klog.Infof("Deleted service: %s", serviceID)
+	logging.Info("Deleted service", "serviceID", serviceID)
 
 	return nil
 }
@@ -282,11 +282,11 @@ func (m *manager) RegisterInstance(ctx context.Context, serviceID string, instan
 	m.instances[serviceID][instanceID] = instance
 	service.InstanceCount++
 
-	klog.Infof("Registered instance %s with service %s", instanceID, serviceID)
+	logging.Info("Registered instance with service", "instanceID", instanceID, "serviceID", serviceID)
 
 	// Create/update Kubernetes Endpoints
 	if err := m.updateKubernetesEndpoints(ctx, service, m.instances[serviceID]); err != nil {
-		klog.Errorf("Failed to update Kubernetes endpoints: %v", err)
+		logging.Error("Failed to update Kubernetes endpoints", "error", err)
 		// Don't fail the registration, just log the error
 	}
 
@@ -310,11 +310,11 @@ func (m *manager) DeregisterInstance(ctx context.Context, serviceID string, inst
 	delete(m.instances[serviceID], instanceID)
 	service.InstanceCount--
 
-	klog.Infof("Deregistered instance %s from service %s", instanceID, serviceID)
+	logging.Info("Deregistered instance from service", "instanceID", instanceID, "serviceID", serviceID)
 
 	// Update Kubernetes Endpoints
 	if err := m.updateKubernetesEndpoints(ctx, service, m.instances[serviceID]); err != nil {
-		klog.Errorf("Failed to update Kubernetes endpoints: %v", err)
+		logging.Error("Failed to update Kubernetes endpoints", "error", err)
 	}
 
 	return nil
@@ -399,7 +399,7 @@ func (m *manager) UpdateInstanceHealthStatus(ctx context.Context, serviceID, ins
 	instance.HealthStatus = status
 	instance.UpdatedAt = time.Now()
 
-	klog.V(2).Infof("Updated health status for instance %s to %s", instanceID, status)
+	logging.Debug("Updated health status for instance", "instanceID", instanceID, "status", status)
 
 	return nil
 }

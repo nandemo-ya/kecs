@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // ManifestApplier handles applying Kubernetes manifests
@@ -120,7 +120,7 @@ func (ma *ManifestApplier) ApplyManifest(ctx context.Context, data []byte) error
 			return fmt.Errorf("failed to apply %s/%s: %w", obj.GetKind(), obj.GetName(), err)
 		}
 
-		klog.Infof("Applied %s/%s in namespace %s", obj.GetKind(), obj.GetName(), obj.GetNamespace())
+		logging.Info("Applied object", "kind", obj.GetKind(), "name", obj.GetName(), "namespace", obj.GetNamespace())
 	}
 
 	return nil
@@ -314,7 +314,7 @@ func (ma *ManifestApplier) applyPVC(ctx context.Context, pvc *corev1.PersistentV
 	}
 
 	// PVCs are mostly immutable, so we don't update
-	klog.V(2).Infof("PVC %s/%s already exists, skipping update", pvc.Namespace, pvc.Name)
+	logging.Debug("PVC already exists, skipping update", "namespace", pvc.Namespace, "name", pvc.Name)
 	return nil
 }
 
@@ -364,7 +364,7 @@ func (ma *ManifestApplier) applyCRD(ctx context.Context, crd *apiextensionsv1.Cu
 func (ma *ManifestApplier) applyUnstructuredObject(ctx context.Context, obj *unstructured.Unstructured) error {
 	// If dynamic client is not available, skip
 	if ma.dynamicClient == nil {
-		klog.V(2).Infof("Skipping unstructured object %s/%s (dynamic client not available)", obj.GetKind(), obj.GetName())
+		logging.Debug("Skipping unstructured object (dynamic client not available)", "kind", obj.GetKind(), "name", obj.GetName())
 		return nil
 	}
 
@@ -372,7 +372,7 @@ func (ma *ManifestApplier) applyUnstructuredObject(ctx context.Context, obj *uns
 	gvk := obj.GroupVersionKind()
 	gvr, err := ma.getGVRFromGVK(gvk)
 	if err != nil {
-		klog.Warningf("Failed to get GVR for %s/%s: %v", obj.GetKind(), obj.GetName(), err)
+		logging.Warn("Failed to get GVR for object", "kind", obj.GetKind(), "name", obj.GetName(), "error", err)
 		return nil
 	}
 

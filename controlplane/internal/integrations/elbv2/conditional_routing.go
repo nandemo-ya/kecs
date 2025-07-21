@@ -10,7 +10,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // ConditionalRoutingManager manages complex conditional routing patterns
@@ -86,7 +86,7 @@ func (c *ConditionalRoutingManager) CreateConditionalRoute(ctx context.Context, 
 		return nil, err
 	}
 	
-	klog.V(2).Infof("Created conditional route %s with priority %d", route.Name, *route.Priority)
+	logging.Debug("Created conditional route", "name", route.Name, "priority", *route.Priority)
 	return rule, nil
 }
 
@@ -291,7 +291,7 @@ func (c *ConditionalRoutingManager) AnalyzeConditionalRoutes(ctx context.Context
 	for _, rule := range rules {
 		conditions, err := c.ruleConverter.ConvertRuleConditionsFromJSON(rule.Conditions)
 		if err != nil {
-			klog.V(2).Infof("Failed to parse conditions for rule %s: %v", rule.ARN, err)
+			logging.Debug("Failed to parse conditions for rule", "ruleArn", rule.ARN, "error", err)
 			continue
 		}
 		
@@ -354,7 +354,7 @@ func (c *ConditionalRoutingManager) flattenConditions(groups []ConditionalGroup)
 		if group.Operator == "AND" || group.Operator == "" {
 			conditions = append(conditions, group.Conditions...)
 		} else if group.Operator == "OR" {
-			klog.V(2).Infof("OR operations require multiple rules; only using first condition")
+			logging.Debug("OR operations require multiple rules; only using first condition")
 			if len(group.Conditions) > 0 {
 				conditions = append(conditions, group.Conditions[0])
 			}
@@ -485,7 +485,7 @@ func strPtr(s string) *string {
 func (c *ConditionalRoutingManager) serializeConditions(conditions []generated_elbv2.RuleCondition) string {
 	data, err := json.Marshal(conditions)
 	if err != nil {
-		klog.V(2).Infof("Failed to serialize conditions: %v", err)
+		logging.Debug("Failed to serialize conditions", "error", err)
 		return "[]"
 	}
 	return string(data)
@@ -495,7 +495,7 @@ func (c *ConditionalRoutingManager) serializeConditions(conditions []generated_e
 func (c *ConditionalRoutingManager) serializeActions(actions []generated_elbv2.Action) string {
 	data, err := json.Marshal(actions)
 	if err != nil {
-		klog.V(2).Infof("Failed to serialize actions: %v", err)
+		logging.Debug("Failed to serialize actions", "error", err)
 		return "[]"
 	}
 	return string(data)

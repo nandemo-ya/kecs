@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // updateKubernetesEndpoints updates Kubernetes endpoints for service discovery
@@ -55,7 +55,7 @@ func (m *manager) updateKubernetesEndpoints(ctx context.Context, service *Servic
 		if _, err := m.kubeClient.CoreV1().Services(k8sNamespace).Create(ctx, k8sService, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("failed to create Kubernetes service: %w", err)
 		}
-		klog.Infof("Created Kubernetes service %s/%s for service discovery", k8sNamespace, k8sServiceName)
+		logging.Info("Created Kubernetes service for service discovery", "namespace", k8sNamespace, "service", k8sServiceName)
 	}
 
 	// Update Endpoints
@@ -79,7 +79,7 @@ func (m *manager) updateKubernetesEndpoints(ctx context.Context, service *Servic
 		}
 	}
 
-	klog.V(2).Infof("Updated endpoints for service %s with %d instances", k8sServiceName, len(instances))
+	logging.Debug("Updated endpoints for service", "service", k8sServiceName, "instanceCount", len(instances))
 
 	return nil
 }
@@ -133,7 +133,7 @@ func (m *manager) buildEndpointSubsets(instances map[string]*Instance, service *
 		}
 
 		if ipAddress == "" {
-			klog.Warningf("Instance %s has no IP address in attributes", instance.ID)
+			logging.Warn("Instance has no IP address in attributes", "instanceID", instance.ID)
 			continue
 		}
 

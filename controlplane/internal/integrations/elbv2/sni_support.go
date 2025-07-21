@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // SNIManager manages SNI configuration for HTTPS listeners
@@ -27,14 +27,14 @@ func NewSNIManager(dynamicClient dynamic.Interface) *SNIManager {
 // UpdateSNIConfiguration updates the TLS configuration for an IngressRoute based on host rules
 func (s *SNIManager) UpdateSNIConfiguration(ctx context.Context, ingressRouteName, namespace string, hostRules []string) error {
 	if s.dynamicClient == nil {
-		klog.V(2).Infof("No dynamicClient available, skipping SNI configuration")
+		logging.Debug("No dynamicClient available, skipping SNI configuration")
 		return nil
 	}
 
 	// Extract unique hosts from rules
 	hosts := s.extractHostsFromRules(hostRules)
 	if len(hosts) == 0 {
-		klog.V(2).Infof("No host rules found, skipping SNI configuration")
+		logging.Debug("No host rules found, skipping SNI configuration")
 		return nil
 	}
 
@@ -70,7 +70,7 @@ func (s *SNIManager) UpdateSNIConfiguration(ctx context.Context, ingressRouteNam
 		return fmt.Errorf("failed to update IngressRoute with SNI configuration: %w", err)
 	}
 
-	klog.V(2).Infof("Successfully updated SNI configuration for %d hosts", len(hosts))
+	logging.Debug("Successfully updated SNI configuration", "hostCount", len(hosts))
 	return nil
 }
 
@@ -259,7 +259,7 @@ func (s *SNIManager) CreateTLSSecret(ctx context.Context, namespace, secretName 
 		return fmt.Errorf("failed to create TLS secret: %w", err)
 	}
 
-	klog.V(2).Infof("Created TLS secret %s in namespace %s", secretName, namespace)
+	logging.Debug("Created TLS secret", "secretName", secretName, "namespace", namespace)
 	return nil
 }
 

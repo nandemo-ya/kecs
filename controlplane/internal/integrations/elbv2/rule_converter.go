@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // RuleConverter handles conversion between ELBv2 rules and Traefik routing rules
@@ -87,7 +87,7 @@ func (c *RuleConverter) convertConditionToMatch(condition *generated_elbv2.RuleC
 		case "source-ip":
 			return c.convertSourceIpToMatch(condition.Values), nil
 		default:
-			klog.V(2).Infof("Unsupported condition field: %s", *condition.Field)
+			logging.Debug("Unsupported condition field", "field", *condition.Field)
 			return "", nil
 		}
 	}

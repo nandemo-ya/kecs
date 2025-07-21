@@ -94,3 +94,16 @@ func Component(name string) *slog.Logger {
 func Operation(name string) *slog.Logger {
 	return With("operation", name)
 }
+
+// SetOutput sets the output writer for the global logger.
+// This is useful for redirecting or discarding log output.
+func SetOutput(w io.Writer) {
+	globalMu.Lock()
+	defer globalMu.Unlock()
+	
+	// Get current handler options from the existing logger if possible
+	opts := defaultTextOptions
+	
+	// Create new logger with the specified writer
+	globalLogger = slog.New(slog.NewTextHandler(w, opts))
+}

@@ -9,9 +9,8 @@ import (
 	"time"
 
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	s3api "github.com/nandemo-ya/kecs/controlplane/internal/s3/generated"
 )
 
@@ -56,7 +55,7 @@ func NewIntegrationWithClient(kubeClient kubernetes.Interface, localstackManager
 
 // DownloadFile downloads a file from S3
 func (i *integration) DownloadFile(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
-	klog.V(2).Infof("Downloading S3 object: s3://%s/%s", bucket, key)
+	logging.Debug("Downloading S3 object", "bucket", bucket, "key", key)
 
 	result, err := i.s3Client.GetObject(ctx, &s3api.GetObjectRequest{
 		Bucket: bucket,
@@ -72,7 +71,7 @@ func (i *integration) DownloadFile(ctx context.Context, bucket, key string) (io.
 
 // UploadFile uploads a file to S3
 func (i *integration) UploadFile(ctx context.Context, bucket, key string, reader io.Reader) error {
-	klog.V(2).Infof("Uploading S3 object: s3://%s/%s", bucket, key)
+	logging.Debug("Uploading S3 object", "bucket", bucket, "key", key)
 
 	// Read all data from reader to []byte
 	data, err := io.ReadAll(reader)
@@ -89,7 +88,7 @@ func (i *integration) UploadFile(ctx context.Context, bucket, key string, reader
 		return fmt.Errorf("failed to upload S3 object: %w", err)
 	}
 
-	klog.Infof("Successfully uploaded S3 object: s3://%s/%s", bucket, key)
+	logging.Info("Successfully uploaded S3 object", "bucket", bucket, "key", key)
 	return nil
 }
 
@@ -126,7 +125,7 @@ func (i *integration) HeadObject(ctx context.Context, bucket, key string) (*Obje
 
 // CreateBucket creates an S3 bucket if it doesn't exist
 func (i *integration) CreateBucket(ctx context.Context, bucket string) error {
-	klog.V(2).Infof("Creating S3 bucket: %s", bucket)
+	logging.Debug("Creating S3 bucket", "bucket", bucket)
 
 	input := &s3api.CreateBucketRequest{
 		Bucket: bucket,
@@ -145,19 +144,19 @@ func (i *integration) CreateBucket(ctx context.Context, bucket string) error {
 		// Check if bucket already exists
 		if strings.Contains(err.Error(), "BucketAlreadyExists") ||
 			strings.Contains(err.Error(), "BucketAlreadyOwnedByYou") {
-			klog.V(2).Infof("S3 bucket already exists: %s", bucket)
+			logging.Debug("S3 bucket already exists", "bucket", bucket)
 			return nil
 		}
 		return fmt.Errorf("failed to create S3 bucket: %w", err)
 	}
 
-	klog.Infof("Successfully created S3 bucket: %s", bucket)
+	logging.Info("Successfully created S3 bucket", "bucket", bucket)
 	return nil
 }
 
 // DeleteObject deletes an object from S3
 func (i *integration) DeleteObject(ctx context.Context, bucket, key string) error {
-	klog.V(2).Infof("Deleting S3 object: s3://%s/%s", bucket, key)
+	logging.Debug("Deleting S3 object", "bucket", bucket, "key", key)
 
 	_, err := i.s3Client.DeleteObject(ctx, &s3api.DeleteObjectRequest{
 		Bucket: bucket,
@@ -167,7 +166,7 @@ func (i *integration) DeleteObject(ctx context.Context, bucket, key string) erro
 		return fmt.Errorf("failed to delete S3 object: %w", err)
 	}
 
-	klog.Infof("Successfully deleted S3 object: s3://%s/%s", bucket, key)
+	logging.Info("Successfully deleted S3 object", "bucket", bucket, "key", key)
 	return nil
 }
 

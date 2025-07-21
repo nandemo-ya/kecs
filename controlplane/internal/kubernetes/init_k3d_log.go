@@ -5,7 +5,6 @@ import (
 	
 	"github.com/k3d-io/k3d/v5/pkg/logger"
 	"github.com/sirupsen/logrus"
-	klog "k8s.io/klog/v2"
 )
 
 func init() {
@@ -25,6 +24,5 @@ func init() {
 	// Disable all hooks
 	logrus.StandardLogger().Hooks = make(logrus.LevelHooks)
 	
-	// Also suppress klog which k3d might use
-	klog.SetOutput(io.Discard)
+	// Note: klog suppression is no longer needed as we don't use klog anymore
 }

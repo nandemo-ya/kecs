@@ -6,7 +6,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // SidecarProxy handles sidecar injection for AWS proxy
@@ -149,7 +149,7 @@ func (sp *SidecarProxy) InjectSidecar(pod *corev1.Pod) error {
 		return nil
 	}
 
-	klog.V(4).Infof("Injecting AWS proxy sidecar into pod %s/%s", pod.Namespace, pod.Name)
+	logging.Debug("Injecting AWS proxy sidecar into pod", "namespace", pod.Namespace, "name", pod.Name)
 
 	// Create sidecar container
 	sidecar := sp.CreateProxySidecar(pod)
@@ -207,7 +207,7 @@ func (sp *SidecarProxy) InjectSidecarPatches(pod *corev1.Pod) ([]PatchOperation,
 		return nil, nil
 	}
 
-	klog.V(4).Infof("Creating patches for AWS proxy sidecar injection into pod %s/%s", pod.Namespace, pod.Name)
+	logging.Debug("Creating patches for AWS proxy sidecar injection into pod", "namespace", pod.Namespace, "name", pod.Name)
 
 	patches := []PatchOperation{}
 

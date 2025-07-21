@@ -9,7 +9,7 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // localStackManager implements the Manager interface
@@ -40,16 +40,16 @@ func NewManager(config *Config, kubeClient kubernetes.Interface, kubeConfig *res
 		// When using Traefik, always use the proxy endpoint for health checks
 		// This works for both host mode and container mode
 		healthEndpoint = config.ProxyEndpoint
-		klog.Infof("Using Traefik proxy endpoint for health checker: %s", healthEndpoint)
+		logging.Info("Using Traefik proxy endpoint for health checker", "endpoint", healthEndpoint)
 	} else if config.ContainerMode {
 		// In container mode without Traefik, we can't use cluster-internal DNS
 		// Fall back to NodePort or other external access method
 		healthEndpoint = fmt.Sprintf("http://localhost:%d", config.Port)
-		klog.Infof("Container mode without Traefik: using localhost endpoint for health checker: %s", healthEndpoint)
+		logging.Info("Container mode without Traefik: using localhost endpoint for health checker", "endpoint", healthEndpoint)
 	} else {
 		// Host mode without Traefik
 		healthEndpoint = fmt.Sprintf("http://localhost:%d", config.Port)
-		klog.Infof("Host mode: using localhost endpoint for health checker: %s", healthEndpoint)
+		logging.Info("Host mode: using localhost endpoint for health checker", "endpoint", healthEndpoint)
 	}
 	healthChecker := NewHealthChecker(healthEndpoint)
 
@@ -79,7 +79,7 @@ func (m *localStackManager) Start(ctx context.Context) error {
 		return fmt.Errorf("LocalStack is already running")
 	}
 
-	klog.Info("Starting LocalStack...")
+	logging.Info("Starting LocalStack...")
 
 	// Create namespace if it doesn't exist
 	if err := m.kubeManager.CreateNamespace(ctx); err != nil {
@@ -121,16 +121,16 @@ func (m *localStackManager) Start(ctx context.Context) error {
 	if m.config.UseTraefik && m.config.ProxyEndpoint != "" {
 		// When using Traefik, always use the proxy endpoint
 		healthEndpoint = m.config.ProxyEndpoint
-		klog.Infof("Using Traefik proxy endpoint for runtime health checks: %s", healthEndpoint)
+		logging.Info("Using Traefik proxy endpoint for runtime health checks", "endpoint", healthEndpoint)
 	} else if m.config.ContainerMode {
 		// In container mode without Traefik, we can't use cluster-internal endpoint
 		// This configuration is not ideal - should use Traefik
 		healthEndpoint = fmt.Sprintf("http://localhost:%d", m.config.Port)
-		klog.Warningf("Container mode without Traefik: health checks may fail. Using: %s", healthEndpoint)
+		logging.Warn("Container mode without Traefik: health checks may fail", "endpoint", healthEndpoint)
 	} else {
 		// Host mode without Traefik
 		healthEndpoint = fmt.Sprintf("http://localhost:%d", m.config.Port)
-		klog.Infof("Host mode without Traefik: using localhost endpoint: %s", healthEndpoint)
+		logging.Info("Host mode without Traefik: using localhost endpoint", "endpoint", healthEndpoint)
 	}
 	
 	// Update the health checker with the correct endpoint
@@ -139,18 +139,18 @@ func (m *localStackManager) Start(ctx context.Context) error {
 	// Wait for LocalStack to output "Ready." in logs
 	// For Kubernetes deployment, wait for "Ready." in logs
 	if !m.config.ContainerMode {
-		klog.Info("Waiting for LocalStack to be ready (monitoring logs for Ready message)...")
+		logging.Info("Waiting for LocalStack to be ready (monitoring logs for Ready message)...")
 		readyCtx, readyCancel := context.WithTimeout(ctx, DefaultHealthTimeout)
 		defer readyCancel()
 
 		if kubeManager, ok := m.kubeManager.(*kubernetesManager); ok {
 			if err := kubeManager.WaitForLocalStackReady(readyCtx, DefaultHealthTimeout); err != nil {
-				klog.Warningf("Failed to detect Ready message: %v", err)
+				logging.Warn("Failed to detect Ready message", "error", err)
 				// Don't consider this a failure - LocalStack might still be usable
 				m.status.Running = true
 				m.status.Healthy = false
 			} else {
-				klog.Info("LocalStack is ready (detected Ready message in logs)")
+				logging.Info("LocalStack is ready (detected Ready message in logs)")
 				m.status.Running = true
 				m.status.Healthy = true
 			}
@@ -169,7 +169,7 @@ func (m *localStackManager) Start(ctx context.Context) error {
 	// Start health monitoring
 	go m.monitorHealth()
 
-	klog.Infof("LocalStack started successfully at %s", endpoint)
+	logging.Info("LocalStack started successfully", "endpoint", endpoint)
 	return nil
 }
 
@@ -182,7 +182,7 @@ func (m *localStackManager) Stop(ctx context.Context) error {
 		return fmt.Errorf("LocalStack is not running")
 	}
 
-	klog.Info("Stopping LocalStack...")
+	logging.Info("Stopping LocalStack...")
 
 	// Stop health monitoring
 	close(m.healthStop)
@@ -198,13 +198,13 @@ func (m *localStackManager) Stop(ctx context.Context) error {
 	m.status.Endpoint = ""
 	m.container = nil
 
-	klog.Info("LocalStack stopped successfully")
+	logging.Info("LocalStack stopped successfully")
 	return nil
 }
 
 // Restart restarts LocalStack
 func (m *localStackManager) Restart(ctx context.Context) error {
-	klog.Info("Restarting LocalStack...")
+	logging.Info("Restarting LocalStack...")
 
 	if err := m.Stop(ctx); err != nil {
 		return fmt.Errorf("failed to stop LocalStack: %w", err)
@@ -274,7 +274,7 @@ func (m *localStackManager) UpdateServices(services []string) error {
 	// Update status
 	m.status.EnabledServices = services
 
-	klog.Infof("Updated enabled services: %v", services)
+	logging.Info("Updated enabled services", "services", services)
 	return nil
 }
 
@@ -398,7 +398,7 @@ func (m *localStackManager) WaitForReady(ctx context.Context, timeout time.Durat
 
 	// For k8s deployment, skip HTTP health check
 	if !m.config.ContainerMode {
-		klog.Info("Skipping HTTP health check for k8s deployment - relying on pod readiness")
+		logging.Info("Skipping HTTP health check for k8s deployment - relying on pod readiness")
 		return nil
 	}
 
@@ -406,8 +406,8 @@ func (m *localStackManager) WaitForReady(ctx context.Context, timeout time.Durat
 	if err := m.healthChecker.WaitForHealthy(ctx, timeout); err != nil {
 		// Check if it's a DNS resolution error
 		if strings.Contains(err.Error(), "no such host") || strings.Contains(err.Error(), "dial tcp: lookup") {
-			klog.Warningf("LocalStack health check failed due to DNS resolution: %v", err)
-			klog.Info("LocalStack pod is running, continuing despite DNS issue")
+			logging.Warn("LocalStack health check failed due to DNS resolution", "error", err)
+			logging.Info("LocalStack pod is running, continuing despite DNS issue")
 			return nil
 		}
 		return err
@@ -432,7 +432,7 @@ func (m *localStackManager) waitForPodReady(ctx context.Context) error {
 		case <-ticker.C:
 			podName, err := m.kubeManager.GetLocalStackPod()
 			if err == nil && podName != "" {
-				klog.Infof("LocalStack pod %s is ready", podName)
+				logging.Info("LocalStack pod is ready", "pod", podName)
 				return nil
 			}
 		}
@@ -468,7 +468,7 @@ func (m *localStackManager) checkHealth() {
 		if m.kubeManager != nil {
 			podName, err := m.kubeManager.GetLocalStackPod()
 			if err != nil || podName == "" {
-				klog.Warningf("LocalStack pod not found: %v", err)
+				logging.Warn("LocalStack pod not found", "error", err)
 				m.status.Healthy = false
 				return
 			}
@@ -484,7 +484,7 @@ func (m *localStackManager) checkHealth() {
 
 	healthStatus, err := m.healthChecker.CheckHealth(ctx)
 	if err != nil {
-		klog.Errorf("Health check failed: %v", err)
+		logging.Error("Health check failed", "error", err)
 		m.status.Healthy = false
 		return
 	}
@@ -502,6 +502,6 @@ func (m *localStackManager) checkHealth() {
 	}
 
 	if !healthStatus.Healthy {
-		klog.Warningf("LocalStack is unhealthy: %s", healthStatus.Message)
+		logging.Warn("LocalStack is unhealthy", "message", healthStatus.Message)
 	}
 }
