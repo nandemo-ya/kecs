@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
@@ -159,7 +159,7 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 				if err := api.ssmIntegration.SyncParameters(ctx, ssmParams, namespace); err != nil {
 					// Log warning but don't fail the task creation
 					// This allows tasks to proceed even if parameter sync fails
-					log.Printf("Warning: Failed to sync SSM parameters for task %s: %v", taskID, err)
+					logging.Warn("Failed to sync SSM parameters for task", "taskId", taskID, "error", err)
 				}
 			}
 		}
@@ -172,7 +172,7 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 				namespace := getNamespaceFromCluster(cluster)
 				if err := api.secretsManagerIntegration.SyncSecrets(ctx, secretsManagerARNs, namespace); err != nil {
 					// Log warning but don't fail the task creation
-					log.Printf("Warning: Failed to sync Secrets Manager secrets for task %s: %v", taskID, err)
+					logging.Warn("Failed to sync Secrets Manager secrets for task", "taskId", taskID, "error", err)
 				}
 			}
 		}
@@ -215,7 +215,7 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 	if len(tasks) > 0 {
 		if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
 			// Log error but don't fail task creation
-			log.Printf("Warning: Failed to update cluster task count: %v", err)
+			logging.Warn("Failed to update cluster task count", "error", err)
 		}
 	}
 
@@ -289,7 +289,7 @@ func (api *DefaultECSAPI) StopTask(ctx context.Context, req *generated.StopTaskR
 		cluster.RunningTasksCount--
 		if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
 			// Log error but don't fail task stop
-			log.Printf("Warning: Failed to update cluster task count: %v", err)
+			logging.Warn("Failed to update cluster task count", "error", err)
 		}
 	}
 

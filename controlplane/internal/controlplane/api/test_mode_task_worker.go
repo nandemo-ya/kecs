@@ -3,12 +3,12 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -38,14 +38,14 @@ func (w *TestModeTaskWorker) Start(ctx context.Context) {
 	w.ticker = time.NewTicker(100 * time.Millisecond)
 
 	go func() {
-		log.Println("Test mode task worker: Started successfully, checking tasks every 100ms")
+		logging.Info("Test mode task worker: Started successfully, checking tasks every 100ms")
 		for {
 			select {
 			case <-ctx.Done():
-				log.Println("Test mode task worker: Stopping due to context cancellation")
+				logging.Info("Test mode task worker: Stopping due to context cancellation")
 				return
 			case <-w.done:
-				log.Println("Test mode task worker: Stopping")
+				logging.Info("Test mode task worker: Stopping")
 				return
 			case <-w.ticker.C:
 				w.processTasks(ctx)
@@ -67,7 +67,7 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 	// Get all clusters first
 	clusters, err := w.storage.ClusterStore().List(ctx)
 	if err != nil {
-		log.Printf("Test mode worker: Failed to list clusters: %v", err)
+		logging.Error("Test mode worker: Failed to list clusters", "error", err)
 		return
 	}
 
@@ -79,12 +79,12 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 		}
 		tasks, err := w.storage.TaskStore().List(ctx, cluster.ARN, filters)
 		if err != nil {
-			log.Printf("Test mode worker: Failed to list tasks for cluster %s: %v", cluster.Name, err)
+			logging.Error("Test mode worker: Failed to list tasks for cluster", "cluster", cluster.Name, "error", err)
 			continue
 		}
 		
 		if len(tasks) > 0 {
-			log.Printf("Test mode worker: Processing %d tasks for cluster %s", len(tasks), cluster.Name)
+			logging.Debug("Test mode worker: Processing tasks for cluster", "count", len(tasks), "cluster", cluster.Name)
 		}
 
 		for _, task := range tasks {
@@ -102,7 +102,7 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 				// Move to PENDING after a short delay
 				timeSinceCreated := time.Since(task.CreatedAt)
 				if timeSinceCreated > 50*time.Millisecond {
-					log.Printf("Test mode worker: Task %s transitioning from PROVISIONING to PENDING (age: %v)", task.ID, timeSinceCreated)
+					logging.Debug("Test mode worker: Task transitioning from PROVISIONING to PENDING", "taskId", task.ID, "age", timeSinceCreated)
 					task.LastStatus = "PENDING"
 					updated = true
 				}
@@ -112,7 +112,7 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 				// Check against CreatedAt since we don't have UpdatedAt
 				timeSinceCreated := time.Since(task.CreatedAt)
 				if timeSinceCreated > 100*time.Millisecond {
-					log.Printf("Test mode worker: Task %s transitioning from PENDING to RUNNING (age: %v)", task.ID, timeSinceCreated)
+					logging.Debug("Test mode worker: Task transitioning from PENDING to RUNNING", "taskId", task.ID, "age", timeSinceCreated)
 					task.LastStatus = "RUNNING"
 					task.StartedAt = &now
 					task.PullStartedAt = &now
@@ -189,9 +189,9 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 			if updated {
 				task.Version++
 				if err := w.storage.TaskStore().Update(ctx, task); err != nil {
-					log.Printf("Test mode worker: Failed to update task %s: %v", task.ID, err)
+					logging.Error("Test mode worker: Failed to update task", "taskId", task.ID, "error", err)
 				} else {
-					log.Printf("Test mode worker: Successfully updated task %s to status %s", task.ID, task.LastStatus)
+					logging.Debug("Test mode worker: Successfully updated task", "taskId", task.ID, "status", task.LastStatus)
 				}
 			}
 		}

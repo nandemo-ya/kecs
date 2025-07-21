@@ -1,9 +1,10 @@
 package api
 
 import (
-	"log"
 	"net/http"
 	"strings"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // CORSMiddleware adds CORS headers to responses
@@ -80,14 +81,14 @@ func LocalStackProxyMiddleware(next http.Handler, server *Server) http.Handler {
 		// Debug log
 		target := r.Header.Get("X-Amz-Target")
 		if target != "" {
-			log.Printf("[LocalStackProxyMiddleware] Request: Method=%s, Path=%s, X-Amz-Target=%s, Auth=%v",
-				r.Method, r.URL.Path, target, r.Header.Get("Authorization") != "")
+			logging.Debug("[LocalStackProxyMiddleware] Request",
+				"method", r.Method, "path", r.URL.Path, "target", target, "hasAuth", r.Header.Get("Authorization") != "")
 		}
 		
 		// Dynamically check if awsProxyRouter is available
 		if server.awsProxyRouter != nil && server.awsProxyRouter.LocalStackManager != nil && 
 		   ShouldProxyToLocalStack(r, server.awsProxyRouter.LocalStackManager) {
-			log.Printf("[LocalStackProxyMiddleware] Proxying to LocalStack: %s %s", r.Method, r.URL.Path)
+			logging.Debug("[LocalStackProxyMiddleware] Proxying to LocalStack", "method", r.Method, "path", r.URL.Path)
 			server.awsProxyRouter.AWSProxyHandler.ServeHTTP(w, r)
 			return
 		}

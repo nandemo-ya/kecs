@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
 	_ "github.com/marcboeker/go-duckdb/v2" // DuckDB driver
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -71,7 +71,7 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 
 // Initialize creates all necessary tables and indexes
 func (s *DuckDBStorage) Initialize(ctx context.Context) error {
-	log.Println("Initializing DuckDB storage...")
+	logging.Info("Initializing DuckDB storage")
 
 	// Migrate existing tables if needed
 	if err := s.migrateSchema(ctx); err != nil {
@@ -125,11 +125,11 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 
 	// Initialize prepared statements for common queries
 	if err := s.pool.InitializeCommonStatements(ctx); err != nil {
-		log.Printf("Warning: failed to initialize prepared statements: %v", err)
+		logging.Warn("Failed to initialize prepared statements", "error", err)
 		// Non-fatal error - continue initialization
 	}
 
-	log.Println("DuckDB storage initialized successfully")
+	logging.Info("DuckDB storage initialized successfully")
 	return nil
 }
 
@@ -420,7 +420,7 @@ func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 		return nil
 	}
 
-	log.Println("Migrating clusters table from JSON to VARCHAR columns...")
+	logging.Info("Migrating clusters table from JSON to VARCHAR columns")
 
 	// Create a transaction for the migration
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -511,7 +511,7 @@ func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 		return fmt.Errorf("failed to commit migration: %w", err)
 	}
 
-	log.Println("Successfully migrated clusters table")
+	logging.Info("Successfully migrated clusters table")
 	return nil
 }
 

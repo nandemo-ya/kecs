@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -59,37 +59,37 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	var taskDef *storage.TaskDefinition
 	taskDefArn := *req.TaskDefinition
 
-	log.Printf("DEBUG: Looking for task definition: %s", taskDefArn)
+	logging.Debug("Looking for task definition", "taskDefinition", taskDefArn)
 
 	if !strings.HasPrefix(taskDefArn, "arn:aws:ecs:") {
 		// Check if it's family:revision or just family
 		if strings.Contains(taskDefArn, ":") {
 			// family:revision format
 			taskDefArn = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", api.region, api.accountID, taskDefArn)
-			log.Printf("DEBUG: Trying to get task definition by ARN: %s", taskDefArn)
+			logging.Debug("Trying to get task definition by ARN", "arn", taskDefArn)
 			taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefArn)
 		} else {
 			// Just family - get latest
-			log.Printf("DEBUG: Trying to get latest task definition for family: %s", taskDefArn)
+			logging.Debug("Trying to get latest task definition for family", "family", taskDefArn)
 			taskDef, err = api.storage.TaskDefinitionStore().GetLatest(ctx, taskDefArn)
 			if taskDef != nil {
 				taskDefArn = taskDef.ARN
-				log.Printf("DEBUG: Found latest task definition: %s", taskDefArn)
+				logging.Debug("Found latest task definition", "arn", taskDefArn)
 			}
 		}
 	} else {
 		// Full ARN provided
-		log.Printf("DEBUG: Full ARN provided: %s", taskDefArn)
+		logging.Debug("Full ARN provided", "arn", taskDefArn)
 		taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefArn)
 	}
 
 	if err != nil {
-		log.Printf("DEBUG: Error getting task definition: %v", err)
+		logging.Debug("Error getting task definition", "error", err)
 		return nil, fmt.Errorf("task definition not found: %s", *req.TaskDefinition)
 	}
 
 	if taskDef == nil {
-		log.Printf("DEBUG: Task definition is nil")
+		logging.Debug("Task definition is nil")
 		return nil, fmt.Errorf("task definition not found: %s", *req.TaskDefinition)
 	}
 
@@ -162,7 +162,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	// In the new architecture, we use a single KECS instance (k3d cluster)
 	// ECS clusters are represented as Kubernetes namespaces within this instance
 	// So we don't need to check for individual k3d clusters per ECS cluster
-	log.Printf("Creating service in namespace for ECS cluster %s", cluster.Name)
+	logging.Info("Creating service in namespace for ECS cluster", "cluster", cluster.Name)
 
 	// Create service converter and manager
 	serviceConverter := converters.NewServiceConverter(api.region, api.accountID)
@@ -259,7 +259,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	cluster.ActiveServicesCount++
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
 		// Log error but don't fail service creation
-		log.Printf("Warning: Failed to update cluster service count: %v", err)
+		logging.Warn("Failed to update cluster service count", "error", err)
 	}
 
 	// Create Kubernetes Deployment and Service
@@ -277,15 +277,15 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	if len(req.ServiceRegistries) > 0 {
 		if err := api.registerServiceWithDiscovery(ctx, storageService, req.ServiceRegistries); err != nil {
 			// Log error but don't fail service creation
-			log.Printf("Warning: Failed to register service with service discovery: %v", err)
+			logging.Warn("Failed to register service with service discovery", "error", err)
 		}
 	}
 
 	// In test mode, create tasks immediately for the service
 	if config.GetBool("features.testMode") && storageService.DesiredCount > 0 {
-		log.Printf("Test mode: Creating %d tasks for service %s", storageService.DesiredCount, storageService.ServiceName)
+		logging.Info("Test mode: Creating tasks for service", "count", storageService.DesiredCount, "service", storageService.ServiceName)
 		if err := api.createTasksForService(ctx, storageService, taskDef, cluster); err != nil {
-			log.Printf("Warning: Failed to create tasks for service in test mode: %v", err)
+			logging.Warn("Failed to create tasks for service in test mode", "error", err)
 			// Don't fail service creation, tasks will be created by the worker
 		}
 	}
@@ -339,17 +339,17 @@ func (api *DefaultECSAPI) DeleteService(ctx context.Context, req *generated.Dele
 	existingService.DesiredCount = 0
 	existingService.UpdatedAt = time.Now()
 	if err := api.storage.ServiceStore().Update(ctx, existingService); err != nil {
-		log.Printf("Warning: failed to update service status to DRAINING: %v", err)
+		logging.Warn("Failed to update service status to DRAINING", "error", err)
 	}
 
 	// Delete Kubernetes resources
 	serviceManager, err := api.getServiceManager()
 	if err != nil {
-		log.Printf("Warning: failed to create service manager for deletion: %v", err)
+		logging.Warn("Failed to create service manager for deletion", "error", err)
 		// Continue with deletion even if service manager creation fails
 	} else if err := serviceManager.DeleteService(ctx, cluster, existingService); err != nil {
-		log.Printf("Warning: failed to delete Kubernetes resources for service %s: %v",
-			existingService.ServiceName, err)
+		logging.Warn("Failed to delete Kubernetes resources for service",
+			"service", existingService.ServiceName, "error", err)
 		// Continue with deletion even if Kubernetes deletion fails
 		// This matches AWS ECS behavior where the service is marked for deletion
 		// even if underlying resources might still exist
@@ -365,12 +365,12 @@ func (api *DefaultECSAPI) DeleteService(ctx context.Context, req *generated.Dele
 		cluster.ActiveServicesCount--
 		if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
 			// Log error but don't fail service deletion
-			log.Printf("Warning: Failed to update cluster service count: %v", err)
+			logging.Warn("Failed to update cluster service count", "error", err)
 		}
 	}
 
-	log.Printf("Successfully deleted service %s from cluster %s",
-		existingService.ServiceName, clusterName)
+	logging.Info("Successfully deleted service",
+		"service", existingService.ServiceName, "cluster", clusterName)
 
 	// Convert back to API response
 	// The service is returned with DRAINING status as per AWS ECS behavior
@@ -565,7 +565,7 @@ func (api *DefaultECSAPI) UpdateService(ctx context.Context, req *generated.Upda
 	// Update fields
 	// Note: DesiredCount can be 0 (to scale down to 0 tasks)
 	if req.DesiredCount != nil && int(*req.DesiredCount) != existingService.DesiredCount {
-		log.Printf("DEBUG: Updating desired count from %d to %d", existingService.DesiredCount, req.DesiredCount)
+		logging.Debug("Updating desired count", "from", existingService.DesiredCount, "to", *req.DesiredCount)
 		existingService.DesiredCount = int(*req.DesiredCount)
 		needsKubernetesUpdate = true
 	}
@@ -680,7 +680,7 @@ func (api *DefaultECSAPI) UpdateService(ctx context.Context, req *generated.Upda
 		taskDef := existingService.TaskDefinitionARN
 		taskDefinition, err := api.storage.TaskDefinitionStore().GetByARN(ctx, taskDef)
 		if err != nil {
-			log.Printf("Failed to get task definition %s: %v", taskDef, err)
+			logging.Error("Failed to get task definition", "taskDefinition", taskDef, "error", err)
 			// Restore old values on failure
 			existingService.DesiredCount = oldDesiredCount
 			existingService.TaskDefinitionARN = oldTaskDefinitionARN
@@ -691,18 +691,18 @@ func (api *DefaultECSAPI) UpdateService(ctx context.Context, req *generated.Upda
 		converter := converters.NewServiceConverter(api.region, api.accountID)
 		deployment, kubeService, err := converter.ConvertServiceToDeployment(existingService, taskDefinition, cluster)
 		if err != nil {
-			log.Printf("Failed to convert service to deployment: %v", err)
+			logging.Error("Failed to convert service to deployment", "error", err)
 			return nil, fmt.Errorf("failed to convert service: %w", err)
 		}
 
 		// Create service manager and update Kubernetes resources
 		serviceManager, err := api.getServiceManager()
 		if err != nil {
-			log.Printf("Failed to create service manager: %v", err)
+			logging.Error("Failed to create service manager", "error", err)
 			return nil, fmt.Errorf("failed to create service manager: %w", err)
 		}
 		if err := serviceManager.UpdateService(ctx, deployment, kubeService, cluster, existingService); err != nil {
-			log.Printf("Failed to update kubernetes deployment: %v", err)
+			logging.Error("Failed to update kubernetes deployment", "error", err)
 			return nil, fmt.Errorf("failed to update kubernetes deployment: %w", err)
 		}
 
@@ -1313,13 +1313,13 @@ func (api *DefaultECSAPI) registerServiceWithDiscovery(ctx context.Context, serv
 		// Format: arn:aws:servicediscovery:region:account-id:service/srv-xxxxx
 		arnParts := strings.Split(*registry.RegistryArn, ":")
 		if len(arnParts) < 6 {
-			log.Printf("Invalid service registry ARN: %s", *registry.RegistryArn)
+			logging.Warn("Invalid service registry ARN", "arn", *registry.RegistryArn)
 			continue
 		}
 
 		resourceParts := strings.Split(arnParts[5], "/")
 		if len(resourceParts) < 2 || resourceParts[0] != "service" {
-			log.Printf("Invalid service registry resource: %s", arnParts[5])
+			logging.Warn("Invalid service registry resource", "resource", arnParts[5])
 			continue
 		}
 
@@ -1327,7 +1327,7 @@ func (api *DefaultECSAPI) registerServiceWithDiscovery(ctx context.Context, serv
 
 		// Register service instances (tasks will register themselves when they start)
 		// For now, we'll just log the registration intent
-		log.Printf("Service %s registered with service discovery service %s", service.ServiceName, serviceID)
+		logging.Info("Service registered with service discovery", "service", service.ServiceName, "discoveryService", serviceID)
 
 		// Store the service registry information in service metadata
 		// This will be used by tasks when they start
@@ -1420,7 +1420,7 @@ func (api *DefaultECSAPI) createTasksForService(ctx context.Context, service *st
 			return fmt.Errorf("failed to create task %d: %w", i, err)
 		}
 		
-		log.Printf("Created task %s for service %s in test mode", taskID, service.ServiceName)
+		logging.Debug("Created task for service in test mode", "taskId", taskID, "service", service.ServiceName)
 	}
 	
 	// Update service counts

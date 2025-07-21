@@ -3,7 +3,6 @@ package ssm
 import (
 	"context"
 	"fmt"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	ssmapi "github.com/nandemo-ya/kecs/controlplane/internal/ssm/generated"
 )
 
@@ -197,7 +197,7 @@ func (i *integration) CreateOrUpdateSecret(ctx context.Context, parameter *Param
 			return fmt.Errorf("failed to create secret: %w", err)
 		}
 
-		log.Printf("Created Kubernetes secret %s/%s for parameter %s", namespace, secretName, parameter.Name)
+		logging.Info("Created Kubernetes secret for SSM parameter", "namespace", namespace, "k8sSecret", secretName, "parameter", parameter.Name)
 		return nil
 	}
 
@@ -220,7 +220,7 @@ func (i *integration) CreateOrUpdateSecret(ctx context.Context, parameter *Param
 		return fmt.Errorf("failed to update secret: %w", err)
 	}
 
-	log.Printf("Updated Kubernetes secret %s/%s for parameter %s", namespace, secretName, parameter.Name)
+	logging.Info("Updated Kubernetes secret for SSM parameter", "namespace", namespace, "k8sSecret", secretName, "parameter", parameter.Name)
 	return nil
 }
 
@@ -240,7 +240,7 @@ func (i *integration) DeleteSecret(ctx context.Context, parameterName, namespace
 	// Clear cache
 	i.cache.delete(parameterName)
 
-	log.Printf("Deleted Kubernetes secret %s/%s for parameter %s", namespace, secretName, parameterName)
+	logging.Info("Deleted Kubernetes secret for SSM parameter", "namespace", namespace, "k8sSecret", secretName, "parameter", parameterName)
 	return nil
 }
 

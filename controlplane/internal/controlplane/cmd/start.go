@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -26,14 +25,14 @@ import (
 var (
 	// Start flags
 	startInstanceName string
-	startDataDir     string
-	startApiPort     int
-	startAdminPort   int
-	startConfigFile  string
+	startDataDir      string
+	startApiPort      int
+	startAdminPort    int
+	startConfigFile   string
 	startNoLocalStack bool
-	startNoTraefik   bool
-	startTimeout     time.Duration
-	startVerbose     bool
+	startNoTraefik    bool
+	startTimeout      time.Duration
+	startVerbose      bool
 )
 
 var startCmd = &cobra.Command{
@@ -118,7 +117,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	// Step 1: Create k3d cluster for KECS instance
 	spinner := progress.NewSpinner("Creating k3d cluster")
 	spinner.Start()
-	
+
 	if err := createK3dCluster(ctx, startInstanceName, cfg, startDataDir); err != nil {
 		spinner.Fail("Failed to create k3d cluster")
 		return fmt.Errorf("failed to create k3d cluster: %w", err)
@@ -137,19 +136,19 @@ func runStart(cmd *cobra.Command, args []string) error {
 	// Step 3: Deploy KECS control plane and LocalStack in parallel
 	// Create log capture for deployment phase
 	logCapture := progress.NewLogCapture(os.Stdout, progress.LogLevelInfo)
-	
+
 	// Redirect standard log output to our capture
 	logRedirector := progress.NewLogRedirector(logCapture, progress.LogLevelInfo)
 	logRedirector.RedirectStandardLog()
 	defer logRedirector.Restore()
-	
+
 	// Re-initialize logging with the log capture
 	logging.InitializeForProgress(logCapture, true)
-	
+
 	// Create parallel tracker for component deployment with log capture
 	parallelTracker := progress.NewParallelTracker("Deploying components").
 		WithLogCapture(logCapture)
-	
+
 	// Add tasks
 	parallelTracker.AddTask("controlplane", "Control Plane", 100)
 	if cfg.LocalStack.Enabled {
@@ -158,10 +157,10 @@ func runStart(cmd *cobra.Command, args []string) error {
 	if cfg.Features.Traefik {
 		parallelTracker.AddTask("traefik", "Traefik Gateway", 100)
 	}
-	
+
 	var wg sync.WaitGroup
 	errChan := make(chan error, 3) // Increased buffer size for potential 3 errors
-	
+
 	// Deploy Control Plane
 	wg.Add(1)
 	go func() {
@@ -174,7 +173,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		}
 		parallelTracker.CompleteTask("controlplane")
 	}()
-	
+
 	// Deploy LocalStack (if enabled)
 	if cfg.LocalStack.Enabled {
 		wg.Add(1)
@@ -189,7 +188,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 			parallelTracker.CompleteTask("localstack")
 		}()
 	}
-	
+
 	// Deploy Traefik gateway (if enabled)
 	if cfg.Features.Traefik {
 		wg.Add(1)
@@ -204,12 +203,12 @@ func runStart(cmd *cobra.Command, args []string) error {
 			parallelTracker.CompleteTask("traefik")
 		}()
 	}
-	
+
 	// Wait for parallel deployments to complete
 	wg.Wait()
 	parallelTracker.Stop()
 	close(errChan)
-	
+
 	// Check for errors from parallel deployments
 	for err := range errChan {
 		return err
@@ -226,7 +225,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	// Show success summary
 	progress.Success("KECS instance '%s' is ready!", startInstanceName)
-	
+
 	fmt.Println()
 	progress.Info("Endpoints:")
 	fmt.Printf("  AWS API: http://localhost:%d\n", startApiPort)
@@ -250,7 +249,7 @@ func createK3dCluster(ctx context.Context, clusterName string, cfg *config.Confi
 	clusterConfig := &kubernetes.ClusterManagerConfig{
 		Provider:      "k3d",
 		ContainerMode: false,
-		EnableTraefik: false, // Disable old Traefik deployment (we use our own)
+		EnableTraefik: false,        // Disable old Traefik deployment (we use our own)
 		TraefikPort:   startApiPort, // Use the API port for Traefik
 		VolumeMounts: []kubernetes.VolumeMount{
 			{
@@ -273,7 +272,7 @@ func createK3dCluster(ctx context.Context, clusterName string, cfg *config.Confi
 	}
 
 	if exists {
-		log.Printf("k3d cluster '%s' already exists, using existing cluster", clusterName)
+		logging.Info("k3d cluster already exists, using existing cluster", "cluster", clusterName)
 		return nil
 	}
 
@@ -283,11 +282,11 @@ func createK3dCluster(ctx context.Context, clusterName string, cfg *config.Confi
 	}
 
 	// Wait for cluster to be ready
-	log.Print("Waiting for cluster to be ready...")
+	logging.Info("Waiting for cluster to be ready")
 	if err := manager.WaitForClusterReady(clusterName, 5*time.Minute); err != nil {
 		return fmt.Errorf("cluster did not become ready: %w", err)
 	}
-	log.Println("Cluster is ready!")
+	logging.Info("Cluster is ready")
 
 	return nil
 }
@@ -319,7 +318,7 @@ func createKecsSystemNamespace(ctx context.Context, clusterName string) error {
 
 	_, err = kubeClient.CoreV1().Namespaces().Get(ctx, "kecs-system", metav1.GetOptions{})
 	if err == nil {
-		log.Println("kecs-system namespace already exists")
+		logging.Info("kecs-system namespace already exists")
 		return nil
 	}
 
@@ -328,7 +327,7 @@ func createKecsSystemNamespace(ctx context.Context, clusterName string) error {
 		return fmt.Errorf("failed to create kecs-system namespace: %w", err)
 	}
 
-	log.Println("Created kecs-system namespace")
+	logging.Info("Created kecs-system namespace")
 	return nil
 }
 
@@ -344,7 +343,7 @@ func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Con
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
-	
+
 	kubeConfig, err := manager.GetKubeConfig(clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes config: %w", err)
@@ -381,7 +380,7 @@ func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Con
 	}
 
 	// Deploy control plane resources programmatically
-	log.Println("Deploying control plane resources...")
+	logging.Info("Deploying control plane resources")
 	if err := deployer.DeployControlPlane(ctx, controlPlaneConfig); err != nil {
 		return fmt.Errorf("failed to deploy control plane: %w", err)
 	}
@@ -390,7 +389,7 @@ func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Con
 	fmt.Print("Waiting for control plane deployment to be ready...")
 	deployment := "kecs-controlplane"
 	namespace := "kecs-system"
-	
+
 	for i := 0; i < 60; i++ { // Wait up to 5 minutes
 		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
 		if err == nil && deps.Status.ReadyReplicas > 0 {
@@ -430,7 +429,7 @@ func deployLocalStack(ctx context.Context, clusterName string, cfg *config.Confi
 		Services:      cfg.LocalStack.Services,
 		Port:          4566,
 		EdgePort:      4566,
-		ProxyEndpoint: "", // Will be set after Traefik is deployed
+		ProxyEndpoint: "",    // Will be set after Traefik is deployed
 		ContainerMode: false, // We're deploying in k8s, not standalone container
 		Image:         cfg.LocalStack.Image,
 		Version:       cfg.LocalStack.Version,
@@ -444,20 +443,20 @@ func deployLocalStack(ctx context.Context, clusterName string, cfg *config.Confi
 	}
 
 	// Deploy LocalStack
-	log.Println("Deploying LocalStack...")
+	logging.Info("Deploying LocalStack")
 	if err := lsManager.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start LocalStack: %w", err)
 	}
 
 	// Wait for LocalStack to be ready
-	log.Print("Waiting for LocalStack to be ready...")
+	logging.Info("Waiting for LocalStack to be ready")
 	for i := 0; i < 60; i++ { // Wait up to 5 minutes
 		if lsManager.IsHealthy() {
-			log.Println("LocalStack is ready!")
+			logging.Info("LocalStack is ready")
 			status, err := lsManager.GetStatus()
 			if err == nil {
-				log.Printf("LocalStack running: %v", status.Running)
-				log.Printf("LocalStack services: %v", status.EnabledServices)
+				logging.Info("LocalStack status", "running", status.Running)
+				logging.Info("LocalStack services", "services", status.EnabledServices)
 			}
 			return nil
 		}
@@ -479,7 +478,7 @@ func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.C
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
-	
+
 	kubeConfig, err := manager.GetKubeConfig(clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes config: %w", err)
@@ -502,7 +501,7 @@ func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.C
 		WebPort:         80,
 		WebNodePort:     30080,
 		AWSPort:         4566,
-		AWSNodePort:     30890,  // Fixed NodePort in valid range (k3d maps host port to this)
+		AWSNodePort:     30890, // Fixed NodePort in valid range (k3d maps host port to this)
 		LogLevel:        "INFO",
 		AccessLog:       true,
 		Metrics:         false,
@@ -510,34 +509,34 @@ func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.C
 	}
 
 	// Deploy Traefik resources programmatically
-	log.Println("Deploying Traefik gateway resources...")
+	logging.Info("Deploying Traefik gateway resources")
 	if err := deployer.DeployTraefik(ctx, traefikConfig); err != nil {
 		return fmt.Errorf("failed to deploy Traefik: %w", err)
 	}
 
 	// Wait for Traefik deployment to be ready
-	log.Print("Waiting for Traefik deployment to be ready...")
+	logging.Info("Waiting for Traefik deployment to be ready")
 	deployment := "traefik"
 	namespace := "kecs-system"
-	
+
 	for i := 0; i < 60; i++ { // Wait up to 5 minutes
 		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
 		if err == nil && deps.Status.ReadyReplicas > 0 {
-			log.Println("Traefik deployment is ready!")
+			logging.Info("Traefik deployment is ready")
 			break
 		}
 		time.Sleep(5 * time.Second)
 	}
 
 	// Wait for Traefik service to get external IP/port
-	log.Print("Waiting for Traefik service to be accessible...")
+	logging.Info("Waiting for Traefik service to be accessible")
 	service := "traefik"
-	
+
 	for i := 0; i < 30; i++ { // Wait up to 2.5 minutes
 		svc, err := kubeClient.CoreV1().Services(namespace).Get(ctx, service, metav1.GetOptions{})
 		if err == nil && len(svc.Status.LoadBalancer.Ingress) > 0 {
-			log.Println("Traefik service is ready!")
-			log.Printf("Traefik LoadBalancer: %s", svc.Status.LoadBalancer.Ingress[0].Hostname)
+			logging.Info("Traefik service is ready")
+			logging.Info("Traefik LoadBalancer configured", "hostname", svc.Status.LoadBalancer.Ingress[0].Hostname)
 			return nil
 		}
 		time.Sleep(5 * time.Second)
@@ -545,8 +544,8 @@ func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.C
 
 	// For k3d, the LoadBalancer might not get an external IP
 	// Port forwarding is handled by k3d itself
-	log.Println("Traefik service is ready! (using k3d port mapping)")
-	
+	logging.Info("Traefik service is ready (using k3d port mapping)")
+
 	return nil
 }
 
@@ -574,27 +573,27 @@ func waitForComponents(ctx context.Context, clusterName string) error {
 		{"LocalStack", "localstack", false}, // Optional based on config
 	}
 
-	log.Println("Checking component readiness...")
-	
+	logging.Info("Checking component readiness")
+
 	allReady := true
 	for _, comp := range components {
 		// Check deployment
 		deployment, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, comp.deployment, metav1.GetOptions{})
 		if err != nil {
 			if comp.required {
-				log.Printf("  %s: ❌ Not found", comp.name)
+				logging.Info("Component not found", "component", comp.name, "status", "❌")
 				allReady = false
 			} else {
-				log.Printf("  %s: ⏭️  Skipped (optional)", comp.name)
+				logging.Info("Component skipped (optional)", "component", comp.name, "status", "⏭️")
 			}
 			continue
 		}
 
 		// Check if deployment is ready
 		if deployment.Status.ReadyReplicas >= 1 {
-			log.Printf("  %s: ✅ Ready (%d/%d replicas)", comp.name, deployment.Status.ReadyReplicas, *deployment.Spec.Replicas)
+			logging.Info("Component ready", "component", comp.name, "status", "✅", "readyReplicas", deployment.Status.ReadyReplicas, "totalReplicas", *deployment.Spec.Replicas)
 		} else {
-			log.Printf("  %s: ⏳ Not ready (0/%d replicas)", comp.name, *deployment.Spec.Replicas)
+			logging.Info("Component not ready", "component", comp.name, "status", "⏳", "readyReplicas", 0, "totalReplicas", *deployment.Spec.Replicas)
 			if comp.required {
 				allReady = false
 			}
@@ -603,7 +602,7 @@ func waitForComponents(ctx context.Context, clusterName string) error {
 		// Check service endpoint
 		service, err := kubeClient.CoreV1().Services(namespace).Get(ctx, comp.deployment, metav1.GetOptions{})
 		if err == nil && len(service.Spec.Ports) > 0 {
-			log.Printf("    Service: %s:%d", service.Name, service.Spec.Ports[0].Port)
+			logging.Info("Service endpoint", "service", service.Name, "port", service.Spec.Ports[0].Port)
 		}
 	}
 
@@ -613,7 +612,7 @@ func waitForComponents(ctx context.Context, clusterName string) error {
 
 	// Skip external health checks for k8s deployments
 	// The deployment readiness checks above are sufficient
-	log.Printf("✅ All components are ready")
+	logging.Info("All components are ready", "status", "✅")
 
 	return nil
 }
@@ -621,7 +620,7 @@ func waitForComponents(ctx context.Context, clusterName string) error {
 func checkEndpointHealth(endpoint string, timeout time.Duration) error {
 	client := &http.Client{Timeout: 5 * time.Second}
 	deadline := time.Now().Add(timeout)
-	
+
 	for time.Now().Before(deadline) {
 		resp, err := client.Get(endpoint)
 		if err == nil {
@@ -632,7 +631,7 @@ func checkEndpointHealth(endpoint string, timeout time.Duration) error {
 		}
 		time.Sleep(2 * time.Second)
 	}
-	
+
 	return fmt.Errorf("endpoint %s did not become healthy within %v", endpoint, timeout)
 }
 
@@ -640,7 +639,7 @@ func checkEndpointHealth(endpoint string, timeout time.Duration) error {
 func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg *config.Config, dataDir string, tracker *progress.ParallelTracker) error {
 	// Update progress during deployment
 	tracker.UpdateTask("controlplane", 20, "Preparing resources")
-	
+
 	// Get k3d cluster manager
 	manager, err := kubernetes.NewK3dClusterManager(nil)
 	if err != nil {
@@ -648,26 +647,26 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 	}
 
 	tracker.UpdateTask("controlplane", 30, "Getting Kubernetes client")
-	
+
 	// Get Kubernetes client and config
 	kubeClient, err := manager.GetKubeClient(clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
-	
+
 	kubeConfig, err := manager.GetKubeConfig(clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes config: %w", err)
 	}
 
 	tracker.UpdateTask("controlplane", 40, "Creating deployer")
-	
+
 	// Create resource deployer with config
 	deployer, err := kubernetes.NewResourceDeployerWithConfig(kubeClient, kubeConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create resource deployer: %w", err)
 	}
-	
+
 	// Configure control plane
 	controlPlaneConfig := &resources.ControlPlaneConfig{
 		Image:           cfg.Server.ControlPlaneImage,
@@ -693,32 +692,32 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 	}
 
 	tracker.UpdateTask("controlplane", 60, "Deploying resources")
-	
+
 	// Deploy control plane resources programmatically
 	if err := deployer.DeployControlPlane(ctx, controlPlaneConfig); err != nil {
 		return fmt.Errorf("failed to deploy control plane: %w", err)
 	}
 
 	tracker.UpdateTask("controlplane", 80, "Waiting for deployment")
-	
+
 	// Wait for deployment to be ready
 	deployment := "kecs-controlplane"
 	namespace := "kecs-system"
 	maxWaitTime := 300 // 5 minutes total
 	checkInterval := 2 // Check every 2 seconds for faster detection
-	
+
 	for elapsed := 0; elapsed < maxWaitTime; elapsed += checkInterval {
 		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
 		if err == nil && deps.Status.ReadyReplicas > 0 {
 			tracker.UpdateTask("controlplane", 100, "Ready")
 			return nil
 		}
-		
+
 		// Check pod status for more detailed progress
 		pods, _ := kubeClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 			LabelSelector: "app=kecs-controlplane",
 		})
-		
+
 		statusMsg := fmt.Sprintf("Waiting for pods (%ds/%ds)", elapsed, maxWaitTime)
 		if len(pods.Items) > 0 {
 			pod := &pods.Items[0]
@@ -737,11 +736,11 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 				statusMsg = fmt.Sprintf("Pod running, waiting for readiness (%ds/%ds)", elapsed, maxWaitTime)
 			}
 		}
-		
+
 		// Calculate progress from 80% to 99% (never reach 100% until actually ready)
 		progress := 80 + (elapsed * 19 / maxWaitTime)
 		tracker.UpdateTask("controlplane", progress, statusMsg)
-		
+
 		time.Sleep(time.Duration(checkInterval) * time.Second)
 	}
 
@@ -751,7 +750,7 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 // deployLocalStackWithProgress wraps deployLocalStack with progress reporting
 func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *config.Config, tracker *progress.ParallelTracker) error {
 	tracker.UpdateTask("localstack", 10, "Initializing")
-	
+
 	// Get k3d cluster manager
 	manager, err := kubernetes.NewK3dClusterManager(nil)
 	if err != nil {
@@ -759,7 +758,7 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 	}
 
 	tracker.UpdateTask("localstack", 20, "Getting Kubernetes client")
-	
+
 	// Get Kubernetes client and config
 	kubeClient, err := manager.GetKubeClient(clusterName)
 	if err != nil {
@@ -772,7 +771,7 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 	}
 
 	tracker.UpdateTask("localstack", 30, "Configuring LocalStack")
-	
+
 	// Configure LocalStack
 	localstackConfig := &localstack.Config{
 		Enabled:       true,
@@ -789,7 +788,7 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 	}
 
 	tracker.UpdateTask("localstack", 40, "Creating LocalStack manager")
-	
+
 	// Create LocalStack manager
 	lsManager, err := localstack.NewManager(localstackConfig, kubeClient, kubeConfig)
 	if err != nil {
@@ -797,7 +796,7 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 	}
 
 	tracker.UpdateTask("localstack", 50, "Starting LocalStack")
-	
+
 	// Deploy LocalStack
 	if err := lsManager.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start LocalStack: %w", err)
@@ -809,7 +808,7 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 	time.Sleep(3 * time.Second)
 
 	tracker.UpdateTask("localstack", 70, "Waiting for LocalStack to be ready")
-	
+
 	// Wait for LocalStack to output "Ready." in logs
 	maxWaitTime := 60 // 5 minutes (60 * 5 seconds)
 	for i := 0; i < maxWaitTime; i++ {
@@ -819,11 +818,11 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 			tracker.UpdateTask("localstack", 100, "Ready")
 			return nil
 		}
-		
+
 		// Calculate progress from 70% to 99% (never reach 100% until actually ready)
 		progress := 70 + ((i + 1) * 29 / maxWaitTime)
 		waitTime := (i + 1) * 5
-		
+
 		// Provide more detailed status message
 		statusMsg := fmt.Sprintf("Waiting for services (%ds/300s)", waitTime)
 		if status != nil {
@@ -834,9 +833,9 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 				statusMsg = fmt.Sprintf("LocalStack initializing services (%ds/300s)", waitTime)
 			}
 		}
-		
+
 		tracker.UpdateTask("localstack", progress, statusMsg)
-		
+
 		time.Sleep(5 * time.Second)
 	}
 
@@ -845,7 +844,7 @@ func deployLocalStackWithProgress(ctx context.Context, clusterName string, cfg *
 
 func deployTraefikWithProgress(ctx context.Context, clusterName string, cfg *config.Config, apiPort int, tracker *progress.ParallelTracker) error {
 	tracker.UpdateTask("traefik", 10, "Getting cluster manager")
-	
+
 	// Get k3d cluster manager
 	manager, err := kubernetes.NewK3dClusterManager(nil)
 	if err != nil {
@@ -853,20 +852,20 @@ func deployTraefikWithProgress(ctx context.Context, clusterName string, cfg *con
 	}
 
 	tracker.UpdateTask("traefik", 20, "Getting Kubernetes client")
-	
+
 	// Get Kubernetes client and config
 	kubeClient, err := manager.GetKubeClient(clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
-	
+
 	kubeConfig, err := manager.GetKubeConfig(clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes config: %w", err)
 	}
 
 	tracker.UpdateTask("traefik", 30, "Creating resource deployer")
-	
+
 	// Create resource deployer with config
 	deployer, err := kubernetes.NewResourceDeployerWithConfig(kubeClient, kubeConfig)
 	if err != nil {
@@ -874,7 +873,7 @@ func deployTraefikWithProgress(ctx context.Context, clusterName string, cfg *con
 	}
 
 	tracker.UpdateTask("traefik", 40, "Configuring Traefik")
-	
+
 	// Configure Traefik
 	traefikConfig := &resources.TraefikConfig{
 		Image:           "traefik:v3.2",
@@ -886,25 +885,25 @@ func deployTraefikWithProgress(ctx context.Context, clusterName string, cfg *con
 		WebPort:         80,
 		WebNodePort:     30080,
 		AWSPort:         4566,
-		AWSNodePort:     30890,  // Fixed NodePort in valid range (k3d maps host port to this)
-		Metrics:         false,  // Metrics disabled to reduce overhead
+		AWSNodePort:     30890, // Fixed NodePort in valid range (k3d maps host port to this)
+		Metrics:         false, // Metrics disabled to reduce overhead
 		LogLevel:        cfg.Server.LogLevel,
 		AccessLog:       cfg.Server.LogLevel == "debug",
 	}
 
 	tracker.UpdateTask("traefik", 50, "Deploying Traefik resources")
-	
+
 	// Deploy Traefik resources programmatically
 	if err := deployer.DeployTraefik(ctx, traefikConfig); err != nil {
 		return fmt.Errorf("failed to deploy Traefik gateway: %w", err)
 	}
 
 	tracker.UpdateTask("traefik", 70, "Waiting for Traefik to be ready")
-	
+
 	// Wait for deployment to be ready
 	deployment := "traefik"
 	namespace := "kecs-system"
-	
+
 	maxWaitTime := 60 // 5 minutes (60 * 5 seconds)
 	for i := 0; i < maxWaitTime; i++ {
 		deps, err := kubeClient.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
@@ -912,14 +911,14 @@ func deployTraefikWithProgress(ctx context.Context, clusterName string, cfg *con
 			tracker.UpdateTask("traefik", 100, "Ready")
 			return nil
 		}
-		
+
 		// Calculate progress from 70% to 99%
 		progress := 70 + ((i + 1) * 29 / maxWaitTime)
 		waitTime := (i + 1) * 5
 		tracker.UpdateTask("traefik", progress, fmt.Sprintf("Health check (%ds/300s)", waitTime))
-		
+
 		time.Sleep(5 * time.Second)
 	}
-	
+
 	return fmt.Errorf("Traefik deployment did not become ready in time")
 }

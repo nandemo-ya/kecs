@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 	"sync"
@@ -16,6 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	secretsmanagerapi "github.com/nandemo-ya/kecs/controlplane/internal/secretsmanager/generated"
 )
 
@@ -255,7 +255,7 @@ func (i *integration) CreateOrUpdateSecret(ctx context.Context, secret *Secret, 
 			return fmt.Errorf("failed to create secret: %w", err)
 		}
 
-		log.Printf("Created Kubernetes secret %s/%s for Secrets Manager secret %s", namespace, secretName, secret.Name)
+		logging.Info("Created Kubernetes secret for Secrets Manager secret", "namespace", namespace, "k8sSecret", secretName, "smSecret", secret.Name)
 		return nil
 	}
 
@@ -278,7 +278,7 @@ func (i *integration) CreateOrUpdateSecret(ctx context.Context, secret *Secret, 
 		return fmt.Errorf("failed to update secret: %w", err)
 	}
 
-	log.Printf("Updated Kubernetes secret %s/%s for Secrets Manager secret %s", namespace, secretName, secret.Name)
+	logging.Info("Updated Kubernetes secret for Secrets Manager secret", "namespace", namespace, "k8sSecret", secretName, "smSecret", secret.Name)
 	return nil
 }
 
@@ -298,7 +298,7 @@ func (i *integration) DeleteSecret(ctx context.Context, secretName, namespace st
 	// Clear from cache
 	i.cache.delete(secretName)
 
-	log.Printf("Deleted Kubernetes secret %s/%s for Secrets Manager secret %s", namespace, k8sSecretName, secretName)
+	logging.Info("Deleted Kubernetes secret for Secrets Manager secret", "namespace", namespace, "k8sSecret", k8sSecretName, "smSecret", secretName)
 	return nil
 }
 

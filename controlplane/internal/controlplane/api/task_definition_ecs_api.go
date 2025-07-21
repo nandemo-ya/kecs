@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -193,9 +193,9 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 					}]
 				}`
 				if err := api.iamIntegration.CreateTaskRole(registeredTaskDef.ARN, roleName, trustPolicy); err != nil {
-					log.Printf("Warning: Failed to create task role %s: %v", roleName, err)
+					logging.Warn("Failed to create task role", "role", roleName, "error", err)
 				} else {
-					log.Printf("Created task role %s for task definition %s", roleName, registeredTaskDef.ARN)
+					logging.Info("Created task role for task definition", "role", roleName, "taskDefinition", registeredTaskDef.ARN)
 				}
 			}
 		}
@@ -205,9 +205,9 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 			roleName := extractRoleNameFromARN(registeredTaskDef.ExecutionRoleARN)
 			if roleName != "" {
 				if err := api.iamIntegration.CreateTaskExecutionRole(roleName); err != nil {
-					log.Printf("Warning: Failed to create execution role %s: %v", roleName, err)
+					logging.Warn("Failed to create execution role", "role", roleName, "error", err)
 				} else {
-					log.Printf("Created execution role %s for task definition %s", roleName, registeredTaskDef.ARN)
+					logging.Info("Created execution role for task definition", "role", roleName, "taskDefinition", registeredTaskDef.ARN)
 				}
 			}
 		}
@@ -288,7 +288,7 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 		return nil, fmt.Errorf("taskDefinition is required")
 	}
 
-	log.Printf("DEBUG: DescribeTaskDefinition called for: %s", req.TaskDefinition)
+	logging.Debug("DescribeTaskDefinition called", "taskDefinition", req.TaskDefinition)
 	var taskDef *storage.TaskDefinition
 	var err error
 
@@ -314,8 +314,8 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 		return nil, fmt.Errorf("task definition not found: %s", req.TaskDefinition)
 	}
 
-	log.Printf("DEBUG: Found task definition: family=%s, revision=%d, containerDefs=%s",
-		taskDef.Family, taskDef.Revision, taskDef.ContainerDefinitions)
+	logging.Debug("Found task definition", 
+		"family", taskDef.Family, "revision", taskDef.Revision, "containerDefs", taskDef.ContainerDefinitions)
 
 	// Convert to generated response
 	responseTaskDef := storageTaskDefinitionToGenerated(taskDef)
@@ -326,8 +326,8 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 	// Note: generated.TaskDefinition doesn't have a Tags field
 	// Tags are handled separately in the API response
 
-	log.Printf("DEBUG: Response task def has %d container definitions",
-		len(responseTaskDef.ContainerDefinitions))
+	logging.Debug("Response task definition container count",
+		"count", len(responseTaskDef.ContainerDefinitions))
 
 	return &generated.DescribeTaskDefinitionResponse{
 		TaskDefinition: responseTaskDef,
@@ -403,7 +403,7 @@ func (api *DefaultECSAPI) DeleteTaskDefinitions(ctx context.Context, req *genera
 		taskDef, err := api.storage.TaskDefinitionStore().Get(ctx, family, revision)
 		if err != nil {
 			// Log but don't fail - the deletion succeeded
-			log.Printf("Failed to get deleted task definition %s:%d: %v", family, revision, err)
+			logging.Debug("Failed to get deleted task definition", "family", family, "revision", revision, "error", err)
 			continue
 		}
 
@@ -499,7 +499,7 @@ func (api *DefaultECSAPI) ListTaskDefinitions(ctx context.Context, req *generate
 	for _, family := range families {
 		revisions, _, err := api.storage.TaskDefinitionStore().ListRevisions(ctx, family.Family, status, 0, "")
 		if err != nil {
-			log.Printf("Failed to list revisions for family %s: %v", family.Family, err)
+			logging.Error("Failed to list revisions for family", "family", family.Family, "error", err)
 			continue
 		}
 		for _, rev := range revisions {
@@ -588,7 +588,7 @@ func storageTaskDefinitionToGenerated(taskDef *storage.TaskDefinition) *generate
 		if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err == nil {
 			response.ContainerDefinitions = containerDefs
 		} else {
-			log.Printf("Failed to unmarshal container definitions for task definition %s:%d: %v", taskDef.Family, taskDef.Revision, err)
+			logging.Error("Failed to unmarshal container definitions", "family", taskDef.Family, "revision", taskDef.Revision, "error", err)
 			// Return empty slice instead of nil to prevent nil pointer dereference
 			response.ContainerDefinitions = []generated.ContainerDefinition{}
 		}
@@ -601,7 +601,7 @@ func storageTaskDefinitionToGenerated(taskDef *storage.TaskDefinition) *generate
 		if err := json.Unmarshal([]byte(taskDef.Volumes), &volumes); err == nil {
 			response.Volumes = volumes
 		} else {
-			log.Printf("Failed to unmarshal volumes for task definition %s:%d: %v", taskDef.Family, taskDef.Revision, err)
+			logging.Error("Failed to unmarshal volumes", "family", taskDef.Family, "revision", taskDef.Revision, "error", err)
 			// Return empty slice instead of nil to prevent nil pointer dereference
 			response.Volumes = []generated.Volume{}
 		}

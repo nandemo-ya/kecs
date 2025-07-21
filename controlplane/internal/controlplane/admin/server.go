@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -52,13 +52,13 @@ func (s *Server) Start() error {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	log.Printf("Starting Admin server on port %d", s.port)
+	logging.Info("Starting Admin server", "port", s.port)
 	return s.httpServer.ListenAndServe()
 }
 
 // Stop gracefully stops the HTTP admin server
 func (s *Server) Stop(ctx context.Context) error {
-	log.Println("Shutting down Admin server...")
+	logging.Info("Shutting down Admin server")
 	return s.httpServer.Shutdown(ctx)
 }
 
