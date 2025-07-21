@@ -42,6 +42,28 @@ func NewLogCapture(output io.Writer, minLevel LogLevel) *LogCapture {
 	}
 }
 
+// Add captures a log entry with timestamp, level and message
+func (lc *LogCapture) Add(timestamp time.Time, level LogLevel, message string) {
+	lc.mu.Lock()
+	defer lc.mu.Unlock()
+
+	entry := LogEntry{
+		Timestamp: timestamp,
+		Level:     level,
+		Message:   message,
+	}
+
+	// Only capture if it meets minimum level
+	if level >= lc.minLevel {
+		lc.entries = append(lc.entries, entry)
+		
+		// Also write immediately if we're at warning or error level
+		if level >= LogLevelWarning {
+			lc.writeEntry(entry)
+		}
+	}
+}
+
 // Log captures a log message
 func (lc *LogCapture) Log(level LogLevel, format string, args ...interface{}) {
 	lc.mu.Lock()

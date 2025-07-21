@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -27,6 +26,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/ssm"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
@@ -61,7 +61,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	// Initialize cluster manager first
 	var clusterManager kubernetes.ClusterManager
 	if apiconfig.GetBool("features.testMode") {
-		log.Println("Running in test mode - Kubernetes operations will be simulated")
+		logging.Info("Running in test mode - Kubernetes operations will be simulated")
 	} else {
 		// Create cluster manager (k3d only)
 		clusterConfig := &kubernetes.ClusterManagerConfig{
@@ -77,8 +77,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 		clusterManager = cm
 
-		log.Printf("Initialized k3d cluster manager (container mode: %v)",
-			clusterConfig.ContainerMode)
+		logging.Info("Initialized k3d cluster manager",
+			"containerMode", clusterConfig.ContainerMode)
 	}
 
 	// Get region and accountID from configuration
@@ -99,15 +99,18 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	taskManager, err := kubernetes.NewTaskManager(storage)
 	if err != nil {
 		if apiconfig.GetBool("features.testMode") || apiconfig.GetBool("features.containerMode") {
-			log.Printf("Warning: Failed to initialize task manager: %v (continuing without it)", err)
+			logging.Warn("Failed to initialize task manager (continuing without it)",
+				"error", err)
 			// Continue without task manager in test/container mode - some features may not work
 		} else {
 			// Check if we're in recovery mode and allow startup without task manager
 			if apiconfig.GetBool("features.autoRecoverState") {
-				log.Printf("Warning: Failed to initialize task manager during recovery: %v (continuing without it)", err)
+				logging.Warn("Failed to initialize task manager during recovery (continuing without it)",
+					"error", err)
 				// Continue without task manager initially - it will be initialized when clusters are created
 			} else {
-				log.Printf("Error: Failed to initialize task manager: %v", err)
+				logging.Error("Failed to initialize task manager",
+					"error", err)
 				// TaskManager is critical for normal operation, return error
 				return nil, fmt.Errorf("failed to initialize task manager: %w", err)
 			}
@@ -124,32 +127,34 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 
 	// Initialize LocalStack manager if configured
 	if localStackConfig != nil && localStackConfig.Enabled {
-		log.Printf("LocalStack config is enabled, initializing...")
+		logging.Info("LocalStack config is enabled, initializing...")
 		// Get Kubernetes client for LocalStack
 		var kubeClient k8s.Interface
 		if s.taskManager != nil {
-			log.Printf("TaskManager is available, getting kubernetes client...")
+			logging.Info("TaskManager is available, getting kubernetes client...")
 			// Get the kubernetes client from task manager
 			kubeConfig, err := kubernetes.GetKubeConfig()
 			if err != nil {
-				log.Printf("Warning: Failed to get kubernetes config for LocalStack: %v", err)
+				logging.Warn("Failed to get kubernetes config for LocalStack",
+					"error", err)
 			} else {
 				kubeClient, err = k8s.NewForConfig(kubeConfig)
 				if err != nil {
-					log.Printf("Warning: Failed to create kubernetes client for LocalStack: %v", err)
+					logging.Warn("Failed to create kubernetes client for LocalStack",
+						"error", err)
 				}
 			}
 		} else {
-			log.Printf("TaskManager is nil, skipping kubernetes client creation")
+			logging.Info("TaskManager is nil, skipping kubernetes client creation")
 		}
 
 		if kubeClient != nil {
-			log.Printf("KubeClient created successfully, proceeding with LocalStack initialization...")
+			logging.Info("KubeClient created successfully, proceeding with LocalStack initialization...")
 			// Check if Traefik is enabled
 			if apiconfig.GetBool("features.traefik") {
 				localStackConfig.UseTraefik = true
 				// Don't set ProxyEndpoint here - it will be set dynamically when LocalStack is deployed
-				log.Println("Traefik proxy enabled for LocalStack (port will be assigned dynamically)")
+				logging.Info("Traefik proxy enabled for LocalStack (port will be assigned dynamically)")
 			}
 			
 			// Set container mode
@@ -163,16 +168,18 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 			
 			localStackManager, err := localstack.NewManager(localStackConfig, kubeClient, kubeConfig)
 			if err != nil {
-				log.Printf("Warning: Failed to initialize LocalStack manager: %v", err)
+				logging.Warn("Failed to initialize LocalStack manager",
+					"error", err)
 			} else {
 				s.localStackManager = localStackManager
 				// Create AWS proxy router
 				awsProxyRouter, err := NewAWSProxyRouter(localStackManager)
 				if err != nil {
-					log.Printf("Warning: Failed to initialize AWS proxy router: %v", err)
+					logging.Warn("Failed to initialize AWS proxy router",
+						"error", err)
 				} else {
 					s.awsProxyRouter = awsProxyRouter
-					log.Printf("AWS proxy router initialized successfully")
+					logging.Info("AWS proxy router initialized successfully")
 				}
 
 
@@ -185,10 +192,11 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					}
 					iamIntegration, err := iam.NewIntegration(kubeClient, localStackManager, iamConfig)
 					if err != nil {
-						log.Printf("Warning: Failed to initialize IAM integration: %v", err)
+						logging.Warn("Failed to initialize IAM integration",
+							"error", err)
 					} else {
 						s.iamIntegration = iamIntegration
-						log.Println("IAM integration initialized successfully")
+						logging.Info("IAM integration initialized successfully")
 					}
 				}
 
@@ -202,10 +210,11 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					}
 					cwIntegration, err := cloudwatch.NewIntegration(kubeClient, localStackManager, cwConfig)
 					if err != nil {
-						log.Printf("Warning: Failed to initialize CloudWatch integration: %v", err)
+						logging.Warn("Failed to initialize CloudWatch integration",
+							"error", err)
 					} else {
 						s.cloudWatchIntegration = cwIntegration
-						log.Println("CloudWatch integration initialized successfully")
+						logging.Info("CloudWatch integration initialized successfully")
 					}
 				}
 
@@ -220,10 +229,11 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					}
 					ssmIntegration, err := ssm.NewIntegration(kubeClient, localStackManager, ssmConfig)
 					if err != nil {
-						log.Printf("Warning: Failed to initialize SSM integration: %v", err)
+						logging.Warn("Failed to initialize SSM integration",
+							"error", err)
 					} else {
 						s.ssmIntegration = ssmIntegration
-						log.Println("SSM Parameter Store integration initialized successfully")
+						logging.Info("SSM Parameter Store integration initialized successfully")
 					}
 				}
 
@@ -238,10 +248,11 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					}
 					smIntegration, err := secretsmanager.NewIntegration(kubeClient, localStackManager, smConfig)
 					if err != nil {
-						log.Printf("Warning: Failed to initialize Secrets Manager integration: %v", err)
+						logging.Warn("Failed to initialize Secrets Manager integration",
+							"error", err)
 					} else {
 						s.secretsManagerIntegration = smIntegration
-						log.Println("Secrets Manager integration initialized successfully")
+						logging.Info("Secrets Manager integration initialized successfully")
 					}
 				}
 
@@ -254,16 +265,17 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					}
 					s3Integration, err := s3.NewIntegration(kubeClient, localStackManager, s3Config)
 					if err != nil {
-						log.Printf("Warning: Failed to initialize S3 integration: %v", err)
+						logging.Warn("Failed to initialize S3 integration",
+							"error", err)
 					} else {
 						s.s3Integration = s3Integration
-						log.Println("S3 integration initialized successfully")
+						logging.Info("S3 integration initialized successfully")
 					}
 				}
 
 			}
 		} else {
-			log.Printf("KubeClient is nil, cannot initialize LocalStack manager and AWS proxy router")
+			logging.Info("KubeClient is nil, cannot initialize LocalStack manager and AWS proxy router")
 		}
 	}
 
@@ -276,9 +288,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		elbv2API := NewELBv2API(storage, elbv2Integration, s.region, s.accountID)
 		s.elbv2Router = generated_elbv2.NewRouter(elbv2API)
 		
-		log.Println("ELBv2 integration and API initialized successfully")
+		logging.Info("ELBv2 integration and API initialized successfully")
 	} else {
-		log.Printf("ClusterManager is nil, cannot initialize ELBv2 integration")
+		logging.Info("ClusterManager is nil, cannot initialize ELBv2 integration")
 	}
 
 	// Create ECS API with integrations
@@ -318,18 +330,19 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		
 		// Set callback to re-initialize AWS proxy router when LocalStack manager is updated
 		defaultAPI.SetLocalStackUpdateCallback(func(newManager localstack.Manager) {
-			log.Printf("LocalStack manager updated, re-initializing AWS proxy router...")
+			logging.Info("LocalStack manager updated, re-initializing AWS proxy router...")
 			s.localStackManager = newManager
 			
 			// Re-initialize AWS proxy router with the new LocalStack manager
 			if s.localStackManager != nil {
 				awsProxyRouter, err := NewAWSProxyRouter(s.localStackManager)
 				if err != nil {
-					log.Printf("Warning: Failed to re-initialize AWS proxy router: %v", err)
+					logging.Warn("Failed to re-initialize AWS proxy router",
+						"error", err)
 				} else {
 					s.awsProxyRouter = awsProxyRouter
-					log.Printf("AWS proxy router re-initialized successfully")
-					log.Printf("LocalStackProxyMiddleware will now use the updated awsProxyRouter")
+					logging.Info("AWS proxy router re-initialized successfully")
+					logging.Info("LocalStackProxyMiddleware will now use the updated awsProxyRouter")
 				}
 			}
 		})
@@ -351,7 +364,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				// Create Service Discovery API handler
 				s.serviceDiscoveryAPI = NewServiceDiscoveryAPI(serviceDiscoveryManager, s.region, s.accountID)
 
-				log.Println("Service Discovery integration initialized successfully")
+				logging.Info("Service Discovery integration initialized successfully")
 			}
 		}
 	}
@@ -366,12 +379,13 @@ func (s *Server) Start() error {
 
 	// Recover state if enabled and not in test mode
 	if !apiconfig.GetBool("features.testMode") && apiconfig.GetBool("features.autoRecoverState") {
-		log.Println("Starting state recovery...")
+		logging.Info("Starting state recovery...")
 		if err := s.RecoverState(ctx); err != nil {
-			log.Printf("State recovery failed: %v", err)
+			logging.Error("State recovery failed",
+				"error", err)
 			// Continue startup even if recovery fails
 		} else {
-			log.Println("State recovery completed")
+			logging.Info("State recovery completed")
 		}
 	}
 
@@ -383,7 +397,8 @@ func (s *Server) Start() error {
 	// Start LocalStack manager if available
 	if s.localStackManager != nil {
 		if err := s.localStackManager.Start(ctx); err != nil {
-			log.Printf("Failed to start LocalStack manager: %v", err)
+			logging.Error("Failed to start LocalStack manager",
+				"error", err)
 		} else {
 		}
 	}
@@ -398,7 +413,8 @@ func (s *Server) Start() error {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	log.Printf("Starting API server on port %d", s.port)
+	logging.Info("Starting API server",
+		"port", s.port)
 	return s.httpServer.ListenAndServe()
 }
 
@@ -417,7 +433,7 @@ func (s *Server) handleELBv2Request(w http.ResponseWriter, r *http.Request) {
 
 // Stop gracefully stops the HTTP server
 func (s *Server) Stop(ctx context.Context) error {
-	log.Println("Shutting down API server...")
+	logging.Info("Shutting down API server...")
 
 	// Stop test mode worker if running
 	if s.testModeWorker != nil {
@@ -428,7 +444,8 @@ func (s *Server) Stop(ctx context.Context) error {
 	// Stop LocalStack manager if running
 	if s.localStackManager != nil {
 		if err := s.localStackManager.Stop(ctx); err != nil {
-			log.Printf("Error stopping LocalStack manager: %v", err)
+			logging.Error("Error stopping LocalStack manager",
+				"error", err)
 		}
 	}
 
@@ -436,7 +453,7 @@ func (s *Server) Stop(ctx context.Context) error {
 	// not by the API server. We don't clean up k3d clusters here anymore.
 	// Namespaces will be cleaned up when the KECS instance is stopped.
 	if apiconfig.GetBool("kubernetes.keepClustersOnShutdown") {
-		log.Println("KECS_KEEP_CLUSTERS_ON_SHUTDOWN is set (legacy setting, no longer needed)")
+		logging.Info("KECS_KEEP_CLUSTERS_ON_SHUTDOWN is set (legacy setting, no longer needed)")
 	}
 
 	return s.httpServer.Shutdown(ctx)
@@ -445,7 +462,7 @@ func (s *Server) Stop(ctx context.Context) error {
 // RecoverState recovers k3d clusters and Kubernetes resources from storage
 func (s *Server) RecoverState(ctx context.Context) error {
 	if s.storage == nil || s.clusterManager == nil {
-		log.Println("Skipping state recovery: storage or cluster manager not available")
+		logging.Info("Skipping state recovery: storage or cluster manager not available")
 		return nil
 	}
 
@@ -456,18 +473,20 @@ func (s *Server) RecoverState(ctx context.Context) error {
 	}
 
 	if len(clusters) == 0 {
-		log.Println("No clusters found in storage, nothing to recover")
+		logging.Info("No clusters found in storage, nothing to recover")
 		return nil
 	}
 
-	log.Printf("Found %d clusters in storage, checking which need recovery...", len(clusters))
+	logging.Info("Found clusters in storage, checking which need recovery...",
+		"count", len(clusters))
 
 	// Track recovery results
 	var recoveredCount, skippedCount, failedCount int
 
 	for _, cluster := range clusters {
 		if cluster.K8sClusterName == "" {
-			log.Printf("Cluster %s has no k8s cluster name, skipping", cluster.Name)
+			logging.Info("Cluster has no k8s cluster name, skipping",
+				"cluster", cluster.Name)
 			skippedCount++
 			continue
 		}
@@ -475,26 +494,34 @@ func (s *Server) RecoverState(ctx context.Context) error {
 		// In the new architecture, we don't recreate k3d clusters
 		// The KECS instance (k3d cluster) should already exist
 		// We only need to ensure namespaces exist
-		log.Printf("Ensuring namespace exists for ECS cluster %s", cluster.Name)
+		logging.Info("Ensuring namespace exists for ECS cluster",
+			"cluster", cluster.Name)
 
 		// Recover LocalStack if it was deployed
 		if err := s.recoverLocalStackForCluster(ctx, cluster); err != nil {
-			log.Printf("Failed to recover LocalStack for cluster %s: %v", cluster.Name, err)
+			logging.Error("Failed to recover LocalStack for cluster",
+				"cluster", cluster.Name,
+				"error", err)
 			// Don't count as failed since cluster was recovered
 		}
 		
 		// Recover services for this cluster
 		if err := s.recoverServicesForCluster(ctx, cluster); err != nil {
-			log.Printf("Failed to recover services for cluster %s: %v", cluster.Name, err)
+			logging.Error("Failed to recover services for cluster",
+				"cluster", cluster.Name,
+				"error", err)
 			// Don't count as failed since cluster was recovered
 		}
 
 		recoveredCount++
-		log.Printf("Successfully recovered k3d cluster %s", cluster.K8sClusterName)
+		logging.Info("Successfully recovered k3d cluster",
+			"k8sCluster", cluster.K8sClusterName)
 	}
 
-	log.Printf("State recovery summary: %d recovered, %d skipped, %d failed",
-		recoveredCount, skippedCount, failedCount)
+	logging.Info("State recovery summary",
+		"recovered", recoveredCount,
+		"skipped", skippedCount,
+		"failed", failedCount)
 
 	if failedCount > 0 {
 		return fmt.Errorf("failed to recover %d clusters", failedCount)
@@ -507,7 +534,8 @@ func (s *Server) RecoverState(ctx context.Context) error {
 func (s *Server) recoverServicesForCluster(ctx context.Context, cluster *storage.Cluster) error {
 	// Skip if storage is not available
 	if s.storage == nil || s.storage.ServiceStore() == nil {
-		log.Printf("Storage not available, skipping service recovery for cluster %s", cluster.Name)
+		logging.Info("Storage not available, skipping service recovery for cluster",
+			"cluster", cluster.Name)
 		return nil
 	}
 
@@ -518,11 +546,14 @@ func (s *Server) recoverServicesForCluster(ctx context.Context, cluster *storage
 	}
 
 	if len(services) == 0 {
-		log.Printf("No services found for cluster %s", cluster.Name)
+		logging.Info("No services found for cluster",
+			"cluster", cluster.Name)
 		return nil
 	}
 
-	log.Printf("Found %d services to recover for cluster %s", len(services), cluster.Name)
+	logging.Info("Found services to recover for cluster",
+		"count", len(services),
+		"cluster", cluster.Name)
 
 	// Get Kubernetes client for the cluster
 	kubeClient, err := s.clusterManager.GetKubeClient(cluster.K8sClusterName)
@@ -538,32 +569,40 @@ func (s *Server) recoverServicesForCluster(ctx context.Context, cluster *storage
 
 	// Recover each service
 	for _, service := range services {
-		log.Printf("Recovering service %s in cluster %s...", service.ServiceName, cluster.Name)
+		logging.Info("Recovering service in cluster...",
+			"service", service.ServiceName,
+			"cluster", cluster.Name)
 
 		// Get task definition
 		taskDefArn := service.TaskDefinitionARN
 		if taskDefArn == "" {
-			log.Printf("Service %s has no task definition, skipping", service.ServiceName)
+			logging.Warn("Service has no task definition, skipping",
+				"service", service.ServiceName)
 			continue
 		}
 
 		// Parse task definition family and revision
 		taskDef, err := s.storage.TaskDefinitionStore().GetByARN(ctx, taskDefArn)
 		if err != nil {
-			log.Printf("Failed to get task definition %s: %v", taskDefArn, err)
+			logging.Error("Failed to get task definition",
+				"taskDefinitionArn", taskDefArn,
+				"error", err)
 			continue
 		}
 
 		// Create service manager if not exists
 		if s.taskManager == nil {
-			log.Printf("Task manager not available, skipping service deployment for %s", service.ServiceName)
+			logging.Warn("Task manager not available, skipping service deployment",
+				"service", service.ServiceName)
 			continue
 		}
 
 		// Create deployment for the service
 		err = s.taskManager.CreateServiceDeployment(ctx, cluster, service, taskDef)
 		if err != nil {
-			log.Printf("Failed to create deployment for service %s: %v", service.ServiceName, err)
+			logging.Error("Failed to create deployment for service",
+				"service", service.ServiceName,
+				"error", err)
 			continue
 		}
 
@@ -573,19 +612,26 @@ func (s *Server) recoverServicesForCluster(ctx context.Context, cluster *storage
 		service.UpdatedAt = time.Now()
 
 		if err := s.storage.ServiceStore().Update(ctx, service); err != nil {
-			log.Printf("Failed to update service %s after recovery: %v", service.ServiceName, err)
+			logging.Error("Failed to update service after recovery",
+				"service", service.ServiceName,
+				"error", err)
 		}
 
 		// Schedule tasks to match desired count
 		if service.DesiredCount > 0 {
-			log.Printf("Scheduling %d tasks for service %s", service.DesiredCount, service.ServiceName)
+			logging.Info("Scheduling tasks for service",
+				"count", service.DesiredCount,
+				"service", service.ServiceName)
 			if err := s.scheduleServiceTasks(ctx, cluster, service, taskDef, service.DesiredCount); err != nil {
-				log.Printf("Failed to schedule tasks for service %s: %v", service.ServiceName, err)
+				logging.Error("Failed to schedule tasks for service",
+					"service", service.ServiceName,
+					"error", err)
 				// Don't fail the whole recovery process
 			}
 		}
 
-		log.Printf("Successfully recovered service %s", service.ServiceName)
+		logging.Info("Successfully recovered service",
+			"service", service.ServiceName)
 	}
 
 	return nil
@@ -593,7 +639,9 @@ func (s *Server) recoverServicesForCluster(ctx context.Context, cluster *storage
 
 // scheduleServiceTasks creates tasks for a service to match its desired count
 func (s *Server) scheduleServiceTasks(ctx context.Context, cluster *storage.Cluster, service *storage.Service, taskDef *storage.TaskDefinition, count int) error {
-	log.Printf("Creating %d tasks for service %s", count, service.ServiceName)
+	logging.Info("Creating tasks for service",
+		"count", count,
+		"service", service.ServiceName)
 
 	// Check if we have the necessary components
 	if s.taskManager == nil {
@@ -628,14 +676,18 @@ func (s *Server) scheduleServiceTasks(ctx context.Context, cluster *storage.Clus
 
 		// Store task
 		if err := s.storage.TaskStore().Create(ctx, task); err != nil {
-			log.Printf("Failed to create task %s in storage: %v", taskID, err)
+			logging.Error("Failed to create task in storage",
+				"taskId", taskID,
+				"error", err)
 			continue
 		}
 
 		// Create Kubernetes pod
 		pod, err := s.createPodForTask(ctx, cluster, service, taskDef, task)
 		if err != nil {
-			log.Printf("Failed to create pod for task %s: %v", taskID, err)
+			logging.Error("Failed to create pod for task",
+				"taskId", taskID,
+				"error", err)
 			// Update task status to failed
 			task.LastStatus = "FAILED"
 			task.StoppedReason = err.Error()
@@ -651,11 +703,15 @@ func (s *Server) scheduleServiceTasks(ctx context.Context, cluster *storage.Clus
 			task.Namespace = namespace
 			task.LastStatus = "PROVISIONING"
 			if err := s.storage.TaskStore().Update(ctx, task); err != nil {
-				log.Printf("Failed to update task %s with pod info: %v", taskID, err)
+				logging.Error("Failed to update task with pod info",
+					"taskId", taskID,
+					"error", err)
 			}
 		}
 
-		log.Printf("Created task %s for service %s", taskID, service.ServiceName)
+		logging.Info("Created task for service",
+			"taskId", taskID,
+			"service", service.ServiceName)
 	}
 
 	return nil
@@ -719,7 +775,8 @@ func (s *Server) createPodForTask(ctx context.Context, cluster *storage.Cluster,
 func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *storage.Cluster) error {
 	// Check if LocalStack was deployed
 	if cluster.LocalStackState == "" {
-		log.Printf("No LocalStack state found for cluster %s", cluster.Name)
+		logging.Info("No LocalStack state found for cluster",
+			"cluster", cluster.Name)
 		return nil
 	}
 	
@@ -730,11 +787,14 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 	}
 	
 	if state == nil || !state.Deployed {
-		log.Printf("LocalStack was not deployed in cluster %s", cluster.Name)
+		logging.Info("LocalStack was not deployed in cluster",
+			"cluster", cluster.Name)
 		return nil
 	}
 	
-	log.Printf("LocalStack was deployed in cluster %s with status %s, attempting recovery...", cluster.Name, state.Status)
+	logging.Info("LocalStack was deployed in cluster, attempting recovery...",
+		"cluster", cluster.Name,
+		"status", state.Status)
 	
 	// Check if LocalStack is enabled
 	var config *localstack.Config
@@ -755,17 +815,17 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 		// Check features.traefik configuration
 		if appConfig.Features.Traefik {
 			config.UseTraefik = true
-			log.Printf("Traefik is enabled for LocalStack recovery via features.traefik")
+			logging.Info("Traefik is enabled for LocalStack recovery via features.traefik")
 		}
 		// Set container mode
 		if appConfig.Features.ContainerMode {
 			config.ContainerMode = true
-			log.Printf("Container mode is enabled for LocalStack recovery")
+			logging.Info("Container mode is enabled for LocalStack recovery")
 		}
 	}
 	
 	if config == nil || !config.Enabled {
-		log.Printf("LocalStack is not enabled in configuration, skipping recovery")
+		logging.Info("LocalStack is not enabled in configuration, skipping recovery")
 		return nil
 	}
 	
@@ -779,9 +839,12 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 	if config.UseTraefik && s.clusterManager != nil {
 		if port, exists := s.clusterManager.GetTraefikPort(cluster.K8sClusterName); exists {
 			config.ProxyEndpoint = fmt.Sprintf("http://localhost:%d", port)
-			log.Printf("Using dynamic Traefik port %d for LocalStack proxy endpoint: %s", port, config.ProxyEndpoint)
+			logging.Info("Using dynamic Traefik port for LocalStack proxy endpoint",
+				"port", port,
+				"proxyEndpoint", config.ProxyEndpoint)
 		} else {
-			log.Printf("Warning: Traefik is enabled but no port found for cluster %s", cluster.K8sClusterName)
+			logging.Warn("Traefik is enabled but no port found for cluster",
+				"k8sCluster", cluster.K8sClusterName)
 		}
 	}
 
@@ -802,19 +865,21 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 	
 	// Re-initialize AWS proxy router with the new LocalStack manager
 	if s.localStackManager != nil {
-		log.Printf("Re-initializing AWS proxy router after LocalStack recovery...")
+		logging.Info("Re-initializing AWS proxy router after LocalStack recovery...")
 		awsProxyRouter, err := NewAWSProxyRouter(s.localStackManager)
 		if err != nil {
-			log.Printf("Warning: Failed to re-initialize AWS proxy router: %v", err)
+			logging.Warn("Failed to re-initialize AWS proxy router",
+				"error", err)
 		} else {
 			s.awsProxyRouter = awsProxyRouter
-			log.Printf("AWS proxy router re-initialized successfully")
+			logging.Info("AWS proxy router re-initialized successfully")
 		}
 	}
 	
 	// Check if LocalStack is already running in this cluster
 	if clusterLocalStackManager.IsRunning() {
-		log.Printf("LocalStack is already running in cluster %s", cluster.Name)
+		logging.Info("LocalStack is already running in cluster",
+			"cluster", cluster.Name)
 		// Update state to running
 		if s.ecsAPI != nil {
 			if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {
@@ -825,9 +890,12 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 	}
 	
 	// Start LocalStack in the cluster
-	log.Printf("Starting LocalStack in cluster %s...", cluster.Name)
+	logging.Info("Starting LocalStack in cluster...",
+		"cluster", cluster.Name)
 	if err := clusterLocalStackManager.Start(ctx); err != nil {
-		log.Printf("Failed to start LocalStack in cluster %s: %v", cluster.Name, err)
+		logging.Error("Failed to start LocalStack in cluster",
+			"cluster", cluster.Name,
+			"error", err)
 		// Update state to failed
 		if s.ecsAPI != nil {
 			if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {
@@ -838,9 +906,12 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 	}
 	
 	// Wait for LocalStack to be ready
-	log.Printf("Waiting for LocalStack to be ready in cluster %s...", cluster.Name)
+	logging.Info("Waiting for LocalStack to be ready in cluster...",
+		"cluster", cluster.Name)
 	if err := clusterLocalStackManager.WaitForReady(ctx, 2*time.Minute); err != nil {
-		log.Printf("LocalStack failed to become ready in cluster %s: %v", cluster.Name, err)
+		logging.Error("LocalStack failed to become ready in cluster",
+			"cluster", cluster.Name,
+			"error", err)
 		// Update state to failed
 		if s.ecsAPI != nil {
 			if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {
@@ -850,7 +921,8 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 		return err
 	}
 	
-	log.Printf("LocalStack successfully recovered in cluster %s", cluster.Name)
+	logging.Info("LocalStack successfully recovered in cluster",
+		"cluster", cluster.Name)
 	// Update state to running
 	if s.ecsAPI != nil {
 		if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {

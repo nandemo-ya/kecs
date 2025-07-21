@@ -18,6 +18,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 )
@@ -111,6 +112,9 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return runStartWithBubbleTea(ctx, startInstanceName, cfg, startDataDir)
 	}
 
+	// Initialize logging for verbose mode
+	logging.InitializeForProgress(nil, true)
+
 	// Step 1: Create k3d cluster for KECS instance
 	spinner := progress.NewSpinner("Creating k3d cluster")
 	spinner.Start()
@@ -138,6 +142,9 @@ func runStart(cmd *cobra.Command, args []string) error {
 	logRedirector := progress.NewLogRedirector(logCapture, progress.LogLevelInfo)
 	logRedirector.RedirectStandardLog()
 	defer logRedirector.Restore()
+	
+	// Re-initialize logging with the log capture
+	logging.InitializeForProgress(logCapture, true)
 	
 	// Create parallel tracker for component deployment with log capture
 	parallelTracker := progress.NewParallelTracker("Deploying components").
