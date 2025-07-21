@@ -1,0 +1,46 @@
+{
+  "family": "batch-job-simple",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "batch-processor",
+      "image": "busybox:latest",
+      "essential": true,
+      "command": [
+        "sh", "-c",
+        "echo '[$(date)] Batch job starting...' && \
+         echo '[$(date)] Processing item 1...' && sleep 2 && \
+         echo '[$(date)] Processing item 2...' && sleep 2 && \
+         echo '[$(date)] Processing item 3...' && sleep 2 && \
+         echo '[$(date)] Generating report...' && \
+         echo '{\"processed\": 3, \"success\": 3, \"failed\": 0, \"timestamp\": \"'$(date -Iseconds)'\"}' > /tmp/report.json && \
+         cat /tmp/report.json && \
+         echo '[$(date)] Batch job completed successfully!' && \
+         exit 0"
+      ],
+      "environment": [
+        {
+          "name": "JOB_TYPE",
+          "value": "data-processing"
+        },
+        {
+          "name": "BATCH_SIZE",
+          "value": "3"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/batch-job-simple",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "batch"
+        }
+      }
+    }
+  ],
+  "executionRoleArn": "arn:aws:iam::000000000000:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::000000000000:role/ecsTaskRole"
+}

@@ -1,0 +1,77 @@
+{
+  "family": "service-with-secrets",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "python:3.9-alpine",
+      "essential": true,
+      "command": [
+        "sh", "-c",
+        "cat > /app/server.py << 'EOF'\nimport os\nimport json\nfrom http.server import HTTPServer, BaseHTTPRequestHandler\n\nclass Handler(BaseHTTPRequestHandler):\n    def do_GET(self):\n        if self.path == '/health':\n            self.send_response(200)\n            self.send_header('Content-Type', 'application/json')\n            self.end_headers()\n            self.wfile.write(json.dumps({'status': 'healthy'}).encode())\n        elif self.path == '/config':\n            self.send_response(200)\n            self.send_header('Content-Type', 'application/json')\n            self.end_headers()\n            config = {\n                'database_url': os.environ.get('DATABASE_URL', 'not_set'),\n                'api_key_present': bool(os.environ.get('API_KEY')),\n                'app_config': os.environ.get('APP_CONFIG', 'not_set'),\n                'feature_flags': os.environ.get('FEATURE_FLAGS', 'not_set'),\n                'environment': os.environ.get('ENVIRONMENT', 'not_set')\n            }\n            self.wfile.write(json.dumps(config, indent=2).encode())\n        elif self.path == '/secrets':\n            self.send_response(200)\n            self.send_header('Content-Type', 'application/json')\n            self.end_headers()\n            # Never expose actual secrets, just confirm they exist\n            secrets = {\n                'db_password_loaded': bool(os.environ.get('DB_PASSWORD')),\n                'jwt_secret_loaded': bool(os.environ.get('JWT_SECRET')),\n                'encryption_key_loaded': bool(os.environ.get('ENCRYPTION_KEY'))\n            }\n            self.wfile.write(json.dumps(secrets, indent=2).encode())\n        else:\n            self.send_response(404)\n            self.end_headers()\n\nif __name__ == '__main__':\n    print('Starting server on port 8080...')\n    print('Environment:', os.environ.get('ENVIRONMENT', 'not_set'))\n    httpd = HTTPServer(('', 8080), Handler)\n    httpd.serve_forever()\nEOF\n&& python /app/server.py"
+      ],
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "ENVIRONMENT",
+          "value": "production"
+        },
+        {
+          "name": "APP_CONFIG",
+          "value": "server=app.example.com;timeout=30;retries=3"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:ssm:us-east-1:000000000000:parameter/myapp/prod/database_url"
+        },
+        {
+          "name": "API_KEY",
+          "valueFrom": "arn:aws:ssm:us-east-1:000000000000:parameter/myapp/prod/api_key"
+        },
+        {
+          "name": "FEATURE_FLAGS",
+          "valueFrom": "arn:aws:ssm:us-east-1:000000000000:parameter/myapp/prod/feature_flags"
+        },
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:000000000000:secret:myapp/prod/db-AbCdEf"
+        },
+        {
+          "name": "JWT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:000000000000:secret:myapp/prod/jwt-GhIjKl"
+        },
+        {
+          "name": "ENCRYPTION_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:000000000000:secret:myapp/prod/encryption-MnOpQr"
+        }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -q -O - http://localhost:8080/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/service-with-secrets",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "app"
+        }
+      }
+    }
+  ],
+  "executionRoleArn": "arn:aws:iam::000000000000:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::000000000000:role/ecsTaskRole"
+}

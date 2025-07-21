@@ -1,0 +1,53 @@
+{
+  "serviceName": "microservice-api",
+  "cluster": "default",
+  "taskDefinition": "microservice-api:latest",
+  "desiredCount": 3,
+  "launchType": "FARGATE",
+  "platformVersion": "LATEST",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": ["subnet-12345678", "subnet-87654321"],
+      "securityGroups": ["sg-api-service"],
+      "assignPublicIp": "ENABLED"
+    }
+  },
+  "loadBalancers": [
+    {
+      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/microservice-api-tg/1234567890123456",
+      "containerName": "api",
+      "containerPort": 3000
+    }
+  ],
+  "healthCheckGracePeriodSeconds": 60,
+  "deploymentConfiguration": {
+    "maximumPercent": 200,
+    "minimumHealthyPercent": 100,
+    "deploymentCircuitBreaker": {
+      "enable": true,
+      "rollback": true
+    }
+  },
+  "placementStrategy": [
+    {
+      "type": "spread",
+      "field": "instanceId"
+    }
+  ],
+  "enableECSManagedTags": true,
+  "propagateTags": "SERVICE",
+  "tags": [
+    {
+      "key": "Environment",
+      "value": "production"
+    },
+    {
+      "key": "Application",
+      "value": "microservice-api"
+    },
+    {
+      "key": "LoadBalanced",
+      "value": "true"
+    }
+  ]
+}

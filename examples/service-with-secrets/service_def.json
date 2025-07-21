@@ -1,0 +1,39 @@
+{
+  "serviceName": "service-with-secrets",
+  "cluster": "default",
+  "taskDefinition": "service-with-secrets:latest",
+  "desiredCount": 2,
+  "launchType": "FARGATE",
+  "platformVersion": "LATEST",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": ["subnet-12345678", "subnet-87654321"],
+      "securityGroups": ["sg-secure-app"],
+      "assignPublicIp": "DISABLED"
+    }
+  },
+  "deploymentConfiguration": {
+    "maximumPercent": 200,
+    "minimumHealthyPercent": 100,
+    "deploymentCircuitBreaker": {
+      "enable": true,
+      "rollback": true
+    }
+  },
+  "enableECSManagedTags": true,
+  "propagateTags": "SERVICE",
+  "tags": [
+    {
+      "key": "Environment",
+      "value": "production"
+    },
+    {
+      "key": "Application",
+      "value": "secure-app"
+    },
+    {
+      "key": "SecretManagement",
+      "value": "enabled"
+    }
+  ]
+}
