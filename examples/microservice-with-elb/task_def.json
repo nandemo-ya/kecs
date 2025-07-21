@@ -46,6 +46,5 @@
       }
     }
   ],
-  "executionRoleArn": "arn:aws:iam::000000000000:role/ecsTaskExecutionRole",
-  "taskRoleArn": "arn:aws:iam::000000000000:role/ecsTaskRole"
+  "executionRoleArn": "arn:aws:iam::000000000000:role/ecsTaskExecutionRole"
 }

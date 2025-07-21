@@ -85,6 +85,15 @@ type Config struct {
 	ProxyEndpoint     string `yaml:"proxy_endpoint" json:"proxy_endpoint"`
 	UseTraefik        bool   `yaml:"use_traefik" json:"use_traefik"`
 	ContainerMode     bool   `yaml:"container_mode" json:"container_mode"`
+	
+	// Initialization configuration
+	InitScripts []InitScript `yaml:"init_scripts" json:"init_scripts"`
+}
+
+// InitScript represents an initialization script to run on LocalStack startup
+type InitScript struct {
+	Name    string `yaml:"name" json:"name"`
+	Content string `yaml:"content" json:"content"`
 }
 
 // ResourceLimits defines resource constraints for LocalStack

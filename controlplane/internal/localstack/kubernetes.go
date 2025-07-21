@@ -124,6 +124,15 @@ func (km *kubernetesManager) createPVC(ctx context.Context, config *Config) erro
 
 // createConfigMap creates a ConfigMap for LocalStack configuration
 func (km *kubernetesManager) createConfigMap(ctx context.Context, config *Config) error {
+	data := map[string]string{
+		"services": config.GetServicesString(),
+	}
+	
+	// Add init scripts to ConfigMap
+	for _, script := range config.InitScripts {
+		data[script.Name] = script.Content
+	}
+	
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "localstack-config",
@@ -133,9 +142,7 @@ func (km *kubernetesManager) createConfigMap(ctx context.Context, config *Config
 				LabelManagedBy: "kecs",
 			},
 		},
-		Data: map[string]string{
-			"services": config.GetServicesString(),
-		},
+		Data: data,
 	}
 
 	_, err := km.client.CoreV1().ConfigMaps(km.namespace).Create(ctx, configMap, metav1.CreateOptions{})
@@ -240,25 +247,51 @@ func (km *kubernetesManager) createDeployment(ctx context.Context, config *Confi
 		},
 	}
 
-	// Add volume mounts if persistence is enabled
+	// Add volumes
+	volumes := []corev1.Volume{}
+	volumeMounts := []corev1.VolumeMount{}
+
+	// Add persistence volume if enabled
 	if config.Persistence {
-		deployment.Spec.Template.Spec.Volumes = []corev1.Volume{
-			{
-				Name: "localstack-data",
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: "localstack-data",
-					},
+		volumes = append(volumes, corev1.Volume{
+			Name: "localstack-data",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: "localstack-data",
 				},
 			},
-		}
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "localstack-data",
+			MountPath: config.DataDir,
+		})
+	}
 
-		deployment.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
-			{
-				Name:      "localstack-data",
-				MountPath: config.DataDir,
+	// Add init scripts volume
+	if len(config.InitScripts) > 0 {
+		volumes = append(volumes, corev1.Volume{
+			Name: "init-scripts",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "localstack-config",
+					},
+					DefaultMode: &[]int32{0755}[0],
+				},
 			},
-		}
+		})
+		
+		// Mount init scripts to LocalStack's init directory
+		// LocalStack automatically executes scripts in /etc/localstack/init/ready.d/
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "init-scripts",
+			MountPath: "/etc/localstack/init/ready.d",
+		})
+	}
+
+	if len(volumes) > 0 {
+		deployment.Spec.Template.Spec.Volumes = volumes
+		deployment.Spec.Template.Spec.Containers[0].VolumeMounts = volumeMounts
 	}
 
 	_, err := km.client.AppsV1().Deployments(km.namespace).Create(ctx, deployment, metav1.CreateOptions{})
@@ -491,7 +524,30 @@ func (km *kubernetesManager) UpdateDeployment(ctx context.Context, config *Confi
 		return fmt.Errorf("failed to get configmap: %w", err)
 	}
 
+	// Update services
 	configMap.Data["services"] = config.GetServicesString()
+	
+	// Update init scripts
+	// First, remove old scripts that are no longer in config
+	for key := range configMap.Data {
+		if key != "services" {
+			found := false
+			for _, script := range config.InitScripts {
+				if script.Name == key {
+					found = true
+					break
+				}
+			}
+			if !found {
+				delete(configMap.Data, key)
+			}
+		}
+	}
+	
+	// Then add/update current scripts
+	for _, script := range config.InitScripts {
+		configMap.Data[script.Name] = script.Content
+	}
 
 	_, err = km.client.CoreV1().ConfigMaps(km.namespace).Update(ctx, configMap, metav1.UpdateOptions{})
 	if err != nil {
