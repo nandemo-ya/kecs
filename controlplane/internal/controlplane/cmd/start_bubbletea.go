@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"sync"
 	"time"
@@ -17,37 +16,10 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress/bubbletea"
-	"github.com/sirupsen/logrus"
 )
 
 // runStartWithBubbleTea is an alternative implementation using Bubble Tea
 func runStartWithBubbleTea(ctx context.Context, instanceName string, cfg *config.Config, dataDir string) error {
-	// Set environment variables to suppress external tool logs before starting
-	originalK3dLogLevel := os.Getenv("K3D_LOG_LEVEL")
-	os.Setenv("K3D_LOG_LEVEL", "panic") // Only show critical errors
-	
-	// Also suppress other potential loggers
-	os.Setenv("DOCKER_CLI_HINTS", "false")
-	os.Setenv("LOGRUS_LEVEL", "panic")
-	
-	// Configure logrus immediately to discard output
-	logrus.SetLevel(logrus.PanicLevel)
-	originalLogrusOut := logrus.StandardLogger().Out
-	logrus.SetOutput(io.Discard)
-	
-	defer func() {
-		if originalK3dLogLevel != "" {
-			os.Setenv("K3D_LOG_LEVEL", originalK3dLogLevel)
-		} else {
-			os.Unsetenv("K3D_LOG_LEVEL")
-		}
-		os.Unsetenv("DOCKER_CLI_HINTS")
-		os.Unsetenv("LOGRUS_LEVEL")
-		
-		// Restore logrus
-		logrus.SetOutput(originalLogrusOut)
-		logrus.SetLevel(logrus.InfoLevel)
-	}()
 	
 	// Use Bubble Tea for the entire process with silent start
 	return bubbletea.RunWithBubbleTeaSilent(ctx, fmt.Sprintf("Creating KECS instance '%s'", instanceName), func(tracker *bubbletea.Adapter) error {

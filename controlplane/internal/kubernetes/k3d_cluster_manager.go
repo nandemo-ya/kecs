@@ -38,6 +38,7 @@ type K3dClusterManager struct {
 
 // NewK3dClusterManager creates a new k3d-based cluster manager
 func NewK3dClusterManager(cfg *ClusterManagerConfig) (*K3dClusterManager, error) {
+	
 	if cfg == nil {
 		cfg = &ClusterManagerConfig{
 			Provider:      "k3d",
