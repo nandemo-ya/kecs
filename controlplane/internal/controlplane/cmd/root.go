@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 var (
@@ -48,6 +50,8 @@ func init() {
 
 // startServer is the default action when no subcommands are specified
 func startServer() {
-	fmt.Printf("Starting KECS Control Plane on port %d with log level %s\n", port, logLevel)
+	logging.Info("Starting KECS Control Plane",
+		"port", port,
+		"logLevel", logLevel)
 	// TODO: Implement actual control plane server startup logic
 }

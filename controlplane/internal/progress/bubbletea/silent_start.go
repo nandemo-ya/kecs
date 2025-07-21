@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 	"github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
@@ -91,6 +92,14 @@ func RunWithBubbleTeaSilent(ctx context.Context, title string, fn func(*Adapter)
 	
 	// Create and start the program
 	adapter := NewAdapter(title)
+	
+	// Initialize slog with the silent writer
+	logging.Initialize(&logging.Config{
+		Level:           logging.ParseLevel("INFO"),
+		Format:          "text",
+		Output:          silentLogWriter,
+		UseCustomFormat: true,
+	})
 	
 	// Set up the silent writer to send logs to the adapter once it's ready
 	silentLogWriter.onWrite = func(p []byte) {

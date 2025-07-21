@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 var (
@@ -144,7 +144,8 @@ func runClusterCreate(cmd *cobra.Command, args []string) error {
 	// Get cluster info
 	info, err := manager.GetClusterInfo(ctx, clusterName)
 	if err != nil {
-		klog.Warningf("Failed to get cluster info: %v", err)
+		logging.Warn("Failed to get cluster info",
+			"error", err)
 	} else {
 		fmt.Printf("\nCluster Information:\n")
 		fmt.Printf("  Name: %s\n", info.Name)
@@ -198,7 +199,8 @@ func runClusterDelete(cmd *cobra.Command, args []string) error {
 	if _, err := os.Stat(dataDir); err == nil {
 		fmt.Printf("Cleaning up data directory: %s\n", dataDir)
 		if err := os.RemoveAll(dataDir); err != nil {
-			klog.Warningf("Failed to remove data directory: %v", err)
+			logging.Warn("Failed to remove data directory",
+				"error", err)
 		}
 	}
 
@@ -225,7 +227,9 @@ func runClusterList(cmd *cobra.Command, args []string) error {
 	for _, name := range clusterNames {
 		exists, err := manager.ClusterExists(ctx, name)
 		if err != nil {
-			klog.Warningf("Failed to check cluster %s: %v", name, err)
+			logging.Warn("Failed to check cluster",
+				"cluster", name,
+				"error", err)
 			continue
 		}
 

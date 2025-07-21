@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/admin"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/security"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/cache"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
@@ -63,10 +63,10 @@ func init() {
 func runServer(cmd *cobra.Command) {
 	// Log mode status for debugging
 	if config.GetBool("features.testMode") {
-		fmt.Println("KECS_TEST_MODE is enabled - running in test mode")
+		logging.Info("KECS_TEST_MODE is enabled - running in test mode")
 	}
 	if config.GetBool("features.containerMode") {
-		fmt.Println("KECS_CONTAINER_MODE is enabled - running in container mode")
+		logging.Info("KECS_CONTAINER_MODE is enabled - running in container mode")
 	}
 
 	// Load configuration
@@ -106,20 +106,28 @@ func runServer(cmd *cobra.Command) {
 		log.Fatalf("Security disclaimer not acknowledged: %v", err)
 	}
 
-	fmt.Printf("Starting KECS Control Plane server on port %d with log level %s\n", cfg.Server.Port, cfg.Server.LogLevel)
-	fmt.Printf("Starting KECS Admin server on port %d\n", cfg.Server.AdminPort)
+	// Initialize logging with configured level
+	logging.SetLevel(logging.ParseLevel(cfg.Server.LogLevel))
+
+	logging.Info("Starting KECS Control Plane server",
+		"port", cfg.Server.Port,
+		"logLevel", cfg.Server.LogLevel)
+	logging.Info("Starting KECS Admin server",
+		"port", cfg.Server.AdminPort)
 	if kubeconfig != "" {
-		fmt.Printf("Using kubeconfig: %s\n", kubeconfig)
+		logging.Info("Using kubeconfig",
+			"path", kubeconfig)
 	} else {
-		fmt.Println("Using in-cluster configuration or default kubeconfig")
+		logging.Info("Using in-cluster configuration or default kubeconfig")
 	}
 
 	// Initialize storage
 	dbPath := filepath.Join(cfg.Server.DataDir, "kecs.db")
-	fmt.Printf("Using database: %s\n", dbPath)
+	logging.Info("Using database",
+		"path", dbPath)
 
 	// Create data directory if it doesn't exist
-	if err := os.MkdirAll(cfg.Server.DataDir, 0755); err != nil {
+	if err := os.MkdirAll(cfg.Server.DataDir, 0o755); err != nil {
 		log.Fatalf("Failed to create data directory: %v", err)
 	}
 
@@ -143,16 +151,19 @@ func runServer(cmd *cobra.Command) {
 
 	defer func() {
 		if err := storage.Close(); err != nil {
-			log.Printf("Error closing storage: %v", err)
+			logging.Error("Error closing storage",
+				"error", err)
 		}
 	}()
 
-	fmt.Printf("Initialized in-memory cache (TTL: %v, Max Size: %d)\n", cacheTTL, cacheSize)
+	logging.Info("Initialized in-memory cache",
+		"ttl", cacheTTL,
+		"maxSize", cacheSize)
 
 	// Initialize the API server with LocalStack configuration
 	var localstackConfig *localstack.Config
 	if cfg.LocalStack.Enabled {
-		fmt.Println("LocalStack integration is enabled")
+		logging.Info("LocalStack integration is enabled")
 		localstackConfig = &cfg.LocalStack
 		// Set UseTraefik from features configuration
 		localstackConfig.UseTraefik = cfg.Features.Traefik
@@ -174,15 +185,16 @@ func runServer(cmd *cobra.Command) {
 
 	go func() {
 		sig := <-sigCh
-		fmt.Printf("Received signal %s, shutting down gracefully...\n", sig)
-		
+		logging.Info("Received signal, shutting down gracefully...",
+			"signal", sig)
+
 		// For in-cluster mode, we need to handle preStop hook gracefully
 		if serverMode == "in-cluster" {
-			fmt.Println("Running in-cluster shutdown sequence...")
+			logging.Info("Running in-cluster shutdown sequence...")
 			// Give time for endpoints to be removed from service
 			time.Sleep(5 * time.Second)
 		}
-		
+
 		cancel()
 
 		// Allow some time for graceful shutdown
@@ -196,34 +208,38 @@ func runServer(cmd *cobra.Command) {
 
 		// Persist state before shutdown
 		if storage != nil {
-			fmt.Println("Persisting state before shutdown...")
+			logging.Info("Persisting state before shutdown...")
 			// Storage should handle its own graceful shutdown
 		}
 
 		// Stop both servers
 		if err := apiServer.Stop(shutdownCtx); err != nil {
-			fmt.Printf("Error during API server shutdown: %v\n", err)
+			logging.Error("Error during API server shutdown",
+				"error", err)
 		}
 
 		if err := adminServer.Stop(shutdownCtx); err != nil {
-			fmt.Printf("Error during Admin server shutdown: %v\n", err)
+			logging.Error("Error during Admin server shutdown",
+				"error", err)
 		}
 
 		// LocalStack will be stopped by the API server during shutdown
-		fmt.Println("Shutdown complete")
+		logging.Info("Shutdown complete")
 	}()
 
 	// Start the admin server in a goroutine
 	go func() {
 		if err := adminServer.Start(); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("Admin server error: %v\n", err)
+			logging.Error("Admin server error",
+				"error", err)
 			cancel() // Cancel context to trigger shutdown of API server
 		}
 	}()
 
 	// Start the API server in the main goroutine
 	if err := apiServer.Start(); err != nil && err != http.ErrServerClosed {
-		fmt.Printf("API server error: %v\n", err)
+		logging.Error("API server error",
+			"error", err)
 		os.Exit(1)
 	}
 
