@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
@@ -82,15 +82,15 @@ func (c *ServiceConverterWithLB) processLoadBalancer(
 		containerPort = int32(cp)
 	}
 
-	klog.V(2).Infof("Processing load balancer configuration: targetGroup=%s, lb=%s, container=%s, port=%d",
-		targetGroupArn, loadBalancerName, containerName, containerPort)
+	logging.Debug("Processing load balancer configuration",
+		"targetGroup", targetGroupArn, "loadBalancer", loadBalancerName, "container", containerName, "port", containerPort)
 
 	// If target group ARN is provided, register the service endpoints
 	if targetGroupArn != "" {
 		// Get pod IPs from the service endpoints
 		targets, err := c.getServiceTargets(ctx, kubeService, containerPort)
 		if err != nil {
-			klog.Warningf("Failed to get service targets: %v", err)
+			logging.Warn("Failed to get service targets", "error", err)
 			// Don't fail the operation, targets can be registered later
 			return nil
 		}
@@ -98,10 +98,10 @@ func (c *ServiceConverterWithLB) processLoadBalancer(
 		if len(targets) > 0 {
 			// Register targets with the target group
 			if err := c.elbv2Integration.RegisterTargets(ctx, targetGroupArn, targets); err != nil {
-				klog.Errorf("Failed to register targets with target group %s: %v", targetGroupArn, err)
+				logging.Error("Failed to register targets with target group", "targetGroupArn", targetGroupArn, "error", err)
 				// Don't fail the operation, targets can be registered later
 			} else {
-				klog.V(2).Infof("Registered %d targets with target group %s", len(targets), targetGroupArn)
+				logging.Debug("Registered targets with target group", "targetCount", len(targets), "targetGroupArn", targetGroupArn)
 			}
 		}
 
@@ -160,7 +160,7 @@ func (c *ServiceConverterWithLB) CreateTargetGroupForService(
 		return nil, fmt.Errorf("failed to create target group: %w", err)
 	}
 
-	klog.V(2).Infof("Created target group %s for service %s", tg.Arn, service.ServiceName)
+	logging.Debug("Created target group for service", "targetGroupArn", tg.Arn, "serviceName", service.ServiceName)
 	return tg, nil
 }
 
@@ -184,7 +184,7 @@ func (c *ServiceConverterWithLB) CreateLoadBalancerForService(
 		return nil, fmt.Errorf("failed to create load balancer: %w", err)
 	}
 
-	klog.V(2).Infof("Created load balancer %s for service %s", lb.Arn, service.ServiceName)
+	logging.Debug("Created load balancer for service", "loadBalancerArn", lb.Arn, "serviceName", service.ServiceName)
 	return lb, nil
 }
 
@@ -199,7 +199,7 @@ func (c *ServiceConverterWithLB) UpdateServiceWithLoadBalancer(
 	var loadBalancers []map[string]interface{}
 	if service.LoadBalancers != "" && service.LoadBalancers != "null" {
 		if err := json.Unmarshal([]byte(service.LoadBalancers), &loadBalancers); err != nil {
-			klog.Warningf("Failed to parse existing load balancers: %v", err)
+			logging.Warn("Failed to parse existing load balancers", "error", err)
 			loadBalancers = []map[string]interface{}{}
 		}
 	}

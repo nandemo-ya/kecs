@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // healthChecker implements the HealthChecker interface
@@ -33,7 +33,7 @@ func (hc *healthChecker) UpdateEndpoint(endpoint string) {
 	hc.mu.Lock()
 	defer hc.mu.Unlock()
 	hc.endpoint = endpoint
-	klog.Infof("Updated health check endpoint to: %s", endpoint)
+	logging.Info("Updated health check endpoint", "endpoint", endpoint)
 }
 
 // CheckHealth performs a health check on LocalStack
@@ -43,7 +43,7 @@ func (hc *healthChecker) CheckHealth(ctx context.Context) (*HealthStatus, error)
 	hc.mu.RUnlock()
 	
 	healthURL := fmt.Sprintf("%s%s", endpoint, HealthCheckPath)
-	klog.V(2).Infof("Performing health check on LocalStack at: %s", healthURL)
+	logging.Debug("Performing health check on LocalStack", "url", healthURL)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
 	if err != nil {
@@ -52,7 +52,7 @@ func (hc *healthChecker) CheckHealth(ctx context.Context) (*HealthStatus, error)
 
 	resp, err := hc.httpClient.Do(req)
 	if err != nil {
-		klog.Warningf("Failed to connect to LocalStack at %s: %v", healthURL, err)
+		logging.Warn("Failed to connect to LocalStack", "url", healthURL, "error", err)
 		return &HealthStatus{
 			Healthy:   false,
 			Message:   fmt.Sprintf("failed to connect to LocalStack: %v", err),
@@ -95,7 +95,7 @@ func (hc *healthChecker) WaitForHealthy(ctx context.Context, timeout time.Durati
 
 			status, err := hc.CheckHealth(ctx)
 			if err != nil {
-				klog.Warningf("Health check error: %v", err)
+				logging.Warn("Health check error", "error", err)
 				consecutiveFails++
 				if consecutiveFails >= maxConsecutiveFails {
 					return fmt.Errorf("health check failed %d times: %w", consecutiveFails, err)
@@ -104,11 +104,11 @@ func (hc *healthChecker) WaitForHealthy(ctx context.Context, timeout time.Durati
 			}
 
 			if status.Healthy {
-				klog.Info("LocalStack is healthy")
+				logging.Info("LocalStack is healthy")
 				return nil
 			}
 
-			klog.Infof("Waiting for LocalStack to become healthy: %s", status.Message)
+			logging.Info("Waiting for LocalStack to become healthy", "message", status.Message)
 			consecutiveFails = 0
 		}
 	}

@@ -11,7 +11,6 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 	"github.com/sirupsen/logrus"
-	"k8s.io/klog/v2"
 )
 
 // silentWriter is a writer that discards all output until activated
@@ -69,12 +68,6 @@ func RunWithBubbleTeaSilent(ctx context.Context, title string, fn func(*Adapter)
 	log.SetOutput(silentLogWriter)
 	defer log.SetOutput(originalLogWriter)
 	
-	// Also redirect klog immediately
-	klog.SetOutput(silentLogWriter)
-	defer func() {
-		klog.Flush()
-		klog.SetOutput(os.Stderr)
-	}()
 	
 	// Set environment to suppress logrus output from k3d
 	// This is needed because k3d uses logrus internally

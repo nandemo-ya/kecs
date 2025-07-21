@@ -5,9 +5,8 @@ import (
 	"fmt"
 
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
@@ -38,7 +37,7 @@ func NewManager(kubeClient kubernetes.Interface, config *localstack.ProxyConfig)
 
 // Start starts the proxy manager with the configured mode
 func (m *Manager) Start(ctx context.Context) error {
-	klog.Infof("Starting proxy manager with mode: %s", m.mode)
+	logging.Info("Starting proxy manager", "mode", m.mode)
 
 	switch m.mode {
 	case localstack.ProxyModeEnvironment:
@@ -46,7 +45,7 @@ func (m *Manager) Start(ctx context.Context) error {
 	case localstack.ProxyModeSidecar:
 		return m.startSidecarMode(ctx)
 	case localstack.ProxyModeDisabled:
-		klog.Info("Proxy mode is disabled")
+		logging.Info("Proxy mode is disabled")
 		return nil
 	default:
 		return fmt.Errorf("unsupported proxy mode: %s", m.mode)
@@ -55,7 +54,7 @@ func (m *Manager) Start(ctx context.Context) error {
 
 // Stop stops the proxy manager
 func (m *Manager) Stop(ctx context.Context) error {
-	klog.Info("Stopping proxy manager")
+	logging.Info("Stopping proxy manager")
 
 	if m.webhookServer != nil {
 		if err := m.webhookServer.Stop(); err != nil {
@@ -68,7 +67,7 @@ func (m *Manager) Stop(ctx context.Context) error {
 
 // startEnvironmentMode starts the environment variable injection mode
 func (m *Manager) startEnvironmentMode(ctx context.Context) error {
-	klog.Info("Starting environment variable proxy mode")
+	logging.Info("Starting environment variable proxy mode")
 
 	// Create environment variable proxy
 	m.envProxy = NewEnvironmentVariableProxy(m.localStackEndpoint)
@@ -92,7 +91,7 @@ func (m *Manager) startEnvironmentMode(ctx context.Context) error {
 
 // startSidecarMode starts the sidecar proxy mode
 func (m *Manager) startSidecarMode(ctx context.Context) error {
-	klog.Info("Starting sidecar proxy mode")
+	logging.Info("Starting sidecar proxy mode")
 
 	// Create sidecar proxy
 	sidecarProxy := NewSidecarProxy(m.localStackEndpoint)
@@ -105,7 +104,7 @@ func (m *Manager) startSidecarMode(ctx context.Context) error {
 	// Store reference for later use
 	m.sidecarProxy = sidecarProxy
 
-	klog.Info("Sidecar proxy mode initialized successfully")
+	logging.Info("Sidecar proxy mode initialized successfully")
 	return nil
 }
 

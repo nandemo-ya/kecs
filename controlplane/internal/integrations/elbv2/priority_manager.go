@@ -8,7 +8,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // PriorityManager manages rule priorities for ELBv2 listeners
@@ -251,7 +251,7 @@ func (p *PriorityManager) OptimizePriorities(ctx context.Context, listenerArn st
 	for i, rule := range rules {
 		conditions, err := p.parseConditions(rule.Conditions)
 		if err != nil {
-			klog.V(2).Infof("Failed to parse conditions for rule %s: %v", rule.ARN, err)
+			logging.Debug("Failed to parse conditions for rule", "ruleArn", rule.ARN, "error", err)
 			continue
 		}
 

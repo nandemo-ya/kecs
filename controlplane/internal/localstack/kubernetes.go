@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // kubernetesManager implements KubernetesManager interface
@@ -51,7 +51,7 @@ func (km *kubernetesManager) CreateNamespace(ctx context.Context) error {
 		return fmt.Errorf("failed to create namespace: %w", err)
 	}
 
-	klog.Infof("Namespace %s created or already exists", km.namespace)
+	logging.Info("Namespace created or already exists", "namespace", km.namespace)
 	return nil
 }
 
@@ -328,13 +328,13 @@ func (km *kubernetesManager) WaitForLocalStackReady(ctx context.Context, timeout
 				LabelSelector: "app=localstack",
 			})
 			if err != nil {
-				klog.Warningf("Failed to list pods: %v", err)
+				logging.Warn("Failed to list pods", "error", err)
 				time.Sleep(2 * time.Second)
 				continue
 			}
 
 			if len(pods.Items) == 0 {
-				klog.Info("No LocalStack pods found yet")
+				logging.Info("No LocalStack pods found yet")
 				time.Sleep(2 * time.Second)
 				continue
 			}
@@ -345,7 +345,7 @@ func (km *kubernetesManager) WaitForLocalStackReady(ctx context.Context, timeout
 				return km.waitForReadyInLogs(ctx, pod.Name, deadline)
 			}
 
-			klog.Infof("Pod status: %s", pod.Status.Phase)
+			logging.Info("Pod status", "phase", pod.Status.Phase)
 			time.Sleep(2 * time.Second)
 		}
 	}
@@ -375,11 +375,11 @@ func (km *kubernetesManager) waitForReadyInLogs(ctx context.Context, podName str
 			}
 
 			line := scanner.Text()
-			klog.V(4).Infof("LocalStack log: %s", line)
+			logging.Debug("LocalStack log", "line", line)
 
 			// Check for "Ready." in the log line
 			if strings.Contains(line, "Ready.") {
-				klog.Info("LocalStack is ready!")
+				logging.Info("LocalStack is ready!")
 				return nil
 			}
 		}

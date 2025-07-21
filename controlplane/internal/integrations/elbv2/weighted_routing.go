@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // WeightedRoutingManager handles weighted routing configuration for ELBv2
@@ -81,7 +81,7 @@ func (w *WeightedRoutingManager) convertForwardConfig(config *generated_elbv2.Fo
 	}
 	
 	if totalWeight == 0 {
-		klog.V(2).Info("Total weight is 0, normalizing weights")
+		logging.Debug("Total weight is 0, normalizing weights")
 		// If all weights are 0, distribute equally
 		equalWeight := int32(100 / len(config.TargetGroups))
 		for i := range config.TargetGroups {
@@ -102,7 +102,7 @@ func (w *WeightedRoutingManager) convertForwardConfig(config *generated_elbv2.Fo
 
 		service, err := w.createServiceFromTargetGroup(*tg.TargetGroupArn, weight, resolver)
 		if err != nil {
-			klog.V(2).Infof("Failed to create service for target group %s: %v", *tg.TargetGroupArn, err)
+			logging.Debug("Failed to create service for target group", "targetGroupArn", *tg.TargetGroupArn, "error", err)
 			continue
 		}
 
@@ -130,7 +130,7 @@ func (w *WeightedRoutingManager) createServiceFromTargetGroup(targetGroupArn str
 	if resolver != nil {
 		tgInfo, err := resolver.GetTargetGroupInfo(targetGroupArn)
 		if err != nil {
-			klog.V(2).Infof("Failed to resolve target group %s: %v", targetGroupArn, err)
+			logging.Debug("Failed to resolve target group", "targetGroupArn", targetGroupArn, "error", err)
 		} else if tgInfo.Port != nil {
 			port = *tgInfo.Port
 		}
@@ -207,7 +207,7 @@ func (w *WeightedRoutingManager) validateForwardConfig(config *generated_elbv2.F
 	// AWS allows total weight to be 0 (will be normalized)
 	// But warn if weights don't add up to 100 for clarity
 	if totalWeight > 0 && totalWeight != 100 {
-		klog.V(2).Infof("Total weight is %d, not 100. Traefik will normalize weights", totalWeight)
+		logging.Debug("Total weight is not 100. Traefik will normalize weights", "totalWeight", totalWeight)
 	}
 
 	return nil

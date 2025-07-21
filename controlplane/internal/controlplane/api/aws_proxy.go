@@ -7,9 +7,8 @@ import (
 	"net/url"
 	"strings"
 
-	"k8s.io/klog/v2"
-
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // AWSProxyHandler handles proxying AWS API calls to LocalStack
@@ -32,23 +31,23 @@ func NewAWSProxyHandler(localStackManager localstack.Manager) (*AWSProxyHandler,
 		if config != nil && config.UseTraefik && config.ProxyEndpoint != "" {
 			// Use the proxy endpoint from configuration
 			endpoint := config.ProxyEndpoint
-			klog.Infof("Using Traefik endpoint from LocalStack config: %s", endpoint)
+			logging.Info("Using Traefik endpoint from LocalStack config", "endpoint", endpoint)
 			
 			if err := handler.updateProxyTarget(endpoint); err != nil {
-				klog.Warningf("Failed to initialize proxy target: %v", err)
+				logging.Warn("Failed to initialize proxy target", "error", err)
 			}
 		} else {
 			// Fallback to getting endpoint from manager
 			endpoint, err := localStackManager.GetEndpoint()
 			if err != nil {
-				klog.Warningf("Failed to get LocalStack endpoint: %v", err)
+				logging.Warn("Failed to get LocalStack endpoint", "error", err)
 				// Use default as last resort
 				endpoint = "http://localhost:4566"
 			}
-			klog.Infof("Using LocalStack endpoint: %s", endpoint)
+			logging.Info("Using LocalStack endpoint", "endpoint", endpoint)
 			
 			if err := handler.updateProxyTarget(endpoint); err != nil {
-				klog.Warningf("Failed to initialize proxy target: %v", err)
+				logging.Warn("Failed to initialize proxy target", "error", err)
 			}
 		}
 	}
@@ -79,12 +78,12 @@ func (h *AWSProxyHandler) updateProxyTarget(endpoint string) error {
 		req.Header.Set("X-LocalStack-Edge", "1")
 
 		// Log the proxied request
-		klog.V(4).Infof("Proxying AWS request: %s %s to %s", req.Method, req.URL.Path, targetURL.Host)
+		logging.Debug("Proxying AWS request", "method", req.Method, "path", req.URL.Path, "target", targetURL.Host)
 	}
 
 	// Custom error handler
 	h.reverseProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		klog.Errorf("Proxy error: %v", err)
+		logging.Error("Proxy error", "error", err)
 		http.Error(w, "Failed to proxy request to LocalStack", http.StatusBadGateway)
 	}
 
@@ -113,17 +112,17 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if config != nil && config.UseTraefik && config.ProxyEndpoint != "" {
 			// Use the proxy endpoint from configuration
 			endpoint = config.ProxyEndpoint
-			klog.Infof("Initializing proxy with Traefik endpoint from config: %s", endpoint)
+			logging.Info("Initializing proxy with Traefik endpoint from config", "endpoint", endpoint)
 		} else {
 			// Fallback to getting endpoint from manager
 			var err error
 			endpoint, err = h.localStackManager.GetEndpoint()
 			if err != nil {
-				klog.Warningf("Failed to get LocalStack endpoint: %v", err)
+				logging.Warn("Failed to get LocalStack endpoint", "error", err)
 				// Use default as last resort
 				endpoint = "http://localhost:4566"
 			}
-			klog.Infof("Initializing proxy with LocalStack endpoint: %s", endpoint)
+			logging.Info("Initializing proxy with LocalStack endpoint", "endpoint", endpoint)
 		}
 		
 		if err := h.updateProxyTarget(endpoint); err != nil {
@@ -134,7 +133,7 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Extract service name from the request (for logging/debugging)
 	service := h.extractServiceFromRequest(r)
-	klog.V(3).Infof("Proxying request for AWS service: %s", service)
+	logging.Debug("Proxying request for AWS service", "service", service)
 
 	// Note: We don't check if the service is enabled here anymore.
 	// LocalStack will handle unknown or disabled services appropriately.

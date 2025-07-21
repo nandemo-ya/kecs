@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // elbv2Store implements storage.ELBv2Store using DuckDB
@@ -578,7 +578,7 @@ func (s *elbv2Store) UpdateTargetHealth(ctx context.Context, targetGroupArn, tar
 		targetGroupArn, targetID,
 	)
 	if err != nil {
-		klog.Errorf("Failed to update target health for %s/%s: %v", targetGroupArn, targetID, err)
+		logging.Error("Failed to update target health", "targetGroupArn", targetGroupArn, "targetID", targetID, "error", err)
 	}
 	return err
 }

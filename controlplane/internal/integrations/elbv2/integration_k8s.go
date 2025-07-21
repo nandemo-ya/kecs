@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // k8sIntegration implements the Integration interface using Kubernetes Services
@@ -57,7 +57,7 @@ func NewK8sIntegration(region, accountID string) Integration {
 
 // CreateLoadBalancer creates a virtual load balancer and deploys Traefik
 func (i *k8sIntegration) CreateLoadBalancer(ctx context.Context, name string, subnets []string, securityGroups []string) (*LoadBalancer, error) {
-	klog.V(2).Infof("Creating load balancer with Traefik deployment: %s", name)
+	logging.Debug("Creating load balancer with Traefik deployment", "name", name)
 
 	// Generate ARN
 	arn := fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:loadbalancer/app/%s/%s",
@@ -95,13 +95,13 @@ func (i *k8sIntegration) CreateLoadBalancer(ctx context.Context, name string, su
 	i.loadBalancers[arn] = lb
 	i.mu.Unlock()
 
-	klog.V(2).Infof("Created load balancer: %s with DNS: %s and Traefik deployment", arn, lb.DNSName)
+	logging.Debug("Created load balancer with DNS and Traefik deployment", "arn", arn, "dnsName", lb.DNSName)
 	return lb, nil
 }
 
 // DeleteLoadBalancer deletes a virtual load balancer
 func (i *k8sIntegration) DeleteLoadBalancer(ctx context.Context, arn string) error {
-	klog.V(2).Infof("Deleting virtual load balancer: %s", arn)
+	logging.Debug("Deleting virtual load balancer", "arn", arn)
 
 	i.mu.Lock()
 	defer i.mu.Unlock()
@@ -116,7 +116,7 @@ func (i *k8sIntegration) DeleteLoadBalancer(ctx context.Context, arn string) err
 
 // CreateTargetGroup creates a virtual target group and Kubernetes resources
 func (i *k8sIntegration) CreateTargetGroup(ctx context.Context, name string, port int32, protocol string, vpcId string) (*TargetGroup, error) {
-	klog.V(2).Infof("Creating target group with Kubernetes resources: %s", name)
+	logging.Debug("Creating target group with Kubernetes resources", "name", name)
 
 	// Generate ARN
 	arn := fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:targetgroup/%s/%s",
@@ -148,13 +148,13 @@ func (i *k8sIntegration) CreateTargetGroup(ctx context.Context, name string, por
 	i.targetHealth[arn] = make(map[string]*TargetHealth)
 	i.mu.Unlock()
 
-	klog.V(2).Infof("Created target group: %s with Kubernetes resources", arn)
+	logging.Debug("Created target group with Kubernetes resources", "arn", arn)
 	return tg, nil
 }
 
 // DeleteTargetGroup deletes a virtual target group
 func (i *k8sIntegration) DeleteTargetGroup(ctx context.Context, arn string) error {
-	klog.V(2).Infof("Deleting virtual target group: %s", arn)
+	logging.Debug("Deleting virtual target group", "arn", arn)
 
 	i.mu.Lock()
 	defer i.mu.Unlock()
@@ -170,7 +170,7 @@ func (i *k8sIntegration) DeleteTargetGroup(ctx context.Context, arn string) erro
 
 // RegisterTargets registers targets with a virtual target group
 func (i *k8sIntegration) RegisterTargets(ctx context.Context, targetGroupArn string, targets []Target) error {
-	klog.V(2).Infof("Registering %d targets with virtual target group: %s", len(targets), targetGroupArn)
+	logging.Debug("Registering targets with virtual target group", "targetCount", len(targets), "targetGroupArn", targetGroupArn)
 
 	i.mu.Lock()
 	if _, exists := i.targetGroups[targetGroupArn]; !exists {
@@ -211,7 +211,7 @@ func (i *k8sIntegration) RegisterTargets(ctx context.Context, targetGroupArn str
 
 // DeregisterTargets deregisters targets from a virtual target group
 func (i *k8sIntegration) DeregisterTargets(ctx context.Context, targetGroupArn string, targets []Target) error {
-	klog.V(2).Infof("Deregistering %d targets from virtual target group: %s", len(targets), targetGroupArn)
+	logging.Debug("Deregistering targets from virtual target group", "targetCount", len(targets), "targetGroupArn", targetGroupArn)
 
 	i.mu.Lock()
 	defer i.mu.Unlock()
@@ -230,7 +230,7 @@ func (i *k8sIntegration) DeregisterTargets(ctx context.Context, targetGroupArn s
 
 // CreateListener creates a virtual listener and updates Traefik configuration
 func (i *k8sIntegration) CreateListener(ctx context.Context, loadBalancerArn string, port int32, protocol string, targetGroupArn string) (*Listener, error) {
-	klog.V(2).Infof("Creating listener on port %d for load balancer: %s", port, loadBalancerArn)
+	logging.Debug("Creating listener for load balancer", "port", port, "loadBalancerArn", loadBalancerArn)
 
 	i.mu.RLock()
 	lb, exists := i.loadBalancers[loadBalancerArn]
@@ -280,13 +280,13 @@ func (i *k8sIntegration) CreateListener(ctx context.Context, loadBalancerArn str
 	i.listeners[arn] = listener
 	i.mu.Unlock()
 
-	klog.V(2).Infof("Created listener: %s with Traefik configuration", arn)
+	logging.Debug("Created listener with Traefik configuration", "arn", arn)
 	return listener, nil
 }
 
 // DeleteListener deletes a virtual listener
 func (i *k8sIntegration) DeleteListener(ctx context.Context, arn string) error {
-	klog.V(2).Infof("Deleting virtual listener: %s", arn)
+	logging.Debug("Deleting virtual listener", "arn", arn)
 
 	i.mu.Lock()
 	listener, exists := i.listeners[arn]
@@ -308,7 +308,7 @@ func (i *k8sIntegration) DeleteListener(ctx context.Context, arn string) error {
 	// Delete IngressRoute CRD if we have the necessary info
 	if lbName != "" && i.dynamicClient != nil {
 		if err := i.deleteIngressRoute(ctx, lbName, listener.Port); err != nil {
-			klog.V(2).Infof("Failed to delete IngressRoute for listener %s: %v", arn, err)
+			logging.Debug("Failed to delete IngressRoute for listener", "arn", arn, "error", err)
 			// Don't fail the operation if IngressRoute deletion fails
 		}
 	}
@@ -318,7 +318,7 @@ func (i *k8sIntegration) DeleteListener(ctx context.Context, arn string) error {
 
 // GetLoadBalancer gets virtual load balancer details
 func (i *k8sIntegration) GetLoadBalancer(ctx context.Context, arn string) (*LoadBalancer, error) {
-	klog.V(2).Infof("Getting virtual load balancer: %s", arn)
+	logging.Debug("Getting virtual load balancer", "arn", arn)
 
 	i.mu.RLock()
 	defer i.mu.RUnlock()
@@ -333,7 +333,7 @@ func (i *k8sIntegration) GetLoadBalancer(ctx context.Context, arn string) (*Load
 
 // GetTargetHealth gets the health status of virtual targets
 func (i *k8sIntegration) GetTargetHealth(ctx context.Context, targetGroupArn string) ([]TargetHealth, error) {
-	klog.V(2).Infof("Getting target health for virtual target group: %s", targetGroupArn)
+	logging.Debug("Getting target health for virtual target group", "targetGroupArn", targetGroupArn)
 
 	i.mu.RLock()
 	defer i.mu.RUnlock()
@@ -357,23 +357,23 @@ func (i *k8sIntegration) GetTargetHealth(ctx context.Context, targetGroupArn str
 
 // CheckTargetHealthWithK8s performs health check using Kubernetes pod status
 func (i *k8sIntegration) CheckTargetHealthWithK8s(ctx context.Context, targetIP string, targetPort int32, targetGroupArn string) (string, error) {
-	klog.V(2).Infof("Checking target health with Kubernetes for %s:%d", targetIP, targetPort)
+	logging.Debug("Checking target health with Kubernetes", "targetIP", targetIP, "targetPort", targetPort)
 	
 	if i.kubeClient == nil {
-		klog.V(2).Infof("No kubeClient available, falling back to basic connectivity check")
+		logging.Debug("No kubeClient available, falling back to basic connectivity check")
 		return i.performBasicConnectivityCheck(targetIP, targetPort)
 	}
 	
 	// Find pod by IP address
 	pod, err := i.findPodByIP(ctx, targetIP)
 	if err != nil {
-		klog.V(2).Infof("Failed to find pod with IP %s: %v", targetIP, err)
+		logging.Debug("Failed to find pod with IP", "targetIP", targetIP, "error", err)
 		// Fallback to basic connectivity check if pod not found
 		return i.performBasicConnectivityCheck(targetIP, targetPort)
 	}
 	
 	if pod == nil {
-		klog.V(2).Infof("No pod found with IP %s, performing basic connectivity check", targetIP)
+		logging.Debug("No pod found with IP, performing basic connectivity check", "targetIP", targetIP)
 		return i.performBasicConnectivityCheck(targetIP, targetPort)
 	}
 	
@@ -402,7 +402,7 @@ func (i *k8sIntegration) findPodByIP(ctx context.Context, targetIP string) (*cor
 func (i *k8sIntegration) checkPodReadiness(pod *corev1.Pod, targetPort int32) (string, error) {
 	// Check pod phase first
 	if pod.Status.Phase != corev1.PodRunning {
-		klog.V(2).Infof("Pod %s/%s is not running (phase: %s)", pod.Namespace, pod.Name, pod.Status.Phase)
+		logging.Debug("Pod is not running", "namespace", pod.Namespace, "name", pod.Name, "phase", pod.Status.Phase)
 		return "unhealthy", nil
 	}
 	
@@ -410,24 +410,24 @@ func (i *k8sIntegration) checkPodReadiness(pod *corev1.Pod, targetPort int32) (s
 	for _, condition := range pod.Status.Conditions {
 		if condition.Type == corev1.PodReady {
 			if condition.Status == corev1.ConditionTrue {
-				klog.V(2).Infof("Pod %s/%s is ready", pod.Namespace, pod.Name)
+				logging.Debug("Pod is ready", "namespace", pod.Namespace, "name", pod.Name)
 				
 				// Additionally check if the target port is exposed by the pod
 				if i.isPodPortExposed(pod, targetPort) {
 					return "healthy", nil
 				} else {
-					klog.V(2).Infof("Pod %s/%s does not expose target port %d", pod.Namespace, pod.Name, targetPort)
+					logging.Debug("Pod does not expose target port", "namespace", pod.Namespace, "name", pod.Name, "targetPort", targetPort)
 					return "unhealthy", nil
 				}
 			} else {
-				klog.V(2).Infof("Pod %s/%s is not ready (reason: %s)", pod.Namespace, pod.Name, condition.Reason)
+				logging.Debug("Pod is not ready", "namespace", pod.Namespace, "name", pod.Name, "reason", condition.Reason)
 				return "unhealthy", nil
 			}
 		}
 	}
 	
 	// If no readiness condition found, consider it unhealthy
-	klog.V(2).Infof("Pod %s/%s has no readiness condition", pod.Namespace, pod.Name)
+	logging.Debug("Pod has no readiness condition", "namespace", pod.Namespace, "name", pod.Name)
 	return "unhealthy", nil
 }
 
@@ -448,11 +448,11 @@ func (i *k8sIntegration) performBasicConnectivityCheck(targetIP string, targetPo
 	timeout := 5 * time.Second
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", targetIP, targetPort), timeout)
 	if err != nil {
-		klog.V(2).Infof("Basic connectivity check failed for %s:%d: %v", targetIP, targetPort, err)
+		logging.Debug("Basic connectivity check failed", "targetIP", targetIP, "targetPort", targetPort, "error", err)
 		return "unhealthy", nil
 	}
 	conn.Close()
-	klog.V(2).Infof("Basic connectivity check passed for %s:%d", targetIP, targetPort)
+	logging.Debug("Basic connectivity check passed", "targetIP", targetIP, "targetPort", targetPort)
 	return "healthy", nil
 }
 
@@ -477,7 +477,7 @@ func getResourceName(arn string) string {
 func (i *k8sIntegration) deployTraefikForLoadBalancer(ctx context.Context, lbName, lbArn string) error {
 	if i.kubeClient == nil {
 		// If no kubeClient is available, just log and continue
-		klog.V(2).Infof("No kubeClient available, skipping Traefik deployment for load balancer: %s", lbName)
+		logging.Debug("No kubeClient available, skipping Traefik deployment for load balancer", "lbName", lbName)
 		return nil
 	}
 
@@ -509,7 +509,7 @@ func (i *k8sIntegration) deployTraefikForLoadBalancer(ctx context.Context, lbNam
 		return fmt.Errorf("failed to create Service: %w", err)
 	}
 
-	klog.V(2).Infof("Successfully deployed Traefik resources for load balancer: %s", lbName)
+	logging.Debug("Successfully deployed Traefik resources for load balancer", "lbName", lbName)
 	return nil
 }
 
@@ -766,7 +766,7 @@ func mustParseResource(s string) resource.Quantity {
 // deployTargetGroupResources deploys Kubernetes resources for a target group
 func (i *k8sIntegration) deployTargetGroupResources(ctx context.Context, tgName, tgArn string, port int32, protocol string) error {
 	if i.kubeClient == nil {
-		klog.V(2).Infof("No kubeClient available, skipping target group resources deployment for: %s", tgName)
+		logging.Debug("No kubeClient available, skipping target group resources deployment", "tgName", tgName)
 		return nil
 	}
 
@@ -810,14 +810,14 @@ func (i *k8sIntegration) deployTargetGroupResources(ctx context.Context, tgName,
 		return fmt.Errorf("failed to create Service for target group: %w", err)
 	}
 
-	klog.V(2).Infof("Created Service %s for target group %s", serviceName, tgName)
+	logging.Debug("Created Service for target group", "serviceName", serviceName, "tgName", tgName)
 	return nil
 }
 
 // updateTraefikConfigForListener updates Traefik configuration for a new listener
 func (i *k8sIntegration) updateTraefikConfigForListener(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
 	if i.kubeClient == nil {
-		klog.V(2).Infof("No kubeClient available, skipping Traefik config update for listener: %s", listenerArn)
+		logging.Debug("No kubeClient available, skipping Traefik config update for listener", "listenerArn", listenerArn)
 		return nil
 	}
 
@@ -856,14 +856,14 @@ func (i *k8sIntegration) updateTraefikConfigForListener(ctx context.Context, lbN
 		}
 	}
 
-	klog.V(2).Infof("Updated Traefik configuration for listener on port %d", port)
+	logging.Debug("Updated Traefik configuration for listener", "port", port)
 	return nil
 }
 
 // createIngressRoute creates a Traefik IngressRoute CRD for routing to target groups
 func (i *k8sIntegration) createIngressRoute(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
 	if i.dynamicClient == nil {
-		klog.V(2).Infof("No dynamicClient available, skipping IngressRoute creation")
+		logging.Debug("No dynamicClient available, skipping IngressRoute creation")
 		return nil
 	}
 
@@ -921,7 +921,7 @@ func (i *k8sIntegration) createIngressRoute(ctx context.Context, lbName, listene
 		return fmt.Errorf("failed to create IngressRoute: %w", err)
 	}
 
-	klog.V(2).Infof("Created IngressRoute %s for listener on port %d routing to target group %s", ingressRouteName, port, targetGroupName)
+	logging.Debug("Created IngressRoute for listener routing to target group", "ingressRouteName", ingressRouteName, "port", port, "targetGroupName", targetGroupName)
 	return nil
 }
 
@@ -938,7 +938,7 @@ func sanitizeName(name string) string {
 // deleteIngressRoute deletes a Traefik IngressRoute CRD
 func (i *k8sIntegration) deleteIngressRoute(ctx context.Context, lbName string, port int32) error {
 	if i.dynamicClient == nil {
-		klog.V(2).Infof("No dynamicClient available, skipping IngressRoute deletion")
+		logging.Debug("No dynamicClient available, skipping IngressRoute deletion")
 		return nil
 	}
 
@@ -958,14 +958,14 @@ func (i *k8sIntegration) deleteIngressRoute(ctx context.Context, lbName string, 
 		return fmt.Errorf("failed to delete IngressRoute: %w", err)
 	}
 
-	klog.V(2).Infof("Deleted IngressRoute %s", ingressRouteName)
+	logging.Debug("Deleted IngressRoute", "ingressRouteName", ingressRouteName)
 	return nil
 }
 
 // updateIngressRoute updates an existing Traefik IngressRoute CRD
 func (i *k8sIntegration) updateIngressRoute(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
 	if i.dynamicClient == nil {
-		klog.V(2).Infof("No dynamicClient available, skipping IngressRoute update")
+		logging.Debug("No dynamicClient available, skipping IngressRoute update")
 		return nil
 	}
 
@@ -1020,7 +1020,7 @@ func (i *k8sIntegration) updateIngressRoute(ctx context.Context, lbName, listene
 		return fmt.Errorf("failed to update IngressRoute: %w", err)
 	}
 
-	klog.V(2).Infof("Updated IngressRoute %s for listener on port %d routing to target group %s", ingressRouteName, port, targetGroupName)
+	logging.Debug("Updated IngressRoute for listener routing to target group", "ingressRouteName", ingressRouteName, "port", port, "targetGroupName", targetGroupName)
 	return nil
 }
 
@@ -1038,7 +1038,7 @@ func (i *k8sIntegration) SyncRulesToListener(ctx context.Context, storageInstanc
 	}
 	
 	if i.ruleManager == nil {
-		klog.V(2).Infof("No rule manager available, skipping rule sync")
+		logging.Debug("No rule manager available, skipping rule sync")
 		return nil
 	}
 	

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"k8s.io/klog/v2"
 )
 
 // Program wraps the Bubble Tea program for progress tracking
@@ -192,18 +191,12 @@ func (lc *logCapture) Start() {
 	os.Setenv("K3D_LOG_LEVEL", "panic")
 	os.Setenv("DOCKER_CLI_HINTS", "false")
 	
-	// Redirect klog output to our writer
-	klog.SetOutput(lc)
 }
 
 // Stop stops capturing and restores original output
 func (lc *logCapture) Stop() {
 	if lc.originalOut != nil {
 		log.SetOutput(lc.originalOut)
-		// Flush klog before restoring
-		klog.Flush()
-		// Also restore klog to stderr
-		klog.SetOutput(os.Stderr)
 	}
 }
 

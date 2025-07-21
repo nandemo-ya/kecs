@@ -13,7 +13,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // PortForwarder manages port forwarding to Kubernetes services
@@ -116,8 +116,8 @@ func (pf *PortForwarder) Start(ctx context.Context) error {
 	// Wait for ready or error
 	select {
 	case <-pf.readyCh:
-		klog.Infof("Port forwarding established: localhost:%d -> %s/%s:%d",
-			pf.localPort, pf.namespace, pf.service, pf.remotePort)
+		logging.Info("Port forwarding established",
+			"localPort", pf.localPort, "namespace", pf.namespace, "service", pf.service, "remotePort", pf.remotePort)
 		return nil
 	case err := <-pf.errorCh:
 		return fmt.Errorf("port forwarding failed: %w", err)

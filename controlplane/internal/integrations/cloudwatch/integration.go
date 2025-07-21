@@ -6,9 +6,8 @@ import (
 	"strings"
 
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-
 	cloudwatchlogsapi "github.com/nandemo-ya/kecs/controlplane/internal/cloudwatchlogs/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
@@ -80,7 +79,7 @@ func (i *integration) CreateLogGroup(groupName string) error {
 	if err != nil {
 		// Check if already exists
 		if strings.Contains(err.Error(), "ResourceAlreadyExistsException") {
-			klog.V(2).Infof("Log group %s already exists", groupName)
+			logging.Debug("Log group already exists", "groupName", groupName)
 			return nil
 		}
 		return fmt.Errorf("failed to create log group: %w", err)
@@ -93,11 +92,11 @@ func (i *integration) CreateLogGroup(groupName string) error {
 			RetentionInDays: i.config.RetentionDays,
 		})
 		if err != nil {
-			klog.Warningf("Failed to set retention policy for log group %s: %v", groupName, err)
+			logging.Warn("Failed to set retention policy for log group", "groupName", groupName, "error", err)
 		}
 	}
 
-	klog.Infof("Created CloudWatch log group: %s", groupName)
+	logging.Info("Created CloudWatch log group", "groupName", groupName)
 	return nil
 }
 
@@ -117,13 +116,13 @@ func (i *integration) CreateLogStream(groupName, streamName string) error {
 	if err != nil {
 		// Check if already exists
 		if strings.Contains(err.Error(), "ResourceAlreadyExistsException") {
-			klog.V(2).Infof("Log stream %s already exists in group %s", streamName, groupName)
+			logging.Debug("Log stream already exists", "streamName", streamName, "groupName", groupName)
 			return nil
 		}
 		return fmt.Errorf("failed to create log stream: %w", err)
 	}
 
-	klog.Infof("Created CloudWatch log stream: %s/%s", groupName, streamName)
+	logging.Info("Created CloudWatch log stream", "groupName", groupName, "streamName", streamName)
 	return nil
 }
 
@@ -142,13 +141,13 @@ func (i *integration) DeleteLogGroup(groupName string) error {
 	if err != nil {
 		// Ignore if not found
 		if strings.Contains(err.Error(), "ResourceNotFoundException") {
-			klog.V(2).Infof("Log group %s not found", groupName)
+			logging.Debug("Log group not found", "groupName", groupName)
 			return nil
 		}
 		return fmt.Errorf("failed to delete log group: %w", err)
 	}
 
-	klog.Infof("Deleted CloudWatch log group: %s", groupName)
+	logging.Info("Deleted CloudWatch log group", "groupName", groupName)
 	return nil
 }
 
