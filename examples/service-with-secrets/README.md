@@ -150,20 +150,9 @@ aws secretsmanager list-secrets \
 
 ### 5. Create IAM Roles with Proper Permissions
 
-```bash
-# Create Task Execution Role
-aws iam create-role \
-  --role-name ecsTaskExecutionRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "ecs-tasks.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }' \
-  --endpoint-url http://localhost:4566
+Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts LocalStack.
 
+```bash
 # Create policy for accessing secrets
 aws iam create-policy \
   --policy-name ECSSecretsPolicy \
@@ -202,6 +191,7 @@ aws iam create-policy \
   --endpoint-url http://localhost:4566
 
 # Attach policies to execution role
+# Note: ecsTaskExecutionRole is auto-created by KECS, we just need to attach additional policies
 aws iam attach-role-policy \
   --role-name ecsTaskExecutionRole \
   --policy-arn arn:aws:iam::000000000000:policy/ECSSecretsPolicy \
@@ -448,6 +438,7 @@ aws ssm delete-parameter \
   --endpoint-url http://localhost:4566
 
 # Delete IAM resources
+# Note: Only detach the policy from ecsTaskExecutionRole, don't delete the role itself as it's managed by KECS
 aws iam detach-role-policy \
   --role-name ecsTaskExecutionRole \
   --policy-arn arn:aws:iam::000000000000:policy/ECSSecretsPolicy \
@@ -455,10 +446,6 @@ aws iam detach-role-policy \
 
 aws iam delete-policy \
   --policy-arn arn:aws:iam::000000000000:policy/ECSSecretsPolicy \
-  --endpoint-url http://localhost:4566
-
-aws iam delete-role \
-  --role-name ecsTaskExecutionRole \
   --endpoint-url http://localhost:4566
 
 aws iam delete-role \
