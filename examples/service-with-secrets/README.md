@@ -45,12 +45,11 @@ This example demonstrates how to securely inject secrets from AWS Secrets Manage
 1. KECS running locally (port 8080)
 2. LocalStack (for Secrets Manager and SSM, port 4566)
 3. AWS CLI configured
-4. ecspresso installed
 
 ### Endpoint URLs
 
 This example uses two different endpoints:
-- **KECS (http://localhost:8080)**: For ECS APIs (clusters, services, tasks)
+- **KECS (http://localhost:4566)**: For ECS APIs (clusters, services, tasks)
 - **LocalStack (http://localhost:4566)**: For AWS services (Secrets Manager, SSM, IAM)
 
 ## Setup Instructions
@@ -80,7 +79,7 @@ done
 
 ```bash
 aws ecs create-cluster --cluster-name default \
-  --endpoint-url http://localhost:8080
+  --endpoint-url http://localhost:4566
 ```
 
 ### 3. Create SSM Parameters
@@ -216,23 +215,10 @@ aws iam create-role \
 ```bash
 aws logs create-log-group \
   --log-group-name /ecs/service-with-secrets \
-  --endpoint-url http://localhost:8080
+  --endpoint-url http://localhost:4566
 ```
 
 ## Deployment
-
-### Using ecspresso
-
-```bash
-# Deploy the service
-ecspresso deploy --config ecspresso.yml
-
-# Check deployment status
-ecspresso status --config ecspresso.yml
-
-# View logs
-ecspresso logs --config ecspresso.yml
-```
 
 ### Using AWS CLI
 
@@ -240,12 +226,12 @@ ecspresso logs --config ecspresso.yml
 # Register task definition
 aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
-  --endpoint-url http://localhost:8080
+  --endpoint-url http://localhost:4566
 
 # Create service
 aws ecs create-service \
   --cli-input-json file://service_def.json \
-  --endpoint-url http://localhost:8080
+  --endpoint-url http://localhost:4566
 ```
 
 ## Verification
@@ -257,7 +243,7 @@ aws ecs create-service \
 aws ecs describe-services \
   --cluster default \
   --services service-with-secrets \
-  --endpoint-url http://localhost:8080 \
+  --endpoint-url http://localhost:4566 \
   --query 'services[0].{Status:status,Desired:desiredCount,Running:runningCount}'
 ```
 
@@ -333,13 +319,13 @@ aws ecs update-service \
   --cluster default \
   --service service-with-secrets \
   --force-new-deployment \
-  --endpoint-url http://localhost:8080
+  --endpoint-url http://localhost:4566
 
 # Wait for deployment to complete
 aws ecs wait services-stable \
   --cluster default \
   --services service-with-secrets \
-  --endpoint-url http://localhost:8080
+  --endpoint-url http://localhost:4566
 ```
 
 ## Key Points to Verify
@@ -364,7 +350,7 @@ aws ecs wait services-stable \
 
 ```bash
 aws logs tail /ecs/service-with-secrets \
-  --endpoint-url http://localhost:8080 \
+  --endpoint-url http://localhost:4566 \
   --follow
 ```
 
@@ -406,7 +392,7 @@ aws ecs delete-service \
   --cluster default \
   --service service-with-secrets \
   --force \
-  --endpoint-url http://localhost:8080
+  --endpoint-url http://localhost:4566
 
 # Delete secrets
 aws secretsmanager delete-secret \
@@ -455,7 +441,7 @@ aws iam delete-role \
 # Delete log group
 aws logs delete-log-group \
   --log-group-name /ecs/service-with-secrets \
-  --endpoint-url http://localhost:8080
+  --endpoint-url http://localhost:4566
 
 # Stop LocalStack
 docker stop localstack

@@ -1,8 +1,0 @@
-region: us-east-1
-cluster: default
-# Note: No service definition for batch jobs
-task_definition: task_def.json
-timeout: 10m
-
-# Run task configuration
-# ecspresso run --config ecspresso.yml --overrides '{"containerOverrides":[{"name":"batch-processor","environment":[{"name":"BATCH_SIZE","value":"10"}]}]}'

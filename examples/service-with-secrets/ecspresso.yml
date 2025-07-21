@@ -1,8 +1,0 @@
-region: us-east-1
-cluster: default
-service: service-with-secrets
-task_definition: task_def.json
-service_definition: service_def.json
-timeout: 10m
-
-# Note: Ensure IAM roles have proper permissions for Secrets Manager and SSM Parameter Store
