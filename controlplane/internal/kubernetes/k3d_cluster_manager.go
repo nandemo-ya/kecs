@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/docker/go-connections/nat"
-	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -21,7 +20,6 @@ import (
 
 	"github.com/k3d-io/k3d/v5/pkg/client"
 	"github.com/k3d-io/k3d/v5/pkg/config/v1alpha5"
-	"github.com/k3d-io/k3d/v5/pkg/logger"
 	"github.com/k3d-io/k3d/v5/pkg/runtimes"
 	"github.com/k3d-io/k3d/v5/pkg/runtimes/docker"
 	k3d "github.com/k3d-io/k3d/v5/pkg/types"
@@ -40,25 +38,6 @@ type K3dClusterManager struct {
 
 // NewK3dClusterManager creates a new k3d-based cluster manager
 func NewK3dClusterManager(cfg *ClusterManagerConfig) (*K3dClusterManager, error) {
-	// Apply log suppression if environment variables are set
-	if os.Getenv("K3D_LOG_LEVEL") == "panic" || os.Getenv("LOGRUS_LEVEL") == "panic" {
-		// Set k3d's logger to panic level
-		if logger.Logger != nil {
-			logger.Logger.SetLevel(logrus.PanicLevel)
-			logger.Logger.SetOutput(io.Discard)
-		}
-		
-		// Also set the standard logrus logger
-		logrus.SetLevel(logrus.PanicLevel)
-		logrus.SetOutput(io.Discard)
-		
-		// Also set the standard logger
-		logrus.StandardLogger().SetLevel(logrus.PanicLevel)
-		logrus.StandardLogger().SetOutput(io.Discard)
-		
-		// Disable all loggers
-		logrus.SetReportCaller(false)
-	}
 	
 	if cfg == nil {
 		cfg = &ClusterManagerConfig{
