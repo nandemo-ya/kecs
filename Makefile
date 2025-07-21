@@ -119,15 +119,15 @@ docker-build:
 .PHONY: docker-build-dev
 docker-build-dev:
 	@echo "Building Docker image for local k3d registry..."
-	$(DOCKER) build -t localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) $(CONTROLPLANE_DIR)
-	$(DOCKER) tag localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) localhost:5000/nandemo-ya/kecs-controlplane:latest
+	$(DOCKER) build -t k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) $(CONTROLPLANE_DIR)
+	$(DOCKER) tag k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:latest
 
 # Push Docker image to local k3d registry (dev mode)
 .PHONY: docker-push-dev
 docker-push-dev: docker-build-dev
 	@echo "Pushing to k3d registry..."
-	$(DOCKER) push localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION)
-	$(DOCKER) push localhost:5000/nandemo-ya/kecs-controlplane:latest
+	$(DOCKER) push k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION)
+	$(DOCKER) push k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:latest
 
 # Build API-only Docker image
 .PHONY: docker-build-api

@@ -241,8 +241,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 	if startDevMode {
 		fmt.Println()
 		progress.Info("Dev mode enabled:")
-		fmt.Printf("  k3d registry: localhost:5000\n")
-		fmt.Printf("  Control plane image: localhost:5000/nandemo-ya/kecs-controlplane:latest\n")
+		fmt.Printf("  k3d registry: k3d-kecs-registry.localhost:5000\n")
+		fmt.Printf("  Control plane image: k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:latest\n")
 		fmt.Printf("  To push updates: make docker-push-dev\n")
 	}
 
@@ -371,7 +371,7 @@ func deployControlPlane(ctx context.Context, clusterName string, cfg *config.Con
 	controlPlaneImage := cfg.Server.ControlPlaneImage
 	if startDevMode {
 		// Use local registry image in dev mode
-		controlPlaneImage = "localhost:5000/nandemo-ya/kecs-controlplane:latest"
+		controlPlaneImage = "k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:latest"
 		logging.Info("Dev mode enabled, using local registry image", "image", controlPlaneImage)
 	}
 	
@@ -690,7 +690,7 @@ func deployControlPlaneWithProgress(ctx context.Context, clusterName string, cfg
 	controlPlaneImage := cfg.Server.ControlPlaneImage
 	if startDevMode {
 		// Use local registry image in dev mode
-		controlPlaneImage = "localhost:5000/nandemo-ya/kecs-controlplane:latest"
+		controlPlaneImage = "k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:latest"
 		logging.Info("Dev mode enabled, using local registry image", "image", controlPlaneImage)
 	}
 	
