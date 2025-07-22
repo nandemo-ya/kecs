@@ -14,6 +14,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/proxy"
@@ -183,8 +184,8 @@ func (c *TaskConverter) ConvertTaskToPod(
 		pod.Spec.HostPID = true
 	}
 
-	// Apply task role via ServiceAccount
-	if taskDef.TaskRoleARN != "" {
+	// Apply task role via ServiceAccount only if IAM integration is enabled
+	if taskDef.TaskRoleARN != "" && config.GetBool("features.iamIntegration") {
 		// Extract role name from ARN
 		roleName := c.extractRoleNameFromARN(taskDef.TaskRoleARN)
 		if roleName != "" {
@@ -229,10 +230,7 @@ func (c *TaskConverter) ConvertTaskToPod(
 	// Add secret annotations
 	c.addSecretAnnotations(pod, containerDefs)
 
-	// Apply IAM role if specified
-	if taskDef.TaskRoleARN != "" {
-		c.applyIAMRole(pod, taskDef.TaskRoleARN)
-	}
+	// Apply IAM role annotations if specified (for tracking purposes)
 	if taskDef.ExecutionRoleARN != "" {
 		pod.ObjectMeta.Annotations["kecs.dev/execution-role-arn"] = taskDef.ExecutionRoleARN
 	}

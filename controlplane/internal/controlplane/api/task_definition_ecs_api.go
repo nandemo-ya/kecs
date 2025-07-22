@@ -175,44 +175,6 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 		return nil, fmt.Errorf("failed to register task definition: %w", err)
 	}
 
-	// Create IAM roles if IAM integration is available
-	if api.iamIntegration != nil {
-		// Create task role if specified
-		if registeredTaskDef.TaskRoleARN != "" {
-			roleName := extractRoleNameFromARN(registeredTaskDef.TaskRoleARN)
-			if roleName != "" {
-				// Default trust policy for ECS tasks
-				trustPolicy := `{
-					"Version": "2012-10-17",
-					"Statement": [{
-						"Effect": "Allow",
-						"Principal": {
-							"Service": "ecs-tasks.amazonaws.com"
-						},
-						"Action": "sts:AssumeRole"
-					}]
-				}`
-				if err := api.iamIntegration.CreateTaskRole(registeredTaskDef.ARN, roleName, trustPolicy); err != nil {
-					logging.Warn("Failed to create task role", "role", roleName, "error", err)
-				} else {
-					logging.Info("Created task role for task definition", "role", roleName, "taskDefinition", registeredTaskDef.ARN)
-				}
-			}
-		}
-
-		// Create execution role if specified
-		if registeredTaskDef.ExecutionRoleARN != "" {
-			roleName := extractRoleNameFromARN(registeredTaskDef.ExecutionRoleARN)
-			if roleName != "" {
-				if err := api.iamIntegration.CreateTaskExecutionRole(roleName); err != nil {
-					logging.Warn("Failed to create execution role", "role", roleName, "error", err)
-				} else {
-					logging.Info("Created execution role for task definition", "role", roleName, "taskDefinition", registeredTaskDef.ARN)
-				}
-			}
-		}
-	}
-
 	// Convert storage task definition to generated response
 	responseTaskDef := storageTaskDefinitionToGenerated(registeredTaskDef)
 
