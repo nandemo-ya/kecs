@@ -62,12 +62,26 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	logging.Debug("Looking for task definition", "taskDefinition", taskDefArn)
 
 	if !strings.HasPrefix(taskDefArn, "arn:aws:ecs:") {
-		// Check if it's family:revision or just family
+		// Check if it's family:revision, family:latest, or just family
 		if strings.Contains(taskDefArn, ":") {
-			// family:revision format
-			taskDefArn = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", api.region, api.accountID, taskDefArn)
-			logging.Debug("Trying to get task definition by ARN", "arn", taskDefArn)
-			taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefArn)
+			parts := strings.SplitN(taskDefArn, ":", 2)
+			family := parts[0]
+			revision := parts[1]
+			
+			if revision == "latest" {
+				// KECS extension: support for family:latest
+				logging.Debug("Resolving 'latest' tag for task definition family", "family", family)
+				taskDef, err = api.storage.TaskDefinitionStore().GetLatest(ctx, family)
+				if taskDef != nil {
+					taskDefArn = taskDef.ARN
+					logging.Debug("Resolved 'latest' to task definition", "arn", taskDefArn, "revision", taskDef.Revision)
+				}
+			} else {
+				// family:revision format
+				taskDefArn = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", api.region, api.accountID, taskDefArn)
+				logging.Debug("Trying to get task definition by ARN", "arn", taskDefArn)
+				taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefArn)
+			}
 		} else {
 			// Just family - get latest
 			logging.Debug("Trying to get latest task definition for family", "family", taskDefArn)
