@@ -183,8 +183,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				}
 
 
-				// Initialize IAM integration if LocalStack is available
-				if kubeClient != nil {
+				// Initialize IAM integration if LocalStack is available and IAM integration is enabled
+				if kubeClient != nil && apiconfig.GetBool("features.iamIntegration") {
 					iamConfig := &iam.Config{
 						LocalStackEndpoint: fmt.Sprintf("http://localhost:%d", localStackConfig.Port),
 						KubeNamespace:      "default",
@@ -198,6 +198,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 						s.iamIntegration = iamIntegration
 						logging.Info("IAM integration initialized successfully")
 					}
+				} else if kubeClient != nil && !apiconfig.GetBool("features.iamIntegration") {
+					logging.Info("IAM integration is disabled by configuration")
 				}
 
 				// Initialize CloudWatch integration if LocalStack is available

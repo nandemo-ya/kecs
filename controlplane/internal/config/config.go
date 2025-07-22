@@ -50,6 +50,7 @@ type FeaturesConfig struct {
 	SkipSecurityDisclaimer  bool `yaml:"skipSecurityDisclaimer" mapstructure:"skipSecurityDisclaimer"`
 	DevMode                 bool `yaml:"devMode" mapstructure:"devMode"`
 	Traefik                 bool `yaml:"traefik" mapstructure:"traefik"`
+	IAMIntegration          bool `yaml:"iamIntegration" mapstructure:"iamIntegration"`
 }
 
 // AWSConfig represents AWS-related configuration
@@ -102,6 +103,7 @@ func InitConfig() error {
 	v.SetDefault("features.securityAcknowledged", false)
 	v.SetDefault("features.skipSecurityDisclaimer", false)
 	v.SetDefault("features.traefik", true) // Enable Traefik by default
+	v.SetDefault("features.iamIntegration", false) // Disable IAM integration by default
 	
 	// AWS defaults
 	v.SetDefault("aws.defaultRegion", "us-east-1")
@@ -146,6 +148,7 @@ func bindLegacyEnvVars() {
 	v.BindEnv("features.skipSecurityDisclaimer", "KECS_SKIP_SECURITY_DISCLAIMER")
 	v.BindEnv("features.traefik", "KECS_ENABLE_TRAEFIK", "KECS_FEATURES_TRAEFIK")
 	v.BindEnv("features.devMode", "KECS_DEV_MODE")
+	v.BindEnv("features.iamIntegration", "KECS_IAM_INTEGRATION")
 	v.BindEnv("localstack.enabled", "KECS_LOCALSTACK_ENABLED")
 	v.BindEnv("localstack.useTraefik", "KECS_LOCALSTACK_USE_TRAEFIK")
 	v.BindEnv("server.controlPlaneImage", "KECS_CONTROLPLANE_IMAGE")
