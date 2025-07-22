@@ -127,7 +127,7 @@ func (s *taskDefinitionStore) GetLatest(ctx context.Context, family string) (*st
 	// Check if we got a NULL (no active revisions found)
 	if !revision.Valid {
 		logging.Debug("No active revisions found", "family", family)
-		return nil, fmt.Errorf("task definition family not found: %s", family)
+		return nil, fmt.Errorf("no active task definition found for family: %s", family)
 	}
 
 	logging.Debug("Found latest revision", "revision", revision.Int64, "family", family)
@@ -315,6 +315,7 @@ func (s *taskDefinitionStore) Deregister(ctx context.Context, family string, rev
 
 	return nil
 }
+
 
 // GetByARN retrieves a task definition by its ARN
 func (s *taskDefinitionStore) GetByARN(ctx context.Context, arn string) (*storage.TaskDefinition, error) {

@@ -51,8 +51,19 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 		} else {
 			parts := strings.SplitN(taskDefIdentifier, ":", 2)
 			family := parts[0]
-			revision, _ := parseRevision(parts[1])
-			taskDef, err = api.storage.TaskDefinitionStore().Get(ctx, family, revision)
+			revisionStr := parts[1]
+			
+			if revisionStr == "latest" {
+				// KECS extension: support for family:latest
+				logging.Debug("Resolving 'latest' tag for task definition family", "family", family)
+				taskDef, err = api.storage.TaskDefinitionStore().GetLatest(ctx, family)
+				if taskDef != nil {
+					logging.Debug("Resolved 'latest' to task definition", "arn", taskDef.ARN, "revision", taskDef.Revision)
+				}
+			} else {
+				revision, _ := parseRevision(revisionStr)
+				taskDef, err = api.storage.TaskDefinitionStore().Get(ctx, family, revision)
+			}
 		}
 	} else {
 		// Just family name - get latest
