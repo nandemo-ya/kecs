@@ -14,9 +14,12 @@ import (
 	k8s "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
+	"k8s.io/client-go/informers"
+
 	apiconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controllers/sync"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
@@ -53,6 +56,8 @@ type Server struct {
 	elbv2Integration          elbv2.Integration
 	elbv2Router               *generated_elbv2.Router
 	serviceDiscoveryAPI       *ServiceDiscoveryAPI
+	syncController            *sync.SyncController
+	syncCancelFunc            context.CancelFunc
 }
 
 // NewServer creates a new API server instance
@@ -119,6 +124,54 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		s.taskManager = taskManager
 	}
 
+	// Initialize sync controller
+	if !apiconfig.GetBool("features.testMode") && s.taskManager != nil {
+		// Try to get kubernetes client
+		var kubeClient k8s.Interface
+		kubeConfig, err := kubernetes.GetKubeConfig()
+		if err != nil {
+			logging.Warn("Failed to get kubernetes config for sync controller",
+				"error", err)
+		} else {
+			kubeClient, err = k8s.NewForConfig(kubeConfig)
+			if err != nil {
+				logging.Warn("Failed to create kubernetes client for sync controller",
+					"error", err)
+			}
+		}
+
+		if kubeClient != nil {
+			// Create informer factory
+			resyncPeriod := 5 * time.Minute
+			informerFactory := informers.NewSharedInformerFactory(kubeClient, resyncPeriod)
+			
+			// Get informers
+			deploymentInformer := informerFactory.Apps().V1().Deployments()
+			replicaSetInformer := informerFactory.Apps().V1().ReplicaSets()
+			podInformer := informerFactory.Core().V1().Pods()
+			eventInformer := informerFactory.Core().V1().Events()
+			
+			// Initialize sync controller
+			syncController := sync.NewSyncController(
+				kubeClient,
+				storage,
+				deploymentInformer,
+				replicaSetInformer,
+				podInformer,
+				eventInformer,
+				2, // workers
+				resyncPeriod,
+			)
+			
+			// Start informers
+			informerFactory.Start(context.Background().Done())
+			
+			s.syncController = syncController
+			logging.Info("Sync controller initialized successfully")
+		} else {
+			logging.Info("Kubernetes client not available, sync controller will not be initialized")
+		}
+	}
 
 	// Initialize test mode worker if in test mode
 	if apiconfig.GetBool("features.testMode") {
@@ -396,6 +449,19 @@ func (s *Server) Start() error {
 		s.testModeWorker.Start(ctx)
 	}
 
+	// Start sync controller if available
+	if s.syncController != nil {
+		logging.Info("Starting sync controller...")
+		syncCtx, cancel := context.WithCancel(ctx)
+		s.syncCancelFunc = cancel
+		go func() {
+			if err := s.syncController.Run(syncCtx); err != nil {
+				logging.Error("Sync controller stopped with error",
+					"error", err)
+			}
+		}()
+	}
+
 	// Start LocalStack manager if available
 	if s.localStackManager != nil {
 		if err := s.localStackManager.Start(ctx); err != nil {
@@ -442,6 +508,18 @@ func (s *Server) Stop(ctx context.Context) error {
 		s.testModeWorker.Stop()
 	}
 
+	// Stop sync controller if running
+	if s.syncController != nil && s.syncCancelFunc != nil {
+		logging.Info("Stopping sync controller...")
+		s.syncCancelFunc()
+		// Give it a moment to shut down gracefully
+		select {
+		case <-time.After(2 * time.Second):
+			logging.Info("Sync controller stopped")
+		case <-ctx.Done():
+			logging.Warn("Context cancelled while waiting for sync controller to stop")
+		}
+	}
 
 	// Stop LocalStack manager if running
 	if s.localStackManager != nil {
