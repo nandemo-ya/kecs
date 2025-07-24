@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,16 +64,54 @@ func init() {
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
-	// Generate instance name if not provided
+	// Create k3d cluster manager to check existing instances
+	manager, err := kubernetes.NewK3dClusterManager(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cluster manager: %w", err)
+	}
+
+	// If instance name is not provided, show selection
 	if startInstanceName == "" {
-		generatedName, err := utils.GenerateRandomName()
+		instanceName, isNew, err := selectOrCreateInstance(manager)
 		if err != nil {
-			return fmt.Errorf("failed to generate instance name: %w", err)
+			return err
 		}
-		startInstanceName = generatedName
-		// Only show info message if using verbose output
-		if startVerbose {
-			progress.Info("Generated KECS instance name: %s", startInstanceName)
+		startInstanceName = instanceName
+		
+		// If an existing instance was selected, check if it's already running
+		if !isNew {
+			running, err := checkInstanceRunning(manager, startInstanceName)
+			if err != nil {
+				return fmt.Errorf("failed to check instance status: %w", err)
+			}
+			if running {
+				progress.Warning("Instance '%s' is already running", startInstanceName)
+				return nil
+			}
+			// For stopped instances, we'll restart them
+			if startVerbose {
+				progress.Info("Restarting stopped instance: %s", startInstanceName)
+			}
+		}
+	} else {
+		// Check if specified instance exists
+		exists, err := manager.ClusterExists(context.Background(), startInstanceName)
+		if err != nil {
+			return fmt.Errorf("failed to check instance existence: %w", err)
+		}
+		if exists {
+			running, err := checkInstanceRunning(manager, startInstanceName)
+			if err != nil {
+				return fmt.Errorf("failed to check instance status: %w", err)
+			}
+			if running {
+				progress.Warning("Instance '%s' is already running", startInstanceName)
+				return nil
+			}
+			// For stopped instances, we'll restart them
+			if startVerbose {
+				progress.Info("Restarting stopped instance: %s", startInstanceName)
+			}
 		}
 	}
 
@@ -947,4 +987,89 @@ func deployTraefikWithProgress(ctx context.Context, clusterName string, cfg *con
 	}
 
 	return fmt.Errorf("Traefik deployment did not become ready in time")
+}
+
+// selectOrCreateInstance shows an interactive selection for existing instances or creates a new one
+func selectOrCreateInstance(manager *kubernetes.K3dClusterManager) (string, bool, error) {
+	ctx := context.Background()
+	
+	spinner := progress.NewSpinner("Fetching KECS instances")
+	spinner.Start()
+	
+	// Get list of clusters
+	clusters, err := manager.ListClusters(ctx)
+	if err != nil {
+		spinner.Fail("Failed to list instances")
+		return "", false, fmt.Errorf("failed to list instances: %w", err)
+	}
+	spinner.Stop()
+	
+	// Add "Create new instance" option at the beginning
+	options := []string{"[Create new instance]"}
+	
+	// Add existing instances with their status
+	for _, cluster := range clusters {
+		status := "stopped"
+		// Check if cluster is running
+		running, _ := checkInstanceRunning(manager, cluster)
+		if running {
+			status = "running"
+		}
+		
+		// Check for data directory
+		home, _ := os.UserHomeDir()
+		dataDir := filepath.Join(home, ".kecs", "instances", cluster, "data")
+		if _, err := os.Stat(dataDir); err == nil {
+			options = append(options, fmt.Sprintf("%s (%s, has data)", cluster, status))
+		} else {
+			options = append(options, fmt.Sprintf("%s (%s)", cluster, status))
+		}
+	}
+	
+	// Show selection prompt
+	selectedOption, err := pterm.DefaultInteractiveSelect.
+		WithOptions(options).
+		WithDefaultText("Select KECS instance to start or create a new one").
+		Show()
+	if err != nil {
+		return "", false, fmt.Errorf("failed to select instance: %w", err)
+	}
+	
+	// Check if user selected to create new instance
+	if selectedOption == "[Create new instance]" {
+		generatedName, err := utils.GenerateRandomName()
+		if err != nil {
+			return "", false, fmt.Errorf("failed to generate instance name: %w", err)
+		}
+		progress.Info("Creating new KECS instance: %s", generatedName)
+		return generatedName, true, nil
+	}
+	
+	// Extract instance name from selection (remove status info)
+	instanceName := selectedOption
+	if idx := strings.Index(selectedOption, " ("); idx > 0 {
+		instanceName = selectedOption[:idx]
+	}
+	
+	return instanceName, false, nil
+}
+
+// checkInstanceRunning checks if a KECS instance is currently running
+func checkInstanceRunning(manager *kubernetes.K3dClusterManager, instanceName string) (bool, error) {
+	ctx := context.Background()
+	
+	// First check if cluster exists
+	exists, err := manager.ClusterExists(ctx, instanceName)
+	if err != nil || !exists {
+		return false, err
+	}
+	
+	// Try to get kube client - if successful, cluster is running
+	_, err = manager.GetKubeClient(instanceName)
+	if err != nil {
+		// Error getting client means cluster is not running properly
+		return false, nil
+	}
+	
+	return true, nil
 }
