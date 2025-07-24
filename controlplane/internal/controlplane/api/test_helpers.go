@@ -61,3 +61,15 @@ func (m *MockClusterManager) GetClusterInfo(ctx context.Context, clusterName str
 func (m *MockClusterManager) GetTraefikPort(clusterName string) (int, bool) {
 	return 0, false
 }
+
+func (m *MockClusterManager) StopCluster(ctx context.Context, clusterName string) error {
+	return nil
+}
+
+func (m *MockClusterManager) StartCluster(ctx context.Context, clusterName string) error {
+	return nil
+}
+
+func (m *MockClusterManager) ListClusters(ctx context.Context) ([]string, error) {
+	return []string{}, nil
+}

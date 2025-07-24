@@ -259,6 +259,95 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 }
 
 // DeleteCluster deletes a k3d cluster
+// StopCluster stops a k3d cluster without deleting it
+func (k *K3dClusterManager) StopCluster(ctx context.Context, clusterName string) error {
+	normalizedName := k.normalizeClusterName(clusterName)
+
+	// Check if cluster exists
+	exists, err := k.ClusterExists(ctx, clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to check if cluster exists: %w", err)
+	}
+
+	if !exists {
+		return fmt.Errorf("cluster does not exist: %s", normalizedName)
+	}
+
+	// Get the cluster
+	clusters, err := client.ClusterList(ctx, k.runtime)
+	if err != nil {
+		return fmt.Errorf("failed to list clusters: %w", err)
+	}
+
+	var cluster *k3d.Cluster
+	for _, c := range clusters {
+		if c.Name == normalizedName {
+			cluster = c
+			break
+		}
+	}
+
+	if cluster == nil {
+		return fmt.Errorf("cluster not found: %s", normalizedName)
+	}
+
+	// Stop the cluster
+	logging.Info("Stopping k3d cluster", "cluster", normalizedName)
+	if err := client.ClusterStop(ctx, k.runtime, cluster); err != nil {
+		return fmt.Errorf("failed to stop cluster: %w", err)
+	}
+
+	logging.Info("k3d cluster stopped successfully", "cluster", normalizedName)
+	return nil
+}
+
+// StartCluster starts a previously stopped k3d cluster
+func (k *K3dClusterManager) StartCluster(ctx context.Context, clusterName string) error {
+	normalizedName := k.normalizeClusterName(clusterName)
+
+	// Check if cluster exists
+	exists, err := k.ClusterExists(ctx, clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to check if cluster exists: %w", err)
+	}
+
+	if !exists {
+		return fmt.Errorf("cluster does not exist: %s", normalizedName)
+	}
+
+	// Get the cluster
+	clusters, err := client.ClusterList(ctx, k.runtime)
+	if err != nil {
+		return fmt.Errorf("failed to list clusters: %w", err)
+	}
+
+	var cluster *k3d.Cluster
+	for _, c := range clusters {
+		if c.Name == normalizedName {
+			cluster = c
+			break
+		}
+	}
+
+	if cluster == nil {
+		return fmt.Errorf("cluster not found: %s", normalizedName)
+	}
+
+	// Start the cluster
+	logging.Info("Starting k3d cluster", "cluster", normalizedName)
+	startOpts := k3d.ClusterStartOpts{
+		WaitForServer: true,
+		Timeout:       60 * time.Second,
+	}
+	
+	if err := client.ClusterStart(ctx, k.runtime, cluster, startOpts); err != nil {
+		return fmt.Errorf("failed to start cluster: %w", err)
+	}
+
+	logging.Info("k3d cluster started successfully", "cluster", normalizedName)
+	return nil
+}
+
 func (k *K3dClusterManager) DeleteCluster(ctx context.Context, clusterName string) error {
 	normalizedName := k.normalizeClusterName(clusterName)
 
