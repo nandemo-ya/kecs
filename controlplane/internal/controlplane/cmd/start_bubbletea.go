@@ -189,8 +189,34 @@ func createK3dClusterWithProgress(ctx context.Context, clusterName string, cfg *
 	}
 
 	if exists {
-		tracker.Log(progress.LogLevelInfo, "k3d cluster '%s' already exists, using existing cluster", clusterName)
-		tracker.UpdateTask("k3d-cluster", 100, "Using existing cluster")
+		tracker.Log(progress.LogLevelInfo, "k3d cluster '%s' already exists, checking if it's running", clusterName)
+		tracker.UpdateTask("k3d-cluster", 60, "Checking cluster status...")
+		
+		// Check if the cluster is running
+		running, err := manager.IsClusterRunning(ctx, clusterName)
+		if err != nil {
+			return fmt.Errorf("failed to check cluster status: %w", err)
+		}
+		
+		if !running {
+			tracker.Log(progress.LogLevelInfo, "k3d cluster '%s' is stopped, starting it", clusterName)
+			tracker.UpdateTask("k3d-cluster", 70, "Starting stopped cluster...")
+			
+			if err := manager.StartCluster(ctx, clusterName); err != nil {
+				return fmt.Errorf("failed to start cluster: %w", err)
+			}
+			
+			// Wait for cluster to be ready after starting
+			tracker.UpdateTask("k3d-cluster", 90, "Waiting for cluster to be ready...")
+			if err := manager.WaitForClusterReady(clusterName, 5*time.Minute); err != nil {
+				return fmt.Errorf("cluster did not become ready after start: %w", err)
+			}
+			tracker.Log(progress.LogLevelInfo, "Cluster is ready")
+		} else {
+			tracker.Log(progress.LogLevelInfo, "k3d cluster '%s' is already running", clusterName)
+		}
+		
+		tracker.UpdateTask("k3d-cluster", 100, "Cluster ready")
 		return nil
 	}
 
