@@ -324,7 +324,30 @@ func createK3dCluster(ctx context.Context, clusterName string, cfg *config.Confi
 	}
 
 	if exists {
-		logging.Info("k3d cluster already exists, using existing cluster", "cluster", clusterName)
+		logging.Info("k3d cluster already exists, checking if it's running", "cluster", clusterName)
+		
+		// Check if the cluster is running
+		running, err := manager.IsClusterRunning(ctx, clusterName)
+		if err != nil {
+			return fmt.Errorf("failed to check cluster status: %w", err)
+		}
+		
+		if !running {
+			logging.Info("k3d cluster is stopped, starting it", "cluster", clusterName)
+			if err := manager.StartCluster(ctx, clusterName); err != nil {
+				return fmt.Errorf("failed to start cluster: %w", err)
+			}
+			
+			// Wait for cluster to be ready after starting
+			logging.Info("Waiting for cluster to be ready after start")
+			if err := manager.WaitForClusterReady(clusterName, 5*time.Minute); err != nil {
+				return fmt.Errorf("cluster did not become ready after start: %w", err)
+			}
+			logging.Info("Cluster is ready")
+		} else {
+			logging.Info("k3d cluster is already running")
+		}
+		
 		return nil
 	}
 
@@ -1058,18 +1081,6 @@ func selectOrCreateInstance(manager *kubernetes.K3dClusterManager) (string, bool
 func checkInstanceRunning(manager *kubernetes.K3dClusterManager, instanceName string) (bool, error) {
 	ctx := context.Background()
 	
-	// First check if cluster exists
-	exists, err := manager.ClusterExists(ctx, instanceName)
-	if err != nil || !exists {
-		return false, err
-	}
-	
-	// Try to get kube client - if successful, cluster is running
-	_, err = manager.GetKubeClient(instanceName)
-	if err != nil {
-		// Error getting client means cluster is not running properly
-		return false, nil
-	}
-	
-	return true, nil
+	// Use the new IsClusterRunning method to check status without triggering warnings
+	return manager.IsClusterRunning(ctx, instanceName)
 }

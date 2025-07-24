@@ -18,6 +18,12 @@ type ClusterManager interface {
 	// DeleteCluster deletes an existing Kubernetes cluster
 	DeleteCluster(ctx context.Context, clusterName string) error
 
+	// StopCluster stops a running Kubernetes cluster
+	StopCluster(ctx context.Context, clusterName string) error
+
+	// StartCluster starts a stopped Kubernetes cluster
+	StartCluster(ctx context.Context, clusterName string) error
+
 	// ClusterExists checks if a cluster exists
 	ClusterExists(ctx context.Context, clusterName string) (bool, error)
 
@@ -38,6 +44,12 @@ type ClusterManager interface {
 
 	// GetTraefikPort returns the Traefik port for a given cluster
 	GetTraefikPort(clusterName string) (int, bool)
+
+	// ListClusters returns a list of all existing clusters
+	ListClusters(ctx context.Context) ([]string, error)
+
+	// IsClusterRunning checks if a cluster is currently running
+	IsClusterRunning(ctx context.Context, clusterName string) (bool, error)
 }
 
 // ClusterInfo contains information about a cluster

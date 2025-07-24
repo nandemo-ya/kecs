@@ -3,8 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -15,13 +13,12 @@ import (
 
 var (
 	stopInstanceName string
-	stopDeleteData   bool
 )
 
 var stopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop KECS instance",
-	Long:  `Stop and delete the KECS instance including its k3d cluster and control plane.`,
+	Long:  `Stop the KECS instance by stopping its k3d cluster. The instance can be restarted later with the start command.`,
 	RunE:  runStop,
 }
 
@@ -29,7 +26,6 @@ func init() {
 	RootCmd.AddCommand(stopCmd)
 
 	stopCmd.Flags().StringVar(&stopInstanceName, "instance", "", "KECS instance name to stop (required)")
-	stopCmd.Flags().BoolVar(&stopDeleteData, "delete-data", false, "Delete persistent data")
 }
 
 func runStop(cmd *cobra.Command, args []string) error {
@@ -92,19 +88,19 @@ func runStop(cmd *cobra.Command, args []string) error {
 	}
 	spinner.Success("Instance found")
 
-	// Create progress tracker for deletion
+	// Create progress tracker for stopping
 	tracker := progress.NewTracker(progress.Options{
-		Description:     "Deleting k3d cluster",
+		Description:     "Stopping k3d cluster",
 		Total:           100,
 		ShowElapsedTime: true,
 		Width:           40,
 	})
 
-	// Start deletion in background
+	// Start stopping in background
 	errChan := make(chan error, 1)
 	go func() {
 		tracker.Update(30)
-		if err := manager.DeleteCluster(ctx, stopInstanceName); err != nil {
+		if err := manager.StopCluster(ctx, stopInstanceName); err != nil {
 			errChan <- err
 			return
 		}
@@ -112,33 +108,16 @@ func runStop(cmd *cobra.Command, args []string) error {
 		errChan <- nil
 	}()
 
-	// Wait for deletion
+	// Wait for stop
 	err = <-errChan
 	if err != nil {
-		tracker.FinishWithMessage("Failed to delete cluster")
-		return fmt.Errorf("failed to delete cluster: %w", err)
+		tracker.FinishWithMessage("Failed to stop cluster")
+		return fmt.Errorf("failed to stop cluster: %w", err)
 	}
-	tracker.FinishWithMessage("Cluster deleted successfully")
+	tracker.FinishWithMessage("Cluster stopped successfully")
 
 	progress.Success("KECS instance '%s' has been stopped", stopInstanceName)
-
-	// Delete data if requested
-	if stopDeleteData {
-		home, _ := os.UserHomeDir()
-		dataDir := filepath.Join(home, ".kecs", "instances", stopInstanceName, "data")
-		
-		spinner = progress.NewSpinner(fmt.Sprintf("Deleting data directory: %s", dataDir))
-		spinner.Start()
-		
-		if err := os.RemoveAll(dataDir); err != nil {
-			spinner.Fail("Failed to delete data directory")
-			progress.Warning("Failed to delete data directory: %v", err)
-		} else {
-			spinner.Success("Data directory deleted")
-		}
-	} else {
-		progress.Info("Instance data preserved. Use --delete-data to remove it.")
-	}
+	progress.Info("Instance data preserved. Use 'kecs start' to restart the instance.")
 
 	return nil
 }
