@@ -76,7 +76,11 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 	if api.clusterManager != nil {
 		// For now, we'll use a simple approach - look for a k3d cluster
 		// In a real implementation, this should be passed from the server configuration
-		k8sClusterName = api.getKecsInstanceName()
+		instanceName := api.getKecsInstanceName()
+		if instanceName != "" {
+			// The k3d cluster name has "kecs-" prefix
+			k8sClusterName = fmt.Sprintf("kecs-%s", instanceName)
+		}
 	}
 	
 	if k8sClusterName == "" {
