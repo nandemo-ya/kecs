@@ -1058,18 +1058,6 @@ func selectOrCreateInstance(manager *kubernetes.K3dClusterManager) (string, bool
 func checkInstanceRunning(manager *kubernetes.K3dClusterManager, instanceName string) (bool, error) {
 	ctx := context.Background()
 	
-	// First check if cluster exists
-	exists, err := manager.ClusterExists(ctx, instanceName)
-	if err != nil || !exists {
-		return false, err
-	}
-	
-	// Try to get kube client - if successful, cluster is running
-	_, err = manager.GetKubeClient(instanceName)
-	if err != nil {
-		// Error getting client means cluster is not running properly
-		return false, nil
-	}
-	
-	return true, nil
+	// Use the new IsClusterRunning method to check status without triggering warnings
+	return manager.IsClusterRunning(ctx, instanceName)
 }

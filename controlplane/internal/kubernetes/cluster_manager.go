@@ -47,6 +47,9 @@ type ClusterManager interface {
 
 	// ListClusters returns a list of all existing clusters
 	ListClusters(ctx context.Context) ([]string, error)
+
+	// IsClusterRunning checks if a cluster is currently running
+	IsClusterRunning(ctx context.Context, clusterName string) (bool, error)
 }
 
 // ClusterInfo contains information about a cluster

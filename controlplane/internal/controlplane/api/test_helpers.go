@@ -73,3 +73,7 @@ func (m *MockClusterManager) StartCluster(ctx context.Context, clusterName strin
 func (m *MockClusterManager) ListClusters(ctx context.Context) ([]string, error) {
 	return []string{}, nil
 }
+
+func (m *MockClusterManager) IsClusterRunning(ctx context.Context, clusterName string) (bool, error) {
+	return true, nil
+}

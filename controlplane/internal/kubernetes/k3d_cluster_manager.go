@@ -432,6 +432,44 @@ func (k *K3dClusterManager) ListClusters(ctx context.Context) ([]string, error) 
 	return clusterNames, nil
 }
 
+// IsClusterRunning checks if a cluster is running by examining container states
+func (k *K3dClusterManager) IsClusterRunning(ctx context.Context, clusterName string) (bool, error) {
+	normalizedName := k.normalizeClusterName(clusterName)
+
+	// Get cluster
+	_, err := client.ClusterGet(ctx, k.runtime, &k3d.Cluster{Name: normalizedName})
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get cluster: %w", err)
+	}
+
+	// Check if any nodes are running
+	nodes, err := k.runtime.GetNodesByLabel(ctx, map[string]string{k3d.LabelClusterName: normalizedName})
+	if err != nil {
+		return false, fmt.Errorf("failed to get nodes: %w", err)
+	}
+
+	// If we have nodes and cluster exists, check container states
+	if len(nodes) > 0 {
+		// Check if at least one node is running
+		for _, node := range nodes {
+			// Get node status from runtime
+			nodeStatus, err := k.runtime.GetNode(ctx, node)
+			if err != nil {
+				continue
+			}
+			// If we find a running node, cluster is considered running
+			if nodeStatus != nil && nodeStatus.State.Running {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
 // GetKubeClient returns a Kubernetes client for the specified cluster
 func (k *K3dClusterManager) GetKubeClient(clusterName string) (kubernetes.Interface, error) {
 	normalizedName := k.normalizeClusterName(clusterName)
