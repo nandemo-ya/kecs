@@ -341,10 +341,45 @@ func (k *K3dClusterManager) StartCluster(ctx context.Context, clusterName string
 	}
 	
 	if err := client.ClusterStart(ctx, k.runtime, cluster, startOpts); err != nil {
+		// If normal start fails due to DNS fix issues, try workaround
+		if strings.Contains(err.Error(), "Host Gateway IP is missing") || 
+		   strings.Contains(err.Error(), "Cannot enable DNS fix") {
+			logging.Warn("Normal start failed due to DNS fix issue, attempting workaround", "error", err)
+			return k.startClusterWithWorkaround(ctx, normalizedName, cluster)
+		}
 		return fmt.Errorf("failed to start cluster: %w", err)
 	}
 
 	logging.Info("k3d cluster started successfully", "cluster", normalizedName)
+	return nil
+}
+
+// startClusterWithWorkaround handles the DNS fix issue by recreating the cluster while preserving data
+func (k *K3dClusterManager) startClusterWithWorkaround(ctx context.Context, normalizedName string, cluster *k3d.Cluster) error {
+	logging.Info("Using workaround: recreating cluster while preserving data", "cluster", normalizedName)
+	
+	// Save the original cluster configuration
+	volumeMounts := k.config.VolumeMounts
+	
+	// Delete the problematic cluster
+	logging.Info("Deleting stopped cluster", "cluster", normalizedName)
+	if err := client.ClusterDelete(ctx, k.runtime, cluster, k3d.ClusterDeleteOpts{SkipRegistryCheck: false}); err != nil {
+		return fmt.Errorf("failed to delete cluster for workaround: %w", err)
+	}
+	
+	// Recreate the cluster with the same configuration
+	logging.Info("Recreating cluster with preserved data", "cluster", normalizedName)
+	
+	// Restore the volume mounts to preserve data
+	k.config.VolumeMounts = volumeMounts
+	
+	// Use the denormalized name for recreation (without "kecs-" prefix)
+	denormalizedName := strings.TrimPrefix(normalizedName, "kecs-")
+	if err := k.CreateCluster(ctx, denormalizedName); err != nil {
+		return fmt.Errorf("failed to recreate cluster: %w", err)
+	}
+	
+	logging.Info("Cluster recreated successfully with preserved data", "cluster", normalizedName)
 	return nil
 }
 
