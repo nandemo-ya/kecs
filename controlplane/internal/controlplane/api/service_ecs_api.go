@@ -114,18 +114,25 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	// Check if service already exists
 	existingService, err := api.storage.ServiceStore().Get(ctx, clusterARN, req.ServiceName)
 	if err == nil && existingService != nil {
-		// Service already exists - return the existing service for idempotency
-		// This helps with client retries and matches common AWS behavior
-		logging.Info("Service already exists, returning existing service", 
-			"service", req.ServiceName, 
-			"cluster", cluster.Name)
-		
-		// Convert storage service to API response
-		responseService := storageServiceToGeneratedService(existingService)
-		
-		return &generated.CreateServiceResponse{
-			Service: responseService,
-		}, nil
+		// Only return existing service if it's not being deleted or failed
+		if existingService.Status != "DRAINING" && existingService.Status != "INACTIVE" && existingService.Status != "FAILED" {
+			// Service already exists - return the existing service for idempotency
+			// This helps with client retries and matches common AWS behavior
+			logging.Info("Service already exists, returning existing service", 
+				"service", req.ServiceName, 
+				"cluster", cluster.Name)
+			
+			// Convert storage service to API response
+			responseService := storageServiceToGeneratedService(existingService)
+			
+			return &generated.CreateServiceResponse{
+				Service: responseService,
+			}, nil
+		}
+		// If service is DRAINING or INACTIVE, proceed with creating a new one
+		logging.Info("Existing service is being deleted, creating new service",
+			"service", req.ServiceName,
+			"status", existingService.Status)
 	}
 
 	// Set default values
@@ -285,6 +292,9 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	if err := api.storage.ServiceStore().Create(ctx, storageService); err != nil {
 		return nil, fmt.Errorf("failed to create service: %w", err)
 	}
+	
+	logging.Info("Service created in storage, proceeding with Kubernetes deployment",
+		"service", storageService.ServiceName)
 
 	// Increment cluster's active service count
 	cluster.ActiveServicesCount++
@@ -294,6 +304,10 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	}
 
 	// Create Kubernetes Deployment and Service
+	logging.Info("Calling ServiceManager.CreateService",
+		"service", storageService.ServiceName,
+		"deployment", deployment.Name,
+		"namespace", deployment.Namespace)
 	if err := serviceManager.CreateService(ctx, deployment, kubeService, cluster, storageService); err != nil {
 		// Service was created in storage but Kubernetes deployment failed
 		// Update status to indicate failure - get fresh service data first

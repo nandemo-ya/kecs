@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
@@ -20,14 +21,55 @@ import (
 type ServiceManager struct {
 	storage        storage.Storage
 	clusterManager ClusterManager
+	clientset      kubernetes.Interface
 }
 
 // NewServiceManager creates a new ServiceManager
 func NewServiceManager(storage storage.Storage, clusterManager ClusterManager) *ServiceManager {
-	return &ServiceManager{
+	sm := &ServiceManager{
 		storage:        storage,
 		clusterManager: clusterManager,
 	}
+	
+	// Initialize kubernetes client
+	if err := sm.initializeClient(); err != nil {
+		logging.Warn("Failed to initialize kubernetes client", "error", err)
+		// Don't fail creation - client will be initialized on first use
+	}
+	
+	return sm
+}
+
+// initializeClient initializes the kubernetes client
+func (sm *ServiceManager) initializeClient() error {
+	if sm.clientset != nil {
+		return nil // Already initialized
+	}
+	
+	// Check if running in test mode
+	if config.GetBool("features.testMode") {
+		logging.Debug("Test mode enabled - skipping kubernetes client initialization")
+		return nil
+	}
+	
+	// Try in-cluster config first
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		// Fall back to kubeconfig
+		cfg, err = GetKubeConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get kubernetes config: %w", err)
+		}
+	}
+	
+	clientset, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+	
+	sm.clientset = clientset
+	logging.Debug("ServiceManager kubernetes client initialized")
+	return nil
 }
 
 // CreateService creates a Kubernetes Deployment and Service for an ECS service
@@ -38,6 +80,10 @@ func (sm *ServiceManager) CreateService(
 	cluster *storage.Cluster,
 	storageService *storage.Service,
 ) error {
+	logging.Info("ServiceManager.CreateService called",
+		"service", storageService.ServiceName,
+		"cluster", cluster.Name,
+		"namespace", deployment.Namespace)
 	// Check if running in test mode
 	if config.GetBool("features.testMode") {
 		// In test mode, simulate service creation
@@ -86,11 +132,17 @@ func (sm *ServiceManager) CreateService(
 		return nil
 	}
 
-	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.K8sClusterName)
-	if err != nil {
-		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	// Ensure kubernetes client is initialized
+	if err := sm.initializeClient(); err != nil {
+		return fmt.Errorf("failed to initialize kubernetes client: %w", err)
 	}
+	
+	// Use the service manager's client
+	kubeClient := sm.clientset
+	
+	logging.Info("Kubernetes client initialized, proceeding with deployment creation",
+		"service", storageService.ServiceName,
+		"clientNil", kubeClient == nil)
 
 	// Ensure namespace exists
 	if err := sm.ensureNamespace(ctx, kubeClient, deployment.Namespace); err != nil {
@@ -225,14 +277,16 @@ func (sm *ServiceManager) UpdateService(
 		return nil
 	}
 
-	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.K8sClusterName)
-	if err != nil {
-		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	// Ensure kubernetes client is initialized
+	if err := sm.initializeClient(); err != nil {
+		return fmt.Errorf("failed to initialize kubernetes client: %w", err)
 	}
+	
+	// Use the service manager's client
+	kubeClient := sm.clientset
 
 	// Update Deployment
-	_, err = kubeClient.AppsV1().Deployments(deployment.Namespace).Update(
+	_, err := kubeClient.AppsV1().Deployments(deployment.Namespace).Update(
 		ctx, deployment, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update deployment: %w", err)
@@ -314,11 +368,13 @@ func (sm *ServiceManager) DeleteService(
 		return nil
 	}
 
-	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.K8sClusterName)
-	if err != nil {
-		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	// Ensure kubernetes client is initialized
+	if err := sm.initializeClient(); err != nil {
+		return fmt.Errorf("failed to initialize kubernetes client: %w", err)
 	}
+	
+	// Use the service manager's client
+	kubeClient := sm.clientset
 
 	namespace := storageService.Namespace
 	if namespace == "" {
@@ -331,7 +387,7 @@ func (sm *ServiceManager) DeleteService(
 	}
 
 	// Delete Deployment
-	err = kubeClient.AppsV1().Deployments(namespace).Delete(
+	err := kubeClient.AppsV1().Deployments(namespace).Delete(
 		ctx, deploymentName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		logging.Warn("Failed to delete deployment",
