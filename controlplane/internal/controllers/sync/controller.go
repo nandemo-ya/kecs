@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -46,6 +47,8 @@ type SyncController struct {
 	// Configuration
 	workers      int
 	resyncPeriod time.Duration
+	accountID    string
+	region       string
 }
 
 // NewSyncController creates a new synchronization controller
@@ -59,6 +62,16 @@ func NewSyncController(
 	workers int,
 	resyncPeriod time.Duration,
 ) *SyncController {
+	// Get configuration
+	cfg := config.GetConfig()
+	accountID := cfg.AWS.AccountID
+	if accountID == "" {
+		accountID = "000000000000" // Default
+	}
+	region := cfg.AWS.DefaultRegion
+	if region == "" {
+		region = "us-east-1" // Default
+	}
 	controller := &SyncController{
 		kubeClient:       kubeClient,
 		storage:          storage,
@@ -83,6 +96,8 @@ func NewSyncController(
 
 		workers:      workers,
 		resyncPeriod: resyncPeriod,
+		accountID:    accountID,
+		region:       region,
 	}
 
 	// Create batch updater with reasonable defaults
@@ -118,6 +133,22 @@ func (c *SyncController) Run(ctx context.Context) error {
 
 	// Wait for informer caches to sync
 	klog.Info("Waiting for informer caches to sync")
+	
+	// Check cache sync status periodically
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				klog.Infof("Cache sync status - Deployments: %v, ReplicaSets: %v, Pods: %v, Events: %v",
+					c.deploymentsSynced(), c.replicaSetsSynced(), c.podsSynced(), c.eventsSynced())
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	
 	if !cache.WaitForCacheSync(ctx.Done(),
 		c.deploymentsSynced,
 		c.replicaSetsSynced,
@@ -160,6 +191,8 @@ func (c *SyncController) processNextDeployment(ctx context.Context) bool {
 		return false
 	}
 	defer c.deploymentQueue.Done(key)
+	
+	klog.Infof("Processing deployment from queue: %s", key)
 
 	err := c.syncDeployment(ctx, key.(string))
 	if err == nil {
@@ -188,8 +221,10 @@ func (c *SyncController) processNextPod(ctx context.Context) bool {
 		return false
 	}
 	defer c.podQueue.Done(key)
+	
+	klog.Infof("Processing pod from queue: %s", key)
 
-	err := c.syncPod(ctx, key.(string))
+	err := c.syncTask(ctx, key.(string))
 	if err == nil {
 		c.podQueue.Forget(key)
 		return true
@@ -211,7 +246,7 @@ func (c *SyncController) processNextPod(ctx context.Context) bool {
 
 // syncDeployment syncs a deployment to ECS service state
 func (c *SyncController) syncDeployment(ctx context.Context, key string) error {
-	klog.V(4).Infof("Syncing deployment: %s", key)
+	klog.Infof("Syncing deployment: %s", key)
 	return c.syncService(ctx, key)
 }
 
@@ -219,6 +254,8 @@ func (c *SyncController) syncDeployment(ctx context.Context, key string) error {
 // Deployment event handlers
 func (c *SyncController) handleDeploymentAdd(obj interface{}) {
 	deployment := obj.(*appsv1.Deployment)
+	// Add debug logging
+	klog.Infof("Deployment add event: %s/%s, managed: %v", deployment.Namespace, deployment.Name, isECSManagedDeployment(deployment))
 	if !isECSManagedDeployment(deployment) {
 		return
 	}
@@ -227,13 +264,16 @@ func (c *SyncController) handleDeploymentAdd(obj interface{}) {
 		runtime.HandleError(err)
 		return
 	}
-	klog.V(4).Infof("ECS deployment added: %s", deployment.Name)
+	klog.Infof("ECS deployment added: %s", deployment.Name)
 	c.deploymentQueue.Add(key)
 }
 
 func (c *SyncController) handleDeploymentUpdate(oldObj, newObj interface{}) {
 	oldDep := oldObj.(*appsv1.Deployment)
 	newDep := newObj.(*appsv1.Deployment)
+	
+	// Add debug logging
+	klog.Infof("Deployment update event: %s/%s, managed: %v", newDep.Namespace, newDep.Name, isECSManagedDeployment(newDep))
 	
 	if !isECSManagedDeployment(newDep) {
 		return
@@ -273,6 +313,7 @@ func (c *SyncController) handleDeploymentDelete(obj interface{}) {
 // Pod event handlers
 func (c *SyncController) handlePodAdd(obj interface{}) {
 	pod := obj.(*corev1.Pod)
+	klog.Infof("Pod add event: %s/%s, managed: %v", pod.Namespace, pod.Name, isECSManagedPod(pod))
 	if !isECSManagedPod(pod) {
 		return
 	}
@@ -281,12 +322,15 @@ func (c *SyncController) handlePodAdd(obj interface{}) {
 		runtime.HandleError(err)
 		return
 	}
+	klog.Infof("ECS pod added: %s", pod.Name)
 	c.podQueue.Add(key)
 }
 
 func (c *SyncController) handlePodUpdate(oldObj, newObj interface{}) {
 	oldPod := oldObj.(*corev1.Pod)
 	newPod := newObj.(*corev1.Pod)
+	
+	klog.Infof("Pod update event: %s/%s, managed: %v", newPod.Namespace, newPod.Name, isECSManagedPod(newPod))
 	
 	if !isECSManagedPod(newPod) {
 		return
@@ -295,6 +339,7 @@ func (c *SyncController) handlePodUpdate(oldObj, newObj interface{}) {
 	// Only sync if status changed
 	if oldPod.Status.Phase != newPod.Status.Phase ||
 		len(oldPod.Status.ContainerStatuses) != len(newPod.Status.ContainerStatuses) {
+		klog.Infof("Pod status changed: %s (phase: %s -> %s)", newPod.Name, oldPod.Status.Phase, newPod.Status.Phase)
 		key, err := cache.MetaNamespaceKeyFunc(newPod)
 		if err != nil {
 			runtime.HandleError(err)

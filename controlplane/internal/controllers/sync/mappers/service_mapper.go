@@ -12,11 +12,17 @@ import (
 )
 
 // ServiceStateMapper maps Kubernetes deployment state to ECS service state
-type ServiceStateMapper struct{}
+type ServiceStateMapper struct{
+	accountID string
+	region    string
+}
 
 // NewServiceStateMapper creates a new service state mapper
-func NewServiceStateMapper() *ServiceStateMapper {
-	return &ServiceStateMapper{}
+func NewServiceStateMapper(accountID, region string) *ServiceStateMapper {
+	return &ServiceStateMapper{
+		accountID: accountID,
+		region:    region,
+	}
 }
 
 // MapDeploymentToServiceStatus maps a Kubernetes deployment to ECS service status
@@ -105,15 +111,18 @@ func (m *ServiceStateMapper) ExtractServiceNameFromDeployment(deploymentName str
 
 // ExtractClusterInfoFromNamespace extracts cluster name and region from namespace
 func (m *ServiceStateMapper) ExtractClusterInfoFromNamespace(namespace string) (clusterName, region string) {
-	// Expected format: kecs-<region>-<cluster-name>
-	if !strings.HasPrefix(namespace, "kecs-") {
-		return "", ""
-	}
-
-	parts := strings.SplitN(strings.TrimPrefix(namespace, "kecs-"), "-", 2)
-	if len(parts) >= 2 {
-		region = parts[0]
-		clusterName = parts[1]
+	// Expected format: <cluster-name>-<region>
+	// Example: default-us-east-1
+	parts := strings.Split(namespace, "-")
+	if len(parts) >= 3 {
+		// Extract region (last 3 parts: us-east-1)
+		region = strings.Join(parts[len(parts)-3:], "-")
+		// Extract cluster name (everything before region)
+		clusterName = strings.Join(parts[:len(parts)-3], "-")
+		// Handle case where cluster name is "default"
+		if clusterName == "" && len(parts) == 3 {
+			clusterName = parts[0]
+		}
 	}
 
 	return clusterName, region
@@ -133,7 +142,7 @@ func (m *ServiceStateMapper) MapDeploymentToService(deployment *appsv1.Deploymen
 	if service == nil {
 		service = &storage.Service{
 			ServiceName: serviceName,
-			ClusterARN:  generateClusterARN(region, clusterName),
+			ClusterARN:  m.generateClusterARN(region, clusterName),
 			Region:      region,
 			CreatedAt:   deployment.CreationTimestamp.Time,
 			LaunchType:  "FARGATE", // Default launch type
@@ -187,12 +196,6 @@ func (m *ServiceStateMapper) MapDeploymentToService(deployment *appsv1.Deploymen
 }
 
 // generateClusterARN generates an ECS cluster ARN
-func generateClusterARN(region, clusterName string) string {
-	if region == "" {
-		region = "us-east-1" // Default region
-	}
-	return "arn:aws:ecs:" + region + ":123456789012:cluster/" + clusterName
-}
 
 // Helper functions for pointer conversions
 func stringPtr(s string) *string {
@@ -208,4 +211,12 @@ func int32Ptr(i int32) *int32 {
 
 func timePtr(t time.Time) *time.Time {
 	return &t
+}
+
+// generateClusterARN generates an ECS cluster ARN
+func (m *ServiceStateMapper) generateClusterARN(region, clusterName string) string {
+	if region == "" {
+		region = m.region
+	}
+	return "arn:aws:ecs:" + region + ":" + m.accountID + ":cluster/" + clusterName
 }

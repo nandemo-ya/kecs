@@ -431,10 +431,12 @@ func (api *DefaultECSAPI) ListTasks(ctx context.Context, req *generated.ListTask
 	}
 
 	// List tasks
+	logging.Info("ListTasks called", "clusterARN", cluster.ARN, "filters", filters)
 	tasks, err := api.storage.TaskStore().List(ctx, cluster.ARN, filters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tasks: %w", err)
 	}
+	logging.Info("ListTasks result", "count", len(tasks))
 
 	// Convert to ARNs
 	taskArns := make([]string, 0, len(tasks))
