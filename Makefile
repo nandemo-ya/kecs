@@ -129,6 +129,39 @@ docker-push-dev: docker-build-dev
 	$(DOCKER) push k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION)
 	$(DOCKER) push k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:latest
 
+# Hot reload: Build and replace controlplane in running KECS instance
+.PHONY: hot-reload
+hot-reload: docker-push-dev
+	@echo "Hot reloading controlplane in KECS..."
+	@# Get the instance name (default to 'default' if not specified)
+	@INSTANCE_NAME=$${KECS_INSTANCE:-default}; \
+	CLUSTER_NAME="kecs-$$INSTANCE_NAME"; \
+	echo "Updating controlplane in cluster: $$CLUSTER_NAME"; \
+	if kubectl config get-contexts -o name | grep -q "k3d-$$CLUSTER_NAME"; then \
+		kubectl config use-context "k3d-$$CLUSTER_NAME" && \
+		kubectl set image deployment/kecs-controlplane kecs=k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) -n kecs-system && \
+		kubectl rollout status deployment/kecs-controlplane -n kecs-system && \
+		echo "✅ Controlplane updated successfully!"; \
+	else \
+		echo "❌ Error: KECS cluster '$$CLUSTER_NAME' not found."; \
+		echo "Available clusters:"; \
+		kubectl config get-contexts -o name | grep "k3d-kecs-" | sed 's/k3d-kecs-/  - /'; \
+		exit 1; \
+	fi
+
+# Dev workflow: Build and hot reload in one command
+.PHONY: dev
+dev: build hot-reload
+	@echo "✅ Development build and deploy completed!"
+
+# Dev workflow with logs: Build, reload and tail logs
+.PHONY: dev-logs
+dev-logs: dev
+	@INSTANCE_NAME=$${KECS_INSTANCE:-default}; \
+	CLUSTER_NAME="kecs-$$INSTANCE_NAME"; \
+	kubectl config use-context "k3d-$$CLUSTER_NAME" && \
+	kubectl logs -f deployment/kecs-controlplane -n kecs-system
+
 # Build API-only Docker image
 .PHONY: docker-build-api
 docker-build-api:
@@ -188,6 +221,17 @@ help:
 	@echo "  docker-push    - Push Docker image"
 	@echo "  docker-build-dev - Build Docker image for k3d registry (dev mode)"
 	@echo "  docker-push-dev - Push Docker image to k3d registry (dev mode)"
+	@echo "  hot-reload     - Build and replace controlplane in running KECS instance"
+	@echo "  dev            - Build binary and hot reload controlplane (development workflow)"
+	@echo "  dev-logs       - Same as 'dev' but also tail controlplane logs"
 	@echo "  docker-build-awsproxy - Build AWS Proxy Docker image"
 	@echo "  docker-push-awsproxy  - Push AWS Proxy Docker image"
 	@echo "  help           - Show this help message"
+	@echo ""
+	@echo "Development workflow:"
+	@echo "  1. Start KECS: ./bin/kecs start"
+	@echo "  2. Make code changes"
+	@echo "  3. Run: make dev"
+	@echo "  4. Or run with logs: make dev-logs"
+	@echo ""
+	@echo "For specific instance: KECS_INSTANCE=myinstance make dev"
