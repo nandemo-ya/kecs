@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controllers/sync/mappers"
@@ -62,21 +61,18 @@ func (c *SyncController) syncTask(ctx context.Context, key string) error {
 
 // handleDeletedPod handles the case when a pod is deleted
 func (c *SyncController) handleDeletedPod(ctx context.Context, namespace, podName string) error {
-	// Generate the task ARN that would have been used
-	taskARN := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:task/%s/%s", namespace, podName)
-	
-	// Try to get the existing task from storage
-	// Extract cluster info from namespace  
-	clusterName := namespace
-	region := "us-east-1"
-	if strings.HasPrefix(namespace, "kecs-") {
-		parts := strings.SplitN(strings.TrimPrefix(namespace, "kecs-"), "-", 2)
-		if len(parts) >= 2 {
-			region = parts[0]
-			clusterName = parts[1]
-		}
+	// Extract cluster info from namespace
+	mapper := mappers.NewServiceStateMapper(c.accountID, c.region)
+	clusterName, region := mapper.ExtractClusterInfoFromNamespace(namespace)
+	if region == "" {
+		region = c.region
 	}
+	
+	// Generate cluster ARN
 	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", region, c.accountID, clusterName)
+	
+	// Generate the task ARN that would have been used
+	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", region, c.accountID, namespace, podName)
 	
 	task, err := c.storage.TaskStore().Get(ctx, clusterARN, taskARN)
 	if err != nil {
