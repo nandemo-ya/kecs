@@ -12,11 +12,17 @@ import (
 )
 
 // TaskStateMapper maps Kubernetes pod state to ECS task state
-type TaskStateMapper struct{}
+type TaskStateMapper struct{
+	accountID string
+	region    string
+}
 
 // NewTaskStateMapper creates a new task state mapper
-func NewTaskStateMapper() *TaskStateMapper {
-	return &TaskStateMapper{}
+func NewTaskStateMapper(accountID, region string) *TaskStateMapper {
+	return &TaskStateMapper{
+		accountID: accountID,
+		region:    region,
+	}
 }
 
 // MapPodPhaseToTaskStatus maps Kubernetes pod phase to ECS task status
@@ -226,17 +232,20 @@ func (m *TaskStateMapper) mapContainerDesiredStatus(status *corev1.ContainerStat
 // Helper methods
 
 func (m *TaskStateMapper) generateTaskARN(pod *corev1.Pod) string {
-	region := "us-east-1" // Default region, should be extracted from cluster config
-	return fmt.Sprintf("arn:aws:ecs:%s:123456789012:task/%s/%s", region, pod.Namespace, pod.Name)
+	_, region := extractClusterInfoFromNamespace(pod.Namespace)
+	if region == "" {
+		region = m.region
+	}
+	return fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", region, m.accountID, pod.Namespace, pod.Name)
 }
 
 func (m *TaskStateMapper) getClusterARNFromNamespace(namespace string) string {
 	// Extract cluster name and region from namespace
 	clusterName, region := extractClusterInfoFromNamespace(namespace)
 	if region == "" {
-		region = "us-east-1"
+		region = m.region
 	}
-	return fmt.Sprintf("arn:aws:ecs:%s:123456789012:cluster/%s", region, clusterName)
+	return fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", region, m.accountID, clusterName)
 }
 
 func (m *TaskStateMapper) extractHealthStatus(pod *corev1.Pod) string {
@@ -410,15 +419,18 @@ func (m *TaskStateMapper) extractResourceLimits(pod *corev1.Pod) (cpu, memory st
 
 // extractClusterInfoFromNamespace is a helper function shared with service mapper
 func extractClusterInfoFromNamespace(namespace string) (clusterName, region string) {
-	// Expected format: kecs-<region>-<cluster-name>
-	if !strings.HasPrefix(namespace, "kecs-") {
-		return "", ""
-	}
-
-	parts := strings.SplitN(strings.TrimPrefix(namespace, "kecs-"), "-", 2)
-	if len(parts) >= 2 {
-		region = parts[0]
-		clusterName = parts[1]
+	// Expected format: <cluster-name>-<region>
+	// Example: default-us-east-1
+	parts := strings.Split(namespace, "-")
+	if len(parts) >= 3 {
+		// Extract region (last 3 parts: us-east-1)
+		region = strings.Join(parts[len(parts)-3:], "-")
+		// Extract cluster name (everything before region)
+		clusterName = strings.Join(parts[:len(parts)-3], "-")
+		// Handle case where cluster name is "default"
+		if clusterName == "" && len(parts) == 3 {
+			clusterName = parts[0]
+		}
 	}
 
 	return clusterName, region

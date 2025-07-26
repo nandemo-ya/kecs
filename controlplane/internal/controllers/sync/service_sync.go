@@ -14,6 +14,7 @@ import (
 
 // syncService syncs a deployment to ECS service state
 func (c *SyncController) syncService(ctx context.Context, key string) error {
+	klog.Infof("syncService called with key: %s", key)
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return fmt.Errorf("invalid resource key: %s", key)
@@ -21,32 +22,37 @@ func (c *SyncController) syncService(ctx context.Context, key string) error {
 
 	// Check if this is an ECS-managed deployment
 	if !strings.HasPrefix(name, "ecs-service-") {
-		klog.V(4).Infof("Ignoring non-ECS deployment: %s", name)
+		klog.Infof("Ignoring non-ECS deployment: %s", name)
 		return nil
 	}
 
 	// Get the deployment
+	klog.Infof("Getting deployment %s/%s", namespace, name)
 	deployment, err := c.deploymentLister.Deployments(namespace).Get(name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Deployment was deleted, update service to INACTIVE
+			klog.Infof("Deployment %s/%s not found, handling deletion", namespace, name)
 			return c.handleDeletedDeployment(ctx, namespace, name)
 		}
 		return fmt.Errorf("error fetching deployment: %v", err)
 	}
+	klog.Infof("Got deployment %s/%s successfully", namespace, name)
 
 	// Map deployment to service
-	mapper := mappers.NewServiceStateMapper()
+	mapper := mappers.NewServiceStateMapper(c.accountID, c.region)
 	serviceName := mapper.ExtractServiceNameFromDeployment(name)
 	clusterName, region := mapper.ExtractClusterInfoFromNamespace(namespace)
+	
+	klog.Infof("Extracted service info - service: %s, cluster: %s, region: %s", serviceName, clusterName, region)
 
 	if clusterName == "" || region == "" {
-		klog.V(4).Infof("Could not extract cluster info from namespace: %s", namespace)
+		klog.Infof("Could not extract cluster info from namespace: %s", namespace)
 		return nil
 	}
 
 	// Get existing service from storage
-	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:123456789012:cluster/%s", region, clusterName)
+	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", region, c.accountID, clusterName)
 	existingService, err := c.storage.ServiceStore().Get(ctx, clusterARN, serviceName)
 	if err != nil && !isNotFound(err) {
 		return fmt.Errorf("error getting service from storage: %v", err)
@@ -60,16 +66,16 @@ func (c *SyncController) syncService(ctx context.Context, key string) error {
 
 	// Update service ARN if not set
 	if service.ARN == "" {
-		service.ARN = fmt.Sprintf("arn:aws:ecs:%s:123456789012:service/%s/%s", 
-			region, clusterName, serviceName)
+		service.ARN = fmt.Sprintf("arn:aws:ecs:%s:%s:service/%s/%s", 
+			region, c.accountID, clusterName, serviceName)
 	}
 
 	// Add to batch updater for efficient storage update
 	c.batchUpdater.AddServiceUpdate(service)
-	klog.V(4).Infof("Queued service update %s in cluster %s", serviceName, clusterName)
+	klog.Infof("Queued service update %s in cluster %s", serviceName, clusterName)
 
 	// Log the sync result
-	klog.V(2).Infof("Successfully synced service %s: status=%s, desired=%d, running=%d, pending=%d",
+	klog.Infof("Successfully synced service %s: status=%s, desired=%d, running=%d, pending=%d",
 		serviceName, service.Status, service.DesiredCount, service.RunningCount, service.PendingCount)
 
 	return nil
@@ -77,7 +83,7 @@ func (c *SyncController) syncService(ctx context.Context, key string) error {
 
 // handleDeletedDeployment handles the case when a deployment is deleted
 func (c *SyncController) handleDeletedDeployment(ctx context.Context, namespace, deploymentName string) error {
-	mapper := mappers.NewServiceStateMapper()
+	mapper := mappers.NewServiceStateMapper(c.accountID, c.region)
 	serviceName := mapper.ExtractServiceNameFromDeployment(deploymentName)
 	clusterName, region := mapper.ExtractClusterInfoFromNamespace(namespace)
 
@@ -85,7 +91,7 @@ func (c *SyncController) handleDeletedDeployment(ctx context.Context, namespace,
 		return nil
 	}
 
-	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:123456789012:cluster/%s", region, clusterName)
+	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", region, c.accountID, clusterName)
 	service, err := c.storage.ServiceStore().Get(ctx, clusterARN, serviceName)
 	if err != nil {
 		if isNotFound(err) {

@@ -16,16 +16,19 @@ import (
 
 // syncTask syncs a pod to ECS task state
 func (c *SyncController) syncTask(ctx context.Context, key string) error {
+	klog.Infof("syncTask called with key: %s", key)
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return fmt.Errorf("invalid resource key: %s", key)
 	}
 
 	// Get the pod
+	klog.Infof("Getting pod %s/%s", namespace, name)
 	pod, err := c.podLister.Pods(namespace).Get(name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Pod was deleted, update task to STOPPED
+			klog.Infof("Pod %s/%s not found, handling deletion", namespace, name)
 			return c.handleDeletedPod(ctx, namespace, name)
 		}
 		return fmt.Errorf("error fetching pod: %v", err)
@@ -33,20 +36,22 @@ func (c *SyncController) syncTask(ctx context.Context, key string) error {
 
 	// Check if this is an ECS-managed pod
 	if !isECSManagedPod(pod) {
-		klog.V(4).Infof("Ignoring non-ECS pod: %s", name)
+		klog.Infof("Ignoring non-ECS pod: %s", name)
 		return nil
 	}
 
 	// Map pod to task
-	mapper := mappers.NewTaskStateMapper()
+	mapper := mappers.NewTaskStateMapper(c.accountID, c.region)
 	task := mapper.MapPodToTask(pod)
 	if task == nil {
 		return fmt.Errorf("failed to map pod to task")
 	}
+	
+	klog.Infof("Mapped pod to task - taskArn: %s, status: %s", task.ARN, task.LastStatus)
 
 	// Add to batch updater for efficient storage update
 	c.batchUpdater.AddTaskUpdate(task)
-	klog.V(4).Infof("Queued task update for pod %s/%s", namespace, name)
+	klog.Infof("Queued task update for pod %s/%s", namespace, name)
 
 	// Log the sync result
 	klog.V(2).Infof("Successfully synced task %s: status=%s, health=%s",
@@ -58,7 +63,7 @@ func (c *SyncController) syncTask(ctx context.Context, key string) error {
 // handleDeletedPod handles the case when a pod is deleted
 func (c *SyncController) handleDeletedPod(ctx context.Context, namespace, podName string) error {
 	// Generate the task ARN that would have been used
-	taskARN := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:task/%s/%s", namespace, podName)
+	taskARN := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:task/%s/%s", namespace, podName)
 	
 	// Try to get the existing task from storage
 	// Extract cluster info from namespace  
@@ -71,7 +76,7 @@ func (c *SyncController) handleDeletedPod(ctx context.Context, namespace, podNam
 			clusterName = parts[1]
 		}
 	}
-	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:123456789012:cluster/%s", region, clusterName)
+	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", region, c.accountID, clusterName)
 	
 	task, err := c.storage.TaskStore().Get(ctx, clusterARN, taskARN)
 	if err != nil {

@@ -58,6 +58,7 @@ type Server struct {
 	serviceDiscoveryAPI       *ServiceDiscoveryAPI
 	syncController            *sync.SyncController
 	syncCancelFunc            context.CancelFunc
+	informerFactory           informers.SharedInformerFactory
 }
 
 // NewServer creates a new API server instance
@@ -163,9 +164,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				resyncPeriod,
 			)
 			
-			// Start informers
-			informerFactory.Start(context.Background().Done())
-			
+			// Store informer factory to start it later with proper context
+			s.informerFactory = informerFactory
 			s.syncController = syncController
 			logging.Info("Sync controller initialized successfully")
 		} else {
@@ -450,16 +450,25 @@ func (s *Server) Start() error {
 	}
 
 	// Start sync controller if available
-	if s.syncController != nil {
+	if s.syncController != nil && s.informerFactory != nil {
 		logging.Info("Starting sync controller...")
 		syncCtx, cancel := context.WithCancel(ctx)
 		s.syncCancelFunc = cancel
+		
+		// Start informers with the sync context
+		logging.Info("Starting informers...")
+		s.informerFactory.Start(syncCtx.Done())
+		
 		go func() {
 			if err := s.syncController.Run(syncCtx); err != nil {
 				logging.Error("Sync controller stopped with error",
 					"error", err)
 			}
 		}()
+	} else {
+		logging.Warn("Sync controller or informer factory not available",
+			"syncController", s.syncController != nil,
+			"informerFactory", s.informerFactory != nil)
 	}
 
 	// Start LocalStack manager if available
@@ -510,7 +519,7 @@ func (s *Server) Stop(ctx context.Context) error {
 
 	// Stop sync controller if running
 	if s.syncController != nil && s.syncCancelFunc != nil {
-		logging.Info("Stopping sync controller...")
+		logging.Info("Stopping sync controller and informers...")
 		s.syncCancelFunc()
 		// Give it a moment to shut down gracefully
 		select {
