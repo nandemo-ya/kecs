@@ -65,7 +65,28 @@ make docker-push    # Build and push Docker image
 ```bash
 make deps           # Download and verify dependencies
 make clean          # Clean build artifacts and coverage files
+
+# Hot reload development workflow
+./bin/kecs start    # Start KECS instance
+make dev            # Build and hot reload controlplane
+make dev-logs       # Build, hot reload, and tail logs
+
+# For specific instance
+KECS_INSTANCE=myinstance make dev
 ```
+
+### Hot Reload Development
+KECS supports hot reloading of the controlplane during development:
+1. **Start KECS**: Run `./bin/kecs start` to create a k3d cluster with KECS
+2. **Make changes**: Edit your Go code in the controlplane
+3. **Hot reload**: Run `make dev` to build and deploy changes instantly
+4. **View logs**: Use `make dev-logs` to reload and tail logs in real-time
+
+The hot reload workflow:
+- Builds a new Docker image with your changes
+- Pushes it to the local k3d registry
+- Updates the running deployment without cluster restart
+- Maintains all existing ECS resources and state
 
 ## Architecture Overview
 
