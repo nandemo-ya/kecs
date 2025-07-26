@@ -108,7 +108,6 @@ func (m *NativeKECSManager) StartKECS(testName string) (*NativeKECSInstance, err
 	
 	// Set environment variables
 	cmd.Env = append(os.Environ(),
-		"KECS_SECURITY_ACKNOWLEDGED=true",
 		"KECS_LOG_LEVEL=debug",
 		"KECS_TEST_MODE=false", // Run in normal mode for integration tests
 		"KECS_CONTAINER_MODE=true",

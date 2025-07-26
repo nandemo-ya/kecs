@@ -17,7 +17,6 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
-	"github.com/nandemo-ya/kecs/controlplane/internal/security"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/cache"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 )
@@ -97,14 +96,6 @@ func runServer(cmd *cobra.Command) {
 		log.Fatalf("Invalid configuration: %v", err)
 	}
 
-	// Show security disclaimer if needed
-	if err := security.ShowDisclaimerIfNeeded(
-		cfg.Features.SkipSecurityDisclaimer,
-		cfg.Features.SecurityAcknowledged,
-		cfg.Server.DataDir,
-	); err != nil {
-		log.Fatalf("Security disclaimer not acknowledged: %v", err)
-	}
 
 	// Initialize logging with configured level
 	logging.SetLevel(logging.ParseLevel(cfg.Server.LogLevel))

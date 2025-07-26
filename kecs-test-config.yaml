@@ -2,7 +2,6 @@ features:
   testMode: false
   containerMode: false
   autoRecoverState: true
-  securityAcknowledged: true
   localstack: true
   traefik: true
 

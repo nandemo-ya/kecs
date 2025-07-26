@@ -46,8 +46,6 @@ type FeaturesConfig struct {
 	TestMode                bool `yaml:"testMode" mapstructure:"testMode"`
 	ContainerMode           bool `yaml:"containerMode" mapstructure:"containerMode"`
 	AutoRecoverState        bool `yaml:"autoRecoverState" mapstructure:"autoRecoverState"`
-	SecurityAcknowledged    bool `yaml:"securityAcknowledged" mapstructure:"securityAcknowledged"`
-	SkipSecurityDisclaimer  bool `yaml:"skipSecurityDisclaimer" mapstructure:"skipSecurityDisclaimer"`
 	DevMode                 bool `yaml:"devMode" mapstructure:"devMode"`
 	Traefik                 bool `yaml:"traefik" mapstructure:"traefik"`
 	IAMIntegration          bool `yaml:"iamIntegration" mapstructure:"iamIntegration"`
@@ -100,8 +98,6 @@ func InitConfig() error {
 	v.SetDefault("features.testMode", false)
 	v.SetDefault("features.containerMode", false)
 	v.SetDefault("features.autoRecoverState", true)
-	v.SetDefault("features.securityAcknowledged", false)
-	v.SetDefault("features.skipSecurityDisclaimer", false)
 	v.SetDefault("features.traefik", true) // Enable Traefik by default
 	v.SetDefault("features.iamIntegration", false) // Disable IAM integration by default
 	
@@ -144,8 +140,6 @@ func bindLegacyEnvVars() {
 	v.BindEnv("kubernetes.keepClustersOnShutdown", "KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
 	v.BindEnv("features.autoRecoverState", "KECS_AUTO_RECOVER_STATE")
 	v.BindEnv("aws.proxyImage", "KECS_AWS_PROXY_IMAGE")
-	v.BindEnv("features.securityAcknowledged", "KECS_SECURITY_ACKNOWLEDGED")
-	v.BindEnv("features.skipSecurityDisclaimer", "KECS_SKIP_SECURITY_DISCLAIMER")
 	v.BindEnv("features.traefik", "KECS_ENABLE_TRAEFIK", "KECS_FEATURES_TRAEFIK")
 	v.BindEnv("features.devMode", "KECS_DEV_MODE")
 	v.BindEnv("features.iamIntegration", "KECS_IAM_INTEGRATION")
