@@ -18,44 +18,21 @@
 
 </div>
 
-## ⚠️ Security Notice - Please Read
+## Development Tool Notice
 
 **KECS is designed exclusively for local development and CI environments.**
 
-KECS requires access to the Docker daemon to create and manage local Kubernetes clusters. This provides significant capabilities:
-
-- **Full access to Docker daemon** (equivalent to root access)
-- **Ability to create, modify, and delete containers**
-- **Access to the host filesystem through volume mounts**
-- **Network configuration capabilities**
+KECS runs its control plane inside a k3d cluster, providing a clean and isolated environment for ECS workloads. The CLI manages k3d cluster lifecycle using the Docker API.
 
 ### ✅ Supported Environments
 - Local development machines  
 - CI/CD pipelines (GitHub Actions, GitLab CI, Jenkins, etc.)  
 - Isolated test environments  
 
-### ❌ NOT Supported/Unsafe
+### ❌ NOT Supported
 - Production environments  
 - Public-facing deployments  
-- Multi-tenant systems  
-- Environments with untrusted users  
-
-**By using KECS, you acknowledge that:**
-1. You understand the security implications
-2. You trust KECS with Docker daemon access
-3. You will only use KECS in supported environments
-
-### First Run
-
-On first run, KECS will display a security disclaimer and request acknowledgment. To skip this in automated environments:
-
-```bash
-# Set environment variable
-export KECS_SECURITY_ACKNOWLEDGED=true
-
-# Or add to config file
-echo "features.securityAcknowledged: true" >> ~/.kecs/config.yaml
-```
+- Multi-tenant systems
 
 ## Overview
 
@@ -163,22 +140,21 @@ docker pull ghcr.io/nandemo-ya/kecs:latest
 
 ## Usage
 
-### Required Permissions
+### Requirements
 
-KECS requires the following permissions to function properly:
+KECS requires the following to function properly:
 
-- **Docker Socket Access**: When running in a container, mount `/var/run/docker.sock`
-- **Network Ports**: Default ports 8080 (API) and 8081 (Admin)
+- **Docker**: For managing k3d clusters (the CLI uses Docker API)
+- **Network Ports**: Port 4566 for unified AWS API endpoint
 - **Local Storage**: For data persistence (default: `~/.kecs/data`)
 
 ```bash
-# Container mode requires Docker socket mounting
-docker run -v /var/run/docker.sock:/var/run/docker.sock \
-           -p 8080:8080 -p 8081:8081 \
-           ghcr.io/nandemo-ya/kecs:latest
+# Start KECS (creates and manages k3d cluster)
+kecs start
 
-# Binary mode requires Docker to be installed and accessible
-kecs server
+# Access AWS APIs through the unified endpoint
+export AWS_ENDPOINT_URL=http://localhost:4566
+aws ecs list-clusters
 ```
 
 
@@ -250,24 +226,22 @@ KECS provides ECS-compatible API endpoints:
 - API documentation is available in the `docs/api` directory
 - For more detailed documentation, visit our [documentation site](https://nandemo-ya.github.io/kecs/)
 
-## Security Considerations
+## Architecture
 
-KECS is a development tool that requires elevated permissions:
+KECS uses a modern architecture where the control plane runs inside a k3d cluster:
 
-1. **Docker Daemon Access**: KECS needs access to the Docker daemon to create and manage k3d clusters. This is equivalent to root access on Linux systems.
-
-2. **Network Access**: KECS creates virtual networks and exposes ports for service communication.
-
-3. **Not for Production**: KECS is explicitly NOT designed for production use. It lacks the security features required for multi-tenant or public-facing deployments.
+1. **CLI Tool**: Manages k3d cluster lifecycle (start, stop, status)
+2. **Control Plane**: Runs as pods inside the k3d cluster, providing ECS and ELBv2 APIs
+3. **Unified Gateway**: Traefik routes AWS API calls to appropriate services (KECS or LocalStack)
 
 ### Comparison with Similar Tools
 
-| Tool | Purpose | Required Permissions |
-|------|---------|---------------------|
-| Docker Desktop | Container runtime | Root/Admin privileges |
-| k3d | Local k3s clusters | Docker socket access |
-| LocalStack | AWS service emulation | Network ports |
-| **KECS** | ECS emulation | Docker socket + Network ports |
+| Tool | Purpose | Architecture |
+|------|---------|--------------|
+| Docker Desktop | Container runtime | System daemon |
+| k3d | Local k3s clusters | CLI + OCI containers |
+| LocalStack | AWS service emulation | Standalone container |
+| **KECS** | ECS emulation | Control plane in k3d cluster |
 
 ## License
 
