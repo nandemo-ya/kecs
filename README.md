@@ -239,7 +239,7 @@ KECS uses a modern architecture where the control plane runs inside a k3d cluste
 | Tool | Purpose | Architecture |
 |------|---------|--------------|
 | Docker Desktop | Container runtime | System daemon |
-| k3d | Local k3s clusters | CLI + Docker containers |
+| k3d | Local k3s clusters | CLI + OCI containers |
 | LocalStack | AWS service emulation | Standalone container |
 | **KECS** | ECS emulation | Control plane in k3d cluster |
 
