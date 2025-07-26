@@ -54,5 +54,8 @@ Thumbs.db
 # Temporary test files
 test-*.md
 
+# QA test results
+qa-results/
+
 # Lefthook
 .lefthook-local/
