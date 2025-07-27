@@ -515,6 +515,15 @@ func (m *MockTaskStore) GetByARNs(ctx context.Context, arns []string) ([]*storag
 	return results, nil
 }
 
+func (m *MockTaskStore) CreateOrUpdate(ctx context.Context, task *storage.Task) error {
+	if m.tasks == nil {
+		m.tasks = make(map[string]*storage.Task)
+	}
+	key := fmt.Sprintf("%s:%s", task.ClusterARN, task.ID)
+	m.tasks[key] = task
+	return nil
+}
+
 // MockTaskSetStore implements storage.TaskSetStore for testing
 type MockTaskSetStore struct {
 	taskSets map[string]*storage.TaskSet

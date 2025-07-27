@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // Type aliases to avoid any potential confusion
@@ -130,20 +130,20 @@ func (b *BatchUpdater) flush(ctx context.Context) {
 
 	// Update services
 	if len(services) > 0 {
-		klog.Infof("Flushing %d service updates", len(services))
+		logging.Info("Flushing service updates", "count", len(services))
 		for _, service := range services {
 			if err := b.updateService(ctx, service); err != nil {
-				klog.Errorf("Failed to update service %s: %v", service.ServiceName, err)
+				logging.Error("Failed to update service", "serviceName", service.ServiceName, "error", err)
 			}
 		}
 	}
 
 	// Update tasks
 	if len(tasks) > 0 {
-		klog.Infof("Flushing %d task updates", len(tasks))
+		logging.Info("Flushing task updates", "count", len(tasks))
 		for _, task := range tasks {
 			if err := b.updateTask(ctx, task); err != nil {
-				klog.Errorf("Failed to update task %s: %v", task.ARN, err)
+				logging.Error("Failed to update task", "taskARN", task.ARN, "error", err)
 			}
 		}
 	}
@@ -151,20 +151,20 @@ func (b *BatchUpdater) flush(ctx context.Context) {
 
 // updateService updates a single service in storage
 func (b *BatchUpdater) updateService(ctx context.Context, service *StorageService) error {
-	klog.Infof("Updating service %s in cluster %s", service.ServiceName, service.ClusterARN)
+	logging.Info("Updating service", "serviceName", service.ServiceName, "clusterARN", service.ClusterARN)
 	
 	// Check if service exists
 	existingService, err := b.storage.ServiceStore().Get(ctx, service.ClusterARN, service.ServiceName)
 	if err != nil {
 		// Service doesn't exist, create it
-		klog.Infof("Service %s not found, creating new", service.ServiceName)
+		logging.Info("Service not found, creating new", "serviceName", service.ServiceName)
 		return b.storage.ServiceStore().Create(ctx, service)
 	}
 
 	// Merge with existing service to preserve fields we don't sync
 	mergedService := b.mergeServices(existingService, service)
-	klog.Infof("Updating existing service %s with new state: running=%d, pending=%d", 
-		service.ServiceName, mergedService.RunningCount, mergedService.PendingCount)
+	logging.Info("Updating existing service with new state", 
+		"serviceName", service.ServiceName, "runningCount", mergedService.RunningCount, "pendingCount", mergedService.PendingCount)
 	return b.storage.ServiceStore().Update(ctx, mergedService)
 }
 
@@ -190,18 +190,16 @@ func (b *BatchUpdater) mergeServices(existing, updated *StorageService) *Storage
 
 // updateTask updates a single task in storage
 func (b *BatchUpdater) updateTask(ctx context.Context, task *StorageTask) error {
-	klog.Infof("Updating task %s in cluster %s", task.ARN, task.ClusterARN)
+	logging.Info("Updating task", "taskARN", task.ARN, "clusterARN", task.ClusterARN)
 	
-	// For tasks, we create or update
-	existingTask, err := b.storage.TaskStore().Get(ctx, task.ClusterARN, task.ARN)
-	if err != nil || existingTask == nil {
-		// Task doesn't exist, create it
-		klog.Infof("Task %s not found, creating new", task.ARN)
-		return b.storage.TaskStore().Create(ctx, task)
+	// Use CreateOrUpdate to avoid duplicate key errors
+	if err := b.storage.TaskStore().CreateOrUpdate(ctx, task); err != nil {
+		logging.Error("Failed to create or update task", "taskARN", task.ARN, "error", err)
+		return err
 	}
-	// Task exists, update it
-	klog.Infof("Updating existing task %s with status: %s", task.ARN, task.LastStatus)
-	return b.storage.TaskStore().Update(ctx, task)
+	
+	logging.Debug("Successfully created or updated task", "taskARN", task.ARN, "lastStatus", task.LastStatus)
+	return nil
 }
 
 // Flush forces an immediate flush of pending updates

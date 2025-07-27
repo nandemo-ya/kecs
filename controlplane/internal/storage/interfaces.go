@@ -374,6 +374,9 @@ type TaskStore interface {
 
 	// Get tasks by ARNs
 	GetByARNs(ctx context.Context, arns []string) ([]*Task, error)
+
+	// CreateOrUpdate creates a new task or updates if it already exists
+	CreateOrUpdate(ctx context.Context, task *Task) error
 }
 
 // TaskFilters defines filters for listing tasks
