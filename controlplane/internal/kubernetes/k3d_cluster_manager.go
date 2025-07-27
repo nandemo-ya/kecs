@@ -460,7 +460,9 @@ func (k *K3dClusterManager) ListClusters(ctx context.Context) ([]string, error) 
 	for _, cluster := range clusters {
 		// Only include KECS clusters (those with kecs- prefix)
 		if strings.HasPrefix(cluster.Name, "kecs-") {
-			clusterNames = append(clusterNames, cluster.Name)
+			// Return the instance name without the kecs- prefix
+			instanceName := strings.TrimPrefix(cluster.Name, "kecs-")
+			clusterNames = append(clusterNames, instanceName)
 		}
 	}
 
@@ -757,8 +759,8 @@ func (k *K3dClusterManager) GetClusterInfo(ctx context.Context, clusterName stri
 		NodeCount: nodeCount,
 		Version:   version,
 		Metadata: map[string]string{
-			"internal_name": normalizedName,
-			"image":         "rancher/k3s:v1.31.4-k3s1",
+			"k3d_cluster_name": normalizedName,
+			"image":            "rancher/k3s:v1.31.4-k3s1",
 		},
 	}, nil
 }
