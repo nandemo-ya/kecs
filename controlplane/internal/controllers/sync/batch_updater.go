@@ -193,8 +193,8 @@ func (b *BatchUpdater) updateTask(ctx context.Context, task *StorageTask) error 
 	klog.Infof("Updating task %s in cluster %s", task.ARN, task.ClusterARN)
 	
 	// For tasks, we create or update
-	_, err := b.storage.TaskStore().Get(ctx, task.ClusterARN, task.ARN)
-	if err != nil {
+	existingTask, err := b.storage.TaskStore().Get(ctx, task.ClusterARN, task.ARN)
+	if err != nil || existingTask == nil {
 		// Task doesn't exist, create it
 		klog.Infof("Task %s not found, creating new", task.ARN)
 		return b.storage.TaskStore().Create(ctx, task)

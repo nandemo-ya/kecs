@@ -89,14 +89,37 @@ func (m *TaskStateMapper) MapPodToTask(pod *corev1.Pod) *storage.Task {
 	// Get cluster ARN from namespace
 	clusterARN := m.getClusterARNFromNamespace(pod.Namespace)
 
-	// Get task definition ARN from pod labels
+	// Get task definition ARN from pod labels or annotations
 	taskDefARN := pod.Labels["ecs.amazonaws.com/task-definition-arn"]
+	if taskDefARN == "" {
+		// Try annotations
+		taskDefARN = pod.Annotations["ecs.amazonaws.com/task-definition-arn"]
+	}
+	if taskDefARN == "" {
+		// Try kecs.dev/task-definition annotation
+		taskDefARN = pod.Annotations["kecs.dev/task-definition"]
+	}
 
 	// Map pod phase to task status
 	desiredStatus, lastStatus := m.MapPodPhaseToTaskStatus(pod)
 
+	// Extract service name from pod labels
+	serviceName := pod.Labels["ecs.amazonaws.com/service-name"]
+	if serviceName == "" {
+		// Try kecs.dev/service label
+		serviceName = pod.Labels["kecs.dev/service"]
+	}
+	startedBy := ""
+	if serviceName != "" {
+		startedBy = fmt.Sprintf("ecs-svc/%s", serviceName)
+	}
+
+	// Generate task ID from pod name
+	taskID := pod.Name
+
 	// Create task object
 	task := &storage.Task{
+		ID:                taskID,
 		ARN:               taskARN,
 		ClusterARN:        clusterARN,
 		TaskDefinitionARN: taskDefARN,
@@ -113,6 +136,12 @@ func (m *TaskStateMapper) MapPodToTask(pod *corev1.Pod) *storage.Task {
 		StoppedAt:         m.getPodStopTime(pod),
 		StoppingAt:        m.getPodStoppingTime(pod),
 		StoppedReason:     m.getPodStopReason(pod),
+		StartedBy:         startedBy,
+		Version:           1,
+		PodName:           pod.Name,
+		Namespace:         pod.Namespace,
+		AccountID:         m.accountID,
+		Region:            m.region,
 	}
 
 	// Set connectivity time if pod is running
