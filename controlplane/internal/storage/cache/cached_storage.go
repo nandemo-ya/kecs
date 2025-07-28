@@ -482,6 +482,20 @@ func (s *cachedTaskStore) Delete(ctx context.Context, clusterArn, taskID string)
 	return nil
 }
 
+func (s *cachedTaskStore) CreateOrUpdate(ctx context.Context, task *storage.Task) error {
+	if err := s.backend.CreateOrUpdate(ctx, task); err != nil {
+		return err
+	}
+
+	// Update cache
+	s.cache.Set(ctx, taskKey(task.ClusterARN, task.ID), task)
+
+	// Invalidate list cache
+	s.cache.Delete(ctx, fmt.Sprintf("tasks:list:%s", task.ClusterARN))
+
+	return nil
+}
+
 // Helper functions for cache keys
 func clusterKey(name string) string {
 	return fmt.Sprintf("cluster:name:%s", name)

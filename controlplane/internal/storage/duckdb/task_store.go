@@ -379,3 +379,61 @@ func nullTime(t *time.Time) sql.NullTime {
 	}
 	return sql.NullTime{Time: *t, Valid: true}
 }
+
+// CreateOrUpdate creates a new task or updates if it already exists
+func (s *taskStore) CreateOrUpdate(ctx context.Context, task *storage.Task) error {
+	query := `
+		INSERT INTO tasks (
+			id, arn, cluster_arn, task_definition_arn, container_instance_arn,
+			overrides, last_status, desired_status, cpu, memory, containers,
+			started_by, version, stop_code, stopped_reason, stopping_at,
+			stopped_at, connectivity, connectivity_at, pull_started_at,
+			pull_stopped_at, execution_stopped_at, created_at, started_at,
+			launch_type, platform_version, platform_family, task_group,
+			attachments, health_status, tags, attributes, enable_execute_command,
+			capacity_provider_name, ephemeral_storage, region, account_id,
+			pod_name, namespace
+		) VALUES (
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+		) ON CONFLICT (arn) DO UPDATE SET
+			last_status = EXCLUDED.last_status,
+			desired_status = EXCLUDED.desired_status,
+			containers = EXCLUDED.containers,
+			version = EXCLUDED.version,
+			stop_code = EXCLUDED.stop_code,
+			stopped_reason = EXCLUDED.stopped_reason,
+			stopping_at = EXCLUDED.stopping_at,
+			stopped_at = EXCLUDED.stopped_at,
+			connectivity = EXCLUDED.connectivity,
+			connectivity_at = EXCLUDED.connectivity_at,
+			pull_started_at = EXCLUDED.pull_started_at,
+			pull_stopped_at = EXCLUDED.pull_stopped_at,
+			execution_stopped_at = EXCLUDED.execution_stopped_at,
+			started_at = EXCLUDED.started_at,
+			health_status = EXCLUDED.health_status,
+			pod_name = EXCLUDED.pod_name,
+			namespace = EXCLUDED.namespace`
+
+	_, err := s.db.ExecContext(ctx, query,
+		task.ID, task.ARN, task.ClusterARN, task.TaskDefinitionARN,
+		nullString(task.ContainerInstanceARN), nullString(task.Overrides),
+		task.LastStatus, task.DesiredStatus, nullString(task.CPU),
+		nullString(task.Memory), task.Containers, nullString(task.StartedBy),
+		task.Version, nullString(task.StopCode), nullString(task.StoppedReason),
+		nullTime(task.StoppingAt), nullTime(task.StoppedAt),
+		nullString(task.Connectivity), nullTime(task.ConnectivityAt),
+		nullTime(task.PullStartedAt), nullTime(task.PullStoppedAt),
+		nullTime(task.ExecutionStoppedAt), task.CreatedAt,
+		nullTime(task.StartedAt), task.LaunchType,
+		nullString(task.PlatformVersion), nullString(task.PlatformFamily),
+		nullString(task.Group), nullString(task.Attachments),
+		nullString(task.HealthStatus), nullString(task.Tags),
+		nullString(task.Attributes), task.EnableExecuteCommand,
+		nullString(task.CapacityProviderName), nullString(task.EphemeralStorage),
+		task.Region, task.AccountID, nullString(task.PodName),
+		nullString(task.Namespace),
+	)
+
+	return err
+}
