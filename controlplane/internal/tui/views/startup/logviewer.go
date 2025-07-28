@@ -48,16 +48,30 @@ func NewLogViewer(instanceName string) *LogViewerModel {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(styles.PrimaryColor)
 
-	return &LogViewerModel{
+	// Create with default size
+	m := &LogViewerModel{
 		spinner:      s,
 		logs:         []string{},
 		instanceName: instanceName,
 		starting:     true,
+		ready:        false,
+		width:        80,  // Default width
+		height:       24,  // Default height
 	}
+	
+	// Initialize viewport with default size
+	m.viewport = viewport.New(76, 14) // width-4, height-10
+	m.viewport.YPosition = 0
+	m.ready = true
+	
+	return m
 }
 
 // Init initializes the log viewer
 func (m *LogViewerModel) Init() tea.Cmd {
+	// Add initial log message
+	m.logs = append(m.logs, fmt.Sprintf("[%s] Initializing KECS startup...", time.Now().Format("15:04:05")))
+	
 	return tea.Batch(
 		m.spinner.Tick,
 		m.startKECS(),
@@ -100,10 +114,12 @@ func (m *LogViewerModel) Update(msg tea.Msg) (*LogViewerModel, tea.Cmd) {
 	case startupLogMsg:
 		m.logs = append(m.logs, msg.line)
 		m.updateViewport()
+		return m, nil
 		
 	case startupProgressMsg:
 		m.logs = append(m.logs, fmt.Sprintf("[%s] %s", time.Now().Format("15:04:05"), msg.message))
 		m.updateViewport()
+		return m, nil
 
 	case startupCompleteMsg:
 		m.starting = false
@@ -144,7 +160,9 @@ func (m *LogViewerModel) Update(msg tea.Msg) (*LogViewerModel, tea.Cmd) {
 // View renders the log viewer
 func (m *LogViewerModel) View() string {
 	if !m.ready {
-		return "\n  Initializing..."
+		// Show more information when not ready
+		return fmt.Sprintf("\n  Initializing... (width: %d, height: %d, logs: %d)\n", 
+			m.width, m.height, len(m.logs))
 	}
 
 	var b strings.Builder
@@ -190,9 +208,17 @@ func (m *LogViewerModel) View() string {
 func (m *LogViewerModel) SetSize(width, height int) {
 	m.width = width
 	m.height = height
-	if m.ready {
+	
+	// Initialize viewport if not ready
+	if !m.ready && width > 0 && height > 0 {
+		m.viewport = viewport.New(width-4, height-10)
+		m.viewport.YPosition = 0
+		m.ready = true
+		m.updateViewport()
+	} else if m.ready {
 		m.viewport.Width = width - 4
 		m.viewport.Height = height - 10
+		m.updateViewport()
 	}
 }
 
@@ -208,9 +234,11 @@ func (m *LogViewerModel) IsFailed() bool {
 
 // updateViewport updates the viewport content
 func (m *LogViewerModel) updateViewport() {
-	content := strings.Join(m.logs, "\n")
-	m.viewport.SetContent(content)
-	m.viewport.GotoBottom()
+	if m.ready {
+		content := strings.Join(m.logs, "\n")
+		m.viewport.SetContent(content)
+		m.viewport.GotoBottom()
+	}
 }
 
 // startKECS starts the KECS instance
@@ -240,6 +268,10 @@ func (m *LogViewerModel) startKECS() tea.Cmd {
 			apiPort = 8300 + (hash % 700)
 		}
 	}
+	
+	// Add log about starting
+	m.logs = append(m.logs, fmt.Sprintf("[%s] Starting KECS instance '%s' on port %d...", 
+		time.Now().Format("15:04:05"), m.instanceName, apiPort))
 	
 	return StartKECSWithStreamer(m.instanceName, apiPort)
 }
