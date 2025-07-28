@@ -49,15 +49,27 @@ func (m *TaskStateMapper) MapPodPhaseToTaskStatus(pod *corev1.Pod) (desiredStatu
 	case corev1.PodRunning:
 		// Check if all containers are ready
 		allReady := true
+		anyRunning := false
 		for _, cs := range pod.Status.ContainerStatuses {
 			if !cs.Ready {
 				allReady = false
-				break
+			}
+			if cs.State.Running != nil {
+				anyRunning = true
 			}
 		}
+		
+		// If all containers are ready, task is RUNNING
 		if allReady {
 			return "RUNNING", "RUNNING"
 		}
+		
+		// If at least one container is running, task is no longer PENDING
+		if anyRunning {
+			return "RUNNING", "RUNNING"
+		}
+		
+		// Otherwise, still activating
 		return "RUNNING", "ACTIVATING"
 
 	case corev1.PodSucceeded:
