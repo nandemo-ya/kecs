@@ -29,6 +29,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/dashboard"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/instances"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/services"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/startup"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/taskdefs"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/tasks"
 )
@@ -65,6 +66,12 @@ type App struct {
 	quitting        bool
 	keyMap          keys.KeyMap
 	help            *help.ContextualHelp
+	
+	// Startup flow
+	startupFlow     *StartupFlow
+	startupDialog   *startup.DialogModel
+	startupLogViewer *startup.LogViewerModel
+	startupState    StartupState
 }
 
 // New creates a new TUI application
@@ -134,7 +141,23 @@ func New(endpoint string) (*App, error) {
 
 // Run starts the TUI application
 func (a *App) Run() error {
+	// Check if KECS is running before starting the full TUI
+	running, checkCmd := CheckKECSAndInit(a.endpoint)
+	if !running {
+		// Initialize startup flow
+		a.startupFlow = NewStartupFlow(a.endpoint)
+		a.startupState = StartupStateDialog
+	}
+	
 	p := tea.NewProgram(a, tea.WithAltScreen())
+	
+	// Set initial command if KECS is not running
+	if checkCmd != nil {
+		go func() {
+			p.Send(checkCmd())
+		}()
+	}
+	
 	if _, err := p.Run(); err != nil {
 		return err
 	}
@@ -157,6 +180,11 @@ func (a *App) Init() tea.Cmd {
 // Update implements tea.Model
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+
+	// Handle startup flow first
+	if a.startupState != StartupStateReady {
+		return a.handleStartupFlow(msg)
+	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -297,12 +325,27 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model
 func (a *App) View() string {
-	if !a.ready {
+	if !a.ready && a.startupState == StartupStateReady {
 		return "\n  Initializing..."
 	}
 
 	if a.quitting {
 		return ""
+	}
+
+	// Handle startup flow views
+	if a.startupState != StartupStateReady {
+		switch a.startupState {
+		case StartupStateDialog:
+			if a.startupDialog != nil {
+				return a.startupDialog.View()
+			}
+		case StartupStateStarting:
+			if a.startupLogViewer != nil {
+				return a.startupLogViewer.View()
+			}
+		}
+		return "\n  Checking KECS status..."
 	}
 
 	var content string
