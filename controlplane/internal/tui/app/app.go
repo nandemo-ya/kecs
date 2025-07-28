@@ -15,16 +15,19 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/components/help"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/keys"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/styles"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/clusters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/dashboard"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/instances"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/services"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/taskdefs"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/tasks"
@@ -39,24 +42,29 @@ const (
 	ViewServices
 	ViewTasks
 	ViewTaskDefs
+	ViewInstances
 	ViewHelp
 )
 
 // App represents the main TUI application
 type App struct {
-	endpoint     string
-	currentView  ViewType
-	dashboard    *dashboard.Model
-	clusterList  *clusters.Model
-	serviceList  *services.Model
-	taskList     *tasks.Model
-	taskDefList  *taskdefs.Model
-	width        int
-	height       int
-	ready        bool
-	quitting     bool
-	keyMap       keys.KeyMap
-	help         *help.ContextualHelp
+	endpoint        string
+	currentInstance string
+	currentView     ViewType
+	apiClient       *api.Client
+	dashboard       *dashboard.Model
+	clusterList     *clusters.Model
+	serviceList     *services.Model
+	taskList        *tasks.Model
+	taskDefList     *taskdefs.Model
+	instanceList    *instances.Model
+	quickSwitch     *instances.QuickSwitchModel
+	width           int
+	height          int
+	ready           bool
+	quitting        bool
+	keyMap          keys.KeyMap
+	help            *help.ContextualHelp
 }
 
 // New creates a new TUI application
@@ -86,17 +94,42 @@ func New(endpoint string) (*App, error) {
 		return nil, fmt.Errorf("failed to create task definition list: %w", err)
 	}
 
-	return &App{
-		endpoint:    endpoint,
-		currentView: ViewDashboard,
-		dashboard:   dashboardModel,
-		clusterList: clusterListModel,
-		serviceList: serviceListModel,
-		taskList:    taskListModel,
-		taskDefList: taskDefListModel,
-		keyMap:      keys.DefaultKeyMap(),
-		help:        help.NewContextualHelp(),
-	}, nil
+	instanceListModel, err := instances.New(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create instance list: %w", err)
+	}
+
+	// Try to detect current instance from endpoint
+	currentInstance := detectCurrentInstance(endpoint)
+	
+	quickSwitchModel, err := instances.NewQuickSwitch(currentInstance)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create quick switch: %w", err)
+	}
+	
+	// Create API client
+	apiClient := api.NewClient(endpoint)
+
+	app := &App{
+		endpoint:        endpoint,
+		currentInstance: currentInstance,
+		currentView:     ViewDashboard,
+		apiClient:      apiClient,
+		dashboard:       dashboardModel,
+		clusterList:     clusterListModel,
+		serviceList:     serviceListModel,
+		taskList:        taskListModel,
+		taskDefList:     taskDefListModel,
+		instanceList:    instanceListModel,
+		quickSwitch:     quickSwitchModel,
+		keyMap:          keys.DefaultKeyMap(),
+		help:            help.NewContextualHelp(),
+	}
+	
+	// Set current instance in dashboard
+	dashboardModel.SetCurrentInstance(currentInstance)
+	
+	return app, nil
 }
 
 // Run starts the TUI application
@@ -117,6 +150,7 @@ func (a *App) Init() tea.Cmd {
 		a.serviceList.Init(),
 		a.taskList.Init(),
 		a.taskDefList.Init(),
+		a.instanceList.Init(),
 	)
 }
 
@@ -136,7 +170,24 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.serviceList.SetSize(msg.Width, msg.Height-3)
 		a.taskList.SetSize(msg.Width, msg.Height-3)
 		a.taskDefList.SetSize(msg.Width, msg.Height-3)
+		a.instanceList.SetSize(msg.Width, msg.Height-3)
+		a.quickSwitch.SetSize(msg.Width, msg.Height)
 		a.help.SetSize(msg.Width, msg.Height-3)
+		
+	case instanceSwitchedMsg:
+		if msg.err != nil {
+			// Handle error - maybe show a notification
+			// For now, just log the error
+			return a, nil
+		}
+		// Re-initialize all views after instance switch
+		cmds = append(cmds, 
+			a.dashboard.Init(),
+			a.clusterList.Init(),
+			a.serviceList.Init(),
+			a.taskList.Init(),
+			a.taskDefList.Init(),
+		)
 		
 	case tea.KeyMsg:
 		switch {
@@ -167,9 +218,39 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case keys.Matches(msg, a.keyMap.TaskDefs):
 			a.currentView = ViewTaskDefs
 			a.help.SetContext(help.ContextTaskDefList)
+			
+		case msg.String() == "6":
+			a.currentView = ViewInstances
+			// TODO: Add ContextInstanceList when available
+			// For now, use dashboard context as placeholder
+			a.help.SetContext(help.ContextDashboard)
+			
+		case msg.String() == "i":
+			// Show quick instance switch
+			if !a.quickSwitch.IsVisible() {
+				return a, a.quickSwitch.Show()
+			}
 		}
 	}
 
+	// Update quick switch first if visible
+	if a.quickSwitch.IsVisible() {
+		var quickSwitchCmd tea.Cmd
+		a.quickSwitch, quickSwitchCmd = a.quickSwitch.Update(msg)
+		cmds = append(cmds, quickSwitchCmd)
+		
+		// Check if an instance was selected
+		if instanceName, selected := a.quickSwitch.GetSelectedInstance(); selected {
+			// Switch to the selected instance
+			cmds = append(cmds, a.switchToInstance(instanceName))
+		}
+		
+		// Don't process other updates if quick switch is visible
+		if a.quickSwitch.IsVisible() {
+			return a, tea.Batch(cmds...)
+		}
+	}
+	
 	// Update help system
 	var helpCmd tea.Cmd
 	a.help, helpCmd = a.help.Update(msg)
@@ -202,7 +283,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.taskDefList, taskDefCmd = a.taskDefList.Update(msg)
 		cmds = append(cmds, taskDefCmd)
 		
-	// TODO: Handle other views
+	case ViewInstances:
+		var instanceCmd tea.Cmd
+		newModel, instanceCmd := a.instanceList.Update(msg)
+		if model, ok := newModel.(*instances.Model); ok {
+			a.instanceList = model
+		}
+		cmds = append(cmds, instanceCmd)
 	}
 
 	return a, tea.Batch(cmds...)
@@ -240,6 +327,9 @@ func (a *App) View() string {
 	case ViewTaskDefs:
 		content = a.taskDefList.View()
 		
+	case ViewInstances:
+		content = a.instanceList.View()
+		
 	case ViewHelp:
 		content = a.renderHelp()
 		
@@ -252,6 +342,11 @@ func (a *App) View() string {
 	
 	// Compose the view
 	mainView := header + "\n" + content + "\n" + footer
+	
+	// If quick switch is shown, overlay it
+	if a.quickSwitch.IsVisible() {
+		return a.quickSwitch.View()
+	}
 	
 	// If help is shown, overlay it
 	helpView := a.help.View()
@@ -275,7 +370,11 @@ func (a *App) View() string {
 }
 
 func (a *App) renderHeader() string {
-	title := fmt.Sprintf("KECS TUI - %s", a.endpoint)
+	title := "KECS TUI"
+	if a.currentInstance != "" {
+		title = fmt.Sprintf("KECS TUI [%s]", a.currentInstance)
+	}
+	title = fmt.Sprintf("%s - %s", title, a.endpoint)
 	return styles.Header.Render(title)
 }
 
@@ -296,6 +395,8 @@ func (a *App) renderFooter() string {
 	items = append(items, "3:Services")
 	items = append(items, "4:Tasks")
 	items = append(items, "5:TaskDefs")
+	items = append(items, "6:Instances")
+	items = append(items, "i:Switch")
 	items = append(items, "?:Help")
 	items = append(items, "q:Quit")
 	
@@ -320,6 +421,8 @@ func (a *App) renderHelp() string {
 - 3: Switch to Services view
 - 4: Switch to Tasks view
 - 5: Switch to Task Definitions view
+- 6: Switch to Instances view
+- i: Quick instance switch
 - ?: Toggle this help screen
 - q: Quit the application
 
@@ -337,4 +440,77 @@ func (a *App) renderHelp() string {
 Each view has additional keyboard shortcuts. Press '?' within a view to see its specific help.
 `
 	return styles.Content.Render(help)
+}
+
+// detectCurrentInstance tries to detect the current instance from the endpoint
+func detectCurrentInstance(endpoint string) string {
+	// Check if it's a local endpoint
+	if strings.Contains(endpoint, "localhost") || strings.Contains(endpoint, "127.0.0.1") {
+		// Extract port from endpoint
+		parts := strings.Split(endpoint, ":")
+		if len(parts) >= 3 {
+			// TODO: Map port to instance name
+			// For now, return "local"
+			return "local"
+		}
+	}
+	
+	// For remote endpoints, we can't determine the instance name
+	return ""
+}
+
+// switchToInstance switches the TUI to a different instance
+func (a *App) switchToInstance(instanceName string) tea.Cmd {
+	return func() tea.Msg {
+		// Get instance details to find the port
+		ctx := context.Background()
+		instanceManager, err := api.NewInstanceManager()
+		if err != nil {
+			return instanceSwitchedMsg{
+				instanceName: instanceName,
+				err:          fmt.Errorf("failed to create instance manager: %w", err),
+			}
+		}
+		
+		instance, err := instanceManager.GetInstance(ctx, instanceName)
+		if err != nil {
+			return instanceSwitchedMsg{
+				instanceName: instanceName,
+				err:          fmt.Errorf("failed to get instance details: %w", err),
+			}
+		}
+		
+		if instance.Status != api.InstanceRunning {
+			return instanceSwitchedMsg{
+				instanceName: instanceName,
+				err:          fmt.Errorf("instance %s is not running", instanceName),
+			}
+		}
+		
+		// Build the new endpoint URL
+		newEndpoint := fmt.Sprintf("http://localhost:%d", instance.APIPort)
+		
+		// Update the API client endpoint
+		a.apiClient.SetEndpoint(newEndpoint)
+		
+		// Update current instance
+		a.currentInstance = instanceName
+		a.endpoint = newEndpoint
+		
+		// Update all views with new endpoint
+		a.dashboard.SetCurrentInstance(instanceName)
+		// Update other views to use the new endpoint
+		a.clusterList.SetEndpoint(newEndpoint)
+		a.serviceList.SetEndpoint(newEndpoint)
+		a.taskList.SetEndpoint(newEndpoint)
+		a.taskDefList.SetEndpoint(newEndpoint)
+		
+		return instanceSwitchedMsg{instanceName: instanceName}
+	}
+}
+
+// instanceSwitchedMsg is sent when instance is switched
+type instanceSwitchedMsg struct {
+	instanceName string
+	err          error
 }

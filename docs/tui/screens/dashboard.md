@@ -2,13 +2,13 @@
 
 ## Overview
 
-The dashboard provides a high-level overview of all ECS resources across clusters.
+The dashboard provides a high-level overview of all ECS resources across clusters, showing the current connected instance and its status.
 
 ## Layout
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ KECS Dashboard                              Connected │ 15:23:45 │
+│ KECS Dashboard [dev-cluster]                Connected │ 15:23:45 │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  Clusters: 3        Services: 12      Tasks: 45                │
@@ -36,24 +36,34 @@ The dashboard provides a high-level overview of all ECS resources across cluster
 
 ## Features
 
+### Instance Indicator
+- Shows current connected instance name in header
+- Connection status (Connected/Connecting/Disconnected)
+- Quick instance switch with `i` key
+
 ### Resource Summary
 - Total count for each resource type
 - Status breakdown with visual indicators
 - Progress bars showing resource utilization
+- Resources scoped to current instance
 
 ### Activity Feed
 - Real-time event stream
 - Filterable by resource type
 - Color-coded by event type
+- Instance-specific events only
 
 ### Quick Actions
 - Shortcuts to common operations
 - Context-aware based on permissions
+- Instance-specific operations
 
 ## Navigation
 
 From the dashboard, users can:
-- Press number keys (1-4) to jump to resource views
+- Press number keys (1-5) to jump to resource views
+- Press `6` to manage instances
+- Press `i` for quick instance switch
 - Use arrow keys to navigate activity feed
 - Press action keys for quick operations
 
