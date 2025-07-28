@@ -174,22 +174,8 @@ func isKECSReady(instanceName string, apiPort int) bool {
 
 // shouldDisplayLog filters logs for display
 func shouldDisplayLog(line string) bool {
-	// Filter out very verbose logs
-	lowerLine := strings.ToLower(line)
-	
-	// Skip debug-level logs unless they're important
-	if strings.Contains(lowerLine, "debug") && 
-		!strings.Contains(lowerLine, "error") &&
-		!strings.Contains(lowerLine, "fail") {
-		return false
-	}
-	
-	// Skip empty lines
-	if strings.TrimSpace(line) == "" {
-		return false
-	}
-	
-	return true
+	// For debugging, show all non-empty lines
+	return strings.TrimSpace(line) != ""
 }
 
 // formatLogLine formats a log line for display

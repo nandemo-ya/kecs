@@ -243,12 +243,18 @@ func (m *LogViewerModel) updateViewport() {
 
 // startKECS starts the KECS instance
 func (m *LogViewerModel) startKECS() tea.Cmd {
+	// Ensure we have an instance name
+	instanceName := m.instanceName
+	if instanceName == "" {
+		instanceName = "default"
+	}
+	
 	// Extract port from instance name or use default
 	apiPort := 8080
-	if m.instanceName != "" && m.instanceName != "default" {
+	if instanceName != "default" {
 		// Try to determine port from instance name
 		// This matches the port allocation in instances.go
-		switch m.instanceName {
+		switch instanceName {
 		case "dev":
 			apiPort = 8080
 		case "staging":
@@ -262,7 +268,7 @@ func (m *LogViewerModel) startKECS() tea.Cmd {
 		default:
 			// Use hash-based allocation for custom instances
 			hash := 0
-			for _, c := range m.instanceName {
+			for _, c := range instanceName {
 				hash = hash*31 + int(c)
 			}
 			apiPort = 8300 + (hash % 700)
@@ -271,9 +277,9 @@ func (m *LogViewerModel) startKECS() tea.Cmd {
 	
 	// Add log about starting
 	m.logs = append(m.logs, fmt.Sprintf("[%s] Starting KECS instance '%s' on port %d...", 
-		time.Now().Format("15:04:05"), m.instanceName, apiPort))
+		time.Now().Format("15:04:05"), instanceName, apiPort))
 	
-	return StartKECSWithStreamer(m.instanceName, apiPort)
+	return StartKECSWithStreamer(instanceName, apiPort)
 }
 
 // Message types

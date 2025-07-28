@@ -19,7 +19,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -51,16 +53,23 @@ func (s *LogStreamer) SetProgram(p *tea.Program) {
 func (s *LogStreamer) Start(ctx context.Context) error {
 	// Build the start command
 	args := []string{"start"}
-	if s.instanceName != "" && s.instanceName != "default" {
-		args = append(args, "--name", s.instanceName)
+	// Always specify instance name to avoid interactive prompt
+	instanceName := s.instanceName
+	if instanceName == "" {
+		instanceName = "default"
 	}
+	args = append(args, "--name", instanceName)
 	if s.apiPort > 0 && s.apiPort != 8080 {
 		args = append(args, "--api-port", fmt.Sprintf("%d", s.apiPort))
 	}
 	args = append(args, "--verbose")
 	
-	// Create the command
-	s.cmd = exec.CommandContext(ctx, "kecs", args...)
+	// Create the command - use the binary from the same directory as the current executable
+	kecsPath := "kecs"
+	if currentExe, err := os.Executable(); err == nil {
+		kecsPath = filepath.Join(filepath.Dir(currentExe), "kecs")
+	}
+	s.cmd = exec.CommandContext(ctx, kecsPath, args...)
 	
 	// Set up pipes
 	stdout, err := s.cmd.StdoutPipe()
@@ -192,16 +201,23 @@ func StartKECSWithStreamer(instanceName string, apiPort int) tea.Cmd {
 		
 		// Build the start command
 		args := []string{"start"}
-		if instanceName != "" && instanceName != "default" {
-			args = append(args, "--name", instanceName)
+		// Always specify instance name to avoid interactive prompt
+		instanceNameToUse := instanceName
+		if instanceNameToUse == "" {
+			instanceNameToUse = "default"
 		}
+		args = append(args, "--name", instanceNameToUse)
 		if apiPort > 0 && apiPort != 8080 {
 			args = append(args, "--api-port", fmt.Sprintf("%d", apiPort))
 		}
 		args = append(args, "--verbose")
 		
-		// Create the command
-		cmd := exec.CommandContext(ctx, "kecs", args...)
+		// Create the command - use the binary from the same directory as the current executable
+		kecsPath := "kecs"
+		if currentExe, err := os.Executable(); err == nil {
+			kecsPath = filepath.Join(filepath.Dir(currentExe), "kecs")
+		}
+		cmd := exec.CommandContext(ctx, kecsPath, args...)
 		
 		// Set up pipes
 		stdout, err := cmd.StdoutPipe()
@@ -214,13 +230,16 @@ func StartKECSWithStreamer(instanceName string, apiPort int) tea.Cmd {
 			return startupErrorMsg{err: fmt.Errorf("failed to create stderr pipe: %w", err)}
 		}
 		
-		// Start the command
-		if err := cmd.Start(); err != nil {
-			return startupErrorMsg{err: fmt.Errorf("failed to start KECS: %w", err)}
-		}
-		
 		// Create message channel
 		msgChan := make(chan tea.Msg, 100)
+		
+		// Log the command being executed
+		msgChan <- startupLogMsg{line: fmt.Sprintf("Executing: %s %v", kecsPath, args)}
+		
+		// Start the command
+		if err := cmd.Start(); err != nil {
+			return startupErrorMsg{err: fmt.Errorf("failed to start KECS at %s: %w", kecsPath, err)}
+		}
 		
 		// Start goroutines to read logs
 		go streamLogsToChannel(stdout, msgChan, false)
