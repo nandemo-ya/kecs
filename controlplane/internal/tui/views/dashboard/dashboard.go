@@ -38,13 +38,14 @@ type Stats struct {
 
 // Model represents the dashboard view model
 type Model struct {
-	endpoint string
-	client   *api.Client
-	stats    Stats
-	width    int
-	height   int
-	loading  bool
-	err      error
+	endpoint        string
+	currentInstance string
+	client          *api.Client
+	stats           Stats
+	width           int
+	height          int
+	loading         bool
+	err             error
 }
 
 // tickMsg is sent when the refresh timer ticks
@@ -63,6 +64,11 @@ func New(endpoint string) (*Model, error) {
 		client:   api.NewClient(endpoint),
 		loading:  true,
 	}, nil
+}
+
+// SetCurrentInstance updates the current instance name
+func (m *Model) SetCurrentInstance(instance string) {
+	m.currentInstance = instance
 }
 
 // Init implements tea.Model

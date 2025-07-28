@@ -140,6 +140,39 @@ var (
 	InactivePanel = BaseStyle.
 		Border(InactiveBorder).
 		BorderForeground(muted)
+
+	// Additional styles for forms and UI elements
+	TitleStyle = BaseStyle.
+		Foreground(primary).
+		Bold(true).
+		MarginBottom(1)
+
+	SubtitleStyle = BaseStyle.
+		Foreground(secondary).
+		Bold(true)
+
+	ErrorStyle = Error
+
+	ActiveStyle = BaseStyle.
+		Foreground(primary).
+		Bold(true)
+
+	SubtleStyle = BaseStyle.
+		Foreground(muted)
+
+	BoxStyle = BaseStyle.
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(muted).
+		Padding(1, 2)
+
+	StatusFailed = StatusStopped
+
+	// Export colors for use in other components
+	PrimaryColor   = primary
+	SecondaryColor = secondary
+
+	// Additional common styles
+	FooterStyle = Footer
 )
 
 // GetStatusStyle returns the appropriate style for a given status

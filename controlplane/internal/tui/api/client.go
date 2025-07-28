@@ -43,6 +43,11 @@ func NewClient(endpoint string) *Client {
 	}
 }
 
+// SetEndpoint updates the client endpoint
+func (c *Client) SetEndpoint(endpoint string) {
+	c.endpoint = endpoint
+}
+
 // makeRequest makes an API request
 func (c *Client) makeRequest(ctx context.Context, action string, payload interface{}, result interface{}) error {
 	jsonData, err := json.Marshal(payload)

@@ -5,7 +5,8 @@ The KECS TUI provides a powerful, interactive terminal-based interface for manag
 ## Features
 
 ### Core Features
-- **Dashboard View**: Real-time overview of all ECS resources
+- **Instance Management**: Create, start, stop, and switch between KECS instances
+- **Dashboard View**: Real-time overview of all ECS resources with current instance indicator
 - **Resource Management**: Full CRUD operations for clusters and services
 - **Task Monitoring**: View and track running/stopped tasks
 - **Task Definitions**: Browse and inspect task definition configurations
@@ -23,11 +24,14 @@ The KECS TUI provides a powerful, interactive terminal-based interface for manag
 ## Quick Start
 
 ```bash
-# Start the TUI with default settings
+# Start the TUI with default settings (auto-detects running instances)
 kecs tui
 
 # Connect to a specific endpoint
 kecs tui --endpoint http://localhost:8080
+
+# Connect to a specific instance by name
+kecs tui --instance dev-cluster
 
 # Connect to remote KECS instance
 kecs tui --endpoint http://remote-kecs:8080
@@ -64,7 +68,9 @@ kecs tui --endpoint http://remote-kecs:8080
 ### Navigation
 | Key | Action |
 |-----|--------|
-| `1-5` | Switch between views |
+| `1-5` | Switch between resource views |
+| `6` | Instance management |
+| `i` | Quick instance switch |
 | `↑/↓` or `j/k` | Navigate up/down |
 | `Enter` | Select/View details |
 | `Esc` | Go back/Cancel |
@@ -74,7 +80,9 @@ kecs tui --endpoint http://remote-kecs:8080
 ### Actions
 | Key | Action |
 |-----|--------|
-| `n` | Create new resource |
+| `n` | Create new resource/instance |
+| `s` | Stop instance (in instance view) |
+| `d` | Destroy instance (in instance view) |
 | `r` | Refresh data |
 | `/` | Search |
 | `f` | Filter |

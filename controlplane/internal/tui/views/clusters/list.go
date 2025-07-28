@@ -295,6 +295,11 @@ func (m *Model) SetSize(width, height int) {
 	m.updateTableColumns()
 }
 
+// SetEndpoint updates the API endpoint
+func (m *Model) SetEndpoint(endpoint string) {
+	m.client = api.NewClient(endpoint)
+}
+
 // updateTableColumns updates table column widths based on available space
 func (m *Model) updateTableColumns() {
 	if m.width == 0 {
