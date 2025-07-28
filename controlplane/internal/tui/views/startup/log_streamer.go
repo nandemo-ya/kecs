@@ -22,6 +22,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -70,6 +72,12 @@ func (s *LogStreamer) Start(ctx context.Context) error {
 		kecsPath = filepath.Join(filepath.Dir(currentExe), "kecs")
 	}
 	s.cmd = exec.CommandContext(ctx, kecsPath, args...)
+	
+	// Disable color output
+	s.cmd.Env = append(os.Environ(), 
+		"NO_COLOR=1",
+		"TERM=dumb",
+	)
 	
 	// Set up pipes
 	stdout, err := s.cmd.StdoutPipe()
@@ -219,6 +227,12 @@ func StartKECSWithStreamer(instanceName string, apiPort int) tea.Cmd {
 		}
 		cmd := exec.CommandContext(ctx, kecsPath, args...)
 		
+		// Disable color output
+		cmd.Env = append(os.Environ(), 
+			"NO_COLOR=1",
+			"TERM=dumb",
+		)
+		
 		// Set up pipes
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
@@ -241,12 +255,15 @@ func StartKECSWithStreamer(instanceName string, apiPort int) tea.Cmd {
 			return startupErrorMsg{err: fmt.Errorf("failed to start KECS at %s: %w", kecsPath, err)}
 		}
 		
+		// Send process info
+		msgChan <- startupLogMsg{line: fmt.Sprintf("[DEBUG] Process started with PID: %d", cmd.Process.Pid)}
+		
 		// Start goroutines to read logs
 		go streamLogsToChannel(stdout, msgChan, false)
 		go streamLogsToChannel(stderr, msgChan, true)
 		
 		// Monitor the process
-		go monitorProcessWithChannel(cmd, instanceName, apiPort, msgChan)
+		go monitorProcessWithChannel(cmd, instanceNameToUse, apiPort, msgChan)
 		
 		// Return a batch command that reads from the channel
 		return tea.Batch(
@@ -275,16 +292,40 @@ func readFromChannel(msgChan <-chan tea.Msg) tea.Cmd {
 // streamLogsToChannel reads from a reader and sends log messages to a channel
 func streamLogsToChannel(reader io.Reader, msgChan chan<- tea.Msg, isError bool) {
 	scanner := bufio.NewScanner(reader)
+	// Increase buffer size for long lines
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+	
 	for scanner.Scan() {
 		line := scanner.Text()
-		if shouldDisplayLog(line) {
-			msgChan <- startupLogMsg{line: formatLogLine(line)}
+		// Clean the line
+		line = cleanLogLine(line)
+		if line == "" {
+			continue // Skip empty lines
 		}
+		
+		// Debug: Send all logs with prefix
+		prefix := "[OUT] "
+		if isError {
+			prefix = "[ERR] "
+		}
+		msgChan <- startupLogMsg{line: prefix + line}
 		
 		// Check for progress indicators
 		if progress := extractProgress(line); progress != "" {
 			msgChan <- startupProgressMsg{message: progress}
 		}
+	}
+	// Check for scanner error
+	if err := scanner.Err(); err != nil {
+		msgChan <- startupLogMsg{line: fmt.Sprintf("[SCAN ERR] %v", err)}
+	}
+	
+	// Send completion message when scanner finishes
+	if isError {
+		msgChan <- startupLogMsg{line: "[ERR] stderr closed"}
+	} else {
+		msgChan <- startupLogMsg{line: "[OUT] stdout closed"}
 	}
 }
 
@@ -366,4 +407,23 @@ func isKECSReadyForPort(instanceName string, apiPort int) bool {
 // StartupStreamerMsg carries the log streamer instance
 type StartupStreamerMsg struct {
 	Streamer *LogStreamer
+}
+
+// ansiRegex matches ANSI escape sequences
+var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+// stripANSI removes ANSI escape sequences from a string
+func stripANSI(str string) string {
+	return ansiRegex.ReplaceAllString(str, "")
+}
+
+// cleanLogLine cleans up log lines for display
+func cleanLogLine(line string) string {
+	// Remove ANSI escape sequences
+	line = stripANSI(line)
+	// Remove carriage returns and other control characters
+	line = strings.ReplaceAll(line, "\r", "")
+	// Trim whitespace
+	line = strings.TrimSpace(line)
+	return line
 }
