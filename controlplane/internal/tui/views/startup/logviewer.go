@@ -39,7 +39,6 @@ type LogViewerModel struct {
 	failed       bool
 	errorMsg     string
 	instanceName string
-	Streamer     *LogStreamer
 }
 
 // NewLogViewer creates a new log viewer
@@ -136,10 +135,6 @@ func (m *LogViewerModel) Update(msg tea.Msg) (*LogViewerModel, tea.Cmd) {
 		m.logs = append(m.logs, "Press ESC to exit")
 		m.updateViewport()
 
-	case StartupStreamerMsg:
-		// Store the streamer reference
-		m.Streamer = msg.Streamer
-		// The streamer will send messages to the program
 
 	case spinner.TickMsg:
 		if m.starting {

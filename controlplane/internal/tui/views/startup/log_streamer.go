@@ -15,255 +15,96 @@
 package startup
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
 )
 
 // LogStreamer handles streaming logs from KECS startup
 type LogStreamer struct {
-	cmd          *exec.Cmd
 	instanceName string
 	apiPort      int
-	program      *tea.Program
+	manager      *instance.Manager
+	cancel       context.CancelFunc
 }
 
 // NewLogStreamer creates a new log streamer
-func NewLogStreamer(instanceName string, apiPort int) *LogStreamer {
+func NewLogStreamer(instanceName string, apiPort int) (*LogStreamer, error) {
+	manager, err := instance.NewManager()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create instance manager: %w", err)
+	}
+	
 	return &LogStreamer{
 		instanceName: instanceName,
 		apiPort:      apiPort,
+		manager:      manager,
+	}, nil
+}
+
+// Stop stops the KECS startup process
+func (s *LogStreamer) Stop() {
+	if s.cancel != nil {
+		s.cancel()
 	}
 }
 
-// SetProgram sets the tea.Program for sending messages
-func (s *LogStreamer) SetProgram(p *tea.Program) {
-	s.program = p
-}
-
-// Start begins the KECS startup process
-func (s *LogStreamer) Start(ctx context.Context) error {
-	// Build the start command
-	args := []string{"start"}
-	// Always specify instance name to avoid interactive prompt
-	instanceName := s.instanceName
-	if instanceName == "" {
-		instanceName = "default"
-	}
-	args = append(args, "--instance", instanceName)
-	if s.apiPort > 0 && s.apiPort != 8080 {
-		args = append(args, "--api-port", fmt.Sprintf("%d", s.apiPort))
-	}
-	args = append(args, "--verbose")
-	
-	// Create the command - use the binary from the same directory as the current executable
-	kecsPath := "kecs"
-	if currentExe, err := os.Executable(); err == nil {
-		kecsPath = filepath.Join(filepath.Dir(currentExe), "kecs")
-	}
-	s.cmd = exec.CommandContext(ctx, kecsPath, args...)
-	
-	// Disable color output
-	s.cmd.Env = append(os.Environ(), 
-		"NO_COLOR=1",
-		"TERM=dumb",
-	)
-	
-	// Set up pipes
-	stdout, err := s.cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("failed to create stdout pipe: %w", err)
-	}
-	
-	stderr, err := s.cmd.StderrPipe()
-	if err != nil {
-		return fmt.Errorf("failed to create stderr pipe: %w", err)
-	}
-	
-	// Start the command
-	if err := s.cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start KECS: %w", err)
-	}
-	
-	// Start streaming logs
-	go s.streamLogs(stdout, false)
-	go s.streamLogs(stderr, true)
-	
-	// Monitor the process
-	go s.monitorProcess()
-	
-	return nil
-}
-
-// streamLogs reads from a reader and sends log messages
-func (s *LogStreamer) streamLogs(reader io.Reader, isError bool) {
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if shouldDisplayLog(line) {
-			s.sendMessage(startupLogMsg{line: formatLogLine(line)})
-		}
-		
-		// Check for progress indicators
-		if progress := extractProgress(line); progress != "" {
-			s.sendMessage(startupProgressMsg{message: progress})
-		}
-	}
-}
-
-// monitorProcess monitors the KECS process and checks for readiness
-func (s *LogStreamer) monitorProcess() {
-	// Monitor process exit
-	done := make(chan error, 1)
-	go func() {
-		done <- s.cmd.Wait()
-	}()
-	
-	// Check for readiness
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	
-	timeout := time.After(2 * time.Minute)
-	retries := 0
-	maxRetries := 60
-	
-	for {
-		select {
-		case err := <-done:
-			// Process exited
-			if err != nil {
-				s.sendMessage(startupErrorMsg{err: fmt.Errorf("KECS process exited: %w", err)})
-			}
-			return
-			
-		case <-ticker.C:
-			// Check if KECS is ready
-			retries++
-			if s.isKECSReady() {
-				s.sendMessage(startupCompleteMsg{})
-				return
-			}
-			
-			if retries%5 == 0 {
-				s.sendMessage(startupProgressMsg{
-					message: fmt.Sprintf("Waiting for KECS to be ready... (%ds)", retries),
-				})
-			}
-			
-			if retries >= maxRetries {
-				s.sendMessage(startupErrorMsg{
-					err: fmt.Errorf("timeout waiting for KECS to start"),
-				})
-				s.cmd.Process.Kill()
-				return
-			}
-			
-		case <-timeout:
-			s.sendMessage(startupErrorMsg{
-				err: fmt.Errorf("timeout waiting for KECS to start"),
-			})
-			s.cmd.Process.Kill()
-			return
-		}
-	}
-}
-
-// isKECSReady checks if KECS is ready
-func (s *LogStreamer) isKECSReady() bool {
-	if s.apiPort == 0 {
-		s.apiPort = 8080
-	}
-	
-	endpoint := fmt.Sprintf("http://localhost:%d", s.apiPort)
-	client := api.NewClient(endpoint)
-	
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	
-	_, err := client.ListClusters(ctx)
-	return err == nil
-}
-
-// sendMessage sends a message to the tea.Program if available
-func (s *LogStreamer) sendMessage(msg tea.Msg) {
-	if s.program != nil {
-		s.program.Send(msg)
-	}
-}
 
 // StartKECSWithStreamer starts KECS with a log streamer
 func StartKECSWithStreamer(instanceName string, apiPort int) tea.Cmd {
 	return func() tea.Msg {
-		// Start the process immediately and return progress message
-		ctx := context.Background()
-		
-		// Build the start command
-		args := []string{"start"}
-		// Always specify instance name to avoid interactive prompt
-		instanceNameToUse := instanceName
-		if instanceNameToUse == "" {
-			instanceNameToUse = "default"
-		}
-		args = append(args, "--instance", instanceNameToUse)
-		if apiPort > 0 && apiPort != 8080 {
-			args = append(args, "--api-port", fmt.Sprintf("%d", apiPort))
-		}
-		args = append(args, "--verbose")
-		
-		// Create the command - use the binary from the same directory as the current executable
-		kecsPath := "kecs"
-		if currentExe, err := os.Executable(); err == nil {
-			kecsPath = filepath.Join(filepath.Dir(currentExe), "kecs")
-		}
-		cmd := exec.CommandContext(ctx, kecsPath, args...)
-		
-		// Disable color output
-		cmd.Env = append(os.Environ(), 
-			"NO_COLOR=1",
-			"TERM=dumb",
-		)
-		
-		// Set up pipes
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			return startupErrorMsg{err: fmt.Errorf("failed to create stdout pipe: %w", err)}
-		}
-		
-		stderr, err := cmd.StderrPipe()
-		if err != nil {
-			return startupErrorMsg{err: fmt.Errorf("failed to create stderr pipe: %w", err)}
-		}
-		
 		// Create message channel
 		msgChan := make(chan tea.Msg, 100)
 		
-		// Log the command being executed
-		msgChan <- startupLogMsg{line: fmt.Sprintf("Executing: %s %v", kecsPath, args)}
-		
-		// Start the command
-		if err := cmd.Start(); err != nil {
-			return startupErrorMsg{err: fmt.Errorf("failed to start KECS at %s: %w", kecsPath, err)}
-		}
-		
-		// Send process info
-		msgChan <- startupLogMsg{line: fmt.Sprintf("[DEBUG] Process started with PID: %d", cmd.Process.Pid)}
-		
-		// Start goroutines to read logs
-		go streamLogsToChannel(stdout, msgChan, false)
-		go streamLogsToChannel(stderr, msgChan, true)
-		
-		// Monitor the process
-		go monitorProcessWithChannel(cmd, instanceNameToUse, apiPort, msgChan)
+		// Start the instance manager in a goroutine
+		go func() {
+			defer close(msgChan)
+			
+			// Create instance manager
+			manager, err := instance.NewManager()
+			if err != nil {
+				msgChan <- startupErrorMsg{err: fmt.Errorf("failed to create instance manager: %w", err)}
+				return
+			}
+			
+			// Set up logging to redirect to TUI
+			logWriter := &tuiLogWriter{msgChan: msgChan}
+			logCapture := progress.NewLogCapture(logWriter, progress.LogLevelInfo)
+			logging.InitializeForProgress(logCapture, false)
+			
+			// Use default instance name if empty
+			instanceNameToUse := instanceName
+			if instanceNameToUse == "" {
+				instanceNameToUse = "default"
+			}
+			
+			// Start options
+			opts := instance.StartOptions{
+				InstanceName: instanceNameToUse,
+				ApiPort:      apiPort,
+				AdminPort:    8081, // Default admin port
+			}
+			
+			// Context for cancellation
+			ctx := context.Background()
+			
+			// Start the instance
+			msgChan <- startupLogMsg{line: fmt.Sprintf("Starting KECS instance '%s'...", instanceNameToUse)}
+			if err := manager.Start(ctx, opts); err != nil {
+				msgChan <- startupErrorMsg{err: err}
+				return
+			}
+			
+			// Check readiness
+			go monitorReadiness(instanceNameToUse, apiPort, msgChan)
+		}()
 		
 		// Return a batch command that reads from the channel
 		return tea.Batch(
@@ -289,58 +130,10 @@ func readFromChannel(msgChan <-chan tea.Msg) tea.Cmd {
 	}
 }
 
-// streamLogsToChannel reads from a reader and sends log messages to a channel
-func streamLogsToChannel(reader io.Reader, msgChan chan<- tea.Msg, isError bool) {
-	scanner := bufio.NewScanner(reader)
-	// Increase buffer size for long lines
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024)
-	
-	for scanner.Scan() {
-		line := scanner.Text()
-		// Clean the line
-		line = cleanLogLine(line)
-		if line == "" {
-			continue // Skip empty lines
-		}
-		
-		// Debug: Send all logs with prefix
-		prefix := "[OUT] "
-		if isError {
-			prefix = "[ERR] "
-		}
-		msgChan <- startupLogMsg{line: prefix + line}
-		
-		// Check for progress indicators
-		if progress := extractProgress(line); progress != "" {
-			msgChan <- startupProgressMsg{message: progress}
-		}
-	}
-	// Check for scanner error
-	if err := scanner.Err(); err != nil {
-		msgChan <- startupLogMsg{line: fmt.Sprintf("[SCAN ERR] %v", err)}
-	}
-	
-	// Send completion message when scanner finishes
-	if isError {
-		msgChan <- startupLogMsg{line: "[ERR] stderr closed"}
-	} else {
-		msgChan <- startupLogMsg{line: "[OUT] stdout closed"}
-	}
-}
-
-// monitorProcessWithChannel monitors the KECS process and sends messages to a channel
-func monitorProcessWithChannel(cmd *exec.Cmd, instanceName string, apiPort int, msgChan chan<- tea.Msg) {
-	defer close(msgChan)
-	
-	// Monitor process exit
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
-	
+// monitorReadiness monitors KECS readiness
+func monitorReadiness(instanceName string, apiPort int, msgChan chan<- tea.Msg) {
 	// Check for readiness
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	
 	timeout := time.After(2 * time.Minute)
@@ -349,13 +142,6 @@ func monitorProcessWithChannel(cmd *exec.Cmd, instanceName string, apiPort int, 
 	
 	for {
 		select {
-		case err := <-done:
-			// Process exited
-			if err != nil {
-				msgChan <- startupErrorMsg{err: fmt.Errorf("KECS process exited: %w", err)}
-			}
-			return
-			
 		case <-ticker.C:
 			// Check if KECS is ready
 			retries++
@@ -366,23 +152,21 @@ func monitorProcessWithChannel(cmd *exec.Cmd, instanceName string, apiPort int, 
 			
 			if retries%5 == 0 {
 				msgChan <- startupProgressMsg{
-					message: fmt.Sprintf("Waiting for KECS to be ready... (%ds)", retries),
+					message: fmt.Sprintf("Waiting for API to be ready... (%ds)", retries*2),
 				}
 			}
 			
 			if retries >= maxRetries {
 				msgChan <- startupErrorMsg{
-					err: fmt.Errorf("timeout waiting for KECS to start"),
+					err: fmt.Errorf("timeout waiting for KECS API to be ready"),
 				}
-				cmd.Process.Kill()
 				return
 			}
 			
 		case <-timeout:
 			msgChan <- startupErrorMsg{
-				err: fmt.Errorf("timeout waiting for KECS to start"),
+				err: fmt.Errorf("timeout waiting for KECS API to be ready"),
 			}
-			cmd.Process.Kill()
 			return
 		}
 	}
@@ -404,26 +188,43 @@ func isKECSReadyForPort(instanceName string, apiPort int) bool {
 	return err == nil
 }
 
-// StartupStreamerMsg carries the log streamer instance
-type StartupStreamerMsg struct {
-	Streamer *LogStreamer
+// Helper functions
+
+// shouldDisplayLog determines if a log line should be displayed
+func shouldDisplayLog(line string) bool {
+	// Filter out noisy debug logs if needed
+	return true
 }
 
-// ansiRegex matches ANSI escape sequences
-var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
-
-// stripANSI removes ANSI escape sequences from a string
-func stripANSI(str string) string {
-	return ansiRegex.ReplaceAllString(str, "")
-}
-
-// cleanLogLine cleans up log lines for display
-func cleanLogLine(line string) string {
-	// Remove ANSI escape sequences
-	line = stripANSI(line)
-	// Remove carriage returns and other control characters
-	line = strings.ReplaceAll(line, "\r", "")
-	// Trim whitespace
+// formatLogLine formats a log line for display
+func formatLogLine(line string) string {
+	// Clean and format the line
 	line = strings.TrimSpace(line)
 	return line
 }
+
+// extractProgress extracts progress information from log lines
+func extractProgress(line string) string {
+	// Look for progress indicators in the log
+	if strings.Contains(line, "Creating") || strings.Contains(line, "Starting") || 
+	   strings.Contains(line, "Waiting") || strings.Contains(line, "Ready") {
+		return line
+	}
+	return ""
+}
+
+// tuiLogWriter implements io.Writer to redirect logs to the TUI
+type tuiLogWriter struct {
+	msgChan chan<- tea.Msg
+}
+
+// Write implements io.Writer
+func (w *tuiLogWriter) Write(p []byte) (n int, err error) {
+	line := strings.TrimSpace(string(p))
+	if line != "" {
+		// Send log as a regular log message
+		w.msgChan <- startupLogMsg{line: line}
+	}
+	return len(p), nil
+}
+

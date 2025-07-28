@@ -172,45 +172,6 @@ func isKECSReady(instanceName string, apiPort int) bool {
 	return err == nil
 }
 
-// shouldDisplayLog filters logs for display
-func shouldDisplayLog(line string) bool {
-	// For debugging, show all non-empty lines
-	return strings.TrimSpace(line) != ""
-}
-
-// formatLogLine formats a log line for display
-func formatLogLine(line string) string {
-	// Remove timestamp if present (we add our own)
-	parts := strings.SplitN(line, " ", 3)
-	if len(parts) >= 3 && strings.Contains(parts[0], "T") {
-		// Looks like a timestamp, skip it
-		return strings.Join(parts[2:], " ")
-	}
-	return line
-}
-
-// extractProgress extracts progress information from log lines
-func extractProgress(line string) string {
-	lowerLine := strings.ToLower(line)
-	
-	if strings.Contains(lowerLine, "creating") && strings.Contains(lowerLine, "cluster") {
-		return "Creating Kubernetes cluster..."
-	}
-	if strings.Contains(lowerLine, "waiting") && strings.Contains(lowerLine, "ready") {
-		return "Waiting for cluster to be ready..."
-	}
-	if strings.Contains(lowerLine, "deploying") {
-		return "Deploying KECS components..."
-	}
-	if strings.Contains(lowerLine, "starting") && strings.Contains(lowerLine, "server") {
-		return "Starting API server..."
-	}
-	if strings.Contains(lowerLine, "kecs") && strings.Contains(lowerLine, "ready") {
-		return "KECS is ready!"
-	}
-	
-	return ""
-}
 
 // CheckKECSStatus checks if KECS is running at the given endpoint
 func CheckKECSStatus(endpoint string) (bool, error) {

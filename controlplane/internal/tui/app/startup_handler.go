@@ -110,12 +110,6 @@ func (a *App) handleStartupFlow(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newViewer, cmd := a.startupLogViewer.Update(msg)
 			a.startupLogViewer = newViewer
 			
-			// Check if we received a streamer
-			if _, ok := msg.(startup.StartupStreamerMsg); ok && a.startupLogViewer.Streamer != nil {
-				// Set the program reference so the streamer can send messages
-				// Note: We can't get the program reference directly in Bubble Tea
-				// The streamer will be set up to send messages through channels
-			}
 			
 			// Check if startup completed
 			if a.startupLogViewer.IsCompleted() {
