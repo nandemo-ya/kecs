@@ -268,6 +268,64 @@ var _ = Describe("Task ECS API", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("tasks is required"))
 			})
+
+			It("should describe tasks using full ARN", func() {
+				// First verify the task exists with short ID
+				req1 := &generated.DescribeTasksRequest{
+					Tasks: []string{"task-1"},
+				}
+				resp1, err1 := server.ecsAPI.DescribeTasks(ctx, req1)
+				Expect(err1).NotTo(HaveOccurred())
+				Expect(resp1.Tasks).To(HaveLen(1))
+
+				// Now test with full ARN
+				req := &generated.DescribeTasksRequest{
+					Tasks: []string{
+						"arn:aws:ecs:us-east-1:000000000000:task/default/task-1",
+						"arn:aws:ecs:us-east-1:000000000000:task/default/task-2",
+					},
+				}
+
+				resp, err := server.ecsAPI.DescribeTasks(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Failures).To(BeEmpty())
+				Expect(resp.Tasks).To(HaveLen(2))
+			})
+
+			It("should handle mixed task identifiers (ARN and ID)", func() {
+				req := &generated.DescribeTasksRequest{
+					Tasks: []string{
+						"task-1",  // Short ID
+						"arn:aws:ecs:us-east-1:000000000000:task/default/task-2",  // Full ARN
+					},
+				}
+
+				resp, err := server.ecsAPI.DescribeTasks(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Tasks).To(HaveLen(2))
+				Expect(resp.Failures).To(BeEmpty())
+			})
+
+			It("should report failures for non-existent tasks with full ARN", func() {
+				req := &generated.DescribeTasksRequest{
+					Tasks: []string{
+						"arn:aws:ecs:us-east-1:000000000000:task/default/task-1",
+						"arn:aws:ecs:us-east-1:000000000000:task/default/non-existent",
+					},
+				}
+
+				resp, err := server.ecsAPI.DescribeTasks(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Tasks).To(HaveLen(1))
+				Expect(resp.Failures).To(HaveLen(1))
+				Expect(*resp.Failures[0].Reason).To(Equal("MISSING"))
+			})
 		})
 	})
 

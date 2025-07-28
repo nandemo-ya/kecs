@@ -446,12 +446,30 @@ func (m *MockTaskStore) Create(ctx context.Context, task *storage.Task) error {
 }
 
 func (m *MockTaskStore) Get(ctx context.Context, cluster, taskID string) (*storage.Task, error) {
-	key := fmt.Sprintf("%s:%s", cluster, taskID)
-	task, exists := m.tasks[key]
-	if !exists {
+	// Handle both short task ID and full ARN (like DuckDB implementation)
+	if strings.Contains(taskID, "arn:aws:ecs:") {
+		// Full ARN provided - search by ARN
+		for _, task := range m.tasks {
+			if task.ARN == taskID {
+				return task, nil
+			}
+		}
 		return nil, errors.New("task not found")
+	} else {
+		// Short ID provided - need cluster context
+		key := fmt.Sprintf("%s:%s", cluster, taskID)
+		task, exists := m.tasks[key]
+		if !exists {
+			// Also check if taskID matches the ID field
+			for k, t := range m.tasks {
+				if strings.HasPrefix(k, cluster+":") && t.ID == taskID {
+					return t, nil
+				}
+			}
+			return nil, errors.New("task not found")
+		}
+		return task, nil
 	}
-	return task, nil
 }
 
 func (m *MockTaskStore) List(ctx context.Context, cluster string, filters storage.TaskFilters) ([]*storage.Task, error) {

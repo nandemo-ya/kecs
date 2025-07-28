@@ -263,7 +263,16 @@ func (api *DefaultECSAPI) StopTask(ctx context.Context, req *generated.StopTaskR
 
 	// Get the task
 	taskIdentifier := req.Task
-	task, err := api.storage.TaskStore().Get(ctx, cluster.ARN, taskIdentifier)
+	var task *storage.Task
+	
+	if strings.Contains(taskIdentifier, "arn:aws:ecs:") {
+		// Full ARN provided - the DuckDB Get method should handle it directly
+		task, err = api.storage.TaskStore().Get(ctx, "", taskIdentifier)
+	} else {
+		// Short ID provided - use the cluster ARN from request
+		task, err = api.storage.TaskStore().Get(ctx, cluster.ARN, taskIdentifier)
+	}
+	
 	if err != nil || task == nil {
 		return nil, fmt.Errorf("task not found: %s", taskIdentifier)
 	}
@@ -304,8 +313,14 @@ func (api *DefaultECSAPI) StopTask(ctx context.Context, req *generated.StopTaskR
 		}
 	}
 
-	// Get updated task
-	task, err = api.storage.TaskStore().Get(ctx, cluster.ARN, taskIdentifier)
+	// Get updated task - reuse the same logic
+	if strings.Contains(taskIdentifier, "arn:aws:ecs:") {
+		// Full ARN provided - the DuckDB Get method should handle it directly
+		task, err = api.storage.TaskStore().Get(ctx, "", taskIdentifier)
+	} else {
+		task, err = api.storage.TaskStore().Get(ctx, cluster.ARN, taskIdentifier)
+	}
+	
 	if err != nil || task == nil {
 		return nil, fmt.Errorf("failed to get updated task")
 	}
@@ -345,7 +360,19 @@ func (api *DefaultECSAPI) DescribeTasks(ctx context.Context, req *generated.Desc
 
 	// Process each task identifier
 	for _, taskIdentifier := range req.Tasks {
-		task, err := api.storage.TaskStore().Get(ctx, cluster.ARN, taskIdentifier)
+		// If taskIdentifier is a full ARN, extract the cluster ARN from it
+		var task *storage.Task
+		var err error
+		
+		if strings.Contains(taskIdentifier, "arn:aws:ecs:") {
+			// Full ARN provided - the DuckDB Get method should handle it directly
+			// We still need to provide a cluster ARN for the Get method, but it will use the full ARN to search
+			task, err = api.storage.TaskStore().Get(ctx, "", taskIdentifier)
+		} else {
+			// Short ID provided - use the cluster ARN from request
+			task, err = api.storage.TaskStore().Get(ctx, cluster.ARN, taskIdentifier)
+		}
+		
 		if err != nil || task == nil {
 			failures = append(failures, generated.Failure{
 				Arn:    ptr.String(taskIdentifier),
