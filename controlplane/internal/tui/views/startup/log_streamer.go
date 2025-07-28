@@ -58,7 +58,7 @@ func (s *LogStreamer) Start(ctx context.Context) error {
 	if instanceName == "" {
 		instanceName = "default"
 	}
-	args = append(args, "--name", instanceName)
+	args = append(args, "--instance", instanceName)
 	if s.apiPort > 0 && s.apiPort != 8080 {
 		args = append(args, "--api-port", fmt.Sprintf("%d", s.apiPort))
 	}
@@ -206,7 +206,7 @@ func StartKECSWithStreamer(instanceName string, apiPort int) tea.Cmd {
 		if instanceNameToUse == "" {
 			instanceNameToUse = "default"
 		}
-		args = append(args, "--name", instanceNameToUse)
+		args = append(args, "--instance", instanceNameToUse)
 		if apiPort > 0 && apiPort != 8080 {
 			args = append(args, "--api-port", fmt.Sprintf("%d", apiPort))
 		}
