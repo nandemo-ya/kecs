@@ -192,24 +192,48 @@ func isKECSReadyForPort(instanceName string, apiPort int) bool {
 
 // shouldDisplayLog determines if a log line should be displayed
 func shouldDisplayLog(line string) bool {
-	// Filter out noisy debug logs if needed
-	return true
+	// Filter out empty lines and whitespace
+	trimmed := strings.TrimSpace(line)
+	return trimmed != ""
 }
 
 // formatLogLine formats a log line for display
 func formatLogLine(line string) string {
 	// Clean and format the line
 	line = strings.TrimSpace(line)
+	
+	// Remove timestamp and log level if present
+	// Pattern: 2025-01-28T12:00:00Z INFO Starting server -> Starting server
+	parts := strings.SplitN(line, " ", 3)
+	if len(parts) >= 3 && strings.Contains(parts[0], "T") && strings.Contains(parts[0], "Z") {
+		// Looks like timestamp + level + message
+		return parts[2]
+	}
+	
 	return line
 }
 
 // extractProgress extracts progress information from log lines
 func extractProgress(line string) string {
 	// Look for progress indicators in the log
-	if strings.Contains(line, "Creating") || strings.Contains(line, "Starting") || 
-	   strings.Contains(line, "Waiting") || strings.Contains(line, "Ready") {
-		return line
+	lower := strings.ToLower(line)
+	
+	if strings.Contains(lower, "creating") && strings.Contains(lower, "kubernetes cluster") {
+		return "Creating Kubernetes cluster..."
 	}
+	if strings.Contains(line, "Waiting for cluster to be ready") {
+		return "Waiting for cluster to be ready..."
+	}
+	if strings.Contains(line, "Deploying KECS control plane") {
+		return "Deploying KECS components..."
+	}
+	if strings.Contains(line, "Starting API server") {
+		return "Starting API server..."
+	}
+	if strings.Contains(line, "KECS is ready") {
+		return "KECS is ready!"
+	}
+	
 	return ""
 }
 
