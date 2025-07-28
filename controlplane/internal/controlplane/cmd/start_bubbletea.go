@@ -11,12 +11,43 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress/bubbletea"
 )
+
+// runStartWithBubbleTeaV2 uses the shared instance manager with Bubble Tea
+func runStartWithBubbleTeaV2(ctx context.Context, manager *instance.Manager, opts instance.StartOptions) error {
+	// Use Bubble Tea for the entire process with silent start
+	return bubbletea.RunWithBubbleTeaSilent(ctx, fmt.Sprintf("Creating KECS instance '%s'", opts.InstanceName), func(tracker *bubbletea.Adapter) error {
+		// Log the generated name if it was auto-generated
+		if opts.InstanceName != "" {
+			tracker.Log(progress.LogLevelInfo, "KECS instance name: %s", opts.InstanceName)
+		}
+		
+		// Start the instance using the shared manager
+		if err := manager.Start(ctx, opts); err != nil {
+			return err
+		}
+		
+		// All done - show success in logs
+		tracker.Log(progress.LogLevelInfo, "🎉 KECS instance '%s' is ready!", opts.InstanceName)
+		tracker.Log(progress.LogLevelInfo, "")
+		tracker.Log(progress.LogLevelInfo, "Endpoints:")
+		tracker.Log(progress.LogLevelInfo, "  AWS API: http://localhost:%d", opts.ApiPort)
+		tracker.Log(progress.LogLevelInfo, "  Admin API: http://localhost:%d", opts.AdminPort)
+		tracker.Log(progress.LogLevelInfo, "  Data directory: %s", opts.DataDir)
+		tracker.Log(progress.LogLevelInfo, "")
+		tracker.Log(progress.LogLevelInfo, "Next steps:")
+		tracker.Log(progress.LogLevelInfo, "  To stop this instance: kecs stop --instance %s", opts.InstanceName)
+		tracker.Log(progress.LogLevelInfo, "  To get kubeconfig: kecs kubeconfig get %s", opts.InstanceName)
+		
+		return nil
+	})
+}
 
 // runStartWithBubbleTea is an alternative implementation using Bubble Tea
 func runStartWithBubbleTea(ctx context.Context, instanceName string, cfg *config.Config, dataDir string) error {
@@ -628,3 +659,4 @@ func waitForComponentsWithProgress(ctx context.Context, clusterName string, trac
 	tracker.UpdateTask("wait-ready", 100, "All components ready")
 	return nil
 }
+
