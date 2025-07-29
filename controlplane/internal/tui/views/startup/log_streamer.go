@@ -33,6 +33,7 @@ type LogStreamer struct {
 	apiPort      int
 	manager      *instance.Manager
 	cancel       context.CancelFunc
+	ctx          context.Context
 }
 
 // NewLogStreamer creates a new log streamer
@@ -63,9 +64,31 @@ func StartKECSWithStreamer(instanceName string, apiPort int) tea.Cmd {
 		// Create message channel
 		msgChan := make(chan tea.Msg, 100)
 		
+		// Create cancellable context for the entire startup process
+		ctx, cancel := context.WithCancel(context.Background())
+		
+		// Create startup context that will be sent back
+		startupCtx := &StartupContext{
+			Cancel: cancel,
+		}
+		
+		// Send startup context immediately so TUI can store it
+		go func() {
+			msgChan <- StartupContextMsg{Ctx: startupCtx}
+		}()
+		
 		// Start the instance manager in a goroutine
 		go func() {
 			defer close(msgChan)
+			defer cancel() // Ensure cancel is called when goroutine exits
+			
+			// Check if cancelled before starting
+			select {
+			case <-ctx.Done():
+				msgChan <- startupErrorMsg{err: fmt.Errorf("startup cancelled")}
+				return
+			default:
+			}
 			
 			// Create instance manager
 			manager, err := instance.NewManager()
@@ -75,7 +98,7 @@ func StartKECSWithStreamer(instanceName string, apiPort int) tea.Cmd {
 			}
 			
 			// Set up logging to redirect to TUI
-			logWriter := &tuiLogWriter{msgChan: msgChan}
+			logWriter := &tuiLogWriter{msgChan: msgChan, ctx: ctx}
 			logCapture := progress.NewLogCapture(logWriter, progress.LogLevelInfo)
 			logging.InitializeForProgress(logCapture, false)
 			
@@ -92,18 +115,19 @@ func StartKECSWithStreamer(instanceName string, apiPort int) tea.Cmd {
 				AdminPort:    8081, // Default admin port
 			}
 			
-			// Context for cancellation
-			ctx := context.Background()
-			
 			// Start the instance
 			msgChan <- startupLogMsg{line: fmt.Sprintf("Starting KECS instance '%s'...", instanceNameToUse)}
 			if err := manager.Start(ctx, opts); err != nil {
-				msgChan <- startupErrorMsg{err: err}
+				if ctx.Err() != nil {
+					msgChan <- startupErrorMsg{err: fmt.Errorf("startup cancelled")}
+				} else {
+					msgChan <- startupErrorMsg{err: err}
+				}
 				return
 			}
 			
 			// Check readiness
-			go monitorReadiness(instanceNameToUse, apiPort, msgChan)
+			go monitorReadiness(ctx, instanceNameToUse, apiPort, msgChan)
 		}()
 		
 		// Return a batch command that reads from the channel
@@ -131,7 +155,7 @@ func readFromChannel(msgChan <-chan tea.Msg) tea.Cmd {
 }
 
 // monitorReadiness monitors KECS readiness
-func monitorReadiness(instanceName string, apiPort int, msgChan chan<- tea.Msg) {
+func monitorReadiness(ctx context.Context, instanceName string, apiPort int, msgChan chan<- tea.Msg) {
 	// Check for readiness
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
@@ -142,6 +166,9 @@ func monitorReadiness(instanceName string, apiPort int, msgChan chan<- tea.Msg) 
 	
 	for {
 		select {
+		case <-ctx.Done():
+			// Context cancelled, stop monitoring
+			return
 		case <-ticker.C:
 			// Check if KECS is ready
 			retries++
@@ -240,15 +267,37 @@ func extractProgress(line string) string {
 // tuiLogWriter implements io.Writer to redirect logs to the TUI
 type tuiLogWriter struct {
 	msgChan chan<- tea.Msg
+	ctx     context.Context
 }
 
 // Write implements io.Writer
 func (w *tuiLogWriter) Write(p []byte) (n int, err error) {
+	// Check if context is cancelled
+	select {
+	case <-w.ctx.Done():
+		return len(p), nil // Silently ignore logs after cancellation
+	default:
+	}
+	
 	line := strings.TrimSpace(string(p))
 	if line != "" {
 		// Send log as a regular log message
-		w.msgChan <- startupLogMsg{line: line}
+		select {
+		case w.msgChan <- startupLogMsg{line: line}:
+		case <-w.ctx.Done():
+			// Context cancelled while sending
+		}
 	}
 	return len(p), nil
+}
+
+// StartupContext holds the context for the startup process
+type StartupContext struct {
+	Cancel context.CancelFunc
+}
+
+// StartupContextMsg is sent to provide the startup context to the TUI
+type StartupContextMsg struct {
+	Ctx *StartupContext
 }
 

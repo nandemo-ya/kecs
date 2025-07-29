@@ -72,6 +72,7 @@ type App struct {
 	startupDialog   *startup.DialogModel
 	startupLogViewer *startup.LogViewerModel
 	startupState    StartupState
+	startupContext  *startup.StartupContext
 }
 
 // New creates a new TUI application
