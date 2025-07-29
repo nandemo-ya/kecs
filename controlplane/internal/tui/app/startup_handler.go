@@ -16,6 +16,7 @@ package app
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/keys"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/views/startup"
 )
 
@@ -41,6 +42,15 @@ func (a *App) handleStartupFlow(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.startupDialog.Init()
 		
 	case tea.KeyMsg:
+		// Check for global quit commands first
+		if keys.Matches(msg, a.keyMap.Quit) || keys.Matches(msg, a.keyMap.ForceQuit) {
+			// Cancel any ongoing startup
+			if a.startupContext != nil && a.startupContext.Cancel != nil {
+				a.startupContext.Cancel()
+			}
+			return a, tea.Quit
+		}
+		
 		// Handle key messages based on current state
 		switch a.startupState {
 		case StartupStateDialog:
@@ -81,6 +91,10 @@ func (a *App) handleStartupFlow(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, cmd
 			}
 		}
+	case startup.StartupContextMsg:
+		// Store the startup context for cancellation
+		a.startupContext = msg.Ctx
+		return a, nil
 	}
 	
 	// Handle other messages during startup

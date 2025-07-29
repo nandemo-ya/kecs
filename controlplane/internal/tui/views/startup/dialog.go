@@ -63,6 +63,11 @@ func (m *DialogModel) Update(msg tea.Msg) (*DialogModel, tea.Cmd) {
 			m.cancelled = true
 			m.visible = false
 			return m, tea.Quit
+		case "ctrl+c":
+			// Always allow quitting with Ctrl+C
+			m.cancelled = true
+			m.visible = false
+			return m, tea.Quit
 		}
 	}
 

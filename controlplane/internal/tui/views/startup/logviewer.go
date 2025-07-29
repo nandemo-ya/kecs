@@ -103,6 +103,9 @@ func (m *LogViewerModel) Update(msg tea.Msg) (*LogViewerModel, tea.Cmd) {
 			if m.completed || m.failed {
 				return m, tea.Quit
 			}
+		case "ctrl+c":
+			// Always allow quitting with Ctrl+C
+			return m, tea.Quit
 		case "enter":
 			if m.completed {
 				// Continue to TUI
@@ -189,7 +192,7 @@ func (m *LogViewerModel) View() string {
 	// Footer
 	b.WriteString("\n")
 	if m.starting {
-		b.WriteString(styles.SubtleStyle.Render("Starting KECS... Please wait"))
+		b.WriteString(styles.SubtleStyle.Render("Starting KECS... Press Ctrl+C to cancel"))
 	} else if m.completed {
 		b.WriteString(styles.Info.Render("Press ENTER to continue"))
 	} else if m.failed {
