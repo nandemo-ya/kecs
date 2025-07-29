@@ -1,0 +1,468 @@
+package tui2
+
+import (
+	"fmt"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui2/mock"
+)
+
+// Run starts the TUI application
+func Run() error {
+	p := tea.NewProgram(
+		NewModel(),
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
+	)
+
+	if _, err := p.Run(); err != nil {
+		return fmt.Errorf("error running TUI: %w", err)
+	}
+
+	return nil
+}
+
+// Update handles all messages and updates the model
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
+
+	// Handle global keys first
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		// Global navigation
+		switch msg.String() {
+		case "ctrl+c", "q":
+			if !m.searchMode && !m.commandMode {
+				return m, tea.Quit
+			}
+		case "esc":
+			if m.searchMode {
+				m.searchMode = false
+				m.searchQuery = ""
+			} else if m.commandMode {
+				m.commandMode = false
+				m.commandInput = ""
+			} else if m.showHelp {
+				m.showHelp = false
+			}
+			return m, nil
+		case "?":
+			if !m.searchMode && !m.commandMode {
+				m.showHelp = !m.showHelp
+				if m.showHelp {
+					m.previousView = m.currentView
+					m.currentView = ViewHelp
+				} else {
+					m.currentView = m.previousView
+				}
+			}
+			return m, nil
+		}
+
+		// Handle input modes
+		if m.searchMode {
+			return m.handleSearchInput(msg)
+		}
+		if m.commandMode {
+			return m.handleCommandInput(msg)
+		}
+
+		// View-specific key handling
+		switch m.currentView {
+		case ViewInstances:
+			m, cmd = m.handleInstancesKeys(msg)
+		case ViewClusters:
+			m, cmd = m.handleClustersKeys(msg)
+		case ViewServices:
+			m, cmd = m.handleServicesKeys(msg)
+		case ViewTasks:
+			m, cmd = m.handleTasksKeys(msg)
+		case ViewLogs:
+			m, cmd = m.handleLogsKeys(msg)
+		case ViewHelp:
+			m, cmd = m.handleHelpKeys(msg)
+		}
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		m.ready = true
+
+	case tickMsg:
+		// Update data periodically
+		cmds = append(cmds, tickCmd())
+		if m.lastUpdate.Add(m.refreshInterval).Before(time.Time(msg)) {
+			cmds = append(cmds, m.loadMockDataCmd())
+			m.lastUpdate = time.Time(msg)
+		}
+
+	case DataLoadedMsg:
+		m.instances = msg.Instances
+		m.clusters = msg.Clusters
+		m.services = msg.Services
+		m.tasks = msg.Tasks
+		m.logs = msg.Logs
+
+	case mock.DataMsg:
+		// Convert mock data to model data
+		m.instances = make([]Instance, len(msg.Instances))
+		for i, inst := range msg.Instances {
+			m.instances[i] = Instance{
+				Name:     inst.Name,
+				Status:   inst.Status,
+				Clusters: inst.Clusters,
+				Services: inst.Services,
+				Tasks:    inst.Tasks,
+				APIPort:  inst.APIPort,
+				Age:      inst.Age,
+			}
+		}
+		
+		m.clusters = make([]Cluster, len(msg.Clusters))
+		for i, cl := range msg.Clusters {
+			m.clusters[i] = Cluster{
+				Name:        cl.Name,
+				Status:      cl.Status,
+				Services:    cl.Services,
+				Tasks:       cl.Tasks,
+				CPUUsed:     cl.CPUUsed,
+				CPUTotal:    cl.CPUTotal,
+				MemoryUsed:  cl.MemoryUsed,
+				MemoryTotal: cl.MemoryTotal,
+				Namespace:   cl.Namespace,
+				Age:         cl.Age,
+			}
+		}
+		
+		m.services = make([]Service, len(msg.Services))
+		for i, svc := range msg.Services {
+			m.services[i] = Service{
+				Name:    svc.Name,
+				Desired: svc.Desired,
+				Running: svc.Running,
+				Pending: svc.Pending,
+				Status:  svc.Status,
+				TaskDef: svc.TaskDef,
+				Age:     svc.Age,
+			}
+		}
+		
+		m.tasks = make([]Task, len(msg.Tasks))
+		for i, task := range msg.Tasks {
+			m.tasks[i] = Task{
+				ID:      task.ID,
+				Service: task.Service,
+				Status:  task.Status,
+				Health:  task.Health,
+				CPU:     task.CPU,
+				Memory:  task.Memory,
+				IP:      task.IP,
+				Age:     task.Age,
+			}
+		}
+		
+		m.logs = make([]LogEntry, len(msg.Logs))
+		for i, log := range msg.Logs {
+			m.logs[i] = LogEntry{
+				Timestamp: log.Timestamp,
+				Level:     log.Level,
+				Message:   log.Message,
+			}
+		}
+
+	case errMsg:
+		m.err = msg.err
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+// View renders the current view
+func (m Model) View() string {
+	if !m.ready {
+		return "Initializing..."
+	}
+
+	var content string
+
+	// Render header
+	header := m.renderHeader()
+
+	// Render breadcrumb
+	breadcrumb := m.renderBreadcrumb()
+
+	// Render main content based on current view
+	switch m.currentView {
+	case ViewInstances:
+		content = m.renderInstancesView()
+	case ViewClusters:
+		content = m.renderClustersView()
+	case ViewServices:
+		content = m.renderServicesView()
+	case ViewTasks:
+		content = m.renderTasksView()
+	case ViewLogs:
+		content = m.renderLogsView()
+	case ViewHelp:
+		content = m.renderHelpView()
+	}
+
+	// Render footer
+	footer := m.renderFooter()
+
+	// Combine all components
+	return lipgloss.JoinVertical(
+		lipgloss.Top,
+		header,
+		breadcrumb,
+		content,
+		footer,
+	)
+}
+
+// Key handlers for each view
+
+func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		m.moveCursorUp()
+	case "down", "j":
+		m.moveCursorDown()
+	case "enter":
+		if len(m.instances) > 0 {
+			m.selectedInstance = m.instances[m.instanceCursor].Name
+			m.currentView = ViewClusters
+			m.clusterCursor = 0
+			return m, m.loadMockDataCmd()
+		}
+	case "N":
+		// Create new instance (mock)
+		m.commandMode = true
+		m.commandInput = "create instance "
+	case "S":
+		// Start/Stop instance (mock)
+		if len(m.instances) > 0 {
+			// Toggle status in mock
+		}
+	case "D":
+		// Delete instance (mock)
+		if len(m.instances) > 0 {
+			// Show confirmation dialog in real implementation
+		}
+	case "ctrl+i":
+		// Quick switch instance
+		// In real implementation, show instance switcher
+	case "/":
+		m.searchMode = true
+		m.searchQuery = ""
+	case ":":
+		m.commandMode = true
+		m.commandInput = ""
+	case "R":
+		return m, m.loadMockDataCmd()
+	}
+	return m, nil
+}
+
+func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		m.moveCursorUp()
+	case "down", "j":
+		m.moveCursorDown()
+	case "enter":
+		if len(m.clusters) > 0 {
+			m.selectedCluster = m.clusters[m.clusterCursor].Name
+			m.currentView = ViewServices
+			m.serviceCursor = 0
+			return m, m.loadMockDataCmd()
+		}
+	case "backspace":
+		m.goBack()
+		return m, m.loadMockDataCmd()
+	case "i":
+		m.currentView = ViewInstances
+		m.selectedInstance = ""
+	case "s":
+		if m.selectedCluster != "" {
+			m.currentView = ViewServices
+		}
+	case "/":
+		m.searchMode = true
+		m.searchQuery = ""
+	case ":":
+		m.commandMode = true
+		m.commandInput = ""
+	case "R":
+		return m, m.loadMockDataCmd()
+	}
+	return m, nil
+}
+
+func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		m.moveCursorUp()
+	case "down", "j":
+		m.moveCursorDown()
+	case "enter":
+		if len(m.services) > 0 {
+			m.selectedService = m.services[m.serviceCursor].Name
+			m.currentView = ViewTasks
+			m.taskCursor = 0
+			return m, m.loadMockDataCmd()
+		}
+	case "backspace":
+		m.goBack()
+		return m, m.loadMockDataCmd()
+	case "i":
+		m.currentView = ViewInstances
+		m.selectedInstance = ""
+	case "c":
+		m.currentView = ViewClusters
+		m.selectedCluster = ""
+	case "t":
+		if m.selectedService != "" {
+			m.currentView = ViewTasks
+		}
+	case "r":
+		// Restart service (mock)
+	case "S":
+		// Scale service (mock)
+		m.commandMode = true
+		m.commandInput = fmt.Sprintf("scale service %s ", m.services[m.serviceCursor].Name)
+	case "u":
+		// Update service (mock)
+	case "x":
+		// Stop service (mock)
+	case "l":
+		// View logs
+		if len(m.services) > 0 {
+			m.previousView = m.currentView
+			m.currentView = ViewLogs
+			return m, m.loadMockDataCmd()
+		}
+	case "/":
+		m.searchMode = true
+		m.searchQuery = ""
+	case ":":
+		m.commandMode = true
+		m.commandInput = ""
+	case "R":
+		return m, m.loadMockDataCmd()
+	}
+	return m, nil
+}
+
+func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		m.moveCursorUp()
+	case "down", "j":
+		m.moveCursorDown()
+	case "enter", "l":
+		// View logs for selected task
+		if len(m.tasks) > 0 {
+			m.selectedTask = m.tasks[m.taskCursor].ID
+			m.previousView = m.currentView
+			m.currentView = ViewLogs
+			return m, m.loadMockDataCmd()
+		}
+	case "backspace":
+		m.goBack()
+		return m, m.loadMockDataCmd()
+	case "i":
+		m.currentView = ViewInstances
+		m.selectedInstance = ""
+	case "c":
+		m.currentView = ViewClusters
+		m.selectedCluster = ""
+	case "s":
+		m.currentView = ViewServices
+		m.selectedService = ""
+	case "D":
+		// Describe task (mock)
+	case "/":
+		m.searchMode = true
+		m.searchQuery = ""
+	case ":":
+		m.commandMode = true
+		m.commandInput = ""
+	case "R":
+		return m, m.loadMockDataCmd()
+	}
+	return m, nil
+}
+
+func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		m.moveCursorUp()
+	case "down", "j":
+		m.moveCursorDown()
+	case "esc", "backspace":
+		m.currentView = m.previousView
+		return m, m.loadMockDataCmd()
+	case "f":
+		// Toggle follow mode (mock)
+	case "s":
+		// Save logs (mock)
+	case "/":
+		m.searchMode = true
+		m.searchQuery = ""
+	}
+	return m, nil
+}
+
+func (m Model) handleHelpKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "?", "q":
+		m.showHelp = false
+		m.currentView = m.previousView
+	}
+	return m, nil
+}
+
+func (m Model) handleSearchInput(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		m.searchMode = false
+		// Apply search filter in real implementation
+	case "backspace":
+		if len(m.searchQuery) > 0 {
+			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+		}
+	default:
+		if len(msg.String()) == 1 {
+			m.searchQuery += msg.String()
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleCommandInput(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		m.commandMode = false
+		// Execute command in real implementation
+		cmd := m.commandInput
+		m.commandInput = ""
+		// Process command...
+		_ = cmd
+	case "backspace":
+		if len(m.commandInput) > 0 {
+			m.commandInput = m.commandInput[:len(m.commandInput)-1]
+		}
+	default:
+		if len(msg.String()) == 1 || msg.String() == " " {
+			m.commandInput += msg.String()
+		}
+	}
+	return m, nil
+}
