@@ -26,6 +26,18 @@ build:
 	@echo "Building $(BINARY_NAME)..."
 	cd $(CONTROLPLANE_DIR) && $(GO) build $(LDFLAGS) -o ../bin/$(BINARY_NAME) ./cmd/controlplane
 
+# Build TUI v2 mock application
+.PHONY: build-tui2
+build-tui2:
+	@echo "Building KECS TUI v2 (mock)..."
+	cd $(CONTROLPLANE_DIR) && $(GO) build -o ../bin/kecs-tui2 ./cmd/kecs-tui2
+
+# Run TUI v2 mock
+.PHONY: run-tui2
+run-tui2: build-tui2
+	@echo "Running KECS TUI v2 (mock)..."
+	./bin/kecs-tui2
+
 # Generate code from AWS API definitions
 .PHONY: generate
 generate:
@@ -226,6 +238,7 @@ help:
 	@echo "  dev-logs       - Same as 'dev' but also tail controlplane logs"
 	@echo "  docker-build-awsproxy - Build AWS Proxy Docker image"
 	@echo "  docker-push-awsproxy  - Push AWS Proxy Docker image"
+	@echo "  build-tui2     - Build TUI v2 mock application"
 	@echo "  help           - Show this help message"
 	@echo ""
 	@echo "Development workflow:"
