@@ -189,39 +189,40 @@ func (m Model) View() string {
 		return "Initializing..."
 	}
 
-	var content string
-
-	// Render header
-	header := m.renderHeader()
-
-	// Render breadcrumb
-	breadcrumb := m.renderBreadcrumb()
-
-	// Render main content based on current view
-	switch m.currentView {
-	case ViewInstances:
-		content = m.renderInstancesView()
-	case ViewClusters:
-		content = m.renderClustersView()
-	case ViewServices:
-		content = m.renderServicesView()
-	case ViewTasks:
-		content = m.renderTasksView()
-	case ViewLogs:
-		content = m.renderLogsView()
-	case ViewHelp:
-		content = m.renderHelpView()
+	// For help view, use full screen
+	if m.currentView == ViewHelp {
+		return m.renderHelpView()
 	}
+
+	// Calculate exact heights for panels
+	footerHeight := 1
+	availableHeight := m.height - footerHeight
+	navPanelHeight := int(float64(availableHeight) * 0.3)
+	resourcePanelHeight := availableHeight - navPanelHeight
+
+	// Ensure minimum heights
+	if navPanelHeight < 10 {
+		navPanelHeight = 10
+	}
+	if resourcePanelHeight < 10 {
+		resourcePanelHeight = 10
+	}
+
+	// Render navigation panel (30% height)
+	navigationPanel := m.renderNavigationPanel()
+
+	// Render resource panel (70% height)
+	resourcePanel := m.renderResourcePanel()
 
 	// Render footer
 	footer := m.renderFooter()
 
-	// Combine all components
+	// Combine all components without extra spacing
+	// The panels already have their own borders and padding
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
-		header,
-		breadcrumb,
-		content,
+		navigationPanel,
+		resourcePanel,
 		footer,
 	)
 }
