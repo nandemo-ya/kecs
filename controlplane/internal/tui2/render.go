@@ -470,10 +470,21 @@ func (m Model) renderInstancesList(maxHeight int) string {
 	// Rows
 	rows := []string{header}
 	
+	// Get filtered instances
+	filteredInstances := m.filterInstances(m.instances)
+	
 	// Calculate visible range with scrolling
 	visibleRows := maxHeight - 2 // Account for header and potential scroll indicator
 	startIdx := 0
-	endIdx := len(m.instances)
+	endIdx := len(filteredInstances)
+	
+	// Adjust cursor if it's out of bounds
+	if m.instanceCursor >= len(filteredInstances) {
+		m.instanceCursor = len(filteredInstances) - 1
+		if m.instanceCursor < 0 {
+			m.instanceCursor = 0
+		}
+	}
 	
 	// Implement scrolling if needed
 	if m.instanceCursor >= visibleRows {
@@ -484,7 +495,7 @@ func (m Model) renderInstancesList(maxHeight int) string {
 	}
 	
 	for i := startIdx; i < endIdx; i++ {
-		instance := m.instances[i]
+		instance := filteredInstances[i]
 		// Format values
 		name := instance.Name
 		status := instance.Status
@@ -529,9 +540,18 @@ func (m Model) renderInstancesList(maxHeight int) string {
 	}
 	
 	// Add scroll indicator if needed
-	if len(m.instances) > visibleRows {
-		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d instances]", startIdx+1, endIdx, len(m.instances))
+	if len(filteredInstances) > visibleRows {
+		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d instances]", startIdx+1, endIdx, len(filteredInstances))
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(scrollInfo))
+	}
+	
+	// Add search indicator if searching
+	if m.searchMode || m.searchQuery != "" {
+		searchInfo := fmt.Sprintf("\n[Search: %s]", m.searchQuery)
+		if m.searchMode {
+			searchInfo += "_"
+		}
+		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00")).Render(searchInfo))
 	}
 	
 	return strings.Join(rows, "\n")
@@ -605,10 +625,21 @@ func (m Model) renderClustersList(maxHeight int) string {
 	// Rows
 	rows := []string{header}
 	
+	// Get filtered clusters
+	filteredClusters := m.filterClusters(m.clusters)
+	
 	// Calculate visible range with scrolling
 	visibleRows := maxHeight - 2
 	startIdx := 0
-	endIdx := len(m.clusters)
+	endIdx := len(filteredClusters)
+	
+	// Adjust cursor if it's out of bounds
+	if m.clusterCursor >= len(filteredClusters) {
+		m.clusterCursor = len(filteredClusters) - 1
+		if m.clusterCursor < 0 {
+			m.clusterCursor = 0
+		}
+	}
 	
 	if m.clusterCursor >= visibleRows {
 		startIdx = m.clusterCursor - visibleRows + 1
@@ -618,7 +649,7 @@ func (m Model) renderClustersList(maxHeight int) string {
 	}
 	
 	for i := startIdx; i < endIdx; i++ {
-		cluster := m.clusters[i]
+		cluster := filteredClusters[i]
 		// Format values
 		name := cluster.Name
 		status := cluster.Status
@@ -669,9 +700,18 @@ func (m Model) renderClustersList(maxHeight int) string {
 	}
 	
 	// Add scroll indicator if needed
-	if len(m.clusters) > visibleRows {
-		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d clusters]", startIdx+1, endIdx, len(m.clusters))
+	if len(filteredClusters) > visibleRows {
+		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d clusters]", startIdx+1, endIdx, len(filteredClusters))
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(scrollInfo))
+	}
+	
+	// Add search indicator if searching
+	if m.searchMode || m.searchQuery != "" {
+		searchInfo := fmt.Sprintf("\n[Search: %s]", m.searchQuery)
+		if m.searchMode {
+			searchInfo += "_"
+		}
+		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00")).Render(searchInfo))
 	}
 	
 	return strings.Join(rows, "\n")
@@ -737,10 +777,21 @@ func (m Model) renderServicesList(maxHeight int) string {
 	// Rows
 	rows := []string{header}
 	
+	// Get filtered services
+	filteredServices := m.filterServices(m.services)
+	
 	// Calculate visible range with scrolling
 	visibleRows := maxHeight - 2
 	startIdx := 0
-	endIdx := len(m.services)
+	endIdx := len(filteredServices)
+	
+	// Adjust cursor if it's out of bounds
+	if m.serviceCursor >= len(filteredServices) {
+		m.serviceCursor = len(filteredServices) - 1
+		if m.serviceCursor < 0 {
+			m.serviceCursor = 0
+		}
+	}
 	
 	if m.serviceCursor >= visibleRows {
 		startIdx = m.serviceCursor - visibleRows + 1
@@ -750,7 +801,7 @@ func (m Model) renderServicesList(maxHeight int) string {
 	}
 	
 	for i := startIdx; i < endIdx; i++ {
-		service := m.services[i]
+		service := filteredServices[i]
 		// Format values
 		name := service.Name
 		desired := fmt.Sprintf("%d", service.Desired)
@@ -802,9 +853,18 @@ func (m Model) renderServicesList(maxHeight int) string {
 	}
 	
 	// Add scroll indicator if needed
-	if len(m.services) > visibleRows {
-		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d services]", startIdx+1, endIdx, len(m.services))
+	if len(filteredServices) > visibleRows {
+		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d services]", startIdx+1, endIdx, len(filteredServices))
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(scrollInfo))
+	}
+	
+	// Add search indicator if searching
+	if m.searchMode || m.searchQuery != "" {
+		searchInfo := fmt.Sprintf("\n[Search: %s]", m.searchQuery)
+		if m.searchMode {
+			searchInfo += "_"
+		}
+		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00")).Render(searchInfo))
 	}
 	
 	return strings.Join(rows, "\n")
@@ -875,10 +935,21 @@ func (m Model) renderTasksList(maxHeight int) string {
 	// Rows
 	rows := []string{header}
 	
+	// Get filtered tasks
+	filteredTasks := m.filterTasks(m.tasks)
+	
 	// Calculate visible range with scrolling
 	visibleRows := maxHeight - 2
 	startIdx := 0
-	endIdx := len(m.tasks)
+	endIdx := len(filteredTasks)
+	
+	// Adjust cursor if it's out of bounds
+	if m.taskCursor >= len(filteredTasks) {
+		m.taskCursor = len(filteredTasks) - 1
+		if m.taskCursor < 0 {
+			m.taskCursor = 0
+		}
+	}
 	
 	if m.taskCursor >= visibleRows {
 		startIdx = m.taskCursor - visibleRows + 1
@@ -888,7 +959,7 @@ func (m Model) renderTasksList(maxHeight int) string {
 	}
 	
 	for i := startIdx; i < endIdx; i++ {
-		task := m.tasks[i]
+		task := filteredTasks[i]
 		// Format values
 		id := task.ID
 		service := task.Service
@@ -959,9 +1030,18 @@ func (m Model) renderTasksList(maxHeight int) string {
 	}
 	
 	// Add scroll indicator if needed
-	if len(m.tasks) > visibleRows {
-		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d tasks]", startIdx+1, endIdx, len(m.tasks))
+	if len(filteredTasks) > visibleRows {
+		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d tasks]", startIdx+1, endIdx, len(filteredTasks))
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(scrollInfo))
+	}
+	
+	// Add search indicator if searching
+	if m.searchMode || m.searchQuery != "" {
+		searchInfo := fmt.Sprintf("\n[Search: %s]", m.searchQuery)
+		if m.searchMode {
+			searchInfo += "_"
+		}
+		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00")).Render(searchInfo))
 	}
 	
 	return strings.Join(rows, "\n")
@@ -1007,15 +1087,26 @@ func (m Model) renderLogsContent(maxHeight int) string {
 	// Build log lines
 	lines := []string{}
 	
+	// Get filtered logs
+	filteredLogs := m.filterLogs(m.logs)
+	
+	// Adjust cursor if it's out of bounds
+	if m.logCursor >= len(filteredLogs) {
+		m.logCursor = len(filteredLogs) - 1
+		if m.logCursor < 0 {
+			m.logCursor = 0
+		}
+	}
+	
 	// Process logs
 	startIdx := m.logCursor
 	endIdx := startIdx + availableHeight
-	if endIdx > len(m.logs) {
-		endIdx = len(m.logs)
+	if endIdx > len(filteredLogs) {
+		endIdx = len(filteredLogs)
 	}
 	
-	for i := startIdx; i < endIdx && i < len(m.logs); i++ {
-		log := m.logs[i]
+	for i := startIdx; i < endIdx && i < len(filteredLogs); i++ {
+		log := filteredLogs[i]
 		
 		// Format timestamp
 		timestamp := log.Timestamp.Format("2006-01-02 15:04:05")
@@ -1056,9 +1147,18 @@ func (m Model) renderLogsContent(maxHeight int) string {
 	}
 	
 	// Add scroll indicator if needed
-	if len(m.logs) > availableHeight {
-		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d log entries]", startIdx+1, endIdx, len(m.logs))
+	if len(filteredLogs) > availableHeight {
+		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d log entries]", startIdx+1, endIdx, len(filteredLogs))
 		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(scrollInfo))
+	}
+	
+	// Add search indicator if searching
+	if m.searchMode || m.searchQuery != "" {
+		searchInfo := fmt.Sprintf("\n[Search: %s]", m.searchQuery)
+		if m.searchMode {
+			searchInfo += "_"
+		}
+		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00")).Render(searchInfo))
 	}
 	
 	return strings.Join(lines, "\n")

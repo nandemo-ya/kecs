@@ -431,19 +431,30 @@ func (m Model) handleHelpKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleSearchInput(msg tea.KeyMsg) (Model, tea.Cmd) {
+	previousQuery := m.searchQuery
+	
 	switch msg.String() {
 	case "enter":
 		m.searchMode = false
-		// Apply search filter in real implementation
+	case "esc":
+		m.searchMode = false
+		m.searchQuery = ""
+		m.resetCursorAfterSearch()
 	case "backspace":
 		if len(m.searchQuery) > 0 {
 			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
 		}
 	default:
-		if len(msg.String()) == 1 {
+		if len(msg.String()) == 1 || msg.String() == " " {
 			m.searchQuery += msg.String()
 		}
 	}
+	
+	// Reset cursor if search query changed
+	if previousQuery != m.searchQuery {
+		m.resetCursorAfterSearch()
+	}
+	
 	return m, nil
 }
 

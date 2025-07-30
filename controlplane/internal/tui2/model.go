@@ -188,15 +188,15 @@ func (m *Model) goBack() {
 func (m *Model) getCurrentListLength() int {
 	switch m.currentView {
 	case ViewInstances:
-		return len(m.instances)
+		return len(m.filterInstances(m.instances))
 	case ViewClusters:
-		return len(m.clusters)
+		return len(m.filterClusters(m.clusters))
 	case ViewServices:
-		return len(m.services)
+		return len(m.filterServices(m.services))
 	case ViewTasks:
-		return len(m.tasks)
+		return len(m.filterTasks(m.tasks))
 	case ViewLogs:
-		return len(m.logs)
+		return len(m.filterLogs(m.logs))
 	default:
 		return 0
 	}
