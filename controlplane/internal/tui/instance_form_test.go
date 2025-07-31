@@ -1,17 +1,17 @@
-package tui2_test
+package tui_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/tui2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui"
 )
 
 var _ = Describe("InstanceForm", func() {
-	var form *tui2.InstanceForm
+	var form *tui.InstanceForm
 
 	BeforeEach(func() {
-		form = tui2.NewInstanceForm()
+		form = tui.NewInstanceForm()
 	})
 
 	Describe("NewInstanceForm", func() {

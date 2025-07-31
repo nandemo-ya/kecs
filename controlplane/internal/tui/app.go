@@ -1,4 +1,4 @@
-package tui2
+package tui
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/nandemo-ya/kecs/controlplane/internal/tui2/mock"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/mock"
 )
 
 // Run starts the TUI application

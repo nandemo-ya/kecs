@@ -1,6 +1,6 @@
-# KECS TUI v2 Command Palette
+# KECS TUI
 
-The KECS TUI v2 includes a powerful command palette that provides quick access to common actions and commands.
+The KECS Terminal User Interface (TUI) provides an interactive, keyboard-driven interface for managing ECS resources. This is the new implementation that replaces the previous TUI with enhanced features and better user experience.
 
 ## Features
 

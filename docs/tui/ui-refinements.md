@@ -1,8 +1,8 @@
-# KECS TUI v2 UI Refinements
+# KECS TUI UI Refinements
 
 ## Overview
 
-The KECS TUI v2 has been refined with a new layout that provides better visual separation between navigation and resource areas, following a 3:7 height ratio design.
+The KECS TUI has been refined with a new layout that provides better visual separation between navigation and resource areas, following a 3:7 height ratio design.
 
 ## Layout Structure
 

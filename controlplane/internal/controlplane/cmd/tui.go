@@ -15,9 +15,7 @@
 package cmd
 
 import (
-	"fmt"
-
-	"github.com/nandemo-ya/kecs/controlplane/internal/tui/app"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -40,22 +38,11 @@ tasks, and task definitions with real-time updates.`,
   # Connect to remote KECS instance
   kecs tui --endpoint http://remote-kecs:8080`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// If no endpoint is specified, use the default
-		if tuiEndpoint == "" {
-			tuiEndpoint = "http://localhost:8080"
-		}
-
-		// Create and run the TUI application
-		app, err := app.New(tuiEndpoint)
-		if err != nil {
-			return fmt.Errorf("failed to create TUI application: %w", err)
-		}
-
-		if err := app.Run(); err != nil {
-			return fmt.Errorf("TUI error: %w", err)
-		}
-
-		return nil
+		// Note: endpoint parameter is not used in TUI v2 mock implementation
+		// It will be used when we integrate with real backend
+		
+		// Run the new TUI implementation
+		return tui.Run()
 	},
 }
 

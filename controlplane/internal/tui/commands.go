@@ -1,8 +1,8 @@
-package tui2
+package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/nandemo-ya/kecs/controlplane/internal/tui2/mock"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/mock"
 )
 
 // loadMockDataCmd loads mock data based on current selections
