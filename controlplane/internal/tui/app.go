@@ -6,13 +6,28 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/mock"
 )
 
 // Run starts the TUI application
 func Run() error {
+	// Load configuration
+	cfg := LoadConfig()
+	
+	// Create API client
+	client := CreateAPIClient(cfg)
+	
+	// Create model with client
+	var model Model
+	if cfg.UseMockData {
+		model = NewModel() // Uses mock client by default
+	} else {
+		model = NewModelWithClient(client)
+	}
+	
 	p := tea.NewProgram(
-		NewModel(),
+		model,
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
@@ -124,6 +139,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tasks = msg.Tasks
 		m.logs = msg.Logs
 
+	case dataLoadedMsg:
+		// Handle API data
+		m.instances = msg.instances
+		m.clusters = msg.clusters
+		m.services = msg.services
+		m.tasks = msg.tasks
+
+	case instanceCreatedMsg:
+		// Add new instance to list
+		m.instances = append(m.instances, msg.instance)
+		// Select the new instance
+		m.selectedInstance = msg.instance.Name
+		// Reset instance form if it exists
+		if m.instanceForm != nil {
+			m.instanceForm.successMsg = fmt.Sprintf("Instance '%s' created successfully", msg.instance.Name)
+			// Close form after short delay
+			cmds = append(cmds, tea.Sequence(
+				tea.Tick(1*time.Second, func(t time.Time) tea.Msg {
+					return nil
+				}),
+				func() tea.Msg {
+					// Navigate to clusters view
+					m.currentView = ViewClusters
+					m.clusterCursor = 0
+					m.instanceForm.Reset()
+					return m.loadMockDataCmd()()
+				},
+			))
+		} else {
+			// Navigate directly if no form
+			m.currentView = ViewClusters
+			m.clusterCursor = 0
+			cmds = append(cmds, m.loadMockDataCmd())
+		}
+
+	case errMsg:
+		// Handle API errors
+		m.err = msg.err
+
 	case mock.DataMsg:
 		// Convert mock data to model data
 		m.instances = make([]Instance, len(msg.Instances))
@@ -191,8 +245,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-	case errMsg:
-		m.err = msg.err
 	}
 
 	return m, tea.Batch(cmds...)
@@ -630,25 +682,30 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.instanceForm.GenerateNewName()
 			return m, nil
 		case FieldSubmit:
-			// Create instance
-			instance, err := m.instanceForm.CreateMockInstance()
-			if err != nil {
-				m.instanceForm.errorMsg = err.Error()
+			// Validate form
+			if !m.instanceForm.Validate() {
+				// Validation errors are already set in form
 				return m, nil
 			}
-			// Add to instances list
-			m.instances = append(m.instances, *instance)
-			// Close form after short delay to show success
-			return m, tea.Sequence(
-				tea.Tick(1*time.Second, func(t time.Time) tea.Msg {
-					return nil
-				}),
-				func() tea.Msg {
-					m.currentView = m.previousView
-					m.instanceForm.Reset()
-					return m.loadMockDataCmd()()
-				},
-			)
+			
+			// Get form data
+			formData := m.instanceForm.GetFormData()
+			
+			// Create API options
+			opts := api.CreateInstanceOptions{
+				Name:       formData["instanceName"].(string),
+				APIPort:    formData["apiPort"].(int),
+				AdminPort:  formData["adminPort"].(int),
+				LocalStack: formData["localStack"].(bool),
+				Traefik:    formData["traefik"].(bool),
+				DevMode:    formData["devMode"].(bool),
+			}
+			
+			// Show creating message
+			m.instanceForm.successMsg = "Creating instance..."
+			
+			// Create instance via API
+			return m, m.createInstanceCmd(opts)
 		case FieldCancel:
 			// Cancel and close
 			m.currentView = m.previousView
@@ -663,22 +720,29 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.instanceForm.ToggleCheckbox()
 		case FieldSubmit:
 			// Same as enter on submit
-			instance, err := m.instanceForm.CreateMockInstance()
-			if err != nil {
-				m.instanceForm.errorMsg = err.Error()
+			if !m.instanceForm.Validate() {
+				// Validation errors are already set in form
 				return m, nil
 			}
-			m.instances = append(m.instances, *instance)
-			return m, tea.Sequence(
-				tea.Tick(1*time.Second, func(t time.Time) tea.Msg {
-					return nil
-				}),
-				func() tea.Msg {
-					m.currentView = m.previousView
-					m.instanceForm.Reset()
-					return m.loadMockDataCmd()()
-				},
-			)
+			
+			// Get form data
+			formData := m.instanceForm.GetFormData()
+			
+			// Create API options
+			opts := api.CreateInstanceOptions{
+				Name:       formData["instanceName"].(string),
+				APIPort:    formData["apiPort"].(int),
+				AdminPort:  formData["adminPort"].(int),
+				LocalStack: formData["localStack"].(bool),
+				Traefik:    formData["traefik"].(bool),
+				DevMode:    formData["devMode"].(bool),
+			}
+			
+			// Show creating message
+			m.instanceForm.successMsg = "Creating instance..."
+			
+			// Create instance via API
+			return m, m.createInstanceCmd(opts)
 		case FieldCancel:
 			m.currentView = m.previousView
 			m.instanceForm.Reset()
