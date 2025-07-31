@@ -1,10 +1,10 @@
-package tui2
+package tui
 
 import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/nandemo-ya/kecs/controlplane/internal/tui2/mock"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/mock"
 )
 
 // ViewType represents the current view in the TUI

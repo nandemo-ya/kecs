@@ -1,19 +1,19 @@
-package tui2_test
+package tui_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/tui2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui"
 )
 
 var _ = Describe("CommandPalette", func() {
 	var (
-		model *tui2.Model
+		model *tui.Model
 	)
 
 	BeforeEach(func() {
-		m := tui2.NewModel()
+		m := tui.NewModel()
 		model = &m
 	})
 
