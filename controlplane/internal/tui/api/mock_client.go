@@ -17,6 +17,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -216,12 +217,14 @@ func (c *MockClient) DeleteInstance(ctx context.Context, name string) error {
 			delete(c.clusters, name)
 			// Clean up related data
 			for key := range c.services {
-				if key[:len(name)] == name {
+				// Key format is "instance/cluster"
+				if strings.HasPrefix(key, name+"/") {
 					delete(c.services, key)
 				}
 			}
 			for key := range c.tasks {
-				if key[:len(name)] == name {
+				// Key format is "instance/cluster/service"
+				if strings.HasPrefix(key, name+"/") {
 					delete(c.tasks, key)
 				}
 			}
