@@ -11,15 +11,20 @@ import (
 var (
 	// Layout styles
 	headerStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#1a1a1a")).
-			Foreground(lipgloss.Color("#ffffff")).
+			Background(lipgloss.Color("#1e1e2e")).
+			Foreground(lipgloss.Color("#cdd6f4")).
 			PaddingLeft(1).
-			PaddingRight(1)
+			PaddingRight(1).
+			Bold(true)
 			
 	breadcrumbStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#2a2a2a")).
-			Foreground(lipgloss.Color("#cccccc")).
-			Padding(0, 1)
+			Background(lipgloss.Color("#313244")).
+			Foreground(lipgloss.Color("#bac2de")).
+			PaddingLeft(1).
+			PaddingRight(1).
+			BorderTop(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("#585b70"))
 			
 	footerStyle = lipgloss.NewStyle().
 			Background(lipgloss.Color("#1a1a1a")).
@@ -38,12 +43,12 @@ var (
 	// New styles for enhanced layout
 	navigationPanelStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#444444")).
+			BorderForeground(lipgloss.Color("#585b70")).
 			Padding(1, 2)
 	
 	resourcePanelStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#444444")).
+			BorderForeground(lipgloss.Color("#585b70")).
 			Padding(1, 2)
 	
 	summaryStyle = lipgloss.NewStyle().
@@ -83,8 +88,8 @@ func (m Model) getHeaderShortcuts() string {
 	shortcuts := []string{}
 	
 	// Style for k9s-like shortcuts
-	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#00ff00"))
-	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#666666"))
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true)
+	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
 	
 	switch m.currentView {
 	case ViewInstances:
@@ -134,72 +139,33 @@ func (m Model) getHeaderShortcuts() string {
 }
 
 func (m Model) renderHeader() string {
-	// Build the left side content
-	left := "KECS v1.0.0"
+	// Calculate the actual available width for left column
+	totalWidth := m.width - 4 // Account for panel borders
+	leftColumnWidth := int(float64(totalWidth) * 0.7)
+	maxContentWidth := leftColumnWidth - 2 // Account for header padding
+	
+	// Build the header content
+	headerText := "KECS v0.0.1-alpha"
 	if m.selectedInstance != "" {
-		left = fmt.Sprintf("KECS v1.0.0 | Instance: %s", m.selectedInstance)
+		headerText = fmt.Sprintf("KECS v0.0.1-alpha | Instance: %s", m.selectedInstance)
 	}
 	
-	// Build the right side content (shortcuts)
-	right := m.getHeaderShortcuts()
-	
-	// Calculate the actual available width for content
-	// navigationPanelStyle sets Width to m.width - 4
-	// headerStyle has Padding(0, 1) which takes 2 more characters
-	maxContentWidth := m.width - 4 - 2
-	
-	// Check if content fits
-	leftWidth := lipgloss.Width(left)
-	rightWidth := lipgloss.Width(right)
-	minGap := 2 // Minimum gap between left and right
-	
-	totalWidth := leftWidth + minGap + rightWidth
-	
-	// If content is too wide, prioritize shortcuts and shorten the left side
-	if totalWidth > maxContentWidth {
-		// Try shorter instance name
+	// Check if we need to truncate
+	if lipgloss.Width(headerText) > maxContentWidth {
 		if m.selectedInstance != "" {
+			// Shorten instance name
 			instanceName := m.selectedInstance
-			if len(instanceName) > 15 {
-				instanceName = instanceName[:12] + "..."
+			prefix := "KECS v0.0.1-alpha | "
+			maxInstanceWidth := maxContentWidth - len(prefix) - 3 // -3 for "..."
+			if maxInstanceWidth > 0 && len(instanceName) > maxInstanceWidth {
+				instanceName = instanceName[:maxInstanceWidth] + "..."
 			}
-			left = fmt.Sprintf("KECS | %s", instanceName)
-			leftWidth = lipgloss.Width(left)
-			totalWidth = leftWidth + minGap + rightWidth
-		}
-		
-		// If still too wide, use even shorter format
-		if totalWidth > maxContentWidth && m.selectedInstance != "" {
-			instanceName := m.selectedInstance
-			if len(instanceName) > 8 {
-				instanceName = instanceName[:5] + "..."
-			}
-			left = instanceName
-			leftWidth = lipgloss.Width(left)
+			headerText = prefix + instanceName
 		}
 	}
 	
-	// Calculate actual gap
-	gap := maxContentWidth - leftWidth - rightWidth
-	if gap < minGap {
-		gap = minGap
-	}
-	
-	// Build the full header
-	headerContent := left + strings.Repeat(" ", gap) + right
-	
-	// Ensure it fits within maxContentWidth
-	if lipgloss.Width(headerContent) > maxContentWidth {
-		// Truncate if necessary, prioritizing shortcuts on the right
-		headerContent = left + "  " + right
-		if lipgloss.Width(headerContent) > maxContentWidth {
-			// Last resort: just show shortcuts
-			headerContent = right
-		}
-	}
-	
-	// Apply header style
-	return headerStyle.Render(headerContent)
+	// Apply header style with proper width
+	return headerStyle.Width(maxContentWidth).Render(headerText)
 }
 
 func (m Model) renderBreadcrumb() string {
@@ -257,11 +223,15 @@ func (m Model) renderBreadcrumb() string {
 	
 	breadcrumb := strings.Join(parts, " ")
 	
+	// Calculate the same width as header for consistency
+	totalWidth := m.width - 4 // Account for panel borders
+	leftColumnWidth := int(float64(totalWidth) * 0.7)
+	maxContentWidth := leftColumnWidth - 2 // Account for breadcrumb padding
+	
 	// Ensure breadcrumb doesn't exceed available width
-	maxWidth := m.width - 2 // Account for padding
-	if lipgloss.Width(breadcrumb) > maxWidth {
+	if lipgloss.Width(breadcrumb) > maxContentWidth {
 		// Truncate from the beginning if too long
-		for lipgloss.Width(breadcrumb) > maxWidth && len(breadcrumb) > 0 {
+		for lipgloss.Width(breadcrumb) > maxContentWidth && len(breadcrumb) > 0 {
 			// Find first space and remove everything before it
 			if idx := strings.Index(breadcrumb, " > "); idx >= 0 {
 				breadcrumb = "..." + breadcrumb[idx+2:]
@@ -272,7 +242,7 @@ func (m Model) renderBreadcrumb() string {
 		}
 	}
 	
-	return breadcrumbStyle.Render(breadcrumb)
+	return breadcrumbStyle.Width(maxContentWidth).Render(breadcrumb)
 }
 
 func (m Model) renderFooter() string {
@@ -354,42 +324,32 @@ func (m Model) renderNavigationPanel() string {
 		navHeight = 10 // Minimum height for navigation content
 	}
 	
-	// Render header
+	// Calculate column widths (7:3 ratio)
+	totalWidth := m.width - 4 // Account for panel borders
+	leftColumnWidth := int(float64(totalWidth) * 0.7)
+	rightColumnWidth := totalWidth - leftColumnWidth - 1 // -1 for gap between columns
+	
+	// Left column: header, breadcrumb, and summary
 	header := m.renderHeader()
-	
-	// Render breadcrumb
 	breadcrumb := m.renderBreadcrumb()
-	
-	// Render summary/overview based on current view
 	summary := m.renderSummary()
 	
-	// Calculate exact heights
-	headerHeight := 1
-	breadcrumbHeight := 1
-	summaryHeight := lipgloss.Height(summary)
-	contentTotalHeight := headerHeight + breadcrumbHeight + summaryHeight
-	
-	// If content is too tall, constrain the summary
-	if contentTotalHeight > navHeight - 4 {
-		// Just show header and breadcrumb
-		navContent := lipgloss.JoinVertical(
-			lipgloss.Top,
-			header,
-			breadcrumb,
-		)
-		return navigationPanelStyle.
-			Width(m.width - 4).
-			Height(navHeight - 4).
-			MaxHeight(navHeight - 4).
-			Render(navContent)
-	}
-	
-	// Combine navigation elements
-	navContent := lipgloss.JoinVertical(
+	// Combine left column elements
+	leftColumn := lipgloss.JoinVertical(
 		lipgloss.Top,
 		header,
 		breadcrumb,
 		summary,
+	)
+	
+	// Right column: shortcuts (vertical list)
+	rightColumn := m.renderShortcutsColumn(rightColumnWidth, navHeight - 4)
+	
+	// Join columns horizontally
+	navContent := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		lipgloss.NewStyle().Width(leftColumnWidth).Render(leftColumn),
+		lipgloss.NewStyle().Width(rightColumnWidth).Render(rightColumn),
 	)
 	
 	// Apply navigation panel style with fixed height
@@ -500,8 +460,10 @@ func (m Model) renderSummary() string {
 		summary = "No resources selected"
 	}
 	
-	// Add separator line - make sure it fits within the panel width
-	separatorWidth := m.width - 8
+	// Add separator line - make sure it fits within the left column width
+	totalWidth := m.width - 4 // Account for panel borders
+	leftColumnWidth := int(float64(totalWidth) * 0.7)
+	separatorWidth := leftColumnWidth - 2 // Account for padding
 	if separatorWidth < 20 {
 		separatorWidth = 20
 	}
@@ -1137,6 +1099,76 @@ func (m Model) renderTasksList(maxHeight int) string {
 	return strings.Join(rows, "\n")
 }
 
+// renderShortcutsColumn renders the shortcuts column for the navigation panel
+func (m Model) renderShortcutsColumn(width, height int) string {
+	// Style for k9s-like shortcuts
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true)
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9399b2"))
+	
+	// Container style for shortcuts column
+	columnStyle := lipgloss.NewStyle().
+		BorderLeft(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("#45475a")).
+		PaddingLeft(1).
+		Width(width)
+	
+	shortcuts := []string{}
+	
+	// Add view-specific shortcuts
+	switch m.currentView {
+	case ViewInstances:
+		shortcuts = append(shortcuts,
+			keyStyle.Render("N")+" "+descStyle.Render("New instance"),
+			keyStyle.Render("↵")+" "+descStyle.Render("Select"),
+			keyStyle.Render("S")+" "+descStyle.Render("Start/Stop"),
+			keyStyle.Render("D")+" "+descStyle.Render("Delete"),
+		)
+	case ViewClusters:
+		shortcuts = append(shortcuts,
+			keyStyle.Render("↵")+" "+descStyle.Render("Select"),
+			keyStyle.Render("←")+" "+descStyle.Render("Back"),
+			keyStyle.Render("i")+" "+descStyle.Render("Instances"),
+			keyStyle.Render("s")+" "+descStyle.Render("Services"),
+		)
+	case ViewServices:
+		shortcuts = append(shortcuts,
+			keyStyle.Render("↵")+" "+descStyle.Render("Select"),
+			keyStyle.Render("S")+" "+descStyle.Render("Scale"),
+			keyStyle.Render("r")+" "+descStyle.Render("Restart"),
+			keyStyle.Render("u")+" "+descStyle.Render("Update"),
+			keyStyle.Render("x")+" "+descStyle.Render("Stop"),
+			keyStyle.Render("l")+" "+descStyle.Render("Logs"),
+		)
+	case ViewTasks:
+		shortcuts = append(shortcuts,
+			keyStyle.Render("↵")+" "+descStyle.Render("View logs"),
+			keyStyle.Render("l")+" "+descStyle.Render("Logs"),
+			keyStyle.Render("D")+" "+descStyle.Render("Describe"),
+			keyStyle.Render("←")+" "+descStyle.Render("Back"),
+		)
+	case ViewLogs:
+		shortcuts = append(shortcuts,
+			keyStyle.Render("f")+" "+descStyle.Render("Follow"),
+			keyStyle.Render("s")+" "+descStyle.Render("Save"),
+			keyStyle.Render("←")+" "+descStyle.Render("Back"),
+		)
+	}
+	
+	// Add common shortcuts
+	shortcuts = append(shortcuts,
+		"", // Empty line for separation
+		keyStyle.Render(":")+" "+descStyle.Render("Command"),
+		keyStyle.Render("/")+" "+descStyle.Render("Search"),
+		keyStyle.Render("?")+" "+descStyle.Render("Help"),
+		keyStyle.Render("q")+" "+descStyle.Render("Quit"),
+	)
+	
+	// Join shortcuts vertically
+	shortcutsContent := strings.Join(shortcuts, "\n")
+	
+	return columnStyle.Height(height).Render(shortcutsContent)
+}
 
 // renderLogsContent renders the logs content with the given height constraint
 func (m Model) renderLogsContent(maxHeight int) string {
