@@ -4,6 +4,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/mock"
 )
 
@@ -126,6 +127,10 @@ type Model struct {
 	
 	// Terminal
 	ready           bool
+	
+	// API client
+	apiClient       api.Client
+	useMockData     bool
 }
 
 // NewModel creates a new application model
@@ -135,6 +140,20 @@ func NewModel() Model {
 		refreshInterval: 5 * time.Second,
 		ready:           false,
 		commandPalette:  NewCommandPalette(),
+		useMockData:     true,  // Default to mock data for now
+		apiClient:       api.NewMockClient(),
+	}
+}
+
+// NewModelWithClient creates a new application model with a specific API client
+func NewModelWithClient(client api.Client) Model {
+	return Model{
+		currentView:     ViewInstances,
+		refreshInterval: 5 * time.Second,
+		ready:           false,
+		commandPalette:  NewCommandPalette(),
+		useMockData:     false,
+		apiClient:       client,
 	}
 }
 
@@ -159,9 +178,6 @@ type DataLoadedMsg struct {
 	Logs      []LogEntry
 }
 
-type errMsg struct {
-	err error
-}
 
 // Commands
 
