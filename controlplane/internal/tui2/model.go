@@ -18,6 +18,7 @@ const (
 	ViewLogs
 	ViewHelp
 	ViewCommandPalette
+	ViewInstanceCreate
 )
 
 // Instance represents a KECS instance
@@ -114,6 +115,9 @@ type Model struct {
 	
 	// Command palette
 	commandPalette  *CommandPalette
+	
+	// Instance form
+	instanceForm    *InstanceForm
 	
 	// Update control
 	lastUpdate      time.Time

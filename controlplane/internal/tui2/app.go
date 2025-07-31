@@ -75,6 +75,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.currentView == ViewCommandPalette {
 			return m.handleCommandPaletteInput(msg)
 		}
+		if m.currentView == ViewInstanceCreate {
+			return m.handleInstanceCreateInput(msg)
+		}
 
 		// View-specific key handling
 		switch m.currentView {
@@ -208,6 +211,11 @@ func (m Model) View() string {
 	if m.currentView == ViewCommandPalette {
 		return m.renderCommandPaletteOverlay()
 	}
+	
+	// For instance create, use overlay
+	if m.currentView == ViewInstanceCreate {
+		return m.renderInstanceCreateOverlay()
+	}
 
 	// Calculate exact heights for panels
 	footerHeight := 1
@@ -258,9 +266,15 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return m, m.loadMockDataCmd()
 		}
 	case "N":
-		// Create new instance (mock)
-		m.commandMode = true
-		m.commandInput = "create instance "
+		// Open instance creation form
+		if m.instanceForm == nil {
+			m.instanceForm = NewInstanceForm()
+		} else {
+			m.instanceForm.Reset()
+		}
+		m.previousView = m.currentView
+		m.currentView = ViewInstanceCreate
+		return m, nil
 	case "S":
 		// Start/Stop instance (mock)
 		if len(m.instances) > 0 {
@@ -571,5 +585,105 @@ func (m Model) handleCommandPaletteInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.commandPalette.FilterCommands(m.commandPalette.query, &m)
 		}
 	}
+	return m, nil
+}
+
+func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
+	if m.instanceForm == nil {
+		return m, nil
+	}
+	
+	switch msg.String() {
+	case "esc":
+		// Close form
+		m.currentView = m.previousView
+		m.instanceForm.Reset()
+		return m, nil
+		
+	case "tab":
+		// Move to next field
+		m.instanceForm.MoveFocusDown()
+		return m, nil
+		
+	case "shift+tab":
+		// Move to previous field
+		m.instanceForm.MoveFocusUp()
+		return m, nil
+		
+	case "enter":
+		// Handle action based on focused field
+		switch m.instanceForm.focusedField {
+		case FieldInstanceName:
+			// If on name field and pressed enter, generate new name
+			m.instanceForm.GenerateNewName()
+			return m, nil
+		case FieldSubmit:
+			// Create instance
+			instance, err := m.instanceForm.CreateMockInstance()
+			if err != nil {
+				m.instanceForm.errorMsg = err.Error()
+				return m, nil
+			}
+			// Add to instances list
+			m.instances = append(m.instances, *instance)
+			// Close form after short delay to show success
+			return m, tea.Sequence(
+				tea.Tick(1*time.Second, func(t time.Time) tea.Msg {
+					return nil
+				}),
+				func() tea.Msg {
+					m.currentView = m.previousView
+					m.instanceForm.Reset()
+					return m.loadMockDataCmd()()
+				},
+			)
+		case FieldCancel:
+			// Cancel and close
+			m.currentView = m.previousView
+			m.instanceForm.Reset()
+			return m, nil
+		}
+		
+	case " ", "space":
+		// Toggle checkbox or press button
+		switch m.instanceForm.focusedField {
+		case FieldLocalStack, FieldTraefik, FieldDevMode:
+			m.instanceForm.ToggleCheckbox()
+		case FieldSubmit:
+			// Same as enter on submit
+			instance, err := m.instanceForm.CreateMockInstance()
+			if err != nil {
+				m.instanceForm.errorMsg = err.Error()
+				return m, nil
+			}
+			m.instances = append(m.instances, *instance)
+			return m, tea.Sequence(
+				tea.Tick(1*time.Second, func(t time.Time) tea.Msg {
+					return nil
+				}),
+				func() tea.Msg {
+					m.currentView = m.previousView
+					m.instanceForm.Reset()
+					return m.loadMockDataCmd()()
+				},
+			)
+		case FieldCancel:
+			m.currentView = m.previousView
+			m.instanceForm.Reset()
+			return m, nil
+		}
+		
+	case "backspace":
+		// Remove character from text field
+		m.instanceForm.RemoveLastChar()
+		return m, nil
+		
+	default:
+		// Handle text input
+		if len(msg.String()) == 1 {
+			m.instanceForm.UpdateField(m.instanceForm.GetCurrentFieldValue() + msg.String())
+		}
+	}
+	
 	return m, nil
 }
