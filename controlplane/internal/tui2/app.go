@@ -50,6 +50,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else if m.currentView == ViewCommandPalette {
 				m.currentView = m.previousView
 				m.commandPalette.Reset()
+			} else if m.currentView == ViewTaskDescribe {
+				m.currentView = m.previousView
 			}
 			return m, nil
 		case "?":
@@ -215,6 +217,11 @@ func (m Model) View() string {
 	// For instance create, use overlay
 	if m.currentView == ViewInstanceCreate {
 		return m.renderInstanceCreateOverlay()
+	}
+	
+	// For task describe, use full screen
+	if m.currentView == ViewTaskDescribe {
+		return m.renderTaskDescribeView()
 	}
 
 	// Calculate exact heights for panels
@@ -417,7 +424,12 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.currentView = ViewServices
 		m.selectedService = ""
 	case "D":
-		// Describe task (mock)
+		// Describe task
+		if len(m.tasks) > 0 {
+			m.selectedTask = m.tasks[m.taskCursor].ID
+			m.previousView = m.currentView
+			m.currentView = ViewTaskDescribe
+		}
 	case "/":
 		m.searchMode = true
 		m.searchQuery = ""

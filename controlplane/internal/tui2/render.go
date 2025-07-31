@@ -1153,6 +1153,13 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 			keyStyle.Render("s")+" "+descStyle.Render("Save"),
 			keyStyle.Render("←")+" "+descStyle.Render("Back"),
 		)
+	case ViewTaskDescribe:
+		shortcuts = append(shortcuts,
+			keyStyle.Render("ESC")+" "+descStyle.Render("Back"),
+			keyStyle.Render("l")+" "+descStyle.Render("View Logs"),
+			keyStyle.Render("r")+" "+descStyle.Render("Restart"),
+			keyStyle.Render("s")+" "+descStyle.Render("Stop"),
+		)
 	}
 	
 	// Add common shortcuts
@@ -1284,6 +1291,136 @@ func (m Model) renderLogsContent(maxHeight int) string {
 	}
 	
 	return strings.Join(lines, "\n")
+}
+
+// renderTaskDescribeView renders the task describe view
+func (m Model) renderTaskDescribeView() string {
+	// Find the selected task
+	var selectedTask *Task
+	for i := range m.tasks {
+		if m.tasks[i].ID == m.selectedTask {
+			selectedTask = &m.tasks[i]
+			break
+		}
+	}
+	
+	if selectedTask == nil {
+		return "Task not found"
+	}
+	
+	// Header style
+	headerStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#1e1e2e")).
+		Foreground(lipgloss.Color("#cdd6f4")).
+		Padding(0, 1).
+		Bold(true)
+	
+	// Section style
+	sectionStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6e3a1")).
+		Bold(true).
+		MarginTop(1)
+	
+	// Label style
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#9399b2"))
+	
+	// Value style
+	valueStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#cdd6f4"))
+	
+	// Status styles
+	runningStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6e3a1"))
+	stoppedStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#f38ba8"))
+	pendingStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#fab387"))
+	
+	// Health styles
+	healthyStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6e3a1"))
+	unhealthyStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#f38ba8"))
+	unknownStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#9399b2"))
+	
+	// Build content
+	content := []string{}
+	
+	// Header
+	header := headerStyle.Width(m.width).Render("Task Details - Press ESC to go back")
+	content = append(content, header)
+	
+	// Basic Information
+	content = append(content, sectionStyle.Render("\n▸ Basic Information"))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Task ID:"), valueStyle.Render(selectedTask.ID)))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Service:"), valueStyle.Render(selectedTask.Service)))
+	
+	// Status
+	statusStr := selectedTask.Status
+	switch selectedTask.Status {
+	case "RUNNING":
+		statusStr = runningStyle.Render("● " + statusStr)
+	case "STOPPED":
+		statusStr = stoppedStyle.Render("○ " + statusStr)
+	case "PENDING":
+		statusStr = pendingStyle.Render("◐ " + statusStr)
+	}
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Status:"), statusStr))
+	
+	// Health
+	healthStr := selectedTask.Health
+	switch selectedTask.Health {
+	case "HEALTHY":
+		healthStr = healthyStyle.Render("✓ " + healthStr)
+	case "UNHEALTHY":
+		healthStr = unhealthyStyle.Render("✗ " + healthStr)
+	default:
+		healthStr = unknownStyle.Render("? " + healthStr)
+	}
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Health:"), healthStr))
+	
+	// Resource Information
+	content = append(content, sectionStyle.Render("\n▸ Resource Usage"))
+	content = append(content, fmt.Sprintf("  %s %.2f%%", labelStyle.Render("CPU:"), selectedTask.CPU))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Memory:"), valueStyle.Render(selectedTask.Memory)))
+	
+	// Network Information
+	content = append(content, sectionStyle.Render("\n▸ Network Information"))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("IP Address:"), valueStyle.Render(selectedTask.IP)))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Port Mappings:"), valueStyle.Render("80:8080, 443:8443")))
+	
+	// Container Information (Mock)
+	content = append(content, sectionStyle.Render("\n▸ Container Information"))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Image:"), valueStyle.Render("nginx:latest")))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Container ID:"), valueStyle.Render("abc123def456")))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Runtime:"), valueStyle.Render("docker")))
+	
+	// Environment Variables (Mock)
+	content = append(content, sectionStyle.Render("\n▸ Environment Variables"))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("ENV:"), valueStyle.Render("production")))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("LOG_LEVEL:"), valueStyle.Render("info")))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("DATABASE_URL:"), valueStyle.Render("postgres://...")))
+	
+	// Timestamps
+	content = append(content, sectionStyle.Render("\n▸ Timestamps"))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Age:"), valueStyle.Render(selectedTask.Age.String())))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Created:"), valueStyle.Render("2024-01-15 10:30:00")))
+	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Started:"), valueStyle.Render("2024-01-15 10:30:15")))
+	
+	// Footer with shortcuts
+	footerStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#313244")).
+		Foreground(lipgloss.Color("#9399b2")).
+		Padding(0, 1).
+		MarginTop(2)
+	
+	footer := footerStyle.Width(m.width).Render("ESC: Back  |  l: View Logs  |  r: Restart  |  s: Stop")
+	content = append(content, footer)
+	
+	// Join all content
+	return lipgloss.JoinVertical(lipgloss.Top, content...)
 }
 
 // renderHelpContent renders the help content with the given height constraint

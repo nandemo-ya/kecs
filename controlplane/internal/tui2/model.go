@@ -19,6 +19,7 @@ const (
 	ViewHelp
 	ViewCommandPalette
 	ViewInstanceCreate
+	ViewTaskDescribe
 )
 
 // Instance represents a KECS instance
