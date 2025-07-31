@@ -58,7 +58,80 @@ var (
 			Background(lipgloss.Color("#2a2a4a")).
 			Foreground(lipgloss.Color("#ffffff")).
 			Bold(true)
+	
+	dimmedStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#808080"))
 )
+
+// getHeaderShortcuts returns context-appropriate shortcuts for the header
+func (m Model) getHeaderShortcuts() string {
+	// Check if we're in a special mode
+	if m.searchMode {
+		return statusActiveStyle.Render("Search Mode")
+	}
+	if m.commandMode {
+		return statusActiveStyle.Render("Command Mode")
+	}
+	if m.currentView == ViewCommandPalette {
+		return statusActiveStyle.Render("Command Palette")
+	}
+	if m.currentView == ViewInstanceCreate {
+		return statusActiveStyle.Render("Create Instance")
+	}
+	
+	// Show context-specific shortcuts
+	shortcuts := []string{}
+	
+	// Style for k9s-like shortcuts
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#00ff00"))
+	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#666666"))
+	
+	switch m.currentView {
+	case ViewInstances:
+		shortcuts = []string{
+			keyStyle.Render("<N>") + sepStyle.Render(" New"),
+			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
+			keyStyle.Render("</>") + sepStyle.Render(" Search"),
+			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
+		}
+	case ViewClusters:
+		shortcuts = []string{
+			keyStyle.Render("<↵>") + sepStyle.Render(" Select"),
+			keyStyle.Render("<←>") + sepStyle.Render(" Back"),
+			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
+			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
+		}
+	case ViewServices:
+		shortcuts = []string{
+			keyStyle.Render("<S>") + sepStyle.Render(" Scale"),
+			keyStyle.Render("<r>") + sepStyle.Render(" Restart"),
+			keyStyle.Render("<l>") + sepStyle.Render(" Logs"),
+			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
+		}
+	case ViewTasks:
+		shortcuts = []string{
+			keyStyle.Render("<l>") + sepStyle.Render(" Logs"),
+			keyStyle.Render("<D>") + sepStyle.Render(" Describe"),
+			keyStyle.Render("<←>") + sepStyle.Render(" Back"),
+			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
+		}
+	case ViewLogs:
+		shortcuts = []string{
+			keyStyle.Render("<f>") + sepStyle.Render(" Follow"),
+			keyStyle.Render("<s>") + sepStyle.Render(" Save"),
+			keyStyle.Render("<Esc>") + sepStyle.Render(" Back"),
+		}
+	default:
+		shortcuts = []string{
+			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
+			keyStyle.Render("</>") + sepStyle.Render(" Search"),
+			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
+		}
+	}
+	
+	// Join shortcuts with spaces
+	return strings.Join(shortcuts, "  ")
+}
 
 func (m Model) renderHeader() string {
 	// Build the left side content
@@ -67,31 +140,13 @@ func (m Model) renderHeader() string {
 		left = fmt.Sprintf("KECS v1.0.0 | Instance: %s", m.selectedInstance)
 	}
 	
-	// Build the right side content (status)
-	right := ""
-	if m.selectedInstance != "" {
-		// Check if the selected instance is active
-		status := "● Active"
-		statusStyle := statusActiveStyle
-		for _, inst := range m.instances {
-			if inst.Name == m.selectedInstance && inst.Status != "ACTIVE" {
-				status = "○ Inactive"
-				statusStyle = statusInactiveStyle
-				break
-			}
-		}
-		right = statusStyle.Render(status)
-	}
+	// Build the right side content (shortcuts)
+	right := m.getHeaderShortcuts()
 	
 	// Calculate the actual available width for content
 	// navigationPanelStyle sets Width to m.width - 4
 	// headerStyle has Padding(0, 1) which takes 2 more characters
 	maxContentWidth := m.width - 4 - 2
-	
-	// If no instance selected, just show KECS version
-	if m.selectedInstance == "" {
-		return headerStyle.Render(left)
-	}
 	
 	// Check if content fits
 	leftWidth := lipgloss.Width(left)
@@ -100,30 +155,27 @@ func (m Model) renderHeader() string {
 	
 	totalWidth := leftWidth + minGap + rightWidth
 	
+	// If content is too wide, prioritize shortcuts and shorten the left side
 	if totalWidth > maxContentWidth {
-		// Content is too wide, try shorter formats
-		instanceName := m.selectedInstance
-		if len(instanceName) > 15 {
-			instanceName = instanceName[:12] + "..."
-			left = fmt.Sprintf("KECS v1.0.0 | Instance: %s", instanceName)
-			leftWidth = lipgloss.Width(left)
-			totalWidth = leftWidth + minGap + rightWidth
-		}
-		
-		// If still too wide, use shorter format
-		if totalWidth > maxContentWidth {
+		// Try shorter instance name
+		if m.selectedInstance != "" {
+			instanceName := m.selectedInstance
+			if len(instanceName) > 15 {
+				instanceName = instanceName[:12] + "..."
+			}
 			left = fmt.Sprintf("KECS | %s", instanceName)
 			leftWidth = lipgloss.Width(left)
 			totalWidth = leftWidth + minGap + rightWidth
 		}
 		
-		// If still too wide, just show left part
-		if totalWidth > maxContentWidth {
-			headerContent := left
-			if lipgloss.Width(headerContent) > maxContentWidth {
-				headerContent = headerContent[:maxContentWidth-3] + "..."
+		// If still too wide, use even shorter format
+		if totalWidth > maxContentWidth && m.selectedInstance != "" {
+			instanceName := m.selectedInstance
+			if len(instanceName) > 8 {
+				instanceName = instanceName[:5] + "..."
 			}
-			return headerStyle.Render(headerContent)
+			left = instanceName
+			leftWidth = lipgloss.Width(left)
 		}
 	}
 	
@@ -135,6 +187,16 @@ func (m Model) renderHeader() string {
 	
 	// Build the full header
 	headerContent := left + strings.Repeat(" ", gap) + right
+	
+	// Ensure it fits within maxContentWidth
+	if lipgloss.Width(headerContent) > maxContentWidth {
+		// Truncate if necessary, prioritizing shortcuts on the right
+		headerContent = left + "  " + right
+		if lipgloss.Width(headerContent) > maxContentWidth {
+			// Last resort: just show shortcuts
+			headerContent = right
+		}
+	}
 	
 	// Apply header style
 	return headerStyle.Render(headerContent)
@@ -214,56 +276,74 @@ func (m Model) renderBreadcrumb() string {
 }
 
 func (m Model) renderFooter() string {
-	shortcuts := []string{}
-	
 	// Check if we should show command result
 	if m.commandPalette != nil && m.commandPalette.ShouldShowResult() {
 		// Show command result for a few seconds
 		result := successStyle.Render("✓ " + m.commandPalette.lastResult)
-		// Also show minimal shortcuts
-		shortcuts = []string{result, "[:] Command", "[?] Help"}
-		footer := strings.Join(shortcuts, "  ")
-		return footerStyle.Width(m.width).Render(footer)
+		return footerStyle.Width(m.width).Render(result)
 	}
 	
-	// Context-specific shortcuts
+	// Show mode-specific input
+	if m.searchMode {
+		input := fmt.Sprintf("Search: %s_", m.searchQuery)
+		help := dimmedStyle.Render("[Enter] Apply  [Esc] Cancel")
+		content := fmt.Sprintf("%s  %s", input, help)
+		return footerStyle.Width(m.width).Render(content)
+	} else if m.commandMode {
+		input := fmt.Sprintf("Command: %s_", m.commandInput)
+		help := dimmedStyle.Render("[Enter] Execute  [Tab] Palette  [Esc] Cancel")
+		content := fmt.Sprintf("%s  %s", input, help)
+		return footerStyle.Width(m.width).Render(content)
+	}
+	
+	// Default footer shows status info
+	left := ""
+	right := ""
+	
+	// Show instance status on the left
+	if m.selectedInstance != "" {
+		status := "Unknown"
+		for _, inst := range m.instances {
+			if inst.Name == m.selectedInstance {
+				if inst.Status == "ACTIVE" {
+					status = statusActiveStyle.Render("● Active")
+				} else {
+					status = statusInactiveStyle.Render("○ Inactive")
+				}
+				break
+			}
+		}
+		left = fmt.Sprintf("Instance: %s", status)
+	}
+	
+	// Show selection count on the right based on current view
 	switch m.currentView {
 	case ViewInstances:
-		shortcuts = []string{
-			"[i] Instances", "[c] Clusters", "[s] Services", "[t] Tasks",
-			"[/] Search", "[:] Command", "[?] Help",
-		}
+		right = fmt.Sprintf("Instances: %d", len(m.instances))
 	case ViewClusters:
-		shortcuts = []string{
-			"[↑↓] Navigate", "[Enter] Select", "[Backspace] Back",
-			"[i] Instances", "[:] Command", "[R] Refresh", "[?] Help",
-		}
+		right = fmt.Sprintf("Clusters: %d", len(m.filterClusters(m.clusters)))
 	case ViewServices:
-		shortcuts = []string{
-			"[↑↓] Navigate", "[Enter] Select", "[Backspace] Back",
-			"[r] Restart", "[S] Scale", "[l] Logs", "[:] Command", "[?] Help",
-		}
+		right = fmt.Sprintf("Services: %d", len(m.filterServices(m.services)))
 	case ViewTasks:
-		shortcuts = []string{
-			"[↑↓] Navigate", "[l] Logs", "[D] Describe",
-			"[Backspace] Back", "[:] Command", "[R] Refresh", "[?] Help",
-		}
+		right = fmt.Sprintf("Tasks: %d", len(m.filterTasks(m.tasks)))
 	case ViewLogs:
-		shortcuts = []string{
-			"[Esc] Back", "[f] Follow", "[/] Filter", "[s] Save",
-			"[↑↓] Scroll", "[:] Command",
-		}
+		right = fmt.Sprintf("Logs: %d", len(m.filterLogs(m.logs)))
 	}
 	
-	// Add mode indicators
-	if m.searchMode {
-		shortcuts = []string{"Search: " + m.searchQuery + "_", "[Enter] Apply", "[Esc] Cancel"}
-	} else if m.commandMode {
-		shortcuts = []string{"Command: " + m.commandInput + "_", "[Enter] Execute", "[Tab] Palette", "[Esc] Cancel"}
+	// Calculate spacing
+	if left == "" && right == "" {
+		return footerStyle.Width(m.width).Render("")
 	}
 	
-	footer := strings.Join(shortcuts, "  ")
-	return footerStyle.Width(m.width).Render(footer)
+	leftWidth := lipgloss.Width(left)
+	rightWidth := lipgloss.Width(right)
+	gap := m.width - leftWidth - rightWidth - 4 // -4 for padding
+	if gap < 2 {
+		gap = 2
+	}
+	
+	content := left + strings.Repeat(" ", gap) + right
+	return footerStyle.Width(m.width).Render(content)
 }
 
 // renderNavigationPanel renders the top navigation panel (30% height)
