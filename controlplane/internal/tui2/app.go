@@ -47,6 +47,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commandInput = ""
 			} else if m.showHelp {
 				m.showHelp = false
+			} else if m.currentView == ViewCommandPalette {
+				m.currentView = m.previousView
+				m.commandPalette.Reset()
 			}
 			return m, nil
 		case "?":
@@ -68,6 +71,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.commandMode {
 			return m.handleCommandInput(msg)
+		}
+		if m.currentView == ViewCommandPalette {
+			return m.handleCommandPaletteInput(msg)
 		}
 
 		// View-specific key handling
@@ -100,6 +106,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.lastUpdate.Add(m.refreshInterval).Before(time.Time(msg)) {
 			cmds = append(cmds, m.loadMockDataCmd())
 			m.lastUpdate = time.Time(msg)
+		}
+		// Check if command result should be cleared
+		if m.commandPalette != nil {
+			m.commandPalette.ShouldShowResult() // This will clear expired results
 		}
 
 	case DataLoadedMsg:
@@ -192,6 +202,11 @@ func (m Model) View() string {
 	// For help view, use full screen
 	if m.currentView == ViewHelp {
 		return m.renderHelpView()
+	}
+	
+	// For command palette, use overlay
+	if m.currentView == ViewCommandPalette {
+		return m.renderCommandPaletteOverlay()
 	}
 
 	// Calculate exact heights for panels
@@ -462,11 +477,53 @@ func (m Model) handleCommandInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.commandMode = false
-		// Execute command in real implementation
+		// If no input, show command palette
+		if m.commandInput == "" {
+			// Ensure command palette is initialized
+			if m.commandPalette == nil {
+				m.commandPalette = NewCommandPalette()
+			}
+			m.previousView = m.currentView
+			m.currentView = ViewCommandPalette
+			m.commandPalette.Reset()
+			m.commandPalette.FilterCommands("", &m)
+			return m, nil
+		}
+		// Execute direct command
 		cmd := m.commandInput
 		m.commandInput = ""
-		// Process command...
-		_ = cmd
+		// Ensure command palette is initialized
+		if m.commandPalette == nil {
+			m.commandPalette = NewCommandPalette()
+		}
+		result, err := m.commandPalette.ExecuteByName(cmd, &m)
+		if err != nil {
+			m.err = err
+		} else {
+			m.commandPalette.lastResult = result
+			m.commandPalette.showResult = true
+		}
+		return m, m.loadMockDataCmd()
+	case "tab":
+		// Switch to command palette for autocomplete
+		if m.commandInput != "" {
+			m.previousView = m.currentView
+			m.currentView = ViewCommandPalette
+			m.commandPalette.FilterCommands(m.commandInput, &m)
+		}
+		return m, nil
+	case "up":
+		// Navigate command history
+		if cmd := m.commandPalette.PreviousFromHistory(); cmd != "" {
+			m.commandInput = cmd
+		}
+		return m, nil
+	case "down":
+		// Navigate command history
+		if cmd := m.commandPalette.NextFromHistory(); cmd != "" {
+			m.commandInput = cmd
+		}
+		return m, nil
 	case "backspace":
 		if len(m.commandInput) > 0 {
 			m.commandInput = m.commandInput[:len(m.commandInput)-1]
@@ -474,6 +531,44 @@ func (m Model) handleCommandInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 	default:
 		if len(msg.String()) == 1 || msg.String() == " " {
 			m.commandInput += msg.String()
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleCommandPaletteInput(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.currentView = m.previousView
+		m.commandPalette.Reset()
+		return m, nil
+	case "enter":
+		_, err := m.commandPalette.ExecuteCommand(&m)
+		if err != nil {
+			m.err = err
+			// Stay in command palette to show error
+			return m, nil
+		}
+		// Command executed successfully
+		m.currentView = m.previousView
+		m.commandPalette.Reset()
+		return m, m.loadMockDataCmd()
+	case "up", "ctrl+p":
+		m.commandPalette.MoveUp()
+		return m, nil
+	case "down", "ctrl+n":
+		m.commandPalette.MoveDown()
+		return m, nil
+	case "backspace":
+		if len(m.commandPalette.query) > 0 {
+			m.commandPalette.query = m.commandPalette.query[:len(m.commandPalette.query)-1]
+			m.commandPalette.FilterCommands(m.commandPalette.query, &m)
+		}
+		return m, nil
+	default:
+		if len(msg.String()) == 1 || msg.String() == " " {
+			m.commandPalette.query += msg.String()
+			m.commandPalette.FilterCommands(m.commandPalette.query, &m)
 		}
 	}
 	return m, nil

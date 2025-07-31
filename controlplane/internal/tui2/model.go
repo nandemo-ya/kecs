@@ -112,6 +112,9 @@ type Model struct {
 	showHelp        bool
 	err             error
 	
+	// Command palette
+	commandPalette  *CommandPalette
+	
 	// Update control
 	lastUpdate      time.Time
 	refreshInterval time.Duration
@@ -126,6 +129,7 @@ func NewModel() Model {
 		currentView:     ViewInstances,
 		refreshInterval: 5 * time.Second,
 		ready:           false,
+		commandPalette:  NewCommandPalette(),
 	}
 }
 
@@ -268,4 +272,26 @@ func (m *Model) moveCursorDown() {
 			m.logCursor++
 		}
 	}
+}
+
+// Getters for testing
+
+// GetSelectedInstance returns the selected instance name
+func (m *Model) GetSelectedInstance() string {
+	return m.selectedInstance
+}
+
+// SetSelectedInstance sets the selected instance name
+func (m *Model) SetSelectedInstance(instance string) {
+	m.selectedInstance = instance
+}
+
+// IsHelpShown returns whether help is being shown
+func (m *Model) IsHelpShown() bool {
+	return m.showHelp
+}
+
+// GetCommandPalette returns the command palette
+func (m *Model) GetCommandPalette() *CommandPalette {
+	return m.commandPalette
 }

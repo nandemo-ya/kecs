@@ -216,32 +216,42 @@ func (m Model) renderBreadcrumb() string {
 func (m Model) renderFooter() string {
 	shortcuts := []string{}
 	
+	// Check if we should show command result
+	if m.commandPalette != nil && m.commandPalette.ShouldShowResult() {
+		// Show command result for a few seconds
+		result := successStyle.Render("✓ " + m.commandPalette.lastResult)
+		// Also show minimal shortcuts
+		shortcuts = []string{result, "[:] Command", "[?] Help"}
+		footer := strings.Join(shortcuts, "  ")
+		return footerStyle.Width(m.width).Render(footer)
+	}
+	
 	// Context-specific shortcuts
 	switch m.currentView {
 	case ViewInstances:
 		shortcuts = []string{
 			"[i] Instances", "[c] Clusters", "[s] Services", "[t] Tasks",
-			"[/] Search", "[?] Help",
+			"[/] Search", "[:] Command", "[?] Help",
 		}
 	case ViewClusters:
 		shortcuts = []string{
 			"[↑↓] Navigate", "[Enter] Select", "[Backspace] Back",
-			"[i] Instances", "[R] Refresh", "[?] Help",
+			"[i] Instances", "[:] Command", "[R] Refresh", "[?] Help",
 		}
 	case ViewServices:
 		shortcuts = []string{
 			"[↑↓] Navigate", "[Enter] Select", "[Backspace] Back",
-			"[r] Restart", "[S] Scale", "[l] Logs", "[?] Help",
+			"[r] Restart", "[S] Scale", "[l] Logs", "[:] Command", "[?] Help",
 		}
 	case ViewTasks:
 		shortcuts = []string{
 			"[↑↓] Navigate", "[l] Logs", "[D] Describe",
-			"[Backspace] Back", "[R] Refresh", "[?] Help",
+			"[Backspace] Back", "[:] Command", "[R] Refresh", "[?] Help",
 		}
 	case ViewLogs:
 		shortcuts = []string{
 			"[Esc] Back", "[f] Follow", "[/] Filter", "[s] Save",
-			"[↑↓] Scroll",
+			"[↑↓] Scroll", "[:] Command",
 		}
 	}
 	
@@ -249,7 +259,7 @@ func (m Model) renderFooter() string {
 	if m.searchMode {
 		shortcuts = []string{"Search: " + m.searchQuery + "_", "[Enter] Apply", "[Esc] Cancel"}
 	} else if m.commandMode {
-		shortcuts = []string{"Command: " + m.commandInput + "_", "[Enter] Execute", "[Esc] Cancel"}
+		shortcuts = []string{"Command: " + m.commandInput + "_", "[Enter] Execute", "[Tab] Palette", "[Esc] Cancel"}
 	}
 	
 	footer := strings.Join(shortcuts, "  ")
