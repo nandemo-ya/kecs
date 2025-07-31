@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
@@ -19,14 +20,18 @@ type Server struct {
 	healthChecker    *HealthChecker
 	metricsCollector *MetricsCollector
 	config           *config.Config
+	instanceAPI      *InstanceAPI
+	ecsProxy         *ECSProxy
 }
 
 // NewServer creates a new admin server instance
 func NewServer(port int, storage storage.Storage) *Server {
+	cfg := config.GetConfig()
+	
 	s := &Server{
 		port:             port,
 		metricsCollector: NewMetricsCollector(),
-		config:           config.GetConfig(),
+		config:           cfg,
 	}
 
 	// Initialize health checker if storage is provided
@@ -36,6 +41,17 @@ func NewServer(port int, storage storage.Storage) *Server {
 		// Create health checker without storage
 		s.healthChecker = NewHealthChecker(nil)
 	}
+
+	// Initialize API handlers
+	instanceAPI, err := NewInstanceAPI(cfg, storage)
+	if err != nil {
+		logging.Error("Failed to create instance API", "error", err)
+		// Continue without instance API
+	} else {
+		s.instanceAPI = instanceAPI
+	}
+	
+	s.ecsProxy = NewECSProxy(cfg)
 
 	return s
 }
@@ -64,23 +80,45 @@ func (s *Server) Stop(ctx context.Context) error {
 
 // setupRoutes configures all the admin routes
 func (s *Server) setupRoutes() http.Handler {
-	mux := http.NewServeMux()
+	router := mux.NewRouter()
 
 	// Health check endpoints
-	mux.HandleFunc("/health", s.handleHealth)
-	mux.HandleFunc("/healthz", s.handleHealthCheck) // Legacy endpoint
-	mux.HandleFunc("/live", s.handleLiveness)
-	mux.HandleFunc("/ready", s.handleReadiness(s.healthChecker))
-	mux.HandleFunc("/health/detailed", s.handleHealthDetailed(s.healthChecker))
+	router.HandleFunc("/health", s.handleHealth).Methods("GET")
+	router.HandleFunc("/healthz", s.handleHealthCheck).Methods("GET") // Legacy endpoint
+	router.HandleFunc("/live", s.handleLiveness).Methods("GET")
+	router.HandleFunc("/ready", s.handleReadiness(s.healthChecker)).Methods("GET")
+	router.HandleFunc("/health/detailed", s.handleHealthDetailed(s.healthChecker)).Methods("GET")
 
 	// Metrics endpoints
-	mux.HandleFunc("/metrics", s.handleMetrics(s.metricsCollector))
-	mux.HandleFunc("/metrics/prometheus", s.handlePrometheusMetrics(s.metricsCollector))
+	router.HandleFunc("/metrics", s.handleMetrics(s.metricsCollector)).Methods("GET")
+	router.HandleFunc("/metrics/prometheus", s.handlePrometheusMetrics(s.metricsCollector)).Methods("GET")
 
 	// Configuration endpoint
-	mux.HandleFunc("/config", s.handleConfig)
+	router.HandleFunc("/config", s.handleConfig).Methods("GET")
 
-	return mux
+	// Register TUI API endpoints
+	if s.instanceAPI != nil {
+		s.instanceAPI.RegisterRoutes(router)
+	}
+	if s.ecsProxy != nil {
+		s.ecsProxy.RegisterRoutes(router)
+	}
+
+	// Add middleware
+	handler := http.Handler(router)
+	
+	// Add CORS middleware if allowed origins are configured
+	if len(s.config.Server.AllowedOrigins) > 0 {
+		handler = CORSMiddleware(s.config.Server.AllowedOrigins)(handler)
+	}
+	
+	// Add API key middleware if configured
+	// TODO: Add APIKey field to config
+	// if s.config.Server.APIKey != "" {
+	// 	handler = APIKeyMiddleware(s.config.Server.APIKey)(handler)
+	// }
+
+	return handler
 }
 
 // HealthResponse represents the health check response
