@@ -15,6 +15,7 @@
 package api
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"strings"
@@ -22,13 +23,15 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 )
 
 // K3dInstanceProvider provides instance information directly from k3d clusters
 type K3dInstanceProvider struct {
-	k3dManager    *kubernetes.K3dClusterManager
-	dockerClient  *client.Client
+	k3dManager       *kubernetes.K3dClusterManager
+	dockerClient     *client.Client
+	instanceManager  *instance.Manager
 }
 
 // NewK3dInstanceProvider creates a new k3d-based instance provider
@@ -44,10 +47,17 @@ func NewK3dInstanceProvider() (*K3dInstanceProvider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Docker client: %w", err)
 	}
+	
+	// Create instance manager for start/stop operations
+	instanceManager, err := instance.NewManager()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create instance manager: %w", err)
+	}
 
 	return &K3dInstanceProvider{
-		k3dManager:   k3dManager,
-		dockerClient: dockerClient,
+		k3dManager:      k3dManager,
+		dockerClient:    dockerClient,
+		instanceManager: instanceManager,
 	}, nil
 }
 
@@ -151,6 +161,166 @@ func (p *K3dInstanceProvider) getContainerInfo(ctx context.Context, containerNam
 	}
 
 	return nil, fmt.Errorf("container %s not found", containerName)
+}
+
+// CreateInstance creates a new KECS instance using instance.Manager
+func (p *K3dInstanceProvider) CreateInstance(ctx context.Context, opts CreateInstanceOptions) (*Instance, error) {
+	// Convert TUI options to instance.StartOptions
+	startOpts := instance.StartOptions{
+		InstanceName: opts.Name,
+		ApiPort:      opts.APIPort,
+		AdminPort:    opts.AdminPort,
+		NoLocalStack: !opts.LocalStack,
+		NoTraefik:    !opts.Traefik,
+		DevMode:      opts.DevMode,
+	}
+	
+	// Use the instance manager to start the instance
+	if err := p.instanceManager.Start(ctx, startOpts); err != nil {
+		return nil, fmt.Errorf("failed to start instance: %w", err)
+	}
+	
+	// Return the created instance info
+	instance, err := p.getInstanceInfo(ctx, opts.Name)
+	if err != nil {
+		return nil, err
+	}
+	return &instance, nil
+}
+
+// GetInstance retrieves a specific KECS instance information
+func (p *K3dInstanceProvider) GetInstance(ctx context.Context, name string) (*Instance, error) {
+	// Check if the instance exists
+	exists, err := p.k3dManager.ClusterExists(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check instance existence: %w", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("instance not found: %s", name)
+	}
+	
+	instance, err := p.getInstanceInfo(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return &instance, nil
+}
+
+// GetInstanceLogs retrieves logs from the KECS instance container
+func (p *K3dInstanceProvider) GetInstanceLogs(ctx context.Context, name string, follow bool) (<-chan LogEntry, error) {
+	// Get container name
+	containerName := fmt.Sprintf("kecs-%s", name)
+	
+	// Find container ID
+	containers, err := p.dockerClient.ContainerList(ctx, container.ListOptions{All: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers: %w", err)
+	}
+	
+	var containerID string
+	for _, c := range containers {
+		for _, n := range c.Names {
+			if strings.TrimPrefix(n, "/") == containerName {
+				containerID = c.ID
+				break
+			}
+		}
+		if containerID != "" {
+			break
+		}
+	}
+	
+	if containerID == "" {
+		return nil, fmt.Errorf("container %s not found", containerName)
+	}
+	
+	// Create log channel
+	logChan := make(chan LogEntry, 100)
+	
+	// Start goroutine to read logs
+	go func() {
+		defer close(logChan)
+		
+		options := container.LogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Follow:     follow,
+			Timestamps: true,
+		}
+		
+		reader, err := p.dockerClient.ContainerLogs(ctx, containerID, options)
+		if err != nil {
+			logChan <- LogEntry{
+				Timestamp: time.Now(),
+				Level:     "ERROR",
+				Message:   fmt.Sprintf("Failed to get logs: %v", err),
+			}
+			return
+		}
+		defer reader.Close()
+		
+		// Parse Docker multiplexed stream
+		scanner := bufio.NewScanner(reader)
+		for scanner.Scan() {
+			line := scanner.Text()
+			
+			// Parse timestamp and message
+			// Docker log format with timestamps: "2025-01-08T10:30:45.123456789Z message"
+			parts := strings.SplitN(line, " ", 2)
+			
+			var timestamp time.Time
+			var message string
+			
+			if len(parts) >= 2 {
+				// Try to parse timestamp
+				if t, err := time.Parse(time.RFC3339Nano, parts[0]); err == nil {
+					timestamp = t
+					message = parts[1]
+				} else {
+					// If parsing fails, use current time and whole line as message
+					timestamp = time.Now()
+					message = line
+				}
+			} else {
+				timestamp = time.Now()
+				message = line
+			}
+			
+			// Determine log level from message content
+			level := "INFO"
+			lowerMsg := strings.ToLower(message)
+			if strings.Contains(lowerMsg, "error") || strings.Contains(lowerMsg, "failed") {
+				level = "ERROR"
+			} else if strings.Contains(lowerMsg, "warn") {
+				level = "WARN"
+			} else if strings.Contains(lowerMsg, "debug") {
+				level = "DEBUG"
+			}
+			
+			logChan <- LogEntry{
+				Timestamp: timestamp,
+				Level:     level,
+				Message:   message,
+			}
+		}
+		
+		if err := scanner.Err(); err != nil {
+			logChan <- LogEntry{
+				Timestamp: time.Now(),
+				Level:     "ERROR",
+				Message:   fmt.Sprintf("Error reading logs: %v", err),
+			}
+		}
+	}()
+	
+	return logChan, nil
+}
+
+// DeleteInstance deletes a KECS instance
+func (p *K3dInstanceProvider) DeleteInstance(ctx context.Context, name string) error {
+	// TODO: Implement using instance.Manager when Stop method is available
+	// For now, use k3d manager directly
+	return p.k3dManager.DeleteCluster(ctx, name)
 }
 
 // Close cleans up resources
