@@ -49,6 +49,7 @@ type FeaturesConfig struct {
 	DevMode                 bool `yaml:"devMode" mapstructure:"devMode"`
 	Traefik                 bool `yaml:"traefik" mapstructure:"traefik"`
 	IAMIntegration          bool `yaml:"iamIntegration" mapstructure:"iamIntegration"`
+	TUIMock                 bool `yaml:"tuiMock" mapstructure:"tuiMock"`
 }
 
 // AWSConfig represents AWS-related configuration
@@ -100,6 +101,7 @@ func InitConfig() error {
 	v.SetDefault("features.autoRecoverState", true)
 	v.SetDefault("features.traefik", true) // Enable Traefik by default
 	v.SetDefault("features.iamIntegration", false) // Disable IAM integration by default
+	v.SetDefault("features.tuiMock", true) // Enable TUI mock mode by default
 	
 	// AWS defaults
 	v.SetDefault("aws.defaultRegion", "us-east-1")
@@ -146,6 +148,7 @@ func bindLegacyEnvVars() {
 	v.BindEnv("localstack.enabled", "KECS_LOCALSTACK_ENABLED")
 	v.BindEnv("localstack.useTraefik", "KECS_LOCALSTACK_USE_TRAEFIK")
 	v.BindEnv("server.controlPlaneImage", "KECS_CONTROLPLANE_IMAGE")
+	v.BindEnv("features.tuiMock", "KECS_TUI_MOCK")
 }
 
 // DefaultConfig returns the default configuration
@@ -285,6 +288,14 @@ func GetStringSlice(key string) []string {
 		InitConfig()
 	}
 	return v.GetStringSlice(key)
+}
+
+// Set sets a configuration value
+func Set(key string, value interface{}) {
+	if v == nil {
+		InitConfig()
+	}
+	v.Set(key, value)
 }
 
 // Validate validates the configuration
