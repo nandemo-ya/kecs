@@ -420,6 +420,14 @@ func (m Model) renderResourcePanel() string {
 		content = m.renderLogsContent(resourceHeight - 4)
 	case ViewHelp:
 		content = m.renderHelpContent(resourceHeight - 4)
+	case ViewTaskDefinitionFamilies:
+		content = m.renderTaskDefFamiliesList(resourceHeight - 4)
+	case ViewTaskDefinitionRevisions:
+		if m.showTaskDefJSON {
+			content = m.renderTaskDefRevisionsTwoColumn(resourceHeight - 4)
+		} else {
+			content = m.renderTaskDefRevisionsList(resourceHeight - 4, m.width - 8)
+		}
 	}
 	
 	// Apply resource panel style with fixed height
@@ -1654,42 +1662,6 @@ func (m Model) renderInstanceSwitcherOverlay() string {
 	return m.instanceSwitcher.Render(m.width, m.height)
 }
 
-// renderTaskDefinitionFamiliesView renders the task definition families view
-func (m Model) renderTaskDefinitionFamiliesView() string {
-	// Calculate heights
-	headerHeight := 3
-	footerHeight := 1
-	availableHeight := m.height - headerHeight - footerHeight
-	
-	// Render components
-	header := m.renderTaskDefFamiliesHeader()
-	content := m.renderTaskDefFamiliesList(availableHeight)
-	footer := m.renderFooter()
-	
-	// Combine
-	return lipgloss.JoinVertical(
-		lipgloss.Top,
-		header,
-		content,
-		footer,
-	)
-}
-
-// renderTaskDefFamiliesHeader renders the header for task definition families
-func (m Model) renderTaskDefFamiliesHeader() string {
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#00ff00"))
-		
-	breadcrumb := fmt.Sprintf("Instances > %s > Task Definitions", m.selectedInstance)
-	
-	return lipgloss.JoinVertical(
-		lipgloss.Left,
-		titleStyle.Render("Task Definition Families"),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(breadcrumb),
-		"",
-	)
-}
 
 // renderTaskDefFamiliesList renders the list of task definition families
 func (m Model) renderTaskDefFamiliesList(maxHeight int) string {
@@ -1776,90 +1748,30 @@ func (m Model) renderTaskDefFamiliesList(maxHeight int) string {
 }
 
 // renderTaskDefinitionRevisionsView renders the task definition revisions view
-func (m Model) renderTaskDefinitionRevisionsView() string {
-	if !m.showTaskDefJSON {
-		// Single column view
-		return m.renderTaskDefRevisionsSingleColumn()
-	}
-	
-	// Two column view
-	return m.renderTaskDefRevisionsTwoColumn()
-}
-
-// renderTaskDefRevisionsSingleColumn renders single column revision list
-func (m Model) renderTaskDefRevisionsSingleColumn() string {
-	// Calculate heights
-	headerHeight := 3
-	footerHeight := 1
-	availableHeight := m.height - headerHeight - footerHeight
-	
-	// Render components
-	header := m.renderTaskDefRevisionsHeader()
-	content := m.renderTaskDefRevisionsList(availableHeight, m.width)
-	footer := m.renderFooter()
-	
-	// Combine
-	return lipgloss.JoinVertical(
-		lipgloss.Top,
-		header,
-		content,
-		footer,
-	)
-}
 
 // renderTaskDefRevisionsTwoColumn renders two column view with JSON
-func (m Model) renderTaskDefRevisionsTwoColumn() string {
+func (m Model) renderTaskDefRevisionsTwoColumn(maxHeight int) string {
 	// Calculate dimensions
-	headerHeight := 3
-	footerHeight := 1
-	availableHeight := m.height - headerHeight - footerHeight
 	leftWidth := m.width / 3
 	rightWidth := m.width - leftWidth - 1 // -1 for border
 	
 	// Render components
-	header := m.renderTaskDefRevisionsHeader()
-	leftColumn := m.renderTaskDefRevisionsList(availableHeight, leftWidth)
-	rightColumn := m.renderTaskDefJSON(availableHeight, rightWidth)
+	leftColumn := m.renderTaskDefRevisionsList(maxHeight, leftWidth)
+	rightColumn := m.renderTaskDefJSON(maxHeight, rightWidth)
 	
 	// Combine columns
-	columns := lipgloss.JoinHorizontal(
+	return lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		leftColumn,
 		lipgloss.NewStyle().
-			Height(availableHeight).
+			Height(maxHeight).
 			BorderLeft(true).
 			BorderStyle(lipgloss.NormalBorder()).
 			Render(""),
 		rightColumn,
 	)
-	
-	footer := m.renderFooter()
-	
-	// Combine all
-	return lipgloss.JoinVertical(
-		lipgloss.Top,
-		header,
-		columns,
-		footer,
-	)
 }
 
-// renderTaskDefRevisionsHeader renders the header for revisions view
-func (m Model) renderTaskDefRevisionsHeader() string {
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#00ff00"))
-		
-	breadcrumb := fmt.Sprintf("Instances > %s > Task Definitions > %s", 
-		m.selectedInstance, m.selectedFamily)
-	
-	return lipgloss.JoinVertical(
-		lipgloss.Left,
-		titleStyle.Render(fmt.Sprintf("%s Revisions", m.selectedFamily)),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(breadcrumb),
-		"",
-	)
-}
 
 // renderTaskDefRevisionsList renders the list of revisions
 func (m Model) renderTaskDefRevisionsList(maxHeight int, width int) string {

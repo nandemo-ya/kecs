@@ -326,16 +326,6 @@ func (m Model) View() string {
 	if m.currentView == ViewInstanceSwitcher {
 		return m.renderInstanceSwitcherOverlay()
 	}
-	
-	// For task definition families, use regular view
-	if m.currentView == ViewTaskDefinitionFamilies {
-		return m.renderTaskDefinitionFamiliesView()
-	}
-	
-	// For task definition revisions, use regular view (possibly 2-column)
-	if m.currentView == ViewTaskDefinitionRevisions {
-		return m.renderTaskDefinitionRevisionsView()
-	}
 
 	// Calculate exact heights for panels
 	footerHeight := 1
