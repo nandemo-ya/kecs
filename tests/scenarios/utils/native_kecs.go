@@ -14,13 +14,14 @@ import (
 
 // NativeKECSManager manages KECS instances running directly on Docker host
 type NativeKECSManager struct {
-	mu               sync.Mutex
-	instances        map[string]*NativeKECSInstance
-	allocatedPorts   map[int]string // port -> instance name mapping
-	baseAPIPort      int
-	baseAdminPort    int
-	imageTag         string
-	localBuild       bool
+	mu                  sync.Mutex
+	instances           map[string]*NativeKECSInstance
+	allocatedPorts      map[int]string // port -> instance name mapping
+	baseAPIPort         int
+	baseAdminPort       int
+	imageTag            string
+	localBuild          bool
+	controlplaneBinary  string // Path to controlplane binary
 }
 
 // NativeKECSInstance represents a running KECS instance
@@ -53,14 +54,53 @@ func NewNativeKECSManager() *NativeKECSManager {
 		}
 	}
 	
-	return &NativeKECSManager{
-		instances:      make(map[string]*NativeKECSInstance),
-		allocatedPorts: make(map[int]string),
-		baseAPIPort:    baseAPIPort,
-		baseAdminPort:  baseAdminPort,
-		imageTag:       getEnvOrDefault("KECS_IMAGE", "kecs:test"),
-		localBuild:     getEnvOrDefault("KECS_LOCAL_BUILD", "true") == "true",
+	// Determine controlplane binary path
+	controlplaneBinary := os.Getenv("KECS_CONTROLPLANE_BINARY")
+	if controlplaneBinary == "" {
+		// Try to find it in common locations
+		possiblePaths := []string{
+			"bin/controlplane",
+			"../controlplane/bin/controlplane",
+			"../../controlplane/bin/controlplane",
+			filepath.Join(os.Getenv("GOPATH"), "src/github.com/nandemo-ya/kecs/controlplane/bin/controlplane"),
+		}
+		
+		for _, path := range possiblePaths {
+			if _, err := os.Stat(path); err == nil {
+				controlplaneBinary = path
+				break
+			}
+		}
+		
+		if controlplaneBinary == "" {
+			// Default to assuming it's in PATH
+			controlplaneBinary = "controlplane"
+		}
 	}
+	
+	return &NativeKECSManager{
+		instances:          make(map[string]*NativeKECSInstance),
+		allocatedPorts:     make(map[int]string),
+		baseAPIPort:        baseAPIPort,
+		baseAdminPort:      baseAdminPort,
+		imageTag:           getEnvOrDefault("KECS_IMAGE", "kecs:test"),
+		localBuild:         getEnvOrDefault("KECS_LOCAL_BUILD", "true") == "true",
+		controlplaneBinary: controlplaneBinary,
+	}
+}
+
+// SetControlplaneBinary sets the path to the controlplane binary
+func (m *NativeKECSManager) SetControlplaneBinary(path string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.controlplaneBinary = path
+}
+
+// GetControlplaneBinary returns the current controlplane binary path
+func (m *NativeKECSManager) GetControlplaneBinary() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.controlplaneBinary
 }
 
 // StartKECS starts a new KECS instance with automatic port allocation
@@ -91,20 +131,16 @@ func (m *NativeKECSManager) StartKECS(testName string) (*NativeKECSInstance, err
 	// Build the kecs start command
 	args := []string{
 		"start",
-		"--name", containerName,
-		"--image", m.imageTag,
+		"--instance", containerName,
 		"--api-port", fmt.Sprintf("%d", apiPort),
 		"--admin-port", fmt.Sprintf("%d", adminPort),
 		"--data-dir", dataDir,
-		"--detach",
 	}
 	
-	if m.localBuild {
-		args = append(args, "--local-build")
-	}
+	// LocalBuild mode is no longer needed with controlplane command
 	
-	// Execute kecs start command
-	cmd := exec.Command("kecs", args...)
+	// Execute controlplane start command
+	cmd := exec.Command(m.controlplaneBinary, args...)
 	
 	// Set environment variables
 	cmd.Env = append(os.Environ(),
@@ -171,20 +207,16 @@ func (m *NativeKECSManager) StartKECSWithDataDir(testName string, dataDir string
 	// Build the kecs start command
 	args := []string{
 		"start",
-		"--name", containerName,
-		"--image", m.imageTag,
+		"--instance", containerName,
 		"--api-port", fmt.Sprintf("%d", apiPort),
 		"--admin-port", fmt.Sprintf("%d", adminPort),
 		"--data-dir", dataDir,
-		"--detach",
 	}
 	
-	if m.localBuild {
-		args = append(args, "--local-build")
-	}
+	// LocalBuild mode is no longer needed with controlplane command
 	
-	// Execute kecs start command
-	cmd := exec.Command("kecs", args...)
+	// Execute controlplane start command
+	cmd := exec.Command(m.controlplaneBinary, args...)
 	
 	// Set environment variables
 	cmd.Env = append(os.Environ(),
@@ -238,7 +270,7 @@ func (m *NativeKECSManager) StopKECS(instance *NativeKECSInstance) error {
 	var errors []error
 	
 	// Stop the container
-	cmd := exec.Command("kecs", "stop", "--name", instance.ContainerName)
+	cmd := exec.Command(m.controlplaneBinary, "stop", "--instance", instance.ContainerName)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		// Log but don't fail - container might already be stopped
 		fmt.Printf("Warning: failed to stop container %s: %v\nOutput: %s\n", 

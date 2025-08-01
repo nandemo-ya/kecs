@@ -18,6 +18,7 @@ import (
 type DefaultECSAPI struct {
 	storage                   storage.Storage
 	clusterManager            kubernetes.ClusterManager
+	taskManagerInstance       *kubernetes.TaskManager
 	region                    string
 	accountID                 string
 	iamIntegration            iam.Integration
@@ -115,4 +116,22 @@ func NewDefaultECSAPIWithClusterManager(storage storage.Storage, clusterManager 
 // getClusterManager returns the cluster manager
 func (api *DefaultECSAPI) getClusterManager() kubernetes.ClusterManager {
 	return api.clusterManager
+}
+
+// taskManager returns the task manager, creating it if necessary
+func (api *DefaultECSAPI) taskManager() (*kubernetes.TaskManager, error) {
+	if api.taskManagerInstance == nil {
+		tm, err := kubernetes.NewTaskManager(api.storage)
+		if err != nil {
+			return nil, err
+		}
+		api.taskManagerInstance = tm
+	}
+
+	// Ensure the kubernetes client is initialized
+	if err := api.taskManagerInstance.InitializeClient(); err != nil {
+		return nil, err
+	}
+
+	return api.taskManagerInstance, nil
 }
