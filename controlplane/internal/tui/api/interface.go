@@ -56,6 +56,9 @@ type Client interface {
 
 	// Health check
 	HealthCheck(ctx context.Context, instanceName string) error
+	
+	// Cleanup
+	Close() error
 }
 
 // StreamingClient defines the interface for real-time updates

@@ -29,15 +29,20 @@ import (
 type HTTPClient struct {
 	baseURL    string
 	httpClient *http.Client
+	k3dProvider *K3dInstanceProvider // For direct k3d access when API is not available
 }
 
 // NewHTTPClient creates a new HTTP-based API client
 func NewHTTPClient(baseURL string) *HTTPClient {
+	// Create k3d provider for direct instance listing
+	k3dProvider, _ := NewK3dInstanceProvider() // Ignore error, will fallback to API
+	
 	return &HTTPClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		k3dProvider: k3dProvider,
 	}
 }
 
@@ -90,6 +95,13 @@ func (c *HTTPClient) doRequest(ctx context.Context, method, path string, body in
 // Instance operations
 
 func (c *HTTPClient) ListInstances(ctx context.Context) ([]Instance, error) {
+	// Always use k3d provider for listing instances
+	// This ensures we can see instances even when their API is not running
+	if c.k3dProvider != nil {
+		return c.k3dProvider.ListInstances(ctx)
+	}
+	
+	// Fallback to API if k3d provider is not available
 	var instances []Instance
 	err := c.doRequest(ctx, "GET", "/api/instances", nil, &instances)
 	return instances, err
@@ -328,4 +340,12 @@ func (c *HTTPClient) DescribeTaskDefinition(ctx context.Context, instanceName st
 func (c *HTTPClient) HealthCheck(ctx context.Context, instanceName string) error {
 	path := fmt.Sprintf("/api/instances/%s/health", url.PathEscape(instanceName))
 	return c.doRequest(ctx, "GET", path, nil, nil)
+}
+
+// Close cleans up resources
+func (c *HTTPClient) Close() error {
+	if c.k3dProvider != nil {
+		return c.k3dProvider.Close()
+	}
+	return nil
 }

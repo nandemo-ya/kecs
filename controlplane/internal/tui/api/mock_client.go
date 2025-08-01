@@ -511,6 +511,11 @@ func (c *MockClient) HealthCheck(ctx context.Context, instanceName string) error
 	return fmt.Errorf("instance not found: %s", instanceName)
 }
 
+// Close implements Client interface
+func (c *MockClient) Close() error {
+	return nil
+}
+
 // Helper function
 func timePtr(t time.Time) *time.Time {
 	return &t

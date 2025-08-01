@@ -37,6 +37,11 @@ func Run() error {
 		return fmt.Errorf("error running TUI: %w", err)
 	}
 
+	// Clean up resources
+	if client != nil {
+		client.Close()
+	}
+
 	return nil
 }
 
