@@ -107,12 +107,14 @@ type TaskDefinitionRevision struct {
 
 // TaskDefinitionEditor manages task definition JSON editing
 type TaskDefinitionEditor struct {
-	family       string
-	baseRevision *int    // Source revision for copy
-	content      string  // JSON being edited
-	cursorLine   int
-	cursorCol    int
-	errors       []ValidationError
+	family        string
+	baseRevision  *int              // Source revision for copy
+	content       string            // JSON being edited
+	cursorLine    int
+	cursorCol     int
+	errors        []ValidationError
+	mode          TaskDefEditorMode
+	commandBuffer string // Buffer for command mode input
 }
 
 // ValidationError represents a JSON validation error
