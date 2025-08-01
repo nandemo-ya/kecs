@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui"
 	"github.com/spf13/cobra"
 )
@@ -38,8 +39,15 @@ tasks, and task definitions with real-time updates.`,
   # Connect to remote KECS instance
   kecs tui --endpoint http://remote-kecs:8080`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Note: endpoint parameter is not used in TUI v2 mock implementation
-		// It will be used when we integrate with real backend
+		// Initialize config if not already done
+		if err := config.InitConfig(); err != nil {
+			return err
+		}
+		
+		// Set endpoint in viper if provided via flag
+		if tuiEndpoint != "" {
+			config.Set("server.endpoint", tuiEndpoint)
+		}
 		
 		// Run the new TUI implementation
 		return tui.Run()

@@ -227,11 +227,20 @@ func NewModelWithClient(client api.Client) Model {
 
 // Init implements tea.Model
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
+	cmds := []tea.Cmd{
 		tickCmd(),
 		statusTickCmd(),
-		mock.LoadAllData("", "", "", ""),
-	)
+	}
+	
+	// Only load mock data if we're using mock mode
+	if m.useMockData {
+		cmds = append(cmds, mock.LoadAllData("", "", "", ""))
+	} else {
+		// Load real data from API
+		cmds = append(cmds, m.loadDataFromAPI())
+	}
+	
+	return tea.Batch(cmds...)
 }
 
 // Messages for tea.Model updates
