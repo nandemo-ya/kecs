@@ -96,6 +96,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.currentView == ViewInstanceCreate {
 			return m.handleInstanceCreateInput(msg)
 		}
+		if m.currentView == ViewInstanceSwitcher {
+			return m.handleInstanceSwitcherInput(msg)
+		}
 
 		// View-specific key handling
 		switch m.currentView {
@@ -133,6 +136,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Check if command result should be cleared
 		if m.commandPalette != nil {
 			m.commandPalette.ShouldShowResult() // This will clear expired results
+		}
+	
+	case statusTickMsg:
+		// Update instance statuses periodically
+		cmds = append(cmds, statusTickCmd())
+		if m.currentView == ViewInstances {
+			cmds = append(cmds, m.updateInstanceStatusCmd())
 		}
 
 	case DataLoadedMsg:
@@ -178,6 +188,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.clusterCursor = 0
 			cmds = append(cmds, m.loadMockDataCmd())
 		}
+	
+	case instanceStatusUpdateMsg:
+		// Update instance statuses
+		m.instances = msg.instances
 
 	case errMsg:
 		// Handle API errors
@@ -291,6 +305,11 @@ func (m Model) View() string {
 	if m.currentView == ViewConfirmDialog {
 		return m.renderConfirmDialogOverlay()
 	}
+	
+	// For instance switcher, use overlay
+	if m.currentView == ViewInstanceSwitcher {
+		return m.renderInstanceSwitcherOverlay()
+	}
 
 	// Calculate exact heights for panels
 	footerHeight := 1
@@ -397,7 +416,11 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 	case "ctrl+i":
 		// Quick switch instance
-		// In real implementation, show instance switcher
+		if len(m.instances) > 1 {
+			m.instanceSwitcher = NewInstanceSwitcher(m.instances)
+			m.previousView = m.currentView
+			m.currentView = ViewInstanceSwitcher
+		}
 	case "/":
 		m.searchMode = true
 		m.searchQuery = ""
@@ -441,6 +464,13 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.commandInput = ""
 	case "R":
 		return m, m.loadMockDataCmd()
+	case "ctrl+i":
+		// Quick switch instance
+		if len(m.instances) > 1 {
+			m.instanceSwitcher = NewInstanceSwitcher(m.instances)
+			m.previousView = m.currentView
+			m.currentView = ViewInstanceSwitcher
+		}
 	}
 	return m, nil
 }
@@ -496,6 +526,13 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.commandInput = ""
 	case "R":
 		return m, m.loadMockDataCmd()
+	case "ctrl+i":
+		// Quick switch instance
+		if len(m.instances) > 1 {
+			m.instanceSwitcher = NewInstanceSwitcher(m.instances)
+			m.previousView = m.currentView
+			m.currentView = ViewInstanceSwitcher
+		}
 	}
 	return m, nil
 }
@@ -541,6 +578,13 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.commandInput = ""
 	case "R":
 		return m, m.loadMockDataCmd()
+	case "ctrl+i":
+		// Quick switch instance
+		if len(m.instances) > 1 {
+			m.instanceSwitcher = NewInstanceSwitcher(m.instances)
+			m.previousView = m.currentView
+			m.currentView = ViewInstanceSwitcher
+		}
 	}
 	return m, nil
 }
@@ -865,6 +909,69 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 		// Handle text input
 		if len(msg.String()) == 1 {
 			m.instanceForm.UpdateField(m.instanceForm.GetCurrentFieldValue() + msg.String())
+		}
+	}
+	
+	return m, nil
+}
+
+// handleInstanceSwitcherInput handles input for instance switcher
+func (m Model) handleInstanceSwitcherInput(msg tea.KeyMsg) (Model, tea.Cmd) {
+	if m.instanceSwitcher == nil {
+		// Safety check
+		m.currentView = m.previousView
+		return m, nil
+	}
+	
+	switch msg.String() {
+	case "esc":
+		// Cancel switching
+		m.currentView = m.previousView
+		m.instanceSwitcher = nil
+		return m, nil
+		
+	case "enter":
+		// Switch to selected instance
+		selected := m.instanceSwitcher.GetSelected()
+		if selected != "" && selected != m.selectedInstance {
+			m.selectedInstance = selected
+			// Find the instance cursor position
+			for i, inst := range m.instances {
+				if inst.Name == selected {
+					m.instanceCursor = i
+					break
+				}
+			}
+			// Navigate to clusters view
+			m.currentView = ViewClusters
+			m.clusterCursor = 0
+			m.instanceSwitcher = nil
+			return m, m.loadMockDataCmd()
+		}
+		// If same instance selected, just close
+		m.currentView = m.previousView
+		m.instanceSwitcher = nil
+		return m, nil
+		
+	case "up", "ctrl+p":
+		m.instanceSwitcher.MoveUp()
+		return m, nil
+		
+	case "down", "ctrl+n":
+		m.instanceSwitcher.MoveDown()
+		return m, nil
+		
+	case "backspace":
+		query := m.instanceSwitcher.query
+		if len(query) > 0 {
+			m.instanceSwitcher.SetQuery(query[:len(query)-1])
+		}
+		return m, nil
+		
+	default:
+		// Handle text input
+		if len(msg.String()) == 1 || msg.String() == " " {
+			m.instanceSwitcher.SetQuery(m.instanceSwitcher.query + msg.String())
 		}
 	}
 	

@@ -550,7 +550,7 @@ func (m Model) renderInstancesList(maxHeight int) string {
 		instance := filteredInstances[i]
 		// Format values
 		name := instance.Name
-		status := instance.Status
+		status := formatInstanceStatus(instance.Status)
 		clusters := fmt.Sprintf("%d", instance.Clusters)
 		services := fmt.Sprintf("%d", instance.Services)
 		tasks := fmt.Sprintf("%d", instance.Tasks)
@@ -581,10 +581,14 @@ func (m Model) renderInstancesList(maxHeight int) string {
 		} else {
 			row = "  " + row
 			switch instance.Status {
-			case "ACTIVE":
+			case "running", "ACTIVE":
 				row = activeStyle.Render(row)
-			case "STOPPED":
+			case "stopped", "STOPPED":
 				row = stoppedStyle.Render(row)
+			case "pending":
+				row = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00")).Render(row)
+			case "unhealthy":
+				row = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff8800")).Render(row)
 			}
 		}
 		
@@ -621,6 +625,22 @@ func formatDuration(d time.Duration) string {
 	} else {
 		days := int(d.Hours() / 24)
 		return fmt.Sprintf("%dd", days)
+	}
+}
+
+// formatInstanceStatus formats instance status with icons
+func formatInstanceStatus(status string) string {
+	switch status {
+	case "running", "ACTIVE":
+		return "● Running"
+	case "stopped", "STOPPED":
+		return "○ Stopped"
+	case "pending":
+		return "◐ Pending"
+	case "unhealthy":
+		return "▲ Unhealthy"
+	default:
+		return status
 	}
 }
 
@@ -1513,5 +1533,16 @@ func (m Model) renderConfirmDialogOverlay() string {
 	
 	// Simply render the dialog centered on screen
 	return m.confirmDialog.Render(m.width, m.height)
+}
+
+// renderInstanceSwitcherOverlay renders the instance switcher as an overlay
+func (m Model) renderInstanceSwitcherOverlay() string {
+	if m.instanceSwitcher == nil {
+		// Safety check - fallback to regular view
+		return m.View()
+	}
+	
+	// Simply render the switcher centered on screen
+	return m.instanceSwitcher.Render(m.width, m.height)
 }
 
