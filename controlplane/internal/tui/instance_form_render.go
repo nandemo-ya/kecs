@@ -138,13 +138,20 @@ func (m Model) renderInstanceForm() string {
 	content = append(content, "")
 	
 	// Buttons
-	createBtn := m.renderFormButton("Create", f.focusedField == FieldSubmit)
+	createBtnLabel := "Create"
+	if f.isCreating {
+		createBtnLabel = "Creating..."
+	}
+	createBtn := m.renderFormButton(createBtnLabel, f.focusedField == FieldSubmit && !f.isCreating)
 	cancelBtn := m.renderFormButton("Cancel", f.focusedField == FieldCancel)
 	buttons := fmt.Sprintf("%s%s", createBtn, cancelBtn)
 	content = append(content, buttons)
 	
 	// Error or success message
-	if f.errorMsg != "" {
+	if f.isCreating {
+		content = append(content, "")
+		content = append(content, formSuccessStyle.Render("⟳ "+f.successMsg))
+	} else if f.errorMsg != "" {
 		content = append(content, "")
 		content = append(content, formErrorStyle.Render("Error: "+f.errorMsg))
 	} else if f.successMsg != "" {

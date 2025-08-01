@@ -184,6 +184,23 @@ func (c *MockClient) GetInstance(ctx context.Context, name string) (*Instance, e
 }
 
 func (c *MockClient) CreateInstance(ctx context.Context, opts CreateInstanceOptions) (*Instance, error) {
+	// Check for duplicate name
+	for _, inst := range c.instances {
+		if inst.Name == opts.Name {
+			return nil, fmt.Errorf("instance with name '%s' already exists", opts.Name)
+		}
+	}
+	
+	// Check for port conflicts
+	for _, inst := range c.instances {
+		if inst.APIPort == opts.APIPort {
+			return nil, fmt.Errorf("API port %d is already in use by instance '%s'", opts.APIPort, inst.Name)
+		}
+		if inst.AdminPort == opts.AdminPort {
+			return nil, fmt.Errorf("Admin port %d is already in use by instance '%s'", opts.AdminPort, inst.Name)
+		}
+	}
+	
 	instance := Instance{
 		Name:      opts.Name,
 		Status:    "pending",

@@ -36,6 +36,7 @@ type InstanceForm struct {
 	focusedField FormField
 	errorMsg     string
 	successMsg   string
+	isCreating   bool
 	
 	// Validation state
 	nameError    string
@@ -52,6 +53,25 @@ func NewInstanceForm() *InstanceForm {
 		instanceName: defaultName,
 		apiPort:      "8080",
 		adminPort:    "8081",
+		localStack:   true,
+		traefik:      true,
+		devMode:      false,
+		focusedField: FieldInstanceName,
+	}
+}
+
+// NewInstanceFormWithSuggestions creates a new instance form with suggested ports
+func NewInstanceFormWithSuggestions(instances []Instance) *InstanceForm {
+	// Generate a default name
+	defaultName, _ := utils.GenerateRandomName()
+	
+	// Suggest available ports
+	apiPort, adminPort := SuggestAvailablePorts(instances, 8080, 8081)
+	
+	return &InstanceForm{
+		instanceName: defaultName,
+		apiPort:      fmt.Sprintf("%d", apiPort),
+		adminPort:    fmt.Sprintf("%d", adminPort),
 		localStack:   true,
 		traefik:      true,
 		devMode:      false,
