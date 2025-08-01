@@ -16,6 +16,7 @@ package tui
 
 import (
 	"os"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
 )
 
@@ -23,7 +24,7 @@ import (
 type Config struct {
 	// APIEndpoint is the base URL for the KECS API
 	APIEndpoint string
-	
+
 	// UseMockData determines whether to use mock data or real API
 	UseMockData bool
 }
@@ -34,22 +35,22 @@ func LoadConfig() Config {
 		APIEndpoint: os.Getenv("KECS_API_ENDPOINT"),
 		UseMockData: true, // Default to mock data
 	}
-	
+
 	// Use real API if endpoint is set
 	if cfg.APIEndpoint != "" {
 		cfg.UseMockData = false
 	}
-	
+
 	// Allow explicit mock mode
 	if os.Getenv("KECS_TUI_MOCK") == "true" {
 		cfg.UseMockData = true
 	}
-	
+
 	// Default endpoint if not set
 	if cfg.APIEndpoint == "" {
 		cfg.APIEndpoint = "http://localhost:8080"
 	}
-	
+
 	return cfg
 }
 

@@ -15,10 +15,10 @@ import (
 func Run() error {
 	// Load configuration
 	cfg := LoadConfig()
-	
+
 	// Create API client
 	client := CreateAPIClient(cfg)
-	
+
 	// Create model with client
 	var model Model
 	if cfg.UseMockData {
@@ -26,7 +26,7 @@ func Run() error {
 	} else {
 		model = NewModelWithClient(client)
 	}
-	
+
 	p := tea.NewProgram(
 		model,
 		tea.WithAltScreen(),
@@ -51,7 +51,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Global navigation
 		switch msg.String() {
 		case "ctrl+c", "q":
-			if !m.searchMode && !m.commandMode {
+			if !m.searchMode && !m.commandMode && m.currentView != ViewTaskDefinitionEditor {
 				return m, tea.Quit
 			}
 		case "esc":
@@ -120,6 +120,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m, cmd = m.handleTaskDefinitionFamiliesKeys(msg)
 		case ViewTaskDefinitionRevisions:
 			m, cmd = m.handleTaskDefinitionRevisionsKeys(msg)
+		case ViewTaskDefinitionEditor:
+			m, cmd = m.handleTaskDefinitionEditorKeys(msg)
 		}
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -141,7 +143,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.commandPalette != nil {
 			m.commandPalette.ShouldShowResult() // This will clear expired results
 		}
-	
+
 	case statusTickMsg:
 		// Update instance statuses periodically
 		cmds = append(cmds, statusTickCmd())
@@ -192,22 +194,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.clusterCursor = 0
 			cmds = append(cmds, m.loadMockDataCmd())
 		}
-	
+
 	case instanceStatusUpdateMsg:
 		// Update instance statuses
 		m.instances = msg.instances
-	
+
 	case taskDefFamiliesLoadedMsg:
 		// Update task definition families
 		m.taskDefFamilies = msg.families
-	
+
 	case taskDefRevisionsLoadedMsg:
 		// Update task definition revisions
 		m.taskDefRevisions = msg.revisions
-	
+
 	case taskDefJSONLoadedMsg:
 		// Cache loaded JSON
 		m.taskDefJSONCache[msg.revision] = msg.json
+
+		// If we're in the editor view, pass the JSON to the editor
+		if m.currentView == ViewTaskDefinitionEditor && m.taskDefEditor != nil {
+			m.taskDefEditor, _ = m.taskDefEditor.Update(msg)
+		}
+
+	case editorSaveMsg:
+		// Handle editor save
+		// In a real implementation, this would create a new revision
+		m.commandPalette.lastResult = fmt.Sprintf("Task definition %s saved as revision %d", msg.family, msg.revision)
+		m.commandPalette.showResult = true
+		// Go back to revisions view
+		m.currentView = ViewTaskDefinitionRevisions
+		m.taskDefEditor = nil
+		// Reload revisions
+		cmds = append(cmds, m.loadTaskDefinitionRevisionsCmd())
+
+	case editorQuitMsg:
+		// Handle editor quit without saving
+		m.currentView = m.previousView
+		m.taskDefEditor = nil
 
 	case errMsg:
 		// Handle API errors
@@ -233,7 +256,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Age:      inst.Age,
 			}
 		}
-		
+
 		m.clusters = make([]Cluster, len(msg.Clusters))
 		for i, cl := range msg.Clusters {
 			m.clusters[i] = Cluster{
@@ -249,7 +272,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Age:         cl.Age,
 			}
 		}
-		
+
 		m.services = make([]Service, len(msg.Services))
 		for i, svc := range msg.Services {
 			m.services[i] = Service{
@@ -262,7 +285,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Age:     svc.Age,
 			}
 		}
-		
+
 		m.tasks = make([]Task, len(msg.Tasks))
 		for i, task := range msg.Tasks {
 			m.tasks[i] = Task{
@@ -276,7 +299,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Age:     task.Age,
 			}
 		}
-		
+
 		m.logs = make([]LogEntry, len(msg.Logs))
 		for i, log := range msg.Logs {
 			m.logs[i] = LogEntry{
@@ -301,30 +324,39 @@ func (m Model) View() string {
 	if m.currentView == ViewHelp {
 		return m.renderHelpView()
 	}
-	
+
 	// For command palette, use overlay
 	if m.currentView == ViewCommandPalette {
 		return m.renderCommandPaletteOverlay()
 	}
-	
+
 	// For instance create, use overlay
 	if m.currentView == ViewInstanceCreate {
 		return m.renderInstanceCreateOverlay()
 	}
-	
+
 	// For task describe, use full screen
 	if m.currentView == ViewTaskDescribe {
 		return m.renderTaskDescribeView()
 	}
-	
+
 	// For confirm dialog, use overlay
 	if m.currentView == ViewConfirmDialog {
 		return m.renderConfirmDialogOverlay()
 	}
-	
+
 	// For instance switcher, use overlay
 	if m.currentView == ViewInstanceSwitcher {
 		return m.renderInstanceSwitcherOverlay()
+	}
+
+	// For task definition editor, use full screen
+	if m.currentView == ViewTaskDefinitionEditor {
+		if m.taskDefEditor != nil {
+			return m.taskDefEditor.Render(m.width, m.height)
+		}
+		// Fallback if editor is nil
+		return m.View()
 	}
 
 	// Calculate exact heights for panels
@@ -395,13 +427,13 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		// Delete instance
 		if len(m.instances) > 0 && m.instanceCursor < len(m.instances) {
 			instanceName := m.instances[m.instanceCursor].Name
-			
-			// Don't allow deleting "default" instance  
+
+			// Don't allow deleting "default" instance
 			if instanceName == "default" {
 				m.err = fmt.Errorf("Cannot delete default instance")
 				return m, nil
 			}
-			
+
 			// Create confirmation dialog
 			m.confirmDialog = DeleteInstanceDialog(
 				instanceName,
@@ -412,12 +444,12 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 					if err != nil {
 						return err
 					}
-					
+
 					// If the deleted instance was selected, clear selection
 					if m.selectedInstance == instanceName {
 						m.selectedInstance = ""
 					}
-					
+
 					// Reload instances
 					return nil
 				},
@@ -425,7 +457,7 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 					// Cancel - just close dialog
 				},
 			)
-			
+
 			m.previousView = m.currentView
 			m.currentView = ViewConfirmDialog
 			return m, nil
@@ -664,7 +696,7 @@ func (m Model) handleHelpKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 func (m Model) handleSearchInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 	previousQuery := m.searchQuery
-	
+
 	switch msg.String() {
 	case "enter":
 		m.searchMode = false
@@ -681,12 +713,12 @@ func (m Model) handleSearchInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.searchQuery += msg.String()
 		}
 	}
-	
+
 	// Reset cursor if search query changed
 	if previousQuery != m.searchQuery {
 		m.resetCursorAfterSearch()
 	}
-	
+
 	return m, nil
 }
 
@@ -759,7 +791,7 @@ func (m Model) handleConfirmDialogKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.currentView = m.previousView
 		return m, nil
 	}
-	
+
 	switch msg.String() {
 	case "left", "h":
 		m.confirmDialog.FocusYes()
@@ -836,7 +868,7 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.instanceForm == nil {
 		return m, nil
 	}
-	
+
 	// If creating, only allow ESC to cancel
 	if m.instanceForm.isCreating {
 		if msg.String() == "esc" {
@@ -847,24 +879,24 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	
+
 	switch msg.String() {
 	case "esc":
 		// Close form
 		m.currentView = m.previousView
 		m.instanceForm.Reset()
 		return m, nil
-		
+
 	case "tab":
 		// Move to next field
 		m.instanceForm.MoveFocusDown()
 		return m, nil
-		
+
 	case "shift+tab":
 		// Move to previous field
 		m.instanceForm.MoveFocusUp()
 		return m, nil
-		
+
 	case "enter":
 		// Handle action based on focused field
 		switch m.instanceForm.focusedField {
@@ -878,10 +910,10 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				// Validation errors are already set in form
 				return m, nil
 			}
-			
+
 			// Get form data
 			formData := m.instanceForm.GetFormData()
-			
+
 			// Create API options
 			opts := api.CreateInstanceOptions{
 				Name:       formData["instanceName"].(string),
@@ -891,12 +923,12 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				Traefik:    formData["traefik"].(bool),
 				DevMode:    formData["devMode"].(bool),
 			}
-			
+
 			// Show creating message and set loading state
 			m.instanceForm.successMsg = "Creating instance..."
 			m.instanceForm.isCreating = true
 			m.instanceForm.errorMsg = ""
-			
+
 			// Create instance via API
 			return m, m.createInstanceCmd(opts)
 		case FieldCancel:
@@ -905,7 +937,7 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.instanceForm.Reset()
 			return m, nil
 		}
-		
+
 	case " ", "space":
 		// Toggle checkbox or press button
 		switch m.instanceForm.focusedField {
@@ -917,10 +949,10 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				// Validation errors are already set in form
 				return m, nil
 			}
-			
+
 			// Get form data
 			formData := m.instanceForm.GetFormData()
-			
+
 			// Create API options
 			opts := api.CreateInstanceOptions{
 				Name:       formData["instanceName"].(string),
@@ -930,12 +962,12 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				Traefik:    formData["traefik"].(bool),
 				DevMode:    formData["devMode"].(bool),
 			}
-			
+
 			// Show creating message and set loading state
 			m.instanceForm.successMsg = "Creating instance..."
 			m.instanceForm.isCreating = true
 			m.instanceForm.errorMsg = ""
-			
+
 			// Create instance via API
 			return m, m.createInstanceCmd(opts)
 		case FieldCancel:
@@ -943,19 +975,19 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.instanceForm.Reset()
 			return m, nil
 		}
-		
+
 	case "backspace":
 		// Remove character from text field
 		m.instanceForm.RemoveLastChar()
 		return m, nil
-		
+
 	default:
 		// Handle text input
 		if len(msg.String()) == 1 {
 			m.instanceForm.UpdateField(m.instanceForm.GetCurrentFieldValue() + msg.String())
 		}
 	}
-	
+
 	return m, nil
 }
 
@@ -966,14 +998,14 @@ func (m Model) handleInstanceSwitcherInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.currentView = m.previousView
 		return m, nil
 	}
-	
+
 	switch msg.String() {
 	case "esc":
 		// Cancel switching
 		m.currentView = m.previousView
 		m.instanceSwitcher = nil
 		return m, nil
-		
+
 	case "enter":
 		// Switch to selected instance
 		selected := m.instanceSwitcher.GetSelected()
@@ -996,29 +1028,29 @@ func (m Model) handleInstanceSwitcherInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.currentView = m.previousView
 		m.instanceSwitcher = nil
 		return m, nil
-		
+
 	case "up", "ctrl+p":
 		m.instanceSwitcher.MoveUp()
 		return m, nil
-		
+
 	case "down", "ctrl+n":
 		m.instanceSwitcher.MoveDown()
 		return m, nil
-		
+
 	case "backspace":
 		query := m.instanceSwitcher.query
 		if len(query) > 0 {
 			m.instanceSwitcher.SetQuery(query[:len(query)-1])
 		}
 		return m, nil
-		
+
 	default:
 		// Handle text input
 		if len(msg.String()) == 1 || msg.String() == " " {
 			m.instanceSwitcher.SetQuery(m.instanceSwitcher.query + msg.String())
 		}
 	}
-	
+
 	return m, nil
 }
 
@@ -1049,7 +1081,38 @@ func (m Model) handleTaskDefinitionFamiliesKeys(msg tea.KeyMsg) (Model, tea.Cmd)
 		return m, m.loadMockDataCmd()
 	case "N":
 		// Create new task definition
-		// TODO: Implement task definition editor
+		m.taskDefEditor = NewTaskDefinitionEditor("new-task-definition", nil)
+		m.previousView = m.currentView
+		m.currentView = ViewTaskDefinitionEditor
+		// Load a template
+		return m, func() tea.Msg {
+			template := `{
+  "family": "new-task-definition",
+  "containerDefinitions": [
+    {
+      "name": "main",
+      "image": "nginx:latest",
+      "memory": 512,
+      "cpu": 256,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ]
+    }
+  ],
+  "requiresCompatibilities": ["EC2"],
+  "networkMode": "bridge",
+  "memory": "512",
+  "cpu": "256"
+}`
+			return taskDefJSONLoadedMsg{
+				revision: 0,
+				json:     template,
+			}
+		}
 	case "C":
 		// Copy selected family's latest revision
 		// TODO: Implement copy functionality
@@ -1107,7 +1170,29 @@ func (m Model) handleTaskDefinitionRevisionsKeys(msg tea.KeyMsg) (Model, tea.Cmd
 		m.taskDefJSONCache = make(map[int]string)
 	case "e":
 		// Edit as new revision
-		// TODO: Implement editor
+		if len(m.taskDefRevisions) > 0 && m.taskDefRevisionCursor < len(m.taskDefRevisions) {
+			selectedRev := m.taskDefRevisions[m.taskDefRevisionCursor]
+			// Create editor with the selected revision as base
+			m.taskDefEditor = NewTaskDefinitionEditor(selectedRev.Family, &selectedRev.Revision)
+			m.previousView = m.currentView
+			m.currentView = ViewTaskDefinitionEditor
+
+			// Load the JSON content for editing
+			if jsonContent, cached := m.taskDefJSONCache[selectedRev.Revision]; cached {
+				// Use cached content
+				return m, func() tea.Msg {
+					return taskDefJSONLoadedMsg{
+						revision: selectedRev.Revision,
+						json:     jsonContent,
+					}
+				}
+			} else {
+				// Load from API
+				taskDefArn := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:task-definition/%s:%d",
+					selectedRev.Family, selectedRev.Revision)
+				return m, m.loadTaskDefinitionJSONCmd(taskDefArn)
+			}
+		}
 	case "c":
 		// Copy to clipboard
 		// TODO: Implement clipboard copy
@@ -1149,5 +1234,32 @@ func (m Model) handleTaskDefinitionRevisionsKeys(msg tea.KeyMsg) (Model, tea.Cmd
 			m.currentView = ViewInstanceSwitcher
 		}
 	}
+	return m, nil
+}
+
+// handleTaskDefinitionEditorKeys handles input for task definition editor view
+func (m Model) handleTaskDefinitionEditorKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	if m.taskDefEditor == nil {
+		// Safety check - go back if no editor
+		m.currentView = m.previousView
+		return m, nil
+	}
+
+	// Pass the key to the editor
+	var cmd tea.Cmd
+	m.taskDefEditor, cmd = m.taskDefEditor.Update(msg)
+
+	// Check for editor messages that need handling
+	if cmd != nil {
+		// We'll handle this through the message system
+		return m, cmd
+	}
+
+	// Handle ESC to exit editor (if not handled by editor)
+	if msg.String() == "esc" && m.taskDefEditor.mode == EditorModeNormal {
+		m.currentView = m.previousView
+		m.taskDefEditor = nil
+	}
+
 	return m, nil
 }
