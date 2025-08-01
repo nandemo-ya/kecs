@@ -299,6 +299,30 @@ func (c *HTTPClient) DeregisterTaskDefinition(ctx context.Context, instanceName 
 	return c.doRequest(ctx, "DELETE", path, nil, nil)
 }
 
+func (c *HTTPClient) ListTaskDefinitionFamilies(ctx context.Context, instanceName string) ([]string, error) {
+	path := fmt.Sprintf("/api/instances/%s/task-definition-families", url.PathEscape(instanceName))
+	var families []string
+	err := c.doRequest(ctx, "GET", path, nil, &families)
+	return families, err
+}
+
+func (c *HTTPClient) ListTaskDefinitionRevisions(ctx context.Context, instanceName string, family string) ([]TaskDefinitionRevision, error) {
+	path := fmt.Sprintf("/api/instances/%s/task-definition-families/%s/revisions", url.PathEscape(instanceName), url.PathEscape(family))
+	var revisions []TaskDefinitionRevision
+	err := c.doRequest(ctx, "GET", path, nil, &revisions)
+	return revisions, err
+}
+
+func (c *HTTPClient) DescribeTaskDefinition(ctx context.Context, instanceName string, taskDefArn string) (*TaskDefinition, error) {
+	path := fmt.Sprintf("/api/instances/%s/task-definitions/%s", url.PathEscape(instanceName), url.PathEscape(taskDefArn))
+	var taskDef TaskDefinition
+	err := c.doRequest(ctx, "GET", path, nil, &taskDef)
+	if err != nil {
+		return nil, err
+	}
+	return &taskDef, nil
+}
+
 // Health check
 
 func (c *HTTPClient) HealthCheck(ctx context.Context, instanceName string) error {

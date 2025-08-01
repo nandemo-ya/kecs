@@ -190,3 +190,69 @@ type ErrorResponse struct {
 	Type    string `json:"__type"`
 	Message string `json:"message"`
 }
+
+// TaskDefinition represents an ECS task definition
+type TaskDefinition struct {
+	TaskDefinitionArn    string                 `json:"taskDefinitionArn"`
+	Family               string                 `json:"family"`
+	Revision             int                    `json:"revision"`
+	Status               string                 `json:"status"`
+	TaskRoleArn          string                 `json:"taskRoleArn,omitempty"`
+	ExecutionRoleArn     string                 `json:"executionRoleArn,omitempty"`
+	NetworkMode          string                 `json:"networkMode"`
+	ContainerDefinitions []ContainerDefinition  `json:"containerDefinitions"`
+	RequiresCompatibilities []string            `json:"requiresCompatibilities"`
+	Cpu                  string                 `json:"cpu,omitempty"`
+	Memory               string                 `json:"memory,omitempty"`
+	RegisteredAt         time.Time              `json:"registeredAt"`
+}
+
+// ContainerDefinition represents a container within a task definition
+type ContainerDefinition struct {
+	Name         string                 `json:"name"`
+	Image        string                 `json:"image"`
+	Cpu          int                    `json:"cpu,omitempty"`
+	Memory       int                    `json:"memory,omitempty"`
+	MemoryReservation int               `json:"memoryReservation,omitempty"`
+	PortMappings []PortMapping          `json:"portMappings,omitempty"`
+	Essential    bool                   `json:"essential"`
+	Environment  []EnvironmentVariable  `json:"environment,omitempty"`
+	MountPoints  []MountPoint           `json:"mountPoints,omitempty"`
+	VolumesFrom  []VolumeFrom           `json:"volumesFrom,omitempty"`
+}
+
+// PortMapping represents a port mapping for a container
+type PortMapping struct {
+	ContainerPort int    `json:"containerPort"`
+	HostPort      int    `json:"hostPort,omitempty"`
+	Protocol      string `json:"protocol"`
+}
+
+// EnvironmentVariable represents an environment variable
+type EnvironmentVariable struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// MountPoint represents a mount point
+type MountPoint struct {
+	SourceVolume  string `json:"sourceVolume"`
+	ContainerPath string `json:"containerPath"`
+	ReadOnly      bool   `json:"readOnly,omitempty"`
+}
+
+// VolumeFrom represents a volume to mount from another container
+type VolumeFrom struct {
+	SourceContainer string `json:"sourceContainer"`
+	ReadOnly        bool   `json:"readOnly,omitempty"`
+}
+
+// TaskDefinitionRevision represents summary info for a task definition revision
+type TaskDefinitionRevision struct {
+	Family    string    `json:"family"`
+	Revision  int       `json:"revision"`
+	Status    string    `json:"status"`
+	Cpu       string    `json:"cpu"`
+	Memory    string    `json:"memory"`
+	CreatedAt time.Time `json:"createdAt"`
+}

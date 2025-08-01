@@ -416,6 +416,79 @@ func (c *MockClient) ListTaskDefinitions(ctx context.Context, instanceName strin
 	}, nil
 }
 
+func (c *MockClient) ListTaskDefinitionFamilies(ctx context.Context, instanceName string) ([]string, error) {
+	// Mock implementation
+	return []string{
+		"nginx-app",
+		"backend-api",
+		"worker-service",
+		"database-proxy",
+	}, nil
+}
+
+func (c *MockClient) ListTaskDefinitionRevisions(ctx context.Context, instanceName string, family string) ([]TaskDefinitionRevision, error) {
+	// Mock implementation
+	switch family {
+	case "nginx-app":
+		return []TaskDefinitionRevision{
+			{Family: "nginx-app", Revision: 5, Status: "ACTIVE", Cpu: "256", Memory: "512", CreatedAt: time.Now().Add(-2 * time.Hour)},
+			{Family: "nginx-app", Revision: 4, Status: "INACTIVE", Cpu: "256", Memory: "512", CreatedAt: time.Now().Add(-24 * time.Hour)},
+			{Family: "nginx-app", Revision: 3, Status: "ACTIVE", Cpu: "128", Memory: "256", CreatedAt: time.Now().Add(-72 * time.Hour)},
+			{Family: "nginx-app", Revision: 2, Status: "INACTIVE", Cpu: "128", Memory: "256", CreatedAt: time.Now().Add(-168 * time.Hour)},
+			{Family: "nginx-app", Revision: 1, Status: "INACTIVE", Cpu: "128", Memory: "256", CreatedAt: time.Now().Add(-336 * time.Hour)},
+		}, nil
+	case "backend-api":
+		return []TaskDefinitionRevision{
+			{Family: "backend-api", Revision: 3, Status: "ACTIVE", Cpu: "512", Memory: "1024", CreatedAt: time.Now().Add(-24 * time.Hour)},
+			{Family: "backend-api", Revision: 2, Status: "INACTIVE", Cpu: "256", Memory: "512", CreatedAt: time.Now().Add(-72 * time.Hour)},
+			{Family: "backend-api", Revision: 1, Status: "INACTIVE", Cpu: "256", Memory: "512", CreatedAt: time.Now().Add(-168 * time.Hour)},
+		}, nil
+	case "worker-service":
+		return []TaskDefinitionRevision{
+			{Family: "worker-service", Revision: 12, Status: "ACTIVE", Cpu: "1024", Memory: "2048", CreatedAt: time.Now().Add(-72 * time.Hour)},
+			{Family: "worker-service", Revision: 11, Status: "ACTIVE", Cpu: "1024", Memory: "2048", CreatedAt: time.Now().Add(-96 * time.Hour)},
+			{Family: "worker-service", Revision: 10, Status: "ACTIVE", Cpu: "512", Memory: "1024", CreatedAt: time.Now().Add(-120 * time.Hour)},
+		}, nil
+	case "database-proxy":
+		return []TaskDefinitionRevision{
+			{Family: "database-proxy", Revision: 1, Status: "ACTIVE", Cpu: "256", Memory: "512", CreatedAt: time.Now().Add(-168 * time.Hour)},
+		}, nil
+	default:
+		return []TaskDefinitionRevision{}, nil
+	}
+}
+
+func (c *MockClient) DescribeTaskDefinition(ctx context.Context, instanceName string, taskDefArn string) (*TaskDefinition, error) {
+	// Mock implementation - return sample task definition
+	return &TaskDefinition{
+		TaskDefinitionArn: taskDefArn,
+		Family:            "nginx-app",
+		Revision:          3,
+		Status:            "ACTIVE",
+		TaskRoleArn:       "arn:aws:iam::000000000000:role/ecsTaskRole",
+		NetworkMode:       "bridge",
+		ContainerDefinitions: []ContainerDefinition{
+			{
+				Name:   "nginx",
+				Image:  "nginx:1.21",
+				Cpu:    128,
+				Memory: 256,
+				PortMappings: []PortMapping{
+					{ContainerPort: 80, Protocol: "tcp"},
+				},
+				Essential: true,
+				Environment: []EnvironmentVariable{
+					{Name: "ENV", Value: "production"},
+				},
+			},
+		},
+		RequiresCompatibilities: []string{"EC2", "FARGATE"},
+		Cpu:                     "128",
+		Memory:                  "256",
+		RegisteredAt:            time.Now().Add(-72 * time.Hour),
+	}, nil
+}
+
 func (c *MockClient) RegisterTaskDefinition(ctx context.Context, instanceName string, taskDef interface{}) (string, error) {
 	return fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:task-definition/new-task:%d", time.Now().Unix()), nil
 }

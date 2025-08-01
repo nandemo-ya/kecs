@@ -95,10 +95,15 @@ func (m Model) getHeaderShortcuts() string {
 	case ViewInstances:
 		shortcuts = []string{
 			keyStyle.Render("<N>") + sepStyle.Render(" New"),
+		}
+		if m.selectedInstance != "" {
+			shortcuts = append(shortcuts, keyStyle.Render("<T>") + sepStyle.Render(" TaskDefs"))
+		}
+		shortcuts = append(shortcuts,
 			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
 			keyStyle.Render("</>") + sepStyle.Render(" Search"),
 			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
-		}
+		)
 	case ViewClusters:
 		shortcuts = []string{
 			keyStyle.Render("<↵>") + sepStyle.Render(" Select"),
@@ -125,6 +130,24 @@ func (m Model) getHeaderShortcuts() string {
 			keyStyle.Render("<f>") + sepStyle.Render(" Follow"),
 			keyStyle.Render("<s>") + sepStyle.Render(" Save"),
 			keyStyle.Render("<Esc>") + sepStyle.Render(" Back"),
+		}
+	case ViewTaskDefinitionFamilies:
+		shortcuts = []string{
+			keyStyle.Render("<↵>") + sepStyle.Render(" Select"),
+			keyStyle.Render("<N>") + sepStyle.Render(" New"),
+			keyStyle.Render("<←>") + sepStyle.Render(" Back"),
+			keyStyle.Render("</>") + sepStyle.Render(" Search"),
+		}
+	case ViewTaskDefinitionRevisions:
+		shortcuts = []string{
+			keyStyle.Render("<↵>") + sepStyle.Render(" JSON"),
+			keyStyle.Render("<e>") + sepStyle.Render(" Edit"),
+			keyStyle.Render("<←>") + sepStyle.Render(" Back"),
+		}
+		if m.showTaskDefJSON {
+			shortcuts = append(shortcuts,
+				keyStyle.Render("<^U/^D>") + sepStyle.Render(" Scroll"),
+			)
 		}
 	default:
 		shortcuts = []string{
@@ -221,6 +244,15 @@ func (m Model) renderBreadcrumb() string {
 		parts = append(parts, ">", "[Logs]")
 	}
 	
+	// Task Definition navigation
+	if m.currentView == ViewTaskDefinitionFamilies || m.currentView == ViewTaskDefinitionRevisions {
+		parts = append(parts, ">", "[Task Definitions]")
+		
+		if m.currentView == ViewTaskDefinitionRevisions && m.selectedFamily != "" {
+			parts = append(parts, ">", m.selectedFamily)
+		}
+	}
+	
 	breadcrumb := strings.Join(parts, " ")
 	
 	// Calculate the same width as header for consistency
@@ -298,6 +330,10 @@ func (m Model) renderFooter() string {
 		right = fmt.Sprintf("Tasks: %d", len(m.filterTasks(m.tasks)))
 	case ViewLogs:
 		right = fmt.Sprintf("Logs: %d", len(m.filterLogs(m.logs)))
+	case ViewTaskDefinitionFamilies:
+		right = fmt.Sprintf("Families: %d", len(m.filterTaskDefFamilies(m.taskDefFamilies)))
+	case ViewTaskDefinitionRevisions:
+		right = fmt.Sprintf("Revisions: %d", len(m.taskDefRevisions))
 	}
 	
 	// Calculate spacing
@@ -384,6 +420,14 @@ func (m Model) renderResourcePanel() string {
 		content = m.renderLogsContent(resourceHeight - 4)
 	case ViewHelp:
 		content = m.renderHelpContent(resourceHeight - 4)
+	case ViewTaskDefinitionFamilies:
+		content = m.renderTaskDefFamiliesList(resourceHeight - 4)
+	case ViewTaskDefinitionRevisions:
+		if m.showTaskDefJSON {
+			content = m.renderTaskDefRevisionsTwoColumn(resourceHeight - 4)
+		} else {
+			content = m.renderTaskDefRevisionsList(resourceHeight - 4, m.width - 8)
+		}
 	}
 	
 	// Apply resource panel style with fixed height
@@ -453,6 +497,36 @@ func (m Model) renderSummary() string {
 		if m.selectedTask != "" {
 			// Keep log view summary short and on one line
 			summary = fmt.Sprintf("Log entries: %d", len(m.logs))
+		}
+		
+	case ViewTaskDefinitionFamilies:
+		if m.selectedInstance != "" {
+			active := 0
+			total := len(m.taskDefFamilies)
+			for _, family := range m.taskDefFamilies {
+				if family.ActiveCount > 0 {
+					active++
+				}
+			}
+			summary = fmt.Sprintf("Instance: %s | Task Definition Families: %d | Active: %d",
+				m.selectedInstance, total, active)
+		}
+		
+	case ViewTaskDefinitionRevisions:
+		if m.selectedFamily != "" {
+			active := 0
+			total := len(m.taskDefRevisions)
+			for _, rev := range m.taskDefRevisions {
+				if rev.Status == "ACTIVE" {
+					active++
+				}
+			}
+			latestRev := 0
+			if len(m.taskDefRevisions) > 0 {
+				latestRev = m.taskDefRevisions[0].Revision
+			}
+			summary = fmt.Sprintf("Family: %s | Revisions: %d | Active: %d | Latest: %d",
+				m.selectedFamily, total, active, latestRev)
 		}
 	}
 	
@@ -1144,12 +1218,19 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 			keyStyle.Render("S")+" "+descStyle.Render("Start/Stop"),
 			keyStyle.Render("D")+" "+descStyle.Render("Delete"),
 		)
+		// Only show Task defs shortcut if an instance is selected
+		if m.selectedInstance != "" {
+			shortcuts = append(shortcuts,
+				keyStyle.Render("T")+" "+descStyle.Render("Task defs"),
+			)
+		}
 	case ViewClusters:
 		shortcuts = append(shortcuts,
 			keyStyle.Render("↵")+" "+descStyle.Render("Select"),
 			keyStyle.Render("←")+" "+descStyle.Render("Back"),
 			keyStyle.Render("i")+" "+descStyle.Render("Instances"),
 			keyStyle.Render("s")+" "+descStyle.Render("Services"),
+			keyStyle.Render("T")+" "+descStyle.Render("Task defs"),
 		)
 	case ViewServices:
 		shortcuts = append(shortcuts,
@@ -1159,6 +1240,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 			keyStyle.Render("u")+" "+descStyle.Render("Update"),
 			keyStyle.Render("x")+" "+descStyle.Render("Stop"),
 			keyStyle.Render("l")+" "+descStyle.Render("Logs"),
+			keyStyle.Render("T")+" "+descStyle.Render("Task defs"),
 		)
 	case ViewTasks:
 		shortcuts = append(shortcuts,
@@ -1166,6 +1248,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 			keyStyle.Render("l")+" "+descStyle.Render("Logs"),
 			keyStyle.Render("D")+" "+descStyle.Render("Describe"),
 			keyStyle.Render("←")+" "+descStyle.Render("Back"),
+			keyStyle.Render("T")+" "+descStyle.Render("Task defs"),
 		)
 	case ViewLogs:
 		shortcuts = append(shortcuts,
@@ -1180,6 +1263,27 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 			keyStyle.Render("r")+" "+descStyle.Render("Restart"),
 			keyStyle.Render("s")+" "+descStyle.Render("Stop"),
 		)
+	case ViewTaskDefinitionFamilies:
+		shortcuts = append(shortcuts,
+			keyStyle.Render("↵")+" "+descStyle.Render("Select"),
+			keyStyle.Render("N")+" "+descStyle.Render("New"),
+			keyStyle.Render("C")+" "+descStyle.Render("Copy latest"),
+			keyStyle.Render("←")+" "+descStyle.Render("Back"),
+		)
+	case ViewTaskDefinitionRevisions:
+		shortcuts = append(shortcuts,
+			keyStyle.Render("↵")+" "+descStyle.Render("Toggle JSON"),
+			keyStyle.Render("e")+" "+descStyle.Render("Edit"),
+			keyStyle.Render("c")+" "+descStyle.Render("Copy"),
+			keyStyle.Render("d")+" "+descStyle.Render("Deregister"),
+			keyStyle.Render("←")+" "+descStyle.Render("Back"),
+		)
+		if m.showTaskDefJSON {
+			shortcuts = append(shortcuts,
+				keyStyle.Render("^U")+" "+descStyle.Render("Scroll up"),
+				keyStyle.Render("^D")+" "+descStyle.Render("Scroll down"),
+			)
+		}
 	}
 	
 	// Add common shortcuts
@@ -1462,7 +1566,7 @@ Resource Navigation:
   c           Go to clusters
   s           Go to services
   t           Go to tasks
-  d           Go to task definitions
+  T           Go to task definitions (from any view with instance selected)
 
 Instance Operations:
   N           Create new instance (Instances view)
@@ -1472,9 +1576,21 @@ Instance Operations:
 
 Service Operations:
   r           Restart service (Service selected)
-  S           Scale service (Service selected)
+  S           Scale service (Service selected)  
   u           Update service (Service selected)
   x           Stop service (Service selected)
+
+Task Definition Operations:
+  N           Create new task definition (Families view)
+  C           Copy family's latest revision (Families view)
+  Enter       Toggle JSON view (Revisions view)
+  e           Edit as new revision (Revisions view)
+  c           Copy to clipboard (Revisions view)
+  d           Deregister revision (Revisions view)
+  a           Activate revision (Revisions view)
+  D           Diff mode (Revisions view)
+  Ctrl+U      Scroll JSON up (JSON view)
+  Ctrl+D      Scroll JSON down (JSON view)
 
 Common Operations:
   l           View logs (Task/Service selected)
@@ -1544,5 +1660,264 @@ func (m Model) renderInstanceSwitcherOverlay() string {
 	
 	// Simply render the switcher centered on screen
 	return m.instanceSwitcher.Render(m.width, m.height)
+}
+
+
+// renderTaskDefFamiliesList renders the list of task definition families
+func (m Model) renderTaskDefFamiliesList(maxHeight int) string {
+	if len(m.taskDefFamilies) == 0 {
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Italic(true).
+			Render("No task definition families found.")
+	}
+	
+	// Filter families
+	filteredFamilies := m.filterTaskDefFamilies(m.taskDefFamilies)
+	if len(filteredFamilies) == 0 {
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Italic(true).
+			Render("No families match the search criteria.")
+	}
+	
+	// Column headers
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#00ff00")).
+		BorderBottom(true).
+		BorderStyle(lipgloss.NormalBorder())
+		
+	headers := fmt.Sprintf("%-30s %4s %6s %6s %12s",
+		"FAMILY NAME", "REV", "ACTIVE", "TOTAL", "UPDATED")
+	
+	// Styles
+	selectedStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#2a2a4a")).
+		Foreground(lipgloss.Color("#ffffff")).
+		Bold(true)
+		
+	normalStyle := lipgloss.NewStyle()
+	
+	// Build rows
+	var rows []string
+	rows = append(rows, headerStyle.Render(headers))
+	
+	visibleRows := maxHeight - 2 // Header and spacing
+	startIdx := 0
+	if m.taskDefFamilyCursor >= visibleRows {
+		startIdx = m.taskDefFamilyCursor - visibleRows + 1
+	}
+	
+	endIdx := startIdx + visibleRows
+	if endIdx > len(filteredFamilies) {
+		endIdx = len(filteredFamilies)
+	}
+	
+	for i := startIdx; i < endIdx; i++ {
+		family := filteredFamilies[i]
+		
+		// Format row
+		row := fmt.Sprintf("%-30s %4d %6d %6d %12s",
+			truncateString(family.Family, 30),
+			family.LatestRevision,
+			family.ActiveCount,
+			family.TotalCount,
+			formatDuration(time.Since(family.LastUpdated)),
+		)
+		
+		// Apply style
+		if i == m.taskDefFamilyCursor {
+			row = selectedStyle.Render("▸ " + row)
+		} else {
+			row = normalStyle.Render("  " + row)
+		}
+		
+		rows = append(rows, row)
+	}
+	
+	// Add scroll indicator
+	if len(filteredFamilies) > visibleRows {
+		scrollInfo := fmt.Sprintf("Showing %d-%d of %d families", startIdx+1, endIdx, len(filteredFamilies))
+		rows = append(rows, "", lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Render(scrollInfo))
+	}
+	
+	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+}
+
+// renderTaskDefinitionRevisionsView renders the task definition revisions view
+
+// renderTaskDefRevisionsTwoColumn renders two column view with JSON
+func (m Model) renderTaskDefRevisionsTwoColumn(maxHeight int) string {
+	// Calculate dimensions
+	leftWidth := m.width / 3
+	rightWidth := m.width - leftWidth - 1 // -1 for border
+	
+	// Render components
+	leftColumn := m.renderTaskDefRevisionsList(maxHeight, leftWidth)
+	rightColumn := m.renderTaskDefJSON(maxHeight, rightWidth)
+	
+	// Combine columns
+	return lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		leftColumn,
+		lipgloss.NewStyle().
+			Height(maxHeight).
+			BorderLeft(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			Render(""),
+		rightColumn,
+	)
+}
+
+
+// renderTaskDefRevisionsList renders the list of revisions
+func (m Model) renderTaskDefRevisionsList(maxHeight int, width int) string {
+	if len(m.taskDefRevisions) == 0 {
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Italic(true).
+			Width(width).
+			Render("No revisions found.")
+	}
+	
+	// Column headers
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#00ff00")).
+		BorderBottom(true).
+		BorderStyle(lipgloss.NormalBorder())
+		
+	headers := fmt.Sprintf("%-4s %-10s %-10s %-12s",
+		"REV", "STATUS", "CPU/MEM", "CREATED")
+	
+	// Styles
+	selectedStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#2a2a4a")).
+		Foreground(lipgloss.Color("#ffffff")).
+		Bold(true).
+		Width(width)
+		
+	activeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00ff00"))
+		
+	inactiveStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#999999"))
+		
+	normalStyle := lipgloss.NewStyle()
+	
+	// Build rows
+	var rows []string
+	rows = append(rows, headerStyle.Width(width).Render(headers))
+	
+	visibleRows := maxHeight - 2
+	startIdx := 0
+	if m.taskDefRevisionCursor >= visibleRows {
+		startIdx = m.taskDefRevisionCursor - visibleRows + 1
+	}
+	
+	endIdx := startIdx + visibleRows
+	if endIdx > len(m.taskDefRevisions) {
+		endIdx = len(m.taskDefRevisions)
+	}
+	
+	for i := startIdx; i < endIdx; i++ {
+		rev := m.taskDefRevisions[i]
+		
+		// Format row
+		cpuMem := fmt.Sprintf("%s/%s", rev.CPU, rev.Memory)
+		row := fmt.Sprintf("%-4d %-10s %-10s %-12s",
+			rev.Revision,
+			rev.Status,
+			cpuMem,
+			formatDuration(time.Since(rev.CreatedAt)),
+		)
+		
+		// Apply style
+		if i == m.taskDefRevisionCursor {
+			if m.showTaskDefJSON {
+				row = selectedStyle.Render("▸" + row + " ◀")
+			} else {
+				row = selectedStyle.Render("▸ " + row)
+			}
+		} else {
+			style := normalStyle
+			if rev.Status == "ACTIVE" {
+				style = activeStyle
+			} else {
+				style = inactiveStyle
+			}
+			row = style.Width(width).Render("  " + row)
+		}
+		
+		rows = append(rows, row)
+	}
+	
+	// Add help text
+	if !m.showTaskDefJSON {
+		helpStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666"))
+		rows = append(rows, "", helpStyle.Render("[Enter] View JSON"))
+	}
+	
+	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+}
+
+// renderTaskDefJSON renders the JSON view
+func (m Model) renderTaskDefJSON(maxHeight int, width int) string {
+	if m.taskDefRevisionCursor >= len(m.taskDefRevisions) {
+		return ""
+	}
+	
+	selectedRev := m.taskDefRevisions[m.taskDefRevisionCursor]
+	
+	// Get JSON from cache or show loading message
+	jsonContent, cached := m.taskDefJSONCache[selectedRev.Revision]
+	if !cached {
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Italic(true).
+			Width(width).
+			Height(maxHeight).
+			Padding(1).
+			Render("Loading task definition JSON...")
+	}
+	
+	// JSON style
+	jsonStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#cccccc")).
+		Width(width-2).
+		Height(maxHeight-2).
+		Padding(1)
+	
+	// Add scroll indicator if needed
+	lines := strings.Split(jsonContent, "\n")
+	visibleLines := maxHeight - 2
+	
+	if m.taskDefJSONScroll > len(lines)-visibleLines {
+		m.taskDefJSONScroll = len(lines) - visibleLines
+	}
+	if m.taskDefJSONScroll < 0 {
+		m.taskDefJSONScroll = 0
+	}
+	
+	endLine := m.taskDefJSONScroll + visibleLines
+	if endLine > len(lines) {
+		endLine = len(lines)
+	}
+	
+	visibleJSON := strings.Join(lines[m.taskDefJSONScroll:endLine], "\n")
+	
+	return jsonStyle.Render(visibleJSON)
+}
+
+// Helper function to truncate strings
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
 

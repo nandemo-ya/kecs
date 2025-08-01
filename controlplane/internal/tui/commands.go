@@ -16,6 +16,7 @@ package tui
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -276,5 +277,132 @@ func (m Model) updateInstanceStatusCmd() tea.Cmd {
 		}
 		
 		return instanceStatusUpdateMsg{instances: tuiInstances}
+	}
+}
+
+// loadTaskDefinitionFamiliesCmd loads task definition families
+func (m Model) loadTaskDefinitionFamiliesCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		
+		// Get families list
+		families, err := m.apiClient.ListTaskDefinitionFamilies(ctx, m.selectedInstance)
+		if err != nil {
+			return errMsg{err: fmt.Errorf("failed to list task definition families: %w", err)}
+		}
+		
+		// Get details for each family
+		taskDefFamilies := make([]TaskDefinitionFamily, 0, len(families))
+		for _, family := range families {
+			// Get revisions for this family
+			revisions, err := m.apiClient.ListTaskDefinitionRevisions(ctx, m.selectedInstance, family)
+			if err != nil {
+				continue // Skip on error
+			}
+			
+			if len(revisions) == 0 {
+				continue
+			}
+			
+			// Count active revisions
+			activeCount := 0
+			for _, rev := range revisions {
+				if rev.Status == "ACTIVE" {
+					activeCount++
+				}
+			}
+			
+			// Latest revision is the first one (assuming sorted by revision desc)
+			latestRevision := revisions[0].Revision
+			lastUpdated := revisions[0].CreatedAt
+			
+			taskDefFamilies = append(taskDefFamilies, TaskDefinitionFamily{
+				Family:         family,
+				LatestRevision: latestRevision,
+				ActiveCount:    activeCount,
+				TotalCount:     len(revisions),
+				LastUpdated:    lastUpdated,
+			})
+		}
+		
+		return taskDefFamiliesLoadedMsg{families: taskDefFamilies}
+	}
+}
+
+// loadTaskDefinitionRevisionsCmd loads revisions for a task definition family
+func (m Model) loadTaskDefinitionRevisionsCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		
+		apiRevisions, err := m.apiClient.ListTaskDefinitionRevisions(ctx, m.selectedInstance, m.selectedFamily)
+		if err != nil {
+			return errMsg{err: fmt.Errorf("failed to list task definition revisions: %w", err)}
+		}
+		
+		// Convert API revisions to TUI revisions
+		tuiRevisions := make([]TaskDefinitionRevision, len(apiRevisions))
+		for i, rev := range apiRevisions {
+			tuiRevisions[i] = TaskDefinitionRevision{
+				Family:    rev.Family,
+				Revision:  rev.Revision,
+				Status:    rev.Status,
+				CPU:       rev.Cpu,
+				Memory:    rev.Memory,
+				CreatedAt: rev.CreatedAt,
+			}
+		}
+		
+		return taskDefRevisionsLoadedMsg{revisions: tuiRevisions}
+	}
+}
+
+// Message types for task definition operations
+type taskDefFamiliesLoadedMsg struct {
+	families []TaskDefinitionFamily
+}
+
+type taskDefRevisionsLoadedMsg struct {
+	revisions []TaskDefinitionRevision
+}
+
+type taskDefJSONLoadedMsg struct {
+	revision int
+	json     string
+}
+
+// loadTaskDefinitionJSONCmd loads the JSON for a specific task definition revision
+func (m Model) loadTaskDefinitionJSONCmd(taskDefArn string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		
+		taskDef, err := m.apiClient.DescribeTaskDefinition(ctx, m.selectedInstance, taskDefArn)
+		if err != nil {
+			return errMsg{err: fmt.Errorf("failed to describe task definition: %w", err)}
+		}
+		
+		// Convert to JSON
+		jsonBytes, err := json.MarshalIndent(taskDef, "", "  ")
+		if err != nil {
+			return errMsg{err: fmt.Errorf("failed to marshal task definition: %w", err)}
+		}
+		
+		// Find revision number from ARN
+		revision := 0
+		for _, rev := range m.taskDefRevisions {
+			if rev.Family+":"+fmt.Sprintf("%d", rev.Revision) == taskDefArn ||
+			   fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s:%d", 
+			   	"us-east-1", "123456789012", rev.Family, rev.Revision) == taskDefArn {
+				revision = rev.Revision
+				break
+			}
+		}
+		
+		return taskDefJSONLoadedMsg{
+			revision: revision,
+			json:     string(jsonBytes),
+		}
 	}
 }
