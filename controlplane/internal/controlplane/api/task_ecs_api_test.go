@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -23,6 +24,9 @@ var _ = Describe("Task ECS API", func() {
 	)
 
 	BeforeEach(func() {
+		// Set test mode to avoid requiring actual Kubernetes cluster
+		os.Setenv("KECS_TEST_MODE", "true")
+		
 		mockStorage = mocks.NewMockStorage()
 		mockTaskStore = mocks.NewMockTaskStore()
 		mockClusterStore = mocks.NewMockClusterStore()
