@@ -3,16 +3,22 @@ package tui
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/mock"
 )
 
 // Run starts the TUI application
 func Run() error {
+	// Suppress logging output while in TUI mode
+	// This prevents k3d and other components from writing logs to the terminal
+	logging.SetOutput(io.Discard)
+	
 	// Load configuration
 	cfg := LoadConfig()
 
@@ -35,6 +41,11 @@ func Run() error {
 
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("error running TUI: %w", err)
+	}
+
+	// Clean up resources
+	if client != nil {
+		client.Close()
 	}
 
 	return nil

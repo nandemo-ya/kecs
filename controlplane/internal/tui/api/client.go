@@ -29,15 +29,20 @@ import (
 type HTTPClient struct {
 	baseURL    string
 	httpClient *http.Client
+	k3dProvider *K3dInstanceProvider // For direct k3d access when API is not available
 }
 
 // NewHTTPClient creates a new HTTP-based API client
 func NewHTTPClient(baseURL string) *HTTPClient {
+	// Create k3d provider for direct instance listing
+	k3dProvider, _ := NewK3dInstanceProvider() // Ignore error, will fallback to API
+	
 	return &HTTPClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		k3dProvider: k3dProvider,
 	}
 }
 
@@ -90,12 +95,25 @@ func (c *HTTPClient) doRequest(ctx context.Context, method, path string, body in
 // Instance operations
 
 func (c *HTTPClient) ListInstances(ctx context.Context) ([]Instance, error) {
+	// Always use k3d provider for listing instances
+	// This ensures we can see instances even when their API is not running
+	if c.k3dProvider != nil {
+		return c.k3dProvider.ListInstances(ctx)
+	}
+	
+	// Fallback to API if k3d provider is not available
 	var instances []Instance
 	err := c.doRequest(ctx, "GET", "/api/instances", nil, &instances)
 	return instances, err
 }
 
 func (c *HTTPClient) GetInstance(ctx context.Context, name string) (*Instance, error) {
+	// Always use k3d provider for getting instance info
+	if c.k3dProvider != nil {
+		return c.k3dProvider.GetInstance(ctx, name)
+	}
+	
+	// Fallback to API if k3d provider is not available
 	var instance Instance
 	path := fmt.Sprintf("/api/instances/%s", url.PathEscape(name))
 	err := c.doRequest(ctx, "GET", path, nil, &instance)
@@ -106,6 +124,13 @@ func (c *HTTPClient) GetInstance(ctx context.Context, name string) (*Instance, e
 }
 
 func (c *HTTPClient) CreateInstance(ctx context.Context, opts CreateInstanceOptions) (*Instance, error) {
+	// Always use k3d provider for creating instances
+	// This ensures we can create instances without any KECS API running
+	if c.k3dProvider != nil {
+		return c.k3dProvider.CreateInstance(ctx, opts)
+	}
+	
+	// Fallback to API if k3d provider is not available
 	var instance Instance
 	err := c.doRequest(ctx, "POST", "/api/instances", opts, &instance)
 	if err != nil {
@@ -115,15 +140,26 @@ func (c *HTTPClient) CreateInstance(ctx context.Context, opts CreateInstanceOpti
 }
 
 func (c *HTTPClient) DeleteInstance(ctx context.Context, name string) error {
+	// Always use k3d provider for deleting instances
+	if c.k3dProvider != nil {
+		return c.k3dProvider.DeleteInstance(ctx, name)
+	}
+	
+	// Fallback to API if k3d provider is not available
 	path := fmt.Sprintf("/api/instances/%s", url.PathEscape(name))
 	return c.doRequest(ctx, "DELETE", path, nil, nil)
 }
 
 func (c *HTTPClient) GetInstanceLogs(ctx context.Context, name string, follow bool) (<-chan LogEntry, error) {
-	// TODO: Implement streaming logs
+	// Always use k3d provider for getting instance logs
+	if c.k3dProvider != nil {
+		return c.k3dProvider.GetInstanceLogs(ctx, name, follow)
+	}
+	
+	// Fallback: streaming logs not implemented for HTTP API
 	ch := make(chan LogEntry)
 	close(ch)
-	return ch, fmt.Errorf("streaming logs not implemented")
+	return ch, fmt.Errorf("streaming logs not implemented for HTTP API")
 }
 
 // ECS Cluster operations
@@ -328,4 +364,12 @@ func (c *HTTPClient) DescribeTaskDefinition(ctx context.Context, instanceName st
 func (c *HTTPClient) HealthCheck(ctx context.Context, instanceName string) error {
 	path := fmt.Sprintf("/api/instances/%s/health", url.PathEscape(instanceName))
 	return c.doRequest(ctx, "GET", path, nil, nil)
+}
+
+// Close cleans up resources
+func (c *HTTPClient) Close() error {
+	if c.k3dProvider != nil {
+		return c.k3dProvider.Close()
+	}
+	return nil
 }
