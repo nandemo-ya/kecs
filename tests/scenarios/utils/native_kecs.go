@@ -91,20 +91,17 @@ func (m *NativeKECSManager) StartKECS(testName string) (*NativeKECSInstance, err
 	// Build the kecs start command
 	args := []string{
 		"start",
-		"--name", containerName,
-		"--image", m.imageTag,
+		"--instance", containerName,
 		"--api-port", fmt.Sprintf("%d", apiPort),
 		"--admin-port", fmt.Sprintf("%d", adminPort),
 		"--data-dir", dataDir,
-		"--detach",
 	}
 	
-	if m.localBuild {
-		args = append(args, "--local-build")
-	}
+	// LocalBuild mode is no longer needed with controlplane command
 	
-	// Execute kecs start command
-	cmd := exec.Command("kecs", args...)
+	// Execute controlplane start command
+	controlplanePath := filepath.Join(os.Getenv("GOPATH"), "src/github.com/nandemo-ya/kecs/controlplane/bin/controlplane")
+	cmd := exec.Command(controlplanePath, args...)
 	
 	// Set environment variables
 	cmd.Env = append(os.Environ(),
@@ -171,20 +168,17 @@ func (m *NativeKECSManager) StartKECSWithDataDir(testName string, dataDir string
 	// Build the kecs start command
 	args := []string{
 		"start",
-		"--name", containerName,
-		"--image", m.imageTag,
+		"--instance", containerName,
 		"--api-port", fmt.Sprintf("%d", apiPort),
 		"--admin-port", fmt.Sprintf("%d", adminPort),
 		"--data-dir", dataDir,
-		"--detach",
 	}
 	
-	if m.localBuild {
-		args = append(args, "--local-build")
-	}
+	// LocalBuild mode is no longer needed with controlplane command
 	
-	// Execute kecs start command
-	cmd := exec.Command("kecs", args...)
+	// Execute controlplane start command
+	controlplanePath := filepath.Join(os.Getenv("GOPATH"), "src/github.com/nandemo-ya/kecs/controlplane/bin/controlplane")
+	cmd := exec.Command(controlplanePath, args...)
 	
 	// Set environment variables
 	cmd.Env = append(os.Environ(),
@@ -238,7 +232,8 @@ func (m *NativeKECSManager) StopKECS(instance *NativeKECSInstance) error {
 	var errors []error
 	
 	// Stop the container
-	cmd := exec.Command("kecs", "stop", "--name", instance.ContainerName)
+	controlplanePath := filepath.Join(os.Getenv("GOPATH"), "src/github.com/nandemo-ya/kecs/controlplane/bin/controlplane")
+	cmd := exec.Command(controlplanePath, "stop", "--instance", instance.ContainerName)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		// Log but don't fail - container might already be stopped
 		fmt.Printf("Warning: failed to stop container %s: %v\nOutput: %s\n", 
