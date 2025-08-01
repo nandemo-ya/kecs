@@ -95,6 +95,7 @@ func (m Model) getHeaderShortcuts() string {
 	case ViewInstances:
 		shortcuts = []string{
 			keyStyle.Render("<N>") + sepStyle.Render(" New"),
+			keyStyle.Render("<T>") + sepStyle.Render(" TaskDefs"),
 			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
 			keyStyle.Render("</>") + sepStyle.Render(" Search"),
 			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
@@ -221,6 +222,15 @@ func (m Model) renderBreadcrumb() string {
 		parts = append(parts, ">", "[Logs]")
 	}
 	
+	// Task Definition navigation
+	if m.currentView == ViewTaskDefinitionFamilies || m.currentView == ViewTaskDefinitionRevisions {
+		parts = append(parts, ">", "[Task Definitions]")
+		
+		if m.currentView == ViewTaskDefinitionRevisions && m.selectedFamily != "" {
+			parts = append(parts, ">", m.selectedFamily)
+		}
+	}
+	
 	breadcrumb := strings.Join(parts, " ")
 	
 	// Calculate the same width as header for consistency
@@ -298,6 +308,10 @@ func (m Model) renderFooter() string {
 		right = fmt.Sprintf("Tasks: %d", len(m.filterTasks(m.tasks)))
 	case ViewLogs:
 		right = fmt.Sprintf("Logs: %d", len(m.filterLogs(m.logs)))
+	case ViewTaskDefinitionFamilies:
+		right = fmt.Sprintf("Families: %d", len(m.filterTaskDefFamilies(m.taskDefFamilies)))
+	case ViewTaskDefinitionRevisions:
+		right = fmt.Sprintf("Revisions: %d", len(m.taskDefRevisions))
 	}
 	
 	// Calculate spacing
@@ -453,6 +467,36 @@ func (m Model) renderSummary() string {
 		if m.selectedTask != "" {
 			// Keep log view summary short and on one line
 			summary = fmt.Sprintf("Log entries: %d", len(m.logs))
+		}
+		
+	case ViewTaskDefinitionFamilies:
+		if m.selectedInstance != "" {
+			active := 0
+			total := len(m.taskDefFamilies)
+			for _, family := range m.taskDefFamilies {
+				if family.ActiveCount > 0 {
+					active++
+				}
+			}
+			summary = fmt.Sprintf("Instance: %s | Task Definition Families: %d | Active: %d",
+				m.selectedInstance, total, active)
+		}
+		
+	case ViewTaskDefinitionRevisions:
+		if m.selectedFamily != "" {
+			active := 0
+			total := len(m.taskDefRevisions)
+			for _, rev := range m.taskDefRevisions {
+				if rev.Status == "ACTIVE" {
+					active++
+				}
+			}
+			latestRev := 0
+			if len(m.taskDefRevisions) > 0 {
+				latestRev = m.taskDefRevisions[0].Revision
+			}
+			summary = fmt.Sprintf("Family: %s | Revisions: %d | Active: %d | Latest: %d",
+				m.selectedFamily, total, active, latestRev)
 		}
 	}
 	
@@ -1143,6 +1187,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 			keyStyle.Render("↵")+" "+descStyle.Render("Select"),
 			keyStyle.Render("S")+" "+descStyle.Render("Start/Stop"),
 			keyStyle.Render("D")+" "+descStyle.Render("Delete"),
+			keyStyle.Render("T")+" "+descStyle.Render("Task defs"),
 		)
 	case ViewClusters:
 		shortcuts = append(shortcuts,
@@ -1462,7 +1507,7 @@ Resource Navigation:
   c           Go to clusters
   s           Go to services
   t           Go to tasks
-  d           Go to task definitions (from instances)
+  T           Go to task definitions (from any view with instance selected)
 
 Instance Operations:
   N           Create new instance (Instances view)

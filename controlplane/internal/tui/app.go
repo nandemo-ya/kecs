@@ -447,7 +447,7 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
 		}
-	case "d":
+	case "T":
 		// Navigate to task definitions
 		if m.selectedInstance != "" {
 			m.currentView = ViewTaskDefinitionFamilies
@@ -503,6 +503,13 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.instanceSwitcher = NewInstanceSwitcher(m.instances)
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
+		}
+	case "T":
+		// Navigate to task definitions
+		if m.selectedInstance != "" {
+			m.currentView = ViewTaskDefinitionFamilies
+			m.taskDefFamilyCursor = 0
+			return m, m.loadTaskDefinitionFamiliesCmd()
 		}
 	}
 	return m, nil
@@ -566,6 +573,13 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
 		}
+	case "T":
+		// Navigate to task definitions
+		if m.selectedInstance != "" {
+			m.currentView = ViewTaskDefinitionFamilies
+			m.taskDefFamilyCursor = 0
+			return m, m.loadTaskDefinitionFamiliesCmd()
+		}
 	}
 	return m, nil
 }
@@ -617,6 +631,13 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.instanceSwitcher = NewInstanceSwitcher(m.instances)
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
+		}
+	case "T":
+		// Navigate to task definitions
+		if m.selectedInstance != "" {
+			m.currentView = ViewTaskDefinitionFamilies
+			m.taskDefFamilyCursor = 0
+			return m, m.loadTaskDefinitionFamiliesCmd()
 		}
 	}
 	return m, nil
