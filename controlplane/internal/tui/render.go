@@ -370,11 +370,19 @@ func (m Model) renderNavigationPanel() string {
 	breadcrumb := m.renderBreadcrumb()
 	summary := m.renderSummary()
 	
+	// Add separator line after breadcrumb
+	separatorWidth := leftColumnWidth - 2 // Account for padding
+	if separatorWidth < 20 {
+		separatorWidth = 20
+	}
+	topSeparator := separatorStyle.Render(strings.Repeat("─", separatorWidth))
+	
 	// Combine left column elements
 	leftColumn := lipgloss.JoinVertical(
 		lipgloss.Top,
 		header,
 		breadcrumb,
+		topSeparator,
 		summary,
 	)
 	
@@ -461,8 +469,41 @@ func (m Model) renderSummary() string {
 				totalServices += cluster.Services
 				totalTasks += cluster.Tasks
 			}
-			summary = fmt.Sprintf("Instance: %s | Clusters: %d | Total Services: %d | Total Tasks: %d",
-				m.selectedInstance, len(m.clusters), totalServices, totalTasks)
+			
+			// Find instance configuration
+			var features []string
+			var apiPort, adminPort int
+			for _, inst := range m.instances {
+				if inst.Name == m.selectedInstance {
+					apiPort = inst.APIPort
+					adminPort = inst.AdminPort
+					if inst.LocalStack {
+						features = append(features, "LocalStack")
+					}
+					if inst.Traefik {
+						features = append(features, "Traefik")
+					}
+					if inst.DevMode {
+						features = append(features, "DevMode")
+					}
+					break
+				}
+			}
+			
+			// Build vertical layout with proper alignment
+			line1 := fmt.Sprintf("Clusters: %-4d  API:   %d", len(m.clusters), apiPort)
+			line2 := fmt.Sprintf("Services: %-4d  Admin: %d", totalServices, adminPort)
+			line3 := fmt.Sprintf("Tasks:    %-4d", totalTasks)
+			
+			// Add features on the same line if they exist
+			if len(features) > 0 {
+				line3 += "  " + strings.Join(features, ", ")
+			}
+			
+			// Create multi-line summary with consistent styling
+			summary = summaryStyle.Render(line1) + "\n" + 
+			         summaryStyle.Render(line2) + "\n" + 
+			         summaryStyle.Render(line3)
 		}
 		
 	case ViewServices:
@@ -473,8 +514,32 @@ func (m Model) renderSummary() string {
 				totalDesired += svc.Desired
 				totalRunning += svc.Running
 			}
-			summary = fmt.Sprintf("Cluster: %s | Services: %d | Desired Tasks: %d | Running Tasks: %d",
-				m.selectedCluster, len(m.services), totalDesired, totalRunning)
+			
+			// Add instance configuration info
+			var instanceInfo string
+			if m.selectedInstance != "" {
+				var features []string
+				for _, inst := range m.instances {
+					if inst.Name == m.selectedInstance {
+						if inst.LocalStack {
+							features = append(features, "LocalStack")
+						}
+						if inst.Traefik {
+							features = append(features, "Traefik")
+						}
+						if inst.DevMode {
+							features = append(features, "DevMode")
+						}
+						break
+					}
+				}
+				if len(features) > 0 {
+					instanceInfo = " | " + strings.Join(features, ", ")
+				}
+			}
+			
+			summary = fmt.Sprintf("Cluster: %s | Services: %d | Desired Tasks: %d | Running Tasks: %d%s",
+				m.selectedCluster, len(m.services), totalDesired, totalRunning, instanceInfo)
 		}
 		
 	case ViewTasks:
@@ -542,6 +607,16 @@ func (m Model) renderSummary() string {
 		separatorWidth = 20
 	}
 	separator := strings.Repeat("─", separatorWidth)
+	
+	// For multi-line summaries (which contain newlines), we need to handle them differently
+	if strings.Contains(summary, "\n") {
+		// Multi-line summary - add style and separator at the end
+		return lipgloss.JoinVertical(
+			lipgloss.Top,
+			summary, // Already styled per line
+			separatorStyle.Render(separator),
+		)
+	}
 	
 	return lipgloss.JoinVertical(
 		lipgloss.Top,

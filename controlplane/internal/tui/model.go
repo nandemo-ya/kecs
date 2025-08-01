@@ -31,14 +31,18 @@ const (
 
 // Instance represents a KECS instance
 type Instance struct {
-	Name      string
-	Status    string
-	Clusters  int
-	Services  int
-	Tasks     int
-	APIPort   int
-	Age       time.Duration
-	Selected  bool
+	Name       string
+	Status     string
+	Clusters   int
+	Services   int
+	Tasks      int
+	APIPort    int
+	AdminPort  int
+	LocalStack bool
+	Traefik    bool
+	DevMode    bool
+	Age        time.Duration
+	Selected   bool
 }
 
 // Cluster represents an ECS cluster

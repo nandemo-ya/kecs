@@ -20,14 +20,17 @@ import (
 
 // Instance represents a KECS instance from the API
 type Instance struct {
-	Name      string    `json:"name"`
-	Status    string    `json:"status"`
-	Clusters  int       `json:"clusters"`
-	Services  int       `json:"services"`
-	Tasks     int       `json:"tasks"`
-	APIPort   int       `json:"apiPort"`
-	AdminPort int       `json:"adminPort"`
-	CreatedAt time.Time `json:"createdAt"`
+	Name       string    `json:"name"`
+	Status     string    `json:"status"`
+	Clusters   int       `json:"clusters"`
+	Services   int       `json:"services"`
+	Tasks      int       `json:"tasks"`
+	APIPort    int       `json:"apiPort"`
+	AdminPort  int       `json:"adminPort"`
+	LocalStack bool      `json:"localStack"`
+	Traefik    bool      `json:"traefik"`
+	DevMode    bool      `json:"devMode"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 // CreateInstanceOptions contains options for creating a new instance

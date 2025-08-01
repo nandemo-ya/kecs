@@ -16,13 +16,17 @@ type DataMsg struct {
 
 // InstanceMsg represents instance data for messaging
 type InstanceMsg struct {
-	Name      string
-	Status    string
-	Clusters  int
-	Services  int
-	Tasks     int
-	APIPort   int
-	Age       time.Duration
+	Name       string
+	Status     string
+	Clusters   int
+	Services   int
+	Tasks      int
+	APIPort    int
+	AdminPort  int
+	LocalStack bool
+	Traefik    bool
+	DevMode    bool
+	Age        time.Duration
 }
 
 // ClusterMsg represents cluster data for messaging
@@ -79,13 +83,17 @@ func LoadAllData(selectedInstance, selectedCluster, selectedService, selectedTas
 		result.Instances = make([]InstanceMsg, len(instanceData))
 		for i, data := range instanceData {
 			result.Instances[i] = InstanceMsg{
-				Name:     data.Name,
-				Status:   data.Status,
-				Clusters: data.Clusters,
-				Services: data.Services,
-				Tasks:    data.Tasks,
-				APIPort:  data.APIPort,
-				Age:      data.Age,
+				Name:       data.Name,
+				Status:     data.Status,
+				Clusters:   data.Clusters,
+				Services:   data.Services,
+				Tasks:      data.Tasks,
+				APIPort:    data.APIPort,
+				AdminPort:  data.AdminPort,
+				LocalStack: data.LocalStack,
+				Traefik:    data.Traefik,
+				DevMode:    data.DevMode,
+				Age:        data.Age,
 			}
 		}
 		
