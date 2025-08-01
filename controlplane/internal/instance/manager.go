@@ -86,6 +86,12 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 	if err := os.MkdirAll(opts.DataDir, 0755); err != nil {
 		return fmt.Errorf("failed to create data directory: %w", err)
 	}
+	
+	// Save instance configuration
+	if err := SaveInstanceConfig(opts.InstanceName, opts); err != nil {
+		// Log warning but don't fail - config saving is not critical
+		// TODO: Add proper logging here
+	}
 
 	// Step 1: Create k3d cluster
 	if err := m.createCluster(ctx, opts.InstanceName, cfg, opts); err != nil {

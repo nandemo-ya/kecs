@@ -84,7 +84,7 @@ func (p *K3dInstanceProvider) ListInstances(ctx context.Context) ([]Instance, er
 
 // getInstanceInfo retrieves detailed information about a KECS instance
 func (p *K3dInstanceProvider) getInstanceInfo(ctx context.Context, name string) (Instance, error) {
-	instance := Instance{
+	inst := Instance{
 		Name:      name,
 		Status:    "Unknown",
 		Clusters:  0,
@@ -93,17 +93,27 @@ func (p *K3dInstanceProvider) getInstanceInfo(ctx context.Context, name string) 
 		APIPort:   8080,
 		CreatedAt: time.Now(), // Default value
 	}
+	
+	// Try to load saved configuration
+	if config, err := instance.LoadInstanceConfig(name); err == nil {
+		inst.APIPort = config.APIPort
+		inst.AdminPort = config.AdminPort
+		inst.LocalStack = config.LocalStack
+		inst.Traefik = config.Traefik
+		inst.DevMode = config.DevMode
+		inst.CreatedAt = config.CreatedAt
+	}
 
 	// Check if cluster is running
 	running, err := p.k3dManager.IsClusterRunning(ctx, name)
 	if err != nil {
-		return instance, err
+		return inst, err
 	}
 
 	if running {
-		instance.Status = "Running"
+		inst.Status = "Running"
 	} else {
-		instance.Status = "Stopped"
+		inst.Status = "Stopped"
 	}
 
 	// Get container info for more details
@@ -113,36 +123,36 @@ func (p *K3dInstanceProvider) getInstanceInfo(ctx context.Context, name string) 
 		// Extract port mapping
 		for _, port := range containerInfo.Ports {
 			if port.PrivatePort == 8080 {
-				instance.APIPort = int(port.PublicPort)
+				inst.APIPort = int(port.PublicPort)
 				break
 			}
 		}
 
 		// Get creation time
 		if containerInfo.Created > 0 {
-			instance.CreatedAt = time.Unix(containerInfo.Created, 0)
+			inst.CreatedAt = time.Unix(containerInfo.Created, 0)
 		}
 
 		// Update status based on container state
 		switch containerInfo.State {
 		case "running":
-			instance.Status = "Running"
+			inst.Status = "Running"
 		case "exited":
-			instance.Status = "Stopped"
+			inst.Status = "Stopped"
 		case "created":
-			instance.Status = "Created"
+			inst.Status = "Created"
 		default:
-			instance.Status = strings.Title(containerInfo.State)
+			inst.Status = strings.Title(containerInfo.State)
 		}
 	}
 
 	// If instance is running, try to get resource counts from API
-	if instance.Status == "Running" {
+	if inst.Status == "Running" {
 		// This will be done through the API client if available
 		// For now, we just return the basic info
 	}
 
-	return instance, nil
+	return inst, nil
 }
 
 // getContainerInfo retrieves Docker container information
@@ -181,11 +191,11 @@ func (p *K3dInstanceProvider) CreateInstance(ctx context.Context, opts CreateIns
 	}
 	
 	// Return the created instance info
-	instance, err := p.getInstanceInfo(ctx, opts.Name)
+	inst, err := p.getInstanceInfo(ctx, opts.Name)
 	if err != nil {
 		return nil, err
 	}
-	return &instance, nil
+	return &inst, nil
 }
 
 // GetInstance retrieves a specific KECS instance information
@@ -199,11 +209,11 @@ func (p *K3dInstanceProvider) GetInstance(ctx context.Context, name string) (*In
 		return nil, fmt.Errorf("instance not found: %s", name)
 	}
 	
-	instance, err := p.getInstanceInfo(ctx, name)
+	inst, err := p.getInstanceInfo(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	return &instance, nil
+	return &inst, nil
 }
 
 // GetInstanceLogs retrieves logs from the KECS instance container

@@ -51,13 +51,17 @@ func (m Model) loadDataFromAPI() tea.Cmd {
 		tuiInstances := make([]Instance, len(instances))
 		for i, inst := range instances {
 			tuiInstances[i] = Instance{
-				Name:     inst.Name,
-				Status:   inst.Status,
-				Clusters: inst.Clusters,
-				Services: inst.Services,
-				Tasks:    inst.Tasks,
-				APIPort:  inst.APIPort,
-				Age:      time.Since(inst.CreatedAt),
+				Name:       inst.Name,
+				Status:     inst.Status,
+				Clusters:   inst.Clusters,
+				Services:   inst.Services,
+				Tasks:      inst.Tasks,
+				APIPort:    inst.APIPort,
+				AdminPort:  inst.AdminPort,
+				LocalStack: inst.LocalStack,
+				Traefik:    inst.Traefik,
+				DevMode:    inst.DevMode,
+				Age:        time.Since(inst.CreatedAt),
 			}
 		}
 
@@ -166,13 +170,17 @@ func (m Model) createInstanceCmd(opts api.CreateInstanceOptions) tea.Cmd {
 
 		return instanceCreatedMsg{
 			instance: Instance{
-				Name:     instance.Name,
-				Status:   instance.Status,
-				Clusters: instance.Clusters,
-				Services: instance.Services,
-				Tasks:    instance.Tasks,
-				APIPort:  instance.APIPort,
-				Age:      time.Since(instance.CreatedAt),
+				Name:       instance.Name,
+				Status:     instance.Status,
+				Clusters:   instance.Clusters,
+				Services:   instance.Services,
+				Tasks:      instance.Tasks,
+				APIPort:    instance.APIPort,
+				AdminPort:  instance.AdminPort,
+				LocalStack: instance.LocalStack,
+				Traefik:    instance.Traefik,
+				DevMode:    instance.DevMode,
+				Age:        time.Since(instance.CreatedAt),
 			},
 		}
 	}
@@ -266,13 +274,17 @@ func (m Model) updateInstanceStatusCmd() tea.Cmd {
 			}
 			
 			tuiInstances[i] = Instance{
-				Name:     inst.Name,
-				Status:   inst.Status,
-				Clusters: inst.Clusters,
-				Services: inst.Services,
-				Tasks:    inst.Tasks,
-				APIPort:  inst.APIPort,
-				Age:      time.Since(inst.CreatedAt),
+				Name:       inst.Name,
+				Status:     inst.Status,
+				Clusters:   inst.Clusters,
+				Services:   inst.Services,
+				Tasks:      inst.Tasks,
+				APIPort:    inst.APIPort,
+				AdminPort:  inst.AdminPort,
+				LocalStack: inst.LocalStack,
+				Traefik:    inst.Traefik,
+				DevMode:    inst.DevMode,
+				Age:        time.Since(inst.CreatedAt),
 			}
 		}
 		

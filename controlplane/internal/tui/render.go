@@ -461,8 +461,34 @@ func (m Model) renderSummary() string {
 				totalServices += cluster.Services
 				totalTasks += cluster.Tasks
 			}
-			summary = fmt.Sprintf("Instance: %s | Clusters: %d | Total Services: %d | Total Tasks: %d",
-				m.selectedInstance, len(m.clusters), totalServices, totalTasks)
+			
+			// Find instance configuration
+			var features []string
+			var apiPort, adminPort int
+			for _, inst := range m.instances {
+				if inst.Name == m.selectedInstance {
+					apiPort = inst.APIPort
+					adminPort = inst.AdminPort
+					if inst.LocalStack {
+						features = append(features, "LocalStack")
+					}
+					if inst.Traefik {
+						features = append(features, "Traefik")
+					}
+					if inst.DevMode {
+						features = append(features, "DevMode")
+					}
+					break
+				}
+			}
+			
+			featuresStr := ""
+			if len(features) > 0 {
+				featuresStr = " | Features: " + strings.Join(features, ", ")
+			}
+			
+			summary = fmt.Sprintf("Instance: %s | Clusters: %d | Total Services: %d | Total Tasks: %d | API: :%d | Admin: :%d%s",
+				m.selectedInstance, len(m.clusters), totalServices, totalTasks, apiPort, adminPort, featuresStr)
 		}
 		
 	case ViewServices:
@@ -473,8 +499,32 @@ func (m Model) renderSummary() string {
 				totalDesired += svc.Desired
 				totalRunning += svc.Running
 			}
-			summary = fmt.Sprintf("Cluster: %s | Services: %d | Desired Tasks: %d | Running Tasks: %d",
-				m.selectedCluster, len(m.services), totalDesired, totalRunning)
+			
+			// Add instance configuration info
+			var instanceInfo string
+			if m.selectedInstance != "" {
+				var features []string
+				for _, inst := range m.instances {
+					if inst.Name == m.selectedInstance {
+						if inst.LocalStack {
+							features = append(features, "LocalStack")
+						}
+						if inst.Traefik {
+							features = append(features, "Traefik")
+						}
+						if inst.DevMode {
+							features = append(features, "DevMode")
+						}
+						break
+					}
+				}
+				if len(features) > 0 {
+					instanceInfo = " | " + strings.Join(features, ", ")
+				}
+			}
+			
+			summary = fmt.Sprintf("Cluster: %s | Services: %d | Desired Tasks: %d | Running Tasks: %d%s",
+				m.selectedCluster, len(m.services), totalDesired, totalRunning, instanceInfo)
 		}
 		
 	case ViewTasks:
