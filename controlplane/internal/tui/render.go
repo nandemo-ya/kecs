@@ -370,11 +370,19 @@ func (m Model) renderNavigationPanel() string {
 	breadcrumb := m.renderBreadcrumb()
 	summary := m.renderSummary()
 	
+	// Add separator line after breadcrumb
+	separatorWidth := leftColumnWidth - 2 // Account for padding
+	if separatorWidth < 20 {
+		separatorWidth = 20
+	}
+	topSeparator := separatorStyle.Render(strings.Repeat("─", separatorWidth))
+	
 	// Combine left column elements
 	leftColumn := lipgloss.JoinVertical(
 		lipgloss.Top,
 		header,
 		breadcrumb,
+		topSeparator,
 		summary,
 	)
 	
