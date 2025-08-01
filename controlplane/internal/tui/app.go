@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -110,6 +111,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m, cmd = m.handleLogsKeys(msg)
 		case ViewHelp:
 			m, cmd = m.handleHelpKeys(msg)
+		case ViewConfirmDialog:
+			m, cmd = m.handleConfirmDialogKeys(msg)
 		}
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -275,6 +278,11 @@ func (m Model) View() string {
 	if m.currentView == ViewTaskDescribe {
 		return m.renderTaskDescribeView()
 	}
+	
+	// For confirm dialog, use overlay
+	if m.currentView == ViewConfirmDialog {
+		return m.renderConfirmDialogOverlay()
+	}
 
 	// Calculate exact heights for panels
 	footerHeight := 1
@@ -340,9 +348,43 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			// Toggle status in mock
 		}
 	case "D":
-		// Delete instance (mock)
-		if len(m.instances) > 0 {
-			// Show confirmation dialog in real implementation
+		// Delete instance
+		if len(m.instances) > 0 && m.instanceCursor < len(m.instances) {
+			instanceName := m.instances[m.instanceCursor].Name
+			
+			// Don't allow deleting "default" instance  
+			if instanceName == "default" {
+				m.err = fmt.Errorf("Cannot delete default instance")
+				return m, nil
+			}
+			
+			// Create confirmation dialog
+			m.confirmDialog = DeleteInstanceDialog(
+				instanceName,
+				func() error {
+					// Delete instance via API
+					ctx := context.Background()
+					err := m.apiClient.DeleteInstance(ctx, instanceName)
+					if err != nil {
+						return err
+					}
+					
+					// If the deleted instance was selected, clear selection
+					if m.selectedInstance == instanceName {
+						m.selectedInstance = ""
+					}
+					
+					// Reload instances
+					return nil
+				},
+				func() {
+					// Cancel - just close dialog
+				},
+			)
+			
+			m.previousView = m.currentView
+			m.currentView = ViewConfirmDialog
+			return m, nil
 		}
 	case "ctrl+i":
 		// Quick switch instance
@@ -610,6 +652,47 @@ func (m Model) handleCommandInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if len(msg.String()) == 1 || msg.String() == " " {
 			m.commandInput += msg.String()
 		}
+	}
+	return m, nil
+}
+
+func (m Model) handleConfirmDialogKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	if m.confirmDialog == nil {
+		// Safety check - go back to previous view
+		m.currentView = m.previousView
+		return m, nil
+	}
+	
+	switch msg.String() {
+	case "left", "h":
+		m.confirmDialog.FocusYes()
+	case "right", "l":
+		m.confirmDialog.FocusNo()
+	case "tab":
+		// Toggle between Yes and No
+		if m.confirmDialog.focused {
+			m.confirmDialog.FocusNo()
+		} else {
+			m.confirmDialog.FocusYes()
+		}
+	case "enter", " ":
+		// Execute the selected action
+		err := m.confirmDialog.Execute()
+		if err != nil {
+			m.err = err
+		}
+		// Clear dialog and go back
+		m.confirmDialog = nil
+		m.currentView = m.previousView
+		// Reload data after potential deletion
+		return m, m.loadMockDataCmd()
+	case "esc", "q":
+		// Cancel and go back
+		if m.confirmDialog.onNo != nil {
+			m.confirmDialog.onNo()
+		}
+		m.confirmDialog = nil
+		m.currentView = m.previousView
 	}
 	return m, nil
 }

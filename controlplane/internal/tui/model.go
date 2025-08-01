@@ -21,6 +21,7 @@ const (
 	ViewCommandPalette
 	ViewInstanceCreate
 	ViewTaskDescribe
+	ViewConfirmDialog
 )
 
 // Instance represents a KECS instance
@@ -120,6 +121,9 @@ type Model struct {
 	
 	// Instance form
 	instanceForm    *InstanceForm
+	
+	// Confirm dialog
+	confirmDialog   *ConfirmDialog
 	
 	// Update control
 	lastUpdate      time.Time

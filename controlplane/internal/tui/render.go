@@ -1504,3 +1504,14 @@ func (m Model) renderLogsView() string {
 	return m.renderLogsContent(m.height - 4)
 }
 
+// renderConfirmDialogOverlay renders the confirmation dialog as an overlay
+func (m Model) renderConfirmDialogOverlay() string {
+	if m.confirmDialog == nil {
+		// Fallback to normal view if no dialog
+		return m.View()
+	}
+	
+	// Simply render the dialog centered on screen
+	return m.confirmDialog.Render(m.width, m.height)
+}
+
