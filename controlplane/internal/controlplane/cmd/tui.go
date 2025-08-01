@@ -15,6 +15,8 @@
 package cmd
 
 import (
+	"os"
+	
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui"
 	"github.com/spf13/cobra"
 )
@@ -38,8 +40,10 @@ tasks, and task definitions with real-time updates.`,
   # Connect to remote KECS instance
   kecs tui --endpoint http://remote-kecs:8080`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Note: endpoint parameter is not used in TUI v2 mock implementation
-		// It will be used when we integrate with real backend
+		// Set endpoint as environment variable if provided
+		if tuiEndpoint != "" {
+			os.Setenv("KECS_API_ENDPOINT", tuiEndpoint)
+		}
 		
 		// Run the new TUI implementation
 		return tui.Run()

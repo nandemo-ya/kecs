@@ -41,9 +41,12 @@ func LoadConfig() Config {
 		cfg.UseMockData = false
 	}
 
-	// Allow explicit mock mode
-	if os.Getenv("KECS_TUI_MOCK") == "true" {
+	// Allow explicit mock mode control
+	mockEnv := os.Getenv("KECS_TUI_MOCK")
+	if mockEnv == "true" {
 		cfg.UseMockData = true
+	} else if mockEnv == "false" {
+		cfg.UseMockData = false
 	}
 
 	// Default endpoint if not set
