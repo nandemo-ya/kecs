@@ -482,13 +482,20 @@ func (m Model) renderSummary() string {
 				}
 			}
 			
-			featuresStr := ""
+			// Build vertical layout with proper alignment
+			line1 := fmt.Sprintf("Clusters: %-4d  API:   %d", len(m.clusters), apiPort)
+			line2 := fmt.Sprintf("Services: %-4d  Admin: %d", totalServices, adminPort)
+			line3 := fmt.Sprintf("Tasks:    %-4d", totalTasks)
+			
+			// Add features on the same line if they exist
 			if len(features) > 0 {
-				featuresStr = " | Features: " + strings.Join(features, ", ")
+				line3 += "  " + strings.Join(features, ", ")
 			}
 			
-			summary = fmt.Sprintf("Instance: %s | Clusters: %d | Total Services: %d | Total Tasks: %d | API: :%d | Admin: :%d%s",
-				m.selectedInstance, len(m.clusters), totalServices, totalTasks, apiPort, adminPort, featuresStr)
+			// Create multi-line summary with consistent styling
+			summary = summaryStyle.Render(line1) + "\n" + 
+			         summaryStyle.Render(line2) + "\n" + 
+			         summaryStyle.Render(line3)
 		}
 		
 	case ViewServices:
@@ -592,6 +599,16 @@ func (m Model) renderSummary() string {
 		separatorWidth = 20
 	}
 	separator := strings.Repeat("─", separatorWidth)
+	
+	// For multi-line summaries (which contain newlines), we need to handle them differently
+	if strings.Contains(summary, "\n") {
+		// Multi-line summary - add style and separator at the end
+		return lipgloss.JoinVertical(
+			lipgloss.Top,
+			summary, // Already styled per line
+			separatorStyle.Render(separator),
+		)
+	}
 	
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
