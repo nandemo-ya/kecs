@@ -22,6 +22,7 @@ const (
 	ViewInstanceCreate
 	ViewTaskDescribe
 	ViewConfirmDialog
+	ViewInstanceSwitcher
 )
 
 // Instance represents a KECS instance
@@ -125,6 +126,9 @@ type Model struct {
 	// Confirm dialog
 	confirmDialog   *ConfirmDialog
 	
+	// Instance switcher
+	instanceSwitcher *InstanceSwitcher
+	
 	// Update control
 	lastUpdate      time.Time
 	refreshInterval time.Duration
@@ -165,6 +169,7 @@ func NewModelWithClient(client api.Client) Model {
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		tickCmd(),
+		statusTickCmd(),
 		mock.LoadAllData("", "", "", ""),
 	)
 }
@@ -172,6 +177,9 @@ func (m Model) Init() tea.Cmd {
 // Messages for tea.Model updates
 
 type tickMsg time.Time
+
+// statusTickMsg is sent periodically to update instance status
+type statusTickMsg time.Time
 
 // DataLoadedMsg contains loaded data
 type DataLoadedMsg struct {
@@ -188,6 +196,13 @@ type DataLoadedMsg struct {
 func tickCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
 		return tickMsg(t)
+	})
+}
+
+// statusTickCmd creates a ticker for status updates
+func statusTickCmd() tea.Cmd {
+	return tea.Tick(10*time.Second, func(t time.Time) tea.Msg {
+		return statusTickMsg(t)
 	})
 }
 

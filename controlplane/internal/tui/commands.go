@@ -193,6 +193,11 @@ type errMsg struct {
 	err error
 }
 
+// instanceStatusUpdateMsg is sent when instance statuses are updated
+type instanceStatusUpdateMsg struct {
+	instances []Instance
+}
+
 // Helper functions
 func parseCPU(cpuStr string) float64 {
 	// Parse CPU string to float64
@@ -226,4 +231,50 @@ func extractTaskID(taskArn string) string {
 		return parts[len(parts)-1]
 	}
 	return taskArn
+}
+
+// updateInstanceStatusCmd updates the status of all instances
+func (m Model) updateInstanceStatusCmd() tea.Cmd {
+	if m.useMockData {
+		// For mock data, simulate status changes
+		return func() tea.Msg {
+			// No status changes in mock mode
+			return instanceStatusUpdateMsg{instances: m.instances}
+		}
+	}
+	
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		
+		instances, err := m.apiClient.ListInstances(ctx)
+		if err != nil {
+			// Don't show error for status updates, just return current state
+			return instanceStatusUpdateMsg{instances: m.instances}
+		}
+		
+		// Convert API instances to TUI instances
+		tuiInstances := make([]Instance, len(instances))
+		for i, inst := range instances {
+			// Check health status if instance is running
+			if inst.Status == "running" {
+				err := m.apiClient.HealthCheck(ctx, inst.Name)
+				if err != nil {
+					inst.Status = "unhealthy"
+				}
+			}
+			
+			tuiInstances[i] = Instance{
+				Name:     inst.Name,
+				Status:   inst.Status,
+				Clusters: inst.Clusters,
+				Services: inst.Services,
+				Tasks:    inst.Tasks,
+				APIPort:  inst.APIPort,
+				Age:      time.Since(inst.CreatedAt),
+			}
+		}
+		
+		return instanceStatusUpdateMsg{instances: tuiInstances}
+	}
 }
