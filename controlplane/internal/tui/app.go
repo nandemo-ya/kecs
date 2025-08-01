@@ -157,6 +157,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reset instance form if it exists
 		if m.instanceForm != nil {
 			m.instanceForm.successMsg = fmt.Sprintf("Instance '%s' created successfully", msg.instance.Name)
+			m.instanceForm.isCreating = false
+			m.instanceForm.errorMsg = ""
 			// Close form after short delay
 			cmds = append(cmds, tea.Sequence(
 				tea.Tick(1*time.Second, func(t time.Time) tea.Msg {
@@ -180,6 +182,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		// Handle API errors
 		m.err = msg.err
+		// If we're in instance creation, show error in form
+		if m.currentView == ViewInstanceCreate && m.instanceForm != nil {
+			m.instanceForm.errorMsg = msg.err.Error()
+			m.instanceForm.successMsg = ""
+			m.instanceForm.isCreating = false
+		}
 
 	case mock.DataMsg:
 		// Convert mock data to model data
@@ -335,9 +343,10 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "N":
 		// Open instance creation form
 		if m.instanceForm == nil {
-			m.instanceForm = NewInstanceForm()
+			m.instanceForm = NewInstanceFormWithSuggestions(m.instances)
 		} else {
-			m.instanceForm.Reset()
+			// Reset with new suggestions
+			m.instanceForm = NewInstanceFormWithSuggestions(m.instances)
 		}
 		m.previousView = m.currentView
 		m.currentView = ViewInstanceCreate
@@ -740,6 +749,17 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	
+	// If creating, only allow ESC to cancel
+	if m.instanceForm.isCreating {
+		if msg.String() == "esc" {
+			m.instanceForm.isCreating = false
+			m.instanceForm.successMsg = ""
+			m.currentView = m.previousView
+			m.instanceForm.Reset()
+		}
+		return m, nil
+	}
+	
 	switch msg.String() {
 	case "esc":
 		// Close form
@@ -784,8 +804,10 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				DevMode:    formData["devMode"].(bool),
 			}
 			
-			// Show creating message
+			// Show creating message and set loading state
 			m.instanceForm.successMsg = "Creating instance..."
+			m.instanceForm.isCreating = true
+			m.instanceForm.errorMsg = ""
 			
 			// Create instance via API
 			return m, m.createInstanceCmd(opts)
@@ -821,8 +843,10 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				DevMode:    formData["devMode"].(bool),
 			}
 			
-			// Show creating message
+			// Show creating message and set loading state
 			m.instanceForm.successMsg = "Creating instance..."
+			m.instanceForm.isCreating = true
+			m.instanceForm.errorMsg = ""
 			
 			// Create instance via API
 			return m, m.createInstanceCmd(opts)
