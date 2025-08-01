@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -22,13 +23,26 @@ type ServiceManager struct {
 	storage        storage.Storage
 	clusterManager ClusterManager
 	clientset      kubernetes.Interface
+	taskManager    *TaskManager
 }
 
 // NewServiceManager creates a new ServiceManager
 func NewServiceManager(storage storage.Storage, clusterManager ClusterManager) *ServiceManager {
+	// Create TaskManager if storage is available
+	var taskManager *TaskManager
+	if storage != nil {
+		tm, err := NewTaskManager(storage)
+		if err != nil {
+			logging.Warn("Failed to create TaskManager for ServiceManager", "error", err)
+		} else {
+			taskManager = tm
+		}
+	}
+	
 	sm := &ServiceManager{
 		storage:        storage,
 		clusterManager: clusterManager,
+		taskManager:    taskManager,
 	}
 	
 	// Initialize kubernetes client
@@ -161,6 +175,11 @@ func (sm *ServiceManager) CreateService(
 			logging.Warn("Failed to create kubernetes service",
 				"error", err)
 		}
+	}
+
+	// Start watching pods for this deployment to create ECS tasks
+	if sm.taskManager != nil {
+		go sm.watchServicePods(context.Background(), deployment, cluster, storageService)
 	}
 
 	// Update service status to ACTIVE after successful deployment using transaction
@@ -591,4 +610,167 @@ type ServiceStatus struct {
 	DesiredCount int
 	RunningCount int
 	PendingCount int
+}
+
+// watchServicePods watches pods created by a deployment and registers them as ECS tasks
+func (sm *ServiceManager) watchServicePods(ctx context.Context, deployment *appsv1.Deployment, cluster *storage.Cluster, service *storage.Service) {
+	if sm.taskManager == nil {
+		logging.Warn("TaskManager not available, cannot watch service pods")
+		return
+	}
+
+	// Initialize TaskManager client if needed
+	if err := sm.taskManager.InitializeClient(); err != nil {
+		logging.Error("Failed to initialize TaskManager client", "error", err)
+		return
+	}
+
+	// Use labels to watch pods for this deployment
+	labelSelector := fmt.Sprintf("app=%s", deployment.Name)
+	
+	// Get clientset
+	var clientset kubernetes.Interface
+	if sm.clientset != nil {
+		clientset = sm.clientset
+	} else if sm.taskManager.Clientset != nil {
+		clientset = sm.taskManager.Clientset
+	} else {
+		logging.Error("No kubernetes client available for watching pods")
+		return
+	}
+
+	// List existing pods first to register them
+	pods, err := clientset.CoreV1().Pods(deployment.Namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		logging.Error("Failed to list pods for service", "service", service.ServiceName, "error", err)
+		return
+	}
+
+	// Register existing pods as tasks
+	for _, pod := range pods.Items {
+		sm.registerPodAsTask(ctx, &pod, cluster, service)
+	}
+
+	// Watch for new pods
+	watcher, err := clientset.CoreV1().Pods(deployment.Namespace).Watch(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		logging.Error("Failed to watch pods for service", "service", service.ServiceName, "error", err)
+		return
+	}
+	defer watcher.Stop()
+
+	logging.Info("Started watching pods for service", "service", service.ServiceName, "namespace", deployment.Namespace)
+
+	for event := range watcher.ResultChan() {
+		pod, ok := event.Object.(*corev1.Pod)
+		if !ok {
+			continue
+		}
+
+		switch event.Type {
+		case "ADDED", "MODIFIED":
+			sm.registerPodAsTask(ctx, pod, cluster, service)
+		case "DELETED":
+			// Handle pod deletion - mark corresponding task as stopped
+			sm.handlePodDeletion(ctx, pod, cluster, service)
+		}
+	}
+}
+
+// registerPodAsTask registers a Kubernetes pod as an ECS task
+func (sm *ServiceManager) registerPodAsTask(ctx context.Context, pod *corev1.Pod, cluster *storage.Cluster, service *storage.Service) {
+	// Skip if pod is terminating
+	if pod.DeletionTimestamp != nil {
+		return
+	}
+
+	// Check if task already exists for this pod
+	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", 
+		service.Region, service.AccountID, cluster.Name, pod.Name)
+	
+	existingTask, err := sm.storage.TaskStore().Get(ctx, cluster.ARN, taskARN)
+	if err == nil && existingTask != nil {
+		// Task already exists, update status if needed
+		if sm.taskManager != nil {
+			if err := sm.taskManager.UpdateTaskStatus(ctx, taskARN, pod); err != nil {
+				logging.Warn("Failed to update task status", "task", taskARN, "error", err)
+			}
+		}
+		return
+	}
+
+	// Create new task
+	now := time.Now()
+	task := &storage.Task{
+		ID:                pod.Name,
+		ARN:               taskARN,
+		ClusterARN:        cluster.ARN,
+		TaskDefinitionARN: service.TaskDefinitionARN,
+		LastStatus:        mapPodPhaseToTaskStatus(pod.Status.Phase),
+		DesiredStatus:     "RUNNING",
+		LaunchType:        service.LaunchType,
+		StartedBy:         fmt.Sprintf("ecs-svc/%s", service.ServiceName),
+		Group:             fmt.Sprintf("service:%s", service.ServiceName),
+		PodName:           pod.Name,
+		Namespace:         pod.Namespace,
+		CreatedAt:         now,
+		Region:            service.Region,
+		AccountID:         service.AccountID,
+		Version:           1,
+		Connectivity:      "CONNECTED",
+		ConnectivityAt:    &now,
+		CPU:               "", // Will be set from task definition
+		Memory:            "", // Will be set from task definition,
+	}
+
+	// Create containers info from pod
+	containers := sm.taskManager.GetContainerStatuses(pod)
+	if len(containers) > 0 {
+		containersJSON, err := json.Marshal(containers)
+		if err == nil {
+			task.Containers = string(containersJSON)
+		}
+	}
+
+	// Store the task
+	if err := sm.storage.TaskStore().Create(ctx, task); err != nil {
+		logging.Error("Failed to create task for pod", "pod", pod.Name, "error", err)
+		return
+	}
+
+	logging.Info("Registered pod as ECS task", "pod", pod.Name, "task", taskARN, "service", service.ServiceName)
+
+	// Start watching the pod for status updates
+	if sm.taskManager != nil {
+		go sm.taskManager.watchPodStatus(context.Background(), taskARN, pod.Namespace, pod.Name)
+	}
+}
+
+// handlePodDeletion handles when a pod is deleted
+func (sm *ServiceManager) handlePodDeletion(ctx context.Context, pod *corev1.Pod, cluster *storage.Cluster, service *storage.Service) {
+	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", 
+		service.Region, service.AccountID, cluster.Name, pod.Name)
+	
+	task, err := sm.storage.TaskStore().Get(ctx, cluster.ARN, taskARN)
+	if err != nil || task == nil {
+		return
+	}
+
+	// Update task status to STOPPED
+	now := time.Now()
+	task.DesiredStatus = "STOPPED"
+	task.LastStatus = "STOPPED"
+	task.StoppedAt = &now
+	task.StoppedReason = "Service pod terminated"
+	task.Version++
+
+	if err := sm.storage.TaskStore().Update(ctx, task); err != nil {
+		logging.Error("Failed to update task status to STOPPED", "task", taskARN, "error", err)
+	}
+
+	logging.Info("Marked task as STOPPED due to pod deletion", "pod", pod.Name, "task", taskARN)
 }
