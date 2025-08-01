@@ -25,7 +25,7 @@ import (
 
 // TaskManager manages ECS tasks as Kubernetes pods
 type TaskManager struct {
-	clientset kubernetes.Interface
+	Clientset kubernetes.Interface
 	storage   storage.Storage
 }
 
@@ -35,7 +35,7 @@ func NewTaskManager(storage storage.Storage) (*TaskManager, error) {
 	if config.GetBool("features.containerMode") || os.Getenv("KECS_TEST_MODE") == "true" {
 		logging.Debug("Container/test mode enabled - deferring kubernetes client initialization")
 		return &TaskManager{
-			clientset: nil, // Will be initialized later
+			Clientset: nil, // Will be initialized later
 			storage:   storage,
 		}, nil
 	}
@@ -56,14 +56,14 @@ func NewTaskManager(storage storage.Storage) (*TaskManager, error) {
 	}
 
 	return &TaskManager{
-		clientset: clientset,
+		Clientset: clientset,
 		storage:   storage,
 	}, nil
 }
 
 // InitializeClient initializes the kubernetes client if not already initialized
 func (tm *TaskManager) InitializeClient() error {
-	if tm.clientset != nil {
+	if tm.Clientset != nil {
 		return nil // Already initialized
 	}
 	
@@ -88,7 +88,7 @@ func (tm *TaskManager) InitializeClient() error {
 		return fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
-	tm.clientset = clientset
+	tm.Clientset = clientset
 	logging.Debug("TaskManager kubernetes client initialized")
 	return nil
 }
@@ -96,7 +96,7 @@ func (tm *TaskManager) InitializeClient() error {
 // CreateTask creates a new task by deploying a pod
 func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *storage.Task, secrets map[string]*converters.SecretInfo) error {
 	// In test mode, skip actual pod creation
-	if tm.clientset == nil {
+	if tm.Clientset == nil {
 		logging.Debug("Kubernetes client not initialized - simulating task creation")
 		task.PodName = "test-pod-" + task.ID
 		task.Namespace = pod.Namespace
@@ -142,7 +142,7 @@ func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *st
 	}
 
 	// Create the pod
-	createdPod, err := tm.clientset.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+	createdPod, err := tm.Clientset.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create pod: %w", err)
 	}
@@ -157,7 +157,7 @@ func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *st
 	// Store task in database
 	if err := tm.storage.TaskStore().Create(ctx, task); err != nil {
 		// Try to clean up the pod if task storage fails
-		_ = tm.clientset.CoreV1().Pods(pod.Namespace).Delete(ctx, createdPod.Name, metav1.DeleteOptions{})
+		_ = tm.Clientset.CoreV1().Pods(pod.Namespace).Delete(ctx, createdPod.Name, metav1.DeleteOptions{})
 		return fmt.Errorf("failed to store task: %w", err)
 	}
 
@@ -190,8 +190,8 @@ func (tm *TaskManager) StopTask(ctx context.Context, cluster, taskID, reason str
 	}
 
 	// Delete the pod (skip if no kubernetes client)
-	if tm.clientset != nil && task.PodName != "" && task.Namespace != "" {
-		err := tm.clientset.CoreV1().Pods(task.Namespace).Delete(ctx, task.PodName, metav1.DeleteOptions{})
+	if tm.Clientset != nil && task.PodName != "" && task.Namespace != "" {
+		err := tm.Clientset.CoreV1().Pods(task.Namespace).Delete(ctx, task.PodName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete pod: %w", err)
 		}
@@ -216,7 +216,7 @@ func (tm *TaskManager) UpdateTaskStatus(ctx context.Context, taskARN string, pod
 	task.Version++
 
 	// Update container statuses
-	containers := tm.getContainerStatuses(pod)
+	containers := tm.GetContainerStatuses(pod)
 	containersJSON, err := json.Marshal(containers)
 	if err != nil {
 		return fmt.Errorf("failed to marshal container statuses: %w", err)
@@ -279,7 +279,7 @@ func (tm *TaskManager) watchPodStatus(ctx context.Context, taskARN, namespace, p
 	// Use a field selector to watch only this specific pod
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", podName).String()
 
-	watcher, err := tm.clientset.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
+	watcher, err := tm.Clientset.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
 		FieldSelector: fieldSelector,
 	})
 	if err != nil {
@@ -308,8 +308,8 @@ func (tm *TaskManager) watchPodStatus(ctx context.Context, taskARN, namespace, p
 	}
 }
 
-// getContainerStatuses extracts container status information
-func (tm *TaskManager) getContainerStatuses(pod *corev1.Pod) []types.Container {
+// GetContainerStatuses extracts container status information
+func (tm *TaskManager) GetContainerStatuses(pod *corev1.Pod) []types.Container {
 	containers := make([]types.Container, 0, len(pod.Status.ContainerStatuses))
 
 	for _, cs := range pod.Status.ContainerStatuses {
@@ -391,7 +391,7 @@ func mapPodPhaseToTaskStatus(phase corev1.PodPhase) string {
 func (tm *TaskManager) createSecrets(ctx context.Context, namespace string, secrets map[string]*converters.SecretInfo) error {
 	for arn, info := range secrets {
 		// Check if secret already exists
-		existingSecret, err := tm.clientset.CoreV1().Secrets(namespace).Get(ctx, info.SecretName, metav1.GetOptions{})
+		existingSecret, err := tm.Clientset.CoreV1().Secrets(namespace).Get(ctx, info.SecretName, metav1.GetOptions{})
 		if err == nil && existingSecret != nil {
 			// Secret already exists, skip creation
 			continue
@@ -417,7 +417,7 @@ func (tm *TaskManager) createSecrets(ctx context.Context, namespace string, secr
 			},
 		}
 
-		_, err = tm.clientset.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+		_, err = tm.Clientset.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			return fmt.Errorf("failed to create secret %s: %w", info.SecretName, err)
 		}
@@ -430,7 +430,7 @@ func (tm *TaskManager) createSecrets(ctx context.Context, namespace string, secr
 func (tm *TaskManager) CreateServiceDeployment(ctx context.Context, cluster *storage.Cluster, service *storage.Service, taskDef *storage.TaskDefinition) error {
 	// Ensure namespace exists
 	namespace := fmt.Sprintf("kecs-%s", cluster.Name)
-	if err := EnsureNamespace(ctx, tm.clientset, namespace); err != nil {
+	if err := EnsureNamespace(ctx, tm.Clientset, namespace); err != nil {
 		return fmt.Errorf("failed to ensure namespace: %w", err)
 	}
 
@@ -447,11 +447,11 @@ func (tm *TaskManager) CreateServiceDeployment(ctx context.Context, cluster *sto
 	k8sDeployment := converters.ConvertDeploymentToK8s(deploymentInfo, containerDefs)
 
 	// Create deployment in Kubernetes
-	_, err := tm.clientset.AppsV1().Deployments(namespace).Create(ctx, k8sDeployment, metav1.CreateOptions{})
+	_, err := tm.Clientset.AppsV1().Deployments(namespace).Create(ctx, k8sDeployment, metav1.CreateOptions{})
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
 			// Update existing deployment
-			_, err = tm.clientset.AppsV1().Deployments(namespace).Update(ctx, k8sDeployment, metav1.UpdateOptions{})
+			_, err = tm.Clientset.AppsV1().Deployments(namespace).Update(ctx, k8sDeployment, metav1.UpdateOptions{})
 			if err != nil {
 				return fmt.Errorf("failed to update existing deployment: %w", err)
 			}
