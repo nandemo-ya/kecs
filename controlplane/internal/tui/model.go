@@ -23,6 +23,10 @@ const (
 	ViewTaskDescribe
 	ViewConfirmDialog
 	ViewInstanceSwitcher
+	ViewTaskDefinitionFamilies
+	ViewTaskDefinitionRevisions
+	ViewTaskDefinitionEditor
+	ViewTaskDefinitionDiff
 )
 
 // Instance represents a KECS instance
@@ -81,6 +85,43 @@ type LogEntry struct {
 	Message   string
 }
 
+// TaskDefinitionFamily represents a task definition family
+type TaskDefinitionFamily struct {
+	Family         string
+	LatestRevision int
+	ActiveCount    int
+	TotalCount     int
+	LastUpdated    time.Time
+}
+
+// TaskDefinitionRevision represents a specific revision of a task definition
+type TaskDefinitionRevision struct {
+	Family     string
+	Revision   int
+	Status     string
+	CPU        string
+	Memory     string
+	CreatedAt  time.Time
+	JSON       string // Complete task definition JSON
+}
+
+// TaskDefinitionEditor manages task definition JSON editing
+type TaskDefinitionEditor struct {
+	family       string
+	baseRevision *int    // Source revision for copy
+	content      string  // JSON being edited
+	cursorLine   int
+	cursorCol    int
+	errors       []ValidationError
+}
+
+// ValidationError represents a JSON validation error
+type ValidationError struct {
+	Line    int
+	Column  int
+	Message string
+}
+
 // Model holds the application state
 type Model struct {
 	// View state
@@ -129,6 +170,21 @@ type Model struct {
 	// Instance switcher
 	instanceSwitcher *InstanceSwitcher
 	
+	// Task Definition state
+	taskDefFamilies      []TaskDefinitionFamily
+	taskDefRevisions     []TaskDefinitionRevision
+	selectedFamily       string
+	selectedRevision     int
+	taskDefFamilyCursor  int
+	taskDefRevisionCursor int
+	taskDefEditor        *TaskDefinitionEditor
+	showTaskDefJSON      bool  // 2-column display flag
+	taskDefJSONScroll    int   // JSON display scroll position
+	taskDefDiffMode      bool  // Diff display mode
+	diffRevision1        int   // Diff comparison target 1
+	diffRevision2        int   // Diff comparison target 2
+	taskDefJSONCache     map[int]string // Cache of loaded task definition JSONs by revision
+	
 	// Update control
 	lastUpdate      time.Time
 	refreshInterval time.Duration
@@ -150,6 +206,7 @@ func NewModel() Model {
 		commandPalette:  NewCommandPalette(),
 		useMockData:     true,  // Default to mock data for now
 		apiClient:       api.NewMockClient(),
+		taskDefJSONCache: make(map[int]string),
 	}
 }
 
@@ -162,6 +219,7 @@ func NewModelWithClient(client api.Client) Model {
 		commandPalette:  NewCommandPalette(),
 		useMockData:     false,
 		apiClient:       client,
+		taskDefJSONCache: make(map[int]string),
 	}
 }
 
@@ -241,6 +299,10 @@ func (m *Model) getCurrentListLength() int {
 		return len(m.filterTasks(m.tasks))
 	case ViewLogs:
 		return len(m.filterLogs(m.logs))
+	case ViewTaskDefinitionFamilies:
+		return len(m.filterTaskDefFamilies(m.taskDefFamilies))
+	case ViewTaskDefinitionRevisions:
+		return len(m.taskDefRevisions)
 	default:
 		return 0
 	}
@@ -258,6 +320,10 @@ func (m *Model) getCurrentCursor() int {
 		return m.taskCursor
 	case ViewLogs:
 		return m.logCursor
+	case ViewTaskDefinitionFamilies:
+		return m.taskDefFamilyCursor
+	case ViewTaskDefinitionRevisions:
+		return m.taskDefRevisionCursor
 	default:
 		return 0
 	}
@@ -285,6 +351,14 @@ func (m *Model) moveCursorUp() {
 		if m.logCursor > 0 {
 			m.logCursor--
 		}
+	case ViewTaskDefinitionFamilies:
+		if m.taskDefFamilyCursor > 0 {
+			m.taskDefFamilyCursor--
+		}
+	case ViewTaskDefinitionRevisions:
+		if m.taskDefRevisionCursor > 0 {
+			m.taskDefRevisionCursor--
+		}
 	}
 }
 
@@ -310,6 +384,14 @@ func (m *Model) moveCursorDown() {
 	case ViewLogs:
 		if m.logCursor < maxIndex {
 			m.logCursor++
+		}
+	case ViewTaskDefinitionFamilies:
+		if m.taskDefFamilyCursor < maxIndex {
+			m.taskDefFamilyCursor++
+		}
+	case ViewTaskDefinitionRevisions:
+		if m.taskDefRevisionCursor < maxIndex {
+			m.taskDefRevisionCursor++
 		}
 	}
 }

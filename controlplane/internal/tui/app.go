@@ -116,6 +116,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m, cmd = m.handleHelpKeys(msg)
 		case ViewConfirmDialog:
 			m, cmd = m.handleConfirmDialogKeys(msg)
+		case ViewTaskDefinitionFamilies:
+			m, cmd = m.handleTaskDefinitionFamiliesKeys(msg)
+		case ViewTaskDefinitionRevisions:
+			m, cmd = m.handleTaskDefinitionRevisionsKeys(msg)
 		}
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -192,6 +196,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case instanceStatusUpdateMsg:
 		// Update instance statuses
 		m.instances = msg.instances
+	
+	case taskDefFamiliesLoadedMsg:
+		// Update task definition families
+		m.taskDefFamilies = msg.families
+	
+	case taskDefRevisionsLoadedMsg:
+		// Update task definition revisions
+		m.taskDefRevisions = msg.revisions
+	
+	case taskDefJSONLoadedMsg:
+		// Cache loaded JSON
+		m.taskDefJSONCache[msg.revision] = msg.json
 
 	case errMsg:
 		// Handle API errors
@@ -310,6 +326,16 @@ func (m Model) View() string {
 	if m.currentView == ViewInstanceSwitcher {
 		return m.renderInstanceSwitcherOverlay()
 	}
+	
+	// For task definition families, use regular view
+	if m.currentView == ViewTaskDefinitionFamilies {
+		return m.renderTaskDefinitionFamiliesView()
+	}
+	
+	// For task definition revisions, use regular view (possibly 2-column)
+	if m.currentView == ViewTaskDefinitionRevisions {
+		return m.renderTaskDefinitionRevisionsView()
+	}
 
 	// Calculate exact heights for panels
 	footerHeight := 1
@@ -420,6 +446,13 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.instanceSwitcher = NewInstanceSwitcher(m.instances)
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
+		}
+	case "d":
+		// Navigate to task definitions
+		if m.selectedInstance != "" {
+			m.currentView = ViewTaskDefinitionFamilies
+			m.taskDefFamilyCursor = 0
+			return m, m.loadTaskDefinitionFamiliesCmd()
 		}
 	case "/":
 		m.searchMode = true
@@ -975,5 +1008,135 @@ func (m Model) handleInstanceSwitcherInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 	}
 	
+	return m, nil
+}
+
+// handleTaskDefinitionFamiliesKeys handles input for task definition families view
+func (m Model) handleTaskDefinitionFamiliesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		m.moveCursorUp()
+	case "down", "j":
+		m.moveCursorDown()
+	case "enter":
+		if len(m.taskDefFamilies) > 0 && m.taskDefFamilyCursor < len(m.taskDefFamilies) {
+			m.selectedFamily = m.taskDefFamilies[m.taskDefFamilyCursor].Family
+			m.currentView = ViewTaskDefinitionRevisions
+			m.taskDefRevisionCursor = 0
+			m.showTaskDefJSON = false
+			return m, m.loadTaskDefinitionRevisionsCmd()
+		}
+	case "backspace":
+		// Go back to instances
+		m.currentView = ViewInstances
+		m.selectedFamily = ""
+		m.taskDefFamilies = []TaskDefinitionFamily{}
+	case "c":
+		// Switch to clusters view
+		m.currentView = ViewClusters
+		m.clusterCursor = 0
+		return m, m.loadMockDataCmd()
+	case "N":
+		// Create new task definition
+		// TODO: Implement task definition editor
+	case "C":
+		// Copy selected family's latest revision
+		// TODO: Implement copy functionality
+	case "/":
+		m.searchMode = true
+		m.searchQuery = ""
+	case ":":
+		m.commandMode = true
+		m.commandInput = ""
+	case "R":
+		return m, m.loadTaskDefinitionFamiliesCmd()
+	case "ctrl+i":
+		// Quick switch instance
+		if len(m.instances) > 1 {
+			m.instanceSwitcher = NewInstanceSwitcher(m.instances)
+			m.previousView = m.currentView
+			m.currentView = ViewInstanceSwitcher
+		}
+	}
+	return m, nil
+}
+
+// handleTaskDefinitionRevisionsKeys handles input for task definition revisions view
+func (m Model) handleTaskDefinitionRevisionsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		if m.taskDefRevisionCursor > 0 {
+			m.taskDefRevisionCursor--
+		}
+	case "down", "j":
+		if m.taskDefRevisionCursor < len(m.taskDefRevisions)-1 {
+			m.taskDefRevisionCursor++
+		}
+	case "enter":
+		// Toggle JSON display
+		m.showTaskDefJSON = !m.showTaskDefJSON
+		if m.showTaskDefJSON && len(m.taskDefRevisions) > 0 && m.taskDefRevisionCursor < len(m.taskDefRevisions) {
+			// Load full task definition for selected revision
+			selectedRev := m.taskDefRevisions[m.taskDefRevisionCursor]
+			// Check if already cached
+			if _, cached := m.taskDefJSONCache[selectedRev.Revision]; !cached {
+				// Create task definition ARN
+				taskDefArn := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:task-definition/%s:%d",
+					selectedRev.Family, selectedRev.Revision)
+				return m, m.loadTaskDefinitionJSONCmd(taskDefArn)
+			}
+		}
+	case "backspace":
+		// Go back to families
+		m.currentView = ViewTaskDefinitionFamilies
+		m.selectedFamily = ""
+		m.taskDefRevisions = []TaskDefinitionRevision{}
+		m.showTaskDefJSON = false
+		// Clear JSON cache to save memory
+		m.taskDefJSONCache = make(map[int]string)
+	case "e":
+		// Edit as new revision
+		// TODO: Implement editor
+	case "c":
+		// Copy to clipboard
+		// TODO: Implement clipboard copy
+	case "d":
+		// Deregister revision
+		// TODO: Implement deregister
+	case "a":
+		// Activate revision
+		// TODO: Implement activate
+	case "D":
+		// Enter diff mode
+		// TODO: Implement diff mode
+	case "ctrl+u":
+		// Scroll JSON up half page
+		if m.showTaskDefJSON {
+			m.taskDefJSONScroll -= 10
+			if m.taskDefJSONScroll < 0 {
+				m.taskDefJSONScroll = 0
+			}
+		}
+	case "ctrl+d":
+		// Scroll JSON down half page
+		if m.showTaskDefJSON {
+			m.taskDefJSONScroll += 10
+		}
+	case "/":
+		m.searchMode = true
+		m.searchQuery = ""
+	case ":":
+		m.commandMode = true
+		m.commandInput = ""
+	case "R":
+		return m, m.loadTaskDefinitionRevisionsCmd()
+	case "ctrl+i":
+		// Quick switch instance
+		if len(m.instances) > 1 {
+			m.instanceSwitcher = NewInstanceSwitcher(m.instances)
+			m.previousView = m.currentView
+			m.currentView = ViewInstanceSwitcher
+		}
+	}
 	return m, nil
 }

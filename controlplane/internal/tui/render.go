@@ -1462,7 +1462,7 @@ Resource Navigation:
   c           Go to clusters
   s           Go to services
   t           Go to tasks
-  d           Go to task definitions
+  d           Go to task definitions (from instances)
 
 Instance Operations:
   N           Create new instance (Instances view)
@@ -1472,9 +1472,21 @@ Instance Operations:
 
 Service Operations:
   r           Restart service (Service selected)
-  S           Scale service (Service selected)
+  S           Scale service (Service selected)  
   u           Update service (Service selected)
   x           Stop service (Service selected)
+
+Task Definition Operations:
+  N           Create new task definition (Families view)
+  C           Copy family's latest revision (Families view)
+  Enter       Toggle JSON view (Revisions view)
+  e           Edit as new revision (Revisions view)
+  c           Copy to clipboard (Revisions view)
+  d           Deregister revision (Revisions view)
+  a           Activate revision (Revisions view)
+  D           Diff mode (Revisions view)
+  Ctrl+U      Scroll JSON up (JSON view)
+  Ctrl+D      Scroll JSON down (JSON view)
 
 Common Operations:
   l           View logs (Task/Service selected)
@@ -1544,5 +1556,360 @@ func (m Model) renderInstanceSwitcherOverlay() string {
 	
 	// Simply render the switcher centered on screen
 	return m.instanceSwitcher.Render(m.width, m.height)
+}
+
+// renderTaskDefinitionFamiliesView renders the task definition families view
+func (m Model) renderTaskDefinitionFamiliesView() string {
+	// Calculate heights
+	headerHeight := 3
+	footerHeight := 1
+	availableHeight := m.height - headerHeight - footerHeight
+	
+	// Render components
+	header := m.renderTaskDefFamiliesHeader()
+	content := m.renderTaskDefFamiliesList(availableHeight)
+	footer := m.renderFooter()
+	
+	// Combine
+	return lipgloss.JoinVertical(
+		lipgloss.Top,
+		header,
+		content,
+		footer,
+	)
+}
+
+// renderTaskDefFamiliesHeader renders the header for task definition families
+func (m Model) renderTaskDefFamiliesHeader() string {
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#00ff00"))
+		
+	breadcrumb := fmt.Sprintf("Instances > %s > Task Definitions", m.selectedInstance)
+	
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		titleStyle.Render("Task Definition Families"),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(breadcrumb),
+		"",
+	)
+}
+
+// renderTaskDefFamiliesList renders the list of task definition families
+func (m Model) renderTaskDefFamiliesList(maxHeight int) string {
+	if len(m.taskDefFamilies) == 0 {
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Italic(true).
+			Render("No task definition families found.")
+	}
+	
+	// Filter families
+	filteredFamilies := m.filterTaskDefFamilies(m.taskDefFamilies)
+	if len(filteredFamilies) == 0 {
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Italic(true).
+			Render("No families match the search criteria.")
+	}
+	
+	// Column headers
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#00ff00")).
+		BorderBottom(true).
+		BorderStyle(lipgloss.NormalBorder())
+		
+	headers := fmt.Sprintf("%-30s %4s %6s %6s %12s",
+		"FAMILY NAME", "REV", "ACTIVE", "TOTAL", "UPDATED")
+	
+	// Styles
+	selectedStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#2a2a4a")).
+		Foreground(lipgloss.Color("#ffffff")).
+		Bold(true)
+		
+	normalStyle := lipgloss.NewStyle()
+	
+	// Build rows
+	var rows []string
+	rows = append(rows, headerStyle.Render(headers))
+	
+	visibleRows := maxHeight - 2 // Header and spacing
+	startIdx := 0
+	if m.taskDefFamilyCursor >= visibleRows {
+		startIdx = m.taskDefFamilyCursor - visibleRows + 1
+	}
+	
+	endIdx := startIdx + visibleRows
+	if endIdx > len(filteredFamilies) {
+		endIdx = len(filteredFamilies)
+	}
+	
+	for i := startIdx; i < endIdx; i++ {
+		family := filteredFamilies[i]
+		
+		// Format row
+		row := fmt.Sprintf("%-30s %4d %6d %6d %12s",
+			truncateString(family.Family, 30),
+			family.LatestRevision,
+			family.ActiveCount,
+			family.TotalCount,
+			formatDuration(time.Since(family.LastUpdated)),
+		)
+		
+		// Apply style
+		if i == m.taskDefFamilyCursor {
+			row = selectedStyle.Render("▸ " + row)
+		} else {
+			row = normalStyle.Render("  " + row)
+		}
+		
+		rows = append(rows, row)
+	}
+	
+	// Add scroll indicator
+	if len(filteredFamilies) > visibleRows {
+		scrollInfo := fmt.Sprintf("Showing %d-%d of %d families", startIdx+1, endIdx, len(filteredFamilies))
+		rows = append(rows, "", lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Render(scrollInfo))
+	}
+	
+	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+}
+
+// renderTaskDefinitionRevisionsView renders the task definition revisions view
+func (m Model) renderTaskDefinitionRevisionsView() string {
+	if !m.showTaskDefJSON {
+		// Single column view
+		return m.renderTaskDefRevisionsSingleColumn()
+	}
+	
+	// Two column view
+	return m.renderTaskDefRevisionsTwoColumn()
+}
+
+// renderTaskDefRevisionsSingleColumn renders single column revision list
+func (m Model) renderTaskDefRevisionsSingleColumn() string {
+	// Calculate heights
+	headerHeight := 3
+	footerHeight := 1
+	availableHeight := m.height - headerHeight - footerHeight
+	
+	// Render components
+	header := m.renderTaskDefRevisionsHeader()
+	content := m.renderTaskDefRevisionsList(availableHeight, m.width)
+	footer := m.renderFooter()
+	
+	// Combine
+	return lipgloss.JoinVertical(
+		lipgloss.Top,
+		header,
+		content,
+		footer,
+	)
+}
+
+// renderTaskDefRevisionsTwoColumn renders two column view with JSON
+func (m Model) renderTaskDefRevisionsTwoColumn() string {
+	// Calculate dimensions
+	headerHeight := 3
+	footerHeight := 1
+	availableHeight := m.height - headerHeight - footerHeight
+	leftWidth := m.width / 3
+	rightWidth := m.width - leftWidth - 1 // -1 for border
+	
+	// Render components
+	header := m.renderTaskDefRevisionsHeader()
+	leftColumn := m.renderTaskDefRevisionsList(availableHeight, leftWidth)
+	rightColumn := m.renderTaskDefJSON(availableHeight, rightWidth)
+	
+	// Combine columns
+	columns := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		leftColumn,
+		lipgloss.NewStyle().
+			Height(availableHeight).
+			BorderLeft(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			Render(""),
+		rightColumn,
+	)
+	
+	footer := m.renderFooter()
+	
+	// Combine all
+	return lipgloss.JoinVertical(
+		lipgloss.Top,
+		header,
+		columns,
+		footer,
+	)
+}
+
+// renderTaskDefRevisionsHeader renders the header for revisions view
+func (m Model) renderTaskDefRevisionsHeader() string {
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#00ff00"))
+		
+	breadcrumb := fmt.Sprintf("Instances > %s > Task Definitions > %s", 
+		m.selectedInstance, m.selectedFamily)
+	
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		titleStyle.Render(fmt.Sprintf("%s Revisions", m.selectedFamily)),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(breadcrumb),
+		"",
+	)
+}
+
+// renderTaskDefRevisionsList renders the list of revisions
+func (m Model) renderTaskDefRevisionsList(maxHeight int, width int) string {
+	if len(m.taskDefRevisions) == 0 {
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Italic(true).
+			Width(width).
+			Render("No revisions found.")
+	}
+	
+	// Column headers
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#00ff00")).
+		BorderBottom(true).
+		BorderStyle(lipgloss.NormalBorder())
+		
+	headers := fmt.Sprintf("%-4s %-10s %-10s %-12s",
+		"REV", "STATUS", "CPU/MEM", "CREATED")
+	
+	// Styles
+	selectedStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#2a2a4a")).
+		Foreground(lipgloss.Color("#ffffff")).
+		Bold(true).
+		Width(width)
+		
+	activeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00ff00"))
+		
+	inactiveStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#999999"))
+		
+	normalStyle := lipgloss.NewStyle()
+	
+	// Build rows
+	var rows []string
+	rows = append(rows, headerStyle.Width(width).Render(headers))
+	
+	visibleRows := maxHeight - 2
+	startIdx := 0
+	if m.taskDefRevisionCursor >= visibleRows {
+		startIdx = m.taskDefRevisionCursor - visibleRows + 1
+	}
+	
+	endIdx := startIdx + visibleRows
+	if endIdx > len(m.taskDefRevisions) {
+		endIdx = len(m.taskDefRevisions)
+	}
+	
+	for i := startIdx; i < endIdx; i++ {
+		rev := m.taskDefRevisions[i]
+		
+		// Format row
+		cpuMem := fmt.Sprintf("%s/%s", rev.CPU, rev.Memory)
+		row := fmt.Sprintf("%-4d %-10s %-10s %-12s",
+			rev.Revision,
+			rev.Status,
+			cpuMem,
+			formatDuration(time.Since(rev.CreatedAt)),
+		)
+		
+		// Apply style
+		if i == m.taskDefRevisionCursor {
+			if m.showTaskDefJSON {
+				row = selectedStyle.Render("▸" + row + " ◀")
+			} else {
+				row = selectedStyle.Render("▸ " + row)
+			}
+		} else {
+			style := normalStyle
+			if rev.Status == "ACTIVE" {
+				style = activeStyle
+			} else {
+				style = inactiveStyle
+			}
+			row = style.Width(width).Render("  " + row)
+		}
+		
+		rows = append(rows, row)
+	}
+	
+	// Add help text
+	if !m.showTaskDefJSON {
+		helpStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666"))
+		rows = append(rows, "", helpStyle.Render("[Enter] View JSON"))
+	}
+	
+	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+}
+
+// renderTaskDefJSON renders the JSON view
+func (m Model) renderTaskDefJSON(maxHeight int, width int) string {
+	if m.taskDefRevisionCursor >= len(m.taskDefRevisions) {
+		return ""
+	}
+	
+	selectedRev := m.taskDefRevisions[m.taskDefRevisionCursor]
+	
+	// Get JSON from cache or show loading message
+	jsonContent, cached := m.taskDefJSONCache[selectedRev.Revision]
+	if !cached {
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Italic(true).
+			Width(width).
+			Height(maxHeight).
+			Padding(1).
+			Render("Loading task definition JSON...")
+	}
+	
+	// JSON style
+	jsonStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#cccccc")).
+		Width(width-2).
+		Height(maxHeight-2).
+		Padding(1)
+	
+	// Add scroll indicator if needed
+	lines := strings.Split(jsonContent, "\n")
+	visibleLines := maxHeight - 2
+	
+	if m.taskDefJSONScroll > len(lines)-visibleLines {
+		m.taskDefJSONScroll = len(lines) - visibleLines
+	}
+	if m.taskDefJSONScroll < 0 {
+		m.taskDefJSONScroll = 0
+	}
+	
+	endLine := m.taskDefJSONScroll + visibleLines
+	if endLine > len(lines) {
+		endLine = len(lines)
+	}
+	
+	visibleJSON := strings.Join(lines[m.taskDefJSONScroll:endLine], "\n")
+	
+	return jsonStyle.Render(visibleJSON)
+}
+
+// Helper function to truncate strings
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
 

@@ -106,6 +106,24 @@ func (m Model) filterLogs(logs []LogEntry) []LogEntry {
 	return filtered
 }
 
+// filterTaskDefFamilies filters task definition families based on search query
+func (m Model) filterTaskDefFamilies(families []TaskDefinitionFamily) []TaskDefinitionFamily {
+	if m.searchQuery == "" {
+		return families
+	}
+	
+	query := strings.ToLower(m.searchQuery)
+	filtered := make([]TaskDefinitionFamily, 0)
+	
+	for _, family := range families {
+		if matchesSearch(family.Family, query) {
+			filtered = append(filtered, family)
+		}
+	}
+	
+	return filtered
+}
+
 // matchesSearch checks if a field contains the search query
 func matchesSearch(field, query string) bool {
 	return strings.Contains(strings.ToLower(field), query)
@@ -124,6 +142,8 @@ func (m Model) getFilteredData() interface{} {
 		return m.filterTasks(m.tasks)
 	case ViewLogs:
 		return m.filterLogs(m.logs)
+	case ViewTaskDefinitionFamilies:
+		return m.filterTaskDefFamilies(m.taskDefFamilies)
 	default:
 		return nil
 	}
@@ -142,5 +162,9 @@ func (m *Model) resetCursorAfterSearch() {
 		m.taskCursor = 0
 	case ViewLogs:
 		m.logCursor = 0
+	case ViewTaskDefinitionFamilies:
+		m.taskDefFamilyCursor = 0
+	case ViewTaskDefinitionRevisions:
+		m.taskDefRevisionCursor = 0
 	}
 }

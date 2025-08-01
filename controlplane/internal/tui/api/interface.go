@@ -48,6 +48,9 @@ type Client interface {
 
 	// Task Definition operations
 	ListTaskDefinitions(ctx context.Context, instanceName string) ([]string, error)
+	ListTaskDefinitionFamilies(ctx context.Context, instanceName string) ([]string, error)
+	ListTaskDefinitionRevisions(ctx context.Context, instanceName string, family string) ([]TaskDefinitionRevision, error)
+	DescribeTaskDefinition(ctx context.Context, instanceName string, taskDefArn string) (*TaskDefinition, error)
 	RegisterTaskDefinition(ctx context.Context, instanceName string, taskDef interface{}) (string, error)
 	DeregisterTaskDefinition(ctx context.Context, instanceName string, taskDefArn string) error
 
