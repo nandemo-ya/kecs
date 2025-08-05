@@ -59,3 +59,6 @@ qa-results/
 
 # Lefthook
 .lefthook-local/
+
+# MCP configuration
+.mcp.json
