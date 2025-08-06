@@ -201,6 +201,10 @@ type Model struct {
 	// API client
 	apiClient       api.Client
 	useMockData     bool
+	
+	// Clipboard notification
+	clipboardMsg     string
+	clipboardMsgTime time.Time
 }
 
 // NewModel creates a new application model

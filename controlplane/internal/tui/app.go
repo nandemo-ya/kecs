@@ -418,6 +418,32 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.clusterCursor = 0
 			return m, m.loadMockDataCmd()
 		}
+	case "y":
+		// Copy instance name to clipboard
+		if len(m.instances) > 0 && m.instanceCursor < len(m.instances) {
+			inst := m.instances[m.instanceCursor]
+			err := copyToClipboard(inst.Name)
+			if err == nil {
+				m.clipboardMsg = fmt.Sprintf("Copied: %s", inst.Name)
+				m.clipboardMsgTime = time.Now()
+			} else {
+				m.clipboardMsg = fmt.Sprintf("Copy failed: %v", err)
+				m.clipboardMsgTime = time.Now()
+			}
+		}
+	case "Y":
+		// Copy full instance info to clipboard
+		if len(m.instances) > 0 && m.instanceCursor < len(m.instances) {
+			inst := m.instances[m.instanceCursor]
+			err := copyToClipboard(copyInstanceInfo(inst))
+			if err == nil {
+				m.clipboardMsg = "Copied instance details to clipboard"
+				m.clipboardMsgTime = time.Now()
+			} else {
+				m.clipboardMsg = fmt.Sprintf("Copy failed: %v", err)
+				m.clipboardMsgTime = time.Now()
+			}
+		}
 	case "N":
 		// Open instance creation form
 		if m.instanceForm == nil {
