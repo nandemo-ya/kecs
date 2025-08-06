@@ -160,7 +160,8 @@ func (m Model) createInstanceCmd(opts api.CreateInstanceOptions) tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		// Increase timeout to 3 minutes for LocalStack and other components to start
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
 
 		instance, err := m.apiClient.CreateInstance(ctx, opts)
@@ -196,6 +197,20 @@ type dataLoadedMsg struct {
 
 type instanceCreatedMsg struct {
 	instance Instance
+}
+
+// Instance creation status messages
+type instanceCreationStatusMsg struct {
+	steps   []CreationStep
+	elapsed string
+}
+
+type instanceCreationTimeoutMsg struct {
+	elapsed string
+}
+
+type instanceCreationContinueMsg struct {
+	continueWaiting bool // true to continue, false to abort
 }
 
 type errMsg struct {
