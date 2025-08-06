@@ -62,3 +62,7 @@ qa-results/
 
 # MCP configuration
 .mcp.json
+
+# Serena MCP cache and memory
+.serena/cache/
+.serena/memory/
