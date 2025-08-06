@@ -259,3 +259,10 @@ type TaskDefinitionRevision struct {
 	Memory    string    `json:"memory"`
 	CreatedAt time.Time `json:"createdAt"`
 }
+
+// CreationStatus represents the status of instance creation
+type CreationStatus struct {
+	Step    string `json:"step"`    // Current step name
+	Status  string `json:"status"`  // "pending", "running", "done", "failed"
+	Message string `json:"message"` // Optional message
+}

@@ -26,6 +26,7 @@ type Client interface {
 	CreateInstance(ctx context.Context, opts CreateInstanceOptions) (*Instance, error)
 	DeleteInstance(ctx context.Context, name string) error
 	GetInstanceLogs(ctx context.Context, name string, follow bool) (<-chan LogEntry, error)
+	GetInstanceCreationStatus(ctx context.Context, name string) (*CreationStatus, error)
 
 	// ECS Cluster operations
 	ListClusters(ctx context.Context, instanceName string) ([]string, error)

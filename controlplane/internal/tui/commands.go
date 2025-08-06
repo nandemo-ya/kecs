@@ -142,9 +142,10 @@ func (m Model) loadDataFromAPI() tea.Cmd {
 // createInstanceCmd creates a new instance via API
 func (m Model) createInstanceCmd(opts api.CreateInstanceOptions) tea.Cmd {
 	if m.useMockData {
-		// Mock creation
+		// Mock creation with steps simulation
 		return func() tea.Msg {
-			time.Sleep(1 * time.Second) // Simulate API delay
+			// Simulate step-by-step creation
+			time.Sleep(500 * time.Millisecond)
 			return instanceCreatedMsg{
 				instance: Instance{
 					Name:     opts.Name,
@@ -186,6 +187,78 @@ func (m Model) createInstanceCmd(opts api.CreateInstanceOptions) tea.Cmd {
 		}
 	}
 }
+
+// monitorInstanceCreation monitors the creation progress and sends status updates
+func (m Model) monitorInstanceCreation(instanceName string, hasLocalStack, hasTraefik bool) tea.Cmd {
+	return func() tea.Msg {
+		// Start a background monitoring goroutine
+		startTime := time.Now()
+		
+		// Define initial steps
+		steps := []CreationStep{
+			{Name: "Creating k3d cluster", Status: "running"},
+			{Name: "Deploying control plane", Status: "pending"},
+		}
+		
+		if hasLocalStack {
+			steps = append(steps, CreationStep{Name: "Starting LocalStack", Status: "pending"})
+		}
+		if hasTraefik {
+			steps = append(steps, CreationStep{Name: "Configuring Traefik", Status: "pending"})
+		}
+		steps = append(steps, CreationStep{Name: "Finalizing", Status: "pending"})
+		
+		// Return initial status immediately
+		elapsed := time.Since(startTime)
+		return instanceCreationStatusMsg{
+			steps:   steps,
+			elapsed: fmt.Sprintf("%.0fs", elapsed.Seconds()),
+		}
+	}
+}
+
+// updateCreationStatusCmd generates periodic updates for instance creation status
+func (m Model) updateCreationStatusCmd() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return creationStatusTickMsg(t)
+	})
+}
+
+// checkCreationStatusCmd checks the actual creation status from API
+func (m Model) checkCreationStatusCmd(instanceName string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		
+		status, err := m.apiClient.GetInstanceCreationStatus(ctx, instanceName)
+		if err != nil {
+			// Ignore errors during status check
+			return nil
+		}
+		
+		if status == nil {
+			// No status means creation is complete or not started
+			return nil
+		}
+		
+		return actualCreationStatusMsg{
+			instanceName: instanceName,
+			status:       status,
+		}
+	}
+}
+
+// creationStatusTickMsg is sent every second during instance creation
+type creationStatusTickMsg time.Time
+
+// actualCreationStatusMsg contains actual status from API
+type actualCreationStatusMsg struct {
+	instanceName string
+	status       *api.CreationStatus
+}
+
+// closeFormMsg is sent to close the instance creation form
+type closeFormMsg struct{}
 
 // Message types for API operations
 type dataLoadedMsg struct {

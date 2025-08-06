@@ -366,6 +366,24 @@ func (c *HTTPClient) HealthCheck(ctx context.Context, instanceName string) error
 	return c.doRequest(ctx, "GET", path, nil, nil)
 }
 
+// GetInstanceCreationStatus gets the creation status of an instance
+func (c *HTTPClient) GetInstanceCreationStatus(ctx context.Context, name string) (*CreationStatus, error) {
+	// Always use k3d provider first for getting creation status
+	// This is important because during instance creation, the API may not be available yet
+	if c.k3dProvider != nil {
+		return c.k3dProvider.GetInstanceCreationStatus(ctx, name)
+	}
+	
+	// Fallback to API if k3d provider is not available
+	path := fmt.Sprintf("/api/instances/%s/creation-status", url.PathEscape(name))
+	var status CreationStatus
+	err := c.doRequest(ctx, "GET", path, nil, &status)
+	if err != nil {
+		return nil, err
+	}
+	return &status, nil
+}
+
 // Close cleans up resources
 func (c *HTTPClient) Close() error {
 	if c.k3dProvider != nil {

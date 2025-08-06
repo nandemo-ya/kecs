@@ -333,6 +333,22 @@ func (p *K3dInstanceProvider) DeleteInstance(ctx context.Context, name string) e
 	return p.k3dManager.DeleteCluster(ctx, name)
 }
 
+// GetInstanceCreationStatus returns the creation status for an instance
+func (p *K3dInstanceProvider) GetInstanceCreationStatus(ctx context.Context, name string) (*CreationStatus, error) {
+	// Get status from the local instance manager
+	status := p.instanceManager.GetCreationStatus(name)
+	if status == nil {
+		return nil, nil
+	}
+	
+	// Convert from instance.CreationStatus to api.CreationStatus
+	return &CreationStatus{
+		Step:    status.Step,
+		Status:  status.Status,
+		Message: status.Message,
+	}, nil
+}
+
 // Close cleans up resources
 func (p *K3dInstanceProvider) Close() error {
 	if p.dockerClient != nil {

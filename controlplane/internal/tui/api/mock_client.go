@@ -511,6 +511,12 @@ func (c *MockClient) HealthCheck(ctx context.Context, instanceName string) error
 	return fmt.Errorf("instance not found: %s", instanceName)
 }
 
+// GetInstanceCreationStatus returns mock creation status
+func (c *MockClient) GetInstanceCreationStatus(ctx context.Context, name string) (*CreationStatus, error) {
+	// For mock, always return nil (no ongoing creation)
+	return nil, nil
+}
+
 // Close implements Client interface
 func (c *MockClient) Close() error {
 	return nil
