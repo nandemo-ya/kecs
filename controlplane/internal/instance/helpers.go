@@ -208,6 +208,18 @@ func (m *Manager) deployTraefik(ctx context.Context, instanceName string, cfg *c
 		return fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
+	// Map API port to a valid NodePort range (30000-32767)
+	// Use a simple mapping: if apiPort < 30000, add 22000 to it
+	// This maps 8080 -> 30080, 8090 -> 30090, etc.
+	awsNodePort := int32(apiPort)
+	if awsNodePort < 30000 {
+		awsNodePort = awsNodePort + 22000
+	}
+	// Ensure it's within valid range
+	if awsNodePort < 30000 || awsNodePort > 32767 {
+		awsNodePort = 30080 // fallback to default
+	}
+
 	// Create Traefik config
 	traefikConfig := &resources.TraefikConfig{
 		Image:           "traefik:v3.2",
@@ -219,7 +231,7 @@ func (m *Manager) deployTraefik(ctx context.Context, instanceName string, cfg *c
 		WebPort:         80,
 		WebNodePort:     30080,
 		AWSPort:         4566,
-		AWSNodePort:     int32(apiPort),
+		AWSNodePort:     awsNodePort,
 		LogLevel:        "INFO",
 		AccessLog:       true,
 	}

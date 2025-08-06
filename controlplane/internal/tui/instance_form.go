@@ -22,6 +22,12 @@ const (
 	FieldCancel
 )
 
+// CreationStep represents each step in instance creation
+type CreationStep struct {
+	Name   string
+	Status string // "pending", "running", "done", "failed"
+}
+
 // InstanceForm represents the instance creation form state
 type InstanceForm struct {
 	// Form fields
@@ -37,6 +43,11 @@ type InstanceForm struct {
 	errorMsg     string
 	successMsg   string
 	isCreating   bool
+	
+	// Creation status tracking
+	creationSteps    []CreationStep
+	creationElapsed  string     // Time elapsed
+	showTimeoutPrompt bool      // Show continue/abort prompt on timeout
 	
 	// Validation state
 	nameError    string

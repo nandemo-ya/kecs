@@ -147,14 +147,48 @@ func (m Model) renderInstanceForm() string {
 	buttons := fmt.Sprintf("%s%s", createBtn, cancelBtn)
 	content = append(content, buttons)
 	
-	// Error or success message
-	if f.isCreating {
+	// Show creation status with checkmarks
+	if f.isCreating && len(f.creationSteps) > 0 {
 		content = append(content, "")
-		content = append(content, formSuccessStyle.Render("⟳ "+f.successMsg))
-	} else if f.errorMsg != "" {
+		for _, step := range f.creationSteps {
+			var icon string
+			var style lipgloss.Style
+			switch step.Status {
+			case "done":
+				icon = "✅"
+				style = formSuccessStyle
+			case "running":
+				icon = "⏳"
+				style = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00"))
+			case "failed":
+				icon = "❌"
+				style = formErrorStyle
+			default:
+				icon = "○"
+				style = formLabelStyle
+			}
+			content = append(content, style.Render(fmt.Sprintf("%s %s", icon, step.Name)))
+		}
+		if f.creationElapsed != "" {
+			content = append(content, formLabelStyle.Render(fmt.Sprintf("⏱  %s elapsed", f.creationElapsed)))
+		}
+	}
+	
+	// Show timeout prompt
+	if f.showTimeoutPrompt {
+		content = append(content, "")
+		content = append(content, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#ffff00")).
+			Render("⚠️  Creation is taking longer than expected"))
+		content = append(content, formLabelStyle.Render("LocalStack may need to download images (~500MB)"))
+		content = append(content, formLabelStyle.Render("Press 'c' to continue waiting or 'ESC' to abort"))
+	}
+	
+	// Error or success message
+	if !f.isCreating && f.errorMsg != "" {
 		content = append(content, "")
 		content = append(content, formErrorStyle.Render("Error: "+f.errorMsg))
-	} else if f.successMsg != "" {
+	} else if !f.isCreating && f.successMsg != "" {
 		content = append(content, "")
 		content = append(content, formSuccessStyle.Render("✓ "+f.successMsg))
 	}
