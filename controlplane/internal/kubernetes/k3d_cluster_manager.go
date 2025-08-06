@@ -258,6 +258,220 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 	return nil
 }
 
+// CreateClusterWithPortMapping creates a new k3d cluster with specified port mappings
+func (k *K3dClusterManager) CreateClusterWithPortMapping(ctx context.Context, clusterName string, portMappings map[int32]int32) error {
+	// Use optimized creation for test mode or when explicitly requested
+	if config.GetBool("features.testMode") || config.GetBool("kubernetes.k3dOptimized") {
+		return k.CreateClusterOptimized(ctx, clusterName)
+	}
+	
+	// Use standard creation with port mappings
+	return k.createClusterStandardWithPorts(ctx, clusterName, portMappings)
+}
+
+// createClusterStandardWithPorts creates a standard k3d cluster with custom port mappings
+func (k *K3dClusterManager) createClusterStandardWithPorts(ctx context.Context, clusterName string, portMappings map[int32]int32) error {
+	normalizedName := k.normalizeClusterName(clusterName)
+
+	// Check if cluster already exists
+	exists, err := k.ClusterExists(ctx, clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to check if cluster exists: %w", err)
+	}
+
+	if exists {
+		logging.Info("k3d cluster already exists", "cluster", normalizedName)
+		return nil
+	}
+	
+	// Handle registry for dev mode
+	var registryNode *k3d.Node
+	if k.config.EnableRegistry {
+		registryNode, err = k.ensureRegistry(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to ensure registry: %w", err)
+		}
+		logging.Info("Using k3d registry for dev mode", "registry", registryNode.Name)
+	}
+
+	// Determine k3s image
+	k3sImage := "rancher/k3s:v1.31.4-k3s1"
+	if k.config.K3dImage != "" {
+		k3sImage = k.config.K3dImage
+	}
+
+	// K3s args for minimal setup - disable unnecessary components
+	k3sArgs := []string{
+		"--disable=traefik",        // Disable Traefik ingress controller
+		"--disable=servicelb",      // Disable the default service load balancer
+		"--disable=metrics-server", // Disable metrics server
+		"--disable-network-policy", // Disable network policy controller
+	}
+
+	// Create server node
+	serverNode := &k3d.Node{
+		Name:    fmt.Sprintf("k3d-%s-server-0", normalizedName),
+		Role:    k3d.ServerRole,
+		Image:   k3sImage,
+		Restart: true,
+		Args:    k3sArgs,
+		K3sNodeLabels: map[string]string{
+			"kecs.io/cluster": normalizedName,
+		},
+		Env: []string{
+			"K3S_KUBECONFIG_MODE=666", // Ensure kubeconfig is readable
+		},
+	}
+	
+	// Add volume mounts if specified
+	if len(k.config.VolumeMounts) > 0 {
+		volumes := []string{}
+		for _, mount := range k.config.VolumeMounts {
+			// k3d expects volume format as "hostPath:containerPath"
+			volumes = append(volumes, fmt.Sprintf("%s:%s", mount.HostPath, mount.ContainerPath))
+		}
+		serverNode.Volumes = volumes
+		logging.Info("Adding volume mounts", "volumes", volumes)
+	}
+	
+	// Add port mappings
+	if len(portMappings) > 0 {
+		portMap := nat.PortMap{}
+		for hostPort, nodePort := range portMappings {
+			logging.Info("Adding port mapping",
+				"hostPort", hostPort,
+				"nodePort", nodePort)
+			portKey := fmt.Sprintf("%d/tcp", nodePort)
+			portMap[nat.Port(portKey)] = []nat.PortBinding{
+				{
+					HostIP:   "0.0.0.0",
+					HostPort: fmt.Sprintf("%d", hostPort),
+				},
+			}
+		}
+		serverNode.Ports = portMap
+		
+		// Store the first port mapping as the main traefik port
+		for hostPort := range portMappings {
+			k.portMutex.Lock()
+			k.traefikPorts[normalizedName] = int(hostPort)
+			k.portMutex.Unlock()
+			break
+		}
+	} else {
+		// Fallback to default behavior if no port mappings provided
+		k.portMutex.Lock()
+		httpPort := k.config.TraefikPort
+		if httpPort == 0 {
+			port, err := k.findAvailablePort(8090)
+			if err != nil {
+				k.portMutex.Unlock()
+				return fmt.Errorf("failed to find available port for HTTP access: %w", err)
+			}
+			httpPort = port
+		}
+		k.traefikPorts[normalizedName] = httpPort
+		k.portMutex.Unlock()
+		
+		logging.Info("Adding default port mapping",
+			"hostPort", httpPort,
+			"nodePort", 30890)
+		serverNode.Ports = nat.PortMap{
+			"30890/tcp": []nat.PortBinding{
+				{
+					HostIP:   "0.0.0.0",
+					HostPort: fmt.Sprintf("%d", httpPort),
+				},
+			},
+		}
+	}
+
+	// Create cluster configuration with minimal required fields
+	// In container mode, check if KECS network is specified
+	networkName := fmt.Sprintf("k3d-%s", normalizedName)
+	if k.config.ContainerMode {
+		if kecsNetwork := config.GetString("docker.network"); kecsNetwork != "" {
+			logging.Info("Using KECS Docker network", "network", kecsNetwork)
+			networkName = kecsNetwork
+		}
+	}
+	
+	cluster := &k3d.Cluster{
+		Name:  normalizedName,
+		Nodes: []*k3d.Node{serverNode},
+		Network: k3d.ClusterNetwork{
+			Name: networkName,
+			IPAM: k3d.IPAM{
+				Managed: false,
+			},
+		},
+		Token: fmt.Sprintf("kecs-%s-token", normalizedName),
+		KubeAPI: &k3d.ExposureOpts{
+			Host: k3d.DefaultAPIHost,
+		},
+	}
+	
+	// Registry connection will be handled after cluster creation
+
+	// Create cluster creation options
+	clusterCreateOpts := &k3d.ClusterCreateOpts{
+		WaitForServer:       true,
+		Timeout:             2 * time.Minute,
+		DisableLoadBalancer: false,
+		GlobalLabels:        make(map[string]string),
+		GlobalEnv:           []string{},
+		NodeHooks:           []k3d.NodeHook{},
+	}
+
+	// Create cluster config for ClusterRun
+	clusterConfig := &v1alpha5.ClusterConfig{
+		Cluster:           *cluster,
+		ClusterCreateOpts: *clusterCreateOpts,
+	}
+
+	// Use ClusterRun to create and start the cluster
+	logging.Info("Creating k3d cluster", "cluster", normalizedName)
+	if err := client.ClusterRun(ctx, k.runtime, clusterConfig); err != nil {
+		return fmt.Errorf("failed to create k3d cluster: %w", err)
+	}
+	
+	// Connect registry to cluster if enabled
+	if registryNode != nil && k.config.EnableRegistry {
+		logging.Info("Connecting registry to cluster", "cluster", normalizedName, "registry", registryNode.Name)
+		// Get the created cluster
+		createdCluster, err := client.ClusterGet(ctx, k.runtime, cluster)
+		if err != nil {
+			return fmt.Errorf("failed to get created cluster: %w", err)
+		}
+		
+		// Connect the registry to the cluster
+		if err := client.RegistryConnectClusters(ctx, k.runtime, registryNode, []*k3d.Cluster{createdCluster}); err != nil {
+			return fmt.Errorf("failed to connect registry to cluster: %w", err)
+		}
+		
+		// Configure k3s to use the registry with HTTP
+		if err := k.configureRegistryForCluster(ctx, normalizedName); err != nil {
+			logging.Warn("Failed to configure registry for cluster", "error", err)
+			// Continue anyway as the registry might still work
+		}
+	}
+
+	// Write kubeconfig to custom path if in container mode
+	if k.config.ContainerMode {
+		kubeconfigPath := k.GetKubeconfigPath(clusterName)
+		if err := k.writeKubeconfig(ctx, cluster, kubeconfigPath); err != nil {
+			return fmt.Errorf("failed to write kubeconfig: %w", err)
+		}
+	}
+
+	logging.Info("Successfully created k3d cluster", "cluster", normalizedName)
+	
+	// Note: Traefik deployment is now handled by start_v2.go using the new architecture
+	// The old TraefikManager is deprecated and should not be used
+	
+	return nil
+}
+
 // DeleteCluster deletes a k3d cluster
 // StopCluster stops a k3d cluster without deleting it
 func (k *K3dClusterManager) StopCluster(ctx context.Context, clusterName string) error {

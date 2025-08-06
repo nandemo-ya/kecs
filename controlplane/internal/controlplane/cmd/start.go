@@ -453,8 +453,8 @@ func deployTraefikGateway(ctx context.Context, clusterName string, cfg *config.C
 		MemoryRequest:   "128Mi",
 		CPULimit:        "500m",
 		MemoryLimit:     "512Mi",
-		WebPort:         80,
-		WebNodePort:     30080,
+		APIPort:         80,
+		APINodePort:     30080,
 		AWSPort:         4566,
 		AWSNodePort:     30890, // Fixed NodePort in valid range (k3d maps host port to this)
 		LogLevel:        "INFO",
@@ -844,8 +844,8 @@ func deployTraefikWithProgress(ctx context.Context, clusterName string, cfg *con
 		MemoryRequest:   "128Mi",
 		CPULimit:        "500m",
 		MemoryLimit:     "512Mi",
-		WebPort:         80,
-		WebNodePort:     30080,
+		APIPort:         80,
+		APINodePort:     30080,
 		AWSPort:         4566,
 		AWSNodePort:     30890, // Fixed NodePort in valid range (k3d maps host port to this)
 		Metrics:         false, // Metrics disabled to reduce overhead
