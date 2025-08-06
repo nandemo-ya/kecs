@@ -278,6 +278,12 @@ func (m Model) renderBreadcrumb() string {
 }
 
 func (m Model) renderFooter() string {
+	// Check if we should show clipboard notification
+	if m.clipboardMsg != "" && time.Since(m.clipboardMsgTime) < 3*time.Second {
+		notification := successStyle.Render("📋 " + m.clipboardMsg)
+		return footerStyle.Width(m.width).Render(notification)
+	}
+	
 	// Check if we should show command result
 	if m.commandPalette != nil && m.commandPalette.ShouldShowResult() {
 		// Show command result for a few seconds
@@ -1635,6 +1641,10 @@ Global Navigation:
   ↓, j        Move down
   Enter       Select/Drill down
   Backspace   Go back to parent view
+
+Clipboard Operations:
+  y           Copy selected item name/ID to clipboard
+  Y           Copy full details to clipboard
 
 Resource Navigation:
   i           Go to instances
