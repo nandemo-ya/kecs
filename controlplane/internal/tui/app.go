@@ -181,28 +181,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.instances = append(m.instances, msg.instance)
 		// Select the new instance
 		m.selectedInstance = msg.instance.Name
-		// Reset instance form if it exists
+		
+		// Reset instance form and close it
 		if m.instanceForm != nil {
-			m.instanceForm.successMsg = fmt.Sprintf("Instance '%s' created successfully", msg.instance.Name)
+			m.instanceForm.successMsg = fmt.Sprintf("Instance '%s' created successfully!", msg.instance.Name)
 			m.instanceForm.isCreating = false
 			m.instanceForm.errorMsg = ""
-			// Close form after short delay
+			m.instanceForm.creationSteps = nil
+			
+			// Show success message briefly then close
 			cmds = append(cmds, tea.Sequence(
-				tea.Tick(1*time.Second, func(t time.Time) tea.Msg {
-					return nil
+				tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+					return closeFormMsg{}
 				}),
-				func() tea.Msg {
-					// Navigate to clusters view
-					m.currentView = ViewClusters
-					m.clusterCursor = 0
-					m.instanceForm.Reset()
-					return m.loadMockDataCmd()()
-				},
 			))
 		} else {
 			// Navigate directly if no form
-			m.currentView = ViewClusters
-			m.clusterCursor = 0
+			m.currentView = ViewInstances
 			cmds = append(cmds, m.loadMockDataCmd())
 		}
 
@@ -242,6 +237,115 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle editor quit without saving
 		m.currentView = m.previousView
 		m.taskDefEditor = nil
+
+	case closeFormMsg:
+		// Close the instance creation form and go back to instances view
+		if m.currentView == ViewInstanceCreate {
+			m.currentView = ViewInstances
+			if m.instanceForm != nil {
+				m.instanceForm.Reset()
+			}
+			// Reload instances list
+			cmds = append(cmds, m.loadMockDataCmd())
+		}
+	
+	case instanceCreationStatusMsg:
+		// Update creation steps status
+		if m.instanceForm != nil && m.instanceForm.isCreating {
+			m.instanceForm.creationSteps = msg.steps
+			m.instanceForm.elapsedTime = msg.elapsed
+			// Start ticker for status updates
+			cmds = append(cmds, m.updateCreationStatusCmd())
+		}
+	
+	case actualCreationStatusMsg:
+		// Update creation steps based on actual status from API
+		if m.instanceForm != nil && m.instanceForm.isCreating && msg.status != nil {
+			// Find the step that matches the current status
+			for i := range m.instanceForm.creationSteps {
+				step := &m.instanceForm.creationSteps[i]
+				
+				// Update matching step
+				if step.Name == msg.status.Step {
+					step.Status = msg.status.Status
+					if msg.status.Status == "failed" && msg.status.Message != "" {
+						// Show error message
+						m.instanceForm.errorMsg = msg.status.Message
+					}
+				} else if step.Status == "running" && msg.status.Step != step.Name {
+					// Previous running step is now done
+					step.Status = "done"
+				}
+			}
+		}
+	
+	case creationStatusTickMsg:
+		// Update creation progress every second
+		if m.instanceForm != nil && m.instanceForm.isCreating {
+			elapsed := time.Since(m.instanceForm.startTime)
+			m.instanceForm.elapsedTime = fmt.Sprintf("%.0fs", elapsed.Seconds())
+			
+			// Get the instance name from form
+			instanceName := m.instanceForm.instanceName
+			if instanceName != "" {
+				// Start async status check
+				cmds = append(cmds, m.checkCreationStatusCmd(instanceName))
+			}
+			
+			// Check all steps status
+			allDone := true
+			hasFailed := false
+			for _, step := range m.instanceForm.creationSteps {
+				if step.Status == "failed" {
+					hasFailed = true
+					break
+				}
+				if step.Status != "done" {
+					allDone = false
+				}
+			}
+			
+			// If all done, failed, or timeout, stop ticking
+			if allDone || hasFailed || elapsed > 3*time.Minute {
+				if allDone && !hasFailed {
+					// All steps completed successfully
+					m.instanceForm.isCreating = false
+					m.instanceForm.successMsg = fmt.Sprintf("Instance '%s' created successfully!", instanceName)
+					// Auto-close form after showing success message
+					cmds = append(cmds, tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+						return closeFormMsg{}
+					}))
+				} else if hasFailed {
+					// Creation failed, keep form open to show error
+					m.instanceForm.isCreating = false
+				} else if elapsed > 3*time.Minute && !m.instanceForm.showTimeoutPrompt {
+					// Timeout
+					m.instanceForm.showTimeoutPrompt = true
+				}
+			} else {
+				// Continue ticking
+				cmds = append(cmds, m.updateCreationStatusCmd())
+			}
+		}
+	
+	case instanceCreationTimeoutMsg:
+		// Show timeout prompt
+		if m.instanceForm != nil && m.instanceForm.isCreating {
+			m.instanceForm.showTimeoutPrompt = true
+			m.instanceForm.elapsedTime = msg.elapsed
+		}
+	
+	case instanceCreationContinueMsg:
+		// Handle timeout response
+		if m.instanceForm != nil {
+			m.instanceForm.showTimeoutPrompt = false
+			if !msg.continueWaiting {
+				// Abort creation
+				m.instanceForm.isCreating = false
+				m.instanceForm.errorMsg = "Instance creation aborted"
+				m.instanceForm.successMsg = ""
+			}
+		}
 
 	case errMsg:
 		// Handle API errors
@@ -961,13 +1065,31 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				DevMode:    formData["devMode"].(bool),
 			}
 
-			// Show creating message and set loading state
+			// Initialize creation steps
+			steps := []CreationStep{
+				{Name: "Creating k3d cluster", Status: "pending"},
+				{Name: "Deploying control plane", Status: "pending"},
+			}
+			if opts.LocalStack {
+				steps = append(steps, CreationStep{Name: "Starting LocalStack", Status: "pending"})
+			}
+			if opts.Traefik {
+				steps = append(steps, CreationStep{Name: "Configuring Traefik", Status: "pending"})
+			}
+			steps = append(steps, CreationStep{Name: "Finalizing", Status: "pending"})
+			
+			// Set initial state
 			m.instanceForm.successMsg = "Creating instance..."
 			m.instanceForm.isCreating = true
 			m.instanceForm.errorMsg = ""
-
-			// Create instance via API
-			return m, m.createInstanceCmd(opts)
+			m.instanceForm.creationSteps = steps
+			m.instanceForm.startTime = time.Now()
+			
+			// Start creation and monitoring
+			return m, tea.Batch(
+				m.createInstanceCmd(opts),
+				m.monitorInstanceCreation(opts.Name, opts.LocalStack, opts.Traefik),
+			)
 		case FieldCancel:
 			// Cancel and close
 			m.currentView = m.previousView
@@ -1000,13 +1122,31 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				DevMode:    formData["devMode"].(bool),
 			}
 
-			// Show creating message and set loading state
+			// Initialize creation steps
+			steps := []CreationStep{
+				{Name: "Creating k3d cluster", Status: "pending"},
+				{Name: "Deploying control plane", Status: "pending"},
+			}
+			if opts.LocalStack {
+				steps = append(steps, CreationStep{Name: "Starting LocalStack", Status: "pending"})
+			}
+			if opts.Traefik {
+				steps = append(steps, CreationStep{Name: "Configuring Traefik", Status: "pending"})
+			}
+			steps = append(steps, CreationStep{Name: "Finalizing", Status: "pending"})
+			
+			// Set initial state
 			m.instanceForm.successMsg = "Creating instance..."
 			m.instanceForm.isCreating = true
 			m.instanceForm.errorMsg = ""
-
-			// Create instance via API
-			return m, m.createInstanceCmd(opts)
+			m.instanceForm.creationSteps = steps
+			m.instanceForm.startTime = time.Now()
+			
+			// Start creation and monitoring
+			return m, tea.Batch(
+				m.createInstanceCmd(opts),
+				m.monitorInstanceCreation(opts.Name, opts.LocalStack, opts.Traefik),
+			)
 		case FieldCancel:
 			m.currentView = m.previousView
 			m.instanceForm.Reset()

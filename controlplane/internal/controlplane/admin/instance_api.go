@@ -278,6 +278,27 @@ func (api *InstanceAPI) sendJSON(w http.ResponseWriter, data interface{}) {
 	}
 }
 
+// handleGetCreationStatus handles GET /api/instances/{name}/creation-status
+func (api *InstanceAPI) handleGetCreationStatus(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	instanceName := vars["name"]
+	
+	// Get creation status from manager
+	status := api.manager.GetCreationStatus(instanceName)
+	if status == nil {
+		// No status means creation is complete or not started
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	
+	// Return status as JSON
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		logging.Error("Failed to encode creation status", "error", err)
+		api.sendError(w, http.StatusInternalServerError, "InternalError", "Failed to encode response")
+	}
+}
+
 func (api *InstanceAPI) sendError(w http.ResponseWriter, status int, errType, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -298,4 +319,5 @@ func (api *InstanceAPI) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/api/instances/{name}", api.handleGetInstance).Methods("GET")
 	router.HandleFunc("/api/instances/{name}", api.handleDeleteInstance).Methods("DELETE")
 	router.HandleFunc("/api/instances/{name}/health", api.handleInstanceHealth).Methods("GET")
+	router.HandleFunc("/api/instances/{name}/creation-status", api.handleGetCreationStatus).Methods("GET")
 }

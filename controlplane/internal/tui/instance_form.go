@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 )
@@ -46,8 +47,10 @@ type InstanceForm struct {
 	
 	// Creation status tracking
 	creationSteps    []CreationStep
-	creationElapsed  string     // Time elapsed
+	creationElapsed  string     // Time elapsed (deprecated - use elapsedTime)
 	showTimeoutPrompt bool      // Show continue/abort prompt on timeout
+	startTime        time.Time // When creation started
+	elapsedTime      string    // Time elapsed as string
 	
 	// Validation state
 	nameError    string
