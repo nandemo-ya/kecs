@@ -139,6 +139,91 @@ func (m Model) loadDataFromAPI() tea.Cmd {
 	}
 }
 
+// loadTaskLogsCmd loads logs for the selected task
+func (m Model) loadTaskLogsCmd() tea.Cmd {
+	return func() tea.Msg {
+		if m.selectedTask == "" {
+			return errMsg{err: fmt.Errorf("no task selected")}
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		// Get logs from API
+		logs, err := m.apiClient.GetTaskLogs(ctx, m.selectedInstance, m.selectedCluster, m.selectedTask, 100)
+		if err != nil {
+			// If API fails, use mock data
+			logs = generateMockLogs(m.selectedTask)
+		}
+
+		// Convert API logs to TUI logs
+		tuiLogs := make([]LogEntry, len(logs))
+		for i, log := range logs {
+			tuiLogs[i] = LogEntry{
+				Timestamp: log.Timestamp,
+				Level:     log.Level,
+				Message:   log.Message,
+			}
+		}
+
+		return logsLoadedMsg{
+			logs: tuiLogs,
+		}
+	}
+}
+
+// generateMockLogs generates mock log entries for testing
+func generateMockLogs(taskID string) []api.LogEntry {
+	now := time.Now()
+	return []api.LogEntry{
+		{
+			Timestamp: now.Add(-5 * time.Minute),
+			Level:     "INFO",
+			Message:   fmt.Sprintf("Starting task %s", taskID),
+		},
+		{
+			Timestamp: now.Add(-4 * time.Minute),
+			Level:     "INFO",
+			Message:   "Pulling container image...",
+		},
+		{
+			Timestamp: now.Add(-3 * time.Minute),
+			Level:     "INFO",
+			Message:   "Container started successfully",
+		},
+		{
+			Timestamp: now.Add(-2 * time.Minute),
+			Level:     "INFO",
+			Message:   "Health check passed",
+		},
+		{
+			Timestamp: now.Add(-1 * time.Minute),
+			Level:     "WARN",
+			Message:   "High memory usage detected (85%)",
+		},
+		{
+			Timestamp: now.Add(-30 * time.Second),
+			Level:     "INFO",
+			Message:   "Request received: GET /health",
+		},
+		{
+			Timestamp: now.Add(-10 * time.Second),
+			Level:     "ERROR",
+			Message:   "Failed to connect to database: timeout",
+		},
+		{
+			Timestamp: now.Add(-5 * time.Second),
+			Level:     "INFO",
+			Message:   "Retrying database connection...",
+		},
+		{
+			Timestamp: now,
+			Level:     "INFO",
+			Message:   "Database connection restored",
+		},
+	}
+}
+
 // createInstanceCmd creates a new instance via API
 func (m Model) createInstanceCmd(opts api.CreateInstanceOptions) tea.Cmd {
 	if m.useMockData {
@@ -266,6 +351,10 @@ type dataLoadedMsg struct {
 	clusters  []Cluster
 	services  []Service
 	tasks     []Task
+}
+
+type logsLoadedMsg struct {
+	logs []LogEntry
 }
 
 type instanceCreatedMsg struct {

@@ -1039,6 +1039,17 @@ func (s *Server) SetupRoutes() http.Handler {
 			s.handleELBv2Request(w, r)
 			return
 		}
+		
+		// Handle custom KECS endpoints
+		// Check both URL path and X-Amz-Target header
+		if r.URL.Path == "/v1/GetTaskLogs" || 
+		   (r.URL.Path == "/" && r.Header.Get("X-Amz-Target") == "AWSie.GetTaskLogs") {
+			if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {
+				defaultAPI.HandleGetTaskLogs(w, r)
+				return
+			}
+		}
+		
 		// Otherwise handle as ECS request
 		// Create router and handle request
 		router := generated.NewRouter(s.ecsAPI)
