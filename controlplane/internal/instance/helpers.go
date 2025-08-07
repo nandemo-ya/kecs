@@ -39,14 +39,31 @@ func generateInstanceName() string {
 func (m *Manager) createCluster(ctx context.Context, instanceName string, cfg *config.Config, opts StartOptions) error {
 	clusterName := fmt.Sprintf("kecs-%s", instanceName)
 
-	// Create cluster using the manager interface
-	// The k3d manager will handle the port mappings and volumes
-	// TODO: Configure volumes and port mappings through the manager
-
-	if err := m.k3dManager.CreateCluster(ctx, clusterName); err != nil {
-		return err
+	// Calculate NodePort for API access
+	apiNodePort := int32(opts.ApiPort)
+	if apiNodePort < 30000 {
+		apiNodePort = apiNodePort + 22000
+	}
+	if apiNodePort < 30000 || apiNodePort > 32767 {
+		apiNodePort = 30080 // fallback to default
 	}
 
+	// Create port mappings for k3d cluster
+	portMappings := map[int32]int32{
+		int32(opts.ApiPort): apiNodePort,  // Map host API port to NodePort for ECS API
+	}
+	
+	// If LocalStack is enabled, add its port mapping
+	if cfg.LocalStack.Enabled {
+		// LocalStack always uses fixed NodePort 30566
+		portMappings[4566] = 30566
+	}
+
+	// Create cluster with port mappings
+	if err := m.k3dManager.CreateClusterWithPortMapping(ctx, clusterName, portMappings); err != nil {
+		return err
+	}
+	
 	return nil
 }
 
@@ -228,10 +245,10 @@ func (m *Manager) deployTraefik(ctx context.Context, instanceName string, cfg *c
 		MemoryRequest:   "128Mi",
 		CPULimit:        "500m",
 		MemoryLimit:     "512Mi",
-		WebPort:         80,
-		WebNodePort:     30080,
+		APIPort:         80,
+		APINodePort:     awsNodePort,    // This is for API access (e.g., 30080 for port 8080)
 		AWSPort:         4566,
-		AWSNodePort:     awsNodePort,
+		AWSNodePort:     30566,          // Fixed port for LocalStack
 		LogLevel:        "INFO",
 		AccessLog:       true,
 	}

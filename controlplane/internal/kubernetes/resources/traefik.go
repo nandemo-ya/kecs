@@ -43,10 +43,10 @@ type TraefikConfig struct {
 	MemoryLimit   string
 	
 	// Ports
-	WebPort      int32  // HTTP port
-	WebNodePort  int32  // NodePort for HTTP (optional)
-	AWSPort      int32  // AWS API port (4566)
-	AWSNodePort  int32  // NodePort for AWS API
+	APIPort      int32  // HTTP port for ECS API
+	APINodePort  int32  // NodePort for ECS API (optional)
+	AWSPort      int32  // LocalStack port (4566)
+	AWSNodePort  int32  // NodePort for LocalStack
 	
 	// Features
 	Debug        bool
@@ -64,8 +64,8 @@ func DefaultTraefikConfig() *TraefikConfig {
 		MemoryRequest:   "128Mi",
 		CPULimit:        "500m",
 		MemoryLimit:     "512Mi",
-		WebPort:         80,
-		WebNodePort:     30080,
+		APIPort:         80,
+		APINodePort:     30080,
 		AWSPort:         4566,
 		AWSNodePort:     30890,
 		LogLevel:        "INFO",
@@ -240,13 +240,14 @@ func createTraefikServices(config *TraefikConfig) []*corev1.Service {
 				},
 				Ports: []corev1.ServicePort{
 					{
-						Name:       "web",
-						Port:       config.WebPort,
+						Name:       "api",
+						Port:       config.APIPort,
 						TargetPort: intstr.FromString("web"),
 						Protocol:   corev1.ProtocolTCP,
+						NodePort:   config.APINodePort,
 					},
 					{
-						Name:       "aws",
+						Name:       "localstack",
 						Port:       config.AWSPort,
 						TargetPort: intstr.FromString("aws"),
 						Protocol:   corev1.ProtocolTCP,
@@ -335,7 +336,7 @@ func createTraefikDeployment(config *TraefikConfig) *appsv1.Deployment {
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "web",
-									ContainerPort: config.WebPort,
+									ContainerPort: config.APIPort,
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
