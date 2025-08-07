@@ -517,6 +517,12 @@ func (c *MockClient) GetInstanceCreationStatus(ctx context.Context, name string)
 	return nil, nil
 }
 
+// GetTaskLogs returns mock task logs
+func (c *MockClient) GetTaskLogs(ctx context.Context, instanceName, clusterName, taskArn string, tail int64) ([]LogEntry, error) {
+	// Return mock logs for any task
+	return generateMockLogs(taskArn), nil
+}
+
 // Close implements Client interface
 func (c *MockClient) Close() error {
 	return nil

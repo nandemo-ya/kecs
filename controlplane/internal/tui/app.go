@@ -176,6 +176,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.services = msg.services
 		m.tasks = msg.tasks
 
+	case logsLoadedMsg:
+		// Handle loaded logs
+		m.logs = msg.logs
+
 	case instanceCreatedMsg:
 		// Add new instance to list
 		m.instances = append(m.instances, msg.instance)
@@ -754,7 +758,7 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.selectedTask = m.tasks[m.taskCursor].ID
 			m.previousView = m.currentView
 			m.currentView = ViewLogs
-			return m, m.loadDataFromAPI()
+			return m, m.loadTaskLogsCmd()
 		}
 	case "backspace":
 		m.goBack()
