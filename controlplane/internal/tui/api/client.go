@@ -22,6 +22,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -530,6 +532,37 @@ func (c *HTTPClient) DeregisterTaskDefinition(ctx context.Context, instanceName 
 }
 
 func (c *HTTPClient) ListTaskDefinitionFamilies(ctx context.Context, instanceName string) ([]string, error) {
+	// Get instance info to find API port
+	if c.k3dProvider != nil {
+		inst, err := c.k3dProvider.GetInstance(ctx, instanceName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get instance: %w", err)
+		}
+		
+		// Call the instance's API directly
+		url := fmt.Sprintf("http://localhost:%d/v1/ListTaskDefinitionFamilies", inst.APIPort)
+		client := &http.Client{Timeout: 5 * time.Second}
+		
+		reqBody, _ := json.Marshal(map[string]interface{}{})
+		resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
+		if err != nil {
+			return nil, fmt.Errorf("failed to call ListTaskDefinitionFamilies: %w", err)
+		}
+		defer resp.Body.Close()
+		
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("ListTaskDefinitionFamilies returned status %d", resp.StatusCode)
+		}
+		
+		var result map[string][]string
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return nil, fmt.Errorf("failed to decode response: %w", err)
+		}
+		
+		return result["families"], nil
+	}
+	
+	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/task-definition-families", url.PathEscape(instanceName))
 	var families []string
 	err := c.doRequest(ctx, "GET", path, nil, &families)
@@ -537,6 +570,57 @@ func (c *HTTPClient) ListTaskDefinitionFamilies(ctx context.Context, instanceNam
 }
 
 func (c *HTTPClient) ListTaskDefinitionRevisions(ctx context.Context, instanceName string, family string) ([]TaskDefinitionRevision, error) {
+	// Get instance info to find API port
+	if c.k3dProvider != nil {
+		inst, err := c.k3dProvider.GetInstance(ctx, instanceName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get instance: %w", err)
+		}
+		
+		// Call the instance's API directly to list task definitions for this family
+		url := fmt.Sprintf("http://localhost:%d/v1/ListTaskDefinitions", inst.APIPort)
+		client := &http.Client{Timeout: 5 * time.Second}
+		
+		reqBody, _ := json.Marshal(map[string]interface{}{
+			"familyPrefix": family,
+		})
+		resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
+		if err != nil {
+			return nil, fmt.Errorf("failed to call ListTaskDefinitions: %w", err)
+		}
+		defer resp.Body.Close()
+		
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("ListTaskDefinitions returned status %d", resp.StatusCode)
+		}
+		
+		var result map[string][]string
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return nil, fmt.Errorf("failed to decode response: %w", err)
+		}
+		
+		// Convert task definition ARNs to revisions
+		var revisions []TaskDefinitionRevision
+		for _, arn := range result["taskDefinitionArns"] {
+			// Parse ARN to extract revision number
+			// Format: arn:aws:ecs:region:account:task-definition/family:revision
+			parts := strings.Split(arn, ":")
+			if len(parts) > 0 {
+				revStr := parts[len(parts)-1]
+				revNum, _ := strconv.Atoi(revStr)
+				revisions = append(revisions, TaskDefinitionRevision{
+					Family:    family,
+					Revision:  revNum,
+					Status:    "ACTIVE",
+					CreatedAt: time.Now(), // Mock for now
+				})
+			}
+		}
+		
+		return revisions, nil
+	}
+	
+	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/task-definition-families/%s/revisions", url.PathEscape(instanceName), url.PathEscape(family))
 	var revisions []TaskDefinitionRevision
 	err := c.doRequest(ctx, "GET", path, nil, &revisions)
@@ -544,6 +628,50 @@ func (c *HTTPClient) ListTaskDefinitionRevisions(ctx context.Context, instanceNa
 }
 
 func (c *HTTPClient) DescribeTaskDefinition(ctx context.Context, instanceName string, taskDefArn string) (*TaskDefinition, error) {
+	// Get instance info to find API port
+	if c.k3dProvider != nil {
+		inst, err := c.k3dProvider.GetInstance(ctx, instanceName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get instance: %w", err)
+		}
+		
+		// Call the instance's API directly
+		url := fmt.Sprintf("http://localhost:%d/v1/DescribeTaskDefinition", inst.APIPort)
+		client := &http.Client{Timeout: 5 * time.Second}
+		
+		reqBody, _ := json.Marshal(map[string]interface{}{
+			"taskDefinition": taskDefArn,
+		})
+		resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
+		if err != nil {
+			return nil, fmt.Errorf("failed to call DescribeTaskDefinition: %w", err)
+		}
+		defer resp.Body.Close()
+		
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("DescribeTaskDefinition returned status %d", resp.StatusCode)
+		}
+		
+		var result map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return nil, fmt.Errorf("failed to decode response: %w", err)
+		}
+		
+		// Extract taskDefinition from response
+		if td, ok := result["taskDefinition"].(map[string]interface{}); ok {
+			// Convert to TaskDefinition struct
+			taskDefJSON, _ := json.Marshal(td)
+			var taskDef TaskDefinition
+			if err := json.Unmarshal(taskDefJSON, &taskDef); err != nil {
+				return nil, fmt.Errorf("failed to parse task definition: %w", err)
+			}
+			return &taskDef, nil
+		}
+		
+		return nil, fmt.Errorf("task definition not found in response")
+	}
+	
+	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/task-definitions/%s", url.PathEscape(instanceName), url.PathEscape(taskDefArn))
 	var taskDef TaskDefinition
 	err := c.doRequest(ctx, "GET", path, nil, &taskDef)
@@ -552,6 +680,8 @@ func (c *HTTPClient) DescribeTaskDefinition(ctx context.Context, instanceName st
 	}
 	return &taskDef, nil
 }
+
+
 
 // Health check
 
