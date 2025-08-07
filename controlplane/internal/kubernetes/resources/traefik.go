@@ -198,7 +198,7 @@ accessLog:
   debug: %v
 
 entryPoints:
-  web:
+  api:
     address: ":80"
   aws:
     address: ":%d"
@@ -242,7 +242,7 @@ func createTraefikServices(config *TraefikConfig) []*corev1.Service {
 					{
 						Name:       "api",
 						Port:       config.APIPort,
-						TargetPort: intstr.FromString("web"),
+						TargetPort: intstr.FromString("api"),
 						Protocol:   corev1.ProtocolTCP,
 						NodePort:   config.APINodePort,
 					},
@@ -335,7 +335,7 @@ func createTraefikDeployment(config *TraefikConfig) *appsv1.Deployment {
 							Args:            []string{"--configfile=/config/traefik.yaml"},
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          "web",
+									Name:          "api",
 									ContainerPort: config.APIPort,
 									Protocol:      corev1.ProtocolTCP,
 								},
@@ -421,27 +421,48 @@ func createTraefikDynamicConfigMap() *corev1.ConfigMap {
 		Data: map[string]string{
 			"dynamic.yaml": `http:
   routers:
-    # ECS API routing based on X-Amz-Target header
-    ecs-api:
+    # === API Entrypoint (Port 80 - ECS API Port) ===
+    # All requests to API entrypoint go to ECS API
+    ecs-header:
+      entryPoints:
+        - api
+      rule: "HeaderRegexp(` + "`X-Amz-Target`" + `, ` + "`^AmazonEC2ContainerServiceV20141113\\\\..*`" + `)"
+      service: ecs-api
+      priority: 100
+    ecs-path:
+      entryPoints:
+        - api
+      rule: "PathPrefix(` + "`/v1`" + `)"
+      service: ecs-api
+      priority: 10
+    ecs-default:
+      entryPoints:
+        - api
+      rule: "PathPrefix(` + "`/`" + `)"
+      service: ecs-api
+      priority: 1
+    
+    # === AWS Entrypoint (Port 4566 - LocalStack Port) ===
+    # ECS API takes priority, LocalStack is fallback
+    aws-ecs-header:
       entryPoints:
         - aws
       rule: "HeaderRegexp(` + "`X-Amz-Target`" + `, ` + "`^AmazonEC2ContainerServiceV20141113\\\\..*`" + `)"
       service: ecs-api
       priority: 100
-    # Legacy ECS API routing for path-based requests
-    ecs-api-legacy:
+    aws-ecs-path:
       entryPoints:
         - aws
       rule: "PathPrefix(` + "`/v1`" + `)"
       service: ecs-api
       priority: 10
-    # LocalStack routing (catch-all)
-    localstack:
+    aws-localstack:
       entryPoints:
         - aws
       rule: "PathPrefix(` + "`/`" + `)"
       service: localstack
       priority: 1
+      
   services:
     ecs-api:
       loadBalancer:
