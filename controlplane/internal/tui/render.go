@@ -1958,10 +1958,15 @@ func (m Model) renderTaskDefJSON(maxHeight int, width int) string {
 	
 	// Add scroll indicator if needed
 	lines := strings.Split(jsonContent, "\n")
-	visibleLines := maxHeight - 2
+	visibleLines := maxHeight - 4 // Leave room for scroll indicator
 	
-	if m.taskDefJSONScroll > len(lines)-visibleLines {
-		m.taskDefJSONScroll = len(lines) - visibleLines
+	// Adjust scroll position
+	maxScroll := len(lines) - visibleLines
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	if m.taskDefJSONScroll > maxScroll {
+		m.taskDefJSONScroll = maxScroll
 	}
 	if m.taskDefJSONScroll < 0 {
 		m.taskDefJSONScroll = 0
@@ -1973,6 +1978,23 @@ func (m Model) renderTaskDefJSON(maxHeight int, width int) string {
 	}
 	
 	visibleJSON := strings.Join(lines[m.taskDefJSONScroll:endLine], "\n")
+	
+	// Add scroll indicator
+	if len(lines) > visibleLines {
+		scrollPercent := 0
+		if maxScroll > 0 {
+			scrollPercent = (m.taskDefJSONScroll * 100) / maxScroll
+		}
+		scrollInfo := fmt.Sprintf(" Lines %d-%d of %d (%d%%) | Scroll: J/K, PgUp/PgDn, g/G, Ctrl+U/D ",
+			m.taskDefJSONScroll+1, endLine, len(lines), scrollPercent)
+		
+		scrollStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#888888")).
+			Align(lipgloss.Center).
+			Width(width-2)
+		
+		visibleJSON = visibleJSON + "\n" + scrollStyle.Render(scrollInfo)
+	}
 	
 	return jsonStyle.Render(visibleJSON)
 }

@@ -651,6 +651,11 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if m.selectedCluster != "" {
 			m.currentView = ViewServices
 		}
+	case "d":
+		// Go to task definitions view
+		m.currentView = ViewTaskDefinitionFamilies
+		m.taskDefFamilyCursor = 0
+		return m, m.loadTaskDefinitionFamiliesCmd()
 	case "/":
 		m.searchMode = true
 		m.searchQuery = ""
@@ -1381,7 +1386,7 @@ func (m Model) handleTaskDefinitionRevisionsKeys(msg tea.KeyMsg) (Model, tea.Cmd
 	case "D":
 		// Enter diff mode
 		// TODO: Implement diff mode
-	case "ctrl+u":
+	case "ctrl+u", "pgup":
 		// Scroll JSON up half page
 		if m.showTaskDefJSON {
 			m.taskDefJSONScroll -= 10
@@ -1389,10 +1394,34 @@ func (m Model) handleTaskDefinitionRevisionsKeys(msg tea.KeyMsg) (Model, tea.Cmd
 				m.taskDefJSONScroll = 0
 			}
 		}
-	case "ctrl+d":
+	case "ctrl+d", "pgdown":
 		// Scroll JSON down half page
 		if m.showTaskDefJSON {
 			m.taskDefJSONScroll += 10
+		}
+	case "g":
+		// Go to top of JSON
+		if m.showTaskDefJSON {
+			m.taskDefJSONScroll = 0
+		}
+	case "G":
+		// Go to bottom of JSON
+		if m.showTaskDefJSON {
+			// Will be adjusted in render to max value
+			m.taskDefJSONScroll = 99999
+		}
+	case "J":
+		// Scroll JSON down one line
+		if m.showTaskDefJSON {
+			m.taskDefJSONScroll++
+		}
+	case "K":
+		// Scroll JSON up one line
+		if m.showTaskDefJSON {
+			m.taskDefJSONScroll--
+			if m.taskDefJSONScroll < 0 {
+				m.taskDefJSONScroll = 0
+			}
 		}
 	case "/":
 		m.searchMode = true
