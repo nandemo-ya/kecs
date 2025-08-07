@@ -36,8 +36,7 @@ func (m Model) filterClusters(clusters []Cluster) []Cluster {
 
 	for _, cluster := range clusters {
 		if matchesSearch(cluster.Name, query) ||
-			matchesSearch(cluster.Status, query) ||
-			matchesSearch(cluster.Namespace, query) {
+			matchesSearch(cluster.Status, query) {
 			filtered = append(filtered, cluster)
 		}
 	}

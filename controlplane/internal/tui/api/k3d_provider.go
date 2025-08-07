@@ -17,7 +17,9 @@ package api
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -147,9 +149,12 @@ func (p *K3dInstanceProvider) getInstanceInfo(ctx context.Context, name string) 
 	}
 
 	// If instance is running, try to get resource counts from API
-	if inst.Status == "Running" {
-		// This will be done through the API client if available
-		// For now, we just return the basic info
+	if inst.Status == "Running" && inst.APIPort > 0 {
+		// Get cluster, service, and task counts from the instance's API
+		clusters, services, tasks := p.getInstanceCounts(inst.APIPort)
+		inst.Clusters = clusters
+		inst.Services = services
+		inst.Tasks = tasks
 	}
 
 	return inst, nil
@@ -347,6 +352,85 @@ func (p *K3dInstanceProvider) GetInstanceCreationStatus(ctx context.Context, nam
 		Status:  status.Status,
 		Message: status.Message,
 	}, nil
+}
+
+// getInstanceCounts retrieves cluster, service, and task counts from an instance's API
+func (p *K3dInstanceProvider) getInstanceCounts(apiPort int) (clusters, services, tasks int) {
+	// Call ListClusters API
+	url := fmt.Sprintf("http://localhost:%d/v1/ListClusters", apiPort)
+	
+	client := &http.Client{
+		Timeout: 2 * time.Second,
+	}
+	
+	resp, err := client.Post(url, "application/json", strings.NewReader("{}"))
+	if err != nil {
+		return 0, 0, 0
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return 0, 0, 0
+	}
+	
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, 0, 0
+	}
+	
+	// Parse cluster response
+	if clusterArns, ok := result["clusterArns"].([]interface{}); ok {
+		clusters = len(clusterArns)
+		
+		// For each cluster, get services and tasks
+		for _, arnInterface := range clusterArns {
+			if arn, ok := arnInterface.(string); ok {
+				// Extract cluster name from ARN
+				clusterName := extractClusterName(arn)
+				
+				// Get services count
+				servicesURL := fmt.Sprintf("http://localhost:%d/v1/ListServices", apiPort)
+				servicesBody := fmt.Sprintf(`{"cluster":"%s"}`, clusterName)
+				servicesResp, err := client.Post(servicesURL, "application/json", strings.NewReader(servicesBody))
+				if err == nil && servicesResp.StatusCode == http.StatusOK {
+					var servicesResult map[string]interface{}
+					if err := json.NewDecoder(servicesResp.Body).Decode(&servicesResult); err == nil {
+						if serviceArns, ok := servicesResult["serviceArns"].([]interface{}); ok {
+							services += len(serviceArns)
+						}
+					}
+					servicesResp.Body.Close()
+				}
+				
+				// Get tasks count
+				tasksURL := fmt.Sprintf("http://localhost:%d/v1/ListTasks", apiPort)
+				tasksBody := fmt.Sprintf(`{"cluster":"%s"}`, clusterName)
+				tasksResp, err := client.Post(tasksURL, "application/json", strings.NewReader(tasksBody))
+				if err == nil && tasksResp.StatusCode == http.StatusOK {
+					var tasksResult map[string]interface{}
+					if err := json.NewDecoder(tasksResp.Body).Decode(&tasksResult); err == nil {
+						if taskArns, ok := tasksResult["taskArns"].([]interface{}); ok {
+							tasks += len(taskArns)
+						}
+					}
+					tasksResp.Body.Close()
+				}
+			}
+		}
+	}
+	
+	return clusters, services, tasks
+}
+
+// extractClusterName extracts the cluster name from an ARN
+func extractClusterName(arn string) string {
+	// ARN format: arn:aws:ecs:region:account:cluster/name
+	parts := strings.Split(arn, "/")
+	if len(parts) > 1 {
+		return parts[len(parts)-1]
+	}
+	// If not in ARN format, assume it's already the cluster name
+	return arn
 }
 
 // Close cleans up resources

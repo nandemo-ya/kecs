@@ -51,11 +51,6 @@ type Cluster struct {
 	Status     string
 	Services   int
 	Tasks      int
-	CPUUsed    float64
-	CPUTotal   float64
-	MemoryUsed string
-	MemoryTotal string
-	Namespace  string
 	Age        time.Duration
 }
 

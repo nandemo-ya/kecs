@@ -15,13 +15,18 @@
 package admin
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
+	"gopkg.in/yaml.v3"
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
@@ -51,14 +56,17 @@ func NewInstanceAPI(cfg *config.Config, storage storage.Storage) (*InstanceAPI, 
 
 // Instance represents a KECS instance in API responses
 type Instance struct {
-	Name      string    `json:"name"`
-	Status    string    `json:"status"`
-	Clusters  int       `json:"clusters"`
-	Services  int       `json:"services"`
-	Tasks     int       `json:"tasks"`
-	APIPort   int       `json:"apiPort"`
-	AdminPort int       `json:"adminPort"`
-	CreatedAt time.Time `json:"createdAt"`
+	Name       string    `json:"name"`
+	Status     string    `json:"status"`
+	Clusters   int       `json:"clusters"`
+	Services   int       `json:"services"`
+	Tasks      int       `json:"tasks"`
+	APIPort    int       `json:"apiPort"`
+	AdminPort  int       `json:"adminPort"`
+	LocalStack bool      `json:"localStack"`
+	Traefik    bool      `json:"traefik"`
+	DevMode    bool      `json:"devMode"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 // CreateInstanceRequest represents the request to create a new instance
@@ -84,19 +92,71 @@ func (api *InstanceAPI) handleListInstances(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// For now, return the current instance info
-	// In multi-instance mode, this would list all instances
-	instances := []Instance{
-		{
-			Name:      "default", // Current instance
-			Status:    "running",
-			Clusters:  api.getClusterCount(),
-			Services:  api.getServiceCount(),
-			Tasks:     api.getTaskCount(),
-			APIPort:   api.config.Server.Port,
-			AdminPort: api.config.Server.AdminPort,
-			CreatedAt: time.Now().Add(-24 * time.Hour), // Mock creation time
-		},
+	// Get home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		api.sendError(w, http.StatusInternalServerError, "InternalError", "Failed to get home directory")
+		return
+	}
+
+	// Read instances from ~/.kecs/instances/
+	instancesDir := filepath.Join(homeDir, ".kecs", "instances")
+	entries, err := os.ReadDir(instancesDir)
+	if err != nil {
+		// If directory doesn't exist, return empty list
+		if os.IsNotExist(err) {
+			api.sendJSON(w, []Instance{})
+			return
+		}
+		api.sendError(w, http.StatusInternalServerError, "InternalError", "Failed to read instances directory")
+		return
+	}
+
+	var instances []Instance
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		// Read instance config
+		configPath := filepath.Join(instancesDir, entry.Name(), "config.yaml")
+		configData, err := os.ReadFile(configPath)
+		if err != nil {
+			logging.Error("Failed to read instance config", "instance", entry.Name(), "error", err)
+			continue
+		}
+
+		// Parse config
+		var config struct {
+			Name       string    `yaml:"name"`
+			CreatedAt  time.Time `yaml:"createdAt"`
+			APIPort    int       `yaml:"apiPort"`
+			AdminPort  int       `yaml:"adminPort"`
+			LocalStack bool      `yaml:"localStack"`
+			Traefik    bool      `yaml:"traefik"`
+			DevMode    bool      `yaml:"devMode"`
+		}
+		if err := yaml.Unmarshal(configData, &config); err != nil {
+			logging.Error("Failed to parse instance config", "instance", entry.Name(), "error", err)
+			continue
+		}
+
+		// Get cluster, service, task counts by calling the instance's API
+		clusters, services, tasks := api.getInstanceCounts(config.APIPort)
+
+		instances = append(instances, Instance{
+			Name:      config.Name,
+			Status:    "running", // TODO: Check actual status
+			Clusters:  clusters,
+			Services:  services,
+			Tasks:     tasks,
+			APIPort:   config.APIPort,
+			AdminPort: config.AdminPort,
+			LocalStack: config.LocalStack,
+			Traefik:   config.Traefik,
+			DevMode:   config.DevMode,
+			CreatedAt: config.CreatedAt,
+		})
 	}
 
 	api.sendJSON(w, instances)
@@ -201,6 +261,100 @@ func (api *InstanceAPI) handleInstanceHealth(w http.ResponseWriter, r *http.Requ
 }
 
 // Helper methods
+
+// getInstanceCounts retrieves cluster, service, and task counts from an instance's API
+func (api *InstanceAPI) getInstanceCounts(apiPort int) (clusters, services, tasks int) {
+	// Call ListClusters API
+	clustersResp, err := api.callInstanceAPI(apiPort, "ListClusters", map[string]interface{}{})
+	if err != nil {
+		logging.Debug("Failed to get cluster count from instance", "port", apiPort, "error", err)
+		return 0, 0, 0
+	}
+	
+	// Parse cluster response
+	if clusterArns, ok := clustersResp["clusterArns"].([]interface{}); ok {
+		clusters = len(clusterArns)
+		
+		// For each cluster, get services and tasks
+		for _, arnInterface := range clusterArns {
+			if arn, ok := arnInterface.(string); ok {
+				// Extract cluster name from ARN
+				clusterName := extractClusterName(arn)
+				
+				// Get services count
+				servicesResp, err := api.callInstanceAPI(apiPort, "ListServices", map[string]interface{}{
+					"cluster": clusterName,
+				})
+				if err == nil {
+					if serviceArns, ok := servicesResp["serviceArns"].([]interface{}); ok {
+						services += len(serviceArns)
+					}
+				}
+				
+				// Get tasks count
+				tasksResp, err := api.callInstanceAPI(apiPort, "ListTasks", map[string]interface{}{
+					"cluster": clusterName,
+				})
+				if err == nil {
+					if taskArns, ok := tasksResp["taskArns"].([]interface{}); ok {
+						tasks += len(taskArns)
+					}
+				}
+			}
+		}
+	}
+	
+	return clusters, services, tasks
+}
+
+// callInstanceAPI makes an API call to a specific instance
+func (api *InstanceAPI) callInstanceAPI(apiPort int, action string, params map[string]interface{}) (map[string]interface{}, error) {
+	url := fmt.Sprintf("http://localhost:%d/v1/%s", apiPort, action)
+	
+	body, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+	
+	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	
+	req.Header.Set("Content-Type", "application/json")
+	
+	client := &http.Client{
+		Timeout: 2 * time.Second,
+	}
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+	
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	
+	return result, nil
+}
+
+// extractClusterName extracts the cluster name from an ARN
+func extractClusterName(arn string) string {
+	// ARN format: arn:aws:ecs:region:account:cluster/name
+	parts := strings.Split(arn, "/")
+	if len(parts) > 1 {
+		return parts[len(parts)-1]
+	}
+	// If not in ARN format, assume it's already the cluster name
+	return arn
+}
 
 func (api *InstanceAPI) getClusterCount() int {
 	if api.storage == nil {
