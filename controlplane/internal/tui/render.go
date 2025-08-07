@@ -811,7 +811,6 @@ func (m Model) renderClustersList(maxHeight int) string {
 	// Colors for clusters
 	activeColor := lipgloss.Color("#00ff00")
 	headerColor := lipgloss.Color("#808080")
-	warningColor := lipgloss.Color("#ffff00")
 	
 	// Styles for clusters
 	clusterHeaderStyle := lipgloss.NewStyle().
@@ -820,31 +819,22 @@ func (m Model) renderClustersList(maxHeight int) string {
 			
 	activeStyle := lipgloss.NewStyle().
 			Foreground(activeColor)
-			
-	warningStyle := lipgloss.NewStyle().
-			Foreground(warningColor)
 	
 	// Calculate column widths based on available width
 	availableWidth := m.width - 8
-	nameWidth := int(float64(availableWidth) * 0.20)
-	statusWidth := int(float64(availableWidth) * 0.10)
-	servicesWidth := int(float64(availableWidth) * 0.10)
-	tasksWidth := int(float64(availableWidth) * 0.10)
-	cpuWidth := int(float64(availableWidth) * 0.12)
-	memoryWidth := int(float64(availableWidth) * 0.12)
-	namespaceWidth := int(float64(availableWidth) * 0.20)
-	ageWidth := int(float64(availableWidth) * 0.10)
+	nameWidth := int(float64(availableWidth) * 0.40)
+	statusWidth := int(float64(availableWidth) * 0.15)
+	servicesWidth := int(float64(availableWidth) * 0.15)
+	tasksWidth := int(float64(availableWidth) * 0.15)
+	ageWidth := int(float64(availableWidth) * 0.15)
 	
 	// Header
 	header := fmt.Sprintf(
-		"%-*s %-*s %-*s %-*s %-*s %-*s %-*s %-*s",
+		"%-*s %-*s %-*s %-*s %-*s",
 		nameWidth, "NAME",
 		statusWidth, "STATUS",
 		servicesWidth, "SERVICES",
 		tasksWidth, "TASKS",
-		cpuWidth, "CPU",
-		memoryWidth, "MEMORY",
-		namespaceWidth, "NAMESPACE",
 		ageWidth, "AGE",
 	)
 	header = clusterHeaderStyle.Render(header)
@@ -882,29 +872,20 @@ func (m Model) renderClustersList(maxHeight int) string {
 		status := cluster.Status
 		services := fmt.Sprintf("%d", cluster.Services)
 		tasks := fmt.Sprintf("%d", cluster.Tasks)
-		cpu := fmt.Sprintf("%.1f/%.1f", cluster.CPUUsed, cluster.CPUTotal)
-		memory := fmt.Sprintf("%s/%s", cluster.MemoryUsed, cluster.MemoryTotal)
-		namespace := cluster.Namespace
 		age := formatDuration(cluster.Age)
 		
 		// Truncate long values
 		if len(name) > nameWidth {
 			name = name[:nameWidth-3] + "..."
 		}
-		if len(namespace) > namespaceWidth {
-			namespace = namespace[:namespaceWidth-3] + "..."
-		}
 		
 		// Create row
 		row := fmt.Sprintf(
-			"%-*s %-*s %-*s %-*s %-*s %-*s %-*s %-*s",
+			"%-*s %-*s %-*s %-*s %-*s",
 			nameWidth, name,
 			statusWidth, status,
 			servicesWidth, services,
 			tasksWidth, tasks,
-			cpuWidth, cpu,
-			memoryWidth, memory,
-			namespaceWidth, namespace,
 			ageWidth, age,
 		)
 		
@@ -914,11 +895,7 @@ func (m Model) renderClustersList(maxHeight int) string {
 			row = selectedRowStyle.Width(availableWidth).Render("▸ " + row)
 		} else {
 			row = "  " + row
-			// Check CPU usage for warning
-			cpuUsagePercent := (cluster.CPUUsed / cluster.CPUTotal) * 100
-			if cpuUsagePercent > 80 {
-				row = warningStyle.Render(row)
-			} else if cluster.Status == "ACTIVE" {
+			if cluster.Status == "ACTIVE" {
 				row = activeStyle.Render(row)
 			}
 		}
@@ -980,13 +957,13 @@ func (m Model) renderServicesList(maxHeight int) string {
 	
 	// Calculate column widths based on available width
 	availableWidth := m.width - 8
-	nameWidth := int(float64(availableWidth) * 0.25)
-	desiredWidth := int(float64(availableWidth) * 0.10)
-	runningWidth := int(float64(availableWidth) * 0.10)
-	pendingWidth := int(float64(availableWidth) * 0.10)
-	statusWidth := int(float64(availableWidth) * 0.15)
-	taskDefWidth := int(float64(availableWidth) * 0.20)
-	ageWidth := int(float64(availableWidth) * 0.10)
+	nameWidth := int(float64(availableWidth) * 0.20)
+	desiredWidth := int(float64(availableWidth) * 0.08)
+	runningWidth := int(float64(availableWidth) * 0.08)
+	pendingWidth := int(float64(availableWidth) * 0.08)
+	statusWidth := int(float64(availableWidth) * 0.10)
+	taskDefWidth := int(float64(availableWidth) * 0.40)
+	ageWidth := int(float64(availableWidth) * 0.06)
 	
 	// Header
 	header := fmt.Sprintf(
@@ -1037,6 +1014,15 @@ func (m Model) renderServicesList(maxHeight int) string {
 		status := service.Status
 		taskDef := service.TaskDef
 		age := formatDuration(service.Age)
+		
+		// Extract task definition name and revision from ARN
+		// ARN format: arn:aws:ecs:region:account:task-definition/name:revision
+		if strings.HasPrefix(taskDef, "arn:") {
+			parts := strings.Split(taskDef, "/")
+			if len(parts) > 1 {
+				taskDef = parts[len(parts)-1] // Gets "name:revision"
+			}
+		}
 		
 		// Truncate long values
 		if len(name) > nameWidth {
@@ -1136,20 +1122,18 @@ func (m Model) renderTasksList(maxHeight int) string {
 	
 	// Calculate column widths based on available width
 	availableWidth := m.width - 8
-	idWidth := int(float64(availableWidth) * 0.20)
-	serviceWidth := int(float64(availableWidth) * 0.20)
-	statusWidth := int(float64(availableWidth) * 0.10)
+	idWidth := int(float64(availableWidth) * 0.45)
+	statusWidth := int(float64(availableWidth) * 0.12)
 	healthWidth := int(float64(availableWidth) * 0.10)
 	cpuWidth := int(float64(availableWidth) * 0.08)
 	memoryWidth := int(float64(availableWidth) * 0.10)
-	ipWidth := int(float64(availableWidth) * 0.15)
-	ageWidth := int(float64(availableWidth) * 0.10)
+	ipWidth := int(float64(availableWidth) * 0.10)
+	ageWidth := int(float64(availableWidth) * 0.05)
 	
 	// Header
 	header := fmt.Sprintf(
-		"%-*s %-*s %-*s %-*s %-*s %-*s %-*s %-*s",
-		idWidth, "ID",
-		serviceWidth, "SERVICE",
+		"%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
+		idWidth, "TASK ID",
 		statusWidth, "STATUS",
 		healthWidth, "HEALTH",
 		cpuWidth, "CPU",
@@ -1189,7 +1173,6 @@ func (m Model) renderTasksList(maxHeight int) string {
 		task := filteredTasks[i]
 		// Format values
 		id := task.ID
-		service := task.Service
 		status := task.Status
 		health := task.Health
 		cpu := fmt.Sprintf("%.1f", task.CPU)
@@ -1208,15 +1191,11 @@ func (m Model) renderTasksList(maxHeight int) string {
 		if len(id) > idWidth {
 			id = id[:idWidth-3] + "..."
 		}
-		if len(service) > serviceWidth {
-			service = service[:serviceWidth-3] + "..."
-		}
 		
 		// Create row
 		row := fmt.Sprintf(
-			"%-*s %-*s %-*s %-*s %-*s %-*s %-*s %-*s",
+			"%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
 			idWidth, id,
-			serviceWidth, service,
 			statusWidth, status,
 			healthWidth, health,
 			cpuWidth, cpu,

@@ -254,11 +254,6 @@ func (cp *CommandPalette) initCommands() {
 					Status:    "ACTIVE",
 					Services:  0,
 					Tasks:     0,
-					CPUUsed:   0,
-					CPUTotal:  100,
-					MemoryUsed: "0 GB",
-					MemoryTotal: "16 GB",
-					Namespace: m.selectedInstance,
 					Age:       0,
 				}
 				m.clusters = append(m.clusters, newCluster)

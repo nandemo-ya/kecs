@@ -379,11 +379,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Status:      cl.Status,
 				Services:    cl.Services,
 				Tasks:       cl.Tasks,
-				CPUUsed:     cl.CPUUsed,
-				CPUTotal:    cl.CPUTotal,
-				MemoryUsed:  cl.MemoryUsed,
-				MemoryTotal: cl.MemoryTotal,
-				Namespace:   cl.Namespace,
 				Age:         cl.Age,
 			}
 		}
@@ -520,7 +515,7 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.selectedInstance = m.instances[m.instanceCursor].Name
 			m.currentView = ViewClusters
 			m.clusterCursor = 0
-			return m, m.loadMockDataCmd()
+			return m, m.loadDataFromAPI()
 		}
 	case "y":
 		// Copy instance name to clipboard
@@ -624,7 +619,7 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.commandMode = true
 		m.commandInput = ""
 	case "R":
-		return m, m.loadMockDataCmd()
+		return m, m.loadDataFromAPI()
 	}
 	return m, nil
 }
@@ -640,11 +635,11 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.selectedCluster = m.clusters[m.clusterCursor].Name
 			m.currentView = ViewServices
 			m.serviceCursor = 0
-			return m, m.loadMockDataCmd()
+			return m, m.loadDataFromAPI()
 		}
 	case "backspace":
 		m.goBack()
-		return m, m.loadMockDataCmd()
+		return m, m.loadDataFromAPI()
 	case "i":
 		m.currentView = ViewInstances
 		m.selectedInstance = ""
@@ -659,7 +654,7 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.commandMode = true
 		m.commandInput = ""
 	case "R":
-		return m, m.loadMockDataCmd()
+		return m, m.loadDataFromAPI()
 	case "ctrl+i":
 		// Quick switch instance
 		if len(m.instances) > 1 {
@@ -689,11 +684,11 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.selectedService = m.services[m.serviceCursor].Name
 			m.currentView = ViewTasks
 			m.taskCursor = 0
-			return m, m.loadMockDataCmd()
+			return m, m.loadDataFromAPI()
 		}
 	case "backspace":
 		m.goBack()
-		return m, m.loadMockDataCmd()
+		return m, m.loadDataFromAPI()
 	case "i":
 		m.currentView = ViewInstances
 		m.selectedInstance = ""
@@ -719,7 +714,7 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if len(m.services) > 0 {
 			m.previousView = m.currentView
 			m.currentView = ViewLogs
-			return m, m.loadMockDataCmd()
+			return m, m.loadDataFromAPI()
 		}
 	case "/":
 		m.searchMode = true
@@ -728,7 +723,7 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.commandMode = true
 		m.commandInput = ""
 	case "R":
-		return m, m.loadMockDataCmd()
+		return m, m.loadDataFromAPI()
 	case "ctrl+i":
 		// Quick switch instance
 		if len(m.instances) > 1 {
@@ -759,11 +754,11 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.selectedTask = m.tasks[m.taskCursor].ID
 			m.previousView = m.currentView
 			m.currentView = ViewLogs
-			return m, m.loadMockDataCmd()
+			return m, m.loadDataFromAPI()
 		}
 	case "backspace":
 		m.goBack()
-		return m, m.loadMockDataCmd()
+		return m, m.loadDataFromAPI()
 	case "i":
 		m.currentView = ViewInstances
 		m.selectedInstance = ""
@@ -787,7 +782,7 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.commandMode = true
 		m.commandInput = ""
 	case "R":
-		return m, m.loadMockDataCmd()
+		return m, m.loadDataFromAPI()
 	case "ctrl+i":
 		// Quick switch instance
 		if len(m.instances) > 1 {
@@ -814,7 +809,7 @@ func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.moveCursorDown()
 	case "esc", "backspace":
 		m.currentView = m.previousView
-		return m, m.loadMockDataCmd()
+		return m, m.loadDataFromAPI()
 	case "f":
 		// Toggle follow mode (mock)
 	case "s":
@@ -893,7 +888,7 @@ func (m Model) handleCommandInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.commandPalette.lastResult = result
 			m.commandPalette.showResult = true
 		}
-		return m, m.loadMockDataCmd()
+		return m, m.loadDataFromAPI()
 	case "tab":
 		// Switch to command palette for autocomplete
 		if m.commandInput != "" {
@@ -955,7 +950,7 @@ func (m Model) handleConfirmDialogKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.confirmDialog = nil
 		m.currentView = m.previousView
 		// Reload data after potential deletion
-		return m, m.loadMockDataCmd()
+		return m, m.loadDataFromAPI()
 	case "esc", "q":
 		// Cancel and go back
 		if m.confirmDialog.onNo != nil {
@@ -983,7 +978,7 @@ func (m Model) handleCommandPaletteInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 		// Command executed successfully
 		m.currentView = m.previousView
 		m.commandPalette.Reset()
-		return m, m.loadMockDataCmd()
+		return m, m.loadDataFromAPI()
 	case "up", "ctrl+p":
 		m.commandPalette.MoveUp()
 		return m, nil
@@ -1199,7 +1194,7 @@ func (m Model) handleInstanceSwitcherInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.currentView = ViewClusters
 			m.clusterCursor = 0
 			m.instanceSwitcher = nil
-			return m, m.loadMockDataCmd()
+			return m, m.loadDataFromAPI()
 		}
 		// If same instance selected, just close
 		m.currentView = m.previousView
@@ -1255,7 +1250,7 @@ func (m Model) handleTaskDefinitionFamiliesKeys(msg tea.KeyMsg) (Model, tea.Cmd)
 		// Switch to clusters view
 		m.currentView = ViewClusters
 		m.clusterCursor = 0
-		return m, m.loadMockDataCmd()
+		return m, m.loadDataFromAPI()
 	case "N":
 		// Create new task definition
 		m.taskDefEditor = NewTaskDefinitionEditor("new-task-definition", nil)

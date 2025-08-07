@@ -51,7 +51,10 @@ func NewServer(port int, storage storage.Storage) *Server {
 		s.instanceAPI = instanceAPI
 	}
 	
-	s.ecsProxy = NewECSProxy(cfg)
+	// Initialize ECS proxy with instance manager if available
+	if s.instanceAPI != nil && s.instanceAPI.manager != nil {
+		s.ecsProxy = NewECSProxy(cfg, s.instanceAPI.manager)
+	}
 
 	return s
 }

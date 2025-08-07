@@ -20,20 +20,26 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"github.com/gorilla/mux"
+	"gopkg.in/yaml.v3"
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // ECSProxy proxies ECS API requests to the main API server
 type ECSProxy struct {
-	config *config.Config
+	config  *config.Config
+	manager *instance.Manager
 }
 
 // NewECSProxy creates a new ECS API proxy
-func NewECSProxy(cfg *config.Config) *ECSProxy {
+func NewECSProxy(cfg *config.Config, manager *instance.Manager) *ECSProxy {
 	return &ECSProxy{
-		config: cfg,
+		config:  cfg,
+		manager: manager,
 	}
 }
 
@@ -56,9 +62,10 @@ func (p *ECSProxy) handleECSProxy(w http.ResponseWriter, r *http.Request) {
 	instanceName := vars["name"]
 	endpoint := vars["endpoint"]
 
-	// For now, only support default instance
-	if instanceName != "default" {
-		p.sendError(w, http.StatusNotFound, "InstanceNotFound", fmt.Sprintf("Instance %s not found", instanceName))
+	// Get instance API port from config file
+	apiPort, err := p.getInstanceAPIPort(instanceName)
+	if err != nil {
+		p.sendError(w, http.StatusNotFound, "InstanceNotFound", fmt.Sprintf("Instance %s not found: %v", instanceName, err))
 		return
 	}
 
@@ -77,8 +84,8 @@ func (p *ECSProxy) handleECSProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Forward to main API server
-	apiURL := fmt.Sprintf("http://localhost:%d/v1/%s", p.config.Server.Port, action)
+	// Forward to instance's API server
+	apiURL := fmt.Sprintf("http://localhost:%d/v1/%s", apiPort, action)
 	
 	// Create new request
 	proxyReq, err := http.NewRequest("POST", apiURL, bytes.NewReader(body))
@@ -220,7 +227,18 @@ func (p *ECSProxy) proxyWithBody(w http.ResponseWriter, r *http.Request, action 
 
 // proxyRequest performs the actual proxy request
 func (p *ECSProxy) proxyRequest(w http.ResponseWriter, r *http.Request, action string, body []byte) {
-	apiURL := fmt.Sprintf("http://localhost:%d/v1/%s", p.config.Server.Port, action)
+	// Get instance name from URL
+	vars := mux.Vars(r)
+	instanceName := vars["name"]
+	
+	// Get instance API port from config file
+	apiPort, err := p.getInstanceAPIPort(instanceName)
+	if err != nil {
+		p.sendError(w, http.StatusNotFound, "InstanceNotFound", fmt.Sprintf("Instance %s not found: %v", instanceName, err))
+		return
+	}
+	
+	apiURL := fmt.Sprintf("http://localhost:%d/v1/%s", apiPort, action)
 	
 	proxyReq, err := http.NewRequest("POST", apiURL, bytes.NewReader(body))
 	if err != nil {
@@ -257,6 +275,38 @@ func (p *ECSProxy) sendError(w http.ResponseWriter, status int, errType, message
 	if encErr := json.NewEncoder(w).Encode(err); encErr != nil {
 		logging.Error("Failed to encode error response", "error", encErr)
 	}
+}
+
+// getInstanceAPIPort retrieves the API port for an instance from its config file
+func (p *ECSProxy) getInstanceAPIPort(instanceName string) (int, error) {
+	// Build config file path
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get home directory: %w", err)
+	}
+	
+	configPath := filepath.Join(homeDir, ".kecs", "instances", instanceName, "config.yaml")
+	
+	// Read config file
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read config file: %w", err)
+	}
+	
+	// Parse YAML
+	var instanceConfig struct {
+		APIPort int `yaml:"apiPort"`
+	}
+	
+	if err := yaml.Unmarshal(data, &instanceConfig); err != nil {
+		return 0, fmt.Errorf("failed to parse config file: %w", err)
+	}
+	
+	if instanceConfig.APIPort == 0 {
+		return 0, fmt.Errorf("API port not found in config")
+	}
+	
+	return instanceConfig.APIPort, nil
 }
 
 // RegisterRoutes registers ECS proxy routes
