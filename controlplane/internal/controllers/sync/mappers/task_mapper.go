@@ -126,8 +126,12 @@ func (m *TaskStateMapper) MapPodToTask(pod *corev1.Pod) *storage.Task {
 		startedBy = fmt.Sprintf("ecs-svc/%s", serviceName)
 	}
 
-	// Generate task ID from pod name
-	taskID := pod.Name
+	// Get task ID from pod label or use pod name as fallback
+	taskID := pod.Labels["kecs.dev/task-id"]
+	if taskID == "" {
+		// Fallback to pod name for compatibility with existing pods
+		taskID = pod.Name
+	}
 
 	// Create task object
 	task := &storage.Task{
@@ -273,11 +277,23 @@ func (m *TaskStateMapper) mapContainerDesiredStatus(status *corev1.ContainerStat
 // Helper methods
 
 func (m *TaskStateMapper) generateTaskARN(pod *corev1.Pod) string {
-	_, region := extractClusterInfoFromNamespace(pod.Namespace)
+	clusterName, region := extractClusterInfoFromNamespace(pod.Namespace)
 	if region == "" {
 		region = m.region
 	}
-	return fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", region, m.accountID, pod.Namespace, pod.Name)
+	if clusterName == "" {
+		// Fallback to default if cluster name extraction failed
+		clusterName = "default"
+	}
+	
+	// Get task ID from pod label or use pod name as fallback
+	taskID := pod.Labels["kecs.dev/task-id"]
+	if taskID == "" {
+		// Fallback to pod name for compatibility with existing pods
+		taskID = pod.Name
+	}
+	
+	return fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", region, m.accountID, clusterName, taskID)
 }
 
 func (m *TaskStateMapper) getClusterARNFromNamespace(namespace string) string {
