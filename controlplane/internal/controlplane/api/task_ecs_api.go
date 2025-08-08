@@ -8,17 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	corev1 "k8s.io/api/core/v1"
-
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	"github.com/nandemo-ya/kecs/controlplane/internal/types"
+	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // RunTask implements the RunTask operation
@@ -107,7 +107,14 @@ func (api *DefaultECSAPI) RunTask(ctx context.Context, req *generated.RunTaskReq
 	// Create requested number of tasks
 	for i := 0; i < count; i++ {
 		// Generate task ID
-		taskID := uuid.New().String()
+		taskID, err := utils.GenerateTaskID()
+		if err != nil {
+			failures = append(failures, generated.Failure{
+				Reason: ptr.String("RESOURCE_CREATION_FAILED"),
+				Detail: ptr.String(fmt.Sprintf("Failed to generate task ID: %v", err)),
+			})
+			continue
+		}
 
 		// Create storage task
 		now := time.Now()
