@@ -32,13 +32,6 @@ type TaskConverter struct {
 	networkConverter      *NetworkConverter
 }
 
-// SecretInfo holds parsed information from a secret ARN
-type SecretInfo struct {
-	SecretName string
-	Key        string
-	Source     string // "secretsmanager" or "ssm"
-}
-
 // NewTaskConverter creates a new task converter
 func NewTaskConverter(region, accountID string) *TaskConverter {
 	return &TaskConverter{
@@ -1652,30 +1645,14 @@ func (c *TaskConverter) convertSecrets(secrets []types.Secret) []corev1.EnvVar {
 
 		switch secretInfo.Source {
 		case "secretsmanager":
-			// Reference Kubernetes secret created from Secrets Manager
-			// The integration uses "sm-" prefix
-			secretName := "sm-" + c.sanitizeSecretName(secretInfo.SecretName)
-			envVar.ValueFrom = &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: secretInfo.Key,
-				},
-			}
+			// TODO: For now, use placeholder values directly as environment variables
+			// In phase 2, this will be replaced with LocalStack integration
+			envVar.Value = c.getPlaceholderSecretValue("secretsmanager", secretInfo.SecretName, secretInfo.Key)
 
 		case "ssm":
-			// Reference Kubernetes secret created from SSM Parameter Store
-			// The integration uses "ssm-" prefix
-			secretName := "ssm-" + c.sanitizeSecretName(secretInfo.SecretName)
-			envVar.ValueFrom = &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: "value", // SSM parameters typically have a single value
-				},
-			}
+			// TODO: For now, use placeholder values directly as environment variables
+			// In phase 2, this will be replaced with LocalStack integration
+			envVar.Value = c.getPlaceholderSecretValue("ssm", secretInfo.SecretName, secretInfo.Key)
 		}
 
 		envVars = append(envVars, envVar)
@@ -1977,4 +1954,45 @@ func (c *TaskConverter) getArtifactEnvironment() []corev1.EnvVar {
 	}
 
 	return env
+}
+
+// getPlaceholderSecretValue returns placeholder values for secrets
+// TODO: Phase 2 - Replace with actual LocalStack integration
+func (c *TaskConverter) getPlaceholderSecretValue(source, secretName, key string) string {
+	// Generate deterministic placeholder values based on the secret name and key
+	// This ensures consistency across deployments while being obviously fake
+	
+	switch source {
+	case "secretsmanager":
+		// Generate different placeholder values for different secret types
+		if strings.Contains(strings.ToLower(secretName), "db") || strings.Contains(strings.ToLower(secretName), "database") {
+			if strings.Contains(strings.ToLower(key), "password") {
+				return "placeholder-db-password-from-secrets-manager"
+			}
+			return "placeholder-db-connection-from-secrets-manager"
+		}
+		if strings.Contains(strings.ToLower(secretName), "jwt") {
+			return "placeholder-jwt-secret-from-secrets-manager"
+		}
+		if strings.Contains(strings.ToLower(secretName), "encrypt") {
+			return "placeholder-encryption-key-from-secrets-manager"
+		}
+		return fmt.Sprintf("placeholder-secret-from-secrets-manager-%s-%s", secretName, key)
+		
+	case "ssm":
+		// Generate placeholder values for SSM parameters
+		if strings.Contains(strings.ToLower(secretName), "database") {
+			return "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+		}
+		if strings.Contains(strings.ToLower(secretName), "api_key") {
+			return "placeholder-api-key-from-ssm"
+		}
+		if strings.Contains(strings.ToLower(secretName), "feature") {
+			return `{"new_ui": true, "beta_features": true, "maintenance_mode": false}`
+		}
+		return fmt.Sprintf("placeholder-parameter-from-ssm-%s", secretName)
+		
+	default:
+		return fmt.Sprintf("placeholder-unknown-secret-%s", secretName)
+	}
 }
