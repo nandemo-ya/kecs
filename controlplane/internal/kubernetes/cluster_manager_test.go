@@ -3,7 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"os"
+	"os/exec"
 	"testing"
 )
 
@@ -107,12 +107,10 @@ func TestK3dClusterManagerBasicOperations(t *testing.T) {
 
 // isDockerAvailable checks if Docker is available for testing
 func isDockerAvailable() bool {
-	// Check if Docker socket exists
-	if _, err := os.Stat("/var/run/docker.sock"); err == nil {
+	// Try to run docker version command
+	cmd := exec.Command("docker", "version")
+	if err := cmd.Run(); err == nil {
 		return true
 	}
-
-	// For non-Unix systems or different Docker setups
-	// We could also try to create a Docker client and ping
 	return false
 }

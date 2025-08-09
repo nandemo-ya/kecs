@@ -151,49 +151,28 @@ tmp_dir = "tmp"
   clear_on_rebuild = false
 ```
 
-## Using Docker Compose
+## Using KECS Container Commands
 
-Create a `docker-compose.yml` for local development:
+KECS provides convenient container commands for running instances:
 
-```yaml
-version: '3.8'
-
-services:
-  kecs:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-      - "8081:8081"
-    environment:
-      - KECS_LOG_LEVEL=debug
-      - KECS_CONTAINER_MODE=true
-      - KECS_DATA_DIR=/data
-      - KECS_LOCALSTACK_ENABLED=true
-      - KECS_LOCALSTACK_ENDPOINT=http://localstack:4566
-    volumes:
-      - ./kecs-data:/data  # Persist data between restarts
-      - /var/run/docker.sock:/var/run/docker.sock  # Required for k3d
-    depends_on:
-      - localstack
-
-  localstack:
-    image: localstack/localstack:latest
-    ports:
-      - "4566:4566"
-    environment:
-      - SERVICES=s3,dynamodb,sqs,sns,secretsmanager,ssm,iam,logs,cloudwatch
-      - DEBUG=1
-    volumes:
-      - ./localstack:/var/lib/localstack
-      - /var/run/docker.sock:/var/run/docker.sock
-```
-
-Run with:
 ```bash
-docker-compose up
+# Start a KECS instance with k3d cluster
+./bin/kecs start
+
+# Start with custom name and port
+./bin/kecs start --name myinstance --api-port 9090
+
+# View instance status
+./bin/kecs status
+
+# View logs
+./bin/kecs logs -f
+
+# Stop the instance
+./bin/kecs stop
 ```
+
+For more details, see [Container Commands documentation](../guides/container-commands.md).
 
 ## IDE Setup
 
