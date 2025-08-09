@@ -1524,10 +1524,17 @@ func (k *K3dClusterManager) configureRegistryForCluster(ctx context.Context, clu
 	logging.Info("Configuring k3s to use registry with HTTP", "cluster", clusterName)
 	
 	// Create registry configuration for k3s
+	// Use k3d-kecs-registry as the hostname (without .localhost) for cluster-internal access
 	registryConfig := `mirrors:
   "k3d-kecs-registry.localhost:5000":
     endpoint:
-      - "http://k3d-kecs-registry.localhost:5000"
+      - "http://k3d-kecs-registry:5000"
+  "localhost:5000":
+    endpoint:
+      - "http://k3d-kecs-registry:5000"
+  "k3d-kecs-registry:5000":
+    endpoint:
+      - "http://k3d-kecs-registry:5000"
 `
 	
 	// Get the server node name

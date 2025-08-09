@@ -79,14 +79,15 @@ KECS_INSTANCE=myinstance make dev
 KECS supports hot reloading of the controlplane during development:
 1. **Start KECS**: Run `./bin/kecs start` to create a k3d cluster with KECS
 2. **Make changes**: Edit your Go code in the controlplane
-3. **Hot reload**: Run `make dev` to build and deploy changes instantly
+3. **Hot reload**: Run `make dev` to build and deploy changes
 4. **View logs**: Use `make dev-logs` to reload and tail logs in real-time
 
-The hot reload workflow:
+The Docker hot reload workflow:
 - Builds a new Docker image with your changes
 - Pushes it to the local k3d registry
 - Updates the running deployment without cluster restart
 - Maintains all existing ECS resources and state
+
 
 ## Architecture Overview
 

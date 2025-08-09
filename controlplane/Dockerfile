@@ -44,20 +44,15 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user and docker group if needed
-RUN groupadd -f -g 999 docker || true && \
-    groupadd -g 1000 kecs && \
-    useradd -u 1000 -g kecs -G docker -m -s /bin/bash kecs && \
+# Create non-root user
+RUN groupadd -g 1000 kecs && \
+    useradd -u 1000 -g kecs -m -s /bin/bash kecs && \
     mkdir -p /data && \
     chown -R kecs:kecs /data
 
 # Copy the binary
 COPY --from=builder /app/controlplane /controlplane
 RUN chmod +x /controlplane
-
-# Copy entrypoint script
-COPY scripts/docker-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 USER kecs
 WORKDIR /data
@@ -68,4 +63,4 @@ ENV KECS_DATA_DIR=/data
 
 EXPOSE 8080 8081
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/controlplane"]
