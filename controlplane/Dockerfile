@@ -54,10 +54,6 @@ RUN groupadd -g 1000 kecs && \
 COPY --from=builder /app/controlplane /controlplane
 RUN chmod +x /controlplane
 
-# Copy entrypoint script
-COPY scripts/docker-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
 USER kecs
 WORKDIR /data
 
@@ -67,4 +63,4 @@ ENV KECS_DATA_DIR=/data
 
 EXPOSE 8080 8081
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/controlplane"]
