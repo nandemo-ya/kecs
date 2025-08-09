@@ -223,15 +223,27 @@ telepresence-intercept: build
 		--env-file .telepresence.env && \
 	echo "✅ Intercept active for API service (port 8080)." && \
 	echo "" && \
+	echo "⚠️  Important: Traffic routing depends on how you access KECS:" && \
+	echo "  - Cluster internal: Automatically intercepted to local controlplane" && \
+	echo "  - Via TUI port (e.g., 8080): Still goes to cluster (use port-forward instead)" && \
+	echo "  - Via port-forward: Goes to local controlplane" && \
+	echo "" && \
 	echo "Run the following to start local controlplane:" && \
-	echo "  source .telepresence.env && ./bin/kecs server"
+	echo "  source .telepresence.env && KECS_DATA_DIR=/tmp/kecs-data ./bin/kecs server"
 
 # Telepresence: Run local controlplane with intercept
 .PHONY: telepresence-run
 telepresence-run: telepresence-intercept
 	@echo "Starting local controlplane with intercepted traffic..."
+	@echo ""
+	@echo "📝 Note: When using Telepresence, access the API through:"
+	@echo "  - Cluster internal traffic: automatically intercepted"
+	@echo "  - External access: kubectl port-forward service/kecs-api 9080:80 -n kecs-system"
+	@echo "  - Then use: http://localhost:9080"
+	@echo ""
 	@if [ -f .telepresence.env ]; then \
-		export $$(grep -v '^#' .telepresence.env | xargs) && \
+		source .telepresence.env && \
+		KECS_DATA_DIR=/tmp/kecs-data \
 		./bin/$(BINARY_NAME) server; \
 	else \
 		echo "❌ Error: .telepresence.env not found. Run 'make telepresence-intercept' first."; \
