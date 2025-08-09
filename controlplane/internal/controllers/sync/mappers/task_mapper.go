@@ -8,6 +8,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -126,11 +127,12 @@ func (m *TaskStateMapper) MapPodToTask(pod *corev1.Pod) *storage.Task {
 		startedBy = fmt.Sprintf("ecs-svc/%s", serviceName)
 	}
 
-	// Get task ID from pod label or use pod name as fallback
+	// Get task ID from pod label or generate from pod name
 	taskID := pod.Labels["kecs.dev/task-id"]
 	if taskID == "" {
-		// Fallback to pod name for compatibility with existing pods
-		taskID = pod.Name
+		// Generate deterministic task ID from pod name for service-created pods
+		// This ensures the same pod always gets the same ECS-compatible task ID
+		taskID = utils.GenerateTaskIDFromString(pod.Name)
 	}
 
 	// Create task object
@@ -286,11 +288,12 @@ func (m *TaskStateMapper) generateTaskARN(pod *corev1.Pod) string {
 		clusterName = "default"
 	}
 	
-	// Get task ID from pod label or use pod name as fallback
+	// Get task ID from pod label or generate from pod name
 	taskID := pod.Labels["kecs.dev/task-id"]
 	if taskID == "" {
-		// Fallback to pod name for compatibility with existing pods
-		taskID = pod.Name
+		// Generate deterministic task ID from pod name for service-created pods
+		// This ensures the same pod always gets the same ECS-compatible task ID
+		taskID = utils.GenerateTaskIDFromString(pod.Name)
 	}
 	
 	return fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", region, m.accountID, clusterName, taskID)

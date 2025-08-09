@@ -2,6 +2,7 @@ package utils
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 )
@@ -17,4 +18,15 @@ func GenerateTaskID() (string, error) {
 	
 	// Convert to hexadecimal string (32 characters)
 	return hex.EncodeToString(bytes), nil
+}
+
+// GenerateTaskIDFromString generates a deterministic task ID from a string (e.g., pod name)
+// This ensures that the same pod name always generates the same task ID
+// Returns a 32-character hexadecimal string
+func GenerateTaskIDFromString(input string) string {
+	// Create SHA256 hash of the input
+	hash := sha256.Sum256([]byte(input))
+	
+	// Take first 16 bytes and convert to hex (32 characters)
+	return hex.EncodeToString(hash[:16])
 }
