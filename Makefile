@@ -174,6 +174,48 @@ dev-logs: dev
 	kubectl config use-context "k3d-$$CLUSTER_NAME" && \
 	kubectl logs -f deployment/kecs-controlplane -n kecs-system
 
+# Ko development: Ultra-fast hot reload using ko
+.PHONY: ko-dev
+ko-dev:
+	@echo "🚀 Using ko for ultra-fast deployment..."
+	@# Auto-detect KECS cluster if not specified
+	@if [ -n "$${KECS_INSTANCE}" ]; then \
+		CLUSTER_NAME="kecs-$${KECS_INSTANCE}"; \
+	else \
+		CLUSTERS=$$(kubectl config get-contexts -o name | grep "^k3d-kecs-" | sed 's/^k3d-//'); \
+		CLUSTER_COUNT=$$(echo "$$CLUSTERS" | grep -c "^kecs-"); \
+		if [ "$$CLUSTER_COUNT" -eq 0 ]; then \
+			echo "❌ Error: No KECS clusters found."; \
+			echo "Start a KECS instance with: ./bin/kecs start"; \
+			exit 1; \
+		elif [ "$$CLUSTER_COUNT" -eq 1 ]; then \
+			CLUSTER_NAME=$$(echo "$$CLUSTERS" | head -1); \
+			echo "Auto-detected cluster: $$CLUSTER_NAME"; \
+		else \
+			echo "Multiple KECS clusters found:"; \
+			echo "$$CLUSTERS" | sed 's/^/  - /'; \
+			echo ""; \
+			echo "Please specify one with: KECS_INSTANCE=<name> make ko-dev"; \
+			exit 1; \
+		fi; \
+	fi; \
+	kubectl config use-context "k3d-$$CLUSTER_NAME" && \
+	export KO_DOCKER_REPO=k3d-kecs-registry.localhost:5000 && \
+	export VERSION=$$(git describe --tags --always --dirty) && \
+	kubectl get deployment kecs-controlplane -n kecs-system -o yaml | \
+		sed 's|image: .*kecs-controlplane.*|image: ko://github.com/nandemo-ya/kecs/controlplane/cmd/controlplane|' | \
+		ko apply -f - --bare -t latest && \
+	kubectl rollout status deployment/kecs-controlplane -n kecs-system && \
+	echo "✅ Deployment updated with ko!"
+
+# Ko development with logs
+.PHONY: ko-dev-logs
+ko-dev-logs: ko-dev
+	@INSTANCE_NAME=$${KECS_INSTANCE:-default}; \
+	CLUSTER_NAME="kecs-$${KECS_INSTANCE}"; \
+	kubectl config use-context "k3d-$$CLUSTER_NAME" && \
+	kubectl logs -f deployment/kecs-controlplane -n kecs-system
+
 # Telepresence: Connect to cluster for local development
 .PHONY: telepresence-connect
 telepresence-connect:
@@ -331,6 +373,8 @@ help:
 	@echo "  hot-reload     - Build and replace controlplane in running KECS instance"
 	@echo "  dev            - Build binary and hot reload controlplane (development workflow)"
 	@echo "  dev-logs       - Same as 'dev' but also tail controlplane logs"
+	@echo "  ko-dev         - Ultra-fast deployment using ko (no Docker build)"
+	@echo "  ko-dev-logs    - Same as 'ko-dev' but also tail controlplane logs"
 	@echo "  docker-build-awsproxy - Build AWS Proxy Docker image"
 	@echo "  docker-push-awsproxy  - Push AWS Proxy Docker image"
 	@echo "  build-tui2     - Build TUI v2 mock application"
@@ -344,6 +388,12 @@ help:
 	@echo ""
 	@echo "  help           - Show this help message"
 	@echo ""
+	@echo "Development workflow (ko - Recommended):"
+	@echo "  1. Start KECS: ./bin/kecs start"
+	@echo "  2. Make code changes"
+	@echo "  3. Run: make ko-dev"
+	@echo "  4. Or run with logs: make ko-dev-logs"
+	@echo ""
 	@echo "Development workflow (Docker hot-reload):"
 	@echo "  1. Start KECS: ./bin/kecs start"
 	@echo "  2. Make code changes"
@@ -356,4 +406,4 @@ help:
 	@echo "  3. Make code changes and restart local binary"
 	@echo "  4. When done: make telepresence-stop"
 	@echo ""
-	@echo "For specific instance: KECS_INSTANCE=myinstance make dev"
+	@echo "For specific instance: KECS_INSTANCE=myinstance make ko-dev"

@@ -75,14 +75,29 @@ make dev-logs       # Build, hot reload, and tail logs
 KECS_INSTANCE=myinstance make dev
 ```
 
-### Hot Reload Development
-KECS supports hot reloading of the controlplane during development:
+### Ko Development (Recommended)
+KECS supports ultra-fast deployment using [ko](https://ko.build/):
+1. **Install ko**: Run `brew install ko` (or see https://ko.build/install/)
+2. **Start KECS**: Run `./bin/kecs start` to create a k3d cluster with KECS
+3. **Make changes**: Edit your Go code in the controlplane
+4. **Deploy instantly**: Run `make ko-dev` (no Docker build required!)
+5. **View logs**: Use `make ko-dev-logs` to deploy and tail logs
+
+The ko workflow advantages:
+- **No Dockerfile needed**: Builds directly from Go source
+- **Ultra-fast**: Skips Docker build overhead completely
+- **TUI-compatible**: Works with any port configuration (8080, etc.)
+- **Auto-detection**: Automatically finds your KECS cluster
+- **Registry integration**: Uses k3d local registry automatically
+
+### Hot Reload Development (Docker)
+Traditional Docker-based hot reloading:
 1. **Start KECS**: Run `./bin/kecs start` to create a k3d cluster with KECS
 2. **Make changes**: Edit your Go code in the controlplane
-3. **Hot reload**: Run `make dev` to build and deploy changes instantly
+3. **Hot reload**: Run `make dev` to build and deploy changes
 4. **View logs**: Use `make dev-logs` to reload and tail logs in real-time
 
-The hot reload workflow:
+The Docker hot reload workflow:
 - Builds a new Docker image with your changes
 - Pushes it to the local k3d registry
 - Updates the running deployment without cluster restart
