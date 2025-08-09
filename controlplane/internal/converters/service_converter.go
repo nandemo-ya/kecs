@@ -536,14 +536,39 @@ func (c *ServiceConverter) convertSecrets(secrets []interface{}) []corev1.EnvVar
 
 			switch secretInfo.Source {
 			case "secretsmanager":
-				// TODO: For now, use placeholder values directly as environment variables
-				// In phase 2, this will be replaced with LocalStack integration
-				envVar.Value = c.getPlaceholderSecretValue("secretsmanager", secretInfo.SecretName, secretInfo.Key)
+				// Reference the synced Kubernetes secret
+				envVar.ValueFrom = &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: c.getK8sSecretName("secretsmanager", secretInfo.SecretName),
+						},
+						Key: secretInfo.Key,
+					},
+				}
 
 			case "ssm":
-				// TODO: For now, use placeholder values directly as environment variables
-				// In phase 2, this will be replaced with LocalStack integration
-				envVar.Value = c.getPlaceholderSecretValue("ssm", secretInfo.SecretName, secretInfo.Key)
+				// Reference the synced Kubernetes secret or ConfigMap  
+				// For sensitive data, use Secret; for configuration, use ConfigMap
+				if c.isSSMParameterSensitive(secretInfo.SecretName) {
+					envVar.ValueFrom = &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: c.getK8sSecretName("ssm", secretInfo.SecretName),
+							},
+							Key: "value",
+						},
+					}
+				} else {
+					// Use ConfigMap for non-sensitive configuration
+					envVar.ValueFrom = &corev1.EnvVarSource{
+						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: c.getK8sConfigMapName(secretInfo.SecretName),
+							},
+							Key: "value",
+						},
+					}
+				}
 			}
 
 			envVars = append(envVars, envVar)
@@ -634,8 +659,58 @@ func (c *ServiceConverter) sanitizeSecretName(name string) string {
 	return name
 }
 
+// getK8sSecretName returns the Kubernetes secret name for a given source and secret name
+func (c *ServiceConverter) getK8sSecretName(source, secretName string) string {
+	switch source {
+	case "secretsmanager":
+		// Remove the random suffix that Secrets Manager adds (e.g., -AbCdEf)
+		re := regexp.MustCompile(`-[A-Za-z0-9]{6}$`)
+		cleanName := re.ReplaceAllString(secretName, "")
+		cleanName = strings.ToLower(cleanName)
+		cleanName = strings.ReplaceAll(cleanName, "/", "-")
+		cleanName = strings.Trim(cleanName, "-")
+		return "sm-" + cleanName
+	case "ssm":
+		cleanName := strings.Trim(secretName, "/")
+		cleanName = strings.ReplaceAll(cleanName, "/", "-")
+		cleanName = strings.ToLower(cleanName)
+		return "ssm-" + cleanName
+	default:
+		return "unknown-" + strings.ToLower(secretName)
+	}
+}
+
+// getK8sConfigMapName returns the Kubernetes ConfigMap name for a given SSM parameter
+func (c *ServiceConverter) getK8sConfigMapName(parameterName string) string {
+	cleanName := strings.Trim(parameterName, "/")
+	cleanName = strings.ReplaceAll(cleanName, "/", "-")
+	cleanName = strings.ToLower(cleanName)
+	return "ssm-cm-" + cleanName
+}
+
+// isSSMParameterSensitive determines if an SSM parameter should be treated as sensitive
+func (c *ServiceConverter) isSSMParameterSensitive(parameterName string) bool {
+	// Check if parameter name contains sensitive keywords
+	lowerName := strings.ToLower(parameterName)
+	sensitiveKeywords := []string{
+		"password", "pass", "secret", "key", "token", "credential", "auth",
+		"private", "cert", "certificate", "jwt", "api_key", "apikey",
+	}
+	
+	for _, keyword := range sensitiveKeywords {
+		if strings.Contains(lowerName, keyword) {
+			return true
+		}
+	}
+	
+	// Non-sensitive parameters are typically configuration
+	// like feature flags, URLs, non-secret config values
+	return false
+}
+
 // getPlaceholderSecretValue returns placeholder values for secrets
-// TODO: Phase 2 - Replace with actual LocalStack integration
+// NOTE: This is now deprecated in favor of actual Kubernetes secret references
+// Kept for backward compatibility and testing
 func (c *ServiceConverter) getPlaceholderSecretValue(source, secretName, key string) string {
 	// Generate deterministic placeholder values based on the secret name and key
 	// This ensures consistency across deployments while being obviously fake
