@@ -87,12 +87,14 @@ var _ = Describe("TaskConverter Secrets", func() {
 
 				// Verify DB_PASSWORD has placeholder value (Phase 1 implementation)
 				Expect(dbPasswordEnv).NotTo(BeNil())
-				Expect(dbPasswordEnv.Value).To(Equal("placeholder-db-connection-from-secrets-manager"))
+				Expect(dbPasswordEnv.Value).To(Equal("placeholder-db-password-from-secrets-manager"))
 				Expect(dbPasswordEnv.ValueFrom).To(BeNil())
 
 				// Verify API_KEY has placeholder value (Phase 1 implementation)
 				Expect(apiKeyEnv).NotTo(BeNil())
-				Expect(apiKeyEnv.Value).To(Equal("placeholder-secret-from-secrets-manager-api-keys-api_key"))
+				// The secret name is "api-keys-XyZ123" and the key is "api_key"
+				// This will generate: placeholder-secret-from-secrets-manager-api-keys-XyZ123-api_key
+				Expect(apiKeyEnv.Value).To(Equal("placeholder-secret-from-secrets-manager-api-keys-XyZ123-api_key"))
 				Expect(apiKeyEnv.ValueFrom).To(BeNil())
 
 				// Check pod annotations for secret tracking
@@ -212,7 +214,7 @@ var _ = Describe("TaskConverter Secrets", func() {
 
 				// Verify Secrets Manager secret has placeholder value
 				Expect(dbPasswordEnv).NotTo(BeNil())
-				Expect(dbPasswordEnv.Value).To(Equal("placeholder-db-connection-from-secrets-manager"))
+				Expect(dbPasswordEnv.Value).To(Equal("placeholder-db-password-from-secrets-manager"))
 				Expect(dbPasswordEnv.ValueFrom).To(BeNil())
 
 				// Verify SSM parameter has placeholder value

@@ -1966,7 +1966,9 @@ func (c *TaskConverter) getPlaceholderSecretValue(source, secretName, key string
 	case "secretsmanager":
 		// Generate different placeholder values for different secret types
 		if strings.Contains(strings.ToLower(secretName), "db") || strings.Contains(strings.ToLower(secretName), "database") {
-			if strings.Contains(strings.ToLower(key), "password") {
+			// Check if key or secretName contains password/pass
+			if strings.Contains(strings.ToLower(key), "password") || strings.Contains(strings.ToLower(key), "pass") ||
+				strings.Contains(strings.ToLower(secretName), "password") || strings.Contains(strings.ToLower(secretName), "pass") {
 				return "placeholder-db-password-from-secrets-manager"
 			}
 			return "placeholder-db-connection-from-secrets-manager"

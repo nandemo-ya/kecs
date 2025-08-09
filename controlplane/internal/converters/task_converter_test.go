@@ -183,7 +183,7 @@ var _ = Describe("TaskConverter", func() {
 			Expect(container.Env).To(HaveLen(1))
 			Expect(container.Env[0].Name).To(Equal("DB_PASSWORD"))
 			// Current implementation uses placeholder values instead of Kubernetes secret references
-			Expect(container.Env[0].Value).To(Equal("placeholder-db-pass-from-secrets-manager"))
+			Expect(container.Env[0].Value).To(Equal("placeholder-db-password-from-secrets-manager"))
 			Expect(container.Env[0].ValueFrom).To(BeNil())
 		})
 
