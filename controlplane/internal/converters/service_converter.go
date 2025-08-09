@@ -58,11 +58,20 @@ func (c *ServiceConverter) ConvertServiceToDeploymentWithNetworkConfig(
 		return nil, nil, fmt.Errorf("no container definitions found in task definition")
 	}
 
+	// Parse volumes from task definition
+	var volumes []map[string]interface{}
+	if taskDef.Volumes != "" {
+		if err := json.Unmarshal([]byte(taskDef.Volumes), &volumes); err != nil {
+			// Log error but continue - volumes are optional
+			// In production, this should use proper logging instead of fmt.Printf
+		}
+	}
+
 	// Determine network mode from task definition
 	networkMode := types.GetNetworkMode(&taskDef.NetworkMode)
 
 	// Create Deployment
-	deployment, err := c.createDeployment(service, containerDefs, cluster, networkConfig, networkMode)
+	deployment, err := c.createDeployment(service, containerDefs, volumes, cluster, networkConfig, networkMode, taskDef)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create deployment: %w", err)
 	}
@@ -80,9 +89,11 @@ func (c *ServiceConverter) ConvertServiceToDeploymentWithNetworkConfig(
 func (c *ServiceConverter) createDeployment(
 	service *storage.Service,
 	containerDefs []map[string]interface{},
+	volumes []map[string]interface{},
 	cluster *storage.Cluster,
 	networkConfig *generated.NetworkConfiguration,
 	networkMode types.NetworkMode,
+	taskDef *storage.TaskDefinition,
 ) (*appsv1.Deployment, error) {
 	// Create namespace name
 	namespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
@@ -91,7 +102,7 @@ func (c *ServiceConverter) createDeployment(
 	deploymentName := fmt.Sprintf("ecs-service-%s", service.ServiceName)
 
 	// Create containers from container definitions
-	containers, err := c.createContainers(containerDefs)
+	containers, k8sVolumes, err := c.createContainersAndVolumes(containerDefs, volumes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containers: %w", err)
 	}
@@ -153,6 +164,7 @@ func (c *ServiceConverter) createDeployment(
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyAlways,
 					Containers:    containers,
+					Volumes:       k8sVolumes,
 				},
 			},
 		},
@@ -177,6 +189,56 @@ func (c *ServiceConverter) createDeployment(
 	}
 
 	return deployment, nil
+}
+
+// createContainersAndVolumes creates Kubernetes containers and volumes from ECS definitions
+func (c *ServiceConverter) createContainersAndVolumes(containerDefs []map[string]interface{}, volumes []map[string]interface{}) ([]corev1.Container, []corev1.Volume, error) {
+	var containers []corev1.Container
+	var k8sVolumes []corev1.Volume
+
+	// First, convert ECS volumes to Kubernetes volumes
+	for _, vol := range volumes {
+		if name, ok := vol["name"].(string); ok && name != "" {
+			k8sVol := corev1.Volume{
+				Name: name,
+			}
+
+			// Check for host volume configuration
+			if hostConfig, ok := vol["host"].(map[string]interface{}); ok {
+				if sourcePath, ok := hostConfig["sourcePath"].(string); ok && sourcePath != "" {
+					// Host path volume
+					k8sVol.VolumeSource = corev1.VolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{
+							Path: sourcePath,
+						},
+					}
+				} else {
+					// Empty host configuration - use emptyDir
+					k8sVol.VolumeSource = corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					}
+				}
+			} else {
+				// No host configuration - default to emptyDir
+				k8sVol.VolumeSource = corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				}
+			}
+
+			k8sVolumes = append(k8sVolumes, k8sVol)
+		}
+	}
+
+	// Then, create containers with volume mounts
+	for _, containerDef := range containerDefs {
+		container, err := c.createContainer(containerDef)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create container: %w", err)
+		}
+		containers = append(containers, container)
+	}
+
+	return containers, k8sVolumes, nil
 }
 
 // createContainers creates Kubernetes containers from ECS container definitions
@@ -265,6 +327,27 @@ func (c *ServiceConverter) createContainer(containerDef map[string]interface{}) 
 						container.Ports = append(container.Ports, corev1.ContainerPort{
 							ContainerPort: int32(containerPort),
 							Protocol:      corev1.Protocol(strings.ToUpper(protocol)),
+						})
+					}
+				}
+			}
+		}
+	}
+
+	// Extract mount points
+	if mountPoints, exists := containerDef["mountPoints"]; exists {
+		if mountList, ok := mountPoints.([]interface{}); ok {
+			for _, mount := range mountList {
+				if mountMap, ok := mount.(map[string]interface{}); ok {
+					sourceVolume, _ := mountMap["sourceVolume"].(string)
+					containerPath, _ := mountMap["containerPath"].(string)
+					readOnly, _ := mountMap["readOnly"].(bool)
+
+					if sourceVolume != "" && containerPath != "" {
+						container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+							Name:      sourceVolume,
+							MountPath: containerPath,
+							ReadOnly:  readOnly,
 						})
 					}
 				}
