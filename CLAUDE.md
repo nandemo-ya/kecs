@@ -88,6 +88,28 @@ The hot reload workflow:
 - Updates the running deployment without cluster restart
 - Maintains all existing ECS resources and state
 
+### Telepresence Development (Alternative)
+For faster local development without rebuilding Docker images, use Telepresence:
+1. **Start KECS**: Run `./bin/kecs start` to create a k3d cluster with KECS
+2. **Connect Telepresence**: Run `make telepresence-connect` to connect to the cluster
+3. **Intercept traffic**: Run `make telepresence-intercept` to intercept controlplane traffic
+4. **Run locally**: The intercept will start your local controlplane with cluster environment
+5. **Make changes**: Edit code and restart the local binary (no Docker build needed)
+6. **Stop**: Run `make telepresence-stop` when done
+
+Telepresence commands:
+- `make telepresence-connect` - Connect to the KECS cluster
+- `make telepresence-intercept` - Build and intercept controlplane traffic
+- `make telepresence-run` - Run local controlplane with intercepted traffic
+- `make telepresence-stop` - Stop intercept and disconnect
+- `make telepresence-status` - Show connection status
+
+Benefits of Telepresence:
+- No Docker build/push needed for each change
+- Direct local debugging with your IDE
+- Access to cluster services and environment
+- Faster iteration cycle
+
 ## Architecture Overview
 
 KECS implements a clean architecture with the following key components:

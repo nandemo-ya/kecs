@@ -174,6 +174,89 @@ dev-logs: dev
 	kubectl config use-context "k3d-$$CLUSTER_NAME" && \
 	kubectl logs -f deployment/kecs-controlplane -n kecs-system
 
+# Telepresence: Connect to cluster for local development
+.PHONY: telepresence-connect
+telepresence-connect:
+	@echo "Connecting to cluster with Telepresence..."
+	@# Try to use KECS_INSTANCE if set, otherwise auto-detect
+	@if [ -n "$${KECS_INSTANCE}" ]; then \
+		CLUSTER_NAME="kecs-$${KECS_INSTANCE}"; \
+	else \
+		CLUSTERS=$$(kubectl config get-contexts -o name | grep "^k3d-kecs-" | sed 's/^k3d-//'); \
+		CLUSTER_COUNT=$$(echo "$$CLUSTERS" | grep -c "^kecs-"); \
+		if [ "$$CLUSTER_COUNT" -eq 0 ]; then \
+			echo "❌ Error: No KECS clusters found."; \
+			echo "Start a KECS instance with: ./bin/kecs start"; \
+			exit 1; \
+		elif [ "$$CLUSTER_COUNT" -eq 1 ]; then \
+			CLUSTER_NAME=$$(echo "$$CLUSTERS" | head -1); \
+			echo "Auto-detected cluster: $$CLUSTER_NAME"; \
+		else \
+			echo "Multiple KECS clusters found:"; \
+			echo "$$CLUSTERS" | sed 's/^/  - /'; \
+			echo ""; \
+			echo "Please specify one with: KECS_INSTANCE=<name> make telepresence-connect"; \
+			exit 1; \
+		fi; \
+	fi; \
+	if kubectl config get-contexts -o name | grep -q "k3d-$$CLUSTER_NAME"; then \
+		kubectl config use-context "k3d-$$CLUSTER_NAME" && \
+		telepresence connect --namespace kecs-system && \
+		echo "✅ Connected to $$CLUSTER_NAME cluster"; \
+	else \
+		echo "❌ Error: KECS cluster '$$CLUSTER_NAME' not found."; \
+		exit 1; \
+	fi
+
+# Telepresence: Intercept controlplane traffic for local development
+.PHONY: telepresence-intercept
+telepresence-intercept: build
+	@echo "Intercepting controlplane traffic..."
+	@if ! telepresence status | grep -q "Connected"; then \
+		echo "Telepresence not connected. Running telepresence-connect..."; \
+		$(MAKE) telepresence-connect; \
+	fi && \
+	echo "Setting up intercept for kecs-controlplane API service..." && \
+	telepresence intercept kecs-controlplane \
+		--service kecs-api \
+		--port 8080:http \
+		--env-file .telepresence.env && \
+	echo "✅ Intercept active for API service (port 8080)." && \
+	echo "" && \
+	echo "Run the following to start local controlplane:" && \
+	echo "  source .telepresence.env && ./bin/kecs server"
+
+# Telepresence: Run local controlplane with intercept
+.PHONY: telepresence-run
+telepresence-run: telepresence-intercept
+	@echo "Starting local controlplane with intercepted traffic..."
+	@if [ -f .telepresence.env ]; then \
+		export $$(grep -v '^#' .telepresence.env | xargs) && \
+		./bin/$(BINARY_NAME) server; \
+	else \
+		echo "❌ Error: .telepresence.env not found. Run 'make telepresence-intercept' first."; \
+		exit 1; \
+	fi
+
+# Telepresence: Stop intercept and disconnect
+.PHONY: telepresence-stop
+telepresence-stop:
+	@echo "Stopping Telepresence intercept..."
+	@telepresence leave kecs-controlplane 2>/dev/null || true
+	@echo "Disconnecting from cluster..."
+	@telepresence quit 2>/dev/null || true
+	@rm -f .telepresence.env
+	@echo "✅ Telepresence stopped"
+
+# Telepresence: Show current status
+.PHONY: telepresence-status
+telepresence-status:
+	@echo "Telepresence status:"
+	@telepresence status
+	@echo ""
+	@echo "Active intercepts:"
+	@telepresence list
+
 # Build API-only Docker image
 .PHONY: docker-build-api
 docker-build-api:
@@ -239,12 +322,26 @@ help:
 	@echo "  docker-build-awsproxy - Build AWS Proxy Docker image"
 	@echo "  docker-push-awsproxy  - Push AWS Proxy Docker image"
 	@echo "  build-tui2     - Build TUI v2 mock application"
+	@echo ""
+	@echo "Telepresence targets (for local development):"
+	@echo "  telepresence-connect   - Connect to KECS cluster with Telepresence"
+	@echo "  telepresence-intercept - Build and intercept controlplane traffic"
+	@echo "  telepresence-run       - Run local controlplane with intercepted traffic"
+	@echo "  telepresence-stop      - Stop intercept and disconnect"
+	@echo "  telepresence-status    - Show Telepresence connection status"
+	@echo ""
 	@echo "  help           - Show this help message"
 	@echo ""
-	@echo "Development workflow:"
+	@echo "Development workflow (Docker hot-reload):"
 	@echo "  1. Start KECS: ./bin/kecs start"
 	@echo "  2. Make code changes"
 	@echo "  3. Run: make dev"
 	@echo "  4. Or run with logs: make dev-logs"
+	@echo ""
+	@echo "Development workflow (Telepresence):"
+	@echo "  1. Start KECS: ./bin/kecs start"
+	@echo "  2. Run: make telepresence-run"
+	@echo "  3. Make code changes and restart local binary"
+	@echo "  4. When done: make telepresence-stop"
 	@echo ""
 	@echo "For specific instance: KECS_INSTANCE=myinstance make dev"
