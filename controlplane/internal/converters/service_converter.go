@@ -3,6 +3,7 @@ package converters
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -15,6 +16,13 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
+
+// SecretInfo holds parsed information from a secret ARN
+type SecretInfo struct {
+	SecretName string
+	Key        string
+	Source     string // "secretsmanager" or "ssm"
+}
 
 // ServiceConverter converts ECS service definitions to Kubernetes Deployments
 type ServiceConverter struct {
@@ -312,6 +320,14 @@ func (c *ServiceConverter) createContainer(containerDef map[string]interface{}) 
 		}
 	}
 
+	// Extract secrets from environment
+	if secrets, exists := containerDef["secrets"]; exists {
+		if secretList, ok := secrets.([]interface{}); ok {
+			secretEnvVars := c.convertSecrets(secretList)
+			container.Env = append(container.Env, secretEnvVars...)
+		}
+	}
+
 	// Extract port mappings
 	if ports, exists := containerDef["portMappings"]; exists {
 		if portList, ok := ports.([]interface{}); ok {
@@ -491,4 +507,172 @@ func (c *ServiceConverter) createKubernetesService(
 	}
 
 	return kubeService, nil
+}
+
+// convertSecrets converts ECS secrets to Kubernetes environment variables
+func (c *ServiceConverter) convertSecrets(secrets []interface{}) []corev1.EnvVar {
+	envVars := make([]corev1.EnvVar, 0, len(secrets))
+
+	for _, secret := range secrets {
+		if secretMap, ok := secret.(map[string]interface{}); ok {
+			name, nameOk := secretMap["name"].(string)
+			valueFrom, valueFromOk := secretMap["valueFrom"].(string)
+
+			if !nameOk || !valueFromOk || name == "" || valueFrom == "" {
+				continue
+			}
+
+			// Parse the secret ARN
+			secretInfo, err := c.parseSecretArn(valueFrom)
+			if err != nil {
+				// If we can't parse it, skip it
+				// In production, you might want to handle this differently
+				continue
+			}
+
+			envVar := corev1.EnvVar{
+				Name: name,
+			}
+
+			switch secretInfo.Source {
+			case "secretsmanager":
+				// TODO: For now, use placeholder values directly as environment variables
+				// In phase 2, this will be replaced with LocalStack integration
+				envVar.Value = c.getPlaceholderSecretValue("secretsmanager", secretInfo.SecretName, secretInfo.Key)
+
+			case "ssm":
+				// TODO: For now, use placeholder values directly as environment variables
+				// In phase 2, this will be replaced with LocalStack integration
+				envVar.Value = c.getPlaceholderSecretValue("ssm", secretInfo.SecretName, secretInfo.Key)
+			}
+
+			envVars = append(envVars, envVar)
+		}
+	}
+
+	return envVars
+}
+
+// parseSecretArn parses an AWS secret ARN and extracts relevant information
+func (c *ServiceConverter) parseSecretArn(arn string) (*SecretInfo, error) {
+	// ARN formats:
+	// Secrets Manager: arn:aws:secretsmanager:region:account-id:secret:name-6RandomChars:key::
+	// SSM: arn:aws:ssm:region:account-id:parameter/name
+
+	parts := strings.Split(arn, ":")
+	if len(parts) < 6 {
+		return nil, fmt.Errorf("invalid ARN format: %s", arn)
+	}
+
+	service := parts[2]
+	info := &SecretInfo{}
+
+	switch service {
+	case "secretsmanager":
+		info.Source = "secretsmanager"
+		// Extract secret name and key from remaining parts
+		// Format: arn:aws:secretsmanager:region:account-id:secret:name-6RandomChars:key::
+		if len(parts) >= 7 {
+			info.SecretName = parts[6]
+			// Check if a JSON key is specified at index 7
+			if len(parts) > 7 && parts[7] != "" && parts[7] != "*" {
+				info.Key = parts[7]
+			} else {
+				// No JSON key specified, the entire secret value will be used
+				// When synced by Secrets Manager integration, JSON secrets will have all keys available
+				info.Key = "value"
+			}
+		} else {
+			return nil, fmt.Errorf("invalid Secrets Manager ARN format: %s", arn)
+		}
+
+	case "ssm":
+		info.Source = "ssm"
+		// Extract parameter name from ARN
+		// Format: arn:aws:ssm:region:account-id:parameter/path/to/param
+		// The parameter path starts after "parameter/"
+		resourcePart := parts[5]
+		if strings.HasPrefix(resourcePart, "parameter/") {
+			info.SecretName = strings.TrimPrefix(resourcePart, "parameter/")
+		} else if strings.HasPrefix(resourcePart, "parameter") && len(parts) > 6 {
+			// Sometimes the path might be in the next part
+			info.SecretName = parts[6]
+		} else {
+			info.SecretName = resourcePart
+		}
+		info.Key = "value"
+
+	default:
+		return nil, fmt.Errorf("unsupported secret service: %s", service)
+	}
+
+	return info, nil
+}
+
+// sanitizeSecretName converts a secret name to be Kubernetes-compatible
+func (c *ServiceConverter) sanitizeSecretName(name string) string {
+	// Remove the random suffix from Secrets Manager secret names
+	// Format: my-secret-AbCdEf -> my-secret
+	if idx := strings.LastIndex(name, "-"); idx > 0 && len(name)-idx == 7 {
+		// Check if last part looks like a random suffix (6 chars)
+		suffix := name[idx+1:]
+		if len(suffix) == 6 && regexp.MustCompile(`^[A-Za-z0-9]+$`).MatchString(suffix) {
+			name = name[:idx]
+		}
+	}
+
+	// Handle path separators for hierarchical secrets
+	name = strings.ReplaceAll(name, "/", "-")
+
+	// Similar to volume names, but for secrets
+	name = strings.ToLower(name)
+	name = regexp.MustCompile(`[^a-z0-9-]`).ReplaceAllString(name, "-")
+	name = strings.Trim(name, "-")
+
+	// Return the sanitized name without prefix
+	// The actual prefix (sm- or ssm-) will be added by the integration modules
+	return name
+}
+
+// getPlaceholderSecretValue returns placeholder values for secrets
+// TODO: Phase 2 - Replace with actual LocalStack integration
+func (c *ServiceConverter) getPlaceholderSecretValue(source, secretName, key string) string {
+	// Generate deterministic placeholder values based on the secret name and key
+	// This ensures consistency across deployments while being obviously fake
+	
+	switch source {
+	case "secretsmanager":
+		// Generate different placeholder values for different secret types
+		if strings.Contains(strings.ToLower(secretName), "db") || strings.Contains(strings.ToLower(secretName), "database") {
+			// Check if key or secretName contains password/pass
+			if strings.Contains(strings.ToLower(key), "password") || strings.Contains(strings.ToLower(key), "pass") ||
+				strings.Contains(strings.ToLower(secretName), "password") || strings.Contains(strings.ToLower(secretName), "pass") {
+				return "placeholder-db-password-from-secrets-manager"
+			}
+			return "placeholder-db-connection-from-secrets-manager"
+		}
+		if strings.Contains(strings.ToLower(secretName), "jwt") {
+			return "placeholder-jwt-secret-from-secrets-manager"
+		}
+		if strings.Contains(strings.ToLower(secretName), "encrypt") {
+			return "placeholder-encryption-key-from-secrets-manager"
+		}
+		return fmt.Sprintf("placeholder-secret-from-secrets-manager-%s-%s", secretName, key)
+		
+	case "ssm":
+		// Generate placeholder values for SSM parameters
+		if strings.Contains(strings.ToLower(secretName), "database") {
+			return "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+		}
+		if strings.Contains(strings.ToLower(secretName), "api_key") {
+			return "placeholder-api-key-from-ssm"
+		}
+		if strings.Contains(strings.ToLower(secretName), "feature") {
+			return `{"new_ui": true, "beta_features": true, "maintenance_mode": false}`
+		}
+		return fmt.Sprintf("placeholder-parameter-from-ssm-%s", secretName)
+		
+	default:
+		return fmt.Sprintf("placeholder-unknown-secret-%s", secretName)
+	}
 }
