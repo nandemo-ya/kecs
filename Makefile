@@ -169,8 +169,19 @@ dev: build hot-reload
 # Dev workflow with logs: Build, reload and tail logs
 .PHONY: dev-logs
 dev-logs: dev
-	@INSTANCE_NAME=$${KECS_INSTANCE:-default}; \
-	CLUSTER_NAME="kecs-$$INSTANCE_NAME"; \
+	@# Auto-detect KECS cluster if not specified (same logic as dev)
+	@if [ -n "$${KECS_INSTANCE}" ]; then \
+		CLUSTER_NAME="kecs-$${KECS_INSTANCE}"; \
+	else \
+		CLUSTERS=$$(kubectl config get-contexts -o name | grep "^k3d-kecs-" | sed 's/^k3d-//'); \
+		CLUSTER_COUNT=$$(echo "$$CLUSTERS" | grep -c "^kecs-"); \
+		if [ "$$CLUSTER_COUNT" -eq 1 ]; then \
+			CLUSTER_NAME=$$(echo "$$CLUSTERS" | head -1); \
+		else \
+			echo "❌ Error: Cannot determine cluster for logs."; \
+			exit 1; \
+		fi; \
+	fi; \
 	kubectl config use-context "k3d-$$CLUSTER_NAME" && \
 	kubectl logs -f deployment/kecs-controlplane -n kecs-system
 
@@ -211,8 +222,19 @@ ko-dev:
 # Ko development with logs
 .PHONY: ko-dev-logs
 ko-dev-logs: ko-dev
-	@INSTANCE_NAME=$${KECS_INSTANCE:-default}; \
-	CLUSTER_NAME="kecs-$${KECS_INSTANCE}"; \
+	@# Auto-detect KECS cluster if not specified (same logic as ko-dev)
+	@if [ -n "$${KECS_INSTANCE}" ]; then \
+		CLUSTER_NAME="kecs-$${KECS_INSTANCE}"; \
+	else \
+		CLUSTERS=$$(kubectl config get-contexts -o name | grep "^k3d-kecs-" | sed 's/^k3d-//'); \
+		CLUSTER_COUNT=$$(echo "$$CLUSTERS" | grep -c "^kecs-"); \
+		if [ "$$CLUSTER_COUNT" -eq 1 ]; then \
+			CLUSTER_NAME=$$(echo "$$CLUSTERS" | head -1); \
+		else \
+			echo "❌ Error: Cannot determine cluster for logs."; \
+			exit 1; \
+		fi; \
+	fi; \
 	kubectl config use-context "k3d-$$CLUSTER_NAME" && \
 	kubectl logs -f deployment/kecs-controlplane -n kecs-system
 
