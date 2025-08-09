@@ -151,47 +151,28 @@ tmp_dir = "tmp"
   clear_on_rebuild = false
 ```
 
-## Docker Compose の使用
+## KECS コンテナコマンドの使用
 
-ローカル開発用の `docker-compose.yml` を作成:
+KECS は便利なコンテナコマンドを提供しています：
 
-```yaml
-version: '3.8'
-
-services:
-  kecs:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-      - "8081:8081"
-    environment:
-      - KECS_LOG_LEVEL=debug
-      - KECS_LOCALSTACK_ENABLED=true
-      - KECS_LOCALSTACK_ENDPOINT=http://localstack:4566
-    volumes:
-      - ./data:/data
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - localstack
-
-  localstack:
-    image: localstack/localstack:latest
-    ports:
-      - "4566:4566"
-    environment:
-      - SERVICES=s3,dynamodb,sqs,sns,secretsmanager,ssm,iam,logs,cloudwatch
-      - DEBUG=1
-    volumes:
-      - ./localstack:/var/lib/localstack
-      - /var/run/docker.sock:/var/run/docker.sock
-```
-
-実行:
 ```bash
-docker-compose up
+# KECS インスタンスを k3d クラスタと共に起動
+./bin/kecs start
+
+# カスタム名とポートで起動
+./bin/kecs start --name myinstance --api-port 9090
+
+# インスタンスのステータスを表示
+./bin/kecs status
+
+# ログを表示
+./bin/kecs logs -f
+
+# インスタンスを停止
+./bin/kecs stop
 ```
+
+詳細については [コンテナコマンドのドキュメント](../guides/container-commands.md) を参照してください。
 
 ## IDE セットアップ
 

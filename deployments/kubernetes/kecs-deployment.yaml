@@ -43,6 +43,7 @@ spec:
       - name: kecs
         image: ghcr.io/nandemo-ya/kecs:latest
         imagePullPolicy: Always
+        args: ["server"]
         ports:
         - name: api
           containerPort: 8080
@@ -60,8 +61,6 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /data
-        - name: docker-sock
-          mountPath: /var/run/docker.sock
         livenessProbe:
           httpGet:
             path: /health
@@ -85,10 +84,6 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: kecs-data-pvc
-      - name: docker-sock
-        hostPath:
-          path: /var/run/docker.sock
-          type: Socket
       # Security context for nonroot user (65532)
       securityContext:
         runAsNonRoot: true
