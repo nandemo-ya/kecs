@@ -1742,6 +1742,14 @@ func (c *TaskConverter) parseSecretArn(arn string) (*SecretInfo, error) {
 	return info, nil
 }
 
+// getNamespacedSecretName returns the namespace-aware secret name for LocalStack
+func (c *TaskConverter) getNamespacedSecretName(cluster *storage.Cluster, secretName string) string {
+	// Format: <namespace>/<secret-name>
+	// The namespace already contains cluster and region information
+	namespace := c.getNamespace(cluster)
+	return fmt.Sprintf("%s/%s", namespace, secretName)
+}
+
 // sanitizeSecretName converts a secret name to be Kubernetes-compatible
 func (c *TaskConverter) sanitizeSecretName(name string) string {
 	// Determine the prefix based on the source

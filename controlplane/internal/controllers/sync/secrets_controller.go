@@ -253,10 +253,14 @@ func (c *SecretsController) syncSecretsManagerSecret(ctx context.Context, arn st
 		jsonKey = parts[7]
 	}
 
-	// Get the secret from Secrets Manager
-	secret, err := c.smIntegration.GetSecret(ctx, secretName)
+	// Build the namespace-aware secret name for LocalStack
+	// Format: <namespace>/<secret-name>
+	namespacedSecretName := fmt.Sprintf("%s/%s", namespace, secretName)
+
+	// Get the secret from Secrets Manager using the namespaced name
+	secret, err := c.smIntegration.GetSecret(ctx, namespacedSecretName)
 	if err != nil {
-		return fmt.Errorf("failed to get secret %s: %w", secretName, err)
+		return fmt.Errorf("failed to get secret %s: %w", namespacedSecretName, err)
 	}
 
 	// Create or update Kubernetes secret
@@ -283,8 +287,12 @@ func (c *SecretsController) syncSSMParameter(ctx context.Context, arn string, na
 		parameterName = resourcePart
 	}
 
-	// Sync the parameter
-	return c.ssmIntegration.SyncParameter(ctx, parameterName, namespace)
+	// Build the namespace-aware parameter name for LocalStack
+	// Format: /<namespace>/<param-path>
+	namespacedParamName := fmt.Sprintf("/%s/%s", namespace, strings.TrimPrefix(parameterName, "/"))
+
+	// Sync the parameter using the namespaced name
+	return c.ssmIntegration.SyncParameter(ctx, namespacedParamName, namespace)
 }
 
 // areSecretssSynced checks if all secrets for a pod are already synced

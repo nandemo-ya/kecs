@@ -708,6 +708,14 @@ func (c *ServiceConverter) isSSMParameterSensitive(parameterName string) bool {
 	return false
 }
 
+// getNamespacedSecretName returns the namespace-aware secret name for LocalStack
+func (c *ServiceConverter) getNamespacedSecretName(cluster *storage.Cluster, secretName string) string {
+	// Format: <namespace>/<secret-name>
+	// The namespace already contains cluster and region information
+	namespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
+	return fmt.Sprintf("%s/%s", namespace, secretName)
+}
+
 // getPlaceholderSecretValue returns placeholder values for secrets
 // NOTE: This is now deprecated in favor of actual Kubernetes secret references
 // Kept for backward compatibility and testing
