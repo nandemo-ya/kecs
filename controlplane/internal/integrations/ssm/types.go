@@ -26,6 +26,19 @@ type Integration interface {
 
 	// GetSecretNameForParameter returns the Kubernetes secret name for a given parameter
 	GetSecretNameForParameter(parameterName string) string
+
+	// ConfigMap methods for non-sensitive configuration
+	// SyncParameterAsConfigMap synchronizes a single SSM parameter to a Kubernetes ConfigMap
+	SyncParameterAsConfigMap(ctx context.Context, parameterName string, namespace string) error
+
+	// CreateOrUpdateConfigMap creates or updates a Kubernetes ConfigMap from SSM parameter
+	CreateOrUpdateConfigMap(ctx context.Context, parameter *Parameter, namespace string) error
+
+	// DeleteConfigMap deletes a synchronized ConfigMap
+	DeleteConfigMap(ctx context.Context, parameterName, namespace string) error
+
+	// GetConfigMapNameForParameter returns the Kubernetes ConfigMap name for a given parameter
+	GetConfigMapNameForParameter(parameterName string) string
 }
 
 // Parameter represents an SSM parameter
@@ -61,6 +74,28 @@ var SecretAnnotations = struct {
 
 // SecretLabels defines labels added to Kubernetes secrets
 var SecretLabels = struct {
+	ManagedBy string
+	Source    string
+}{
+	ManagedBy: "kecs.io/managed-by",
+	Source:    "kecs.io/source",
+}
+
+// ConfigMapAnnotations defines annotations added to Kubernetes ConfigMaps
+var ConfigMapAnnotations = struct {
+	ParameterName    string
+	ParameterVersion string
+	LastSynced       string
+	Source           string
+}{
+	ParameterName:    "kecs.io/ssm-parameter-name",
+	ParameterVersion: "kecs.io/ssm-parameter-version",
+	LastSynced:       "kecs.io/ssm-last-synced",
+	Source:           "kecs.io/config-source",
+}
+
+// ConfigMapLabels defines labels added to Kubernetes ConfigMaps
+var ConfigMapLabels = struct {
 	ManagedBy string
 	Source    string
 }{

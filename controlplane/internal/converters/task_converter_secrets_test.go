@@ -85,17 +85,21 @@ var _ = Describe("TaskConverter Secrets", func() {
 					}
 				}
 
-				// Verify DB_PASSWORD has placeholder value (Phase 1 implementation)
+				// Verify DB_PASSWORD references Kubernetes secret (Phase 2 implementation)
 				Expect(dbPasswordEnv).NotTo(BeNil())
-				Expect(dbPasswordEnv.Value).To(Equal("placeholder-db-password-from-secrets-manager"))
-				Expect(dbPasswordEnv.ValueFrom).To(BeNil())
+				Expect(dbPasswordEnv.Value).To(BeEmpty())
+				Expect(dbPasswordEnv.ValueFrom).NotTo(BeNil())
+				Expect(dbPasswordEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+				Expect(dbPasswordEnv.ValueFrom.SecretKeyRef.Name).To(Equal("sm-db-password"))
+				Expect(dbPasswordEnv.ValueFrom.SecretKeyRef.Key).To(Equal("value"))
 
-				// Verify API_KEY has placeholder value (Phase 1 implementation)
+				// Verify API_KEY references Kubernetes secret (Phase 2 implementation)
 				Expect(apiKeyEnv).NotTo(BeNil())
-				// The secret name is "api-keys-XyZ123" and the key is "api_key"
-				// This will generate: placeholder-secret-from-secrets-manager-api-keys-XyZ123-api_key
-				Expect(apiKeyEnv.Value).To(Equal("placeholder-secret-from-secrets-manager-api-keys-XyZ123-api_key"))
-				Expect(apiKeyEnv.ValueFrom).To(BeNil())
+				Expect(apiKeyEnv.Value).To(BeEmpty())
+				Expect(apiKeyEnv.ValueFrom).NotTo(BeNil())
+				Expect(apiKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+				Expect(apiKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("sm-api-keys"))
+				Expect(apiKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal("api_key"))
 
 				// Check pod annotations for secret tracking
 				Expect(pod.Annotations).To(HaveKeyWithValue("kecs.dev/secret-count", "2"))
@@ -152,10 +156,14 @@ var _ = Describe("TaskConverter Secrets", func() {
 					}
 				}
 
-				// Verify CONFIG_VALUE has placeholder value (Phase 1 implementation)
+				// Verify CONFIG_VALUE references Kubernetes ConfigMap (Phase 2 implementation)
+				// Since "config/value" doesn't contain sensitive keywords, it should use ConfigMap
 				Expect(configValueEnv).NotTo(BeNil())
-				Expect(configValueEnv.Value).To(Equal("placeholder-parameter-from-ssm-app/config/value"))
-				Expect(configValueEnv.ValueFrom).To(BeNil())
+				Expect(configValueEnv.Value).To(BeEmpty())
+				Expect(configValueEnv.ValueFrom).NotTo(BeNil())
+				Expect(configValueEnv.ValueFrom.ConfigMapKeyRef).NotTo(BeNil())
+				Expect(configValueEnv.ValueFrom.ConfigMapKeyRef.Name).To(Equal("ssm-cm-app-config-value"))
+				Expect(configValueEnv.ValueFrom.ConfigMapKeyRef.Key).To(Equal("value"))
 			})
 		})
 
@@ -212,15 +220,21 @@ var _ = Describe("TaskConverter Secrets", func() {
 					}
 				}
 
-				// Verify Secrets Manager secret has placeholder value
+				// Verify Secrets Manager secret references Kubernetes secret
 				Expect(dbPasswordEnv).NotTo(BeNil())
-				Expect(dbPasswordEnv.Value).To(Equal("placeholder-db-password-from-secrets-manager"))
-				Expect(dbPasswordEnv.ValueFrom).To(BeNil())
+				Expect(dbPasswordEnv.Value).To(BeEmpty())
+				Expect(dbPasswordEnv.ValueFrom).NotTo(BeNil())
+				Expect(dbPasswordEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+				Expect(dbPasswordEnv.ValueFrom.SecretKeyRef.Name).To(Equal("sm-db-password"))
 
-				// Verify SSM parameter has placeholder value
+				// Verify SSM parameter references Kubernetes ConfigMap
+				// "app/config" doesn't contain sensitive keywords
 				Expect(appConfigEnv).NotTo(BeNil())
-				Expect(appConfigEnv.Value).To(Equal("placeholder-parameter-from-ssm-app/config"))
-				Expect(appConfigEnv.ValueFrom).To(BeNil())
+				Expect(appConfigEnv.Value).To(BeEmpty())
+				Expect(appConfigEnv.ValueFrom).NotTo(BeNil())
+				Expect(appConfigEnv.ValueFrom.ConfigMapKeyRef).NotTo(BeNil())
+				Expect(appConfigEnv.ValueFrom.ConfigMapKeyRef.Name).To(Equal("ssm-cm-app-config"))
+				Expect(appConfigEnv.ValueFrom.ConfigMapKeyRef.Key).To(Equal("value"))
 			})
 		})
 	})
