@@ -41,8 +41,8 @@ func NewAWSProxyHandler(localStackManager localstack.Manager) (*AWSProxyHandler,
 			endpoint, err := localStackManager.GetEndpoint()
 			if err != nil {
 				logging.Warn("Failed to get LocalStack endpoint", "error", err)
-				// Use default as last resort
-				endpoint = "http://localhost:4566"
+				// Use cluster-internal endpoint as fallback
+				endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 			}
 			logging.Info("Using LocalStack endpoint", "endpoint", endpoint)
 			
@@ -119,8 +119,8 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			endpoint, err = h.localStackManager.GetEndpoint()
 			if err != nil {
 				logging.Warn("Failed to get LocalStack endpoint", "error", err)
-				// Use default as last resort
-				endpoint = "http://localhost:4566"
+				// Use cluster-internal endpoint as last resort
+				endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 			}
 			logging.Info("Initializing proxy with LocalStack endpoint", "endpoint", endpoint)
 		}

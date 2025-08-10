@@ -17,9 +17,9 @@ import (
 	"k8s.io/client-go/informers"
 
 	apiconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controllers/sync"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
-	"github.com/nandemo-ya/kecs/controlplane/internal/controllers/sync"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
@@ -96,7 +96,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		kubeconfig:     kubeconfig,
 		region:         region,
 		accountID:      accountID,
-		ecsAPI:         nil,              // Will be set after IAM integration
+		ecsAPI:         nil, // Will be set after IAM integration
 		storage:        storage,
 		clusterManager: clusterManager,
 	}
@@ -145,13 +145,13 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 			// Create informer factory
 			resyncPeriod := 5 * time.Minute
 			informerFactory := informers.NewSharedInformerFactory(kubeClient, resyncPeriod)
-			
+
 			// Get informers
 			deploymentInformer := informerFactory.Apps().V1().Deployments()
 			replicaSetInformer := informerFactory.Apps().V1().ReplicaSets()
 			podInformer := informerFactory.Core().V1().Pods()
 			eventInformer := informerFactory.Core().V1().Events()
-			
+
 			// Initialize sync controller
 			syncController := sync.NewSyncController(
 				kubeClient,
@@ -163,7 +163,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				2, // workers
 				resyncPeriod,
 			)
-			
+
 			// Store informer factory to start it later with proper context
 			s.informerFactory = informerFactory
 			s.syncController = syncController
@@ -209,16 +209,16 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				// Don't set ProxyEndpoint here - it will be set dynamically when LocalStack is deployed
 				logging.Info("Traefik proxy enabled for LocalStack (port will be assigned dynamically)")
 			}
-			
+
 			// Set container mode
 			localStackConfig.ContainerMode = apiconfig.GetBool("features.containerMode")
-			
+
 			// Get kubeconfig if available
 			var kubeConfig *rest.Config
 			// We'll create LocalStack managers per-cluster when they're created
 			// At startup, we don't have a cluster yet
 			kubeConfig = nil
-			
+
 			localStackManager, err := localstack.NewManager(localStackConfig, kubeClient, kubeConfig)
 			if err != nil {
 				logging.Warn("Failed to initialize LocalStack manager",
@@ -235,11 +235,10 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					logging.Info("AWS proxy router initialized successfully")
 				}
 
-
 				// Initialize IAM integration if LocalStack is available and IAM integration is enabled
 				if kubeClient != nil && apiconfig.GetBool("features.iamIntegration") {
 					iamConfig := &iam.Config{
-						LocalStackEndpoint: fmt.Sprintf("http://localhost:%d", localStackConfig.Port),
+						LocalStackEndpoint: "", // Let the integration use the default cluster-internal endpoint
 						KubeNamespace:      "default",
 						RolePrefix:         "kecs-",
 					}
@@ -258,7 +257,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				// Initialize CloudWatch integration if LocalStack is available
 				if kubeClient != nil {
 					cwConfig := &cloudwatch.Config{
-						LocalStackEndpoint: fmt.Sprintf("http://localhost:%d", localStackConfig.Port),
+						LocalStackEndpoint: "", // Let the integration use the default cluster-internal endpoint
 						LogGroupPrefix:     "/ecs/",
 						RetentionDays:      7,
 						KubeNamespace:      "default",
@@ -276,7 +275,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				// Initialize SSM integration if LocalStack is available
 				if kubeClient != nil {
 					ssmConfig := &ssm.Config{
-						LocalStackEndpoint: fmt.Sprintf("http://localhost:%d", localStackConfig.Port),
+						LocalStackEndpoint: "", // Let the integration use the default cluster-internal endpoint
 						SecretPrefix:       "ssm-",
 						KubeNamespace:      "default",
 						SyncRetries:        3,
@@ -295,7 +294,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				// Initialize Secrets Manager integration if LocalStack is available
 				if kubeClient != nil {
 					smConfig := &secretsmanager.Config{
-						LocalStackEndpoint: fmt.Sprintf("http://localhost:%d", localStackConfig.Port),
+						LocalStackEndpoint: "", // Let the integration use the default cluster-internal endpoint
 						SecretPrefix:       "sm-",
 						KubeNamespace:      "default",
 						SyncRetries:        3,
@@ -314,7 +313,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				// Initialize S3 integration if LocalStack is available
 				if kubeClient != nil {
 					s3Config := &s3.Config{
-						LocalStackEndpoint: fmt.Sprintf("http://localhost:%d", localStackConfig.Port),
+						LocalStackEndpoint: "", // Let the integration use the default cluster-internal endpoint
 						Region:             "us-east-1",
 						ForcePathStyle:     true, // Required for LocalStack
 					}
@@ -338,11 +337,11 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	if clusterManager != nil {
 		elbv2Integration := elbv2.NewK8sIntegration(s.region, s.accountID)
 		s.elbv2Integration = elbv2Integration
-		
+
 		// Initialize ELBv2 API and router
 		elbv2API := NewELBv2API(storage, elbv2Integration, s.region, s.accountID)
 		s.elbv2Router = generated_elbv2.NewRouter(elbv2API)
-		
+
 		logging.Info("ELBv2 integration and API initialized successfully")
 	} else {
 		logging.Info("ClusterManager is nil, cannot initialize ELBv2 integration")
@@ -382,12 +381,12 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		if localStackConfig != nil {
 			defaultAPI.SetLocalStackConfig(localStackConfig)
 		}
-		
+
 		// Set callback to re-initialize AWS proxy router when LocalStack manager is updated
 		defaultAPI.SetLocalStackUpdateCallback(func(newManager localstack.Manager) {
 			logging.Info("LocalStack manager updated, re-initializing AWS proxy router...")
 			s.localStackManager = newManager
-			
+
 			// Re-initialize AWS proxy router with the new LocalStack manager
 			if s.localStackManager != nil {
 				awsProxyRouter, err := NewAWSProxyRouter(s.localStackManager)
@@ -454,11 +453,11 @@ func (s *Server) Start() error {
 		logging.Info("Starting sync controller...")
 		syncCtx, cancel := context.WithCancel(ctx)
 		s.syncCancelFunc = cancel
-		
+
 		// Start informers with the sync context
 		logging.Info("Starting informers...")
 		s.informerFactory.Start(syncCtx.Done())
-		
+
 		go func() {
 			if err := s.syncController.Run(syncCtx); err != nil {
 				logging.Error("Sync controller stopped with error",
@@ -503,7 +502,7 @@ func (s *Server) handleELBv2Request(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `{"__type":"ServiceUnavailable","message":"ELBv2 API not available"}`)
 		return
 	}
-	
+
 	// Use the generated router to handle the request
 	s.elbv2Router.Route(w, r)
 }
@@ -593,7 +592,7 @@ func (s *Server) RecoverState(ctx context.Context) error {
 				"error", err)
 			// Don't count as failed since cluster was recovered
 		}
-		
+
 		// Recover services for this cluster
 		if err := s.recoverServicesForCluster(ctx, cluster); err != nil {
 			logging.Error("Failed to recover services for cluster",
@@ -819,7 +818,7 @@ func (s *Server) createPodForTask(ctx context.Context, cluster *storage.Cluster,
 
 	// Convert task definition to pod
 	namespace := fmt.Sprintf("kecs-%s", cluster.Name)
-	
+
 	// Create a minimal RunTask request for the converter
 	runTaskReq := map[string]interface{}{
 		"cluster":        cluster.Name,
@@ -830,7 +829,7 @@ func (s *Server) createPodForTask(ctx context.Context, cluster *storage.Cluster,
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal run task request: %w", err)
 	}
-	
+
 	pod, err := taskConverter.ConvertTaskToPod(taskDef, runTaskReqJSON, cluster, task.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert task definition to pod: %w", err)
@@ -868,23 +867,23 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 			"cluster", cluster.Name)
 		return nil
 	}
-	
+
 	// Deserialize LocalStack state
 	state, err := storage.DeserializeLocalStackState(cluster.LocalStackState)
 	if err != nil {
 		return fmt.Errorf("failed to deserialize LocalStack state: %w", err)
 	}
-	
+
 	if state == nil || !state.Deployed {
 		logging.Info("LocalStack was not deployed in cluster",
 			"cluster", cluster.Name)
 		return nil
 	}
-	
+
 	logging.Info("LocalStack was deployed in cluster, attempting recovery...",
 		"cluster", cluster.Name,
 		"status", state.Status)
-	
+
 	// Check if LocalStack is enabled
 	var config *localstack.Config
 	if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok && defaultAPI.localStackConfig != nil {
@@ -912,18 +911,18 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 			logging.Info("Container mode is enabled for LocalStack recovery")
 		}
 	}
-	
+
 	if config == nil || !config.Enabled {
 		logging.Info("LocalStack is not enabled in configuration, skipping recovery")
 		return nil
 	}
-	
+
 	// Get Kubernetes client for the specific k3d cluster
 	kubeClient, err := s.clusterManager.GetKubeClient(cluster.K8sClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get Kubernetes client: %w", err)
 	}
-	
+
 	// If Traefik is enabled, get the dynamic port from cluster manager
 	if config.UseTraefik && s.clusterManager != nil {
 		if port, exists := s.clusterManager.GetTraefikPort(cluster.K8sClusterName); exists {
@@ -948,10 +947,10 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 	if err != nil {
 		return fmt.Errorf("failed to create LocalStack manager: %w", err)
 	}
-	
+
 	// Update the server's LocalStack manager
 	s.localStackManager = clusterLocalStackManager
-	
+
 	// Re-initialize AWS proxy router with the new LocalStack manager
 	if s.localStackManager != nil {
 		logging.Info("Re-initializing AWS proxy router after LocalStack recovery...")
@@ -964,7 +963,7 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 			logging.Info("AWS proxy router re-initialized successfully")
 		}
 	}
-	
+
 	// Check if LocalStack is already running in this cluster
 	if clusterLocalStackManager.IsRunning() {
 		logging.Info("LocalStack is already running in cluster",
@@ -977,7 +976,7 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 		}
 		return nil
 	}
-	
+
 	// Start LocalStack in the cluster
 	logging.Info("Starting LocalStack in cluster...",
 		"cluster", cluster.Name)
@@ -993,7 +992,7 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 		}
 		return err
 	}
-	
+
 	// Wait for LocalStack to be ready
 	logging.Info("Waiting for LocalStack to be ready in cluster...",
 		"cluster", cluster.Name)
@@ -1009,7 +1008,7 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 		}
 		return err
 	}
-	
+
 	logging.Info("LocalStack successfully recovered in cluster",
 		"cluster", cluster.Name)
 	// Update state to running
@@ -1018,7 +1017,7 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 			defaultAPI.updateLocalStackState(cluster, "running", "")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1039,17 +1038,17 @@ func (s *Server) SetupRoutes() http.Handler {
 			s.handleELBv2Request(w, r)
 			return
 		}
-		
+
 		// Handle custom KECS endpoints
 		// Check both URL path and X-Amz-Target header
-		if r.URL.Path == "/v1/GetTaskLogs" || 
-		   (r.URL.Path == "/" && r.Header.Get("X-Amz-Target") == "AWSie.GetTaskLogs") {
+		if r.URL.Path == "/v1/GetTaskLogs" ||
+			(r.URL.Path == "/" && r.Header.Get("X-Amz-Target") == "AWSie.GetTaskLogs") {
 			if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {
 				defaultAPI.HandleGetTaskLogs(w, r)
 				return
 			}
 		}
-		
+
 		// Otherwise handle as ECS request
 		// Create router and handle request
 		router := generated.NewRouter(s.ecsAPI)
@@ -1063,15 +1062,13 @@ func (s *Server) SetupRoutes() http.Handler {
 	mux.HandleFunc("/api/localstack/status", s.GetLocalStackStatus)
 	mux.HandleFunc("/localstack/dashboard", s.GetLocalStackDashboard)
 
-
-
 	// Apply middleware
 	handler := http.Handler(mux)
 	handler = APIProxyMiddleware(handler)
 	handler = SecurityHeadersMiddleware(handler)
 	handler = CORSMiddleware(handler)
 	handler = LoggingMiddleware(handler)
-	
+
 	// Add LocalStack proxy middleware LAST so it runs FIRST
 	// This ensures AWS API calls are intercepted before reaching ECS handlers
 	// Pass the server instance so the middleware can dynamically check awsProxyRouter
