@@ -44,15 +44,15 @@
         },
         {
           "name": "DB_PASSWORD",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:000000000000:secret:myapp/prod/db-AbCdEf"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:000000000000:secret:myapp/prod/db"
         },
         {
           "name": "JWT_SECRET",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:000000000000:secret:myapp/prod/jwt-GhIjKl"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:000000000000:secret:myapp/prod/jwt"
         },
         {
           "name": "ENCRYPTION_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:000000000000:secret:myapp/prod/encryption-MnOpQr"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:000000000000:secret:myapp/prod/encryption"
         }
       ],
       "healthCheck": {
