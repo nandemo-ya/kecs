@@ -57,7 +57,9 @@ type Server struct {
 	elbv2Router               *generated_elbv2.Router
 	serviceDiscoveryAPI       *ServiceDiscoveryAPI
 	syncController            *sync.SyncController
+	secretsController         *sync.SecretsController
 	syncCancelFunc            context.CancelFunc
+	secretsCancelFunc         context.CancelFunc
 	informerFactory           informers.SharedInformerFactory
 }
 
@@ -310,6 +312,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					}
 				}
 
+
+
 				// Initialize S3 integration if LocalStack is available
 				if kubeClient != nil {
 					s3Config := &s3.Config{
@@ -331,6 +335,48 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		} else {
 			logging.Info("KubeClient is nil, cannot initialize LocalStack manager and AWS proxy router")
 		}
+	}
+
+	// Initialize SecretsController
+	// It will start watching pods immediately and sync secrets when integrations become available
+	// Try to get kubernetes client
+	var kubeClient k8s.Interface
+	if s.taskManager != nil {
+		kubeConfig, err := kubernetes.GetKubeConfig()
+		if err != nil {
+			logging.Warn("Failed to get kubernetes config for SecretsController",
+				"error", err)
+		} else {
+			kubeClient, err = k8s.NewForConfig(kubeConfig)
+			if err != nil {
+				logging.Warn("Failed to create kubernetes client for SecretsController",
+					"error", err)
+			}
+		}
+	}
+
+	if kubeClient != nil {
+		// Create SecretsController with references to integration pointers
+		// It will check if integrations are available during runtime
+		secretsController := sync.NewSecretsController(
+			kubeClient,
+			nil, // Will be set later when available
+			nil, // Will be set later when available
+			"",  // Empty string means watch all namespaces
+		)
+		s.secretsController = secretsController
+		
+		// Set integrations if already available
+		if s.secretsManagerIntegration != nil {
+			s.secretsController.SetSecretsManagerIntegration(s.secretsManagerIntegration)
+		}
+		if s.ssmIntegration != nil {
+			s.secretsController.SetSSMIntegration(s.ssmIntegration)
+		}
+		
+		logging.Info("SecretsController initialized and will start watching pods")
+	} else {
+		logging.Warn("Kubernetes client not available for SecretsController")
 	}
 
 	// Initialize ELBv2 integration (independent of LocalStack)
@@ -397,6 +443,17 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					s.awsProxyRouter = awsProxyRouter
 					logging.Info("AWS proxy router re-initialized successfully")
 					logging.Info("LocalStackProxyMiddleware will now use the updated awsProxyRouter")
+				}
+				
+				// Update SecretsController integrations if available
+				if s.secretsController != nil {
+					if s.secretsManagerIntegration != nil {
+						s.secretsController.SetSecretsManagerIntegration(s.secretsManagerIntegration)
+					}
+					if s.ssmIntegration != nil {
+						s.secretsController.SetSSMIntegration(s.ssmIntegration)
+					}
+					logging.Info("SecretsController integrations updated")
 				}
 			}
 		})
@@ -470,6 +527,24 @@ func (s *Server) Start() error {
 			"informerFactory", s.informerFactory != nil)
 	}
 
+	// Start secrets controller if available
+	if s.secretsController != nil {
+		logging.Info("Starting secrets controller...")
+		secretsCtx, secretsCancel := context.WithCancel(ctx)
+		// Store cancel function for cleanup (we can add this to Server struct if needed)
+		s.secretsCancelFunc = secretsCancel
+		go func() {
+			if err := s.secretsController.Start(secretsCtx); err != nil {
+				logging.Error("Secrets controller stopped with error",
+					"error", err)
+			}
+		}()
+		// Store cancel function for later cleanup
+		// Note: We should add secretsCancelFunc to Server struct for proper cleanup
+	} else {
+		logging.Info("Secrets controller not available")
+	}
+
 	// Start LocalStack manager if available
 	if s.localStackManager != nil {
 		if err := s.localStackManager.Start(ctx); err != nil {
@@ -526,6 +601,19 @@ func (s *Server) Stop(ctx context.Context) error {
 			logging.Info("Sync controller stopped")
 		case <-ctx.Done():
 			logging.Warn("Context cancelled while waiting for sync controller to stop")
+		}
+	}
+
+	// Stop secrets controller if running
+	if s.secretsController != nil && s.secretsCancelFunc != nil {
+		logging.Info("Stopping secrets controller...")
+		s.secretsCancelFunc()
+		// Give it a moment to shut down gracefully
+		select {
+		case <-time.After(2 * time.Second):
+			logging.Info("Secrets controller stopped")
+		case <-ctx.Done():
+			logging.Warn("Context cancelled while waiting for secrets controller to stop")
 		}
 	}
 

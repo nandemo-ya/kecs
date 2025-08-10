@@ -29,6 +29,7 @@ type SecretsController struct {
 	replicator    *SecretsReplicator
 	stopCh        chan struct{}
 	wg            sync.WaitGroup
+	mu            sync.RWMutex // Protect integration updates
 }
 
 // NewSecretsController creates a new secrets synchronization controller
@@ -242,6 +243,15 @@ func (c *SecretsController) syncSecret(ctx context.Context, arn string, namespac
 
 // syncSecretsManagerSecret syncs a Secrets Manager secret
 func (c *SecretsController) syncSecretsManagerSecret(ctx context.Context, arn string, podNamespace string) error {
+	// Check if integration is available
+	c.mu.RLock()
+	smIntegration := c.smIntegration
+	c.mu.RUnlock()
+	
+	if smIntegration == nil {
+		return fmt.Errorf("Secrets Manager integration not available yet")
+	}
+	
 	// Extract secret name and key from ARN
 	// Format: arn:aws:secretsmanager:region:account-id:secret:name-6RandomChars:key::
 	parts := strings.Split(arn, ":")
@@ -257,13 +267,13 @@ func (c *SecretsController) syncSecretsManagerSecret(ctx context.Context, arn st
 
 	// First, sync to kecs-system namespace (master copy)
 	// Use simple secret name without namespace prefix for kecs-system
-	secret, err := c.smIntegration.GetSecret(ctx, secretName)
+	secret, err := smIntegration.GetSecret(ctx, secretName)
 	if err != nil {
 		return fmt.Errorf("failed to get secret %s: %w", secretName, err)
 	}
 
 	// Create or update Kubernetes secret in kecs-system
-	err = c.smIntegration.CreateOrUpdateSecret(ctx, secret, jsonKey, "kecs-system")
+	err = smIntegration.CreateOrUpdateSecret(ctx, secret, jsonKey, "kecs-system")
 	if err != nil {
 		return fmt.Errorf("failed to create secret in kecs-system: %w", err)
 	}
@@ -284,6 +294,15 @@ func (c *SecretsController) syncSecretsManagerSecret(ctx context.Context, arn st
 
 // syncSSMParameter syncs an SSM parameter
 func (c *SecretsController) syncSSMParameter(ctx context.Context, arn string, podNamespace string) error {
+	// Check if integration is available
+	c.mu.RLock()
+	ssmIntegration := c.ssmIntegration
+	c.mu.RUnlock()
+	
+	if ssmIntegration == nil {
+		return fmt.Errorf("SSM integration not available yet")
+	}
+	
 	// Extract parameter name from ARN
 	// Format: arn:aws:ssm:region:account-id:parameter/path/to/param
 	parts := strings.Split(arn, ":")
@@ -304,14 +323,14 @@ func (c *SecretsController) syncSSMParameter(ctx context.Context, arn string, po
 
 	// First, sync to kecs-system namespace (master copy)
 	// Use simple parameter name without namespace prefix for kecs-system
-	err := c.ssmIntegration.SyncParameter(ctx, parameterName, "kecs-system")
+	err := ssmIntegration.SyncParameter(ctx, parameterName, "kecs-system")
 	if err != nil {
 		return fmt.Errorf("failed to sync parameter to kecs-system: %w", err)
 	}
 
 	// Determine if this is a secret or configmap based on parameter type
 	// (This logic should match what's in ssmIntegration.SyncParameter)
-	k8sResourceName := c.ssmIntegration.GetSecretNameForParameter(parameterName)
+	k8sResourceName := ssmIntegration.GetSecretNameForParameter(parameterName)
 	isSecret := c.isSSMParameterSensitive(parameterName)
 
 	// Replicate to pod's namespace if different from kecs-system
@@ -382,14 +401,20 @@ func (c *SecretsController) isSSMParameterSensitive(parameterName string) bool {
 
 // getK8sSecretName returns the Kubernetes secret name for a given service and resource
 func (c *SecretsController) getK8sSecretName(service, resourceName string) string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
 	switch service {
 	case "secretsmanager":
-		return c.smIntegration.GetSecretNameForSecret(resourceName)
+		if c.smIntegration != nil {
+			return c.smIntegration.GetSecretNameForSecret(resourceName)
+		}
 	case "ssm":
-		return c.ssmIntegration.GetSecretNameForParameter(resourceName)
-	default:
-		return ""
+		if c.ssmIntegration != nil {
+			return c.ssmIntegration.GetSecretNameForParameter(resourceName)
+		}
 	}
+	return ""
 }
 
 // getK8sSecretNameFromARN returns the Kubernetes secret name for a given ARN
@@ -401,23 +426,28 @@ func (c *SecretsController) getK8sSecretNameFromARN(arn string) string {
 
 	service := parts[2]
 	
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
 	switch service {
 	case "secretsmanager":
-		if len(parts) >= 7 {
+		if c.smIntegration != nil && len(parts) >= 7 {
 			secretName := parts[6]
 			return c.smIntegration.GetSecretNameForSecret(secretName)
 		}
 	case "ssm":
-		resourcePart := parts[5]
-		parameterName := ""
-		if strings.HasPrefix(resourcePart, "parameter/") {
-			parameterName = strings.TrimPrefix(resourcePart, "parameter/")
-		} else if len(parts) > 6 {
-			parameterName = parts[6]
-		} else {
-			parameterName = resourcePart
+		if c.ssmIntegration != nil {
+			resourcePart := parts[5]
+			parameterName := ""
+			if strings.HasPrefix(resourcePart, "parameter/") {
+				parameterName = strings.TrimPrefix(resourcePart, "parameter/")
+			} else if len(parts) > 6 {
+				parameterName = parts[6]
+			} else {
+				parameterName = resourcePart
+			}
+			return c.ssmIntegration.GetSecretNameForParameter(parameterName)
 		}
-		return c.ssmIntegration.GetSecretNameForParameter(parameterName)
 	}
 
 	return ""
@@ -513,4 +543,27 @@ func (c *SecretsController) getServiceFromARN(arn string) string {
 		return parts[2]
 	}
 	return ""
+}
+
+// SetSecretsManagerIntegration sets the Secrets Manager integration
+func (c *SecretsController) SetSecretsManagerIntegration(integration secretsmanager.Integration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.smIntegration = integration
+	logging.Info("SecretsController: Secrets Manager integration updated")
+}
+
+// SetSSMIntegration sets the SSM integration
+func (c *SecretsController) SetSSMIntegration(integration ssm.Integration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ssmIntegration = integration
+	logging.Info("SecretsController: SSM integration updated")
+}
+
+// HasIntegrations checks if any integration is available
+func (c *SecretsController) HasIntegrations() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.smIntegration != nil || c.ssmIntegration != nil
 }
