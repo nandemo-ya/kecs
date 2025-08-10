@@ -1,6 +1,8 @@
 package converters
 
 import (
+	"fmt"
+	
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -121,6 +123,7 @@ func ConvertDeploymentToK8s(deployment *DeploymentInfo, containerDefs []types.Co
 					Labels: map[string]string{
 						"app": deployment.Name,
 					},
+					Annotations: make(map[string]string),
 				},
 				Spec: corev1.PodSpec{
 					Containers: containers,
@@ -135,6 +138,9 @@ func ConvertDeploymentToK8s(deployment *DeploymentInfo, containerDefs []types.Co
 	for k, v := range deployment.Labels {
 		k8sDeployment.Spec.Template.ObjectMeta.Labels[k] = v
 	}
+
+	// Add secret annotations for pod template
+	addSecretAnnotationsToPodTemplate(&k8sDeployment.Spec.Template, containerDefs)
 
 	return k8sDeployment
 }
@@ -199,4 +205,31 @@ func parseCPUUnits(cpuUnits int) resource.Quantity {
 	// Convert to millicores (1000m = 1 CPU)
 	millicores := (cpuUnits * 1000) / 1024
 	return *resource.NewMilliQuantity(int64(millicores), resource.DecimalSI)
+}
+
+// addSecretAnnotationsToPodTemplate adds annotations for secrets used by the containers
+func addSecretAnnotationsToPodTemplate(podTemplate *corev1.PodTemplateSpec, containerDefs []types.ContainerDefinition) {
+	if podTemplate.Annotations == nil {
+		podTemplate.Annotations = make(map[string]string)
+	}
+	
+	secretIndex := 0
+	for _, containerDef := range containerDefs {
+		if containerDef.Secrets != nil {
+			for _, secret := range containerDef.Secrets {
+				if secret.Name != nil && secret.ValueFrom != nil {
+					// Add annotation for each secret with container and environment variable info
+					annotationKey := fmt.Sprintf("kecs.dev/secret-%d-arn", secretIndex)
+					annotationValue := fmt.Sprintf("%s:%s:%s", *containerDef.Name, *secret.Name, *secret.ValueFrom)
+					podTemplate.Annotations[annotationKey] = annotationValue
+					secretIndex++
+				}
+			}
+		}
+	}
+	
+	// Add total count of secrets
+	if secretIndex > 0 {
+		podTemplate.Annotations["kecs.dev/secret-count"] = fmt.Sprintf("%d", secretIndex)
+	}
 }
