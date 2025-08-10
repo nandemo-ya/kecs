@@ -1645,7 +1645,8 @@ func (c *TaskConverter) convertSecrets(secrets []types.Secret) []corev1.EnvVar {
 
 		switch secretInfo.Source {
 		case "secretsmanager":
-			// Reference the synced Kubernetes secret
+			// Reference the synced Kubernetes secret in kecs-system namespace
+			// Note: Cross-namespace secret reference requires proper RBAC setup
 			envVar.ValueFrom = &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -1656,7 +1657,7 @@ func (c *TaskConverter) convertSecrets(secrets []types.Secret) []corev1.EnvVar {
 			}
 
 		case "ssm":
-			// Reference the synced Kubernetes secret or ConfigMap
+			// Reference the synced Kubernetes secret or ConfigMap in kecs-system namespace
 			// For sensitive data, use Secret; for configuration, use ConfigMap
 			if c.isSSMParameterSensitive(secretInfo.SecretName) {
 				envVar.ValueFrom = &corev1.EnvVarSource{

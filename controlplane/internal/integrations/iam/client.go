@@ -22,7 +22,8 @@ type iamClient struct {
 // newIAMClient creates a new IAM client
 func newIAMClient(endpoint string) IAMClient {
 	if endpoint == "" {
-		endpoint = "http://localhost:4566"
+		// Use cluster-internal LocalStack service endpoint
+		endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 	}
 
 	return &iamClient{
@@ -315,7 +316,8 @@ type stsClient struct {
 // newSTSClient creates a new STS client
 func newSTSClient(endpoint string) STSClient {
 	if endpoint == "" {
-		endpoint = "http://localhost:4566"
+		// Use cluster-internal LocalStack service endpoint
+		endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 	}
 
 	return &stsClient{
