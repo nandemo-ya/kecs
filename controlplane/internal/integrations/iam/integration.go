@@ -36,7 +36,8 @@ func NewIntegration(kubeClient kubernetes.Interface, localstackManager localstac
 	// Create IAM and STS clients configured for LocalStack
 	endpoint := config.LocalStackEndpoint
 	if endpoint == "" {
-		endpoint = "http://localhost:4566"
+		// Use cluster-internal LocalStack service endpoint
+		endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 	}
 
 	iamClient := newIAMClient(endpoint)

@@ -26,6 +26,7 @@ type SecretsController struct {
 	smIntegration secretsmanager.Integration
 	ssmIntegration ssm.Integration
 	namespace     string
+	replicator    *SecretsReplicator
 	stopCh        chan struct{}
 	wg            sync.WaitGroup
 }
@@ -42,6 +43,7 @@ func NewSecretsController(
 		smIntegration: smIntegration,
 		ssmIntegration: ssmIntegration,
 		namespace:     namespace,
+		replicator:    NewSecretsReplicator(kubeClient),
 		stopCh:        make(chan struct{}),
 	}
 }
@@ -239,7 +241,7 @@ func (c *SecretsController) syncSecret(ctx context.Context, arn string, namespac
 }
 
 // syncSecretsManagerSecret syncs a Secrets Manager secret
-func (c *SecretsController) syncSecretsManagerSecret(ctx context.Context, arn string, namespace string) error {
+func (c *SecretsController) syncSecretsManagerSecret(ctx context.Context, arn string, podNamespace string) error {
 	// Extract secret name and key from ARN
 	// Format: arn:aws:secretsmanager:region:account-id:secret:name-6RandomChars:key::
 	parts := strings.Split(arn, ":")
@@ -253,22 +255,35 @@ func (c *SecretsController) syncSecretsManagerSecret(ctx context.Context, arn st
 		jsonKey = parts[7]
 	}
 
-	// Build the namespace-aware secret name for LocalStack
-	// Format: <namespace>/<secret-name>
-	namespacedSecretName := fmt.Sprintf("%s/%s", namespace, secretName)
-
-	// Get the secret from Secrets Manager using the namespaced name
-	secret, err := c.smIntegration.GetSecret(ctx, namespacedSecretName)
+	// First, sync to kecs-system namespace (master copy)
+	// Use simple secret name without namespace prefix for kecs-system
+	secret, err := c.smIntegration.GetSecret(ctx, secretName)
 	if err != nil {
-		return fmt.Errorf("failed to get secret %s: %w", namespacedSecretName, err)
+		return fmt.Errorf("failed to get secret %s: %w", secretName, err)
 	}
 
-	// Create or update Kubernetes secret
-	return c.smIntegration.CreateOrUpdateSecret(ctx, secret, jsonKey, namespace)
+	// Create or update Kubernetes secret in kecs-system
+	err = c.smIntegration.CreateOrUpdateSecret(ctx, secret, jsonKey, "kecs-system")
+	if err != nil {
+		return fmt.Errorf("failed to create secret in kecs-system: %w", err)
+	}
+
+	// Get the K8s secret name
+	k8sSecretName := c.getK8sSecretName("secretsmanager", secretName)
+
+	// Replicate to pod's namespace if different from kecs-system
+	if podNamespace != "kecs-system" {
+		err = c.replicator.ReplicateSecretToNamespace(ctx, k8sSecretName, podNamespace)
+		if err != nil {
+			return fmt.Errorf("failed to replicate secret to namespace %s: %w", podNamespace, err)
+		}
+	}
+
+	return nil
 }
 
 // syncSSMParameter syncs an SSM parameter
-func (c *SecretsController) syncSSMParameter(ctx context.Context, arn string, namespace string) error {
+func (c *SecretsController) syncSSMParameter(ctx context.Context, arn string, podNamespace string) error {
 	// Extract parameter name from ARN
 	// Format: arn:aws:ssm:region:account-id:parameter/path/to/param
 	parts := strings.Split(arn, ":")
@@ -287,12 +302,34 @@ func (c *SecretsController) syncSSMParameter(ctx context.Context, arn string, na
 		parameterName = resourcePart
 	}
 
-	// Build the namespace-aware parameter name for LocalStack
-	// Format: /<namespace>/<param-path>
-	namespacedParamName := fmt.Sprintf("/%s/%s", namespace, strings.TrimPrefix(parameterName, "/"))
+	// First, sync to kecs-system namespace (master copy)
+	// Use simple parameter name without namespace prefix for kecs-system
+	err := c.ssmIntegration.SyncParameter(ctx, parameterName, "kecs-system")
+	if err != nil {
+		return fmt.Errorf("failed to sync parameter to kecs-system: %w", err)
+	}
 
-	// Sync the parameter using the namespaced name
-	return c.ssmIntegration.SyncParameter(ctx, namespacedParamName, namespace)
+	// Determine if this is a secret or configmap based on parameter type
+	// (This logic should match what's in ssmIntegration.SyncParameter)
+	k8sResourceName := c.ssmIntegration.GetSecretNameForParameter(parameterName)
+	isSecret := c.isSSMParameterSensitive(parameterName)
+
+	// Replicate to pod's namespace if different from kecs-system
+	if podNamespace != "kecs-system" {
+		if isSecret {
+			err = c.replicator.ReplicateSecretToNamespace(ctx, k8sResourceName, podNamespace)
+			if err != nil {
+				return fmt.Errorf("failed to replicate secret to namespace %s: %w", podNamespace, err)
+			}
+		} else {
+			err = c.replicator.ReplicateConfigMapToNamespace(ctx, k8sResourceName, podNamespace)
+			if err != nil {
+				return fmt.Errorf("failed to replicate configmap to namespace %s: %w", podNamespace, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 // areSecretssSynced checks if all secrets for a pod are already synced
@@ -315,7 +352,7 @@ func (c *SecretsController) areSecretssSynced(ctx context.Context, pod *corev1.P
 		arn := parts[2]
 		
 		// Check if the corresponding Kubernetes secret exists
-		secretName := c.getK8sSecretName(arn)
+		secretName := c.getK8sSecretNameFromARN(arn)
 		_, err := c.kubeClient.CoreV1().Secrets(pod.Namespace).Get(ctx, secretName, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -329,8 +366,34 @@ func (c *SecretsController) areSecretssSynced(ctx context.Context, pod *corev1.P
 	return true
 }
 
-// getK8sSecretName returns the Kubernetes secret name for a given ARN
-func (c *SecretsController) getK8sSecretName(arn string) string {
+// isSSMParameterSensitive determines if an SSM parameter should be stored as a Secret
+// Parameters with "password", "secret", "key", "token" in their names are considered sensitive
+func (c *SecretsController) isSSMParameterSensitive(parameterName string) bool {
+	lowerName := strings.ToLower(parameterName)
+	sensitivePatterns := []string{"password", "secret", "key", "token", "credential"}
+	
+	for _, pattern := range sensitivePatterns {
+		if strings.Contains(lowerName, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// getK8sSecretName returns the Kubernetes secret name for a given service and resource
+func (c *SecretsController) getK8sSecretName(service, resourceName string) string {
+	switch service {
+	case "secretsmanager":
+		return c.smIntegration.GetSecretNameForSecret(resourceName)
+	case "ssm":
+		return c.ssmIntegration.GetSecretNameForParameter(resourceName)
+	default:
+		return ""
+	}
+}
+
+// getK8sSecretNameFromARN returns the Kubernetes secret name for a given ARN
+func (c *SecretsController) getK8sSecretNameFromARN(arn string) string {
 	parts := strings.Split(arn, ":")
 	if len(parts) < 6 {
 		return ""
@@ -384,7 +447,7 @@ func (c *SecretsController) updatePodContainers(ctx context.Context, pod *corev1
 		arn := parts[2]
 
 		// Get the Kubernetes secret name
-		secretName := c.getK8sSecretName(arn)
+		secretName := c.getK8sSecretNameFromARN(arn)
 		if secretName == "" {
 			continue
 		}

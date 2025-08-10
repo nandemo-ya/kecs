@@ -21,7 +21,8 @@ type ssmClient struct {
 // newSSMClient creates a new SSM client
 func newSSMClient(endpoint string) SSMClient {
 	if endpoint == "" {
-		endpoint = "http://localhost:4566"
+		// Use cluster-internal LocalStack service endpoint
+		endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 	}
 
 	return &ssmClient{

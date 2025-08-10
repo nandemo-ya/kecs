@@ -55,7 +55,8 @@ func NewIntegration(kubeClient kubernetes.Interface, localStackManager localstac
 	// Create SSM client configured for LocalStack
 	endpoint := cfg.LocalStackEndpoint
 	if endpoint == "" {
-		endpoint = "http://localhost:4566"
+		// Use cluster-internal LocalStack service endpoint
+		endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 	}
 
 	ssmClient := newSSMClient(endpoint)
