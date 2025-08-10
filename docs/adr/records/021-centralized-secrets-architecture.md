@@ -1,4 +1,4 @@
-# 12. Centralized Secrets Architecture
+# 21. Centralized Secrets Architecture
 
 Date: 2025-01-10
 
