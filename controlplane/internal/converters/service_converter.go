@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
@@ -64,6 +65,19 @@ func (c *ServiceConverter) ConvertServiceToDeploymentWithNetworkConfig(
 
 	if len(containerDefs) == 0 {
 		return nil, nil, fmt.Errorf("no container definitions found in task definition")
+	}
+	
+	// Debug: Check if secrets are in containerDefs
+	for i, containerDef := range containerDefs {
+		containerName, _ := containerDef["name"].(string)
+		if secrets, exists := containerDef["secrets"]; exists {
+			logging.Info("Container has secrets field", "index", i, "name", containerName, "hasSecrets", secrets != nil)
+			if secretList, ok := secrets.([]interface{}); ok {
+				logging.Info("Container secrets count", "index", i, "name", containerName, "count", len(secretList))
+			}
+		} else {
+			logging.Info("Container has NO secrets field", "index", i, "name", containerName)
+		}
 	}
 
 	// Parse volumes from task definition
@@ -146,6 +160,36 @@ func (c *ServiceConverter) createDeployment(
 	podAnnotations := make(map[string]string)
 	for k, v := range annotations {
 		podAnnotations[k] = v
+	}
+
+	// Add secret annotations to pod template
+	secretIndex := 0
+	logging.Info("Processing containers for secrets", "containerCount", len(containerDefs))
+	for _, containerDef := range containerDefs {
+		containerName, _ := containerDef["name"].(string)
+		logging.Info("Processing container for pod annotations", "container", containerName)
+		if secrets, exists := containerDef["secrets"]; exists {
+			if secretList, ok := secrets.([]interface{}); ok {
+				for _, secret := range secretList {
+					if secretMap, ok := secret.(map[string]interface{}); ok {
+						name, nameOk := secretMap["name"].(string)
+						valueFrom, valueFromOk := secretMap["valueFrom"].(string)
+						if nameOk && valueFromOk && name != "" && valueFrom != "" {
+							annotationKey := fmt.Sprintf("kecs.dev/secret-%d-arn", secretIndex)
+							annotationValue := fmt.Sprintf("%s:%s:%s", containerName, name, valueFrom)
+							podAnnotations[annotationKey] = annotationValue
+							secretIndex++
+							// Debug log
+							logging.Info("Added secret annotation", "key", annotationKey, "value", annotationValue)
+						}
+					}
+				}
+			}
+		}
+	}
+	if secretIndex > 0 {
+		podAnnotations["kecs.dev/secret-count"] = fmt.Sprintf("%d", secretIndex)
+		logging.Info("Total secrets found and annotated", "count", secretIndex)
 	}
 
 	// Create Deployment
