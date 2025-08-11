@@ -6,11 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
-	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 )
 
 var (
@@ -43,121 +41,87 @@ func runDestroy(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create cluster manager: %w", err)
 	}
 
-	// If instance name is not provided, show selection
+	// If instance name is not provided, list available instances
 	if destroyInstanceName == "" {
-		spinner := progress.NewSpinner("Fetching KECS instances")
-		spinner.Start()
+		fmt.Println("Fetching KECS instances...")
 		
 		// Get list of clusters
 		clusters, err := manager.ListClusters(ctx)
 		if err != nil {
-			spinner.Fail("Failed to list instances")
 			return fmt.Errorf("failed to list instances: %w", err)
 		}
-		spinner.Stop()
 		
 		if len(clusters) == 0 {
-			progress.Warning("No KECS instances found")
+			fmt.Println("No KECS instances found")
 			return nil
 		}
 		
-		// Show selection prompt
-		selectedInstance, err := pterm.DefaultInteractiveSelect.
-			WithOptions(clusters).
-			WithDefaultText("Select KECS instance to destroy").
-			Show()
-		if err != nil {
-			return fmt.Errorf("failed to select instance: %w", err)
+		// List available instances
+		fmt.Println("\nAvailable KECS instances:")
+		for i, cluster := range clusters {
+			// Check if cluster is running
+			running, _ := manager.IsClusterRunning(ctx, cluster)
+			status := "stopped"
+			if running {
+				status = "running"
+			}
+			fmt.Printf("  %d. %s (%s)\n", i+1, cluster, status)
 		}
 		
-		destroyInstanceName = selectedInstance
+		return fmt.Errorf("please specify an instance to destroy with --instance flag")
 	}
 
 	// Show header
-	progress.SectionHeader(fmt.Sprintf("Destroying KECS instance '%s'", destroyInstanceName))
+	fmt.Printf("Destroying KECS instance '%s'\n", destroyInstanceName)
 
 	// Check instance status
-	spinner := progress.NewSpinner("Checking instance status")
-	spinner.Start()
+	fmt.Println("Checking instance status...")
 
 	// Check if cluster exists
 	exists, err := manager.ClusterExists(ctx, destroyInstanceName)
 	if err != nil {
-		spinner.Fail("Failed to check instance")
 		return fmt.Errorf("failed to check cluster existence: %w", err)
 	}
 
 	if !exists {
-		spinner.Stop()
-		progress.Warning("KECS instance '%s' does not exist", destroyInstanceName)
+		fmt.Printf("KECS instance '%s' does not exist\n", destroyInstanceName)
 		return nil
 	}
-	spinner.Success("Instance found")
+	fmt.Println("Instance found")
 
-	// Show confirmation prompt if not forced
+	// Show warning if not forced
 	if !destroyForce {
-		confirmed, err := pterm.DefaultInteractiveConfirm.
-			WithDefaultText(fmt.Sprintf("Are you sure you want to destroy instance '%s'? This action cannot be undone.", destroyInstanceName)).
-			Show()
-		if err != nil {
-			return fmt.Errorf("failed to get confirmation: %w", err)
-		}
-		if !confirmed {
-			progress.Info("Destroy operation cancelled")
-			return nil
-		}
+		fmt.Printf("\n⚠️  WARNING: You are about to destroy instance '%s'. This action cannot be undone.\n", destroyInstanceName)
+		fmt.Println("Use --force flag to skip this warning.")
+		return fmt.Errorf("operation cancelled (use --force to confirm)")
 	}
 
-	// Create progress tracker for deletion
-	tracker := progress.NewTracker(progress.Options{
-		Description:     "Deleting k3d cluster",
-		Total:           100,
-		ShowElapsedTime: true,
-		Width:           40,
-	})
-
-	// Start deletion in background
-	errChan := make(chan error, 1)
-	go func() {
-		tracker.Update(30)
-		if err := manager.DeleteCluster(ctx, destroyInstanceName); err != nil {
-			errChan <- err
-			return
-		}
-		tracker.Update(100)
-		errChan <- nil
-	}()
-
-	// Wait for deletion
-	err = <-errChan
-	if err != nil {
-		tracker.FinishWithMessage("Failed to delete cluster")
+	// Delete the cluster
+	fmt.Println("Deleting k3d cluster...")
+	if err := manager.DeleteCluster(ctx, destroyInstanceName); err != nil {
 		return fmt.Errorf("failed to delete cluster: %w", err)
 	}
-	tracker.FinishWithMessage("Cluster deleted successfully")
-
-	progress.Success("KECS instance '%s' has been destroyed", destroyInstanceName)
+	
+	fmt.Printf("✅ KECS instance '%s' has been destroyed\n", destroyInstanceName)
 
 	// Delete data if requested
 	if destroyDeleteData {
 		home, _ := os.UserHomeDir()
 		dataDir := filepath.Join(home, ".kecs", "instances", destroyInstanceName, "data")
 		
-		spinner = progress.NewSpinner(fmt.Sprintf("Deleting data directory: %s", dataDir))
-		spinner.Start()
+		fmt.Printf("Deleting data directory: %s\n", dataDir)
 		
 		if err := os.RemoveAll(dataDir); err != nil {
-			spinner.Fail("Failed to delete data directory")
-			progress.Warning("Failed to delete data directory: %v", err)
+			fmt.Printf("⚠️  Failed to delete data directory: %v\n", err)
 		} else {
-			spinner.Success("Data directory deleted")
+			fmt.Println("Data directory deleted")
 		}
 		
 		// Also delete the instance directory if it's empty
 		instanceDir := filepath.Join(home, ".kecs", "instances", destroyInstanceName)
 		os.Remove(instanceDir) // This will only succeed if directory is empty
 	} else {
-		progress.Info("Instance data preserved. Use --delete-data to remove it.")
+		fmt.Println("Instance data preserved. Use --delete-data to remove it.")
 	}
 
 	return nil

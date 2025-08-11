@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
-	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 )
 
 var (
@@ -37,87 +35,62 @@ func runStop(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create cluster manager: %w", err)
 	}
 
-	// If instance name is not provided, show selection
+	// If instance name is not provided, list available instances
 	if stopInstanceName == "" {
-		spinner := progress.NewSpinner("Fetching KECS instances")
-		spinner.Start()
+		fmt.Println("Fetching KECS instances...")
 		
 		// Get list of clusters
 		clusters, err := manager.ListClusters(ctx)
 		if err != nil {
-			spinner.Fail("Failed to list instances")
 			return fmt.Errorf("failed to list instances: %w", err)
 		}
-		spinner.Stop()
 		
 		if len(clusters) == 0 {
-			progress.Warning("No KECS instances found")
+			fmt.Println("No KECS instances found")
 			return nil
 		}
 		
-		// Show selection prompt
-		selectedInstance, err := pterm.DefaultInteractiveSelect.
-			WithOptions(clusters).
-			WithDefaultText("Select KECS instance to stop").
-			Show()
-		if err != nil {
-			return fmt.Errorf("failed to select instance: %w", err)
+		// List available instances
+		fmt.Println("\nAvailable KECS instances:")
+		for i, cluster := range clusters {
+			// Check if cluster is running
+			running, _ := manager.IsClusterRunning(ctx, cluster)
+			status := "stopped"
+			if running {
+				status = "running"
+			}
+			fmt.Printf("  %d. %s (%s)\n", i+1, cluster, status)
 		}
 		
-		stopInstanceName = selectedInstance
+		return fmt.Errorf("please specify an instance to stop with --instance flag")
 	}
 
 	// Show header
-	progress.SectionHeader(fmt.Sprintf("Stopping KECS instance '%s'", stopInstanceName))
+	fmt.Printf("Stopping KECS instance '%s'\n", stopInstanceName)
 
 	// Check instance status
-	spinner := progress.NewSpinner("Checking instance status")
-	spinner.Start()
+	fmt.Println("Checking instance status...")
 
 	// Check if cluster exists
 	exists, err := manager.ClusterExists(ctx, stopInstanceName)
 	if err != nil {
-		spinner.Fail("Failed to check instance")
 		return fmt.Errorf("failed to check cluster existence: %w", err)
 	}
 
 	if !exists {
-		spinner.Stop()
-		progress.Warning("KECS instance '%s' does not exist", stopInstanceName)
+		fmt.Printf("KECS instance '%s' does not exist\n", stopInstanceName)
 		return nil
 	}
-	spinner.Success("Instance found")
+	fmt.Println("Instance found")
 
-	// Create progress tracker for stopping
-	tracker := progress.NewTracker(progress.Options{
-		Description:     "Stopping k3d cluster",
-		Total:           100,
-		ShowElapsedTime: true,
-		Width:           40,
-	})
-
-	// Start stopping in background
-	errChan := make(chan error, 1)
-	go func() {
-		tracker.Update(30)
-		if err := manager.StopCluster(ctx, stopInstanceName); err != nil {
-			errChan <- err
-			return
-		}
-		tracker.Update(100)
-		errChan <- nil
-	}()
-
-	// Wait for stop
-	err = <-errChan
-	if err != nil {
-		tracker.FinishWithMessage("Failed to stop cluster")
+	// Stop the cluster
+	fmt.Println("Stopping k3d cluster...")
+	if err := manager.StopCluster(ctx, stopInstanceName); err != nil {
 		return fmt.Errorf("failed to stop cluster: %w", err)
 	}
-	tracker.FinishWithMessage("Cluster stopped successfully")
-
-	progress.Success("KECS instance '%s' has been stopped", stopInstanceName)
-	progress.Info("Instance data preserved. Use 'kecs start' to restart the instance.")
+	
+	fmt.Printf("✅ KECS instance '%s' has been stopped\n", stopInstanceName)
+	fmt.Println("Instance data preserved. Use 'kecs start' to restart the instance.")
 
 	return nil
 }
