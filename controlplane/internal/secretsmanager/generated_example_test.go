@@ -18,7 +18,7 @@ func TestGeneratedTypes(t *testing.T) {
 var _ = Describe("Secrets Manager Generated Types", func() {
 	Describe("GetSecretValueRequest", func() {
 		Context("when marshaling to JSON", func() {
-			It("should use camelCase field names", func() {
+			It("should use PascalCase field names for AWS API compatibility", func() {
 				req := &sm.GetSecretValueRequest{
 					SecretId:     "my-secret",
 					VersionId:    stringPtr("v1"),
@@ -29,14 +29,14 @@ var _ = Describe("Secrets Manager Generated Types", func() {
 				data, err := json.Marshal(req)
 				Expect(err).NotTo(HaveOccurred())
 
-				// Verify JSON has camelCase fields
+				// Verify JSON has PascalCase fields (AWS standard)
 				var jsonMap map[string]interface{}
 				err = json.Unmarshal(data, &jsonMap)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(jsonMap["secretId"]).To(Equal("my-secret"))
-				Expect(jsonMap["versionId"]).To(Equal("v1"))
-				Expect(jsonMap["versionStage"]).To(Equal("AWSCURRENT"))
+				Expect(jsonMap["SecretId"]).To(Equal("my-secret"))
+				Expect(jsonMap["VersionId"]).To(Equal("v1"))
+				Expect(jsonMap["VersionStage"]).To(Equal("AWSCURRENT"))
 			})
 		})
 	})
