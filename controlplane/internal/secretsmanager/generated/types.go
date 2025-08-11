@@ -324,11 +324,11 @@ type GetResourcePolicyResponse struct {
 
 // GetSecretValueRequest represents the GetSecretValueRequest structure
 type GetSecretValueRequest struct {
-	SecretId string `json:"secretId"`
+	SecretId string `json:"SecretId"`
 
-	VersionId *string `json:"versionId,omitempty"`
+	VersionId *string `json:"VersionId,omitempty"`
 
-	VersionStage *string `json:"versionStage,omitempty"`
+	VersionStage *string `json:"VersionStage,omitempty"`
 }
 
 // GetSecretValueResponse represents the GetSecretValueResponse structure

@@ -4091,9 +4091,9 @@ type GetParameterHistoryResult struct {
 
 // GetParameterRequest represents the GetParameterRequest structure
 type GetParameterRequest struct {
-	Name string `json:"name"`
+	Name string `json:"Name"`
 
-	WithDecryption *bool `json:"withDecryption,omitempty"`
+	WithDecryption *bool `json:"WithDecryption,omitempty"`
 }
 
 // GetParameterResult represents the GetParameterResult structure
@@ -4128,9 +4128,9 @@ type GetParametersByPathResult struct {
 
 // GetParametersRequest represents the GetParametersRequest structure
 type GetParametersRequest struct {
-	Names []string `json:"names"`
+	Names []string `json:"Names"`
 
-	WithDecryption *bool `json:"withDecryption,omitempty"`
+	WithDecryption *bool `json:"WithDecryption,omitempty"`
 }
 
 // GetParametersResult represents the GetParametersResult structure
