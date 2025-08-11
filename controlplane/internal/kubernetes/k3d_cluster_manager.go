@@ -61,6 +61,11 @@ func NewK3dClusterManager(cfg *ClusterManagerConfig) (*K3dClusterManager, error)
 	}, nil
 }
 
+// SetEnableRegistry sets whether to enable k3d registry for the cluster
+func (k *K3dClusterManager) SetEnableRegistry(enable bool) {
+	k.config.EnableRegistry = enable
+}
+
 // CreateCluster creates a new k3d cluster with optimizations based on environment
 func (k *K3dClusterManager) CreateCluster(ctx context.Context, clusterName string) error {
 	// Use optimized creation for test mode or when explicitly requested
