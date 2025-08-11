@@ -55,8 +55,13 @@ type Manager struct {
 
 // NewManager creates a new instance manager
 func NewManager() (*Manager, error) {
-	// Create k3d manager
-	k3dManager, err := kecs.NewK3dClusterManager(nil)
+	// Default configuration - registry will be enabled per-instance based on DevMode flag
+	k3dConfig := &kecs.ClusterManagerConfig{
+		Provider:       "k3d",
+		EnableRegistry: false, // Will be overridden per-instance based on DevMode
+		ContainerMode:  false, // TUI mode is not container mode
+	}
+	k3dManager, err := kecs.NewK3dClusterManager(k3dConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create k3d manager: %w", err)
 	}
