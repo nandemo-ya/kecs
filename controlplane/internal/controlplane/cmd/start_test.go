@@ -12,6 +12,88 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var _ = Describe("Start Command Unit Tests", func() {
+	Describe("determineInstanceToStart", func() {
+		Context("when no instance name is provided", func() {
+			BeforeEach(func() {
+				startInstanceName = ""
+			})
+
+			It("should call selectOrCreateInstance", func() {
+				// This test would require mocking the K3dClusterManager
+				// which would be implemented with a proper testing interface
+				Skip("Requires mock implementation")
+			})
+		})
+
+		Context("when instance name is provided", func() {
+			BeforeEach(func() {
+				startInstanceName = "test-instance"
+			})
+
+			It("should check if the instance exists", func() {
+				// This test would require mocking the K3dClusterManager
+				Skip("Requires mock implementation")
+			})
+		})
+	})
+
+	Describe("showStartCompletionMessage", func() {
+		It("should display completion message with correct ports", func() {
+			// Capture stdout for testing
+			// This would be better tested with a writer interface
+			Skip("Requires output capture implementation")
+		})
+	})
+
+	Describe("getInstanceStatus", func() {
+		It("should return 'running' for running instances", func() {
+			// This test would require mocking the K3dClusterManager
+			Skip("Requires mock implementation")
+		})
+
+		It("should return 'stopped' for stopped instances", func() {
+			// This test would require mocking the K3dClusterManager
+			Skip("Requires mock implementation")
+		})
+	})
+
+	Describe("getInstanceDataInfo", func() {
+		Context("when data directory exists", func() {
+			It("should return ', has data'", func() {
+				// This would require setting up a temporary directory
+				Skip("Requires filesystem setup")
+			})
+		})
+
+		Context("when data directory does not exist", func() {
+			It("should return empty string", func() {
+				result := getInstanceDataInfo("non-existent-instance")
+				Expect(result).To(Equal(""))
+			})
+		})
+	})
+
+	Describe("createNewInstance", func() {
+		It("should generate a random instance name", func() {
+			name, isNew, err := createNewInstance()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(name).NotTo(BeEmpty())
+			Expect(isNew).To(BeTrue())
+		})
+
+		It("should return different names on subsequent calls", func() {
+			name1, _, err1 := createNewInstance()
+			Expect(err1).NotTo(HaveOccurred())
+			
+			name2, _, err2 := createNewInstance()
+			Expect(err2).NotTo(HaveOccurred())
+			
+			Expect(name1).NotTo(Equal(name2))
+		})
+	})
+})
+
 var _ = Describe("Start V2 Command Integration Tests", func() {
 	var (
 		clusterName string

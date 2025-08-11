@@ -333,9 +333,8 @@ func (p *K3dInstanceProvider) GetInstanceLogs(ctx context.Context, name string, 
 
 // DeleteInstance deletes a KECS instance
 func (p *K3dInstanceProvider) DeleteInstance(ctx context.Context, name string) error {
-	// TODO: Implement using instance.Manager when Stop method is available
-	// For now, use k3d manager directly
-	return p.k3dManager.DeleteCluster(ctx, name)
+	// Use instance manager to destroy the instance (without deleting data)
+	return p.instanceManager.Destroy(ctx, name, false)
 }
 
 // GetInstanceCreationStatus returns the creation status for an instance
@@ -343,7 +342,21 @@ func (p *K3dInstanceProvider) GetInstanceCreationStatus(ctx context.Context, nam
 	// Get status from the local instance manager
 	status := p.instanceManager.GetCreationStatus(name)
 	if status == nil {
-		return nil, nil
+		// If no creation status, check if instance exists
+		exists, err := p.k3dManager.ClusterExists(ctx, name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check instance existence: %w", err)
+		}
+		if !exists {
+			return nil, fmt.Errorf("instance not found: %s", name)
+		}
+		
+		// Instance exists but no creation status - it's already created
+		return &CreationStatus{
+			Step:    "Completed",
+			Status:  "done",
+			Message: "Instance is ready",
+		}, nil
 	}
 	
 	// Convert from instance.CreationStatus to api.CreationStatus

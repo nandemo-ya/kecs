@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	kecs "github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
@@ -233,22 +234,171 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 
 // Stop stops a KECS instance
 func (m *Manager) Stop(ctx context.Context, instanceName string) error {
-	// Implementation will be moved from stop.go
+	// Check if instance exists
+	exists, err := m.k3dManager.ClusterExists(ctx, instanceName)
+	if err != nil {
+		return fmt.Errorf("failed to check instance existence: %w", err)
+	}
+	
+	if !exists {
+		return fmt.Errorf("instance '%s' does not exist", instanceName)
+	}
+	
+	// Check if instance is running
+	running, err := m.k3dManager.IsClusterRunning(ctx, instanceName)
+	if err != nil {
+		return fmt.Errorf("failed to check instance status: %w", err)
+	}
+	
+	if !running {
+		return fmt.Errorf("instance '%s' is not running", instanceName)
+	}
+	
+	// Stop the k3d cluster
+	if err := m.k3dManager.StopCluster(ctx, instanceName); err != nil {
+		return fmt.Errorf("failed to stop instance: %w", err)
+	}
+	
+	return nil
+}
+
+// Destroy destroys a KECS instance
+func (m *Manager) Destroy(ctx context.Context, instanceName string, deleteData bool) error {
+	// Check if instance exists
+	exists, err := m.k3dManager.ClusterExists(ctx, instanceName)
+	if err != nil {
+		return fmt.Errorf("failed to check instance existence: %w", err)
+	}
+	
+	if !exists {
+		return fmt.Errorf("instance '%s' does not exist", instanceName)
+	}
+	
+	// Delete the k3d cluster
+	if err := m.k3dManager.DeleteCluster(ctx, instanceName); err != nil {
+		return fmt.Errorf("failed to delete instance: %w", err)
+	}
+	
+	// Delete data if requested
+	if deleteData {
+		home, _ := os.UserHomeDir()
+		dataDir := filepath.Join(home, ".kecs", "instances", instanceName, "data")
+		
+		if err := os.RemoveAll(dataDir); err != nil {
+			// Non-fatal error - just log it
+			// TODO: Add proper logging here
+		}
+		
+		// Also delete the instance directory if it's empty
+		instanceDir := filepath.Join(home, ".kecs", "instances", instanceName)
+		os.Remove(instanceDir) // This will only succeed if directory is empty
+	}
+	
 	return nil
 }
 
 // List lists all KECS instances
 func (m *Manager) List(ctx context.Context) ([]InstanceInfo, error) {
-	// Implementation will be moved from existing code
-	return nil, nil
+	// Get list of k3d clusters
+	clusters, err := m.k3dManager.ListClusters(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list instances: %w", err)
+	}
+	
+	instances := make([]InstanceInfo, 0, len(clusters))
+	for _, clusterName := range clusters {
+		// Check if cluster is running
+		running, _ := m.k3dManager.IsClusterRunning(ctx, clusterName)
+		status := "STOPPED"
+		if running {
+			status = "RUNNING"
+		}
+		
+		// Load instance config to get ports
+		cfg, _ := LoadInstanceConfig(clusterName)
+		
+		// Check for data directory
+		home, _ := os.UserHomeDir()
+		dataDir := filepath.Join(home, ".kecs", "instances", clusterName, "data")
+		hasData := false
+		if _, err := os.Stat(dataDir); err == nil {
+			hasData = true
+		}
+		
+		instances = append(instances, InstanceInfo{
+			Name:     clusterName,
+			Status:   status,
+			ApiPort:  cfg.APIPort,
+			AdminPort: cfg.AdminPort,
+			HasData:  hasData,
+			DevMode:  cfg.DevMode,
+			LocalStack: cfg.LocalStack,
+			Traefik:  cfg.Traefik,
+		})
+	}
+	
+	return instances, nil
 }
 
 // InstanceInfo contains information about a KECS instance
 type InstanceInfo struct {
-	Name      string
-	Status    string
-	CreatedAt string
-	ApiPort   int
+	Name       string
+	Status     string
+	ApiPort    int
+	AdminPort  int
+	HasData    bool
+	DevMode    bool
+	LocalStack bool
+	Traefik    bool
+}
+
+// IsRunning checks if an instance is running
+func (m *Manager) IsRunning(ctx context.Context, instanceName string) (bool, error) {
+	exists, err := m.k3dManager.ClusterExists(ctx, instanceName)
+	if err != nil {
+		return false, fmt.Errorf("failed to check instance existence: %w", err)
+	}
+	
+	if !exists {
+		return false, nil
+	}
+	
+	return m.k3dManager.IsClusterRunning(ctx, instanceName)
+}
+
+// Restart restarts a stopped instance
+func (m *Manager) Restart(ctx context.Context, instanceName string) error {
+	// Check if instance exists
+	exists, err := m.k3dManager.ClusterExists(ctx, instanceName)
+	if err != nil {
+		return fmt.Errorf("failed to check instance existence: %w", err)
+	}
+	
+	if !exists {
+		return fmt.Errorf("instance '%s' does not exist", instanceName)
+	}
+	
+	// Check if instance is running
+	running, err := m.k3dManager.IsClusterRunning(ctx, instanceName)
+	if err != nil {
+		return fmt.Errorf("failed to check instance status: %w", err)
+	}
+	
+	if running {
+		return fmt.Errorf("instance '%s' is already running", instanceName)
+	}
+	
+	// Start the k3d cluster
+	if err := m.k3dManager.StartCluster(ctx, instanceName); err != nil {
+		return fmt.Errorf("failed to start instance: %w", err)
+	}
+	
+	// Wait for cluster to be ready
+	if err := m.k3dManager.WaitForClusterReady(instanceName, 5*time.Minute); err != nil {
+		return fmt.Errorf("instance did not become ready: %w", err)
+	}
+	
+	return nil
 }
 
 // Helper functions will be implemented below...
