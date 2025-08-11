@@ -51,18 +51,25 @@ func NewSecretsController(
 
 // Start begins watching for pods and synchronizing secrets
 func (c *SecretsController) Start(ctx context.Context) error {
-	logging.Info("Starting secrets synchronization controller", "namespace", c.namespace)
+	// Determine namespace scope
+	namespace := c.namespace
+	if namespace == "" {
+		namespace = metav1.NamespaceAll
+		logging.Info("Starting secrets synchronization controller for all namespaces")
+	} else {
+		logging.Info("Starting secrets synchronization controller", "namespace", namespace)
+	}
 
 	// Create pod informer
 	podInformer := cache.NewSharedInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = "kecs.dev/managed-by=kecs"
-				return c.kubeClient.CoreV1().Pods(c.namespace).List(ctx, options)
+				return c.kubeClient.CoreV1().Pods(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = "kecs.dev/managed-by=kecs"
-				return c.kubeClient.CoreV1().Pods(c.namespace).Watch(ctx, options)
+				return c.kubeClient.CoreV1().Pods(namespace).Watch(ctx, options)
 			},
 		},
 		&corev1.Pod{},
@@ -260,6 +267,27 @@ func (c *SecretsController) syncSecretsManagerSecret(ctx context.Context, arn st
 	}
 
 	secretName := parts[6]
+	// Remove the random suffix (6 characters) if present
+	// Format: secret-name-AbCdEf -> secret-name
+	if idx := strings.LastIndex(secretName, "-"); idx > 0 && len(secretName)-idx == 7 {
+		// Check if last part looks like a random suffix (6 chars after dash)
+		possibleName := secretName[:idx]
+		// Only remove if it looks like a random suffix (alphanumeric)
+		suffix := secretName[idx+1:]
+		if len(suffix) == 6 {
+			isRandomSuffix := true
+			for _, ch := range suffix {
+				if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')) {
+					isRandomSuffix = false
+					break
+				}
+			}
+			if isRandomSuffix {
+				secretName = possibleName
+			}
+		}
+	}
+	
 	jsonKey := ""
 	if len(parts) > 7 && parts[7] != "" && parts[7] != "*" {
 		jsonKey = parts[7]
@@ -314,9 +342,11 @@ func (c *SecretsController) syncSSMParameter(ctx context.Context, arn string, po
 	parameterName := ""
 	
 	if strings.HasPrefix(resourcePart, "parameter/") {
-		parameterName = strings.TrimPrefix(resourcePart, "parameter/")
+		// Keep the leading slash for SSM parameter names
+		parameterName = "/" + strings.TrimPrefix(resourcePart, "parameter/")
 	} else if strings.HasPrefix(resourcePart, "parameter") && len(parts) > 6 {
-		parameterName = parts[6]
+		// Handle case where parameter name is in the next part
+		parameterName = "/" + parts[6]
 	} else {
 		parameterName = resourcePart
 	}
