@@ -16,11 +16,12 @@ mkdir -p "$CODEGEN_DIR"
 # These are Smithy JSON files from the SDK's codegen/sdk-codegen/aws-models directory
 
 SERVICES=(
+    "ecs"
     "cloudwatch-logs"
     "elastic-load-balancing-v2"
     "iam"
     "s3"
-    "secretsmanager"
+    "secrets-manager"
     "ssm"
     "sts"
 )
