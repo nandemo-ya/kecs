@@ -1485,14 +1485,51 @@ func (k *K3dClusterManager) GetTraefikPort(clusterName string) (int, bool) {
 	return port, exists
 }
 
-// ensureRegistry gets the k3d registry for dev mode (does not create)
+// ensureRegistry ensures a k3d registry exists for dev mode (creates if necessary)
 func (k *K3dClusterManager) ensureRegistry(ctx context.Context) (*k3d.Node, error) {
-	registryName := "k3d-kecs-registry.localhost"
+	registryName := "k3d-kecs-registry"
 	
-	// Try to get the registry
+	// Try to get the registry (k3d internally prefixes with "k3d-")
 	existingRegistry, err := client.RegistryGet(ctx, k.runtime, registryName)
 	if err != nil || existingRegistry == nil {
-		return nil, fmt.Errorf("k3d registry not found. Please run 'kecs registry start' first")
+		// Registry doesn't exist, create it
+		logging.Info("k3d registry not found, creating new registry", "name", registryName)
+		
+		// Create registry configuration
+		reg := &k3d.Registry{
+			Host:  fmt.Sprintf("%s.localhost", registryName),
+			Image: "docker.io/library/registry:2",
+			ExposureOpts: k3d.ExposureOpts{
+				Host: "0.0.0.0",
+				PortMapping: nat.PortMapping{
+					Port: nat.Port("5000/tcp"),
+					Binding: nat.PortBinding{
+						HostIP:   "0.0.0.0",
+						HostPort: "5000",
+					},
+				},
+			},
+		}
+		
+		// Create the registry
+		registryNode, err := client.RegistryCreate(ctx, k.runtime, reg)
+		if err != nil {
+			// Check if it's a port conflict error
+			if strings.Contains(err.Error(), "port is already allocated") {
+				return nil, fmt.Errorf("port 5000 is already in use. Please stop any other services using this port or manually create the registry with 'kecs registry start': %w", err)
+			}
+			return nil, fmt.Errorf("failed to create k3d registry: %w", err)
+		}
+		
+		logging.Info("Created k3d registry", "name", registryName)
+		
+		// Start the registry
+		if err := k.runtime.StartNode(ctx, registryNode); err != nil {
+			logging.Warn("Failed to start registry after creation", "error", err)
+		}
+		
+		// Return the created registry node
+		return registryNode, nil
 	}
 	
 	logging.Info("Found existing k3d registry", "name", registryName)
@@ -1524,7 +1561,7 @@ func (k *K3dClusterManager) configureRegistryForCluster(ctx context.Context, clu
 	logging.Info("Configuring k3s to use registry with HTTP", "cluster", clusterName)
 	
 	// Create registry configuration for k3s
-	// Use k3d-kecs-registry as the hostname (without .localhost) for cluster-internal access
+	// Use k3d-kecs-registry as the hostname for cluster-internal access
 	registryConfig := `mirrors:
   "k3d-kecs-registry.localhost:5000":
     endpoint:
