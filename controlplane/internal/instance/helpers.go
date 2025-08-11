@@ -26,6 +26,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 )
 
@@ -57,6 +58,16 @@ func (m *Manager) createCluster(ctx context.Context, instanceName string, cfg *c
 	if cfg.LocalStack.Enabled {
 		// LocalStack always uses fixed NodePort 30566
 		portMappings[4566] = 30566
+	}
+
+	// Update k3dManager configuration based on DevMode
+	// Note: This modifies the shared k3dManager config, but it's safe because
+	// each instance creation is sequential
+	if opts.DevMode {
+		logging.Info("DevMode enabled, enabling k3d registry for hot reload support")
+		m.k3dManager.SetEnableRegistry(true)
+	} else {
+		m.k3dManager.SetEnableRegistry(false)
 	}
 
 	// Create cluster with port mappings
