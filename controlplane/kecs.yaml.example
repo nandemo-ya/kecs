@@ -85,4 +85,4 @@ aws:
 localstack:
   enabled: false
   services: []
-  # Additional LocalStack configuration options...
+  # Additional LocalStack configuration options
