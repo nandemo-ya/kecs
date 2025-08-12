@@ -641,7 +641,7 @@ func (i *k8sIntegration) createDeployment(ctx context.Context, namespace, traefi
 					Containers: []corev1.Container{
 						{
 							Name:  "traefik",
-							Image: "traefik:v3.0",
+							Image: "traefik:v3.5.0",
 							Args: []string{
 								"--configfile=/config/traefik.yml",
 							},

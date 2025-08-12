@@ -58,7 +58,7 @@ type TraefikConfig struct {
 // DefaultTraefikConfig returns default configuration
 func DefaultTraefikConfig() *TraefikConfig {
 	return &TraefikConfig{
-		Image:           "traefik:v3.2",
+		Image:           "traefik:v3.5.0",
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		CPURequest:      "100m",
 		MemoryRequest:   "128Mi",

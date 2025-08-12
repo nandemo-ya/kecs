@@ -250,7 +250,7 @@ func (m *Manager) deployTraefik(ctx context.Context, instanceName string, cfg *c
 
 	// Create Traefik config
 	traefikConfig := &resources.TraefikConfig{
-		Image:           "traefik:v3.2",
+		Image:           "traefik:v3.5.0",
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		CPURequest:      "100m",
 		MemoryRequest:   "128Mi",
