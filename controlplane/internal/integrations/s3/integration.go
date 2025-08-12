@@ -133,7 +133,7 @@ func (i *integration) CreateBucket(ctx context.Context, bucket string) error {
 
 	// Don't set LocationConstraint for us-east-1
 	if i.config.Region != "us-east-1" {
-		regionConstraint := interface{}(i.config.Region)
+		regionConstraint := s3api.BucketLocationConstraint(i.config.Region)
 		input.CreateBucketConfiguration = &s3api.CreateBucketConfiguration{
 			LocationConstraint: &regionConstraint,
 		}

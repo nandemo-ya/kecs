@@ -355,15 +355,11 @@ func getTime(t *time.Time) time.Time {
 	return *t
 }
 
-func getParameterType(t *interface{}) string {
+func getParameterType(t *ssmapi.ParameterType) string {
 	if t == nil {
 		return "String"
 	}
-	// Try to assert as string
-	if str, ok := (*t).(string); ok {
-		return str
-	}
-	return "String"
+	return string(*t)
 }
 
 func ptrBool(b bool) *bool {

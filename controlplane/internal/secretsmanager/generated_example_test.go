@@ -70,7 +70,7 @@ var _ = Describe("Secrets Manager Generated Types", func() {
 
 	Describe("CreateSecretRequest", func() {
 		Context("when marshaling with tags", func() {
-			It("should correctly serialize tags with camelCase", func() {
+			It("should correctly serialize tags with PascalCase", func() {
 				req := &sm.CreateSecretRequest{
 					Name:         "new-secret",
 					Description:  stringPtr("My new secret"),
@@ -96,21 +96,21 @@ var _ = Describe("Secrets Manager Generated Types", func() {
 				err = json.Unmarshal(data, &jsonMap)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(jsonMap["name"]).To(Equal("new-secret"))
-				Expect(jsonMap["description"]).To(Equal("My new secret"))
-				Expect(jsonMap["secretString"]).To(Equal(`{"key":"value"}`))
+				Expect(jsonMap["Name"]).To(Equal("new-secret"))
+				Expect(jsonMap["Description"]).To(Equal("My new secret"))
+				Expect(jsonMap["SecretString"]).To(Equal(`{"key":"value"}`))
 
 				// Verify tags
-				tags := jsonMap["tags"].([]interface{})
+				tags := jsonMap["Tags"].([]interface{})
 				Expect(tags).To(HaveLen(2))
 
 				tag1 := tags[0].(map[string]interface{})
-				Expect(tag1["key"]).To(Equal("Environment"))
-				Expect(tag1["value"]).To(Equal("Production"))
+				Expect(tag1["Key"]).To(Equal("Environment"))
+				Expect(tag1["Value"]).To(Equal("Production"))
 
 				tag2 := tags[1].(map[string]interface{})
-				Expect(tag2["key"]).To(Equal("Application"))
-				Expect(tag2["value"]).To(Equal("MyApp"))
+				Expect(tag2["Key"]).To(Equal("Application"))
+				Expect(tag2["Value"]).To(Equal("MyApp"))
 			})
 		})
 	})
