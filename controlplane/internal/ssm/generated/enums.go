@@ -30,8 +30,6 @@ const (
 type AssociationComplianceSeverity string
 
 const (
-	AssociationComplianceSeverityCritical AssociationComplianceSeverity = "Critical"
-
 	AssociationComplianceSeverityHigh AssociationComplianceSeverity = "High"
 
 	AssociationComplianceSeverityMedium AssociationComplianceSeverity = "Medium"
@@ -39,6 +37,8 @@ const (
 	AssociationComplianceSeverityLow AssociationComplianceSeverity = "Low"
 
 	AssociationComplianceSeverityUnspecified AssociationComplianceSeverity = "Unspecified"
+
+	AssociationComplianceSeverityCritical AssociationComplianceSeverity = "Critical"
 )
 
 // AssociationExecutionFilterKey represents the AssociationExecutionFilterKey enum type
@@ -67,6 +67,12 @@ const (
 type AssociationFilterKey string
 
 const (
+	AssociationFilterKeyInstanceId AssociationFilterKey = "InstanceId"
+
+	AssociationFilterKeyName AssociationFilterKey = "Name"
+
+	AssociationFilterKeyAssociationId AssociationFilterKey = "AssociationId"
+
 	AssociationFilterKeyStatus AssociationFilterKey = "Status"
 
 	AssociationFilterKeyLastExecutedBefore AssociationFilterKey = "LastExecutedBefore"
@@ -76,12 +82,6 @@ const (
 	AssociationFilterKeyAssociationName AssociationFilterKey = "AssociationName"
 
 	AssociationFilterKeyResourceGroupName AssociationFilterKey = "ResourceGroupName"
-
-	AssociationFilterKeyInstanceId AssociationFilterKey = "InstanceId"
-
-	AssociationFilterKeyName AssociationFilterKey = "Name"
-
-	AssociationFilterKeyAssociationId AssociationFilterKey = "AssociationId"
 )
 
 // AssociationFilterOperatorType represents the AssociationFilterOperatorType enum type
@@ -137,15 +137,19 @@ const (
 type AutomationExecutionFilterKey string
 
 const (
+	AutomationExecutionFilterKeyEXECUTION_ID AutomationExecutionFilterKey = "EXECUTION_ID"
+
 	AutomationExecutionFilterKeySTART_TIME_BEFORE AutomationExecutionFilterKey = "START_TIME_BEFORE"
 
-	AutomationExecutionFilterKeyTAG_KEY AutomationExecutionFilterKey = "TAG_KEY"
+	AutomationExecutionFilterKeyTARGET_RESOURCE_GROUP AutomationExecutionFilterKey = "TARGET_RESOURCE_GROUP"
+
+	AutomationExecutionFilterKeyAUTOMATION_SUBTYPE AutomationExecutionFilterKey = "AUTOMATION_SUBTYPE"
 
 	AutomationExecutionFilterKeyOPS_ITEM_ID AutomationExecutionFilterKey = "OPS_ITEM_ID"
 
-	AutomationExecutionFilterKeyDOCUMENT_NAME_PREFIX AutomationExecutionFilterKey = "DOCUMENT_NAME_PREFIX"
-
 	AutomationExecutionFilterKeyEXECUTION_STATUS AutomationExecutionFilterKey = "EXECUTION_STATUS"
+
+	AutomationExecutionFilterKeyPARENT_EXECUTION_ID AutomationExecutionFilterKey = "PARENT_EXECUTION_ID"
 
 	AutomationExecutionFilterKeyCURRENT_ACTION AutomationExecutionFilterKey = "CURRENT_ACTION"
 
@@ -153,65 +157,61 @@ const (
 
 	AutomationExecutionFilterKeyAUTOMATION_TYPE AutomationExecutionFilterKey = "AUTOMATION_TYPE"
 
-	AutomationExecutionFilterKeyTARGET_RESOURCE_GROUP AutomationExecutionFilterKey = "TARGET_RESOURCE_GROUP"
+	AutomationExecutionFilterKeyTAG_KEY AutomationExecutionFilterKey = "TAG_KEY"
 
-	AutomationExecutionFilterKeyAUTOMATION_SUBTYPE AutomationExecutionFilterKey = "AUTOMATION_SUBTYPE"
-
-	AutomationExecutionFilterKeyEXECUTION_ID AutomationExecutionFilterKey = "EXECUTION_ID"
-
-	AutomationExecutionFilterKeyPARENT_EXECUTION_ID AutomationExecutionFilterKey = "PARENT_EXECUTION_ID"
+	AutomationExecutionFilterKeyDOCUMENT_NAME_PREFIX AutomationExecutionFilterKey = "DOCUMENT_NAME_PREFIX"
 )
 
 // AutomationExecutionStatus represents the AutomationExecutionStatus enum type
 type AutomationExecutionStatus string
 
 const (
+	AutomationExecutionStatusCHANGE_CALENDAR_OVERRIDE_REJECTED AutomationExecutionStatus = "CHANGE_CALENDAR_OVERRIDE_REJECTED"
+
 	AutomationExecutionStatusFAILED AutomationExecutionStatus = "FAILED"
+
+	AutomationExecutionStatusPENDING_APPROVAL AutomationExecutionStatus = "PENDING_APPROVAL"
+
+	AutomationExecutionStatusREJECTED AutomationExecutionStatus = "REJECTED"
+
+	AutomationExecutionStatusCOMPLETED_WITH_SUCCESS AutomationExecutionStatus = "COMPLETED_WITH_SUCCESS"
+
+	AutomationExecutionStatusCOMPLETED_WITH_FAILURE AutomationExecutionStatus = "COMPLETED_WITH_FAILURE"
+
+	AutomationExecutionStatusEXITED AutomationExecutionStatus = "EXITED"
+
+	AutomationExecutionStatusWAITING AutomationExecutionStatus = "WAITING"
+
+	AutomationExecutionStatusSUCCESS AutomationExecutionStatus = "SUCCESS"
 
 	AutomationExecutionStatusAPPROVED AutomationExecutionStatus = "APPROVED"
 
 	AutomationExecutionStatusSCHEDULED AutomationExecutionStatus = "SCHEDULED"
 
-	AutomationExecutionStatusCOMPLETED_WITH_FAILURE AutomationExecutionStatus = "COMPLETED_WITH_FAILURE"
+	AutomationExecutionStatusTIMEDOUT AutomationExecutionStatus = "TIMEDOUT"
 
-	AutomationExecutionStatusWAITING AutomationExecutionStatus = "WAITING"
+	AutomationExecutionStatusCANCELLING AutomationExecutionStatus = "CANCELLING"
+
+	AutomationExecutionStatusPENDING_CHANGE_CALENDAR_OVERRIDE AutomationExecutionStatus = "PENDING_CHANGE_CALENDAR_OVERRIDE"
+
+	AutomationExecutionStatusPENDING AutomationExecutionStatus = "PENDING"
+
+	AutomationExecutionStatusINPROGRESS AutomationExecutionStatus = "INPROGRESS"
 
 	AutomationExecutionStatusCANCELLED AutomationExecutionStatus = "CANCELLED"
 
 	AutomationExecutionStatusRUNBOOK_INPROGRESS AutomationExecutionStatus = "RUNBOOK_INPROGRESS"
 
-	AutomationExecutionStatusPENDING_CHANGE_CALENDAR_OVERRIDE AutomationExecutionStatus = "PENDING_CHANGE_CALENDAR_OVERRIDE"
-
 	AutomationExecutionStatusCHANGE_CALENDAR_OVERRIDE_APPROVED AutomationExecutionStatus = "CHANGE_CALENDAR_OVERRIDE_APPROVED"
-
-	AutomationExecutionStatusCOMPLETED_WITH_SUCCESS AutomationExecutionStatus = "COMPLETED_WITH_SUCCESS"
-
-	AutomationExecutionStatusINPROGRESS AutomationExecutionStatus = "INPROGRESS"
-
-	AutomationExecutionStatusTIMEDOUT AutomationExecutionStatus = "TIMEDOUT"
-
-	AutomationExecutionStatusCHANGE_CALENDAR_OVERRIDE_REJECTED AutomationExecutionStatus = "CHANGE_CALENDAR_OVERRIDE_REJECTED"
-
-	AutomationExecutionStatusEXITED AutomationExecutionStatus = "EXITED"
-
-	AutomationExecutionStatusPENDING AutomationExecutionStatus = "PENDING"
-
-	AutomationExecutionStatusSUCCESS AutomationExecutionStatus = "SUCCESS"
-
-	AutomationExecutionStatusCANCELLING AutomationExecutionStatus = "CANCELLING"
-
-	AutomationExecutionStatusPENDING_APPROVAL AutomationExecutionStatus = "PENDING_APPROVAL"
-
-	AutomationExecutionStatusREJECTED AutomationExecutionStatus = "REJECTED"
 )
 
 // AutomationSubtype represents the AutomationSubtype enum type
 type AutomationSubtype string
 
 const (
-	AutomationSubtypeAccessRequest AutomationSubtype = "AccessRequest"
-
 	AutomationSubtypeChangeRequest AutomationSubtype = "ChangeRequest"
+
+	AutomationSubtypeAccessRequest AutomationSubtype = "AccessRequest"
 )
 
 // AutomationType represents the AutomationType enum type
@@ -236,6 +236,8 @@ const (
 type CommandFilterKey string
 
 const (
+	CommandFilterKeyDOCUMENT_NAME CommandFilterKey = "DOCUMENT_NAME"
+
 	CommandFilterKeyINVOKED_AFTER CommandFilterKey = "INVOKED_AFTER"
 
 	CommandFilterKeyINVOKED_BEFORE CommandFilterKey = "INVOKED_BEFORE"
@@ -243,14 +245,18 @@ const (
 	CommandFilterKeySTATUS CommandFilterKey = "STATUS"
 
 	CommandFilterKeyEXECUTION_STAGE CommandFilterKey = "EXECUTION_STAGE"
-
-	CommandFilterKeyDOCUMENT_NAME CommandFilterKey = "DOCUMENT_NAME"
 )
 
 // CommandInvocationStatus represents the CommandInvocationStatus enum type
 type CommandInvocationStatus string
 
 const (
+	CommandInvocationStatusSUCCESS CommandInvocationStatus = "SUCCESS"
+
+	CommandInvocationStatusCANCELLED CommandInvocationStatus = "CANCELLED"
+
+	CommandInvocationStatusTIMED_OUT CommandInvocationStatus = "TIMED_OUT"
+
 	CommandInvocationStatusFAILED CommandInvocationStatus = "FAILED"
 
 	CommandInvocationStatusCANCELLING CommandInvocationStatus = "CANCELLING"
@@ -260,12 +266,6 @@ const (
 	CommandInvocationStatusIN_PROGRESS CommandInvocationStatus = "IN_PROGRESS"
 
 	CommandInvocationStatusDELAYED CommandInvocationStatus = "DELAYED"
-
-	CommandInvocationStatusSUCCESS CommandInvocationStatus = "SUCCESS"
-
-	CommandInvocationStatusCANCELLED CommandInvocationStatus = "CANCELLED"
-
-	CommandInvocationStatusTIMED_OUT CommandInvocationStatus = "TIMED_OUT"
 )
 
 // CommandPluginStatus represents the CommandPluginStatus enum type
@@ -289,6 +289,12 @@ const (
 type CommandStatus string
 
 const (
+	CommandStatusPENDING CommandStatus = "PENDING"
+
+	CommandStatusIN_PROGRESS CommandStatus = "IN_PROGRESS"
+
+	CommandStatusSUCCESS CommandStatus = "SUCCESS"
+
 	CommandStatusCANCELLED CommandStatus = "CANCELLED"
 
 	CommandStatusFAILED CommandStatus = "FAILED"
@@ -296,33 +302,31 @@ const (
 	CommandStatusTIMED_OUT CommandStatus = "TIMED_OUT"
 
 	CommandStatusCANCELLING CommandStatus = "CANCELLING"
-
-	CommandStatusPENDING CommandStatus = "PENDING"
-
-	CommandStatusIN_PROGRESS CommandStatus = "IN_PROGRESS"
-
-	CommandStatusSUCCESS CommandStatus = "SUCCESS"
 )
 
 // ComplianceQueryOperatorType represents the ComplianceQueryOperatorType enum type
 type ComplianceQueryOperatorType string
 
 const (
-	ComplianceQueryOperatorTypeGreaterThan ComplianceQueryOperatorType = "GreaterThan"
-
-	ComplianceQueryOperatorTypeEqual ComplianceQueryOperatorType = "Equal"
-
 	ComplianceQueryOperatorTypeNotEqual ComplianceQueryOperatorType = "NotEqual"
 
 	ComplianceQueryOperatorTypeBeginWith ComplianceQueryOperatorType = "BeginWith"
 
 	ComplianceQueryOperatorTypeLessThan ComplianceQueryOperatorType = "LessThan"
+
+	ComplianceQueryOperatorTypeGreaterThan ComplianceQueryOperatorType = "GreaterThan"
+
+	ComplianceQueryOperatorTypeEqual ComplianceQueryOperatorType = "Equal"
 )
 
 // ComplianceSeverity represents the ComplianceSeverity enum type
 type ComplianceSeverity string
 
 const (
+	ComplianceSeverityInformational ComplianceSeverity = "Informational"
+
+	ComplianceSeverityUnspecified ComplianceSeverity = "Unspecified"
+
 	ComplianceSeverityCritical ComplianceSeverity = "Critical"
 
 	ComplianceSeverityHigh ComplianceSeverity = "High"
@@ -330,10 +334,6 @@ const (
 	ComplianceSeverityMedium ComplianceSeverity = "Medium"
 
 	ComplianceSeverityLow ComplianceSeverity = "Low"
-
-	ComplianceSeverityInformational ComplianceSeverity = "Informational"
-
-	ComplianceSeverityUnspecified ComplianceSeverity = "Unspecified"
 )
 
 // ComplianceStatus represents the ComplianceStatus enum type
@@ -367,35 +367,35 @@ const (
 type DescribeActivationsFilterKeys string
 
 const (
-	DescribeActivationsFilterKeysACTIVATION_IDS DescribeActivationsFilterKeys = "ACTIVATION_IDS"
-
 	DescribeActivationsFilterKeysDEFAULT_INSTANCE_NAME DescribeActivationsFilterKeys = "DEFAULT_INSTANCE_NAME"
 
 	DescribeActivationsFilterKeysIAM_ROLE DescribeActivationsFilterKeys = "IAM_ROLE"
+
+	DescribeActivationsFilterKeysACTIVATION_IDS DescribeActivationsFilterKeys = "ACTIVATION_IDS"
 )
 
 // DocumentFilterKey represents the DocumentFilterKey enum type
 type DocumentFilterKey string
 
 const (
-	DocumentFilterKeyOwner DocumentFilterKey = "Owner"
-
-	DocumentFilterKeyPlatformTypes DocumentFilterKey = "PlatformTypes"
-
 	DocumentFilterKeyDocumentType DocumentFilterKey = "DocumentType"
 
 	DocumentFilterKeyName DocumentFilterKey = "Name"
+
+	DocumentFilterKeyOwner DocumentFilterKey = "Owner"
+
+	DocumentFilterKeyPlatformTypes DocumentFilterKey = "PlatformTypes"
 )
 
 // DocumentFormat represents the DocumentFormat enum type
 type DocumentFormat string
 
 const (
-	DocumentFormatTEXT DocumentFormat = "TEXT"
-
 	DocumentFormatYAML DocumentFormat = "YAML"
 
 	DocumentFormatJSON DocumentFormat = "JSON"
+
+	DocumentFormatTEXT DocumentFormat = "TEXT"
 )
 
 // DocumentHashType represents the DocumentHashType enum type
@@ -434,13 +434,13 @@ const (
 type DocumentReviewAction string
 
 const (
-	DocumentReviewActionSendForReview DocumentReviewAction = "SendForReview"
-
-	DocumentReviewActionUpdateReview DocumentReviewAction = "UpdateReview"
-
 	DocumentReviewActionApprove DocumentReviewAction = "Approve"
 
 	DocumentReviewActionReject DocumentReviewAction = "Reject"
+
+	DocumentReviewActionSendForReview DocumentReviewAction = "SendForReview"
+
+	DocumentReviewActionUpdateReview DocumentReviewAction = "UpdateReview"
 )
 
 // DocumentReviewCommentType represents the DocumentReviewCommentType enum type
@@ -469,37 +469,37 @@ const (
 type DocumentType string
 
 const (
-	DocumentTypeChangeCalendar DocumentType = "ChangeCalendar"
-
-	DocumentTypeChangeTemplate DocumentType = "ChangeTemplate"
-
 	DocumentTypeProblemAnalysis DocumentType = "ProblemAnalysis"
-
-	DocumentTypeManualApprovalPolicy DocumentType = "ManualApprovalPolicy"
-
-	DocumentTypeAutomation DocumentType = "Automation"
-
-	DocumentTypeDeploymentStrategy DocumentType = "DeploymentStrategy"
-
-	DocumentTypeCloudFormation DocumentType = "CloudFormation"
-
-	DocumentTypeAutoApprovalPolicy DocumentType = "AutoApprovalPolicy"
-
-	DocumentTypeConformancePackTemplate DocumentType = "ConformancePackTemplate"
-
-	DocumentTypeCommand DocumentType = "Command"
-
-	DocumentTypePolicy DocumentType = "Policy"
 
 	DocumentTypeQuickSetup DocumentType = "QuickSetup"
 
+	DocumentTypeAutomation DocumentType = "Automation"
+
 	DocumentTypeSession DocumentType = "Session"
+
+	DocumentTypeApplicationConfiguration DocumentType = "ApplicationConfiguration"
+
+	DocumentTypeChangeTemplate DocumentType = "ChangeTemplate"
+
+	DocumentTypeCloudFormation DocumentType = "CloudFormation"
+
+	DocumentTypeConformancePackTemplate DocumentType = "ConformancePackTemplate"
+
+	DocumentTypeDeploymentStrategy DocumentType = "DeploymentStrategy"
+
+	DocumentTypeChangeCalendar DocumentType = "ChangeCalendar"
 
 	DocumentTypeProblemAnalysisTemplate DocumentType = "ProblemAnalysisTemplate"
 
+	DocumentTypeAutoApprovalPolicy DocumentType = "AutoApprovalPolicy"
+
+	DocumentTypePolicy DocumentType = "Policy"
+
 	DocumentTypePackage DocumentType = "Package"
 
-	DocumentTypeApplicationConfiguration DocumentType = "ApplicationConfiguration"
+	DocumentTypeManualApprovalPolicy DocumentType = "ManualApprovalPolicy"
+
+	DocumentTypeCommand DocumentType = "Command"
 
 	DocumentTypeApplicationConfigurationSchema DocumentType = "ApplicationConfigurationSchema"
 )
@@ -550,17 +550,21 @@ const (
 type ImpactType string
 
 const (
+	ImpactTypeMUTATING ImpactType = "MUTATING"
+
 	ImpactTypeNON_MUTATING ImpactType = "NON_MUTATING"
 
 	ImpactTypeUNDETERMINED ImpactType = "UNDETERMINED"
-
-	ImpactTypeMUTATING ImpactType = "MUTATING"
 )
 
 // InstanceInformationFilterKey represents the InstanceInformationFilterKey enum type
 type InstanceInformationFilterKey string
 
 const (
+	InstanceInformationFilterKeyRESOURCE_TYPE InstanceInformationFilterKey = "RESOURCE_TYPE"
+
+	InstanceInformationFilterKeyASSOCIATION_STATUS InstanceInformationFilterKey = "ASSOCIATION_STATUS"
+
 	InstanceInformationFilterKeyINSTANCE_IDS InstanceInformationFilterKey = "INSTANCE_IDS"
 
 	InstanceInformationFilterKeyAGENT_VERSION InstanceInformationFilterKey = "AGENT_VERSION"
@@ -572,52 +576,50 @@ const (
 	InstanceInformationFilterKeyACTIVATION_IDS InstanceInformationFilterKey = "ACTIVATION_IDS"
 
 	InstanceInformationFilterKeyIAM_ROLE InstanceInformationFilterKey = "IAM_ROLE"
-
-	InstanceInformationFilterKeyRESOURCE_TYPE InstanceInformationFilterKey = "RESOURCE_TYPE"
-
-	InstanceInformationFilterKeyASSOCIATION_STATUS InstanceInformationFilterKey = "ASSOCIATION_STATUS"
 )
 
 // InstancePatchStateOperatorType represents the InstancePatchStateOperatorType enum type
 type InstancePatchStateOperatorType string
 
 const (
+	InstancePatchStateOperatorTypeGREATER_THAN InstancePatchStateOperatorType = "GREATER_THAN"
+
 	InstancePatchStateOperatorTypeEQUAL InstancePatchStateOperatorType = "EQUAL"
 
 	InstancePatchStateOperatorTypeNOT_EQUAL InstancePatchStateOperatorType = "NOT_EQUAL"
 
 	InstancePatchStateOperatorTypeLESS_THAN InstancePatchStateOperatorType = "LESS_THAN"
-
-	InstancePatchStateOperatorTypeGREATER_THAN InstancePatchStateOperatorType = "GREATER_THAN"
 )
 
 // InstancePropertyFilterKey represents the InstancePropertyFilterKey enum type
 type InstancePropertyFilterKey string
 
 const (
-	InstancePropertyFilterKeyRESOURCE_TYPE InstancePropertyFilterKey = "RESOURCE_TYPE"
-
-	InstancePropertyFilterKeyASSOCIATION_STATUS InstancePropertyFilterKey = "ASSOCIATION_STATUS"
-
 	InstancePropertyFilterKeyINSTANCE_IDS InstancePropertyFilterKey = "INSTANCE_IDS"
-
-	InstancePropertyFilterKeyACTIVATION_IDS InstancePropertyFilterKey = "ACTIVATION_IDS"
 
 	InstancePropertyFilterKeyAGENT_VERSION InstancePropertyFilterKey = "AGENT_VERSION"
 
 	InstancePropertyFilterKeyPING_STATUS InstancePropertyFilterKey = "PING_STATUS"
+
+	InstancePropertyFilterKeyACTIVATION_IDS InstancePropertyFilterKey = "ACTIVATION_IDS"
+
+	InstancePropertyFilterKeyASSOCIATION_STATUS InstancePropertyFilterKey = "ASSOCIATION_STATUS"
 
 	InstancePropertyFilterKeyPLATFORM_TYPES InstancePropertyFilterKey = "PLATFORM_TYPES"
 
 	InstancePropertyFilterKeyDOCUMENT_NAME InstancePropertyFilterKey = "DOCUMENT_NAME"
 
 	InstancePropertyFilterKeyIAM_ROLE InstancePropertyFilterKey = "IAM_ROLE"
+
+	InstancePropertyFilterKeyRESOURCE_TYPE InstancePropertyFilterKey = "RESOURCE_TYPE"
 )
 
 // InstancePropertyFilterOperator represents the InstancePropertyFilterOperator enum type
 type InstancePropertyFilterOperator string
 
 const (
+	InstancePropertyFilterOperatorLESS_THAN InstancePropertyFilterOperator = "LESS_THAN"
+
 	InstancePropertyFilterOperatorGREATER_THAN InstancePropertyFilterOperator = "GREATER_THAN"
 
 	InstancePropertyFilterOperatorEQUAL InstancePropertyFilterOperator = "EQUAL"
@@ -625,8 +627,6 @@ const (
 	InstancePropertyFilterOperatorNOT_EQUAL InstancePropertyFilterOperator = "NOT_EQUAL"
 
 	InstancePropertyFilterOperatorBEGIN_WITH InstancePropertyFilterOperator = "BEGIN_WITH"
-
-	InstancePropertyFilterOperatorLESS_THAN InstancePropertyFilterOperator = "LESS_THAN"
 )
 
 // InventoryAttributeDataType represents the InventoryAttributeDataType enum type
@@ -688,12 +688,6 @@ const (
 type MaintenanceWindowExecutionStatus string
 
 const (
-	MaintenanceWindowExecutionStatusInProgress MaintenanceWindowExecutionStatus = "InProgress"
-
-	MaintenanceWindowExecutionStatusSuccess MaintenanceWindowExecutionStatus = "Success"
-
-	MaintenanceWindowExecutionStatusFailed MaintenanceWindowExecutionStatus = "Failed"
-
 	MaintenanceWindowExecutionStatusTimedOut MaintenanceWindowExecutionStatus = "TimedOut"
 
 	MaintenanceWindowExecutionStatusCancelling MaintenanceWindowExecutionStatus = "Cancelling"
@@ -703,6 +697,12 @@ const (
 	MaintenanceWindowExecutionStatusSkippedOverlapping MaintenanceWindowExecutionStatus = "SkippedOverlapping"
 
 	MaintenanceWindowExecutionStatusPending MaintenanceWindowExecutionStatus = "Pending"
+
+	MaintenanceWindowExecutionStatusInProgress MaintenanceWindowExecutionStatus = "InProgress"
+
+	MaintenanceWindowExecutionStatusSuccess MaintenanceWindowExecutionStatus = "Success"
+
+	MaintenanceWindowExecutionStatusFailed MaintenanceWindowExecutionStatus = "Failed"
 )
 
 // MaintenanceWindowResourceType represents the MaintenanceWindowResourceType enum type
@@ -758,17 +758,17 @@ const (
 type NodeAttributeName string
 
 const (
-	NodeAttributeNamePLATFORM_VERSION NodeAttributeName = "PLATFORM_VERSION"
-
-	NodeAttributeNameREGION NodeAttributeName = "REGION"
-
-	NodeAttributeNameRESOURCE_TYPE NodeAttributeName = "RESOURCE_TYPE"
-
 	NodeAttributeNameAGENT_VERSION NodeAttributeName = "AGENT_VERSION"
 
 	NodeAttributeNamePLATFORM_NAME NodeAttributeName = "PLATFORM_NAME"
 
 	NodeAttributeNamePLATFORM_TYPE NodeAttributeName = "PLATFORM_TYPE"
+
+	NodeAttributeNamePLATFORM_VERSION NodeAttributeName = "PLATFORM_VERSION"
+
+	NodeAttributeNameREGION NodeAttributeName = "REGION"
+
+	NodeAttributeNameRESOURCE_TYPE NodeAttributeName = "RESOURCE_TYPE"
 )
 
 // NodeFilterKey represents the NodeFilterKey enum type
@@ -779,42 +779,42 @@ const (
 
 	NodeFilterKeyIP_ADDRESS NodeFilterKey = "IP_ADDRESS"
 
-	NodeFilterKeyCOMPUTER_NAME NodeFilterKey = "COMPUTER_NAME"
+	NodeFilterKeyMANAGED_STATUS NodeFilterKey = "MANAGED_STATUS"
+
+	NodeFilterKeyINSTANCE_ID NodeFilterKey = "INSTANCE_ID"
 
 	NodeFilterKeyINSTANCE_STATUS NodeFilterKey = "INSTANCE_STATUS"
 
-	NodeFilterKeyRESOURCE_TYPE NodeFilterKey = "RESOURCE_TYPE"
+	NodeFilterKeyPLATFORM_NAME NodeFilterKey = "PLATFORM_NAME"
 
-	NodeFilterKeyORGANIZATIONAL_UNIT_PATH NodeFilterKey = "ORGANIZATIONAL_UNIT_PATH"
+	NodeFilterKeyPLATFORM_VERSION NodeFilterKey = "PLATFORM_VERSION"
+
+	NodeFilterKeyRESOURCE_TYPE NodeFilterKey = "RESOURCE_TYPE"
 
 	NodeFilterKeyREGION NodeFilterKey = "REGION"
 
 	NodeFilterKeyAGENT_TYPE NodeFilterKey = "AGENT_TYPE"
 
-	NodeFilterKeyAGENT_VERSION NodeFilterKey = "AGENT_VERSION"
-
-	NodeFilterKeyINSTANCE_ID NodeFilterKey = "INSTANCE_ID"
-
-	NodeFilterKeyPLATFORM_NAME NodeFilterKey = "PLATFORM_NAME"
-
 	NodeFilterKeyPLATFORM_TYPE NodeFilterKey = "PLATFORM_TYPE"
 
-	NodeFilterKeyMANAGED_STATUS NodeFilterKey = "MANAGED_STATUS"
-
-	NodeFilterKeyPLATFORM_VERSION NodeFilterKey = "PLATFORM_VERSION"
-
 	NodeFilterKeyORGANIZATIONAL_UNIT_ID NodeFilterKey = "ORGANIZATIONAL_UNIT_ID"
+
+	NodeFilterKeyAGENT_VERSION NodeFilterKey = "AGENT_VERSION"
+
+	NodeFilterKeyCOMPUTER_NAME NodeFilterKey = "COMPUTER_NAME"
+
+	NodeFilterKeyORGANIZATIONAL_UNIT_PATH NodeFilterKey = "ORGANIZATIONAL_UNIT_PATH"
 )
 
 // NodeFilterOperatorType represents the NodeFilterOperatorType enum type
 type NodeFilterOperatorType string
 
 const (
-	NodeFilterOperatorTypeEQUAL NodeFilterOperatorType = "EQUAL"
-
 	NodeFilterOperatorTypeNOT_EQUAL NodeFilterOperatorType = "NOT_EQUAL"
 
 	NodeFilterOperatorTypeBEGIN_WITH NodeFilterOperatorType = "BEGIN_WITH"
+
+	NodeFilterOperatorTypeEQUAL NodeFilterOperatorType = "EQUAL"
 )
 
 // NodeTypeName represents the NodeTypeName enum type
@@ -828,6 +828,8 @@ const (
 type NotificationEvent string
 
 const (
+	NotificationEventIN_PROGRESS NotificationEvent = "IN_PROGRESS"
+
 	NotificationEventSUCCESS NotificationEvent = "SUCCESS"
 
 	NotificationEventTIMED_OUT NotificationEvent = "TIMED_OUT"
@@ -837,8 +839,6 @@ const (
 	NotificationEventFAILED NotificationEvent = "FAILED"
 
 	NotificationEventALL NotificationEvent = "ALL"
-
-	NotificationEventIN_PROGRESS NotificationEvent = "IN_PROGRESS"
 )
 
 // NotificationType represents the NotificationType enum type
@@ -854,52 +854,52 @@ const (
 type OperatingSystem string
 
 const (
-	OperatingSystemAmazonLinux OperatingSystem = "AmazonLinux"
-
-	OperatingSystemAmazonLinux2022 OperatingSystem = "AmazonLinux2022"
-
-	OperatingSystemUbuntu OperatingSystem = "Ubuntu"
-
-	OperatingSystemMacOS OperatingSystem = "MacOS"
-
-	OperatingSystemRocky_Linux OperatingSystem = "Rocky_Linux"
-
-	OperatingSystemWindows OperatingSystem = "Windows"
-
 	OperatingSystemAmazonLinux2 OperatingSystem = "AmazonLinux2"
 
 	OperatingSystemRedhatEnterpriseLinux OperatingSystem = "RedhatEnterpriseLinux"
 
+	OperatingSystemAmazonLinux2022 OperatingSystem = "AmazonLinux2022"
+
 	OperatingSystemSuse OperatingSystem = "Suse"
 
-	OperatingSystemDebian OperatingSystem = "Debian"
-
-	OperatingSystemCentOS OperatingSystem = "CentOS"
-
-	OperatingSystemOracleLinux OperatingSystem = "OracleLinux"
+	OperatingSystemRaspbian OperatingSystem = "Raspbian"
 
 	OperatingSystemAlmaLinux OperatingSystem = "AlmaLinux"
 
+	OperatingSystemAmazonLinux OperatingSystem = "AmazonLinux"
+
+	OperatingSystemCentOS OperatingSystem = "CentOS"
+
+	OperatingSystemDebian OperatingSystem = "Debian"
+
+	OperatingSystemRocky_Linux OperatingSystem = "Rocky_Linux"
+
 	OperatingSystemAmazonLinux2023 OperatingSystem = "AmazonLinux2023"
 
-	OperatingSystemRaspbian OperatingSystem = "Raspbian"
+	OperatingSystemWindows OperatingSystem = "Windows"
+
+	OperatingSystemUbuntu OperatingSystem = "Ubuntu"
+
+	OperatingSystemOracleLinux OperatingSystem = "OracleLinux"
+
+	OperatingSystemMacOS OperatingSystem = "MacOS"
 )
 
 // OpsFilterOperatorType represents the OpsFilterOperatorType enum type
 type OpsFilterOperatorType string
 
 const (
-	OpsFilterOperatorTypeLESS_THAN OpsFilterOperatorType = "LESS_THAN"
-
-	OpsFilterOperatorTypeGREATER_THAN OpsFilterOperatorType = "GREATER_THAN"
-
-	OpsFilterOperatorTypeEXISTS OpsFilterOperatorType = "EXISTS"
-
 	OpsFilterOperatorTypeEQUAL OpsFilterOperatorType = "EQUAL"
 
 	OpsFilterOperatorTypeNOT_EQUAL OpsFilterOperatorType = "NOT_EQUAL"
 
 	OpsFilterOperatorTypeBEGIN_WITH OpsFilterOperatorType = "BEGIN_WITH"
+
+	OpsFilterOperatorTypeLESS_THAN OpsFilterOperatorType = "LESS_THAN"
+
+	OpsFilterOperatorTypeGREATER_THAN OpsFilterOperatorType = "GREATER_THAN"
+
+	OpsFilterOperatorTypeEXISTS OpsFilterOperatorType = "EXISTS"
 )
 
 // OpsItemDataType represents the OpsItemDataType enum type
@@ -929,92 +929,92 @@ const (
 type OpsItemFilterKey string
 
 const (
-	OpsItemFilterKeyTITLE OpsItemFilterKey = "TITLE"
+	OpsItemFilterKeyCREATED_BY OpsItemFilterKey = "CREATED_BY"
 
-	OpsItemFilterKeyLAST_MODIFIED_TIME OpsItemFilterKey = "LAST_MODIFIED_TIME"
+	OpsItemFilterKeySOURCE OpsItemFilterKey = "SOURCE"
 
-	OpsItemFilterKeyRESOURCE_ID OpsItemFilterKey = "RESOURCE_ID"
+	OpsItemFilterKeyACTUAL_END_TIME OpsItemFilterKey = "ACTUAL_END_TIME"
 
-	OpsItemFilterKeyCHANGE_REQUEST_TEMPLATE OpsItemFilterKey = "CHANGE_REQUEST_TEMPLATE"
+	OpsItemFilterKeyPLANNED_START_TIME OpsItemFilterKey = "PLANNED_START_TIME"
+
+	OpsItemFilterKeyAUTOMATION_ID OpsItemFilterKey = "AUTOMATION_ID"
+
+	OpsItemFilterKeyACCESS_REQUEST_REQUESTER_ARN OpsItemFilterKey = "ACCESS_REQUEST_REQUESTER_ARN"
+
+	OpsItemFilterKeyCHANGE_REQUEST_APPROVER_NAME OpsItemFilterKey = "CHANGE_REQUEST_APPROVER_NAME"
+
+	OpsItemFilterKeySEVERITY OpsItemFilterKey = "SEVERITY"
+
+	OpsItemFilterKeyACCESS_REQUEST_APPROVER_ARN OpsItemFilterKey = "ACCESS_REQUEST_APPROVER_ARN"
 
 	OpsItemFilterKeySTATUS OpsItemFilterKey = "STATUS"
 
-	OpsItemFilterKeyOPERATIONAL_DATA OpsItemFilterKey = "OPERATIONAL_DATA"
-
-	OpsItemFilterKeyINSIGHT_TYPE OpsItemFilterKey = "INSIGHT_TYPE"
-
-	OpsItemFilterKeyACTUAL_END_TIME OpsItemFilterKey = "ACTUAL_END_TIME"
+	OpsItemFilterKeyOPERATIONAL_DATA_VALUE OpsItemFilterKey = "OPERATIONAL_DATA_VALUE"
 
 	OpsItemFilterKeyCATEGORY OpsItemFilterKey = "CATEGORY"
 
 	OpsItemFilterKeyACCESS_REQUEST_REQUESTER_ID OpsItemFilterKey = "ACCESS_REQUEST_REQUESTER_ID"
 
-	OpsItemFilterKeyPLANNED_START_TIME OpsItemFilterKey = "PLANNED_START_TIME"
-
-	OpsItemFilterKeyOPERATIONAL_DATA_VALUE OpsItemFilterKey = "OPERATIONAL_DATA_VALUE"
-
-	OpsItemFilterKeyACCESS_REQUEST_APPROVER_ARN OpsItemFilterKey = "ACCESS_REQUEST_APPROVER_ARN"
-
-	OpsItemFilterKeyCREATED_TIME OpsItemFilterKey = "CREATED_TIME"
-
-	OpsItemFilterKeyPLANNED_END_TIME OpsItemFilterKey = "PLANNED_END_TIME"
-
-	OpsItemFilterKeySEVERITY OpsItemFilterKey = "SEVERITY"
-
-	OpsItemFilterKeyOPSITEM_TYPE OpsItemFilterKey = "OPSITEM_TYPE"
-
-	OpsItemFilterKeyACCESS_REQUEST_REQUESTER_ARN OpsItemFilterKey = "ACCESS_REQUEST_REQUESTER_ARN"
-
-	OpsItemFilterKeyACCESS_REQUEST_IS_REPLICA OpsItemFilterKey = "ACCESS_REQUEST_IS_REPLICA"
+	OpsItemFilterKeyACCESS_REQUEST_SOURCE_REGION OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_REGION"
 
 	OpsItemFilterKeyACCESS_REQUEST_TARGET_RESOURCE_ID OpsItemFilterKey = "ACCESS_REQUEST_TARGET_RESOURCE_ID"
 
-	OpsItemFilterKeyCHANGE_REQUEST_TARGETS_RESOURCE_GROUP OpsItemFilterKey = "CHANGE_REQUEST_TARGETS_RESOURCE_GROUP"
+	OpsItemFilterKeyLAST_MODIFIED_TIME OpsItemFilterKey = "LAST_MODIFIED_TIME"
 
-	OpsItemFilterKeyCREATED_BY OpsItemFilterKey = "CREATED_BY"
-
-	OpsItemFilterKeyACCESS_REQUEST_SOURCE_ACCOUNT_ID OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_ACCOUNT_ID"
-
-	OpsItemFilterKeyCHANGE_REQUEST_APPROVER_ARN OpsItemFilterKey = "CHANGE_REQUEST_APPROVER_ARN"
-
-	OpsItemFilterKeyAUTOMATION_ID OpsItemFilterKey = "AUTOMATION_ID"
-
-	OpsItemFilterKeyACCESS_REQUEST_APPROVER_ID OpsItemFilterKey = "ACCESS_REQUEST_APPROVER_ID"
-
-	OpsItemFilterKeyACCESS_REQUEST_SOURCE_REGION OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_REGION"
+	OpsItemFilterKeyOPSITEM_TYPE OpsItemFilterKey = "OPSITEM_TYPE"
 
 	OpsItemFilterKeyCHANGE_REQUEST_REQUESTER_NAME OpsItemFilterKey = "CHANGE_REQUEST_REQUESTER_NAME"
 
-	OpsItemFilterKeyCHANGE_REQUEST_APPROVER_NAME OpsItemFilterKey = "CHANGE_REQUEST_APPROVER_NAME"
+	OpsItemFilterKeyCHANGE_REQUEST_APPROVER_ARN OpsItemFilterKey = "CHANGE_REQUEST_APPROVER_ARN"
+
+	OpsItemFilterKeyCHANGE_REQUEST_TEMPLATE OpsItemFilterKey = "CHANGE_REQUEST_TEMPLATE"
+
+	OpsItemFilterKeyTITLE OpsItemFilterKey = "TITLE"
+
+	OpsItemFilterKeyRESOURCE_ID OpsItemFilterKey = "RESOURCE_ID"
 
 	OpsItemFilterKeyACCOUNT_ID OpsItemFilterKey = "ACCOUNT_ID"
 
-	OpsItemFilterKeySOURCE OpsItemFilterKey = "SOURCE"
-
-	OpsItemFilterKeyPRIORITY OpsItemFilterKey = "PRIORITY"
-
-	OpsItemFilterKeyOPSITEM_ID OpsItemFilterKey = "OPSITEM_ID"
-
-	OpsItemFilterKeyACTUAL_START_TIME OpsItemFilterKey = "ACTUAL_START_TIME"
+	OpsItemFilterKeyCREATED_TIME OpsItemFilterKey = "CREATED_TIME"
 
 	OpsItemFilterKeyOPERATIONAL_DATA_KEY OpsItemFilterKey = "OPERATIONAL_DATA_KEY"
 
 	OpsItemFilterKeyACCESS_REQUEST_SOURCE_OPS_ITEM_ID OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_OPS_ITEM_ID"
 
 	OpsItemFilterKeyCHANGE_REQUEST_REQUESTER_ARN OpsItemFilterKey = "CHANGE_REQUEST_REQUESTER_ARN"
+
+	OpsItemFilterKeyINSIGHT_TYPE OpsItemFilterKey = "INSIGHT_TYPE"
+
+	OpsItemFilterKeyACTUAL_START_TIME OpsItemFilterKey = "ACTUAL_START_TIME"
+
+	OpsItemFilterKeyPLANNED_END_TIME OpsItemFilterKey = "PLANNED_END_TIME"
+
+	OpsItemFilterKeyOPERATIONAL_DATA OpsItemFilterKey = "OPERATIONAL_DATA"
+
+	OpsItemFilterKeyACCESS_REQUEST_IS_REPLICA OpsItemFilterKey = "ACCESS_REQUEST_IS_REPLICA"
+
+	OpsItemFilterKeyCHANGE_REQUEST_TARGETS_RESOURCE_GROUP OpsItemFilterKey = "CHANGE_REQUEST_TARGETS_RESOURCE_GROUP"
+
+	OpsItemFilterKeyPRIORITY OpsItemFilterKey = "PRIORITY"
+
+	OpsItemFilterKeyOPSITEM_ID OpsItemFilterKey = "OPSITEM_ID"
+
+	OpsItemFilterKeyACCESS_REQUEST_APPROVER_ID OpsItemFilterKey = "ACCESS_REQUEST_APPROVER_ID"
+
+	OpsItemFilterKeyACCESS_REQUEST_SOURCE_ACCOUNT_ID OpsItemFilterKey = "ACCESS_REQUEST_SOURCE_ACCOUNT_ID"
 )
 
 // OpsItemFilterOperator represents the OpsItemFilterOperator enum type
 type OpsItemFilterOperator string
 
 const (
-	OpsItemFilterOperatorGREATER_THAN OpsItemFilterOperator = "GREATER_THAN"
-
-	OpsItemFilterOperatorLESS_THAN OpsItemFilterOperator = "LESS_THAN"
-
 	OpsItemFilterOperatorEQUAL OpsItemFilterOperator = "EQUAL"
 
 	OpsItemFilterOperatorCONTAINS OpsItemFilterOperator = "CONTAINS"
+
+	OpsItemFilterOperatorGREATER_THAN OpsItemFilterOperator = "GREATER_THAN"
+
+	OpsItemFilterOperatorLESS_THAN OpsItemFilterOperator = "LESS_THAN"
 )
 
 // OpsItemRelatedItemsFilterKey represents the OpsItemRelatedItemsFilterKey enum type
@@ -1039,29 +1039,7 @@ const (
 type OpsItemStatus string
 
 const (
-	OpsItemStatusCHANGE_CALENDAR_OVERRIDE_APPROVED OpsItemStatus = "CHANGE_CALENDAR_OVERRIDE_APPROVED"
-
-	OpsItemStatusIN_PROGRESS OpsItemStatus = "IN_PROGRESS"
-
-	OpsItemStatusCANCELLED OpsItemStatus = "CANCELLED"
-
-	OpsItemStatusSCHEDULED OpsItemStatus = "SCHEDULED"
-
-	OpsItemStatusCHANGE_CALENDAR_OVERRIDE_REJECTED OpsItemStatus = "CHANGE_CALENDAR_OVERRIDE_REJECTED"
-
-	OpsItemStatusCLOSED OpsItemStatus = "CLOSED"
-
-	OpsItemStatusPENDING OpsItemStatus = "PENDING"
-
-	OpsItemStatusCOMPLETED_WITH_FAILURE OpsItemStatus = "COMPLETED_WITH_FAILURE"
-
-	OpsItemStatusPENDING_APPROVAL OpsItemStatus = "PENDING_APPROVAL"
-
-	OpsItemStatusAPPROVED OpsItemStatus = "APPROVED"
-
-	OpsItemStatusREVOKED OpsItemStatus = "REVOKED"
-
-	OpsItemStatusREJECTED OpsItemStatus = "REJECTED"
+	OpsItemStatusTIMED_OUT OpsItemStatus = "TIMED_OUT"
 
 	OpsItemStatusFAILED OpsItemStatus = "FAILED"
 
@@ -1069,15 +1047,37 @@ const (
 
 	OpsItemStatusRUNBOOK_IN_PROGRESS OpsItemStatus = "RUNBOOK_IN_PROGRESS"
 
-	OpsItemStatusPENDING_CHANGE_CALENDAR_OVERRIDE OpsItemStatus = "PENDING_CHANGE_CALENDAR_OVERRIDE"
+	OpsItemStatusREVOKED OpsItemStatus = "REVOKED"
 
-	OpsItemStatusOPEN OpsItemStatus = "OPEN"
+	OpsItemStatusIN_PROGRESS OpsItemStatus = "IN_PROGRESS"
 
 	OpsItemStatusRESOLVED OpsItemStatus = "RESOLVED"
 
-	OpsItemStatusTIMED_OUT OpsItemStatus = "TIMED_OUT"
-
 	OpsItemStatusCANCELLING OpsItemStatus = "CANCELLING"
+
+	OpsItemStatusCANCELLED OpsItemStatus = "CANCELLED"
+
+	OpsItemStatusREJECTED OpsItemStatus = "REJECTED"
+
+	OpsItemStatusCLOSED OpsItemStatus = "CLOSED"
+
+	OpsItemStatusOPEN OpsItemStatus = "OPEN"
+
+	OpsItemStatusPENDING OpsItemStatus = "PENDING"
+
+	OpsItemStatusSCHEDULED OpsItemStatus = "SCHEDULED"
+
+	OpsItemStatusPENDING_CHANGE_CALENDAR_OVERRIDE OpsItemStatus = "PENDING_CHANGE_CALENDAR_OVERRIDE"
+
+	OpsItemStatusCHANGE_CALENDAR_OVERRIDE_APPROVED OpsItemStatus = "CHANGE_CALENDAR_OVERRIDE_APPROVED"
+
+	OpsItemStatusCHANGE_CALENDAR_OVERRIDE_REJECTED OpsItemStatus = "CHANGE_CALENDAR_OVERRIDE_REJECTED"
+
+	OpsItemStatusAPPROVED OpsItemStatus = "APPROVED"
+
+	OpsItemStatusCOMPLETED_WITH_FAILURE OpsItemStatus = "COMPLETED_WITH_FAILURE"
+
+	OpsItemStatusPENDING_APPROVAL OpsItemStatus = "PENDING_APPROVAL"
 )
 
 // ParameterTier represents the ParameterTier enum type
@@ -1126,6 +1126,10 @@ const (
 type PatchComplianceDataState string
 
 const (
+	PatchComplianceDataStateInstalledOther PatchComplianceDataState = "InstalledOther"
+
+	PatchComplianceDataStateInstalledPendingReboot PatchComplianceDataState = "InstalledPendingReboot"
+
 	PatchComplianceDataStateInstalledRejected PatchComplianceDataState = "InstalledRejected"
 
 	PatchComplianceDataStateMissing PatchComplianceDataState = "Missing"
@@ -1137,16 +1141,14 @@ const (
 	PatchComplianceDataStateAvailableSecurityUpdate PatchComplianceDataState = "AvailableSecurityUpdate"
 
 	PatchComplianceDataStateInstalled PatchComplianceDataState = "Installed"
-
-	PatchComplianceDataStateInstalledOther PatchComplianceDataState = "InstalledOther"
-
-	PatchComplianceDataStateInstalledPendingReboot PatchComplianceDataState = "InstalledPendingReboot"
 )
 
 // PatchComplianceLevel represents the PatchComplianceLevel enum type
 type PatchComplianceLevel string
 
 const (
+	PatchComplianceLevelHigh PatchComplianceLevel = "High"
+
 	PatchComplianceLevelMedium PatchComplianceLevel = "Medium"
 
 	PatchComplianceLevelLow PatchComplianceLevel = "Low"
@@ -1156,51 +1158,43 @@ const (
 	PatchComplianceLevelUnspecified PatchComplianceLevel = "Unspecified"
 
 	PatchComplianceLevelCritical PatchComplianceLevel = "Critical"
-
-	PatchComplianceLevelHigh PatchComplianceLevel = "High"
 )
 
 // PatchComplianceStatus represents the PatchComplianceStatus enum type
 type PatchComplianceStatus string
 
 const (
-	PatchComplianceStatusNonCompliant PatchComplianceStatus = "NonCompliant"
-
 	PatchComplianceStatusCompliant PatchComplianceStatus = "Compliant"
+
+	PatchComplianceStatusNonCompliant PatchComplianceStatus = "NonCompliant"
 )
 
 // PatchDeploymentStatus represents the PatchDeploymentStatus enum type
 type PatchDeploymentStatus string
 
 const (
-	PatchDeploymentStatusExplicitRejected PatchDeploymentStatus = "ExplicitRejected"
-
-	PatchDeploymentStatusApproved PatchDeploymentStatus = "Approved"
-
 	PatchDeploymentStatusPendingApproval PatchDeploymentStatus = "PendingApproval"
 
 	PatchDeploymentStatusExplicitApproved PatchDeploymentStatus = "ExplicitApproved"
+
+	PatchDeploymentStatusExplicitRejected PatchDeploymentStatus = "ExplicitRejected"
+
+	PatchDeploymentStatusApproved PatchDeploymentStatus = "Approved"
 )
 
 // PatchFilterKey represents the PatchFilterKey enum type
 type PatchFilterKey string
 
 const (
-	PatchFilterKeyRepository PatchFilterKey = "Repository"
+	PatchFilterKeyPriority PatchFilterKey = "Priority"
 
 	PatchFilterKeyAdvisoryId PatchFilterKey = "AdvisoryId"
 
-	PatchFilterKeyPatchSet PatchFilterKey = "PatchSet"
-
-	PatchFilterKeyProduct PatchFilterKey = "Product"
-
-	PatchFilterKeyMsrcSeverity PatchFilterKey = "MsrcSeverity"
-
-	PatchFilterKeyArch PatchFilterKey = "Arch"
-
 	PatchFilterKeyBugzillaId PatchFilterKey = "BugzillaId"
 
-	PatchFilterKeyCVEId PatchFilterKey = "CVEId"
+	PatchFilterKeyProductFamily PatchFilterKey = "ProductFamily"
+
+	PatchFilterKeyClassification PatchFilterKey = "Classification"
 
 	PatchFilterKeyName PatchFilterKey = "Name"
 
@@ -1208,21 +1202,27 @@ const (
 
 	PatchFilterKeySection PatchFilterKey = "Section"
 
-	PatchFilterKeyRelease PatchFilterKey = "Release"
-
-	PatchFilterKeyProductFamily PatchFilterKey = "ProductFamily"
-
-	PatchFilterKeyClassification PatchFilterKey = "Classification"
-
-	PatchFilterKeySeverity PatchFilterKey = "Severity"
-
-	PatchFilterKeySecurity PatchFilterKey = "Security"
-
-	PatchFilterKeyVersion PatchFilterKey = "Version"
+	PatchFilterKeyCVEId PatchFilterKey = "CVEId"
 
 	PatchFilterKeyEpoch PatchFilterKey = "Epoch"
 
-	PatchFilterKeyPriority PatchFilterKey = "Priority"
+	PatchFilterKeyMsrcSeverity PatchFilterKey = "MsrcSeverity"
+
+	PatchFilterKeyRepository PatchFilterKey = "Repository"
+
+	PatchFilterKeySeverity PatchFilterKey = "Severity"
+
+	PatchFilterKeyVersion PatchFilterKey = "Version"
+
+	PatchFilterKeyPatchSet PatchFilterKey = "PatchSet"
+
+	PatchFilterKeyRelease PatchFilterKey = "Release"
+
+	PatchFilterKeyArch PatchFilterKey = "Arch"
+
+	PatchFilterKeyProduct PatchFilterKey = "Product"
+
+	PatchFilterKeySecurity PatchFilterKey = "Security"
 )
 
 // PatchOperationType represents the PatchOperationType enum type
@@ -1311,16 +1311,6 @@ const (
 type ResourceTypeForTagging string
 
 const (
-	ResourceTypeForTaggingMAINTENANCE_WINDOW ResourceTypeForTagging = "MAINTENANCE_WINDOW"
-
-	ResourceTypeForTaggingPARAMETER ResourceTypeForTagging = "PARAMETER"
-
-	ResourceTypeForTaggingPATCH_BASELINE ResourceTypeForTagging = "PATCH_BASELINE"
-
-	ResourceTypeForTaggingOPS_ITEM ResourceTypeForTagging = "OPS_ITEM"
-
-	ResourceTypeForTaggingOPSMETADATA ResourceTypeForTagging = "OPSMETADATA"
-
 	ResourceTypeForTaggingAUTOMATION ResourceTypeForTagging = "AUTOMATION"
 
 	ResourceTypeForTaggingASSOCIATION ResourceTypeForTagging = "ASSOCIATION"
@@ -1328,27 +1318,35 @@ const (
 	ResourceTypeForTaggingDOCUMENT ResourceTypeForTagging = "DOCUMENT"
 
 	ResourceTypeForTaggingMANAGED_INSTANCE ResourceTypeForTagging = "MANAGED_INSTANCE"
+
+	ResourceTypeForTaggingMAINTENANCE_WINDOW ResourceTypeForTagging = "MAINTENANCE_WINDOW"
+
+	ResourceTypeForTaggingOPSMETADATA ResourceTypeForTagging = "OPSMETADATA"
+
+	ResourceTypeForTaggingPARAMETER ResourceTypeForTagging = "PARAMETER"
+
+	ResourceTypeForTaggingPATCH_BASELINE ResourceTypeForTagging = "PATCH_BASELINE"
+
+	ResourceTypeForTaggingOPS_ITEM ResourceTypeForTagging = "OPS_ITEM"
 )
 
 // ReviewStatus represents the ReviewStatus enum type
 type ReviewStatus string
 
 const (
-	ReviewStatusREJECTED ReviewStatus = "REJECTED"
-
 	ReviewStatusAPPROVED ReviewStatus = "APPROVED"
 
 	ReviewStatusNOT_REVIEWED ReviewStatus = "NOT_REVIEWED"
 
 	ReviewStatusPENDING ReviewStatus = "PENDING"
+
+	ReviewStatusREJECTED ReviewStatus = "REJECTED"
 )
 
 // SessionFilterKey represents the SessionFilterKey enum type
 type SessionFilterKey string
 
 const (
-	SessionFilterKeySESSION_ID SessionFilterKey = "SESSION_ID"
-
 	SessionFilterKeyACCESS_TYPE SessionFilterKey = "ACCESS_TYPE"
 
 	SessionFilterKeyINVOKED_AFTER SessionFilterKey = "INVOKED_AFTER"
@@ -1360,6 +1358,8 @@ const (
 	SessionFilterKeyOWNER SessionFilterKey = "OWNER"
 
 	SessionFilterKeySTATUS SessionFilterKey = "STATUS"
+
+	SessionFilterKeySESSION_ID SessionFilterKey = "SESSION_ID"
 )
 
 // SessionState represents the SessionState enum type
@@ -1375,10 +1375,6 @@ const (
 type SessionStatus string
 
 const (
-	SessionStatusCONNECTING SessionStatus = "CONNECTING"
-
-	SessionStatusDISCONNECTED SessionStatus = "DISCONNECTED"
-
 	SessionStatusTERMINATED SessionStatus = "TERMINATED"
 
 	SessionStatusTERMINATING SessionStatus = "TERMINATING"
@@ -1386,16 +1382,16 @@ const (
 	SessionStatusFAILED SessionStatus = "FAILED"
 
 	SessionStatusCONNECTED SessionStatus = "CONNECTED"
+
+	SessionStatusCONNECTING SessionStatus = "CONNECTING"
+
+	SessionStatusDISCONNECTED SessionStatus = "DISCONNECTED"
 )
 
 // SignalType represents the SignalType enum type
 type SignalType string
 
 const (
-	SignalTypeSTART_STEP SignalType = "START_STEP"
-
-	SignalTypeSTOP_STEP SignalType = "STOP_STEP"
-
 	SignalTypeRESUME SignalType = "RESUME"
 
 	SignalTypeREVOKE SignalType = "REVOKE"
@@ -1403,40 +1399,44 @@ const (
 	SignalTypeAPPROVE SignalType = "APPROVE"
 
 	SignalTypeREJECT SignalType = "REJECT"
+
+	SignalTypeSTART_STEP SignalType = "START_STEP"
+
+	SignalTypeSTOP_STEP SignalType = "STOP_STEP"
 )
 
 // SourceType represents the SourceType enum type
 type SourceType string
 
 const (
-	SourceTypeAWS_SSM_MANAGEDINSTANCE SourceType = "AWS_SSM_MANAGEDINSTANCE"
-
 	SourceTypeAWS_EC2_INSTANCE SourceType = "AWS_EC2_INSTANCE"
 
 	SourceTypeAWS_IOT_THING SourceType = "AWS_IOT_THING"
+
+	SourceTypeAWS_SSM_MANAGEDINSTANCE SourceType = "AWS_SSM_MANAGEDINSTANCE"
 )
 
 // StepExecutionFilterKey represents the StepExecutionFilterKey enum type
 type StepExecutionFilterKey string
 
 const (
-	StepExecutionFilterKeySTEP_NAME StepExecutionFilterKey = "STEP_NAME"
+	StepExecutionFilterKeySTART_TIME_BEFORE StepExecutionFilterKey = "START_TIME_BEFORE"
+
+	StepExecutionFilterKeySTART_TIME_AFTER StepExecutionFilterKey = "START_TIME_AFTER"
 
 	StepExecutionFilterKeyACTION StepExecutionFilterKey = "ACTION"
 
 	StepExecutionFilterKeyPARENT_STEP_ITERATION StepExecutionFilterKey = "PARENT_STEP_ITERATION"
 
-	StepExecutionFilterKeySTART_TIME_BEFORE StepExecutionFilterKey = "START_TIME_BEFORE"
-
-	StepExecutionFilterKeySTART_TIME_AFTER StepExecutionFilterKey = "START_TIME_AFTER"
-
 	StepExecutionFilterKeySTEP_EXECUTION_STATUS StepExecutionFilterKey = "STEP_EXECUTION_STATUS"
+
+	StepExecutionFilterKeySTEP_EXECUTION_ID StepExecutionFilterKey = "STEP_EXECUTION_ID"
+
+	StepExecutionFilterKeySTEP_NAME StepExecutionFilterKey = "STEP_NAME"
 
 	StepExecutionFilterKeyPARENT_STEP_EXECUTION_ID StepExecutionFilterKey = "PARENT_STEP_EXECUTION_ID"
 
 	StepExecutionFilterKeyPARENT_STEP_ITERATOR_VALUE StepExecutionFilterKey = "PARENT_STEP_ITERATOR_VALUE"
-
-	StepExecutionFilterKeySTEP_EXECUTION_ID StepExecutionFilterKey = "STEP_EXECUTION_ID"
 )
 
 // StopType represents the StopType enum type

@@ -2,6 +2,7 @@ package ssm_test
 
 import (
 	"context"
+	"github.com/nandemo-ya/kecs/controlplane/internal/common"
 	"fmt"
 	"time"
 
@@ -54,7 +55,7 @@ var _ = Describe("SSM Integration", func() {
 					Value:            &paramValue,
 					Type:             &paramType,
 					Version:          &version,
-					LastModifiedDate: &now,
+					LastModifiedDate: &common.UnixTime{Time: now},
 				},
 			}
 
@@ -87,7 +88,7 @@ var _ = Describe("SSM Integration", func() {
 					Value:            &paramValue,
 					Type:             &paramType,
 					Version:          &version,
-					LastModifiedDate: &now,
+					LastModifiedDate: &common.UnixTime{Time: now},
 				},
 			}
 
@@ -107,7 +108,7 @@ var _ = Describe("SSM Integration", func() {
 					Value:            &newValue,
 					Type:             &paramType2,
 					Version:          &version2,
-					LastModifiedDate: &now2,
+					LastModifiedDate: &common.UnixTime{Time: now2},
 				},
 			}
 
@@ -216,7 +217,7 @@ var _ = Describe("SSM Integration", func() {
 					Value:            &paramValue,
 					Type:             &paramType,
 					Version:          &version,
-					LastModifiedDate: &now,
+					LastModifiedDate: &common.UnixTime{Time: now},
 				},
 			}
 
@@ -292,7 +293,7 @@ var _ = Describe("SSM Integration", func() {
 						Value:            &value,
 						Type:             &paramType,
 						Version:          &version,
-						LastModifiedDate: &now,
+						LastModifiedDate: &common.UnixTime{Time: now},
 					},
 				}
 			}
@@ -327,7 +328,7 @@ var _ = Describe("SSM Integration", func() {
 					Value:            &value0,
 					Type:             &paramType0,
 					Version:          &version0,
-					LastModifiedDate: &now0,
+					LastModifiedDate: &common.UnixTime{Time: now0},
 				},
 			}
 

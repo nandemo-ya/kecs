@@ -136,7 +136,7 @@ func (i *integration) GetSecret(ctx context.Context, secretName string) (*Secret
 		Name:         getString(result.Name),
 		VersionId:    getString(result.VersionId),
 		VersionStage: result.VersionStages,
-		CreatedDate:  getTime(result.CreatedDate),
+		CreatedDate:  getTime(result.CreatedDate.ToTime()),
 	}
 
 	// Handle string vs binary secret

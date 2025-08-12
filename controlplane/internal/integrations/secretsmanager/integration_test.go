@@ -2,6 +2,7 @@ package secretsmanager_test
 
 import (
 	"context"
+	"github.com/nandemo-ya/kecs/controlplane/internal/common"
 	"fmt"
 	"time"
 
@@ -54,7 +55,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				SecretString:  &secretValuePtr,
 				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   &createdDatePtr,
+				CreatedDate:   &common.UnixTime{Time: createdDatePtr},
 			}
 
 			// Get secret
@@ -80,7 +81,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				SecretBinary:  binaryData,
 				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   &createdDatePtr,
+				CreatedDate:   &common.UnixTime{Time: createdDatePtr},
 			}
 
 			// Get secret
@@ -111,7 +112,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				SecretString:  &secretValuePtr,
 				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   &createdDatePtr,
+				CreatedDate:   &common.UnixTime{Time: createdDatePtr},
 			}
 
 			// First call
@@ -130,7 +131,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				SecretString:  &newValuePtr,
 				VersionId:     &versionIdPtr2,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   &createdDatePtr2,
+				CreatedDate:   &common.UnixTime{Time: createdDatePtr2},
 			}
 
 			// Second call should return cached value
@@ -155,7 +156,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				SecretString:  &jsonValuePtr,
 				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   &createdDatePtr,
+				CreatedDate:   &common.UnixTime{Time: createdDatePtr},
 			}
 
 			// Get specific key
@@ -177,7 +178,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				SecretString:  &secretValuePtr,
 				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   &createdDatePtr,
+				CreatedDate:   &common.UnixTime{Time: createdDatePtr},
 			}
 
 			// Get without key
@@ -199,7 +200,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				SecretString:  &jsonValuePtr,
 				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   &createdDatePtr,
+				CreatedDate:   &common.UnixTime{Time: createdDatePtr},
 			}
 
 			// Try to get non-existent key
@@ -330,7 +331,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				SecretString:  &secretValuePtr,
 				VersionId:     &versionIdPtr,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   &createdDatePtr,
+				CreatedDate:   &common.UnixTime{Time: createdDatePtr},
 			}
 
 			// Sync secret
@@ -404,7 +405,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				SecretString:  &value1,
 				VersionId:     &version1,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   &date1,
+				CreatedDate:   &common.UnixTime{Time: date1},
 			}
 			name2 := "my-app/batch/secret2"
 			value2 := `{"username": "admin", "password": "secret123"}`
@@ -415,7 +416,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				SecretString:  &value2,
 				VersionId:     &version2,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   &date2,
+				CreatedDate:   &common.UnixTime{Time: date2},
 			}
 			name3 := "my-app/batch/secret3"
 			value3 := "value-3"
@@ -426,7 +427,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				SecretString:  &value3,
 				VersionId:     &version3,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   &date3,
+				CreatedDate:   &common.UnixTime{Time: date3},
 			}
 
 			// Sync all secrets
@@ -466,7 +467,7 @@ var _ = Describe("Secrets Manager Integration", func() {
 				SecretString:  &valueExists,
 				VersionId:     &versionExists,
 				VersionStages: []string{"AWSCURRENT"},
-				CreatedDate:   &dateExists,
+				CreatedDate:   &common.UnixTime{Time: dateExists},
 			}
 
 			// Sync secrets

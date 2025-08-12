@@ -6,6 +6,10 @@ package generated
 type FilterNameStringType string
 
 const (
+	FilterNameStringTypetag_key FilterNameStringType = "tag_key"
+
+	FilterNameStringTypetag_value FilterNameStringType = "tag_value"
+
 	FilterNameStringTypeprimary_region FilterNameStringType = "primary_region"
 
 	FilterNameStringTypeowning_service FilterNameStringType = "owning_service"
@@ -15,10 +19,6 @@ const (
 	FilterNameStringTypedescription FilterNameStringType = "description"
 
 	FilterNameStringTypename FilterNameStringType = "name"
-
-	FilterNameStringTypetag_key FilterNameStringType = "tag_key"
-
-	FilterNameStringTypetag_value FilterNameStringType = "tag_value"
 )
 
 // SortOrderType represents the SortOrderType enum type
@@ -34,9 +34,9 @@ const (
 type StatusType string
 
 const (
-	StatusTypeFailed StatusType = "Failed"
-
 	StatusTypeInProgress StatusType = "InProgress"
 
 	StatusTypeInSync StatusType = "InSync"
+
+	StatusTypeFailed StatusType = "Failed"
 )
