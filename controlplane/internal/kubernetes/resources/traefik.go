@@ -25,7 +25,7 @@ type TraefikResources struct {
 	ClusterRole        *rbacv1.ClusterRole
 	ClusterRoleBinding *rbacv1.ClusterRoleBinding
 	ConfigMap          *corev1.ConfigMap
-	DynamicConfigMap   *corev1.ConfigMap  // Dynamic routing configuration
+	DynamicConfigMap   *corev1.ConfigMap // Dynamic routing configuration
 	Services           []*corev1.Service
 	Deployment         *appsv1.Deployment
 }
@@ -35,24 +35,24 @@ type TraefikConfig struct {
 	// Image configuration
 	Image           string
 	ImagePullPolicy corev1.PullPolicy
-	
+
 	// Resource limits
 	CPURequest    string
 	MemoryRequest string
 	CPULimit      string
 	MemoryLimit   string
-	
+
 	// Ports
-	APIPort      int32  // HTTP port for ECS API
-	APINodePort  int32  // NodePort for ECS API (optional)
-	AWSPort      int32  // LocalStack port (4566)
-	AWSNodePort  int32  // NodePort for LocalStack
-	
+	APIPort     int32 // HTTP port for ECS API
+	APINodePort int32 // NodePort for ECS API (optional)
+	AWSPort     int32 // LocalStack port (4566)
+	AWSNodePort int32 // NodePort for LocalStack
+
 	// Features
-	Debug        bool
-	LogLevel     string
-	AccessLog    bool
-	Metrics      bool
+	Debug     bool
+	LogLevel  string
+	AccessLog bool
+	Metrics   bool
 }
 
 // DefaultTraefikConfig returns default configuration
@@ -298,15 +298,15 @@ func createTraefikDeployment(config *TraefikConfig) *appsv1.Deployment {
 	runAsUser := int64(65532)
 	runAsNonRoot := true
 	readOnlyRootFilesystem := true
-	
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      TraefikName,
 			Namespace: ControlPlaneNamespace,
 			Labels: map[string]string{
-				LabelManagedBy: "true",
-				LabelComponent: "gateway",
-				LabelApp:       TraefikName,
+				LabelManagedBy:     "true",
+				LabelComponent:     "gateway",
+				LabelApp:           TraefikName,
 				"kecs.dev/version": "v2",
 			},
 		},

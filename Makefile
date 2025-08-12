@@ -171,7 +171,7 @@ hot-reload: docker-push-dev
 	fi; \
 	echo "Updating controlplane in cluster: $$CLUSTER_NAME"; \
 	kubectl config use-context "k3d-$$CLUSTER_NAME" && \
-	kubectl set image deployment/kecs-controlplane kecs=k3d-kecs-registry:5000/nandemo-ya/kecs-controlplane:$(VERSION) -n kecs-system && \
+	kubectl set image deployment/kecs-controlplane controlplane=k3d-kecs-registry:5000/nandemo-ya/kecs-controlplane:$(VERSION) -n kecs-system && \
 	kubectl rollout status deployment/kecs-controlplane -n kecs-system && \
 	echo "✅ Controlplane updated successfully!"
 

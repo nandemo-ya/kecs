@@ -66,7 +66,7 @@ func (tm *TaskManager) InitializeClient() error {
 	if tm.Clientset != nil {
 		return nil // Already initialized
 	}
-	
+
 	// Skip initialization in test mode
 	if os.Getenv("KECS_TEST_MODE") == "true" {
 		logging.Debug("Test mode enabled - skipping kubernetes client initialization")
@@ -103,7 +103,7 @@ func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *st
 		// Don't override LastStatus - keep what was set by the caller
 		task.Connectivity = "CONNECTED"
 		task.ConnectivityAt = &task.CreatedAt
-		
+
 		// Simulate container and network information for test mode
 		if p := pod; p != nil {
 			containers := tm.createTestContainers(p, task)
@@ -113,7 +113,7 @@ func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *st
 					task.Containers = string(containersJSON)
 				}
 			}
-			
+
 			// Check for awsvpc network mode and create attachments
 			if networkMode, ok := p.Annotations["ecs.amazonaws.com/network-mode"]; ok && networkMode == "awsvpc" {
 				attachments := tm.createTestNetworkAttachments(p)
@@ -125,15 +125,15 @@ func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *st
 				}
 			}
 		}
-		
+
 		// Store task in database
 		if err := tm.storage.TaskStore().Create(ctx, task); err != nil {
 			return fmt.Errorf("failed to store task: %w", err)
 		}
-		
+
 		return nil
 	}
-	
+
 	// Create secrets first if any
 	if len(secrets) > 0 {
 		if err := tm.createSecrets(ctx, pod.Namespace, secrets); err != nil {
@@ -481,10 +481,10 @@ func ptr(s string) *string {
 // createTestContainers creates container information for test mode
 func (tm *TaskManager) createTestContainers(pod *corev1.Pod, task *storage.Task) []types.Container {
 	var containers []types.Container
-	
+
 	// Use a test IP address
 	podIP := "10.0.0.1"
-	
+
 	for _, container := range pod.Spec.Containers {
 		testContainer := types.Container{
 			Name:         container.Name,
@@ -493,7 +493,7 @@ func (tm *TaskManager) createTestContainers(pod *corev1.Pod, task *storage.Task)
 			Image:        container.Image,
 			LastStatus:   "PENDING",
 		}
-		
+
 		// Add network interfaces for awsvpc mode
 		if networkMode := pod.Annotations["ecs.amazonaws.com/network-mode"]; networkMode == "awsvpc" {
 			testContainer.NetworkInterfaces = []types.NetworkInterface{
@@ -503,7 +503,7 @@ func (tm *TaskManager) createTestContainers(pod *corev1.Pod, task *storage.Task)
 				},
 			}
 		}
-		
+
 		// Add network bindings from container ports
 		for _, port := range container.Ports {
 			testContainer.NetworkBindings = append(testContainer.NetworkBindings, types.NetworkBinding{
@@ -512,21 +512,21 @@ func (tm *TaskManager) createTestContainers(pod *corev1.Pod, task *storage.Task)
 				BindIP:        podIP,
 			})
 		}
-		
+
 		containers = append(containers, testContainer)
 	}
-	
+
 	return containers
 }
 
 // createTestNetworkAttachments creates network attachments for test mode
 func (tm *TaskManager) createTestNetworkAttachments(pod *corev1.Pod) []types.Attachment {
 	var attachments []types.Attachment
-	
+
 	// Get network configuration from annotations
 	subnets := pod.Annotations["ecs.amazonaws.com/subnets"]
 	privateIP := "10.0.0.1"
-	
+
 	// Create elastic network interface attachment
 	var details []types.KeyValuePair
 	if subnets != "" {
@@ -554,14 +554,14 @@ func (tm *TaskManager) createTestNetworkAttachments(pod *corev1.Pod) []types.Att
 			Value: ptr(privateIP),
 		},
 	)
-	
+
 	attachment := types.Attachment{
 		Id:      ptr(fmt.Sprintf("eni-attach-%s", pod.UID)),
 		Type:    ptr("ElasticNetworkInterface"),
 		Status:  ptr("ATTACHED"),
 		Details: details,
 	}
-	
+
 	attachments = append(attachments, attachment)
 	return attachments
 }

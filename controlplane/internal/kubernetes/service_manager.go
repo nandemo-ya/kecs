@@ -38,19 +38,19 @@ func NewServiceManager(storage storage.Storage, clusterManager ClusterManager) *
 			taskManager = tm
 		}
 	}
-	
+
 	sm := &ServiceManager{
 		storage:        storage,
 		clusterManager: clusterManager,
 		taskManager:    taskManager,
 	}
-	
+
 	// Initialize kubernetes client
 	if err := sm.initializeClient(); err != nil {
 		logging.Warn("Failed to initialize kubernetes client", "error", err)
 		// Don't fail creation - client will be initialized on first use
 	}
-	
+
 	return sm
 }
 
@@ -59,13 +59,13 @@ func (sm *ServiceManager) initializeClient() error {
 	if sm.clientset != nil {
 		return nil // Already initialized
 	}
-	
+
 	// Check if running in test mode
 	if config.GetBool("features.testMode") {
 		logging.Debug("Test mode enabled - skipping kubernetes client initialization")
 		return nil
 	}
-	
+
 	// Try in-cluster config first
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
@@ -75,12 +75,12 @@ func (sm *ServiceManager) initializeClient() error {
 			return fmt.Errorf("failed to get kubernetes config: %w", err)
 		}
 	}
-	
+
 	clientset, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
-	
+
 	sm.clientset = clientset
 	logging.Debug("ServiceManager kubernetes client initialized")
 	return nil
@@ -150,10 +150,10 @@ func (sm *ServiceManager) CreateService(
 	if err := sm.initializeClient(); err != nil {
 		return fmt.Errorf("failed to initialize kubernetes client: %w", err)
 	}
-	
+
 	// Use the service manager's client
 	kubeClient := sm.clientset
-	
+
 	logging.Info("Kubernetes client initialized, proceeding with deployment creation",
 		"service", storageService.ServiceName,
 		"clientNil", kubeClient == nil)
@@ -300,7 +300,7 @@ func (sm *ServiceManager) UpdateService(
 	if err := sm.initializeClient(); err != nil {
 		return fmt.Errorf("failed to initialize kubernetes client: %w", err)
 	}
-	
+
 	// Use the service manager's client
 	kubeClient := sm.clientset
 
@@ -391,7 +391,7 @@ func (sm *ServiceManager) DeleteService(
 	if err := sm.initializeClient(); err != nil {
 		return fmt.Errorf("failed to initialize kubernetes client: %w", err)
 	}
-	
+
 	// Use the service manager's client
 	kubeClient := sm.clientset
 
@@ -627,7 +627,7 @@ func (sm *ServiceManager) watchServicePods(ctx context.Context, deployment *apps
 
 	// Use labels to watch pods for this deployment
 	labelSelector := fmt.Sprintf("app=%s", deployment.Name)
-	
+
 	// Get clientset
 	var clientset kubernetes.Interface
 	if sm.clientset != nil {
@@ -689,9 +689,9 @@ func (sm *ServiceManager) registerPodAsTask(ctx context.Context, pod *corev1.Pod
 	}
 
 	// Check if task already exists for this pod
-	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", 
+	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s",
 		service.Region, service.AccountID, cluster.Name, pod.Name)
-	
+
 	existingTask, err := sm.storage.TaskStore().Get(ctx, cluster.ARN, taskARN)
 	if err == nil && existingTask != nil {
 		// Task already exists, update status if needed
@@ -752,9 +752,9 @@ func (sm *ServiceManager) registerPodAsTask(ctx context.Context, pod *corev1.Pod
 
 // handlePodDeletion handles when a pod is deleted
 func (sm *ServiceManager) handlePodDeletion(ctx context.Context, pod *corev1.Pod, cluster *storage.Cluster, service *storage.Service) {
-	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", 
+	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s",
 		service.Region, service.AccountID, cluster.Name, pod.Name)
-	
+
 	task, err := sm.storage.TaskStore().Get(ctx, cluster.ARN, taskARN)
 	if err != nil || task == nil {
 		return
