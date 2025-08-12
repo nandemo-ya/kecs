@@ -10,9 +10,10 @@ pre-commit:
     # Go formatting check
     go-fmt:
       tags: go fmt
-      glob: "*.go"
+      glob: "controlplane/**/*.go"
       run: |
-        cd controlplane && gofmt -l {staged_files} | grep . && exit 1 || exit 0
+        files=$(echo {staged_files} | sed 's|controlplane/||g')
+        cd controlplane && gofmt -l $files | grep . && exit 1 || exit 0
 
     # Go vet check
     go-vet:
