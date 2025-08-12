@@ -95,6 +95,7 @@ func (r *SecretsReplicator) ReplicateSecretToNamespace(ctx context.Context, secr
 }
 
 // ReplicateConfigMapToNamespace replicates a ConfigMap from kecs-system to target namespace
+// DEPRECATED: All SSM parameters are now stored as Secrets. This function is kept for backward compatibility.
 func (r *SecretsReplicator) ReplicateConfigMapToNamespace(ctx context.Context, configMapName, targetNamespace string) error {
 	// Get the ConfigMap from kecs-system
 	sourceConfigMap, err := r.kubeClient.CoreV1().ConfigMaps("kecs-system").Get(ctx, configMapName, metav1.GetOptions{})

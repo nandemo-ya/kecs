@@ -358,23 +358,16 @@ func (c *SecretsController) syncSSMParameter(ctx context.Context, arn string, po
 		return fmt.Errorf("failed to sync parameter to kecs-system: %w", err)
 	}
 
-	// Determine if this is a secret or configmap based on parameter type
-	// (This logic should match what's in ssmIntegration.SyncParameter)
+	// Get the K8s secret name for the parameter
+	// All SSM parameters are now stored as Secrets for consistency
 	k8sResourceName := ssmIntegration.GetSecretNameForParameter(parameterName)
-	isSecret := c.isSSMParameterSensitive(parameterName)
 
 	// Replicate to pod's namespace if different from kecs-system
+	// All SSM parameters are now stored as Secrets for consistency
 	if podNamespace != "kecs-system" {
-		if isSecret {
-			err = c.replicator.ReplicateSecretToNamespace(ctx, k8sResourceName, podNamespace)
-			if err != nil {
-				return fmt.Errorf("failed to replicate secret to namespace %s: %w", podNamespace, err)
-			}
-		} else {
-			err = c.replicator.ReplicateConfigMapToNamespace(ctx, k8sResourceName, podNamespace)
-			if err != nil {
-				return fmt.Errorf("failed to replicate configmap to namespace %s: %w", podNamespace, err)
-			}
+		err = c.replicator.ReplicateSecretToNamespace(ctx, k8sResourceName, podNamespace)
+		if err != nil {
+			return fmt.Errorf("failed to replicate secret to namespace %s: %w", podNamespace, err)
 		}
 	}
 
@@ -418,15 +411,9 @@ func (c *SecretsController) areSecretssSynced(ctx context.Context, pod *corev1.P
 // isSSMParameterSensitive determines if an SSM parameter should be stored as a Secret
 // Parameters with "password", "secret", "key", "token" in their names are considered sensitive
 func (c *SecretsController) isSSMParameterSensitive(parameterName string) bool {
-	lowerName := strings.ToLower(parameterName)
-	sensitivePatterns := []string{"password", "secret", "key", "token", "credential"}
-	
-	for _, pattern := range sensitivePatterns {
-		if strings.Contains(lowerName, pattern) {
-			return true
-		}
-	}
-	return false
+	// Treat all SSM parameters as sensitive and store them as Secrets
+	// This simplifies the implementation and ensures consistency
+	return true
 }
 
 // getK8sSecretName returns the Kubernetes secret name for a given service and resource
