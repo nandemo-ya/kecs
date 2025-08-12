@@ -143,7 +143,7 @@ func (i *integration) GetParameter(ctx context.Context, parameterName string) (*
 		Value:        getString(result.Parameter.Value),
 		Type:         getParameterType(result.Parameter.Type),
 		Version:      getInt64(result.Parameter.Version),
-		LastModified: getTime(result.Parameter.LastModifiedDate),
+		LastModified: getTime(result.Parameter.LastModifiedDate.ToTime()),
 	}
 
 	// Cache the parameter
