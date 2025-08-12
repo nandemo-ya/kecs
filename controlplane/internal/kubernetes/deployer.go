@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -15,15 +17,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // ResourceDeployer handles deployment of Kubernetes resources
 type ResourceDeployer struct {
-	client        kubernetes.Interface
-	extClient     apiextensionsclient.Interface
-	config        *rest.Config
+	client    kubernetes.Interface
+	extClient apiextensionsclient.Interface
+	config    *rest.Config
 }
 
 // NewResourceDeployer creates a new resource deployer
@@ -39,7 +39,7 @@ func NewResourceDeployerWithConfig(client kubernetes.Interface, config *rest.Con
 	if err != nil {
 		return nil, fmt.Errorf("failed to create apiextensions client: %w", err)
 	}
-	
+
 	return &ResourceDeployer{
 		client:    client,
 		extClient: extClient,
@@ -50,50 +50,50 @@ func NewResourceDeployerWithConfig(client kubernetes.Interface, config *rest.Con
 // DeployControlPlane deploys all control plane resources
 func (d *ResourceDeployer) DeployControlPlane(ctx context.Context, config *resources.ControlPlaneConfig) error {
 	logging.Info("Deploying KECS control plane resources")
-	
+
 	// Create resources
 	res := resources.CreateControlPlaneResources(config)
-	
+
 	// Deploy namespace first
 	if err := d.applyNamespace(ctx, res.Namespace); err != nil {
 		return fmt.Errorf("failed to create namespace: %w", err)
 	}
-	
+
 	// Deploy RBAC resources
 	if err := d.applyServiceAccount(ctx, res.ServiceAccount); err != nil {
 		return fmt.Errorf("failed to create service account: %w", err)
 	}
-	
+
 	if err := d.applyClusterRole(ctx, res.ClusterRole); err != nil {
 		return fmt.Errorf("failed to create cluster role: %w", err)
 	}
-	
+
 	if err := d.applyClusterRoleBinding(ctx, res.ClusterRoleBinding); err != nil {
 		return fmt.Errorf("failed to create cluster role binding: %w", err)
 	}
-	
+
 	// Deploy ConfigMap
 	if err := d.applyConfigMap(ctx, res.ConfigMap); err != nil {
 		return fmt.Errorf("failed to create config map: %w", err)
 	}
-	
+
 	// Deploy PVC
 	if err := d.applyPVC(ctx, res.PVC); err != nil {
 		return fmt.Errorf("failed to create PVC: %w", err)
 	}
-	
+
 	// Deploy Services
 	for _, svc := range res.Services {
 		if err := d.applyService(ctx, svc); err != nil {
 			return fmt.Errorf("failed to create service %s: %w", svc.Name, err)
 		}
 	}
-	
+
 	// Deploy Deployment
 	if err := d.applyDeployment(ctx, res.Deployment); err != nil {
 		return fmt.Errorf("failed to create deployment: %w", err)
 	}
-	
+
 	logging.Info("Control plane resources deployed successfully")
 	return nil
 }
@@ -101,50 +101,50 @@ func (d *ResourceDeployer) DeployControlPlane(ctx context.Context, config *resou
 // DeployTraefik deploys all Traefik resources
 func (d *ResourceDeployer) DeployTraefik(ctx context.Context, config *resources.TraefikConfig) error {
 	logging.Info("Deploying Traefik gateway resources")
-	
+
 	// Skip CRD deployment - using file-based configuration instead
 	// CRDs are not needed with file provider
-	
+
 	// Create resources
 	res := resources.CreateTraefikResources(config)
-	
+
 	// Deploy RBAC resources
 	if err := d.applyServiceAccount(ctx, res.ServiceAccount); err != nil {
 		return fmt.Errorf("failed to create service account: %w", err)
 	}
-	
+
 	if err := d.applyClusterRole(ctx, res.ClusterRole); err != nil {
 		return fmt.Errorf("failed to create cluster role: %w", err)
 	}
-	
+
 	if err := d.applyClusterRoleBinding(ctx, res.ClusterRoleBinding); err != nil {
 		return fmt.Errorf("failed to create cluster role binding: %w", err)
 	}
-	
+
 	// Deploy ConfigMaps
 	if err := d.applyConfigMap(ctx, res.ConfigMap); err != nil {
 		return fmt.Errorf("failed to create config map: %w", err)
 	}
-	
+
 	if err := d.applyConfigMap(ctx, res.DynamicConfigMap); err != nil {
 		return fmt.Errorf("failed to create dynamic config map: %w", err)
 	}
-	
+
 	// Deploy Services
 	for _, svc := range res.Services {
 		if err := d.applyService(ctx, svc); err != nil {
 			return fmt.Errorf("failed to create service %s: %w", svc.Name, err)
 		}
 	}
-	
+
 	// Deploy Deployment
 	if err := d.applyDeployment(ctx, res.Deployment); err != nil {
 		return fmt.Errorf("failed to create deployment: %w", err)
 	}
-	
+
 	// Skip IngressRoute deployment - using file-based configuration
 	// Routes are defined in the dynamic ConfigMap instead
-	
+
 	logging.Info("Traefik resources deployed successfully")
 	return nil
 }
@@ -152,18 +152,18 @@ func (d *ResourceDeployer) DeployTraefik(ctx context.Context, config *resources.
 // WaitForDeploymentReady waits for a deployment to become ready
 func (d *ResourceDeployer) WaitForDeploymentReady(ctx context.Context, namespace, name string, timeout time.Duration) error {
 	logging.Info("Waiting for deployment to be ready", "namespace", namespace, "name", name)
-	
+
 	return wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
 		deployment, err := d.client.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-		
+
 		// Check if deployment is ready
 		if deployment.Status.ReadyReplicas > 0 && deployment.Status.ReadyReplicas == *deployment.Spec.Replicas {
 			return true, nil
 		}
-		
+
 		return false, nil
 	})
 }
@@ -182,7 +182,7 @@ func (d *ResourceDeployer) applyNamespace(ctx context.Context, ns *corev1.Namesp
 		}
 		return err
 	}
-	
+
 	// Update labels if needed
 	existing.Labels = ns.Labels
 	_, err = d.client.CoreV1().Namespaces().Update(ctx, existing, metav1.UpdateOptions{})
@@ -207,7 +207,7 @@ func (d *ResourceDeployer) applyServiceAccount(ctx context.Context, sa *corev1.S
 		}
 		return err
 	}
-	
+
 	// Update if exists
 	existing.Labels = sa.Labels
 	_, err = d.client.CoreV1().ServiceAccounts(sa.Namespace).Update(ctx, existing, metav1.UpdateOptions{})
@@ -232,7 +232,7 @@ func (d *ResourceDeployer) applyClusterRole(ctx context.Context, cr *rbacv1.Clus
 		}
 		return err
 	}
-	
+
 	// Update if exists
 	existing.Labels = cr.Labels
 	existing.Rules = cr.Rules
@@ -258,7 +258,7 @@ func (d *ResourceDeployer) applyClusterRoleBinding(ctx context.Context, crb *rba
 		}
 		return err
 	}
-	
+
 	// Update if exists
 	existing.Labels = crb.Labels
 	existing.RoleRef = crb.RoleRef
@@ -285,7 +285,7 @@ func (d *ResourceDeployer) applyConfigMap(ctx context.Context, cm *corev1.Config
 		}
 		return err
 	}
-	
+
 	// Update if exists
 	existing.Labels = cm.Labels
 	existing.Data = cm.Data
@@ -311,11 +311,11 @@ func (d *ResourceDeployer) applyService(ctx context.Context, svc *corev1.Service
 		}
 		return err
 	}
-	
+
 	// Update if exists (preserve ClusterIP and NodePorts)
 	svc.Spec.ClusterIP = existing.Spec.ClusterIP
 	svc.Spec.ClusterIPs = existing.Spec.ClusterIPs
-	
+
 	// Preserve NodePorts if not specified
 	for i, port := range svc.Spec.Ports {
 		for _, existingPort := range existing.Spec.Ports {
@@ -324,7 +324,7 @@ func (d *ResourceDeployer) applyService(ctx context.Context, svc *corev1.Service
 			}
 		}
 	}
-	
+
 	existing.Labels = svc.Labels
 	existing.Spec = svc.Spec
 	_, err = d.client.CoreV1().Services(svc.Namespace).Update(ctx, existing, metav1.UpdateOptions{})
@@ -349,7 +349,7 @@ func (d *ResourceDeployer) applyPVC(ctx context.Context, pvc *corev1.PersistentV
 		}
 		return err
 	}
-	
+
 	// PVCs are mostly immutable, so we don't update
 	logging.Debug("PVC already exists, skipping update", "namespace", pvc.Namespace, "name", pvc.Name)
 	return nil
@@ -369,7 +369,7 @@ func (d *ResourceDeployer) applyDeployment(ctx context.Context, deploy *appsv1.D
 		}
 		return err
 	}
-	
+
 	// Update if exists
 	existing.Labels = deploy.Labels
 	existing.Spec = deploy.Spec
@@ -384,7 +384,7 @@ func (d *ResourceDeployer) applyDeployment(ctx context.Context, deploy *appsv1.D
 // deployTraefikCRDs deploys Traefik CRDs
 func (d *ResourceDeployer) deployTraefikCRDs(ctx context.Context) error {
 	logging.Info("Deploying Traefik CRDs")
-	
+
 	// Create IngressRoute CRD
 	ingressRouteCRD := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
@@ -469,11 +469,11 @@ func (d *ResourceDeployer) deployTraefikCRDs(ctx context.Context) error {
 			},
 		},
 	}
-	
+
 	if err := d.applyCRD(ctx, ingressRouteCRD); err != nil {
 		return fmt.Errorf("failed to create IngressRoute CRD: %w", err)
 	}
-	
+
 	logging.Info("Traefik CRDs deployed successfully")
 	return nil
 }
@@ -492,7 +492,7 @@ func (d *ResourceDeployer) applyCRD(ctx context.Context, crd *apiextensionsv1.Cu
 		}
 		return err
 	}
-	
+
 	// Update if exists
 	existing.Labels = crd.Labels
 	existing.Spec = crd.Spec
@@ -507,10 +507,10 @@ func (d *ResourceDeployer) applyCRD(ctx context.Context, crd *apiextensionsv1.Cu
 // deployTraefikRoutes deploys Traefik IngressRoute resources
 func (d *ResourceDeployer) deployTraefikRoutes(ctx context.Context) error {
 	logging.Info("Deploying Traefik routes")
-	
+
 	// For now, we'll skip the actual IngressRoute deployment as it requires dynamic client
 	// This can be implemented later with unstructured resources
 	logging.Info("Traefik routes deployment skipped (requires dynamic client)")
-	
+
 	return nil
 }

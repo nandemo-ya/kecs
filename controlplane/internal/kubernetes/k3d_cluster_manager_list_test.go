@@ -17,10 +17,10 @@ type MockK3dClient struct {
 
 func TestK3dClusterManager_ListClusters(t *testing.T) {
 	tests := []struct {
-		name           string
-		k3dClusters    []k3d.Cluster
-		expectedNames  []string
-		expectedError  bool
+		name          string
+		k3dClusters   []k3d.Cluster
+		expectedNames []string
+		expectedError bool
 	}{
 		{
 			name: "returns instance names without kecs- prefix",
@@ -44,19 +44,19 @@ func TestK3dClusterManager_ListClusters(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name:           "returns empty list when no KECS clusters",
-			k3dClusters:    []k3d.Cluster{
+			name: "returns empty list when no KECS clusters",
+			k3dClusters: []k3d.Cluster{
 				{Name: "other-cluster"},
 				{Name: "k3d-test"},
 			},
-			expectedNames:  []string{},
-			expectedError:  false,
+			expectedNames: []string{},
+			expectedError: false,
 		},
 		{
-			name:           "returns empty list when no clusters exist",
-			k3dClusters:    []k3d.Cluster{},
-			expectedNames:  []string{},
-			expectedError:  false,
+			name:          "returns empty list when no clusters exist",
+			k3dClusters:   []k3d.Cluster{},
+			expectedNames: []string{},
+			expectedError: false,
 		},
 	}
 
@@ -65,13 +65,13 @@ func TestK3dClusterManager_ListClusters(t *testing.T) {
 			// Note: This is a unit test to verify the logic of ListClusters
 			// In real implementation, we would need to mock the k3d client.ClusterList function
 			// For now, this test documents the expected behavior
-			
+
 			// Expected behavior verification
 			for i, cluster := range tt.k3dClusters {
 				if len(cluster.Name) > 5 && cluster.Name[:5] == "kecs-" {
 					expectedName := cluster.Name[5:] // Remove "kecs-" prefix
 					if i < len(tt.expectedNames) {
-						assert.Equal(t, tt.expectedNames[i], expectedName, 
+						assert.Equal(t, tt.expectedNames[i], expectedName,
 							"Instance name should not include kecs- prefix")
 					}
 				}
@@ -119,22 +119,22 @@ func TestK3dClusterManager_NormalizeClusterName(t *testing.T) {
 func TestK3dClusterManager_InstanceNameConsistency(t *testing.T) {
 	// This test verifies that instance names are handled consistently
 	// throughout the cluster manager operations
-	
+
 	t.Run("ListClusters returns names without prefix", func(t *testing.T) {
 		// When ListClusters returns ["myinstance", "dev", "staging"]
 		// Users should be able to use these names directly in commands:
 		// - kecs stop --instance myinstance
 		// - kecs destroy --instance dev
 		// - kecs start --instance staging
-		
+
 		// The normalizeClusterName method should add the prefix internally
 		// when interacting with k3d
 	})
-	
+
 	t.Run("All operations accept instance names without prefix", func(t *testing.T) {
 		operations := []string{
 			"ClusterExists",
-			"DeleteCluster", 
+			"DeleteCluster",
 			"StopCluster",
 			"StartCluster",
 			"GetKubeClient",
@@ -142,7 +142,7 @@ func TestK3dClusterManager_InstanceNameConsistency(t *testing.T) {
 			"GetClusterInfo",
 			"IsClusterRunning",
 		}
-		
+
 		for _, op := range operations {
 			// Each operation should accept "myinstance" and internally
 			// convert it to "kecs-myinstance" for k3d operations

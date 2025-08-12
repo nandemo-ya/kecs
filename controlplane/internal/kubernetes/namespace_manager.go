@@ -12,8 +12,8 @@ import (
 )
 
 type NamespaceManager struct {
-	clientset    *kubernetes.Clientset
-	rbacManager  *sync.RBACManager
+	clientset   *kubernetes.Clientset
+	rbacManager *sync.RBACManager
 }
 
 func NewNamespaceManager(clientset *kubernetes.Clientset) *NamespaceManager {

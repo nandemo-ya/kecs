@@ -8,30 +8,30 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // ManifestApplier handles applying Kubernetes manifests
 type ManifestApplier struct {
-	client          kubernetes.Interface
-	extClient       apiextensionsclient.Interface
-	dynamicClient   dynamic.Interface
-	config          *rest.Config
+	client        kubernetes.Interface
+	extClient     apiextensionsclient.Interface
+	dynamicClient dynamic.Interface
+	config        *rest.Config
 }
 
 // NewManifestApplier creates a new manifest applier
@@ -285,7 +285,7 @@ func (ma *ManifestApplier) applyService(ctx context.Context, svc *corev1.Service
 	// Update if exists (preserve ClusterIP and NodePorts)
 	svc.Spec.ClusterIP = existing.Spec.ClusterIP
 	svc.Spec.ClusterIPs = existing.Spec.ClusterIPs
-	
+
 	// Preserve NodePorts if not specified
 	for i, port := range svc.Spec.Ports {
 		for _, existingPort := range existing.Spec.Ports {
@@ -434,7 +434,7 @@ func (ma *ManifestApplier) applyKustomization(ctx context.Context, dir string) e
 func (ma *ManifestApplier) getGVRFromGVK(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
 	// For CRDs, we need to discover the resource name
 	// This is a simplified version - in production, you'd use discovery client
-	
+
 	// Handle known Traefik CRDs
 	if gvk.Group == "traefik.io" {
 		var resource string
@@ -463,14 +463,14 @@ func (ma *ManifestApplier) getGVRFromGVK(gvk schema.GroupVersionKind) (schema.Gr
 			// Try to pluralize the kind
 			resource = strings.ToLower(gvk.Kind) + "s"
 		}
-		
+
 		return schema.GroupVersionResource{
 			Group:    gvk.Group,
 			Version:  gvk.Version,
 			Resource: resource,
 		}, nil
 	}
-	
+
 	// For other resources, try simple pluralization
 	// In production, use discovery client for accurate resource names
 	resource := strings.ToLower(gvk.Kind) + "s"

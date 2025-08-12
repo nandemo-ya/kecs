@@ -78,25 +78,25 @@ type ClusterManagerConfig struct {
 
 	// AdditionalOptions for provider-specific configuration
 	AdditionalOptions map[string]interface{} `json:"additionalOptions,omitempty"`
-	
+
 	// EnableTraefik enables Traefik reverse proxy deployment
 	EnableTraefik bool `json:"enableTraefik"`
-	
+
 	// TraefikPort specifies the port for Traefik proxy (0 for dynamic allocation)
 	TraefikPort int `json:"traefikPort,omitempty"`
-	
+
 	// VolumeMounts specifies volume mounts for the cluster
 	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty"`
-	
+
 	// APIPort specifies the port to expose for the k3d API server
 	APIPort int `json:"apiPort,omitempty"`
-	
+
 	// K3dImage specifies the k3s image to use
 	K3dImage string `json:"k3dImage,omitempty"`
-	
+
 	// EnableRegistry enables k3d registry for dev mode
 	EnableRegistry bool `json:"enableRegistry,omitempty"`
-	
+
 	// RegistryPort specifies the port for the k3d registry (default: 5000)
 	RegistryPort int `json:"registryPort,omitempty"`
 }
@@ -120,7 +120,7 @@ func NewClusterManager(config *ClusterManagerConfig) (ClusterManager, error) {
 
 	// Use Viper config which handles environment variables
 	viperConfig := appconfig.GetConfig()
-	
+
 	// Set container mode from app config if not explicitly set
 	if !config.ContainerMode && viperConfig.Features.ContainerMode {
 		config.ContainerMode = true

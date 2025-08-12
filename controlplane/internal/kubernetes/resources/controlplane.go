@@ -23,13 +23,13 @@ func int64Ptr(i int64) *int64 {
 const (
 	// ControlPlane constants
 	ControlPlaneNamespace      = "kecs-system"
-	ControlPlaneName          = "kecs-controlplane"
+	ControlPlaneName           = "kecs-controlplane"
 	ControlPlaneServiceAccount = "kecs-controlplane"
-	ControlPlaneConfigMap     = "kecs-config"
-	ControlPlanePVC           = "kecs-data"
-	ControlPlaneAPIService    = "kecs-api"
-	ControlPlaneService       = "kecs-controlplane"
-	
+	ControlPlaneConfigMap      = "kecs-config"
+	ControlPlanePVC            = "kecs-data"
+	ControlPlaneAPIService     = "kecs-api"
+	ControlPlaneService        = "kecs-controlplane"
+
 	// Labels
 	LabelManagedBy = "kecs.dev/managed"
 	LabelComponent = "kecs.dev/component"
@@ -39,14 +39,14 @@ const (
 
 // ControlPlaneResources contains all resources needed for the control plane
 type ControlPlaneResources struct {
-	Namespace        *corev1.Namespace
-	ServiceAccount   *corev1.ServiceAccount
-	ClusterRole      *rbacv1.ClusterRole
+	Namespace          *corev1.Namespace
+	ServiceAccount     *corev1.ServiceAccount
+	ClusterRole        *rbacv1.ClusterRole
 	ClusterRoleBinding *rbacv1.ClusterRoleBinding
-	ConfigMap        *corev1.ConfigMap
-	PVC              *corev1.PersistentVolumeClaim
-	Services         []*corev1.Service
-	Deployment       *appsv1.Deployment
+	ConfigMap          *corev1.ConfigMap
+	PVC                *corev1.PersistentVolumeClaim
+	Services           []*corev1.Service
+	Deployment         *appsv1.Deployment
 }
 
 // ControlPlaneConfig contains configuration for control plane resources
@@ -54,24 +54,24 @@ type ControlPlaneConfig struct {
 	// Image configuration
 	Image           string
 	ImagePullPolicy corev1.PullPolicy
-	
+
 	// Resource limits
 	CPURequest    string
 	MemoryRequest string
 	CPULimit      string
 	MemoryLimit   string
-	
+
 	// Storage
 	StorageSize string
-	
+
 	// Ports
 	APIPort   int32
 	AdminPort int32
-	
+
 	// Features
-	Debug       bool
-	LogLevel    string
-	
+	Debug    bool
+	LogLevel string
+
 	// Additional environment variables
 	ExtraEnvVars []corev1.EnvVar
 }
@@ -357,7 +357,7 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 // createDeployment creates the control plane deployment
 func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 	replicas := int32(1)
-	
+
 	// Build environment variables
 	envVars := []corev1.EnvVar{
 		{
@@ -389,7 +389,7 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 			},
 		},
 	}
-	
+
 	// Add debug environment variable if enabled
 	if config.Debug {
 		envVars = append(envVars, corev1.EnvVar{
@@ -397,10 +397,10 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 			Value: "true",
 		})
 	}
-	
+
 	// Add extra environment variables
 	envVars = append(envVars, config.ExtraEnvVars...)
-	
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ControlPlaneName,
@@ -431,16 +431,16 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 					},
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: ControlPlaneServiceAccount,
+					ServiceAccountName:            ControlPlaneServiceAccount,
 					TerminationGracePeriodSeconds: int64Ptr(30),
-					DNSPolicy: corev1.DNSClusterFirstWithHostNet,
+					DNSPolicy:                     corev1.DNSClusterFirstWithHostNet,
 					// Add init container to verify network connectivity before main container starts
 					InitContainers: []corev1.Container{
 						{
-							Name:  "wait-for-network",
-							Image: "busybox:1.36",
+							Name:    "wait-for-network",
+							Image:   "busybox:1.36",
 							Command: []string{"sh", "-c"},
-							Args: []string{"echo 'Checking network connectivity...'; nslookup kubernetes.default.svc.cluster.local || true; echo 'Network check complete'"},
+							Args:    []string{"echo 'Checking network connectivity...'; nslookup kubernetes.default.svc.cluster.local || true; echo 'Network check complete'"},
 						},
 					},
 					Containers: []corev1.Container{
@@ -480,9 +480,9 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 										Port: intstr.FromString("admin"),
 									},
 								},
-								InitialDelaySeconds: 5,   // Start checking early
-								PeriodSeconds:       2,   // Check frequently during startup
-								FailureThreshold:    60,  // Allow up to 2 minutes for startup (60 * 2s)
+								InitialDelaySeconds: 5,  // Start checking early
+								PeriodSeconds:       2,  // Check frequently during startup
+								FailureThreshold:    60, // Allow up to 2 minutes for startup (60 * 2s)
 								SuccessThreshold:    1,
 							},
 							LivenessProbe: &corev1.Probe{
@@ -492,7 +492,7 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 										Port: intstr.FromString("admin"),
 									},
 								},
-								InitialDelaySeconds: 0,  // No delay needed with startup probe
+								InitialDelaySeconds: 0, // No delay needed with startup probe
 								PeriodSeconds:       30,
 								FailureThreshold:    3,
 							},
@@ -503,9 +503,9 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 										Port: intstr.FromString("admin"),
 									},
 								},
-								InitialDelaySeconds: 0,  // No delay needed with startup probe
-								PeriodSeconds:       5,  // Check more frequently for faster detection
-								FailureThreshold:    3,  // Reduced since startup probe handles initial startup
+								InitialDelaySeconds: 0, // No delay needed with startup probe
+								PeriodSeconds:       5, // Check more frequently for faster detection
+								FailureThreshold:    3, // Reduced since startup probe handles initial startup
 								SuccessThreshold:    1,
 							},
 							VolumeMounts: []corev1.VolumeMount{
