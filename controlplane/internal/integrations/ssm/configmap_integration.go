@@ -14,6 +14,9 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
+// DEPRECATED: All SSM parameters are now stored as Secrets for consistency and simplicity.
+// This code is kept for backward compatibility but is no longer used.
+//
 // CreateOrUpdateConfigMap creates or updates a Kubernetes ConfigMap from SSM parameter
 // This is useful for non-sensitive configuration data
 func (i *integration) CreateOrUpdateConfigMap(ctx context.Context, parameter *Parameter, namespace string) error {

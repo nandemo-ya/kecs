@@ -157,13 +157,13 @@ var _ = Describe("TaskConverter Secrets", func() {
 				}
 
 				// Verify CONFIG_VALUE references Kubernetes ConfigMap (Phase 2 implementation)
-				// Since "config/value" doesn't contain sensitive keywords, it should use ConfigMap
+				// All SSM parameters are now stored as Secrets for consistency
 				Expect(configValueEnv).NotTo(BeNil())
 				Expect(configValueEnv.Value).To(BeEmpty())
 				Expect(configValueEnv.ValueFrom).NotTo(BeNil())
-				Expect(configValueEnv.ValueFrom.ConfigMapKeyRef).NotTo(BeNil())
-				Expect(configValueEnv.ValueFrom.ConfigMapKeyRef.Name).To(Equal("ssm-cm-app-config-value"))
-				Expect(configValueEnv.ValueFrom.ConfigMapKeyRef.Key).To(Equal("value"))
+				Expect(configValueEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+				Expect(configValueEnv.ValueFrom.SecretKeyRef.Name).To(Equal("ssm-app-config-value"))
+				Expect(configValueEnv.ValueFrom.SecretKeyRef.Key).To(Equal("value"))
 			})
 		})
 
@@ -227,14 +227,14 @@ var _ = Describe("TaskConverter Secrets", func() {
 				Expect(dbPasswordEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
 				Expect(dbPasswordEnv.ValueFrom.SecretKeyRef.Name).To(Equal("sm-db-password"))
 
-				// Verify SSM parameter references Kubernetes ConfigMap
-				// "app/config" doesn't contain sensitive keywords
+				// Verify SSM parameter references Kubernetes Secret
+				// All SSM parameters are now stored as Secrets for consistency
 				Expect(appConfigEnv).NotTo(BeNil())
 				Expect(appConfigEnv.Value).To(BeEmpty())
 				Expect(appConfigEnv.ValueFrom).NotTo(BeNil())
-				Expect(appConfigEnv.ValueFrom.ConfigMapKeyRef).NotTo(BeNil())
-				Expect(appConfigEnv.ValueFrom.ConfigMapKeyRef.Name).To(Equal("ssm-cm-app-config"))
-				Expect(appConfigEnv.ValueFrom.ConfigMapKeyRef.Key).To(Equal("value"))
+				Expect(appConfigEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+				Expect(appConfigEnv.ValueFrom.SecretKeyRef.Name).To(Equal("ssm-app-config"))
+				Expect(appConfigEnv.ValueFrom.SecretKeyRef.Key).To(Equal("value"))
 			})
 		})
 	})

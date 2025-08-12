@@ -1657,27 +1657,14 @@ func (c *TaskConverter) convertSecrets(secrets []types.Secret) []corev1.EnvVar {
 			}
 
 		case "ssm":
-			// Reference the synced Kubernetes secret or ConfigMap in kecs-system namespace
-			// For sensitive data, use Secret; for configuration, use ConfigMap
-			if c.isSSMParameterSensitive(secretInfo.SecretName) {
-				envVar.ValueFrom = &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: c.getK8sSecretName("ssm", secretInfo.SecretName),
-						},
-						Key: "value",
+			// All SSM parameters are now stored as Secrets for consistency
+			envVar.ValueFrom = &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: c.getK8sSecretName("ssm", secretInfo.SecretName),
 					},
-				}
-			} else {
-				// Use ConfigMap for non-sensitive configuration
-				envVar.ValueFrom = &corev1.EnvVarSource{
-					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: c.getK8sConfigMapName(secretInfo.SecretName),
-						},
-						Key: "value",
-					},
-				}
+					Key: "value",
+				},
 			}
 		}
 
@@ -2012,6 +1999,7 @@ func (c *TaskConverter) getK8sSecretName(source, secretName string) string {
 }
 
 // getK8sConfigMapName returns the Kubernetes ConfigMap name for a given SSM parameter
+// DEPRECATED: All SSM parameters are now stored as Secrets for consistency
 func (c *TaskConverter) getK8sConfigMapName(parameterName string) string {
 	cleanName := strings.Trim(parameterName, "/")
 	cleanName = strings.ReplaceAll(cleanName, "/", "-")
@@ -2020,23 +2008,10 @@ func (c *TaskConverter) getK8sConfigMapName(parameterName string) string {
 }
 
 // isSSMParameterSensitive determines if an SSM parameter should be treated as sensitive
+// DEPRECATED: All SSM parameters are now stored as Secrets for consistency
 func (c *TaskConverter) isSSMParameterSensitive(parameterName string) bool {
-	// Check if parameter name contains sensitive keywords
-	lowerName := strings.ToLower(parameterName)
-	sensitiveKeywords := []string{
-		"password", "pass", "secret", "key", "token", "credential", "auth",
-		"private", "cert", "certificate", "jwt", "api_key", "apikey",
-	}
-	
-	for _, keyword := range sensitiveKeywords {
-		if strings.Contains(lowerName, keyword) {
-			return true
-		}
-	}
-	
-	// Non-sensitive parameters are typically configuration
-	// like feature flags, URLs, non-secret config values
-	return false
+	// All SSM parameters are now treated as sensitive and stored as Secrets
+	return true
 }
 
 // getPlaceholderSecretValue returns placeholder values for secrets

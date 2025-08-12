@@ -57,9 +57,9 @@ var _ = Describe("SecretsController", func() {
 		})
 
 		Context("when syncing SSM parameters", func() {
-			It("should create ConfigMap for non-sensitive parameters in kecs-system", func() {
-				// This test requires the controller to be running
-				// It documents the expected behavior but is skipped in unit tests
+			It("should create Secret for all SSM parameters in kecs-system", func() {
+				// All SSM parameters are now stored as Secrets for consistency
+				// This test documents the expected behavior
 			})
 
 			It("should create Secret for sensitive SSM parameters in kecs-system", func() {
