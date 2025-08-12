@@ -4,6 +4,8 @@ package generated
 
 import (
 	"time"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/common"
 )
 
 // Unit represents an empty response
@@ -64,13 +66,13 @@ type Accounts []string
 type Activation struct {
 	ActivationId *string `json:"ActivationId,omitempty"`
 
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
 	DefaultInstanceName *string `json:"DefaultInstanceName,omitempty"`
 
 	Description *string `json:"Description,omitempty"`
 
-	ExpirationDate *time.Time `json:"ExpirationDate,omitempty"`
+	ExpirationDate *common.UnixTime `json:"ExpirationDate,omitempty"`
 
 	Expired *bool `json:"Expired,omitempty"`
 
@@ -229,7 +231,7 @@ type Association struct {
 
 	InstanceId *string `json:"InstanceId,omitempty"`
 
-	LastExecutionDate *time.Time `json:"LastExecutionDate,omitempty"`
+	LastExecutionDate *common.UnixTime `json:"LastExecutionDate,omitempty"`
 
 	Name *string `json:"Name,omitempty"`
 
@@ -281,7 +283,7 @@ type AssociationDescription struct {
 
 	ComplianceSeverity *AssociationComplianceSeverity `json:"ComplianceSeverity,omitempty"`
 
-	Date *time.Time `json:"Date,omitempty"`
+	Date *common.UnixTime `json:"Date,omitempty"`
 
 	DocumentVersion *string `json:"DocumentVersion,omitempty"`
 
@@ -289,11 +291,11 @@ type AssociationDescription struct {
 
 	InstanceId *string `json:"InstanceId,omitempty"`
 
-	LastExecutionDate *time.Time `json:"LastExecutionDate,omitempty"`
+	LastExecutionDate *common.UnixTime `json:"LastExecutionDate,omitempty"`
 
-	LastSuccessfulExecutionDate *time.Time `json:"LastSuccessfulExecutionDate,omitempty"`
+	LastSuccessfulExecutionDate *common.UnixTime `json:"LastSuccessfulExecutionDate,omitempty"`
 
-	LastUpdateAssociationDate *time.Time `json:"LastUpdateAssociationDate,omitempty"`
+	LastUpdateAssociationDate *common.UnixTime `json:"LastUpdateAssociationDate,omitempty"`
 
 	MaxConcurrency *string `json:"MaxConcurrency,omitempty"`
 
@@ -355,13 +357,13 @@ type AssociationExecution struct {
 
 	AssociationVersion *string `json:"AssociationVersion,omitempty"`
 
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
+	CreatedTime *common.UnixTime `json:"CreatedTime,omitempty"`
 
 	DetailedStatus *string `json:"DetailedStatus,omitempty"`
 
 	ExecutionId *string `json:"ExecutionId,omitempty"`
 
-	LastExecutionDate *time.Time `json:"LastExecutionDate,omitempty"`
+	LastExecutionDate *common.UnixTime `json:"LastExecutionDate,omitempty"`
 
 	ResourceCountByStatus *string `json:"ResourceCountByStatus,omitempty"`
 
@@ -418,7 +420,7 @@ type AssociationExecutionTarget struct {
 
 	ExecutionId *string `json:"ExecutionId,omitempty"`
 
-	LastExecutionDate *time.Time `json:"LastExecutionDate,omitempty"`
+	LastExecutionDate *common.UnixTime `json:"LastExecutionDate,omitempty"`
 
 	OutputSource *OutputSource `json:"OutputSource,omitempty"`
 
@@ -538,7 +540,7 @@ type AssociationVersionInfo struct {
 
 	ComplianceSeverity *AssociationComplianceSeverity `json:"ComplianceSeverity,omitempty"`
 
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
 	DocumentVersion *string `json:"DocumentVersion,omitempty"`
 
@@ -737,9 +739,9 @@ type AutomationExecution struct {
 
 	ExecutedBy *string `json:"ExecutedBy,omitempty"`
 
-	ExecutionEndTime *time.Time `json:"ExecutionEndTime,omitempty"`
+	ExecutionEndTime *common.UnixTime `json:"ExecutionEndTime,omitempty"`
 
-	ExecutionStartTime *time.Time `json:"ExecutionStartTime,omitempty"`
+	ExecutionStartTime *common.UnixTime `json:"ExecutionStartTime,omitempty"`
 
 	FailureMessage *string `json:"FailureMessage,omitempty"`
 
@@ -763,7 +765,7 @@ type AutomationExecution struct {
 
 	Runbooks []Runbook `json:"Runbooks,omitempty"`
 
-	ScheduledTime *time.Time `json:"ScheduledTime,omitempty"`
+	ScheduledTime *common.UnixTime `json:"ScheduledTime,omitempty"`
 
 	StepExecutions []StepExecution `json:"StepExecutions,omitempty"`
 
@@ -866,9 +868,9 @@ type AutomationExecutionMetadata struct {
 
 	ExecutedBy *string `json:"ExecutedBy,omitempty"`
 
-	ExecutionEndTime *time.Time `json:"ExecutionEndTime,omitempty"`
+	ExecutionEndTime *common.UnixTime `json:"ExecutionEndTime,omitempty"`
 
-	ExecutionStartTime *time.Time `json:"ExecutionStartTime,omitempty"`
+	ExecutionStartTime *common.UnixTime `json:"ExecutionStartTime,omitempty"`
 
 	FailureMessage *string `json:"FailureMessage,omitempty"`
 
@@ -890,7 +892,7 @@ type AutomationExecutionMetadata struct {
 
 	Runbooks []Runbook `json:"Runbooks,omitempty"`
 
-	ScheduledTime *time.Time `json:"ScheduledTime,omitempty"`
+	ScheduledTime *common.UnixTime `json:"ScheduledTime,omitempty"`
 
 	Target *string `json:"Target,omitempty"`
 
@@ -1090,7 +1092,7 @@ type Command struct {
 
 	ErrorCount *int32 `json:"ErrorCount,omitempty"`
 
-	ExpiresAfter *time.Time `json:"ExpiresAfter,omitempty"`
+	ExpiresAfter *common.UnixTime `json:"ExpiresAfter,omitempty"`
 
 	InstanceIds []string `json:"InstanceIds,omitempty"`
 
@@ -1108,7 +1110,7 @@ type Command struct {
 
 	Parameters map[string][]string `json:"Parameters,omitempty"`
 
-	RequestedDateTime *time.Time `json:"RequestedDateTime,omitempty"`
+	RequestedDateTime *common.UnixTime `json:"RequestedDateTime,omitempty"`
 
 	ServiceRole *string `json:"ServiceRole,omitempty"`
 
@@ -1161,7 +1163,7 @@ type CommandInvocation struct {
 
 	NotificationConfig *NotificationConfig `json:"NotificationConfig,omitempty"`
 
-	RequestedDateTime *time.Time `json:"RequestedDateTime,omitempty"`
+	RequestedDateTime *common.UnixTime `json:"RequestedDateTime,omitempty"`
 
 	ServiceRole *string `json:"ServiceRole,omitempty"`
 
@@ -1199,9 +1201,9 @@ type CommandPlugin struct {
 
 	ResponseCode *int32 `json:"ResponseCode,omitempty"`
 
-	ResponseFinishDateTime *time.Time `json:"ResponseFinishDateTime,omitempty"`
+	ResponseFinishDateTime *common.UnixTime `json:"ResponseFinishDateTime,omitempty"`
 
-	ResponseStartDateTime *time.Time `json:"ResponseStartDateTime,omitempty"`
+	ResponseStartDateTime *common.UnixTime `json:"ResponseStartDateTime,omitempty"`
 
 	StandardErrorUrl *string `json:"StandardErrorUrl,omitempty"`
 
@@ -1384,7 +1386,7 @@ type CreateActivationRequest struct {
 
 	Description *string `json:"Description,omitempty"`
 
-	ExpirationDate *time.Time `json:"ExpirationDate,omitempty"`
+	ExpirationDate *common.UnixTime `json:"ExpirationDate,omitempty"`
 
 	IamRole string `json:"IamRole"`
 
@@ -1574,9 +1576,9 @@ type CreateMaintenanceWindowResult struct {
 type CreateOpsItemRequest struct {
 	AccountId *string `json:"AccountId,omitempty"`
 
-	ActualEndTime *time.Time `json:"ActualEndTime,omitempty"`
+	ActualEndTime *common.UnixTime `json:"ActualEndTime,omitempty"`
 
-	ActualStartTime *time.Time `json:"ActualStartTime,omitempty"`
+	ActualStartTime *common.UnixTime `json:"ActualStartTime,omitempty"`
 
 	Category *string `json:"Category,omitempty"`
 
@@ -1588,9 +1590,9 @@ type CreateOpsItemRequest struct {
 
 	OpsItemType *string `json:"OpsItemType,omitempty"`
 
-	PlannedEndTime *time.Time `json:"PlannedEndTime,omitempty"`
+	PlannedEndTime *common.UnixTime `json:"PlannedEndTime,omitempty"`
 
-	PlannedStartTime *time.Time `json:"PlannedStartTime,omitempty"`
+	PlannedStartTime *common.UnixTime `json:"PlannedStartTime,omitempty"`
 
 	Priority *int32 `json:"Priority,omitempty"`
 
@@ -2589,7 +2591,7 @@ type DocumentDescription struct {
 
 	CategoryEnum []string `json:"CategoryEnum,omitempty"`
 
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
 	DefaultVersion *string `json:"DefaultVersion,omitempty"`
 
@@ -2663,7 +2665,7 @@ type DocumentHash string
 type DocumentIdentifier struct {
 	Author *string `json:"Author,omitempty"`
 
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
 	DisplayName *string `json:"DisplayName,omitempty"`
 
@@ -2825,13 +2827,13 @@ type DocumentReviewerResponseList []DocumentReviewerResponseSource
 type DocumentReviewerResponseSource struct {
 	Comment []DocumentReviewCommentSource `json:"Comment,omitempty"`
 
-	CreateTime *time.Time `json:"CreateTime,omitempty"`
+	CreateTime *common.UnixTime `json:"CreateTime,omitempty"`
 
 	ReviewStatus *ReviewStatus `json:"ReviewStatus,omitempty"`
 
 	Reviewer *string `json:"Reviewer,omitempty"`
 
-	UpdatedTime *time.Time `json:"UpdatedTime,omitempty"`
+	UpdatedTime *common.UnixTime `json:"UpdatedTime,omitempty"`
 }
 
 // DocumentReviews represents the DocumentReviews structure
@@ -2855,7 +2857,7 @@ type DocumentVersion string
 
 // DocumentVersionInfo represents the DocumentVersionInfo structure
 type DocumentVersionInfo struct {
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
 	DisplayName *string `json:"DisplayName,omitempty"`
 
@@ -3221,7 +3223,7 @@ type GetDocumentResult struct {
 
 	Content *string `json:"Content,omitempty"`
 
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
 	DisplayName *string `json:"DisplayName,omitempty"`
 
@@ -3251,7 +3253,7 @@ type GetExecutionPreviewRequest struct {
 
 // GetExecutionPreviewResponse represents the GetExecutionPreviewResponse structure
 type GetExecutionPreviewResponse struct {
-	EndedAt *time.Time `json:"EndedAt,omitempty"`
+	EndedAt *common.UnixTime `json:"EndedAt,omitempty"`
 
 	ExecutionPreview *ExecutionPreview `json:"ExecutionPreview,omitempty"`
 
@@ -3312,9 +3314,9 @@ type GetMaintenanceWindowExecutionRequest struct {
 
 // GetMaintenanceWindowExecutionResult represents the GetMaintenanceWindowExecutionResult structure
 type GetMaintenanceWindowExecutionResult struct {
-	EndTime *time.Time `json:"EndTime,omitempty"`
+	EndTime *common.UnixTime `json:"EndTime,omitempty"`
 
-	StartTime *time.Time `json:"StartTime,omitempty"`
+	StartTime *common.UnixTime `json:"StartTime,omitempty"`
 
 	Status *MaintenanceWindowExecutionStatus `json:"Status,omitempty"`
 
@@ -3336,7 +3338,7 @@ type GetMaintenanceWindowExecutionTaskInvocationRequest struct {
 
 // GetMaintenanceWindowExecutionTaskInvocationResult represents the GetMaintenanceWindowExecutionTaskInvocationResult structure
 type GetMaintenanceWindowExecutionTaskInvocationResult struct {
-	EndTime *time.Time `json:"EndTime,omitempty"`
+	EndTime *common.UnixTime `json:"EndTime,omitempty"`
 
 	ExecutionId *string `json:"ExecutionId,omitempty"`
 
@@ -3346,7 +3348,7 @@ type GetMaintenanceWindowExecutionTaskInvocationResult struct {
 
 	Parameters *string `json:"Parameters,omitempty"`
 
-	StartTime *time.Time `json:"StartTime,omitempty"`
+	StartTime *common.UnixTime `json:"StartTime,omitempty"`
 
 	Status *MaintenanceWindowExecutionStatus `json:"Status,omitempty"`
 
@@ -3372,7 +3374,7 @@ type GetMaintenanceWindowExecutionTaskRequest struct {
 type GetMaintenanceWindowExecutionTaskResult struct {
 	AlarmConfiguration *AlarmConfiguration `json:"AlarmConfiguration,omitempty"`
 
-	EndTime *time.Time `json:"EndTime,omitempty"`
+	EndTime *common.UnixTime `json:"EndTime,omitempty"`
 
 	MaxConcurrency *string `json:"MaxConcurrency,omitempty"`
 
@@ -3382,7 +3384,7 @@ type GetMaintenanceWindowExecutionTaskResult struct {
 
 	ServiceRole *string `json:"ServiceRole,omitempty"`
 
-	StartTime *time.Time `json:"StartTime,omitempty"`
+	StartTime *common.UnixTime `json:"StartTime,omitempty"`
 
 	Status *MaintenanceWindowExecutionStatus `json:"Status,omitempty"`
 
@@ -3410,7 +3412,7 @@ type GetMaintenanceWindowRequest struct {
 type GetMaintenanceWindowResult struct {
 	AllowUnassociatedTargets *bool `json:"AllowUnassociatedTargets,omitempty"`
 
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
 	Cutoff *int32 `json:"Cutoff,omitempty"`
 
@@ -3422,7 +3424,7 @@ type GetMaintenanceWindowResult struct {
 
 	EndDate *string `json:"EndDate,omitempty"`
 
-	ModifiedDate *time.Time `json:"ModifiedDate,omitempty"`
+	ModifiedDate *common.UnixTime `json:"ModifiedDate,omitempty"`
 
 	Name *string `json:"Name,omitempty"`
 
@@ -3640,13 +3642,13 @@ type GetPatchBaselineResult struct {
 
 	BaselineId *string `json:"BaselineId,omitempty"`
 
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
 	Description *string `json:"Description,omitempty"`
 
 	GlobalFilters *PatchFilterGroup `json:"GlobalFilters,omitempty"`
 
-	ModifiedDate *time.Time `json:"ModifiedDate,omitempty"`
+	ModifiedDate *common.UnixTime `json:"ModifiedDate,omitempty"`
 
 	Name *string `json:"Name,omitempty"`
 
@@ -3845,7 +3847,7 @@ type InstanceAssociationStatusInfo struct {
 
 	ErrorCode *string `json:"ErrorCode,omitempty"`
 
-	ExecutionDate *time.Time `json:"ExecutionDate,omitempty"`
+	ExecutionDate *common.UnixTime `json:"ExecutionDate,omitempty"`
 
 	ExecutionSummary *string `json:"ExecutionSummary,omitempty"`
 
@@ -3913,11 +3915,11 @@ type InstanceInformation struct {
 
 	IsLatestVersion *bool `json:"IsLatestVersion,omitempty"`
 
-	LastAssociationExecutionDate *time.Time `json:"LastAssociationExecutionDate,omitempty"`
+	LastAssociationExecutionDate *common.UnixTime `json:"LastAssociationExecutionDate,omitempty"`
 
-	LastPingDateTime *time.Time `json:"LastPingDateTime,omitempty"`
+	LastPingDateTime *common.UnixTime `json:"LastPingDateTime,omitempty"`
 
-	LastSuccessfulAssociationExecutionDate *time.Time `json:"LastSuccessfulAssociationExecutionDate,omitempty"`
+	LastSuccessfulAssociationExecutionDate *common.UnixTime `json:"LastSuccessfulAssociationExecutionDate,omitempty"`
 
 	Name *string `json:"Name,omitempty"`
 
@@ -3929,7 +3931,7 @@ type InstanceInformation struct {
 
 	PlatformVersion *string `json:"PlatformVersion,omitempty"`
 
-	RegistrationDate *time.Time `json:"RegistrationDate,omitempty"`
+	RegistrationDate *common.UnixTime `json:"RegistrationDate,omitempty"`
 
 	ResourceType *ResourceType `json:"ResourceType,omitempty"`
 
@@ -3995,7 +3997,7 @@ type InstancePatchState struct {
 
 	InstanceId string `json:"InstanceId"`
 
-	LastNoRebootInstallOperationTime *time.Time `json:"LastNoRebootInstallOperationTime,omitempty"`
+	LastNoRebootInstallOperationTime *common.UnixTime `json:"LastNoRebootInstallOperationTime,omitempty"`
 
 	MissingCount *int32 `json:"MissingCount,omitempty"`
 
@@ -4080,13 +4082,13 @@ type InstanceProperty struct {
 
 	KeyName *string `json:"KeyName,omitempty"`
 
-	LastAssociationExecutionDate *time.Time `json:"LastAssociationExecutionDate,omitempty"`
+	LastAssociationExecutionDate *common.UnixTime `json:"LastAssociationExecutionDate,omitempty"`
 
-	LastPingDateTime *time.Time `json:"LastPingDateTime,omitempty"`
+	LastPingDateTime *common.UnixTime `json:"LastPingDateTime,omitempty"`
 
-	LastSuccessfulAssociationExecutionDate *time.Time `json:"LastSuccessfulAssociationExecutionDate,omitempty"`
+	LastSuccessfulAssociationExecutionDate *common.UnixTime `json:"LastSuccessfulAssociationExecutionDate,omitempty"`
 
-	LaunchTime *time.Time `json:"LaunchTime,omitempty"`
+	LaunchTime *common.UnixTime `json:"LaunchTime,omitempty"`
 
 	Name *string `json:"Name,omitempty"`
 
@@ -4098,7 +4100,7 @@ type InstanceProperty struct {
 
 	PlatformVersion *string `json:"PlatformVersion,omitempty"`
 
-	RegistrationDate *time.Time `json:"RegistrationDate,omitempty"`
+	RegistrationDate *common.UnixTime `json:"RegistrationDate,omitempty"`
 
 	ResourceType *string `json:"ResourceType,omitempty"`
 
@@ -5202,7 +5204,7 @@ type InventoryDeletionStartTime time.Time
 type InventoryDeletionStatusItem struct {
 	DeletionId *string `json:"DeletionId,omitempty"`
 
-	DeletionStartTime *time.Time `json:"DeletionStartTime,omitempty"`
+	DeletionStartTime *common.UnixTime `json:"DeletionStartTime,omitempty"`
 
 	DeletionSummary *InventoryDeletionSummary `json:"DeletionSummary,omitempty"`
 
@@ -5210,7 +5212,7 @@ type InventoryDeletionStatusItem struct {
 
 	LastStatusMessage *string `json:"LastStatusMessage,omitempty"`
 
-	LastStatusUpdateTime *time.Time `json:"LastStatusUpdateTime,omitempty"`
+	LastStatusUpdateTime *common.UnixTime `json:"LastStatusUpdateTime,omitempty"`
 
 	TypeName *string `json:"TypeName,omitempty"`
 }
@@ -5846,9 +5848,9 @@ type MaintenanceWindowEnabled bool
 
 // MaintenanceWindowExecution represents the MaintenanceWindowExecution structure
 type MaintenanceWindowExecution struct {
-	EndTime *time.Time `json:"EndTime,omitempty"`
+	EndTime *common.UnixTime `json:"EndTime,omitempty"`
 
-	StartTime *time.Time `json:"StartTime,omitempty"`
+	StartTime *common.UnixTime `json:"StartTime,omitempty"`
 
 	Status *MaintenanceWindowExecutionStatus `json:"Status,omitempty"`
 
@@ -5881,9 +5883,9 @@ type MaintenanceWindowExecutionTaskIdList []string
 type MaintenanceWindowExecutionTaskIdentity struct {
 	AlarmConfiguration *AlarmConfiguration `json:"AlarmConfiguration,omitempty"`
 
-	EndTime *time.Time `json:"EndTime,omitempty"`
+	EndTime *common.UnixTime `json:"EndTime,omitempty"`
 
-	StartTime *time.Time `json:"StartTime,omitempty"`
+	StartTime *common.UnixTime `json:"StartTime,omitempty"`
 
 	Status *MaintenanceWindowExecutionStatus `json:"Status,omitempty"`
 
@@ -5908,7 +5910,7 @@ type MaintenanceWindowExecutionTaskInvocationId string
 
 // MaintenanceWindowExecutionTaskInvocationIdentity represents the MaintenanceWindowExecutionTaskInvocationIdentity structure
 type MaintenanceWindowExecutionTaskInvocationIdentity struct {
-	EndTime *time.Time `json:"EndTime,omitempty"`
+	EndTime *common.UnixTime `json:"EndTime,omitempty"`
 
 	ExecutionId *string `json:"ExecutionId,omitempty"`
 
@@ -5918,7 +5920,7 @@ type MaintenanceWindowExecutionTaskInvocationIdentity struct {
 
 	Parameters *string `json:"Parameters,omitempty"`
 
-	StartTime *time.Time `json:"StartTime,omitempty"`
+	StartTime *common.UnixTime `json:"StartTime,omitempty"`
 
 	Status *MaintenanceWindowExecutionStatus `json:"Status,omitempty"`
 
@@ -6277,7 +6279,7 @@ type NextToken string
 
 // Node represents the Node structure
 type Node struct {
-	CaptureTime *time.Time `json:"CaptureTime,omitempty"`
+	CaptureTime *common.UnixTime `json:"CaptureTime,omitempty"`
 
 	Id *string `json:"Id,omitempty"`
 
@@ -6482,21 +6484,21 @@ type OpsFilterValueList []string
 
 // OpsItem represents the OpsItem structure
 type OpsItem struct {
-	ActualEndTime *time.Time `json:"ActualEndTime,omitempty"`
+	ActualEndTime *common.UnixTime `json:"ActualEndTime,omitempty"`
 
-	ActualStartTime *time.Time `json:"ActualStartTime,omitempty"`
+	ActualStartTime *common.UnixTime `json:"ActualStartTime,omitempty"`
 
 	Category *string `json:"Category,omitempty"`
 
 	CreatedBy *string `json:"CreatedBy,omitempty"`
 
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
+	CreatedTime *common.UnixTime `json:"CreatedTime,omitempty"`
 
 	Description *string `json:"Description,omitempty"`
 
 	LastModifiedBy *string `json:"LastModifiedBy,omitempty"`
 
-	LastModifiedTime *time.Time `json:"LastModifiedTime,omitempty"`
+	LastModifiedTime *common.UnixTime `json:"LastModifiedTime,omitempty"`
 
 	Notifications []OpsItemNotification `json:"Notifications,omitempty"`
 
@@ -6508,9 +6510,9 @@ type OpsItem struct {
 
 	OpsItemType *string `json:"OpsItemType,omitempty"`
 
-	PlannedEndTime *time.Time `json:"PlannedEndTime,omitempty"`
+	PlannedEndTime *common.UnixTime `json:"PlannedEndTime,omitempty"`
 
-	PlannedStartTime *time.Time `json:"PlannedStartTime,omitempty"`
+	PlannedStartTime *common.UnixTime `json:"PlannedStartTime,omitempty"`
 
 	Priority *int32 `json:"Priority,omitempty"`
 
@@ -6642,7 +6644,7 @@ type OpsItemEventSummaries []OpsItemEventSummary
 type OpsItemEventSummary struct {
 	CreatedBy *OpsItemIdentity `json:"CreatedBy,omitempty"`
 
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
+	CreatedTime *common.UnixTime `json:"CreatedTime,omitempty"`
 
 	Detail *string `json:"Detail,omitempty"`
 
@@ -6839,11 +6841,11 @@ type OpsItemRelatedItemSummary struct {
 
 	CreatedBy *OpsItemIdentity `json:"CreatedBy,omitempty"`
 
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
+	CreatedTime *common.UnixTime `json:"CreatedTime,omitempty"`
 
 	LastModifiedBy *OpsItemIdentity `json:"LastModifiedBy,omitempty"`
 
-	LastModifiedTime *time.Time `json:"LastModifiedTime,omitempty"`
+	LastModifiedTime *common.UnixTime `json:"LastModifiedTime,omitempty"`
 
 	OpsItemId *string `json:"OpsItemId,omitempty"`
 
@@ -6884,19 +6886,19 @@ type OpsItemSummaries []OpsItemSummary
 
 // OpsItemSummary represents the OpsItemSummary structure
 type OpsItemSummary struct {
-	ActualEndTime *time.Time `json:"ActualEndTime,omitempty"`
+	ActualEndTime *common.UnixTime `json:"ActualEndTime,omitempty"`
 
-	ActualStartTime *time.Time `json:"ActualStartTime,omitempty"`
+	ActualStartTime *common.UnixTime `json:"ActualStartTime,omitempty"`
 
 	Category *string `json:"Category,omitempty"`
 
 	CreatedBy *string `json:"CreatedBy,omitempty"`
 
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
+	CreatedTime *common.UnixTime `json:"CreatedTime,omitempty"`
 
 	LastModifiedBy *string `json:"LastModifiedBy,omitempty"`
 
-	LastModifiedTime *time.Time `json:"LastModifiedTime,omitempty"`
+	LastModifiedTime *common.UnixTime `json:"LastModifiedTime,omitempty"`
 
 	OperationalData map[string]OpsItemDataValue `json:"OperationalData,omitempty"`
 
@@ -6904,9 +6906,9 @@ type OpsItemSummary struct {
 
 	OpsItemType *string `json:"OpsItemType,omitempty"`
 
-	PlannedEndTime *time.Time `json:"PlannedEndTime,omitempty"`
+	PlannedEndTime *common.UnixTime `json:"PlannedEndTime,omitempty"`
 
-	PlannedStartTime *time.Time `json:"PlannedStartTime,omitempty"`
+	PlannedStartTime *common.UnixTime `json:"PlannedStartTime,omitempty"`
 
 	Priority *int32 `json:"Priority,omitempty"`
 
@@ -6927,9 +6929,9 @@ type OpsItemType string
 
 // OpsMetadata represents the OpsMetadata structure
 type OpsMetadata struct {
-	CreationDate *time.Time `json:"CreationDate,omitempty"`
+	CreationDate *common.UnixTime `json:"CreationDate,omitempty"`
 
-	LastModifiedDate *time.Time `json:"LastModifiedDate,omitempty"`
+	LastModifiedDate *common.UnixTime `json:"LastModifiedDate,omitempty"`
 
 	LastModifiedUser *string `json:"LastModifiedUser,omitempty"`
 
@@ -7128,7 +7130,7 @@ type Parameter struct {
 
 	DataType *string `json:"DataType,omitempty"`
 
-	LastModifiedDate *time.Time `json:"LastModifiedDate,omitempty"`
+	LastModifiedDate *common.UnixTime `json:"LastModifiedDate,omitempty"`
 
 	Name *string `json:"Name,omitempty"`
 
@@ -7181,7 +7183,7 @@ type ParameterHistory struct {
 
 	Labels []string `json:"Labels,omitempty"`
 
-	LastModifiedDate *time.Time `json:"LastModifiedDate,omitempty"`
+	LastModifiedDate *common.UnixTime `json:"LastModifiedDate,omitempty"`
 
 	LastModifiedUser *string `json:"LastModifiedUser,omitempty"`
 
@@ -7274,7 +7276,7 @@ type ParameterMetadata struct {
 
 	KeyId *string `json:"KeyId,omitempty"`
 
-	LastModifiedDate *time.Time `json:"LastModifiedDate,omitempty"`
+	LastModifiedDate *common.UnixTime `json:"LastModifiedDate,omitempty"`
 
 	LastModifiedUser *string `json:"LastModifiedUser,omitempty"`
 
@@ -7482,7 +7484,7 @@ type Patch struct {
 
 	Release *string `json:"Release,omitempty"`
 
-	ReleaseDate *time.Time `json:"ReleaseDate,omitempty"`
+	ReleaseDate *common.UnixTime `json:"ReleaseDate,omitempty"`
 
 	Repository *string `json:"Repository,omitempty"`
 
@@ -7754,7 +7756,7 @@ type PatchSourceProductList []string
 
 // PatchStatus represents the PatchStatus structure
 type PatchStatus struct {
-	ApprovalDate *time.Time `json:"ApprovalDate,omitempty"`
+	ApprovalDate *common.UnixTime `json:"ApprovalDate,omitempty"`
 
 	ComplianceLevel *PatchComplianceLevel `json:"ComplianceLevel,omitempty"`
 
@@ -8219,17 +8221,17 @@ func (e ResourceDataSyncInvalidConfigurationException) ErrorFault() string {
 type ResourceDataSyncItem struct {
 	LastStatus *LastResourceDataSyncStatus `json:"LastStatus,omitempty"`
 
-	LastSuccessfulSyncTime *time.Time `json:"LastSuccessfulSyncTime,omitempty"`
+	LastSuccessfulSyncTime *common.UnixTime `json:"LastSuccessfulSyncTime,omitempty"`
 
 	LastSyncStatusMessage *string `json:"LastSyncStatusMessage,omitempty"`
 
-	LastSyncTime *time.Time `json:"LastSyncTime,omitempty"`
+	LastSyncTime *common.UnixTime `json:"LastSyncTime,omitempty"`
 
 	S3Destination *ResourceDataSyncS3Destination `json:"S3Destination,omitempty"`
 
-	SyncCreatedTime *time.Time `json:"SyncCreatedTime,omitempty"`
+	SyncCreatedTime *common.UnixTime `json:"SyncCreatedTime,omitempty"`
 
-	SyncLastModifiedTime *time.Time `json:"SyncLastModifiedTime,omitempty"`
+	SyncLastModifiedTime *common.UnixTime `json:"SyncLastModifiedTime,omitempty"`
 
 	SyncName *string `json:"SyncName,omitempty"`
 
@@ -8534,7 +8536,7 @@ type ResumeSessionResponse struct {
 
 // ReviewInformation represents the ReviewInformation structure
 type ReviewInformation struct {
-	ReviewedTime *time.Time `json:"ReviewedTime,omitempty"`
+	ReviewedTime *common.UnixTime `json:"ReviewedTime,omitempty"`
 
 	Reviewer *string `json:"Reviewer,omitempty"`
 
@@ -8704,7 +8706,7 @@ type ServiceRole string
 type ServiceSetting struct {
 	ARN *string `json:"ARN,omitempty"`
 
-	LastModifiedDate *time.Time `json:"LastModifiedDate,omitempty"`
+	LastModifiedDate *common.UnixTime `json:"LastModifiedDate,omitempty"`
 
 	LastModifiedUser *string `json:"LastModifiedUser,omitempty"`
 
@@ -8749,7 +8751,7 @@ type Session struct {
 
 	DocumentName *string `json:"DocumentName,omitempty"`
 
-	EndDate *time.Time `json:"EndDate,omitempty"`
+	EndDate *common.UnixTime `json:"EndDate,omitempty"`
 
 	MaxSessionDuration *string `json:"MaxSessionDuration,omitempty"`
 
@@ -8761,7 +8763,7 @@ type Session struct {
 
 	SessionId *string `json:"SessionId,omitempty"`
 
-	StartDate *time.Time `json:"StartDate,omitempty"`
+	StartDate *common.UnixTime `json:"StartDate,omitempty"`
 
 	Status *SessionStatus `json:"Status,omitempty"`
 
@@ -8940,9 +8942,9 @@ type StartChangeRequestExecutionRequest struct {
 
 	Runbooks []Runbook `json:"Runbooks"`
 
-	ScheduledEndTime *time.Time `json:"ScheduledEndTime,omitempty"`
+	ScheduledEndTime *common.UnixTime `json:"ScheduledEndTime,omitempty"`
 
-	ScheduledTime *time.Time `json:"ScheduledTime,omitempty"`
+	ScheduledTime *common.UnixTime `json:"ScheduledTime,omitempty"`
 
 	Tags []Tag `json:"Tags,omitempty"`
 }
@@ -9021,9 +9023,9 @@ func (e StatusUnchanged) ErrorFault() string {
 type StepExecution struct {
 	Action *string `json:"Action,omitempty"`
 
-	ExecutionEndTime *time.Time `json:"ExecutionEndTime,omitempty"`
+	ExecutionEndTime *common.UnixTime `json:"ExecutionEndTime,omitempty"`
 
-	ExecutionStartTime *time.Time `json:"ExecutionStartTime,omitempty"`
+	ExecutionStartTime *common.UnixTime `json:"ExecutionStartTime,omitempty"`
 
 	FailureDetails *FailureDetails `json:"FailureDetails,omitempty"`
 
@@ -9841,9 +9843,9 @@ type UpdateManagedInstanceRoleResult struct {
 
 // UpdateOpsItemRequest represents the UpdateOpsItemRequest structure
 type UpdateOpsItemRequest struct {
-	ActualEndTime *time.Time `json:"ActualEndTime,omitempty"`
+	ActualEndTime *common.UnixTime `json:"ActualEndTime,omitempty"`
 
-	ActualStartTime *time.Time `json:"ActualStartTime,omitempty"`
+	ActualStartTime *common.UnixTime `json:"ActualStartTime,omitempty"`
 
 	Category *string `json:"Category,omitempty"`
 
@@ -9859,9 +9861,9 @@ type UpdateOpsItemRequest struct {
 
 	OpsItemId string `json:"OpsItemId"`
 
-	PlannedEndTime *time.Time `json:"PlannedEndTime,omitempty"`
+	PlannedEndTime *common.UnixTime `json:"PlannedEndTime,omitempty"`
 
-	PlannedStartTime *time.Time `json:"PlannedStartTime,omitempty"`
+	PlannedStartTime *common.UnixTime `json:"PlannedStartTime,omitempty"`
 
 	Priority *int32 `json:"Priority,omitempty"`
 
@@ -9935,13 +9937,13 @@ type UpdatePatchBaselineResult struct {
 
 	BaselineId *string `json:"BaselineId,omitempty"`
 
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
 	Description *string `json:"Description,omitempty"`
 
 	GlobalFilters *PatchFilterGroup `json:"GlobalFilters,omitempty"`
 
-	ModifiedDate *time.Time `json:"ModifiedDate,omitempty"`
+	ModifiedDate *common.UnixTime `json:"ModifiedDate,omitempty"`
 
 	Name *string `json:"Name,omitempty"`
 

@@ -4,6 +4,8 @@ package generated
 
 import (
 	"time"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/common"
 )
 
 // Unit represents an empty response
@@ -147,7 +149,7 @@ type DeleteSecretRequest struct {
 type DeleteSecretResponse struct {
 	ARN *string `json:"ARN,omitempty"`
 
-	DeletionDate *time.Time `json:"DeletionDate,omitempty"`
+	DeletionDate *common.UnixTime `json:"DeletionDate,omitempty"`
 
 	Name *string `json:"Name,omitempty"`
 }
@@ -167,23 +169,23 @@ type DescribeSecretRequest struct {
 type DescribeSecretResponse struct {
 	ARN *string `json:"ARN,omitempty"`
 
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
-	DeletedDate *time.Time `json:"DeletedDate,omitempty"`
+	DeletedDate *common.UnixTime `json:"DeletedDate,omitempty"`
 
 	Description *string `json:"Description,omitempty"`
 
 	KmsKeyId *string `json:"KmsKeyId,omitempty"`
 
-	LastAccessedDate *time.Time `json:"LastAccessedDate,omitempty"`
+	LastAccessedDate *common.UnixTime `json:"LastAccessedDate,omitempty"`
 
-	LastChangedDate *time.Time `json:"LastChangedDate,omitempty"`
+	LastChangedDate *common.UnixTime `json:"LastChangedDate,omitempty"`
 
-	LastRotatedDate *time.Time `json:"LastRotatedDate,omitempty"`
+	LastRotatedDate *common.UnixTime `json:"LastRotatedDate,omitempty"`
 
 	Name *string `json:"Name,omitempty"`
 
-	NextRotationDate *time.Time `json:"NextRotationDate,omitempty"`
+	NextRotationDate *common.UnixTime `json:"NextRotationDate,omitempty"`
 
 	OwningService *string `json:"OwningService,omitempty"`
 
@@ -316,7 +318,7 @@ type GetSecretValueRequest struct {
 type GetSecretValueResponse struct {
 	ARN *string `json:"ARN,omitempty"`
 
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
 	Name *string `json:"Name,omitempty"`
 
@@ -671,7 +673,7 @@ type ReplicationStatusListType []ReplicationStatusType
 type ReplicationStatusType struct {
 	KmsKeyId *string `json:"KmsKeyId,omitempty"`
 
-	LastAccessedDate *time.Time `json:"LastAccessedDate,omitempty"`
+	LastAccessedDate *common.UnixTime `json:"LastAccessedDate,omitempty"`
 
 	Region *string `json:"Region,omitempty"`
 
@@ -794,23 +796,23 @@ type SecretIdType string
 type SecretListEntry struct {
 	ARN *string `json:"ARN,omitempty"`
 
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
-	DeletedDate *time.Time `json:"DeletedDate,omitempty"`
+	DeletedDate *common.UnixTime `json:"DeletedDate,omitempty"`
 
 	Description *string `json:"Description,omitempty"`
 
 	KmsKeyId *string `json:"KmsKeyId,omitempty"`
 
-	LastAccessedDate *time.Time `json:"LastAccessedDate,omitempty"`
+	LastAccessedDate *common.UnixTime `json:"LastAccessedDate,omitempty"`
 
-	LastChangedDate *time.Time `json:"LastChangedDate,omitempty"`
+	LastChangedDate *common.UnixTime `json:"LastChangedDate,omitempty"`
 
-	LastRotatedDate *time.Time `json:"LastRotatedDate,omitempty"`
+	LastRotatedDate *common.UnixTime `json:"LastRotatedDate,omitempty"`
 
 	Name *string `json:"Name,omitempty"`
 
-	NextRotationDate *time.Time `json:"NextRotationDate,omitempty"`
+	NextRotationDate *common.UnixTime `json:"NextRotationDate,omitempty"`
 
 	OwningService *string `json:"OwningService,omitempty"`
 
@@ -840,7 +842,7 @@ type SecretStringType string
 type SecretValueEntry struct {
 	ARN *string `json:"ARN,omitempty"`
 
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
 	Name *string `json:"Name,omitempty"`
 
@@ -867,11 +869,11 @@ type SecretVersionStagesType []string
 
 // SecretVersionsListEntry represents the SecretVersionsListEntry structure
 type SecretVersionsListEntry struct {
-	CreatedDate *time.Time `json:"CreatedDate,omitempty"`
+	CreatedDate *common.UnixTime `json:"CreatedDate,omitempty"`
 
 	KmsKeyIds []string `json:"KmsKeyIds,omitempty"`
 
-	LastAccessedDate *time.Time `json:"LastAccessedDate,omitempty"`
+	LastAccessedDate *common.UnixTime `json:"LastAccessedDate,omitempty"`
 
 	VersionId *string `json:"VersionId,omitempty"`
 
