@@ -47,7 +47,7 @@ var _ = Describe("SSM Integration", func() {
 			paramValue := "secret-password-123"
 			now := time.Now()
 			version := int64(1)
-			paramType := interface{}("SecureString")
+			paramType := ssmapi.ParameterType("SecureString")
 			mockSSM.parameters[paramName] = &ssmapi.GetParameterResult{
 				Parameter: &ssmapi.Parameter{
 					Name:             &paramName,
@@ -80,7 +80,7 @@ var _ = Describe("SSM Integration", func() {
 			paramValue := "cached-value"
 			now := time.Now()
 			version := int64(1)
-			paramType := interface{}("String")
+			paramType := ssmapi.ParameterType("String")
 			mockSSM.parameters[paramName] = &ssmapi.GetParameterResult{
 				Parameter: &ssmapi.Parameter{
 					Name:             &paramName,
@@ -100,7 +100,7 @@ var _ = Describe("SSM Integration", func() {
 			now2 := time.Now()
 			version2 := int64(2)
 			newValue := "new-value"
-			paramType2 := interface{}("String")
+			paramType2 := ssmapi.ParameterType("String")
 			mockSSM.parameters[paramName] = &ssmapi.GetParameterResult{
 				Parameter: &ssmapi.Parameter{
 					Name:             &paramName,
@@ -209,7 +209,7 @@ var _ = Describe("SSM Integration", func() {
 			paramValue := "sync-test-value"
 			now := time.Now()
 			version := int64(1)
-			paramType := interface{}("String")
+			paramType := ssmapi.ParameterType("String")
 			mockSSM.parameters[paramName] = &ssmapi.GetParameterResult{
 				Parameter: &ssmapi.Parameter{
 					Name:             &paramName,
@@ -284,7 +284,7 @@ var _ = Describe("SSM Integration", func() {
 				value := fmt.Sprintf("value-%d", i+1)
 				now := time.Now()
 				version := int64(1)
-				paramType := interface{}("String")
+				paramType := ssmapi.ParameterType("String")
 				paramNameCopy := paramName
 				mockSSM.parameters[paramName] = &ssmapi.GetParameterResult{
 					Parameter: &ssmapi.Parameter{
@@ -320,7 +320,7 @@ var _ = Describe("SSM Integration", func() {
 			value0 := "exists-value"
 			now0 := time.Now()
 			version0 := int64(1)
-			paramType0 := interface{}("String")
+			paramType0 := ssmapi.ParameterType("String")
 			mockSSM.parameters[params[0]] = &ssmapi.GetParameterResult{
 				Parameter: &ssmapi.Parameter{
 					Name:             &paramName0,

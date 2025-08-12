@@ -136,8 +136,9 @@ func (m *SmithyMember) GetJSONName(fieldName string) string {
 			}
 		}
 	}
-	// Convert to camelCase by default
-	return toCamelCase(fieldName)
+	// AWS APIs use PascalCase for field names, not camelCase
+	// Return the field name as-is to preserve AWS API compatibility
+	return fieldName
 }
 
 // toCamelCase converts a string to camelCase

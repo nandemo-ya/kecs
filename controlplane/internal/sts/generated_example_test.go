@@ -18,7 +18,7 @@ func TestGeneratedTypes(t *testing.T) {
 var _ = Describe("STS Generated Types", func() {
 	Describe("AssumeRoleRequest", func() {
 		Context("when marshaling to JSON", func() {
-			It("should use camelCase field names", func() {
+			It("should use PascalCase field names", func() {
 				req := &sts.AssumeRoleRequest{
 					RoleArn:         "arn:aws:iam::123456789012:role/MyRole",
 					RoleSessionName: "MySession",
@@ -41,24 +41,24 @@ var _ = Describe("STS Generated Types", func() {
 				err = json.Unmarshal(data, &jsonMap)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(jsonMap["roleArn"]).To(Equal("arn:aws:iam::123456789012:role/MyRole"))
-				Expect(jsonMap["roleSessionName"]).To(Equal("MySession"))
-				Expect(jsonMap["durationSeconds"]).To(Equal(float64(3600)))
-				Expect(jsonMap["externalId"]).To(Equal("unique-external-id"))
+				Expect(jsonMap["RoleArn"]).To(Equal("arn:aws:iam::123456789012:role/MyRole"))
+				Expect(jsonMap["RoleSessionName"]).To(Equal("MySession"))
+				Expect(jsonMap["DurationSeconds"]).To(Equal(float64(3600)))
+				Expect(jsonMap["ExternalId"]).To(Equal("unique-external-id"))
 
 				// Verify tags
-				tags := jsonMap["tags"].([]interface{})
+				tags := jsonMap["Tags"].([]interface{})
 				Expect(tags).To(HaveLen(1))
 				tag := tags[0].(map[string]interface{})
-				Expect(tag["key"]).To(Equal("Environment"))
-				Expect(tag["value"]).To(Equal("Test"))
+				Expect(tag["Key"]).To(Equal("Environment"))
+				Expect(tag["Value"]).To(Equal("Test"))
 			})
 		})
 	})
 
 	Describe("AssumeRoleResponse", func() {
 		Context("when unmarshaling from JSON", func() {
-			It("should correctly parse camelCase fields", func() {
+			It("should correctly parse PascalCase fields", func() {
 				jsonData := `{
 			"credentials": {
 				"accessKeyId": "AKIAIOSFODNN7EXAMPLE",

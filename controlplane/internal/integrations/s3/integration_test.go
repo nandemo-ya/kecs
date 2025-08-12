@@ -277,9 +277,8 @@ var _ = Describe("S3 Integration", func() {
 			mockClient.createBucketFunc = func(ctx context.Context, params *s3api.CreateBucketRequest) (*s3api.CreateBucketOutput, error) {
 				Expect(params.CreateBucketConfiguration).NotTo(BeNil())
 				Expect(params.CreateBucketConfiguration.LocationConstraint).NotTo(BeNil())
-				constraint, ok := (*params.CreateBucketConfiguration.LocationConstraint).(string)
-				Expect(ok).To(BeTrue())
-				Expect(constraint).To(Equal("eu-west-1"))
+				// LocationConstraint is now of type *BucketLocationConstraint
+				Expect(string(*params.CreateBucketConfiguration.LocationConstraint)).To(Equal("eu-west-1"))
 				return &s3api.CreateBucketOutput{}, nil
 			}
 
