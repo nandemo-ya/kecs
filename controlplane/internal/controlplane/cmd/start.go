@@ -212,13 +212,13 @@ func createNewInstance() (string, bool, error) {
 }
 
 // displayExistingInstances shows the list of existing KECS instances
-func displayExistingInstances(manager *kubernetes.K3dClusterManager, clusters []string) {
+func displayExistingInstances(manager *kubernetes.K3dClusterManager, clusters []kubernetes.ClusterInfo) {
 	fmt.Println(msgExistingInstances)
 	for i, cluster := range clusters {
-		status := getInstanceStatus(manager, cluster)
-		dataInfo := getInstanceDataInfo(cluster)
+		status := getInstanceStatus(manager, cluster.Name)
+		dataInfo := getInstanceDataInfo(cluster.Name)
 		
-		fmt.Printf("  %d. %s (%s%s)\n", i+1, cluster, status, dataInfo)
+		fmt.Printf("  %d. %s (%s%s)\n", i+1, cluster.Name, status, dataInfo)
 	}
 	
 	fmt.Println(msgUseExistingHint)

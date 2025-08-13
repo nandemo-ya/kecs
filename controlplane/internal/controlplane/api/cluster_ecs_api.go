@@ -719,7 +719,7 @@ func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 		}
 
 		// Get Kubernetes client for the KECS instance
-		client, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
+		client, err := clusterManager.GetKubeClient(context.Background(), cluster.K8sClusterName)
 		if err != nil {
 			logging.Error("Failed to get kubernetes client", "error", err)
 			return
@@ -794,7 +794,7 @@ func (api *DefaultECSAPI) deleteK8sClusterAndNamespace(cluster *storage.Cluster)
 		}
 
 		// Get Kubernetes client for the KECS instance
-		client, err := clusterManager.GetKubeClient(cluster.K8sClusterName)
+		client, err := clusterManager.GetKubeClient(context.Background(), cluster.K8sClusterName)
 		if err != nil {
 			logging.Error("Failed to get kubernetes client", "error", err)
 			return
@@ -876,7 +876,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 	
 	// If Traefik is enabled, get the dynamic port from cluster manager
 	if config.UseTraefik && api.clusterManager != nil {
-		if port, exists := api.clusterManager.GetTraefikPort(cluster.K8sClusterName); exists {
+		if port, err := api.clusterManager.GetTraefikPort(context.Background(), cluster.K8sClusterName); err == nil {
 			// In container mode, use k3d node hostname with NodePort
 			if config.ContainerMode {
 				k3dNodeName := fmt.Sprintf("k3d-%s-server-0", cluster.K8sClusterName)
@@ -923,7 +923,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		logging.Debug("In-cluster config failed (expected in local development)", "error", err)
 		
 		// Get Kubernetes client for the specific k3d cluster
-		client, err := api.clusterManager.GetKubeClient(cluster.K8sClusterName)
+		client, err := api.clusterManager.GetKubeClient(ctx, cluster.K8sClusterName)
 		if err != nil {
 			logging.Error("Failed to get Kubernetes client", "error", err)
 			return
@@ -931,7 +931,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		kubeClient = client
 
 		// Get kube config
-		kubeConfig, err = api.clusterManager.GetKubeConfig(cluster.K8sClusterName)
+		kubeConfig, err = api.clusterManager.GetKubeConfig(context.Background(), cluster.K8sClusterName)
 		if err != nil {
 			logging.Error("Failed to get kube config", "error", err)
 			return

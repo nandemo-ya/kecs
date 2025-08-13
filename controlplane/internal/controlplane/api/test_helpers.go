@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"time"
+	"fmt"
 
 	k8s "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -38,15 +38,15 @@ func (m *MockClusterManager) ClusterExists(ctx context.Context, clusterName stri
 	return m.ClusterMap[clusterName], nil
 }
 
-func (m *MockClusterManager) GetKubeClient(clusterName string) (k8s.Interface, error) {
+func (m *MockClusterManager) GetKubeClient(ctx context.Context, clusterName string) (k8s.Interface, error) {
 	return nil, nil
 }
 
-func (m *MockClusterManager) GetKubeConfig(clusterName string) (*rest.Config, error) {
+func (m *MockClusterManager) GetKubeConfig(ctx context.Context, clusterName string) (*rest.Config, error) {
 	return nil, nil
 }
 
-func (m *MockClusterManager) WaitForClusterReady(clusterName string, timeout time.Duration) error {
+func (m *MockClusterManager) WaitForClusterReady(ctx context.Context, clusterName string) error {
 	return nil
 }
 
@@ -58,8 +58,8 @@ func (m *MockClusterManager) GetClusterInfo(ctx context.Context, clusterName str
 	return nil, nil
 }
 
-func (m *MockClusterManager) GetTraefikPort(clusterName string) (int, bool) {
-	return 0, false
+func (m *MockClusterManager) GetTraefikPort(ctx context.Context, clusterName string) (int, error) {
+	return 0, fmt.Errorf("not implemented")
 }
 
 func (m *MockClusterManager) StopCluster(ctx context.Context, clusterName string) error {
@@ -70,8 +70,8 @@ func (m *MockClusterManager) StartCluster(ctx context.Context, clusterName strin
 	return nil
 }
 
-func (m *MockClusterManager) ListClusters(ctx context.Context) ([]string, error) {
-	return []string{}, nil
+func (m *MockClusterManager) ListClusters(ctx context.Context) ([]kubernetes.ClusterInfo, error) {
+	return []kubernetes.ClusterInfo{}, nil
 }
 
 func (m *MockClusterManager) IsClusterRunning(ctx context.Context, clusterName string) (bool, error) {

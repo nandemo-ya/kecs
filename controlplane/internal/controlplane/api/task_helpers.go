@@ -91,5 +91,5 @@ func (s *Server) getKubeClient(k8sClusterName string) (kubernetes.Interface, err
 		return nil, fmt.Errorf("cluster manager not available")
 	}
 
-	return s.clusterManager.GetKubeClient(k8sClusterName)
+	return s.clusterManager.GetKubeClient(context.Background(), k8sClusterName)
 }

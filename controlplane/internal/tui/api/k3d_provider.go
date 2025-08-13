@@ -31,9 +31,9 @@ import (
 
 // K3dInstanceProvider provides instance information directly from k3d clusters
 type K3dInstanceProvider struct {
-	k3dManager       *kubernetes.K3dClusterManager
-	dockerClient     *client.Client
-	instanceManager  *instance.Manager
+	k3dManager      *kubernetes.K3dClusterManager
+	dockerClient    *client.Client
+	instanceManager *instance.Manager
 }
 
 // NewK3dInstanceProvider creates a new k3d-based instance provider
@@ -49,7 +49,7 @@ func NewK3dInstanceProvider() (*K3dInstanceProvider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Docker client: %w", err)
 	}
-	
+
 	// Create instance manager for start/stop operations
 	instanceManager, err := instance.NewManager()
 	if err != nil {
@@ -66,14 +66,14 @@ func NewK3dInstanceProvider() (*K3dInstanceProvider, error) {
 // ListInstances returns all KECS instances from k3d clusters
 func (p *K3dInstanceProvider) ListInstances(ctx context.Context) ([]Instance, error) {
 	// Get all KECS clusters from k3d
-	clusterNames, err := p.k3dManager.ListClusters(ctx)
+	clusters, err := p.k3dManager.ListClusters(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list k3d clusters: %w", err)
 	}
 
 	var instances []Instance
-	for _, name := range clusterNames {
-		instance, err := p.getInstanceInfo(ctx, name)
+	for _, cluster := range clusters {
+		instance, err := p.getInstanceInfo(ctx, cluster.Name)
 		if err != nil {
 			// Log error but continue with other instances
 			continue
@@ -95,7 +95,7 @@ func (p *K3dInstanceProvider) getInstanceInfo(ctx context.Context, name string) 
 		APIPort:   8080,
 		CreatedAt: time.Now(), // Default value
 	}
-	
+
 	// Try to load saved configuration
 	if config, err := instance.LoadInstanceConfig(name); err == nil {
 		inst.APIPort = config.APIPort
@@ -189,12 +189,12 @@ func (p *K3dInstanceProvider) CreateInstance(ctx context.Context, opts CreateIns
 		NoTraefik:    !opts.Traefik,
 		DevMode:      opts.DevMode,
 	}
-	
+
 	// Use the instance manager to start the instance
 	if err := p.instanceManager.Start(ctx, startOpts); err != nil {
 		return nil, fmt.Errorf("failed to start instance: %w", err)
 	}
-	
+
 	// Return the created instance info
 	inst, err := p.getInstanceInfo(ctx, opts.Name)
 	if err != nil {
@@ -213,7 +213,7 @@ func (p *K3dInstanceProvider) GetInstance(ctx context.Context, name string) (*In
 	if !exists {
 		return nil, fmt.Errorf("instance not found: %s", name)
 	}
-	
+
 	inst, err := p.getInstanceInfo(ctx, name)
 	if err != nil {
 		return nil, err
@@ -225,13 +225,13 @@ func (p *K3dInstanceProvider) GetInstance(ctx context.Context, name string) (*In
 func (p *K3dInstanceProvider) GetInstanceLogs(ctx context.Context, name string, follow bool) (<-chan LogEntry, error) {
 	// Get container name
 	containerName := fmt.Sprintf("kecs-%s", name)
-	
+
 	// Find container ID
 	containers, err := p.dockerClient.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
-	
+
 	var containerID string
 	for _, c := range containers {
 		for _, n := range c.Names {
@@ -244,25 +244,25 @@ func (p *K3dInstanceProvider) GetInstanceLogs(ctx context.Context, name string, 
 			break
 		}
 	}
-	
+
 	if containerID == "" {
 		return nil, fmt.Errorf("container %s not found", containerName)
 	}
-	
+
 	// Create log channel
 	logChan := make(chan LogEntry, 100)
-	
+
 	// Start goroutine to read logs
 	go func() {
 		defer close(logChan)
-		
+
 		options := container.LogsOptions{
 			ShowStdout: true,
 			ShowStderr: true,
 			Follow:     follow,
 			Timestamps: true,
 		}
-		
+
 		reader, err := p.dockerClient.ContainerLogs(ctx, containerID, options)
 		if err != nil {
 			logChan <- LogEntry{
@@ -273,19 +273,19 @@ func (p *K3dInstanceProvider) GetInstanceLogs(ctx context.Context, name string, 
 			return
 		}
 		defer reader.Close()
-		
+
 		// Parse Docker multiplexed stream
 		scanner := bufio.NewScanner(reader)
 		for scanner.Scan() {
 			line := scanner.Text()
-			
+
 			// Parse timestamp and message
 			// Docker log format with timestamps: "2025-01-08T10:30:45.123456789Z message"
 			parts := strings.SplitN(line, " ", 2)
-			
+
 			var timestamp time.Time
 			var message string
-			
+
 			if len(parts) >= 2 {
 				// Try to parse timestamp
 				if t, err := time.Parse(time.RFC3339Nano, parts[0]); err == nil {
@@ -300,7 +300,7 @@ func (p *K3dInstanceProvider) GetInstanceLogs(ctx context.Context, name string, 
 				timestamp = time.Now()
 				message = line
 			}
-			
+
 			// Determine log level from message content
 			level := "INFO"
 			lowerMsg := strings.ToLower(message)
@@ -311,14 +311,14 @@ func (p *K3dInstanceProvider) GetInstanceLogs(ctx context.Context, name string, 
 			} else if strings.Contains(lowerMsg, "debug") {
 				level = "DEBUG"
 			}
-			
+
 			logChan <- LogEntry{
 				Timestamp: timestamp,
 				Level:     level,
 				Message:   message,
 			}
 		}
-		
+
 		if err := scanner.Err(); err != nil {
 			logChan <- LogEntry{
 				Timestamp: time.Now(),
@@ -327,7 +327,7 @@ func (p *K3dInstanceProvider) GetInstanceLogs(ctx context.Context, name string, 
 			}
 		}
 	}()
-	
+
 	return logChan, nil
 }
 
@@ -350,7 +350,7 @@ func (p *K3dInstanceProvider) GetInstanceCreationStatus(ctx context.Context, nam
 		if !exists {
 			return nil, fmt.Errorf("instance not found: %s", name)
 		}
-		
+
 		// Instance exists but no creation status - it's already created
 		return &CreationStatus{
 			Step:    "Completed",
@@ -358,7 +358,7 @@ func (p *K3dInstanceProvider) GetInstanceCreationStatus(ctx context.Context, nam
 			Message: "Instance is ready",
 		}, nil
 	}
-	
+
 	// Convert from instance.CreationStatus to api.CreationStatus
 	return &CreationStatus{
 		Step:    status.Step,
@@ -371,36 +371,36 @@ func (p *K3dInstanceProvider) GetInstanceCreationStatus(ctx context.Context, nam
 func (p *K3dInstanceProvider) getInstanceCounts(apiPort int) (clusters, services, tasks int) {
 	// Call ListClusters API
 	url := fmt.Sprintf("http://localhost:%d/v1/ListClusters", apiPort)
-	
+
 	client := &http.Client{
 		Timeout: 2 * time.Second,
 	}
-	
+
 	resp, err := client.Post(url, "application/json", strings.NewReader("{}"))
 	if err != nil {
 		return 0, 0, 0
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return 0, 0, 0
 	}
-	
+
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return 0, 0, 0
 	}
-	
+
 	// Parse cluster response
 	if clusterArns, ok := result["clusterArns"].([]interface{}); ok {
 		clusters = len(clusterArns)
-		
+
 		// For each cluster, get services and tasks
 		for _, arnInterface := range clusterArns {
 			if arn, ok := arnInterface.(string); ok {
 				// Extract cluster name from ARN
 				clusterName := extractClusterName(arn)
-				
+
 				// Get services count
 				servicesURL := fmt.Sprintf("http://localhost:%d/v1/ListServices", apiPort)
 				servicesBody := fmt.Sprintf(`{"cluster":"%s"}`, clusterName)
@@ -414,7 +414,7 @@ func (p *K3dInstanceProvider) getInstanceCounts(apiPort int) (clusters, services
 					}
 					servicesResp.Body.Close()
 				}
-				
+
 				// Get tasks count
 				tasksURL := fmt.Sprintf("http://localhost:%d/v1/ListTasks", apiPort)
 				tasksBody := fmt.Sprintf(`{"cluster":"%s"}`, clusterName)
@@ -431,7 +431,7 @@ func (p *K3dInstanceProvider) getInstanceCounts(apiPort int) (clusters, services
 			}
 		}
 	}
-	
+
 	return clusters, services, tasks
 }
 

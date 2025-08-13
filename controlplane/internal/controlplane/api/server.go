@@ -732,7 +732,7 @@ func (s *Server) recoverServicesForCluster(ctx context.Context, cluster *storage
 		"cluster", cluster.Name)
 
 	// Get Kubernetes client for the cluster
-	kubeClient, err := s.clusterManager.GetKubeClient(cluster.K8sClusterName)
+	kubeClient, err := s.clusterManager.GetKubeClient(ctx, cluster.K8sClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client for cluster %s: %w", cluster.K8sClusterName, err)
 	}
@@ -896,7 +896,7 @@ func (s *Server) scheduleServiceTasks(ctx context.Context, cluster *storage.Clus
 // createPodForTask creates a Kubernetes pod for an ECS task
 func (s *Server) createPodForTask(ctx context.Context, cluster *storage.Cluster, service *storage.Service, taskDef *storage.TaskDefinition, task *storage.Task) (*corev1.Pod, error) {
 	// Get Kubernetes client
-	kubeClient, err := s.clusterManager.GetKubeClient(cluster.K8sClusterName)
+	kubeClient, err := s.clusterManager.GetKubeClient(ctx, cluster.K8sClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
@@ -1006,14 +1006,14 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 	}
 
 	// Get Kubernetes client for the specific k3d cluster
-	kubeClient, err := s.clusterManager.GetKubeClient(cluster.K8sClusterName)
+	kubeClient, err := s.clusterManager.GetKubeClient(ctx, cluster.K8sClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get Kubernetes client: %w", err)
 	}
 
 	// If Traefik is enabled, get the dynamic port from cluster manager
 	if config.UseTraefik && s.clusterManager != nil {
-		if port, exists := s.clusterManager.GetTraefikPort(cluster.K8sClusterName); exists {
+		if port, err := s.clusterManager.GetTraefikPort(ctx, cluster.K8sClusterName); err == nil {
 			config.ProxyEndpoint = fmt.Sprintf("http://localhost:%d", port)
 			logging.Info("Using dynamic Traefik port for LocalStack proxy endpoint",
 				"port", port,
@@ -1025,7 +1025,7 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 	}
 
 	// Get kube config
-	kubeConfig, err := s.clusterManager.GetKubeConfig(cluster.K8sClusterName)
+	kubeConfig, err := s.clusterManager.GetKubeConfig(ctx, cluster.K8sClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kube config: %w", err)
 	}
