@@ -56,13 +56,13 @@ kubectl get pod -n $NAMESPACE ecs-task-$TASK_ID -o wide
 echo "6. Checking pod annotations for CloudWatch configuration..."
 kubectl get pod -n $NAMESPACE ecs-task-$TASK_ID -o jsonpath='{.metadata.annotations}' | jq '.' | grep -E 'kecs.dev/container.*logs' || true
 
-# Check FluentBit DaemonSet
-echo "7. Checking FluentBit DaemonSet..."
-kubectl get daemonset -n $NAMESPACE fluent-bit -o wide 2>/dev/null || echo "FluentBit DaemonSet not found"
+# Check Vector DaemonSet
+echo "7. Checking Vector DaemonSet..."
+kubectl get daemonset -n kecs-system vector -o wide 2>/dev/null || echo "Vector DaemonSet not found in kecs-system"
 
-# Check FluentBit ConfigMap
-echo "8. Checking FluentBit ConfigMap..."
-kubectl get configmap -n $NAMESPACE fluent-bit-config 2>/dev/null || echo "FluentBit ConfigMap not found"
+# Check Vector ConfigMap
+echo "8. Checking Vector ConfigMap..."
+kubectl get configmap -n kecs-system vector-config -o wide 2>/dev/null || echo "Vector ConfigMap not found in kecs-system"
 
 # Generate some logs from nginx
 echo "9. Generating logs from nginx container..."

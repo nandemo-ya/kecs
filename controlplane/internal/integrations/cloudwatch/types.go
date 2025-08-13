@@ -33,10 +33,6 @@ type LogConfiguration struct {
 	LogStreamName string
 	LogDriver     string
 	Options       map[string]string
-
-	// Kubernetes logging configuration
-	FluentBitConfigMapName string
-	FluentBitConfig        string
 }
 
 // Config represents CloudWatch integration configuration

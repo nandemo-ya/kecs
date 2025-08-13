@@ -200,66 +200,10 @@ func (i *integration) ConfigureContainerLogging(taskArn string, containerName st
 		return nil, fmt.Errorf("failed to create log group: %w", err)
 	}
 
-	// Create FluentBit configuration for CloudWatch
-	fluentBitConfig := i.generateFluentBitConfig(logGroupName, logStreamName, options)
-
 	return &LogConfiguration{
-		LogGroupName:           logGroupName,
-		LogStreamName:          logStreamName,
-		LogDriver:              logDriver,
-		Options:                options,
-		FluentBitConfigMapName: fmt.Sprintf("fluent-bit-config-%s", taskArn),
-		FluentBitConfig:        fluentBitConfig,
+		LogGroupName:  logGroupName,
+		LogStreamName: logStreamName,
+		LogDriver:     logDriver,
+		Options:       options,
 	}, nil
-}
-
-// generateFluentBitConfig generates FluentBit configuration for CloudWatch
-func (i *integration) generateFluentBitConfig(logGroupName, logStreamPrefix string, options map[string]string) string {
-	region := options["awslogs-region"]
-	if region == "" {
-		region = "us-east-1"
-	}
-
-	endpoint := i.config.LocalStackEndpoint
-	if endpoint == "" {
-		endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
-	}
-
-	// FluentBit configuration for CloudWatch
-	return fmt.Sprintf(`[SERVICE]
-    Flush        1
-    Daemon       Off
-    Log_Level    info
-
-[INPUT]
-    Name              tail
-    Path              /var/log/containers/*.log
-    Parser            docker
-    Tag               kube.*
-    Refresh_Interval  5
-    Mem_Buf_Limit     5MB
-    Skip_Long_Lines   On
-
-[FILTER]
-    Name                kubernetes
-    Match               kube.*
-    Kube_URL            https://kubernetes.default.svc:443
-    Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-    Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
-    Merge_Log           On
-    K8S-Logging.Parser  On
-    K8S-Logging.Exclude On
-
-[OUTPUT]
-    Name                cloudwatch_logs
-    Match               *
-    region              %s
-    log_group_name      %s
-    log_stream_prefix   %s
-    auto_create_group   true
-    endpoint            %s
-    port                4566
-    tls                 Off
-    net.keepalive       Off
-`, region, logGroupName, logStreamPrefix, endpoint)
 }

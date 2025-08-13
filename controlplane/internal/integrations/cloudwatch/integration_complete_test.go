@@ -53,11 +53,6 @@ var _ = Describe("CloudWatch Integration Complete", func() {
 			Expect(logConfig.LogGroupName).To(Equal("/ecs/my-app"))
 			Expect(logConfig.LogStreamName).To(Equal("my-app"))
 			Expect(logConfig.LogDriver).To(Equal("awslogs"))
-
-			// Verify FluentBit config was generated
-			Expect(logConfig.FluentBitConfig).To(ContainSubstring("[OUTPUT]"))
-			Expect(logConfig.FluentBitConfig).To(ContainSubstring("cloudwatch_logs"))
-			Expect(logConfig.FluentBitConfig).To(ContainSubstring("/ecs/my-app"))
 		})
 
 		It("should create log group if not specified", func() {
@@ -121,31 +116,6 @@ var _ = Describe("CloudWatch Integration Complete", func() {
 		})
 	})
 
-	Describe("FluentBit Configuration", func() {
-		It("should generate valid FluentBit configuration", func() {
-			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/task-xyz"
-			containerName := "app"
-			options := map[string]string{
-				"awslogs-group":  "/ecs/my-service",
-				"awslogs-region": "us-west-2",
-			}
-
-			logConfig, err := integration.ConfigureContainerLogging(taskArn, containerName, "awslogs", options)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Verify FluentBit config contains required sections
-			config := logConfig.FluentBitConfig
-			Expect(config).To(ContainSubstring("[SERVICE]"))
-			Expect(config).To(ContainSubstring("[INPUT]"))
-			Expect(config).To(ContainSubstring("[FILTER]"))
-			Expect(config).To(ContainSubstring("[OUTPUT]"))
-
-			// Verify specific settings
-			Expect(config).To(ContainSubstring("region              us-west-2"))
-			Expect(config).To(ContainSubstring("log_group_name      /ecs/my-service"))
-			Expect(config).To(ContainSubstring("endpoint            http://localstack.kecs-system.svc.cluster.local:4566"))
-		})
-	})
 })
 
 // mockCloudWatchLogsTestClient for testing
