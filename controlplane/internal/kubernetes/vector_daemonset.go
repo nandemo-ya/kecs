@@ -159,15 +159,17 @@ source = '''
 # Default values
 .log_group = "/kecs/default"
 .log_stream = .namespace + "/" + .pod_name + "/" + .container_name
+.cloudwatch_enabled = false
 
 # Check for container-specific log configuration
 container_prefix = "kecs.dev/container-" + .container_name + "-logs-"
 
 # Extract log configuration from annotations
 if exists(.annotations) {
-  # Check if CloudWatch is enabled
   if exists(.annotations."kecs.dev/cloudwatch-logs-enabled") {
     if .annotations."kecs.dev/cloudwatch-logs-enabled" == "true" {
+      .cloudwatch_enabled = true
+      
       # Get log group
       group_key = container_prefix + "group"
       if exists(.annotations[group_key]) {
@@ -180,17 +182,8 @@ if exists(.annotations) {
         stream_prefix = string!(.annotations[stream_key])
         .log_stream = stream_prefix + "/" + .pod_name
       }
-      
-      # Mark as CloudWatch enabled
-      .cloudwatch_enabled = true
-    } else {
-      .cloudwatch_enabled = false
     }
-  } else {
-    .cloudwatch_enabled = false
   }
-} else {
-  .cloudwatch_enabled = false
 }
 '''
 
@@ -199,6 +192,12 @@ if exists(.annotations) {
 type = "filter"
 inputs = ["process_logs"]
 condition = '.cloudwatch_enabled == true'
+
+# Optional: Sample logs for debugging (1%% of messages)
+[transforms.sample_debug]
+type = "filter"
+inputs = ["route_cloudwatch"]
+condition = 'random_float(0.0, 1.0) < 0.01'
 
 # Output: Send to CloudWatch Logs via LocalStack
 [sinks.cloudwatch]
@@ -212,20 +211,12 @@ create_missing_group = true
 create_missing_stream = true
 encoding.codec = "text"
 
-# Optional: Console output for debugging
+# Optional: Console output for debugging (sampled)
 [sinks.console_debug]
 type = "console"
-inputs = ["route_cloudwatch"]
+inputs = ["sample_debug"]
 encoding.codec = "json"
 target = "stdout"
-
-# Sink configuration for debugging (can be removed in production)
-[sinks.console_debug.when]
-type = "vrl"
-source = '''
-# Only log every 100th message to reduce noise
-random_float() < 0.01
-'''
 `, localstackEndpoint, region)
 
 	cm := &corev1.ConfigMap{
