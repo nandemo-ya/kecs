@@ -172,15 +172,16 @@ if exists(.annotations) {
       
       # Get log group
       group_key = container_prefix + "group"
-      if exists(.annotations[group_key]) {
-        .log_group = string!(.annotations[group_key])
+      group_value = get(.annotations, [group_key]) ?? null
+      if group_value != null {
+        .log_group = string!(group_value)
       }
       
       # Get stream prefix
       stream_key = container_prefix + "stream-prefix"
-      if exists(.annotations[stream_key]) {
-        stream_prefix = string!(.annotations[stream_key])
-        .log_stream = stream_prefix + "/" + .pod_name
+      stream_value = get(.annotations, [stream_key]) ?? null
+      if stream_value != null {
+        .log_stream = string!(stream_value) + "/" + .pod_name
       }
     }
   }
