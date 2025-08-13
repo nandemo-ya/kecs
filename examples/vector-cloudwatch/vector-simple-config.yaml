@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+  namespace: kecs-system
+data:
+  vector.toml: |
+    # Simple Vector configuration for CloudWatch Logs
+    
+    # Input: Collect all container logs
+    [sources.kubernetes_logs]
+    type = "kubernetes_logs"
+    
+    # Transform: Add namespace filter
+    [transforms.filter_namespace]
+    type = "filter"
+    inputs = ["kubernetes_logs"]
+    condition = '''
+    !includes(["kecs-system", "kube-system"], .kubernetes.pod_namespace)
+    '''
+    
+    # Transform: Format log message
+    [transforms.format_logs]
+    type = "remap"
+    inputs = ["filter_namespace"]
+    source = '''
+    # Extract basic metadata
+    .namespace = string!(.kubernetes.pod_namespace)
+    .pod_name = string!(.kubernetes.pod_name)
+    .container_name = string!(.kubernetes.container_name)
+    
+    # Build log stream name
+    .log_stream = .namespace + "/" + .pod_name + "/" + .container_name
+    
+    # Check for ECS annotations (safely)
+    if exists(.kubernetes.pod_annotations."kecs.dev/cluster") {
+      .ecs_cluster = string!(.kubernetes.pod_annotations."kecs.dev/cluster")
+    } else {
+      .ecs_cluster = "default"
+    }
+    
+    if exists(.kubernetes.pod_annotations."kecs.dev/service") {
+      .ecs_service = string!(.kubernetes.pod_annotations."kecs.dev/service")
+    } else {
+      .ecs_service = "none"
+    }
+    
+    # Default log group based on namespace
+    if starts_with(.namespace, "default-") {
+      .log_group = "/ecs/default-logs"
+    } else {
+      .log_group = "/kecs/" + .namespace
+    }
+    '''
+    
+    # Output: Send to CloudWatch Logs via LocalStack
+    [sinks.cloudwatch]
+    type = "aws_cloudwatch_logs"
+    inputs = ["format_logs"]
+    endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
+    region = "us-east-1"
+    group_name = "{{ log_group }}"
+    stream_name = "{{ log_stream }}"
+    create_missing_group = true
+    create_missing_stream = true
+    encoding.codec = "text"
+    
+    # Output: Console for debugging
+    [sinks.console]
+    type = "console"
+    inputs = ["format_logs"]
+    encoding.codec = "json"
+    target = "stdout"

@@ -1,0 +1,98 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+  namespace: kecs-system
+data:
+  vector.toml: |
+    # Vector configuration for CloudWatch Logs integration
+    
+    # Input: Collect logs from Kubernetes containers
+    [sources.kubernetes_logs]
+    type = "kubernetes_logs"
+    auto_partial_merge = true
+    exclude_paths = [
+      "/var/log/containers/*_kecs-system_*.log",
+      "/var/log/containers/*_kube-system_*.log"
+    ]
+    
+    # Transform: Parse container logs and extract metadata
+    [transforms.parse_logs]
+    type = "remap"
+    inputs = ["kubernetes_logs"]
+    source = '''
+    # Parse JSON logs if present
+    if is_string(.message) && starts_with(.message, "{") {
+      parsed = parse_json!(.message)
+      . = merge(., parsed)
+    }
+    
+    # Extract ECS metadata from pod annotations
+    .ecs_cluster = .kubernetes.pod_annotations."kecs.dev/cluster" ?? "default"
+    .ecs_service = .kubernetes.pod_annotations."kecs.dev/service" ?? "unknown"
+    .ecs_task_family = .kubernetes.pod_annotations."kecs.dev/task-family" ?? "unknown"
+    
+    # Extract CloudWatch Logs configuration from annotations
+    .container_name = .kubernetes.container_name
+    prefix = "kecs.dev/container-" + .container_name + "-logs"
+    
+    .log_driver = .kubernetes.pod_annotations.(prefix + "-driver") ?? "none"
+    .log_group = .kubernetes.pod_annotations.(prefix + "-group") ?? "/ecs/default-logs"
+    .log_stream_prefix = .kubernetes.pod_annotations.(prefix + "-stream-prefix") ?? .container_name
+    .log_region = .kubernetes.pod_annotations.(prefix + "-region") ?? "us-east-1"
+    
+    # Create log stream name
+    .log_stream = .log_stream_prefix + "/" + .kubernetes.pod_name
+    '''
+    
+    # Filter: Only send logs configured for CloudWatch
+    [transforms.filter_cloudwatch]
+    type = "filter"
+    inputs = ["parse_logs"]
+    condition = '''
+    .log_driver == "awslogs"
+    '''
+    
+    # Transform: Format for CloudWatch
+    [transforms.format_cloudwatch]
+    type = "remap"
+    inputs = ["filter_cloudwatch"]
+    source = '''
+    # Keep only necessary fields
+    .timestamp = .timestamp
+    .message = .message
+    .log_group = .log_group
+    .log_stream = .log_stream
+    
+    # Add ECS metadata to the message
+    .message = "[" + .ecs_cluster + "/" + .ecs_service + "] " + .message
+    '''
+    
+    # Output: Send to CloudWatch Logs (via LocalStack)
+    [sinks.cloudwatch_logs]
+    type = "aws_cloudwatch_logs"
+    inputs = ["format_cloudwatch"]
+    endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
+    region = "us-east-1"
+    group_name = "{{ log_group }}"
+    stream_name = "{{ log_stream }}"
+    create_missing_group = true
+    create_missing_stream = true
+    encoding.codec = "text"
+    
+    # Retry configuration
+    request.retry_attempts = 3
+    request.retry_initial_backoff_secs = 1
+    
+    # Batch configuration for performance
+    batch.max_bytes = 1048576  # 1MB
+    batch.max_events = 10000
+    batch.timeout_secs = 1
+    
+    # For debugging: Also output to console
+    [sinks.console_debug]
+    type = "console"
+    inputs = ["parse_logs"]
+    encoding.codec = "json"
+    # Only enable for debugging
+    # target = "stdout"
