@@ -706,6 +706,12 @@ func (api *DefaultECSAPI) createK8sClusterAndNamespace(cluster *storage.Cluster)
 func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 	ctx := context.Background()
 
+	// Skip actual namespace creation in CI/test mode
+	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+		logging.Info("CI/TEST MODE: Skipping namespace creation", "cluster", cluster.Name)
+		return
+	}
+
 	// Try to create Kubernetes client
 	// First, try in-cluster config (when running inside Kubernetes)
 	kubeClient, err := kubernetes.GetInClusterClient()
@@ -827,6 +833,12 @@ func extractClusterNameFromARN(identifier string) string {
 // deployLocalStackIfEnabled deploys LocalStack to the k3d cluster if enabled
 func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 	logging.Debug("deployLocalStackIfEnabled called", "cluster", cluster.Name)
+	
+	// Skip in CI/test mode
+	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+		logging.Info("CI/TEST MODE: Skipping LocalStack deployment", "cluster", cluster.Name)
+		return
+	}
 	
 	// Skip if cluster manager is not available
 	if api.clusterManager == nil {

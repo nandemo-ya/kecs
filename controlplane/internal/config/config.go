@@ -310,7 +310,11 @@ func Set(key string, value interface{}) {
 
 // ensureInitialized ensures the configuration is initialized
 func ensureInitialized() {
-	if v == nil {
+	mu.RLock()
+	initialized := v != nil
+	mu.RUnlock()
+
+	if !initialized {
 		InitConfig()
 	}
 }
