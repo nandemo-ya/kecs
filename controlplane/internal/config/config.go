@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/spf13/viper"
 
@@ -40,16 +41,15 @@ type KubernetesConfig struct {
 	KeepClustersOnShutdown bool   `yaml:"keepClustersOnShutdown" mapstructure:"keepClustersOnShutdown"`
 }
 
-
 // FeaturesConfig represents feature toggles
 type FeaturesConfig struct {
-	TestMode                bool `yaml:"testMode" mapstructure:"testMode"`
-	ContainerMode           bool `yaml:"containerMode" mapstructure:"containerMode"`
-	AutoRecoverState        bool `yaml:"autoRecoverState" mapstructure:"autoRecoverState"`
-	DevMode                 bool `yaml:"devMode" mapstructure:"devMode"`
-	Traefik                 bool `yaml:"traefik" mapstructure:"traefik"`
-	IAMIntegration          bool `yaml:"iamIntegration" mapstructure:"iamIntegration"`
-	TUIMock                 bool `yaml:"tuiMock" mapstructure:"tuiMock"`
+	TestMode         bool `yaml:"testMode" mapstructure:"testMode"`
+	ContainerMode    bool `yaml:"containerMode" mapstructure:"containerMode"`
+	AutoRecoverState bool `yaml:"autoRecoverState" mapstructure:"autoRecoverState"`
+	DevMode          bool `yaml:"devMode" mapstructure:"devMode"`
+	Traefik          bool `yaml:"traefik" mapstructure:"traefik"`
+	IAMIntegration   bool `yaml:"iamIntegration" mapstructure:"iamIntegration"`
+	TUIMock          bool `yaml:"tuiMock" mapstructure:"tuiMock"`
 }
 
 // AWSConfig represents AWS-related configuration
@@ -62,67 +62,77 @@ type AWSConfig struct {
 var (
 	v        *viper.Viper
 	instance *Config
+	initOnce sync.Once
+	mu       sync.RWMutex
 )
 
 // ResetConfig resets the configuration instance (for testing)
 func ResetConfig() {
+	mu.Lock()
+	defer mu.Unlock()
 	v = nil
 	instance = nil
+	initOnce = sync.Once{}
 }
 
 // InitConfig initializes the configuration with Viper
 func InitConfig() error {
-	v = viper.New()
-	
-	// Set default values
-	homeDir, _ := os.UserHomeDir()
-	defaultDataDir := filepath.Join(homeDir, ".kecs", "data")
-	
-	// Server defaults
-	v.SetDefault("server.port", 8080)
-	v.SetDefault("server.adminPort", 8081)
-	v.SetDefault("server.dataDir", defaultDataDir)
-	v.SetDefault("server.logLevel", "info")
-	v.SetDefault("server.allowedOrigins", []string{})
-	v.SetDefault("server.endpoint", "")
-	v.SetDefault("server.controlPlaneImage", "ghcr.io/nandemo-ya/kecs:latest")
-	
-	// Kubernetes defaults
-	v.SetDefault("kubernetes.kubeconfigPath", "")
-	v.SetDefault("kubernetes.k3dOptimized", false)
-	v.SetDefault("kubernetes.k3dAsync", false)
-	v.SetDefault("kubernetes.disableCoreDNS", false)
-	v.SetDefault("kubernetes.keepClustersOnShutdown", false)
-	
-	
-	// Features defaults
-	v.SetDefault("features.testMode", false)
-	v.SetDefault("features.containerMode", false)
-	v.SetDefault("features.autoRecoverState", true)
-	v.SetDefault("features.traefik", true) // Enable Traefik by default
-	v.SetDefault("features.iamIntegration", false) // Disable IAM integration by default
-	v.SetDefault("features.tuiMock", true) // Enable TUI mock mode by default
-	
-	// AWS defaults
-	v.SetDefault("aws.defaultRegion", "us-east-1")
-	v.SetDefault("aws.accountID", "000000000000")
-	v.SetDefault("aws.proxyImage", "")
-	
-	// LocalStack defaults
-	v.SetDefault("localstack.enabled", true) // Enable LocalStack by default
-	v.SetDefault("localstack.useTraefik", true) // Enable Traefik for LocalStack by default
-	v.SetDefault("localstack.image", "localstack/localstack")
-	v.SetDefault("localstack.version", "latest")
-	
-	// Enable environment variable support
-	v.SetEnvPrefix("KECS")
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	v.AutomaticEnv()
-	
-	// Map legacy environment variables to new structure
-	bindLegacyEnvVars()
-	
-	return nil
+	var initErr error
+	initOnce.Do(func() {
+		mu.Lock()
+		defer mu.Unlock()
+
+		v = viper.New()
+
+		// Set default values
+		homeDir, _ := os.UserHomeDir()
+		defaultDataDir := filepath.Join(homeDir, ".kecs", "data")
+
+		// Server defaults
+		v.SetDefault("server.port", 8080)
+		v.SetDefault("server.adminPort", 8081)
+		v.SetDefault("server.dataDir", defaultDataDir)
+		v.SetDefault("server.logLevel", "info")
+		v.SetDefault("server.allowedOrigins", []string{})
+		v.SetDefault("server.endpoint", "")
+		v.SetDefault("server.controlPlaneImage", "ghcr.io/nandemo-ya/kecs:latest")
+
+		// Kubernetes defaults
+		v.SetDefault("kubernetes.kubeconfigPath", "")
+		v.SetDefault("kubernetes.k3dOptimized", false)
+		v.SetDefault("kubernetes.k3dAsync", false)
+		v.SetDefault("kubernetes.disableCoreDNS", false)
+		v.SetDefault("kubernetes.keepClustersOnShutdown", false)
+
+		// Features defaults
+		v.SetDefault("features.testMode", false)
+		v.SetDefault("features.containerMode", false)
+		v.SetDefault("features.autoRecoverState", true)
+		v.SetDefault("features.traefik", true)         // Enable Traefik by default
+		v.SetDefault("features.iamIntegration", false) // Disable IAM integration by default
+		v.SetDefault("features.tuiMock", true)         // Enable TUI mock mode by default
+
+		// AWS defaults
+		v.SetDefault("aws.defaultRegion", "us-east-1")
+		v.SetDefault("aws.accountID", "000000000000")
+		v.SetDefault("aws.proxyImage", "")
+
+		// LocalStack defaults
+		v.SetDefault("localstack.enabled", true)    // Enable LocalStack by default
+		v.SetDefault("localstack.useTraefik", true) // Enable Traefik for LocalStack by default
+		v.SetDefault("localstack.image", "localstack/localstack")
+		v.SetDefault("localstack.version", "latest")
+
+		// Enable environment variable support
+		v.SetEnvPrefix("KECS")
+		v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+		v.AutomaticEnv()
+
+		// Map legacy environment variables to new structure
+		bindLegacyEnvVars()
+	})
+
+	return initErr
 }
 
 // bindLegacyEnvVars maps legacy environment variables to the new structure
@@ -158,7 +168,7 @@ func DefaultConfig() *Config {
 			// Fallback to basic defaults if initialization fails
 			homeDir, _ := os.UserHomeDir()
 			defaultDataDir := filepath.Join(homeDir, ".kecs", "data")
-			
+
 			return &Config{
 				Server: ServerConfig{
 					Port:      8080,
@@ -169,7 +179,7 @@ func DefaultConfig() *Config {
 				LocalStack: *localstack.DefaultConfig(),
 			}
 		}
-		
+
 		cfg := &Config{
 			LocalStack: *localstack.DefaultConfig(),
 		}
@@ -177,7 +187,7 @@ func DefaultConfig() *Config {
 			// Return minimal config on error
 			homeDir, _ := os.UserHomeDir()
 			defaultDataDir := filepath.Join(homeDir, ".kecs", "data")
-			
+
 			return &Config{
 				Server: ServerConfig{
 					Port:      8080,
@@ -188,10 +198,10 @@ func DefaultConfig() *Config {
 				LocalStack: *localstack.DefaultConfig(),
 			}
 		}
-		
+
 		instance = cfg
 	}
-	
+
 	return instance
 }
 
@@ -200,7 +210,7 @@ func LoadConfig(configPath string) (*Config, error) {
 	if err := InitConfig(); err != nil {
 		return nil, fmt.Errorf("failed to initialize config: %w", err)
 	}
-	
+
 	if configPath != "" {
 		// Check if the config file exists before trying to read it
 		if _, err := os.Stat(configPath); err != nil {
@@ -209,7 +219,7 @@ func LoadConfig(configPath string) (*Config, error) {
 			}
 			return nil, fmt.Errorf("failed to access config file: %w", err)
 		}
-		
+
 		v.SetConfigFile(configPath)
 		if err := v.ReadInConfig(); err != nil {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -221,7 +231,7 @@ func LoadConfig(configPath string) (*Config, error) {
 		v.AddConfigPath(".")
 		v.AddConfigPath("$HOME/.kecs")
 		v.AddConfigPath("/etc/kecs")
-		
+
 		// Read config file if it exists
 		if err := v.ReadInConfig(); err != nil {
 			// It's ok if config file doesn't exist
@@ -230,14 +240,14 @@ func LoadConfig(configPath string) (*Config, error) {
 			}
 		}
 	}
-	
+
 	config := &Config{
 		LocalStack: *localstack.DefaultConfig(),
 	}
 	if err := v.Unmarshal(config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
-	
+
 	instance = config
 	return config, nil
 }
@@ -260,42 +270,53 @@ func Get(key string) interface{} {
 
 // GetString returns a string configuration value
 func GetString(key string) string {
-	if v == nil {
-		InitConfig()
-	}
+	ensureInitialized()
+	mu.RLock()
+	defer mu.RUnlock()
 	return v.GetString(key)
 }
 
 // GetInt returns an int configuration value
 func GetInt(key string) int {
-	if v == nil {
-		InitConfig()
-	}
+	ensureInitialized()
+	mu.RLock()
+	defer mu.RUnlock()
 	return v.GetInt(key)
 }
 
 // GetBool returns a bool configuration value
 func GetBool(key string) bool {
-	if v == nil {
-		InitConfig()
-	}
+	ensureInitialized()
+	mu.RLock()
+	defer mu.RUnlock()
 	return v.GetBool(key)
 }
 
 // GetStringSlice returns a string slice configuration value
 func GetStringSlice(key string) []string {
-	if v == nil {
-		InitConfig()
-	}
+	ensureInitialized()
+	mu.RLock()
+	defer mu.RUnlock()
 	return v.GetStringSlice(key)
 }
 
 // Set sets a configuration value
 func Set(key string, value interface{}) {
-	if v == nil {
+	ensureInitialized()
+	mu.Lock()
+	defer mu.Unlock()
+	v.Set(key, value)
+}
+
+// ensureInitialized ensures the configuration is initialized
+func ensureInitialized() {
+	mu.RLock()
+	initialized := v != nil
+	mu.RUnlock()
+
+	if !initialized {
 		InitConfig()
 	}
-	v.Set(key, value)
 }
 
 // Validate validates the configuration
@@ -310,7 +331,7 @@ func (c *Config) Validate() error {
 	if c.Server.DataDir == "" {
 		return fmt.Errorf("data directory cannot be empty")
 	}
-	
+
 	// Validate log level
 	validLogLevels := map[string]bool{
 		"debug": true,
@@ -329,7 +350,7 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("invalid AWS region format: %s", c.AWS.DefaultRegion)
 		}
 	}
-	
+
 	// Validate AWS account ID if specified
 	if c.AWS.AccountID != "" && len(c.AWS.AccountID) != 12 {
 		return fmt.Errorf("AWS account ID must be 12 digits: %s", c.AWS.AccountID)

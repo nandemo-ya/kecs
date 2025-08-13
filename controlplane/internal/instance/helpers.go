@@ -51,9 +51,9 @@ func (m *Manager) createCluster(ctx context.Context, instanceName string, cfg *c
 
 	// Create port mappings for k3d cluster
 	portMappings := map[int32]int32{
-		int32(opts.ApiPort): apiNodePort,  // Map host API port to NodePort for ECS API
+		int32(opts.ApiPort): apiNodePort, // Map host API port to NodePort for ECS API
 	}
-	
+
 	// If LocalStack is enabled, add its port mapping
 	if cfg.LocalStack.Enabled {
 		// LocalStack always uses fixed NodePort 30566
@@ -74,14 +74,14 @@ func (m *Manager) createCluster(ctx context.Context, instanceName string, cfg *c
 	if err := m.k3dManager.CreateClusterWithPortMapping(ctx, clusterName, portMappings); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
 // createNamespace creates the kecs-system namespace
 func (m *Manager) createNamespace(ctx context.Context, instanceName string) error {
 	clusterName := fmt.Sprintf("kecs-%s", instanceName)
-	kubeconfig, err := m.k3dManager.GetKubeConfig(clusterName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(context.Background(), clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubeconfig: %w", err)
 	}
@@ -108,7 +108,7 @@ func (m *Manager) createNamespace(ctx context.Context, instanceName string) erro
 func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, cfg *config.Config, opts StartOptions) error {
 
 	clusterName := fmt.Sprintf("kecs-%s", instanceName)
-	kubeconfig, err := m.k3dManager.GetKubeConfig(clusterName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(context.Background(), clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubeconfig: %w", err)
 	}
@@ -189,7 +189,7 @@ func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, c
 func (m *Manager) deployLocalStack(ctx context.Context, instanceName string, cfg *config.Config) error {
 
 	clusterName := fmt.Sprintf("kecs-%s", instanceName)
-	kubeconfig, err := m.k3dManager.GetKubeConfig(clusterName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(context.Background(), clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubeconfig: %w", err)
 	}
@@ -226,7 +226,7 @@ func (m *Manager) deployLocalStack(ctx context.Context, instanceName string, cfg
 func (m *Manager) deployTraefik(ctx context.Context, instanceName string, cfg *config.Config, apiPort int) error {
 
 	clusterName := fmt.Sprintf("kecs-%s", instanceName)
-	kubeconfig, err := m.k3dManager.GetKubeConfig(clusterName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(context.Background(), clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubeconfig: %w", err)
 	}
@@ -257,9 +257,9 @@ func (m *Manager) deployTraefik(ctx context.Context, instanceName string, cfg *c
 		CPULimit:        "500m",
 		MemoryLimit:     "512Mi",
 		APIPort:         80,
-		APINodePort:     awsNodePort,    // This is for API access (e.g., 30080 for port 8080)
+		APINodePort:     awsNodePort, // This is for API access (e.g., 30080 for port 8080)
 		AWSPort:         4566,
-		AWSNodePort:     30566,          // Fixed port for LocalStack
+		AWSNodePort:     30566, // Fixed port for LocalStack
 		LogLevel:        "INFO",
 		AccessLog:       true,
 	}
@@ -319,7 +319,7 @@ func (m *Manager) deployTraefik(ctx context.Context, instanceName string, cfg *c
 func (m *Manager) waitForReady(ctx context.Context, instanceName string, cfg *config.Config) error {
 
 	clusterName := fmt.Sprintf("kecs-%s", instanceName)
-	kubeconfig, err := m.k3dManager.GetKubeConfig(clusterName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(context.Background(), clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubeconfig: %w", err)
 	}

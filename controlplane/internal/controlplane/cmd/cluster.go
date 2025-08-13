@@ -135,7 +135,7 @@ func runClusterCreate(cmd *cobra.Command, args []string) error {
 
 	// Wait for cluster to be ready
 	fmt.Print("Waiting for cluster to be ready...")
-	if err := manager.WaitForClusterReady(clusterName, clusterWaitTimeout); err != nil {
+	if err := manager.WaitForClusterReady(ctx, clusterName); err != nil {
 		fmt.Println(" timeout!")
 		return fmt.Errorf("cluster did not become ready: %w", err)
 	}
@@ -156,7 +156,8 @@ func runClusterCreate(cmd *cobra.Command, args []string) error {
 
 	// Get Traefik port if enabled
 	if cfg.Features.Traefik {
-		if port, exists := manager.GetTraefikPort(clusterName); exists {
+		port, err := manager.GetTraefikPort(ctx, clusterName)
+		if err == nil {
 			fmt.Printf("\nAWS API Endpoint: http://localhost:%d\n", port)
 		}
 	}
@@ -291,7 +292,8 @@ func runClusterInfo(cmd *cobra.Command, args []string) error {
 	fmt.Printf("\nKubeconfig: %s\n", manager.GetKubeconfigPath(clusterName))
 
 	// Get Traefik port if available
-	if port, exists := manager.GetTraefikPort(clusterName); exists {
+	port, err := manager.GetTraefikPort(ctx, clusterName)
+	if err == nil {
 		fmt.Printf("AWS API Port: %d\n", port)
 	}
 

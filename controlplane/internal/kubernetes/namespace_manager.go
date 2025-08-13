@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controllers/sync"
 )
 
@@ -52,10 +53,13 @@ func (n *NamespaceManager) CreateNamespace(ctx context.Context, clusterName, reg
 	}
 
 	// Setup RBAC for cross-namespace secret access
-	err = n.rbacManager.SetupNamespaceRBAC(ctx, namespaceName)
-	if err != nil {
-		// Log error but don't fail namespace creation
-		fmt.Printf("Warning: failed to setup RBAC for namespace %s: %v\n", namespaceName, err)
+	// Skip in test mode to avoid RBAC permission issues
+	if !config.GetBool("features.testMode") {
+		err = n.rbacManager.SetupNamespaceRBAC(ctx, namespaceName)
+		if err != nil {
+			// Log error but don't fail namespace creation
+			fmt.Printf("Warning: failed to setup RBAC for namespace %s: %v\n", namespaceName, err)
+		}
 	}
 
 	return nil
@@ -65,13 +69,16 @@ func (n *NamespaceManager) DeleteNamespace(ctx context.Context, clusterName, reg
 	namespaceName := fmt.Sprintf("%s-%s", clusterName, region)
 
 	// Cleanup RBAC resources first
-	err := n.rbacManager.CleanupNamespaceRBAC(ctx, namespaceName)
-	if err != nil {
-		// Log error but continue with namespace deletion
-		fmt.Printf("Warning: failed to cleanup RBAC for namespace %s: %v\n", namespaceName, err)
+	// Skip in test mode to avoid RBAC permission issues
+	if !config.GetBool("features.testMode") {
+		err := n.rbacManager.CleanupNamespaceRBAC(ctx, namespaceName)
+		if err != nil {
+			// Log error but continue with namespace deletion
+			fmt.Printf("Warning: failed to cleanup RBAC for namespace %s: %v\n", namespaceName, err)
+		}
 	}
 
-	err = n.clientset.CoreV1().Namespaces().Delete(ctx, namespaceName, metav1.DeleteOptions{})
+	err := n.clientset.CoreV1().Namespaces().Delete(ctx, namespaceName, metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to delete namespace %s: %w", namespaceName, err)
 	}

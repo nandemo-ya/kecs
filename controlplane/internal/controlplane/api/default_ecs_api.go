@@ -92,7 +92,6 @@ func (api *DefaultECSAPI) SetLocalStackConfig(config *localstack.Config) {
 func (api *DefaultECSAPI) SetLocalStackUpdateCallback(callback func(localstack.Manager)) {
 	api.localStackUpdateCallback = callback
 }
-
 // NewDefaultECSAPIWithConfig creates a new default ECS API implementation with custom region and accountID
 // Deprecated: Use NewDefaultECSAPIWithClusterManager instead
 func NewDefaultECSAPIWithConfig(storage storage.Storage, region, accountID string) generated.ECSAPIInterface {
