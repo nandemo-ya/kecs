@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -66,7 +67,7 @@ func (c *ServiceConverter) ConvertServiceToDeploymentWithNetworkConfig(
 	if len(containerDefs) == 0 {
 		return nil, nil, fmt.Errorf("no container definitions found in task definition")
 	}
-	
+
 	// Debug: Check if secrets are in containerDefs
 	for i, containerDef := range containerDefs {
 		containerName, _ := containerDef["name"].(string)
@@ -436,6 +437,26 @@ func (c *ServiceConverter) createContainer(containerDef map[string]interface{}) 
 		}
 	}
 
+	// Extract health check and convert to probes
+	if healthCheck, exists := containerDef["healthCheck"]; exists {
+		if hc, ok := healthCheck.(map[string]interface{}); ok {
+			probe := c.convertHealthCheckToProbe(hc)
+			if probe != nil {
+				// Use the same probe for both liveness and readiness
+				// In production, you might want to differentiate between them
+				container.LivenessProbe = probe
+				// Create a copy for readiness probe with potentially different settings
+				readinessProbe := &corev1.Probe{}
+				*readinessProbe = *probe
+				// Readiness probe can have shorter initial delay
+				if probe.InitialDelaySeconds > 10 {
+					readinessProbe.InitialDelaySeconds = 10
+				}
+				container.ReadinessProbe = readinessProbe
+			}
+		}
+	}
+
 	return container, nil
 }
 
@@ -741,7 +762,7 @@ func (c *ServiceConverter) getNamespacedSecretName(cluster *storage.Cluster, sec
 func (c *ServiceConverter) getPlaceholderSecretValue(source, secretName, key string) string {
 	// Generate deterministic placeholder values based on the secret name and key
 	// This ensures consistency across deployments while being obviously fake
-	
+
 	switch source {
 	case "secretsmanager":
 		// Generate different placeholder values for different secret types
@@ -760,7 +781,7 @@ func (c *ServiceConverter) getPlaceholderSecretValue(source, secretName, key str
 			return "placeholder-encryption-key-from-secrets-manager"
 		}
 		return fmt.Sprintf("placeholder-secret-from-secrets-manager-%s-%s", secretName, key)
-		
+
 	case "ssm":
 		// Generate placeholder values for SSM parameters
 		if strings.Contains(strings.ToLower(secretName), "database") {
@@ -773,8 +794,118 @@ func (c *ServiceConverter) getPlaceholderSecretValue(source, secretName, key str
 			return `{"new_ui": true, "beta_features": true, "maintenance_mode": false}`
 		}
 		return fmt.Sprintf("placeholder-parameter-from-ssm-%s", secretName)
-		
+
 	default:
 		return fmt.Sprintf("placeholder-unknown-secret-%s", secretName)
 	}
+}
+
+// convertHealthCheckToProbe converts ECS health check to Kubernetes probe
+func (c *ServiceConverter) convertHealthCheckToProbe(healthCheck map[string]interface{}) *corev1.Probe {
+	probe := &corev1.Probe{}
+
+	// Extract command
+	if command, exists := healthCheck["command"]; exists {
+		if cmdList, ok := command.([]interface{}); ok && len(cmdList) > 0 {
+			// ECS health check command format: ["CMD-SHELL", "command"] or ["CMD", "arg1", "arg2"]
+			cmdType, _ := cmdList[0].(string)
+
+			switch cmdType {
+			case "CMD-SHELL":
+				// Shell command - use exec probe with sh -c
+				if len(cmdList) > 1 {
+					if shellCmd, ok := cmdList[1].(string); ok {
+						probe.Exec = &corev1.ExecAction{
+							Command: []string{"sh", "-c", shellCmd},
+						}
+					}
+				}
+			case "CMD":
+				// Direct command - use exec probe
+				var execCmd []string
+				for i := 1; i < len(cmdList); i++ {
+					if cmd, ok := cmdList[i].(string); ok {
+						execCmd = append(execCmd, cmd)
+					}
+				}
+				if len(execCmd) > 0 {
+					probe.Exec = &corev1.ExecAction{
+						Command: execCmd,
+					}
+				}
+			case "HTTP":
+				// HTTP health check
+				if len(cmdList) > 1 {
+					if path, ok := cmdList[1].(string); ok {
+						port := 8080 // Default port
+
+						// Extract port if specified
+						if len(cmdList) > 2 {
+							if portStr, ok := cmdList[2].(string); ok {
+								// Try to parse port from string
+								if p, err := strconv.Atoi(portStr); err == nil {
+									port = p
+								}
+							} else if portFloat, ok := cmdList[2].(float64); ok {
+								// Handle numeric port
+								port = int(portFloat)
+							}
+						}
+
+						probe.HTTPGet = &corev1.HTTPGetAction{
+							Path: path,
+							Port: intstr.FromInt(port),
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// If no probe handler was set, return nil
+	if probe.Exec == nil && probe.HTTPGet == nil && probe.TCPSocket == nil {
+		return nil
+	}
+
+	// Extract timing parameters
+	// ECS interval (seconds) -> Kubernetes periodSeconds
+	if interval, exists := healthCheck["interval"]; exists {
+		if intervalFloat, ok := interval.(float64); ok {
+			probe.PeriodSeconds = int32(intervalFloat)
+		}
+	} else {
+		probe.PeriodSeconds = 30 // Default
+	}
+
+	// ECS timeout (seconds) -> Kubernetes timeoutSeconds
+	if timeout, exists := healthCheck["timeout"]; exists {
+		if timeoutFloat, ok := timeout.(float64); ok {
+			probe.TimeoutSeconds = int32(timeoutFloat)
+		}
+	} else {
+		probe.TimeoutSeconds = 5 // Default
+	}
+
+	// ECS retries -> Kubernetes failureThreshold
+	if retries, exists := healthCheck["retries"]; exists {
+		if retriesFloat, ok := retries.(float64); ok {
+			probe.FailureThreshold = int32(retriesFloat)
+		}
+	} else {
+		probe.FailureThreshold = 3 // Default
+	}
+
+	// ECS startPeriod (seconds) -> Kubernetes initialDelaySeconds
+	if startPeriod, exists := healthCheck["startPeriod"]; exists {
+		if startPeriodFloat, ok := startPeriod.(float64); ok {
+			probe.InitialDelaySeconds = int32(startPeriodFloat)
+		}
+	} else {
+		probe.InitialDelaySeconds = 30 // Default
+	}
+
+	// Kubernetes successThreshold is always 1 for liveness probe
+	probe.SuccessThreshold = 1
+
+	return probe
 }
