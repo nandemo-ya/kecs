@@ -47,34 +47,34 @@ type Instance struct {
 
 // Cluster represents an ECS cluster
 type Cluster struct {
-	Name       string
-	Status     string
-	Services   int
-	Tasks      int
-	Age        time.Duration
+	Name     string
+	Status   string
+	Services int
+	Tasks    int
+	Age      time.Duration
 }
 
 // Service represents an ECS service
 type Service struct {
-	Name       string
-	Desired    int
-	Running    int
-	Pending    int
-	Status     string
-	TaskDef    string
-	Age        time.Duration
+	Name    string
+	Desired int
+	Running int
+	Pending int
+	Status  string
+	TaskDef string
+	Age     time.Duration
 }
 
 // Task represents an ECS task
 type Task struct {
-	ID         string
-	Service    string
-	Status     string
-	Health     string
-	CPU        float64
-	Memory     string
-	IP         string
-	Age        time.Duration
+	ID      string
+	Service string
+	Status  string
+	Health  string
+	CPU     float64
+	Memory  string
+	IP      string
+	Age     time.Duration
 }
 
 // LogEntry represents a log line
@@ -95,20 +95,20 @@ type TaskDefinitionFamily struct {
 
 // TaskDefinitionRevision represents a specific revision of a task definition
 type TaskDefinitionRevision struct {
-	Family     string
-	Revision   int
-	Status     string
-	CPU        string
-	Memory     string
-	CreatedAt  time.Time
-	JSON       string // Complete task definition JSON
+	Family    string
+	Revision  int
+	Status    string
+	CPU       string
+	Memory    string
+	CreatedAt time.Time
+	JSON      string // Complete task definition JSON
 }
 
 // TaskDefinitionEditor manages task definition JSON editing
 type TaskDefinitionEditor struct {
 	family        string
-	baseRevision  *int              // Source revision for copy
-	content       string            // JSON being edited
+	baseRevision  *int   // Source revision for copy
+	content       string // JSON being edited
 	cursorLine    int
 	cursorCol     int
 	errors        []ValidationError
@@ -126,77 +126,77 @@ type ValidationError struct {
 // Model holds the application state
 type Model struct {
 	// View state
-	currentView     ViewType
-	previousView    ViewType
-	width           int
-	height          int
-	
+	currentView  ViewType
+	previousView ViewType
+	width        int
+	height       int
+
 	// Navigation state
 	selectedInstance string
 	selectedCluster  string
 	selectedService  string
 	selectedTask     string
-	
+
 	// List cursors
-	instanceCursor  int
-	clusterCursor   int
-	serviceCursor   int
-	taskCursor      int
-	logCursor       int
-	
+	instanceCursor int
+	clusterCursor  int
+	serviceCursor  int
+	taskCursor     int
+	logCursor      int
+
 	// Data
-	instances       []Instance
-	clusters        []Cluster
-	services        []Service
-	tasks           []Task
-	logs            []LogEntry
-	
+	instances []Instance
+	clusters  []Cluster
+	services  []Service
+	tasks     []Task
+	logs      []LogEntry
+
 	// UI state
-	searchMode      bool
-	searchQuery     string
-	commandMode     bool
-	commandInput    string
-	showHelp        bool
-	err             error
-	
+	searchMode   bool
+	searchQuery  string
+	commandMode  bool
+	commandInput string
+	showHelp     bool
+	err          error
+
 	// Command palette
-	commandPalette  *CommandPalette
-	
+	commandPalette *CommandPalette
+
 	// Instance form
-	instanceForm    *InstanceForm
-	
+	instanceForm *InstanceForm
+
 	// Confirm dialog
-	confirmDialog   *ConfirmDialog
-	
+	confirmDialog *ConfirmDialog
+
 	// Instance switcher
 	instanceSwitcher *InstanceSwitcher
-	
+
 	// Task Definition state
-	taskDefFamilies      []TaskDefinitionFamily
-	taskDefRevisions     []TaskDefinitionRevision
-	selectedFamily       string
-	selectedRevision     int
-	taskDefFamilyCursor  int
+	taskDefFamilies       []TaskDefinitionFamily
+	taskDefRevisions      []TaskDefinitionRevision
+	selectedFamily        string
+	selectedRevision      int
+	taskDefFamilyCursor   int
 	taskDefRevisionCursor int
-	taskDefEditor        *TaskDefinitionEditor
-	showTaskDefJSON      bool  // 2-column display flag
-	taskDefJSONScroll    int   // JSON display scroll position
-	taskDefDiffMode      bool  // Diff display mode
-	diffRevision1        int   // Diff comparison target 1
-	diffRevision2        int   // Diff comparison target 2
-	taskDefJSONCache     map[int]string // Cache of loaded task definition JSONs by revision
-	
+	taskDefEditor         *TaskDefinitionEditor
+	showTaskDefJSON       bool           // 2-column display flag
+	taskDefJSONScroll     int            // JSON display scroll position
+	taskDefDiffMode       bool           // Diff display mode
+	diffRevision1         int            // Diff comparison target 1
+	diffRevision2         int            // Diff comparison target 2
+	taskDefJSONCache      map[int]string // Cache of loaded task definition JSONs by revision
+
 	// Update control
 	lastUpdate      time.Time
 	refreshInterval time.Duration
-	
+
 	// Terminal
-	ready           bool
-	
+	ready bool
+
 	// API client
-	apiClient       api.Client
-	useMockData     bool
-	
+	apiClient   api.Client
+	useMockData bool
+
 	// Clipboard notification
 	clipboardMsg     string
 	clipboardMsgTime time.Time
@@ -205,12 +205,12 @@ type Model struct {
 // NewModel creates a new application model
 func NewModel() Model {
 	return Model{
-		currentView:     ViewInstances,
-		refreshInterval: 5 * time.Second,
-		ready:           false,
-		commandPalette:  NewCommandPalette(),
-		useMockData:     true,  // Default to mock data for now
-		apiClient:       api.NewMockClient(),
+		currentView:      ViewInstances,
+		refreshInterval:  5 * time.Second,
+		ready:            false,
+		commandPalette:   NewCommandPalette(),
+		useMockData:      true, // Default to mock data for now
+		apiClient:        api.NewMockClient(),
 		taskDefJSONCache: make(map[int]string),
 	}
 }
@@ -218,12 +218,12 @@ func NewModel() Model {
 // NewModelWithClient creates a new application model with a specific API client
 func NewModelWithClient(client api.Client) Model {
 	return Model{
-		currentView:     ViewInstances,
-		refreshInterval: 5 * time.Second,
-		ready:           false,
-		commandPalette:  NewCommandPalette(),
-		useMockData:     false,
-		apiClient:       client,
+		currentView:      ViewInstances,
+		refreshInterval:  5 * time.Second,
+		ready:            false,
+		commandPalette:   NewCommandPalette(),
+		useMockData:      false,
+		apiClient:        client,
 		taskDefJSONCache: make(map[int]string),
 	}
 }
@@ -234,7 +234,7 @@ func (m Model) Init() tea.Cmd {
 		tickCmd(),
 		statusTickCmd(),
 	}
-	
+
 	// Only load mock data if we're using mock mode
 	if m.useMockData {
 		cmds = append(cmds, mock.LoadAllData("", "", "", ""))
@@ -242,7 +242,7 @@ func (m Model) Init() tea.Cmd {
 		// Load real data from API
 		cmds = append(cmds, m.loadDataFromAPI())
 	}
-	
+
 	return tea.Batch(cmds...)
 }
 
@@ -262,7 +262,6 @@ type DataLoadedMsg struct {
 	Logs      []LogEntry
 }
 
-
 // Commands
 
 func tickCmd() tea.Cmd {
@@ -277,7 +276,6 @@ func statusTickCmd() tea.Cmd {
 		return statusTickMsg(t)
 	})
 }
-
 
 // Navigation helpers
 

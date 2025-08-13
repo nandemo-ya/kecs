@@ -85,10 +85,10 @@ var _ = Describe("Start Command Unit Tests", func() {
 		It("should return different names on subsequent calls", func() {
 			name1, _, err1 := createNewInstance()
 			Expect(err1).NotTo(HaveOccurred())
-			
+
 			name2, _, err2 := createNewInstance()
 			Expect(err2).NotTo(HaveOccurred())
-			
+
 			Expect(name1).NotTo(Equal(name2))
 		})
 	})
@@ -141,7 +141,7 @@ var _ = Describe("Start V2 Command Integration Tests", func() {
 			}, 2*time.Minute, 5*time.Second).Should(Succeed())
 
 			By("Testing ECS API through Traefik")
-			cmd = exec.Command("aws", "ecs", "list-clusters", 
+			cmd = exec.Command("aws", "ecs", "list-clusters",
 				"--endpoint-url", "http://localhost:4566",
 				"--region", "us-east-1",
 				"--no-cli-pager")

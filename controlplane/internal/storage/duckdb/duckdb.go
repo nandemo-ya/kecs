@@ -665,7 +665,6 @@ func (s *DuckDBStorage) createAttributesTable(ctx context.Context) error {
 	return nil
 }
 
-
 // createELBv2Tables creates all ELBv2-related tables
 func (s *DuckDBStorage) createELBv2Tables(ctx context.Context) error {
 	// Create load balancers table

@@ -4,7 +4,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
 )
 
@@ -12,16 +12,16 @@ import (
 type Config struct {
 	// Level is the minimum log level
 	Level slog.Level
-	
+
 	// Format is the output format (text or json)
 	Format string
-	
+
 	// Output is the output writer
 	Output io.Writer
-	
+
 	// ProgressCapture is the progress system log capture (optional)
 	ProgressCapture *progress.LogCapture
-	
+
 	// UseCustomFormat uses our custom format for progress display
 	UseCustomFormat bool
 }
@@ -41,22 +41,22 @@ func Initialize(cfg *Config) {
 	if cfg == nil {
 		cfg = DefaultConfig()
 	}
-	
+
 	// Create the output writer
 	var output io.Writer = cfg.Output
-	
+
 	// If progress capture is provided, wrap the output
 	if cfg.ProgressCapture != nil {
 		pw := NewProgressWriter(cfg.Output)
 		pw.SetLogCapture(cfg.ProgressCapture)
 		output = pw
 	}
-	
+
 	// Create handler options
 	opts := &slog.HandlerOptions{
 		Level: cfg.Level,
 	}
-	
+
 	// Create the logger based on format
 	var logger *slog.Logger
 	switch cfg.Format {
@@ -69,7 +69,7 @@ func Initialize(cfg *Config) {
 			logger = slog.New(slog.NewTextHandler(output, opts))
 		}
 	}
-	
+
 	// Set as global logger
 	SetGlobalLogger(logger)
 }
@@ -77,7 +77,7 @@ func Initialize(cfg *Config) {
 // InitializeForProgress initializes logging for use with progress display
 func InitializeForProgress(capture *progress.LogCapture, verbose bool) {
 	cfg := DefaultConfig()
-	
+
 	if verbose {
 		// In verbose mode, log directly to stderr
 		cfg.ProgressCapture = nil
@@ -87,7 +87,7 @@ func InitializeForProgress(capture *progress.LogCapture, verbose bool) {
 		cfg.ProgressCapture = capture
 		cfg.UseCustomFormat = true
 	}
-	
+
 	Initialize(cfg)
 }
 

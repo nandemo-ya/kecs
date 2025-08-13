@@ -276,7 +276,7 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 		return nil, fmt.Errorf("task definition not found: %s", req.TaskDefinition)
 	}
 
-	logging.Debug("Found task definition", 
+	logging.Debug("Found task definition",
 		"family", taskDef.Family, "revision", taskDef.Revision, "containerDefs", taskDef.ContainerDefinitions)
 
 	// Convert to generated response

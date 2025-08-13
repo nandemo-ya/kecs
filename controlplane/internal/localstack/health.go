@@ -41,7 +41,7 @@ func (hc *healthChecker) CheckHealth(ctx context.Context) (*HealthStatus, error)
 	hc.mu.RLock()
 	endpoint := hc.endpoint
 	hc.mu.RUnlock()
-	
+
 	healthURL := fmt.Sprintf("%s%s", endpoint, HealthCheckPath)
 	logging.Debug("Performing health check on LocalStack", "url", healthURL)
 

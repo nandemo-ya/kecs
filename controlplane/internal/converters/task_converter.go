@@ -232,38 +232,8 @@ func (c *TaskConverter) ConvertTaskToPod(
 	// Apply CloudWatch logs configuration
 	if c.cloudWatchIntegration != nil {
 		c.applyCloudWatchLogsConfiguration(pod, containerDefs, taskDef)
-
-		// Add FluentBit sidecar if needed
-		sidecar, configMap := c.createCloudWatchSidecar(containerDefs, taskDef, cluster, taskID)
-		if sidecar != nil {
-			pod.Spec.Containers = append(pod.Spec.Containers, *sidecar)
-
-			// Add host path volumes for logs
-			pod.Spec.Volumes = append(pod.Spec.Volumes,
-				corev1.Volume{
-					Name: "varlog",
-					VolumeSource: corev1.VolumeSource{
-						HostPath: &corev1.HostPathVolumeSource{
-							Path: "/var/log",
-						},
-					},
-				},
-				corev1.Volume{
-					Name: "varlibdockercontainers",
-					VolumeSource: corev1.VolumeSource{
-						HostPath: &corev1.HostPathVolumeSource{
-							Path: "/var/lib/docker/containers",
-						},
-					},
-				},
-			)
-
-			// Store config map info for later creation
-			if configMap != nil {
-				pod.Annotations["kecs.dev/fluent-bit-configmap"] = configMap.Name
-				pod.Annotations["kecs.dev/fluent-bit-config"] = configMap.Data["fluent-bit.conf"]
-			}
-		}
+		// Note: FluentBit sidecar is no longer needed as we use Vector DaemonSet
+		// The annotations set by applyCloudWatchLogsConfiguration will be read by Vector
 	}
 
 	// Add AWS proxy sidecar if proxy manager is available
@@ -287,8 +257,8 @@ func (c *TaskConverter) convertContainers(
 ) []corev1.Container {
 	containers := make([]corev1.Container, 0, len(containerDefs))
 
-	// Generate task ARN for logging
-	taskArn := taskDef.ARN
+	// taskArn is no longer needed since we removed FluentBit sidecar
+	// taskArn := taskDef.ARN
 
 	for _, def := range containerDefs {
 		container := corev1.Container{
@@ -412,27 +382,8 @@ func (c *TaskConverter) convertContainers(
 			container.SecurityContext.ReadOnlyRootFilesystem = ptr.To(true)
 		}
 
-		// Process log configuration if CloudWatch integration is available
-		if c.cloudWatchIntegration != nil && def.LogConfiguration != nil {
-			if def.LogConfiguration.LogDriver != nil && *def.LogConfiguration.LogDriver == "awslogs" {
-				// Configure CloudWatch logging
-				logConfig, err := c.cloudWatchIntegration.ConfigureContainerLogging(
-					taskArn,
-					*def.Name,
-					*def.LogConfiguration.LogDriver,
-					def.LogConfiguration.Options,
-				)
-				if err == nil && logConfig != nil {
-					// Add annotations for log configuration
-					if containerDefs[0].Name != nil && container.Name == *containerDefs[0].Name { // Only add to first container to avoid duplication
-						container.Env = append(container.Env, corev1.EnvVar{
-							Name:  "FLUENT_BIT_CONFIG",
-							Value: logConfig.FluentBitConfig,
-						})
-					}
-				}
-			}
-		}
+		// Note: Log configuration is now handled by annotations set in applyCloudWatchLogsConfiguration
+		// Vector DaemonSet will read these annotations to route logs to CloudWatch
 
 		containers = append(containers, container)
 	}
@@ -1437,22 +1388,39 @@ func (c *TaskConverter) applyCloudWatchLogsConfiguration(pod *corev1.Pod, contai
 				options = make(map[string]string)
 			}
 
-			// Get log group and stream names
+			// Get log configuration from task definition
 			logGroupName := options["awslogs-group"]
 			if logGroupName == "" {
 				logGroupName = c.cloudWatchIntegration.GetLogGroupForTask(taskDef.ARN)
 			}
 
-			logStreamName := c.cloudWatchIntegration.GetLogStreamForContainer(taskDef.ARN, *def.Name)
+			// Handle stream prefix - this is what Vector will use
+			streamPrefix := options["awslogs-stream-prefix"]
+			if streamPrefix == "" {
+				streamPrefix = *def.Name
+			}
+
+			// Get region from options or use default
+			region := options["awslogs-region"]
+			if region == "" {
+				region = "us-east-1"
+			}
 
 			// Add annotations for each container's log configuration
+			// These annotations will be read by Vector to determine log routing
 			annotationPrefix := fmt.Sprintf("kecs.dev/container-%s-logs", *def.Name)
 			pod.Annotations[annotationPrefix+"-driver"] = "awslogs"
 			pod.Annotations[annotationPrefix+"-group"] = logGroupName
-			pod.Annotations[annotationPrefix+"-stream"] = logStreamName
+			pod.Annotations[annotationPrefix+"-stream-prefix"] = streamPrefix
+			pod.Annotations[annotationPrefix+"-region"] = region
 
-			if region, ok := options["awslogs-region"]; ok {
-				pod.Annotations[annotationPrefix+"-region"] = region
+			// Add any additional options as annotations
+			for key, value := range options {
+				if key != "awslogs-group" && key != "awslogs-stream-prefix" && key != "awslogs-region" {
+					// Convert awslogs-* format to annotation format
+					annotationKey := strings.ReplaceAll(key, "awslogs-", "")
+					pod.Annotations[annotationPrefix+"-"+annotationKey] = value
+				}
 			}
 		}
 	}
@@ -1474,7 +1442,13 @@ func (c *TaskConverter) applyCloudWatchLogsConfiguration(pod *corev1.Pod, contai
 				logGroupName = c.cloudWatchIntegration.GetLogGroupForTask(taskDef.ARN)
 			}
 
-			logStreamName := c.cloudWatchIntegration.GetLogStreamForContainer(taskDef.ARN, *def.Name)
+			// Use stream prefix to construct stream name
+			streamPrefix := options["awslogs-stream-prefix"]
+			if streamPrefix == "" {
+				streamPrefix = *def.Name
+			}
+			// Construct stream name: prefix/pod-name
+			logStreamName := fmt.Sprintf("%s/%s", streamPrefix, pod.Name)
 
 			// Create log group and stream
 			if err := c.cloudWatchIntegration.CreateLogGroup(logGroupName); err != nil {
@@ -1485,6 +1459,11 @@ func (c *TaskConverter) applyCloudWatchLogsConfiguration(pod *corev1.Pod, contai
 			}
 		}
 	}
+}
+
+// ApplyCloudWatchLogsConfiguration is a public wrapper for testing
+func (c *TaskConverter) ApplyCloudWatchLogsConfiguration(pod *corev1.Pod, containerDefs []types.ContainerDefinition, taskDef *storage.TaskDefinition) {
+	c.applyCloudWatchLogsConfiguration(pod, containerDefs, taskDef)
 }
 
 // applyTags adds tags as labels to the pod
@@ -1531,105 +1510,106 @@ func (c *TaskConverter) sanitizeLabelKey(key string) string {
 	return key
 }
 
-// createCloudWatchSidecar creates a FluentBit sidecar container for CloudWatch logging
-func (c *TaskConverter) createCloudWatchSidecar(containerDefs []types.ContainerDefinition, taskDef *storage.TaskDefinition, cluster *storage.Cluster, taskID string) (*corev1.Container, *corev1.ConfigMap) {
-	if c.cloudWatchIntegration == nil {
-		return nil, nil
-	}
-
-	// Check if any container uses awslogs
-	var awslogsConfigs []types.LogConfiguration
-	for _, def := range containerDefs {
-		if def.LogConfiguration != nil && def.LogConfiguration.LogDriver != nil && *def.LogConfiguration.LogDriver == "awslogs" {
-			awslogsConfigs = append(awslogsConfigs, *def.LogConfiguration)
-		}
-	}
-
-	if len(awslogsConfigs) == 0 {
-		return nil, nil
-	}
-
-	// Get the first awslogs configuration as the primary one
-	primaryConfig := awslogsConfigs[0]
-	options := primaryConfig.Options
-	if options == nil {
-		options = make(map[string]string)
-	}
-
-	// Configure CloudWatch logging
-	logConfig, err := c.cloudWatchIntegration.ConfigureContainerLogging(
-		taskDef.ARN,
-		"fluent-bit",
-		"awslogs",
-		options,
-	)
-	if err != nil {
-		return nil, nil
-	}
-
-	// Create FluentBit sidecar container
-	sidecar := &corev1.Container{
-		Name:  "fluent-bit",
-		Image: "amazon/aws-for-fluent-bit:latest",
-		Env: []corev1.EnvVar{
-			{
-				Name:  "AWS_DEFAULT_REGION",
-				Value: c.region,
-			},
-			{
-				Name:  "AWS_ACCESS_KEY_ID",
-				Value: "test", // LocalStack default
-			},
-			{
-				Name:  "AWS_SECRET_ACCESS_KEY",
-				Value: "test", // LocalStack default
-			},
-		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "varlog",
-				MountPath: "/var/log",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "varlibdockercontainers",
-				MountPath: "/var/lib/docker/containers",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "fluent-bit-config",
-				MountPath: "/fluent-bit/etc/",
-			},
-		},
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("128Mi"),
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("200m"),
-				corev1.ResourceMemory: resource.MustParse("256Mi"),
-			},
-		},
-	}
-
-	// Create ConfigMap for FluentBit configuration
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("fluent-bit-config-%s", taskID),
-			Namespace: c.getNamespace(cluster),
-			Labels: map[string]string{
-				"kecs.dev/task-id":    taskID,
-				"kecs.dev/managed-by": "kecs",
-			},
-		},
-		Data: map[string]string{
-			"fluent-bit.conf": logConfig.FluentBitConfig,
-		},
-	}
-
-	return sidecar, configMap
-}
+// // createCloudWatchSidecar is deprecated - we now use Vector DaemonSet instead of FluentBit sidecar
+// // Keeping this function for reference but it's no longer called
+// // func (c *TaskConverter) createCloudWatchSidecar(containerDefs []types.ContainerDefinition, taskDef *storage.TaskDefinition, cluster *storage.Cluster, taskID string) (*corev1.Container, *corev1.ConfigMap) {
+// 	if c.cloudWatchIntegration == nil {
+// 		return nil, nil
+// 	}
+//
+// 	// Check if any container uses awslogs
+// 	var awslogsConfigs []types.LogConfiguration
+// 	for _, def := range containerDefs {
+// 		if def.LogConfiguration != nil && def.LogConfiguration.LogDriver != nil && *def.LogConfiguration.LogDriver == "awslogs" {
+// 			awslogsConfigs = append(awslogsConfigs, *def.LogConfiguration)
+// 		}
+// 	}
+//
+// 	if len(awslogsConfigs) == 0 {
+// 		return nil, nil
+// 	}
+//
+// 	// Get the first awslogs configuration as the primary one
+// 	primaryConfig := awslogsConfigs[0]
+// 	options := primaryConfig.Options
+// 	if options == nil {
+// 		options = make(map[string]string)
+// 	}
+//
+// 	// Configure CloudWatch logging
+// 	logConfig, err := c.cloudWatchIntegration.ConfigureContainerLogging(
+// 		taskDef.ARN,
+// 		"fluent-bit",
+// 		"awslogs",
+// 		options,
+// 	)
+// 	if err != nil {
+// 		return nil, nil
+// 	}
+//
+// 	// Create FluentBit sidecar container
+// 	sidecar := &corev1.Container{
+// 		Name:  "fluent-bit",
+// 		Image: "amazon/aws-for-fluent-bit:latest",
+// 		Env: []corev1.EnvVar{
+// 			{
+// 				Name:  "AWS_DEFAULT_REGION",
+// 				Value: c.region,
+// 			},
+// 			{
+// 				Name:  "AWS_ACCESS_KEY_ID",
+// 				Value: "test", // LocalStack default
+// 			},
+// 			{
+// 				Name:  "AWS_SECRET_ACCESS_KEY",
+// 				Value: "test", // LocalStack default
+// 			},
+// 		},
+// 		VolumeMounts: []corev1.VolumeMount{
+// 			{
+// 				Name:      "varlog",
+// 				MountPath: "/var/log",
+// 				ReadOnly:  true,
+// 			},
+// 			{
+// 				Name:      "varlibdockercontainers",
+// 				MountPath: "/var/lib/docker/containers",
+// 				ReadOnly:  true,
+// 			},
+// 			{
+// 				Name:      "fluent-bit-config",
+// 				MountPath: "/fluent-bit/etc/",
+// 			},
+// 		},
+// 		Resources: corev1.ResourceRequirements{
+// 			Requests: corev1.ResourceList{
+// 				corev1.ResourceCPU:    resource.MustParse("100m"),
+// 				corev1.ResourceMemory: resource.MustParse("128Mi"),
+// 			},
+// 			Limits: corev1.ResourceList{
+// 				corev1.ResourceCPU:    resource.MustParse("200m"),
+// 				corev1.ResourceMemory: resource.MustParse("256Mi"),
+// 			},
+// 		},
+// 	}
+//
+// 	// Create ConfigMap for FluentBit configuration
+// 	configMap := &corev1.ConfigMap{
+// 		ObjectMeta: metav1.ObjectMeta{
+// 			Name:      fmt.Sprintf("fluent-bit-config-%s", taskID),
+// 			Namespace: c.getNamespace(cluster),
+// 			Labels: map[string]string{
+// 				"kecs.dev/task-id":    taskID,
+// 				"kecs.dev/managed-by": "kecs",
+// 			},
+// 		},
+// 		Data: map[string]string{
+// 			"fluent-bit.conf": logConfig.FluentBitConfig,
+// 		},
+// 	}
+//
+// 	return sidecar, configMap
+// }
 
 // sanitizeLabelValue converts a tag value to a valid Kubernetes label value
 func (c *TaskConverter) sanitizeLabelValue(value string) string {

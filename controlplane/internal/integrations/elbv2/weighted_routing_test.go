@@ -87,10 +87,10 @@ var _ = Describe("WeightedRoutingManager", func() {
 				services, err := manager.ConvertActionsToWeightedServices(actions, resolver)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(services).To(HaveLen(2))
-				
+
 				Expect(services[0].Name).To(Equal("tg-api-v1"))
 				Expect(services[0].Weight).To(Equal(int32(70)))
-				
+
 				Expect(services[1].Name).To(Equal("tg-api-v2"))
 				Expect(services[1].Weight).To(Equal(int32(30)))
 			})
@@ -117,7 +117,7 @@ var _ = Describe("WeightedRoutingManager", func() {
 				services, err := manager.ConvertActionsToWeightedServices(actions, resolver)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(services).To(HaveLen(2))
-				
+
 				// Should distribute equally (50/50)
 				Expect(services[0].Weight).To(Equal(int32(50)))
 				Expect(services[1].Weight).To(Equal(int32(50)))
@@ -145,7 +145,7 @@ var _ = Describe("WeightedRoutingManager", func() {
 				services, err := manager.ConvertActionsToWeightedServices(actions, resolver)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(services).To(HaveLen(1))
-				
+
 				Expect(services[0].Sticky).NotTo(BeNil())
 				Expect(services[0].Sticky.Cookie).NotTo(BeNil())
 				Expect(services[0].Sticky.Cookie.Name).To(Equal("kecs-sticky-3600"))
@@ -248,7 +248,7 @@ var _ = Describe("WeightedRoutingManager", func() {
 			}
 
 			normalized := manager.NormalizeWeights(services)
-			
+
 			totalWeight := int32(0)
 			for _, service := range normalized {
 				totalWeight += service.Weight
@@ -264,12 +264,12 @@ var _ = Describe("WeightedRoutingManager", func() {
 			}
 
 			normalized := manager.NormalizeWeights(services)
-			
+
 			// Should be approximately 33, 33, 34
 			Expect(normalized[0].Weight).To(BeNumerically(">=", 33))
 			Expect(normalized[1].Weight).To(Equal(int32(33)))
 			Expect(normalized[2].Weight).To(Equal(int32(33)))
-			
+
 			totalWeight := int32(0)
 			for _, service := range normalized {
 				totalWeight += service.Weight
@@ -286,7 +286,7 @@ var _ = Describe("WeightedRoutingManager", func() {
 			}
 
 			distribution := manager.CalculateWeightDistribution(services, 1000)
-			
+
 			Expect(distribution["service1"]).To(Equal(700))
 			Expect(distribution["service2"]).To(Equal(300))
 		})
@@ -299,7 +299,7 @@ var _ = Describe("WeightedRoutingManager", func() {
 			}
 
 			distribution := manager.CalculateWeightDistribution(services, 100)
-			
+
 			total := 0
 			for _, count := range distribution {
 				total += count
@@ -324,7 +324,7 @@ var _ = Describe("WeightedRoutingManager", func() {
 			}
 
 			yaml := manager.GenerateTraefikServiceYAML(services)
-			
+
 			Expect(yaml).To(ContainSubstring("services:"))
 			Expect(yaml).To(ContainSubstring("- name: tg-api-v1"))
 			Expect(yaml).To(ContainSubstring("  port: 8080"))
@@ -351,7 +351,7 @@ var _ = Describe("WeightedRoutingManager", func() {
 			}
 
 			yaml := manager.GenerateTraefikServiceYAML(services)
-			
+
 			Expect(yaml).To(ContainSubstring("sticky:"))
 			Expect(yaml).To(ContainSubstring("cookie:"))
 			Expect(yaml).To(ContainSubstring("name: kecs-sticky"))

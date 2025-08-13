@@ -18,15 +18,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/mux"
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"gopkg.in/yaml.v3"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"github.com/gorilla/mux"
-	"gopkg.in/yaml.v3"
-	"github.com/nandemo-ya/kecs/controlplane/internal/config"
-	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // ECSProxy proxies ECS API requests to the main API server
@@ -86,7 +86,7 @@ func (p *ECSProxy) handleECSProxy(w http.ResponseWriter, r *http.Request) {
 
 	// Forward to instance's API server
 	apiURL := fmt.Sprintf("http://localhost:%d/v1/%s", apiPort, action)
-	
+
 	// Create new request
 	proxyReq, err := http.NewRequest("POST", apiURL, bytes.NewReader(body))
 	if err != nil {
@@ -134,13 +134,13 @@ func (p *ECSProxy) mapEndpointToAction(endpoint string) string {
 		return "ListClusters"
 	case "clusters/describe":
 		return "DescribeClusters"
-		
+
 	// Service operations
 	case "services":
 		return "ListServices"
 	case "services/describe":
 		return "DescribeServices"
-		
+
 	// Task operations
 	case "tasks":
 		return "ListTasks"
@@ -148,13 +148,13 @@ func (p *ECSProxy) mapEndpointToAction(endpoint string) string {
 		return "DescribeTasks"
 	case "tasks/run":
 		return "RunTask"
-		
+
 	// Task definition operations
 	case "task-definitions":
 		return "ListTaskDefinitions"
 	case "task-definitions/register":
 		return "RegisterTaskDefinition"
-		
+
 	default:
 		return ""
 	}
@@ -169,11 +169,11 @@ func (p *ECSProxy) handleCreateCluster(w http.ResponseWriter, r *http.Request) {
 func (p *ECSProxy) handleDeleteCluster(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	clusterName := vars["cluster"]
-	
+
 	body := map[string]string{
 		"cluster": clusterName,
 	}
-	
+
 	p.proxyWithBody(w, r, "DeleteCluster", body)
 }
 
@@ -186,19 +186,19 @@ func (p *ECSProxy) handleDeleteService(w http.ResponseWriter, r *http.Request) {
 func (p *ECSProxy) handleStopTask(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	taskArn := vars["task"]
-	
+
 	// Read request body for cluster info
 	var req map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		p.sendError(w, http.StatusBadRequest, "InvalidRequest", "Invalid request body")
 		return
 	}
-	
+
 	body := map[string]string{
 		"task":    taskArn,
 		"cluster": req["cluster"],
 	}
-	
+
 	p.proxyWithBody(w, r, "StopTask", body)
 }
 
@@ -230,16 +230,16 @@ func (p *ECSProxy) proxyRequest(w http.ResponseWriter, r *http.Request, action s
 	// Get instance name from URL
 	vars := mux.Vars(r)
 	instanceName := vars["name"]
-	
+
 	// Get instance API port from config file
 	apiPort, err := p.getInstanceAPIPort(instanceName)
 	if err != nil {
 		p.sendError(w, http.StatusNotFound, "InstanceNotFound", fmt.Sprintf("Instance %s not found: %v", instanceName, err))
 		return
 	}
-	
+
 	apiURL := fmt.Sprintf("http://localhost:%d/v1/%s", apiPort, action)
-	
+
 	proxyReq, err := http.NewRequest("POST", apiURL, bytes.NewReader(body))
 	if err != nil {
 		logging.Error("Failed to create proxy request", "error", err)
@@ -249,7 +249,7 @@ func (p *ECSProxy) proxyRequest(w http.ResponseWriter, r *http.Request, action s
 
 	// Copy relevant headers
 	proxyReq.Header.Set("Content-Type", "application/json")
-	
+
 	client := &http.Client{}
 	resp, err := client.Do(proxyReq)
 	if err != nil {
@@ -284,28 +284,28 @@ func (p *ECSProxy) getInstanceAPIPort(instanceName string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to get home directory: %w", err)
 	}
-	
+
 	configPath := filepath.Join(homeDir, ".kecs", "instances", instanceName, "config.yaml")
-	
+
 	// Read config file
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return 0, fmt.Errorf("failed to read config file: %w", err)
 	}
-	
+
 	// Parse YAML
 	var instanceConfig struct {
 		APIPort int `yaml:"apiPort"`
 	}
-	
+
 	if err := yaml.Unmarshal(data, &instanceConfig); err != nil {
 		return 0, fmt.Errorf("failed to parse config file: %w", err)
 	}
-	
+
 	if instanceConfig.APIPort == 0 {
 		return 0, fmt.Errorf("API port not found in config")
 	}
-	
+
 	return instanceConfig.APIPort, nil
 }
 
@@ -313,7 +313,7 @@ func (p *ECSProxy) getInstanceAPIPort(instanceName string) (int, error) {
 func (p *ECSProxy) RegisterRoutes(router *mux.Router) {
 	// Generic ECS proxy endpoints
 	router.HandleFunc("/api/instances/{name}/{endpoint:.*}", p.handleECSProxy).Methods("POST")
-	
+
 	// Specific endpoints that need custom handling
 	router.HandleFunc("/api/instances/{name}/clusters", p.handleCreateCluster).Methods("POST")
 	router.HandleFunc("/api/instances/{name}/clusters/{cluster}", p.handleDeleteCluster).Methods("DELETE")

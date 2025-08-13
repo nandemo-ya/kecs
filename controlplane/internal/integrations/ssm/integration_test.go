@@ -2,8 +2,8 @@ package ssm_test
 
 import (
 	"context"
-	"github.com/nandemo-ya/kecs/controlplane/internal/common"
 	"fmt"
+	"github.com/nandemo-ya/kecs/controlplane/internal/common"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"

@@ -85,7 +85,7 @@ func TestParallelTrackerRender(t *testing.T) {
 		updateChan: make(chan struct{}, 100),
 		stopChan:   make(chan struct{}),
 	}
-	
+
 	// Add and update tasks
 	pt.AddTask("task1", "Task One", 100)
 	pt.StartTask("task1")
@@ -199,7 +199,7 @@ func TestParallelTrackerConcurrency(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		<-done
 	}
-	
+
 	// If we get here without deadlock or panic, the test passes
 	assert.True(t, true)
 }

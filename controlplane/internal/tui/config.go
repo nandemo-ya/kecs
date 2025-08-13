@@ -32,7 +32,7 @@ type Config struct {
 func LoadConfig() Config {
 	// Get KECS configuration
 	kecsConfig := config.GetConfig()
-	
+
 	cfg := Config{
 		APIEndpoint: config.GetString("server.endpoint"),
 		UseMockData: config.GetBool("features.tuiMock"),

@@ -26,9 +26,9 @@ const (
 
 // ContainerdRuntime implements Runtime interface for containerd
 type ContainerdRuntime struct {
-	client       *containerd.Client
-	namespace    string
-	socketPath   string
+	client     *containerd.Client
+	namespace  string
+	socketPath string
 }
 
 // NewContainerdRuntime creates a new containerd runtime
@@ -40,24 +40,24 @@ func NewContainerdRuntime(socketPath string) (*ContainerdRuntime, error) {
 			"/var/run/containerd/containerd.sock",
 			"/run/k3s/containerd/containerd.sock",
 		}
-		
+
 		for _, path := range socketPaths {
 			if _, err := os.Stat(path); err == nil {
 				socketPath = path
 				break
 			}
 		}
-		
+
 		if socketPath == "" {
 			return nil, fmt.Errorf("containerd socket not found")
 		}
 	}
-	
+
 	client, err := containerd.New(socketPath)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &ContainerdRuntime{
 		client:     client,
 		namespace:  defaultNamespace,
@@ -75,10 +75,10 @@ func (c *ContainerdRuntime) IsAvailable() bool {
 	if c.client == nil {
 		return false
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	_, err := c.client.Version(ctx)
 	return err == nil
 }
@@ -86,13 +86,13 @@ func (c *ContainerdRuntime) IsAvailable() bool {
 // CreateContainer creates a new container
 func (c *ContainerdRuntime) CreateContainer(ctx context.Context, config *ContainerConfig) (*Container, error) {
 	ctx = namespaces.WithNamespace(ctx, c.namespace)
-	
+
 	// Pull image if not exists
 	image, err := c.ensureImage(ctx, config.Image)
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensure image: %w", err)
 	}
-	
+
 	// Create container with OCI options
 	opts := []containerd.NewContainerOpts{
 		containerd.WithImage(image),
@@ -101,7 +101,7 @@ func (c *ContainerdRuntime) CreateContainer(ctx context.Context, config *Contain
 			c.buildOCISpec(config)...,
 		),
 	}
-	
+
 	// Add labels
 	labels := map[string]string{}
 	for k, v := range config.Labels {
@@ -109,49 +109,49 @@ func (c *ContainerdRuntime) CreateContainer(ctx context.Context, config *Contain
 	}
 	labels[labelPrefix+"name"] = config.Name
 	opts = append(opts, containerd.WithContainerLabels(labels))
-	
+
 	// Create container
 	container, err := c.client.NewContainer(ctx, config.Name, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}
-	
+
 	return c.containerdToContainer(container)
 }
 
 // StartContainer starts a container
 func (c *ContainerdRuntime) StartContainer(ctx context.Context, id string) error {
 	ctx = namespaces.WithNamespace(ctx, c.namespace)
-	
+
 	container, err := c.client.LoadContainer(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to load container: %w", err)
 	}
-	
+
 	// Create task
 	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
 	if err != nil {
 		return fmt.Errorf("failed to create task: %w", err)
 	}
-	
+
 	// Start task
 	if err := task.Start(ctx); err != nil {
 		task.Delete(ctx)
 		return fmt.Errorf("failed to start task: %w", err)
 	}
-	
+
 	return nil
 }
 
 // StopContainer stops a container
 func (c *ContainerdRuntime) StopContainer(ctx context.Context, id string, timeout *int) error {
 	ctx = namespaces.WithNamespace(ctx, c.namespace)
-	
+
 	container, err := c.client.LoadContainer(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to load container: %w", err)
 	}
-	
+
 	task, err := container.Task(ctx, nil)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
@@ -159,23 +159,23 @@ func (c *ContainerdRuntime) StopContainer(ctx context.Context, id string, timeou
 		}
 		return fmt.Errorf("failed to get task: %w", err)
 	}
-	
+
 	// Send SIGTERM
 	if err := task.Kill(ctx, syscall.SIGTERM); err != nil {
 		return fmt.Errorf("failed to kill task: %w", err)
 	}
-	
+
 	// Wait for task to exit or timeout
 	exitCh, err := task.Wait(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to wait task: %w", err)
 	}
-	
+
 	timeoutDuration := 30 * time.Second
 	if timeout != nil {
 		timeoutDuration = time.Duration(*timeout) * time.Second
 	}
-	
+
 	select {
 	case <-exitCh:
 		// Task exited
@@ -183,7 +183,7 @@ func (c *ContainerdRuntime) StopContainer(ctx context.Context, id string, timeou
 		// Force kill
 		task.Kill(ctx, syscall.SIGKILL)
 	}
-	
+
 	// Delete task
 	_, err = task.Delete(ctx)
 	return err
@@ -192,12 +192,12 @@ func (c *ContainerdRuntime) StopContainer(ctx context.Context, id string, timeou
 // RemoveContainer removes a container
 func (c *ContainerdRuntime) RemoveContainer(ctx context.Context, id string, force bool) error {
 	ctx = namespaces.WithNamespace(ctx, c.namespace)
-	
+
 	container, err := c.client.LoadContainer(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to load container: %w", err)
 	}
-	
+
 	// Stop task if running
 	if force {
 		if task, err := container.Task(ctx, nil); err == nil {
@@ -205,7 +205,7 @@ func (c *ContainerdRuntime) RemoveContainer(ctx context.Context, id string, forc
 			task.Delete(ctx)
 		}
 	}
-	
+
 	// Delete container
 	return container.Delete(ctx, containerd.WithSnapshotCleanup)
 }
@@ -213,30 +213,30 @@ func (c *ContainerdRuntime) RemoveContainer(ctx context.Context, id string, forc
 // GetContainer gets container information
 func (c *ContainerdRuntime) GetContainer(ctx context.Context, id string) (*Container, error) {
 	ctx = namespaces.WithNamespace(ctx, c.namespace)
-	
+
 	container, err := c.client.LoadContainer(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return c.containerdToContainer(container)
 }
 
 // ListContainers lists containers
 func (c *ContainerdRuntime) ListContainers(ctx context.Context, opts ListContainersOptions) ([]*Container, error) {
 	ctx = namespaces.WithNamespace(ctx, c.namespace)
-	
+
 	// Build filters
 	var filters []string
 	for k, v := range opts.Labels {
 		filters = append(filters, fmt.Sprintf("labels.%s%s==%s", labelPrefix, k, v))
 	}
-	
+
 	containers, err := c.client.Containers(ctx, filters...)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	result := make([]*Container, 0, len(containers))
 	for _, container := range containers {
 		// Check name filter
@@ -245,7 +245,7 @@ func (c *ContainerdRuntime) ListContainers(ctx context.Context, opts ListContain
 			if err != nil {
 				continue
 			}
-			
+
 			found := false
 			for _, name := range opts.Names {
 				if info.ID == name || info.Labels[labelPrefix+"name"] == name {
@@ -257,13 +257,13 @@ func (c *ContainerdRuntime) ListContainers(ctx context.Context, opts ListContain
 				continue
 			}
 		}
-		
+
 		cont, err := c.containerdToContainer(container)
 		if err == nil {
 			result = append(result, cont)
 		}
 	}
-	
+
 	return result, nil
 }
 
@@ -278,13 +278,13 @@ func (c *ContainerdRuntime) ContainerLogs(ctx context.Context, id string, opts L
 // PullImage pulls an image
 func (c *ContainerdRuntime) PullImage(ctx context.Context, imageName string, opts PullImageOptions) (io.ReadCloser, error) {
 	ctx = namespaces.WithNamespace(ctx, c.namespace)
-	
+
 	// Use platform default if not specified
 	platformStr := platforms.DefaultString()
 	if opts.Platform != "" {
 		platformStr = opts.Platform
 	}
-	
+
 	// Pull image
 	_, err := c.client.Pull(ctx, imageName,
 		containerd.WithPlatform(platformStr),
@@ -293,7 +293,7 @@ func (c *ContainerdRuntime) PullImage(ctx context.Context, imageName string, opt
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Return a dummy reader since containerd doesn't provide progress
 	return io.NopCloser(strings.NewReader("Image pulled successfully")), nil
 }
@@ -306,7 +306,7 @@ func (c *ContainerdRuntime) ensureImage(ctx context.Context, imageName string) (
 	if err == nil {
 		return image, nil
 	}
-	
+
 	// Pull image
 	image, err = c.client.Pull(ctx, imageName,
 		containerd.WithPlatform(platforms.DefaultString()),
@@ -315,7 +315,7 @@ func (c *ContainerdRuntime) ensureImage(ctx context.Context, imageName string) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image: %w", err)
 	}
-	
+
 	return image, nil
 }
 
@@ -325,12 +325,12 @@ func (c *ContainerdRuntime) buildOCISpec(config *ContainerConfig) []oci.SpecOpts
 		oci.WithHostname(config.Name),
 		oci.WithEnv(config.Env),
 	}
-	
+
 	// Add command if specified
 	if len(config.Cmd) > 0 {
 		opts = append(opts, oci.WithProcessArgs(config.Cmd...))
 	}
-	
+
 	// Add mounts
 	for _, m := range config.Mounts {
 		opts = append(opts, oci.WithMounts([]specs.Mount{
@@ -342,12 +342,12 @@ func (c *ContainerdRuntime) buildOCISpec(config *ContainerConfig) []oci.SpecOpts
 			},
 		}))
 	}
-	
+
 	// Add resource limits using a custom function
 	if config.Resources != nil {
 		opts = append(opts, withResources(config.Resources))
 	}
-	
+
 	return opts
 }
 
@@ -370,7 +370,7 @@ func withResources(res *Resources) oci.SpecOpts {
 		if spec.Linux.Resources == nil {
 			spec.Linux.Resources = &specs.LinuxResources{}
 		}
-		
+
 		// Set CPU resources
 		if res.CPUShares > 0 || res.CPUQuota > 0 || res.CPUPeriod > 0 {
 			if spec.Linux.Resources.CPU == nil {
@@ -388,7 +388,7 @@ func withResources(res *Resources) oci.SpecOpts {
 				spec.Linux.Resources.CPU.Period = &period
 			}
 		}
-		
+
 		// Set memory resources
 		if res.Memory > 0 || res.MemorySwap > 0 {
 			if spec.Linux.Resources.Memory == nil {
@@ -401,19 +401,19 @@ func withResources(res *Resources) oci.SpecOpts {
 				spec.Linux.Resources.Memory.Swap = &res.MemorySwap
 			}
 		}
-		
+
 		return nil
 	}
 }
 
 func (c *ContainerdRuntime) containerdToContainer(container containerd.Container) (*Container, error) {
 	ctx := namespaces.WithNamespace(context.Background(), c.namespace)
-	
+
 	info, err := container.Info(ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Get task status
 	state := "created"
 	if task, err := container.Task(ctx, nil); err == nil {
@@ -422,7 +422,7 @@ func (c *ContainerdRuntime) containerdToContainer(container containerd.Container
 			state = string(status.Status)
 		}
 	}
-	
+
 	// Extract labels
 	labels := make(map[string]string)
 	for k, v := range info.Labels {
@@ -430,7 +430,7 @@ func (c *ContainerdRuntime) containerdToContainer(container containerd.Container
 			labels[strings.TrimPrefix(k, labelPrefix)] = v
 		}
 	}
-	
+
 	return &Container{
 		ID:      info.ID,
 		Name:    info.Labels[labelPrefix+"name"],

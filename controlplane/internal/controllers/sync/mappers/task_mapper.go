@@ -13,7 +13,7 @@ import (
 )
 
 // TaskStateMapper maps Kubernetes pod state to ECS task state
-type TaskStateMapper struct{
+type TaskStateMapper struct {
 	accountID string
 	region    string
 }
@@ -59,17 +59,17 @@ func (m *TaskStateMapper) MapPodPhaseToTaskStatus(pod *corev1.Pod) (desiredStatu
 				anyRunning = true
 			}
 		}
-		
+
 		// If all containers are ready, task is RUNNING
 		if allReady {
 			return "RUNNING", "RUNNING"
 		}
-		
+
 		// If at least one container is running, task is no longer PENDING
 		if anyRunning {
 			return "RUNNING", "RUNNING"
 		}
-		
+
 		// Otherwise, still activating
 		return "RUNNING", "ACTIVATING"
 
@@ -287,7 +287,7 @@ func (m *TaskStateMapper) generateTaskARN(pod *corev1.Pod) string {
 		// Fallback to default if cluster name extraction failed
 		clusterName = "default"
 	}
-	
+
 	// Get task ID from pod label or generate from pod name
 	taskID := pod.Labels["kecs.dev/task-id"]
 	if taskID == "" {
@@ -295,7 +295,7 @@ func (m *TaskStateMapper) generateTaskARN(pod *corev1.Pod) string {
 		// This ensures the same pod always gets the same ECS-compatible task ID
 		taskID = utils.GenerateTaskIDFromString(pod.Name)
 	}
-	
+
 	return fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", region, m.accountID, clusterName, taskID)
 }
 
@@ -449,7 +449,6 @@ func (m *TaskStateMapper) serializeContainers(containers []generated.Container) 
 	}
 	return string(data)
 }
-
 
 func (m *TaskStateMapper) extractResourceLimits(pod *corev1.Pod) (cpu, memory string) {
 	totalCPU := int64(0)

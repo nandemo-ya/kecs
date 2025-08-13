@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -15,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // kubernetesManager implements KubernetesManager interface
@@ -127,12 +127,12 @@ func (km *kubernetesManager) createConfigMap(ctx context.Context, config *Config
 	data := map[string]string{
 		"services": config.GetServicesString(),
 	}
-	
+
 	// Add init scripts to ConfigMap
 	for _, script := range config.InitScripts {
 		data[script.Name] = script.Content
 	}
-	
+
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "localstack-config",
@@ -280,7 +280,7 @@ func (km *kubernetesManager) createDeployment(ctx context.Context, config *Confi
 				},
 			},
 		})
-		
+
 		// Mount init scripts to LocalStack's init directory
 		// LocalStack automatically executes scripts in /etc/localstack/init/ready.d/
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
@@ -450,7 +450,6 @@ func (km *kubernetesManager) DeleteLocalStack(ctx context.Context) error {
 	return nil
 }
 
-
 // GetLocalStackPod returns the name of the LocalStack pod
 func (km *kubernetesManager) GetLocalStackPod() (string, error) {
 	pods, err := km.client.CoreV1().Pods(km.namespace).List(context.Background(), metav1.ListOptions{
@@ -526,7 +525,7 @@ func (km *kubernetesManager) UpdateDeployment(ctx context.Context, config *Confi
 
 	// Update services
 	configMap.Data["services"] = config.GetServicesString()
-	
+
 	// Update init scripts
 	// First, remove old scripts that are no longer in config
 	for key := range configMap.Data {
@@ -543,7 +542,7 @@ func (km *kubernetesManager) UpdateDeployment(ctx context.Context, config *Confi
 			}
 		}
 	}
-	
+
 	// Then add/update current scripts
 	for _, script := range config.InitScripts {
 		configMap.Data[script.Name] = script.Content

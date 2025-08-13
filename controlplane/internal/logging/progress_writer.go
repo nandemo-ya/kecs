@@ -48,20 +48,20 @@ func (pw *ProgressWriter) Write(p []byte) (n int, err error) {
 	// slog text format: "time=2025-07-21T15:04:05.000+09:00 level=INFO msg=\"message\" key=value"
 	// slog json format: {"time":"2025-07-21T15:04:05.000+09:00","level":"INFO","msg":"message","key":"value"}
 	level := pw.parseLogLevel(p)
-	
+
 	// Convert bytes to string and trim whitespace
 	message := strings.TrimSpace(string(p))
-	
+
 	// Add to capture with parsed level
 	pw.capture.Add(time.Now(), level, message)
-	
+
 	return len(p), nil
 }
 
 // parseLogLevel extracts the log level from slog output
 func (pw *ProgressWriter) parseLogLevel(p []byte) progress.LogLevel {
 	s := string(p)
-	
+
 	// Check for text format
 	if strings.Contains(s, "level=") {
 		if strings.Contains(s, "level=DEBUG") {
@@ -74,7 +74,7 @@ func (pw *ProgressWriter) parseLogLevel(p []byte) progress.LogLevel {
 			return progress.LogLevelError
 		}
 	}
-	
+
 	// Check for JSON format
 	if strings.Contains(s, `"level":`) {
 		if strings.Contains(s, `"level":"DEBUG"`) {
@@ -87,7 +87,7 @@ func (pw *ProgressWriter) parseLogLevel(p []byte) progress.LogLevel {
 			return progress.LogLevelError
 		}
 	}
-	
+
 	// Default to info if we can't determine
 	return progress.LogLevelInfo
 }
@@ -110,17 +110,17 @@ func NewCustomTextHandler(w io.Writer, opts *slog.HandlerOptions) *CustomTextHan
 func (h *CustomTextHandler) Handle(ctx context.Context, r slog.Record) error {
 	// Format: "HH:MM:SS LEVEL  message [attrs]"
 	var buf bytes.Buffer
-	
+
 	// Time
 	fmt.Fprintf(&buf, "%s ", r.Time.Format("15:04:05"))
-	
+
 	// Level (padded to 5 chars)
 	level := r.Level.String()
 	fmt.Fprintf(&buf, "%-5s  ", level)
-	
+
 	// Message
 	buf.WriteString(r.Message)
-	
+
 	// Attributes
 	if r.NumAttrs() > 0 {
 		buf.WriteString(" ")
@@ -129,9 +129,9 @@ func (h *CustomTextHandler) Handle(ctx context.Context, r slog.Record) error {
 			return true
 		})
 	}
-	
+
 	buf.WriteByte('\n')
-	
+
 	_, err := h.writer.Write(buf.Bytes())
 	return err
 }

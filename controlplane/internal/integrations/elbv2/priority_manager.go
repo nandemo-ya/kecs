@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // PriorityManager manages rule priorities for ELBv2 listeners
@@ -150,11 +150,11 @@ func (p *PriorityManager) AnalyzeRulePriorities(ctx context.Context, listenerArn
 	}
 
 	analysis := &PriorityAnalysis{
-		TotalRules:      len(rules),
-		PriorityRanges:  make(map[string]int),
-		Gaps:            []PriorityGap{},
-		Conflicts:       []PriorityConflict{},
-		UsedPriorities:  make([]int32, 0, len(rules)),
+		TotalRules:     len(rules),
+		PriorityRanges: make(map[string]int),
+		Gaps:           []PriorityGap{},
+		Conflicts:      []PriorityConflict{},
+		UsedPriorities: make([]int32, 0, len(rules)),
 	}
 
 	// Sort rules by priority
@@ -165,7 +165,7 @@ func (p *PriorityManager) AnalyzeRulePriorities(ctx context.Context, listenerArn
 	// Count rules in each range
 	for _, rule := range rules {
 		analysis.UsedPriorities = append(analysis.UsedPriorities, rule.Priority)
-		
+
 		switch {
 		case rule.Priority >= PriorityRangeCritical.Start && rule.Priority <= PriorityRangeCritical.End:
 			analysis.PriorityRanges["critical"]++
@@ -194,13 +194,13 @@ func (p *PriorityManager) AnalyzeRulePriorities(ctx context.Context, listenerArn
 
 	// Detect potential conflicts (rules with very close priorities)
 	for i := 0; i < len(rules)-1; i++ {
-		if rules[i+1].Priority - rules[i].Priority == 1 {
+		if rules[i+1].Priority-rules[i].Priority == 1 {
 			analysis.Conflicts = append(analysis.Conflicts, PriorityConflict{
-				Rule1: rules[i].ARN,
-				Rule2: rules[i+1].ARN,
+				Rule1:     rules[i].ARN,
+				Rule2:     rules[i+1].ARN,
 				Priority1: rules[i].Priority,
 				Priority2: rules[i+1].Priority,
-				Message: "Adjacent priorities may cause maintenance issues",
+				Message:   "Adjacent priorities may cause maintenance issues",
 			})
 		}
 	}
@@ -246,7 +246,7 @@ func (p *PriorityManager) OptimizePriorities(ctx context.Context, listenerArn st
 	})
 
 	suggestions := make([]RulePriorityUpdate, 0, len(rules))
-	
+
 	// Analyze rule conditions to determine specificity
 	for i, rule := range rules {
 		conditions, err := p.parseConditions(rule.Conditions)
@@ -258,7 +258,7 @@ func (p *PriorityManager) OptimizePriorities(ctx context.Context, listenerArn st
 		// Calculate suggested priority based on specificity
 		specificity := p.calculateSpecificity(conditions)
 		suggestedPriority := p.suggestPriorityFromSpecificity(specificity, i, len(rules))
-		
+
 		if suggestedPriority != rule.Priority {
 			suggestions = append(suggestions, RulePriorityUpdate{
 				RuleArn:  rule.ARN,
@@ -279,7 +279,7 @@ func (p *PriorityManager) parseConditions(conditionsJSON string) ([]generated_el
 // calculateSpecificity calculates a specificity score for rule conditions
 func (p *PriorityManager) calculateSpecificity(conditions []generated_elbv2.RuleCondition) int {
 	score := 0
-	
+
 	for _, condition := range conditions {
 		// Exact matches are more specific
 		if condition.PathPatternConfig != nil {
@@ -293,7 +293,7 @@ func (p *PriorityManager) calculateSpecificity(conditions []generated_elbv2.Rule
 				}
 			}
 		}
-		
+
 		if condition.HostHeaderConfig != nil {
 			for _, host := range condition.HostHeaderConfig.Values {
 				if !strings.Contains(host, "*") {
@@ -303,29 +303,29 @@ func (p *PriorityManager) calculateSpecificity(conditions []generated_elbv2.Rule
 				}
 			}
 		}
-		
+
 		if condition.HttpHeaderConfig != nil {
 			score += 6 // HTTP header conditions are fairly specific
 		}
-		
+
 		if condition.HttpRequestMethodConfig != nil {
 			score += 2 // Method conditions are less specific
 		}
-		
+
 		if condition.QueryStringConfig != nil {
 			score += 7 // Query string conditions are specific
 		}
-		
+
 		if condition.SourceIpConfig != nil {
 			score += 5 // Source IP conditions
 		}
 	}
-	
+
 	// Multiple conditions make a rule more specific
 	if len(conditions) > 1 {
 		score += len(conditions) * 2
 	}
-	
+
 	return score
 }
 
@@ -373,18 +373,18 @@ func (p *PriorityManager) ReorderRulesForClarity(ctx context.Context, listenerAr
 
 	updates := make([]RulePriorityUpdate, 0, len(rules))
 	currentPriority := int32(10) // Start from 10
-	
+
 	for _, rule := range rules {
 		// Skip default rule
 		if rule.Priority >= 50000 {
 			continue
 		}
-		
+
 		updates = append(updates, RulePriorityUpdate{
 			RuleArn:  rule.ARN,
 			Priority: currentPriority,
 		})
-		
+
 		currentPriority += gapSize
 	}
 
@@ -395,7 +395,7 @@ func (p *PriorityManager) ReorderRulesForClarity(ctx context.Context, listenerAr
 func (p *PriorityManager) FindPriorityForConditions(ctx context.Context, listenerArn string, conditions []generated_elbv2.RuleCondition) (int32, error) {
 	// Calculate specificity
 	specificity := p.calculateSpecificity(conditions)
-	
+
 	// Determine appropriate range
 	var targetRange PriorityRange
 	if specificity >= 15 {
@@ -405,7 +405,7 @@ func (p *PriorityManager) FindPriorityForConditions(ctx context.Context, listene
 	} else {
 		targetRange = PriorityRangeCatchAll
 	}
-	
+
 	// Find available priority in range
 	return p.GetNextAvailablePriority(ctx, listenerArn, targetRange)
 }

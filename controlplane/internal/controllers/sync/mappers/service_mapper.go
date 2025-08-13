@@ -12,7 +12,7 @@ import (
 )
 
 // ServiceStateMapper maps Kubernetes deployment state to ECS service state
-type ServiceStateMapper struct{
+type ServiceStateMapper struct {
 	accountID string
 	region    string
 }
@@ -166,16 +166,16 @@ func (m *ServiceStateMapper) MapDeploymentToService(deployment *appsv1.Deploymen
 
 	// Create deployment info to store in DeploymentConfiguration field
 	deploymentInfo := generated.Deployment{
-		Id:               &deployment.Name,
-		Status:           &service.Status,
-		TaskDefinition:   &service.TaskDefinitionARN,
-		DesiredCount:     int32Ptr(int32(service.DesiredCount)),
-		RunningCount:     int32Ptr(int32(service.RunningCount)),
-		PendingCount:     int32Ptr(int32(service.PendingCount)),
-		CreatedAt:        timePtr(deployment.CreationTimestamp.Time),
-		UpdatedAt:        timePtr(time.Now()),
-		LaunchType:       (*generated.LaunchType)(stringPtr(service.LaunchType)),
-		PlatformVersion:  stringPtr(service.PlatformVersion),
+		Id:              &deployment.Name,
+		Status:          &service.Status,
+		TaskDefinition:  &service.TaskDefinitionARN,
+		DesiredCount:    int32Ptr(int32(service.DesiredCount)),
+		RunningCount:    int32Ptr(int32(service.RunningCount)),
+		PendingCount:    int32Ptr(int32(service.PendingCount)),
+		CreatedAt:       timePtr(deployment.CreationTimestamp.Time),
+		UpdatedAt:       timePtr(time.Now()),
+		LaunchType:      (*generated.LaunchType)(stringPtr(service.LaunchType)),
+		PlatformVersion: stringPtr(service.PlatformVersion),
 	}
 
 	// Serialize deployment info to JSON for storage

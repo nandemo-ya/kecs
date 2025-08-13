@@ -16,7 +16,7 @@ var (
 			PaddingLeft(1).
 			PaddingRight(1).
 			Bold(true)
-			
+
 	breadcrumbStyle = lipgloss.NewStyle().
 			Background(lipgloss.Color("#313244")).
 			Foreground(lipgloss.Color("#bac2de")).
@@ -25,45 +25,45 @@ var (
 			BorderTop(true).
 			BorderStyle(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("#585b70"))
-			
+
 	footerStyle = lipgloss.NewStyle().
 			Background(lipgloss.Color("#1a1a1a")).
 			Foreground(lipgloss.Color("#808080")).
 			Padding(0, 1)
-			
+
 	contentStyle = lipgloss.NewStyle().
 			Padding(1, 2)
-			
+
 	statusActiveStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#00ff00"))
-			
+				Foreground(lipgloss.Color("#00ff00"))
+
 	statusInactiveStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#ff0000"))
-	
+				Foreground(lipgloss.Color("#ff0000"))
+
 	// New styles for enhanced layout
 	navigationPanelStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#585b70")).
-			Padding(1, 2)
-	
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#585b70")).
+				Padding(1, 2)
+
 	resourcePanelStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#585b70")).
-			Padding(1, 2)
-	
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#585b70")).
+				Padding(1, 2)
+
 	summaryStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#aaaaaa")).
 			Padding(0, 1)
-	
+
 	separatorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#333333"))
-	
+
 	// Row highlight style for selected items
 	selectedRowStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#2a2a4a")).
-			Foreground(lipgloss.Color("#ffffff")).
-			Bold(true)
-	
+				Background(lipgloss.Color("#2a2a4a")).
+				Foreground(lipgloss.Color("#ffffff")).
+				Bold(true)
+
 	dimmedStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#808080"))
 )
@@ -83,26 +83,26 @@ func (m Model) getHeaderShortcuts() string {
 	if m.currentView == ViewInstanceCreate {
 		return statusActiveStyle.Render("Create Instance")
 	}
-	
+
 	// Show context-specific shortcuts
 	shortcuts := []string{}
-	
+
 	// Style for k9s-like shortcuts
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true)
 	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
-	
+
 	switch m.currentView {
 	case ViewInstances:
 		shortcuts = []string{
 			keyStyle.Render("<N>") + sepStyle.Render(" New"),
 		}
 		if m.selectedInstance != "" {
-			shortcuts = append(shortcuts, keyStyle.Render("<T>") + sepStyle.Render(" TaskDefs"))
+			shortcuts = append(shortcuts, keyStyle.Render("<T>")+sepStyle.Render(" TaskDefs"))
 		}
 		shortcuts = append(shortcuts,
-			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
-			keyStyle.Render("</>") + sepStyle.Render(" Search"),
-			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
+			keyStyle.Render("<:>")+sepStyle.Render(" Cmd"),
+			keyStyle.Render("</>")+sepStyle.Render(" Search"),
+			keyStyle.Render("<?>")+sepStyle.Render(" Help"),
 		)
 	case ViewClusters:
 		shortcuts = []string{
@@ -146,7 +146,7 @@ func (m Model) getHeaderShortcuts() string {
 		}
 		if m.showTaskDefJSON {
 			shortcuts = append(shortcuts,
-				keyStyle.Render("<^U/^D>") + sepStyle.Render(" Scroll"),
+				keyStyle.Render("<^U/^D>")+sepStyle.Render(" Scroll"),
 			)
 		}
 	default:
@@ -156,7 +156,7 @@ func (m Model) getHeaderShortcuts() string {
 			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
 		}
 	}
-	
+
 	// Join shortcuts with spaces
 	return strings.Join(shortcuts, "  ")
 }
@@ -166,13 +166,13 @@ func (m Model) renderHeader() string {
 	totalWidth := m.width - 4 // Account for panel borders
 	leftColumnWidth := int(float64(totalWidth) * 0.7)
 	maxContentWidth := leftColumnWidth - 2 // Account for header padding
-	
+
 	// Build the header content
 	headerText := "KECS v0.0.1-alpha"
 	if m.selectedInstance != "" {
 		headerText = fmt.Sprintf("KECS v0.0.1-alpha | Instance: %s", m.selectedInstance)
 	}
-	
+
 	// Check if we need to truncate
 	if lipgloss.Width(headerText) > maxContentWidth {
 		if m.selectedInstance != "" {
@@ -186,14 +186,14 @@ func (m Model) renderHeader() string {
 			headerText = prefix + instanceName
 		}
 	}
-	
+
 	// Apply header style with proper width
 	return headerStyle.Width(maxContentWidth).Render(headerText)
 }
 
 func (m Model) renderBreadcrumb() string {
 	parts := []string{}
-	
+
 	// Build breadcrumb based on current navigation
 	if m.currentView == ViewInstances || m.selectedInstance != "" {
 		if m.currentView == ViewInstances {
@@ -202,35 +202,35 @@ func (m Model) renderBreadcrumb() string {
 			parts = append(parts, "Instances")
 		}
 	}
-	
+
 	if m.selectedInstance != "" {
 		parts = append(parts, ">", m.selectedInstance)
-		
+
 		if m.currentView == ViewClusters {
 			parts = append(parts, ">", "[Clusters]")
 		} else if m.selectedCluster != "" {
 			parts = append(parts, ">", "Clusters")
 		}
 	}
-	
+
 	if m.selectedCluster != "" {
 		parts = append(parts, ">", m.selectedCluster)
-		
+
 		if m.currentView == ViewServices {
 			parts = append(parts, ">", "[Services]")
 		} else if m.selectedService != "" {
 			parts = append(parts, ">", "Services")
 		}
 	}
-	
+
 	if m.selectedService != "" {
 		parts = append(parts, ">", m.selectedService)
-		
+
 		if m.currentView == ViewTasks {
 			parts = append(parts, ">", "[Tasks]")
 		}
 	}
-	
+
 	if m.currentView == ViewLogs {
 		if m.selectedTask != "" {
 			// Truncate long task IDs to prevent overflow
@@ -243,23 +243,23 @@ func (m Model) renderBreadcrumb() string {
 		}
 		parts = append(parts, ">", "[Logs]")
 	}
-	
+
 	// Task Definition navigation
 	if m.currentView == ViewTaskDefinitionFamilies || m.currentView == ViewTaskDefinitionRevisions {
 		parts = append(parts, ">", "[Task Definitions]")
-		
+
 		if m.currentView == ViewTaskDefinitionRevisions && m.selectedFamily != "" {
 			parts = append(parts, ">", m.selectedFamily)
 		}
 	}
-	
+
 	breadcrumb := strings.Join(parts, " ")
-	
+
 	// Calculate the same width as header for consistency
 	totalWidth := m.width - 4 // Account for panel borders
 	leftColumnWidth := int(float64(totalWidth) * 0.7)
 	maxContentWidth := leftColumnWidth - 2 // Account for breadcrumb padding
-	
+
 	// Ensure breadcrumb doesn't exceed available width
 	if lipgloss.Width(breadcrumb) > maxContentWidth {
 		// Truncate from the beginning if too long
@@ -273,7 +273,7 @@ func (m Model) renderBreadcrumb() string {
 			}
 		}
 	}
-	
+
 	return breadcrumbStyle.Width(maxContentWidth).Render(breadcrumb)
 }
 
@@ -283,14 +283,14 @@ func (m Model) renderFooter() string {
 		notification := successStyle.Render("📋 " + m.clipboardMsg)
 		return footerStyle.Width(m.width).Render(notification)
 	}
-	
+
 	// Check if we should show command result
 	if m.commandPalette != nil && m.commandPalette.ShouldShowResult() {
 		// Show command result for a few seconds
 		result := successStyle.Render("✓ " + m.commandPalette.lastResult)
 		return footerStyle.Width(m.width).Render(result)
 	}
-	
+
 	// Show mode-specific input
 	if m.searchMode {
 		input := fmt.Sprintf("Search: %s_", m.searchQuery)
@@ -303,11 +303,11 @@ func (m Model) renderFooter() string {
 		content := fmt.Sprintf("%s  %s", input, help)
 		return footerStyle.Width(m.width).Render(content)
 	}
-	
+
 	// Default footer shows status info
 	left := ""
 	right := ""
-	
+
 	// Show instance status on the left
 	if m.selectedInstance != "" {
 		status := "Unknown"
@@ -323,7 +323,7 @@ func (m Model) renderFooter() string {
 		}
 		left = fmt.Sprintf("Instance: %s", status)
 	}
-	
+
 	// Show selection count on the right based on current view
 	switch m.currentView {
 	case ViewInstances:
@@ -341,19 +341,19 @@ func (m Model) renderFooter() string {
 	case ViewTaskDefinitionRevisions:
 		right = fmt.Sprintf("Revisions: %d", len(m.taskDefRevisions))
 	}
-	
+
 	// Calculate spacing
 	if left == "" && right == "" {
 		return footerStyle.Width(m.width).Render("")
 	}
-	
+
 	leftWidth := lipgloss.Width(left)
 	rightWidth := lipgloss.Width(right)
 	gap := m.width - leftWidth - rightWidth - 4 // -4 for padding
 	if gap < 2 {
 		gap = 2
 	}
-	
+
 	content := left + strings.Repeat(" ", gap) + right
 	return footerStyle.Width(m.width).Render(content)
 }
@@ -365,24 +365,24 @@ func (m Model) renderNavigationPanel() string {
 	if navHeight < 10 {
 		navHeight = 10 // Minimum height for navigation content
 	}
-	
+
 	// Calculate column widths (7:3 ratio)
 	totalWidth := m.width - 4 // Account for panel borders
 	leftColumnWidth := int(float64(totalWidth) * 0.7)
 	rightColumnWidth := totalWidth - leftColumnWidth - 1 // -1 for gap between columns
-	
+
 	// Left column: header, breadcrumb, and summary
 	header := m.renderHeader()
 	breadcrumb := m.renderBreadcrumb()
 	summary := m.renderSummary()
-	
+
 	// Add separator line after breadcrumb
 	separatorWidth := leftColumnWidth - 2 // Account for padding
 	if separatorWidth < 20 {
 		separatorWidth = 20
 	}
 	topSeparator := separatorStyle.Render(strings.Repeat("─", separatorWidth))
-	
+
 	// Combine left column elements
 	leftColumn := lipgloss.JoinVertical(
 		lipgloss.Top,
@@ -391,17 +391,17 @@ func (m Model) renderNavigationPanel() string {
 		topSeparator,
 		summary,
 	)
-	
+
 	// Right column: shortcuts (vertical list)
-	rightColumn := m.renderShortcutsColumn(rightColumnWidth, navHeight - 4)
-	
+	rightColumn := m.renderShortcutsColumn(rightColumnWidth, navHeight-4)
+
 	// Join columns horizontally
 	navContent := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		lipgloss.NewStyle().Width(leftColumnWidth).Render(leftColumn),
 		lipgloss.NewStyle().Width(rightColumnWidth).Render(rightColumn),
 	)
-	
+
 	// Apply navigation panel style with fixed height
 	return navigationPanelStyle.
 		Width(m.width - 4). // Account for borders and padding
@@ -417,9 +417,9 @@ func (m Model) renderResourcePanel() string {
 	if resourceHeight < 10 {
 		resourceHeight = 10 // Minimum height
 	}
-	
+
 	var content string
-	
+
 	// Render view-specific content
 	switch m.currentView {
 	case ViewInstances:
@@ -440,13 +440,13 @@ func (m Model) renderResourcePanel() string {
 		if m.showTaskDefJSON {
 			content = m.renderTaskDefRevisionsTwoColumn(resourceHeight - 4)
 		} else {
-			content = m.renderTaskDefRevisionsList(resourceHeight - 4, m.width - 8)
+			content = m.renderTaskDefRevisionsList(resourceHeight-4, m.width-8)
 		}
 	}
-	
+
 	// Apply resource panel style with fixed height
 	return resourcePanelStyle.
-		Width(m.width - 4). // Account for borders and padding
+		Width(m.width - 4).         // Account for borders and padding
 		Height(resourceHeight - 4). // Account for borders and padding
 		Render(content)
 }
@@ -454,7 +454,7 @@ func (m Model) renderResourcePanel() string {
 // renderSummary renders contextual summary information
 func (m Model) renderSummary() string {
 	var summary string
-	
+
 	switch m.currentView {
 	case ViewInstances:
 		active := 0
@@ -464,9 +464,9 @@ func (m Model) renderSummary() string {
 				active++
 			}
 		}
-		summary = fmt.Sprintf("Total Instances: %d | Active: %d | Stopped: %d", 
+		summary = fmt.Sprintf("Total Instances: %d | Active: %d | Stopped: %d",
 			total, active, total-active)
-		
+
 	case ViewClusters:
 		if m.selectedInstance != "" {
 			totalServices := 0
@@ -475,7 +475,7 @@ func (m Model) renderSummary() string {
 				totalServices += cluster.Services
 				totalTasks += cluster.Tasks
 			}
-			
+
 			// Find instance configuration
 			var features []string
 			var apiPort, adminPort int
@@ -495,23 +495,23 @@ func (m Model) renderSummary() string {
 					break
 				}
 			}
-			
+
 			// Build vertical layout with proper alignment
 			line1 := fmt.Sprintf("Clusters: %-4d  API:   %d", len(m.clusters), apiPort)
 			line2 := fmt.Sprintf("Services: %-4d  Admin: %d", totalServices, adminPort)
 			line3 := fmt.Sprintf("Tasks:    %-4d", totalTasks)
-			
+
 			// Add features on the same line if they exist
 			if len(features) > 0 {
 				line3 += "  " + strings.Join(features, ", ")
 			}
-			
+
 			// Create multi-line summary with consistent styling
-			summary = summaryStyle.Render(line1) + "\n" + 
-			         summaryStyle.Render(line2) + "\n" + 
-			         summaryStyle.Render(line3)
+			summary = summaryStyle.Render(line1) + "\n" +
+				summaryStyle.Render(line2) + "\n" +
+				summaryStyle.Render(line3)
 		}
-		
+
 	case ViewServices:
 		if m.selectedCluster != "" {
 			totalDesired := 0
@@ -520,7 +520,7 @@ func (m Model) renderSummary() string {
 				totalDesired += svc.Desired
 				totalRunning += svc.Running
 			}
-			
+
 			// Add instance configuration info
 			var instanceInfo string
 			if m.selectedInstance != "" {
@@ -543,11 +543,11 @@ func (m Model) renderSummary() string {
 					instanceInfo = " | " + strings.Join(features, ", ")
 				}
 			}
-			
+
 			summary = fmt.Sprintf("Cluster: %s | Services: %d | Desired Tasks: %d | Running Tasks: %d%s",
 				m.selectedCluster, len(m.services), totalDesired, totalRunning, instanceInfo)
 		}
-		
+
 	case ViewTasks:
 		if m.selectedService != "" {
 			running := 0
@@ -563,13 +563,13 @@ func (m Model) renderSummary() string {
 			summary = fmt.Sprintf("Service: %s | Tasks: %d | Running: %d | Healthy: %d",
 				m.selectedService, len(m.tasks), running, healthy)
 		}
-		
+
 	case ViewLogs:
 		if m.selectedTask != "" {
 			// Keep log view summary short and on one line
 			summary = fmt.Sprintf("Log entries: %d", len(m.logs))
 		}
-		
+
 	case ViewTaskDefinitionFamilies:
 		if m.selectedInstance != "" {
 			active := 0
@@ -582,7 +582,7 @@ func (m Model) renderSummary() string {
 			summary = fmt.Sprintf("Instance: %s | Task Definition Families: %d | Active: %d",
 				m.selectedInstance, total, active)
 		}
-		
+
 	case ViewTaskDefinitionRevisions:
 		if m.selectedFamily != "" {
 			active := 0
@@ -600,11 +600,11 @@ func (m Model) renderSummary() string {
 				m.selectedFamily, total, active, latestRev)
 		}
 	}
-	
+
 	if summary == "" {
 		summary = "No resources selected"
 	}
-	
+
 	// Add separator line - make sure it fits within the left column width
 	totalWidth := m.width - 4 // Account for panel borders
 	leftColumnWidth := int(float64(totalWidth) * 0.7)
@@ -613,7 +613,7 @@ func (m Model) renderSummary() string {
 		separatorWidth = 20
 	}
 	separator := strings.Repeat("─", separatorWidth)
-	
+
 	// For multi-line summaries (which contain newlines), we need to handle them differently
 	if strings.Contains(summary, "\n") {
 		// Multi-line summary - add style and separator at the end
@@ -623,7 +623,7 @@ func (m Model) renderSummary() string {
 			separatorStyle.Render(separator),
 		)
 	}
-	
+
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
 		summaryStyle.Render(summary),
@@ -639,18 +639,18 @@ func (m Model) renderInstancesList(maxHeight int) string {
 	activeColor := lipgloss.Color("#00ff00")
 	stoppedColor := lipgloss.Color("#ff0000")
 	headerColor := lipgloss.Color("#808080")
-	
+
 	// Styles for instances
 	instHeaderStyle := lipgloss.NewStyle().
-			Foreground(headerColor).
-			Bold(true)
-			
+		Foreground(headerColor).
+		Bold(true)
+
 	activeStyle := lipgloss.NewStyle().
-			Foreground(activeColor)
-			
+		Foreground(activeColor)
+
 	stoppedStyle := lipgloss.NewStyle().
-			Foreground(stoppedColor)
-	
+		Foreground(stoppedColor)
+
 	// Calculate column widths based on available width
 	availableWidth := m.width - 8 // Account for padding and borders
 	nameWidth := int(float64(availableWidth) * 0.25)
@@ -660,7 +660,7 @@ func (m Model) renderInstancesList(maxHeight int) string {
 	tasksWidth := int(float64(availableWidth) * 0.10)
 	portWidth := int(float64(availableWidth) * 0.12)
 	ageWidth := int(float64(availableWidth) * 0.10)
-	
+
 	// Header
 	header := fmt.Sprintf(
 		"%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
@@ -673,18 +673,18 @@ func (m Model) renderInstancesList(maxHeight int) string {
 		ageWidth, "AGE",
 	)
 	header = instHeaderStyle.Render(header)
-	
+
 	// Rows
 	rows := []string{header}
-	
+
 	// Get filtered instances
 	filteredInstances := m.filterInstances(m.instances)
-	
+
 	// Calculate visible range with scrolling
 	visibleRows := maxHeight - 2 // Account for header and potential scroll indicator
 	startIdx := 0
 	endIdx := len(filteredInstances)
-	
+
 	// Adjust cursor if it's out of bounds
 	if m.instanceCursor >= len(filteredInstances) {
 		m.instanceCursor = len(filteredInstances) - 1
@@ -692,15 +692,15 @@ func (m Model) renderInstancesList(maxHeight int) string {
 			m.instanceCursor = 0
 		}
 	}
-	
+
 	// Implement scrolling if needed
 	if m.instanceCursor >= visibleRows {
 		startIdx = m.instanceCursor - visibleRows + 1
 	}
-	if endIdx > startIdx + visibleRows {
+	if endIdx > startIdx+visibleRows {
 		endIdx = startIdx + visibleRows
 	}
-	
+
 	for i := startIdx; i < endIdx; i++ {
 		instance := filteredInstances[i]
 		// Format values
@@ -711,12 +711,12 @@ func (m Model) renderInstancesList(maxHeight int) string {
 		tasks := fmt.Sprintf("%d", instance.Tasks)
 		port := fmt.Sprintf("%d", instance.APIPort)
 		age := formatDuration(instance.Age)
-		
+
 		// Truncate long values
 		if len(name) > nameWidth {
 			name = name[:nameWidth-3] + "..."
 		}
-		
+
 		// Create row
 		row := fmt.Sprintf(
 			"%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
@@ -728,7 +728,7 @@ func (m Model) renderInstancesList(maxHeight int) string {
 			portWidth, port,
 			ageWidth, age,
 		)
-		
+
 		// Apply styles
 		if i == m.instanceCursor {
 			// Apply full-row highlight with consistent width
@@ -746,16 +746,16 @@ func (m Model) renderInstancesList(maxHeight int) string {
 				row = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff8800")).Render(row)
 			}
 		}
-		
+
 		rows = append(rows, row)
 	}
-	
+
 	// Add scroll indicator if needed
 	if len(filteredInstances) > visibleRows {
 		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d instances]", startIdx+1, endIdx, len(filteredInstances))
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(scrollInfo))
 	}
-	
+
 	// Add search indicator if searching
 	if m.searchMode || m.searchQuery != "" {
 		searchInfo := fmt.Sprintf("\n[Search: %s]", m.searchQuery)
@@ -764,10 +764,9 @@ func (m Model) renderInstancesList(maxHeight int) string {
 		}
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00")).Render(searchInfo))
 	}
-	
+
 	return strings.Join(rows, "\n")
 }
-
 
 // formatDuration formats a duration into a human-readable string
 func formatDuration(d time.Duration) string {
@@ -811,15 +810,15 @@ func (m Model) renderClustersList(maxHeight int) string {
 	// Colors for clusters
 	activeColor := lipgloss.Color("#00ff00")
 	headerColor := lipgloss.Color("#808080")
-	
+
 	// Styles for clusters
 	clusterHeaderStyle := lipgloss.NewStyle().
-			Foreground(headerColor).
-			Bold(true)
-			
+		Foreground(headerColor).
+		Bold(true)
+
 	activeStyle := lipgloss.NewStyle().
-			Foreground(activeColor)
-	
+		Foreground(activeColor)
+
 	// Calculate column widths based on available width
 	availableWidth := m.width - 8
 	nameWidth := int(float64(availableWidth) * 0.40)
@@ -827,7 +826,7 @@ func (m Model) renderClustersList(maxHeight int) string {
 	servicesWidth := int(float64(availableWidth) * 0.15)
 	tasksWidth := int(float64(availableWidth) * 0.15)
 	ageWidth := int(float64(availableWidth) * 0.15)
-	
+
 	// Header
 	header := fmt.Sprintf(
 		"%-*s %-*s %-*s %-*s %-*s",
@@ -838,18 +837,18 @@ func (m Model) renderClustersList(maxHeight int) string {
 		ageWidth, "AGE",
 	)
 	header = clusterHeaderStyle.Render(header)
-	
+
 	// Rows
 	rows := []string{header}
-	
+
 	// Get filtered clusters
 	filteredClusters := m.filterClusters(m.clusters)
-	
+
 	// Calculate visible range with scrolling
 	visibleRows := maxHeight - 2
 	startIdx := 0
 	endIdx := len(filteredClusters)
-	
+
 	// Adjust cursor if it's out of bounds
 	if m.clusterCursor >= len(filteredClusters) {
 		m.clusterCursor = len(filteredClusters) - 1
@@ -857,14 +856,14 @@ func (m Model) renderClustersList(maxHeight int) string {
 			m.clusterCursor = 0
 		}
 	}
-	
+
 	if m.clusterCursor >= visibleRows {
 		startIdx = m.clusterCursor - visibleRows + 1
 	}
-	if endIdx > startIdx + visibleRows {
+	if endIdx > startIdx+visibleRows {
 		endIdx = startIdx + visibleRows
 	}
-	
+
 	for i := startIdx; i < endIdx; i++ {
 		cluster := filteredClusters[i]
 		// Format values
@@ -873,12 +872,12 @@ func (m Model) renderClustersList(maxHeight int) string {
 		services := fmt.Sprintf("%d", cluster.Services)
 		tasks := fmt.Sprintf("%d", cluster.Tasks)
 		age := formatDuration(cluster.Age)
-		
+
 		// Truncate long values
 		if len(name) > nameWidth {
 			name = name[:nameWidth-3] + "..."
 		}
-		
+
 		// Create row
 		row := fmt.Sprintf(
 			"%-*s %-*s %-*s %-*s %-*s",
@@ -888,7 +887,7 @@ func (m Model) renderClustersList(maxHeight int) string {
 			tasksWidth, tasks,
 			ageWidth, age,
 		)
-		
+
 		// Apply styles
 		if i == m.clusterCursor {
 			// Apply full-row highlight with consistent width
@@ -899,16 +898,16 @@ func (m Model) renderClustersList(maxHeight int) string {
 				row = activeStyle.Render(row)
 			}
 		}
-		
+
 		rows = append(rows, row)
 	}
-	
+
 	// Add scroll indicator if needed
 	if len(filteredClusters) > visibleRows {
 		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d clusters]", startIdx+1, endIdx, len(filteredClusters))
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(scrollInfo))
 	}
-	
+
 	// Add search indicator if searching
 	if m.searchMode || m.searchQuery != "" {
 		searchInfo := fmt.Sprintf("\n[Search: %s]", m.searchQuery)
@@ -917,10 +916,9 @@ func (m Model) renderClustersList(maxHeight int) string {
 		}
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00")).Render(searchInfo))
 	}
-	
+
 	return strings.Join(rows, "\n")
 }
-
 
 // renderServicesList renders the services list with the given height constraint
 func (m Model) renderServicesList(maxHeight int) string {
@@ -937,24 +935,24 @@ func (m Model) renderServicesList(maxHeight int) string {
 	updatingColor := lipgloss.Color("#ffff00")
 	provisioningColor := lipgloss.Color("#ff8800")
 	headerColor := lipgloss.Color("#808080")
-	
+
 	// Styles for services
 	serviceHeaderStyle := lipgloss.NewStyle().
-			Foreground(headerColor).
-			Bold(true)
-			
+		Foreground(headerColor).
+		Bold(true)
+
 	activeStyle := lipgloss.NewStyle().
-			Foreground(activeColor)
-			
+		Foreground(activeColor)
+
 	inactiveStyle := lipgloss.NewStyle().
-			Foreground(inactiveColor)
-			
+		Foreground(inactiveColor)
+
 	updatingStyle := lipgloss.NewStyle().
-			Foreground(updatingColor)
-			
+		Foreground(updatingColor)
+
 	provisioningStyle := lipgloss.NewStyle().
-			Foreground(provisioningColor)
-	
+		Foreground(provisioningColor)
+
 	// Calculate column widths based on available width
 	availableWidth := m.width - 8
 	nameWidth := int(float64(availableWidth) * 0.20)
@@ -964,7 +962,7 @@ func (m Model) renderServicesList(maxHeight int) string {
 	statusWidth := int(float64(availableWidth) * 0.10)
 	taskDefWidth := int(float64(availableWidth) * 0.40)
 	ageWidth := int(float64(availableWidth) * 0.06)
-	
+
 	// Header
 	header := fmt.Sprintf(
 		"%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
@@ -977,18 +975,18 @@ func (m Model) renderServicesList(maxHeight int) string {
 		ageWidth, "AGE",
 	)
 	header = serviceHeaderStyle.Render(header)
-	
+
 	// Rows
 	rows := []string{header}
-	
+
 	// Get filtered services
 	filteredServices := m.filterServices(m.services)
-	
+
 	// Calculate visible range with scrolling
 	visibleRows := maxHeight - 2
 	startIdx := 0
 	endIdx := len(filteredServices)
-	
+
 	// Adjust cursor if it's out of bounds
 	if m.serviceCursor >= len(filteredServices) {
 		m.serviceCursor = len(filteredServices) - 1
@@ -996,14 +994,14 @@ func (m Model) renderServicesList(maxHeight int) string {
 			m.serviceCursor = 0
 		}
 	}
-	
+
 	if m.serviceCursor >= visibleRows {
 		startIdx = m.serviceCursor - visibleRows + 1
 	}
-	if endIdx > startIdx + visibleRows {
+	if endIdx > startIdx+visibleRows {
 		endIdx = startIdx + visibleRows
 	}
-	
+
 	for i := startIdx; i < endIdx; i++ {
 		service := filteredServices[i]
 		// Format values
@@ -1014,7 +1012,7 @@ func (m Model) renderServicesList(maxHeight int) string {
 		status := service.Status
 		taskDef := service.TaskDef
 		age := formatDuration(service.Age)
-		
+
 		// Extract task definition name and revision from ARN
 		// ARN format: arn:aws:ecs:region:account:task-definition/name:revision
 		if strings.HasPrefix(taskDef, "arn:") {
@@ -1023,7 +1021,7 @@ func (m Model) renderServicesList(maxHeight int) string {
 				taskDef = parts[len(parts)-1] // Gets "name:revision"
 			}
 		}
-		
+
 		// Truncate long values
 		if len(name) > nameWidth {
 			name = name[:nameWidth-3] + "..."
@@ -1031,7 +1029,7 @@ func (m Model) renderServicesList(maxHeight int) string {
 		if len(taskDef) > taskDefWidth {
 			taskDef = taskDef[:taskDefWidth-3] + "..."
 		}
-		
+
 		// Create row
 		row := fmt.Sprintf(
 			"%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
@@ -1043,7 +1041,7 @@ func (m Model) renderServicesList(maxHeight int) string {
 			taskDefWidth, taskDef,
 			ageWidth, age,
 		)
-		
+
 		// Apply styles
 		if i == m.serviceCursor {
 			// Apply full-row highlight with consistent width
@@ -1061,16 +1059,16 @@ func (m Model) renderServicesList(maxHeight int) string {
 				row = provisioningStyle.Render(row)
 			}
 		}
-		
+
 		rows = append(rows, row)
 	}
-	
+
 	// Add scroll indicator if needed
 	if len(filteredServices) > visibleRows {
 		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d services]", startIdx+1, endIdx, len(filteredServices))
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(scrollInfo))
 	}
-	
+
 	// Add search indicator if searching
 	if m.searchMode || m.searchQuery != "" {
 		searchInfo := fmt.Sprintf("\n[Search: %s]", m.searchQuery)
@@ -1079,10 +1077,9 @@ func (m Model) renderServicesList(maxHeight int) string {
 		}
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00")).Render(searchInfo))
 	}
-	
+
 	return strings.Join(rows, "\n")
 }
-
 
 // renderTasksList renders the tasks list with the given height constraint
 func (m Model) renderTasksList(maxHeight int) string {
@@ -1102,24 +1099,24 @@ func (m Model) renderTasksList(maxHeight int) string {
 	unhealthyColor := lipgloss.Color("#ff0000")
 	unknownColor := lipgloss.Color("#808080")
 	headerColor := lipgloss.Color("#808080")
-	
+
 	// Styles for tasks
 	taskHeaderStyle := lipgloss.NewStyle().
-			Foreground(headerColor).
-			Bold(true)
-			
+		Foreground(headerColor).
+		Bold(true)
+
 	runningStyle := lipgloss.NewStyle().
-			Foreground(runningColor)
-			
+		Foreground(runningColor)
+
 	pendingStyle := lipgloss.NewStyle().
-			Foreground(pendingColor)
-			
+		Foreground(pendingColor)
+
 	stoppingStyle := lipgloss.NewStyle().
-			Foreground(stoppingColor)
-			
+		Foreground(stoppingColor)
+
 	failedStyle := lipgloss.NewStyle().
-			Foreground(failedColor)
-	
+		Foreground(failedColor)
+
 	// Calculate column widths based on available width
 	availableWidth := m.width - 8
 	idWidth := int(float64(availableWidth) * 0.45)
@@ -1129,7 +1126,7 @@ func (m Model) renderTasksList(maxHeight int) string {
 	memoryWidth := int(float64(availableWidth) * 0.10)
 	ipWidth := int(float64(availableWidth) * 0.10)
 	ageWidth := int(float64(availableWidth) * 0.05)
-	
+
 	// Header
 	header := fmt.Sprintf(
 		"%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
@@ -1142,18 +1139,18 @@ func (m Model) renderTasksList(maxHeight int) string {
 		ageWidth, "AGE",
 	)
 	header = taskHeaderStyle.Render(header)
-	
+
 	// Rows
 	rows := []string{header}
-	
+
 	// Get filtered tasks
 	filteredTasks := m.filterTasks(m.tasks)
-	
+
 	// Calculate visible range with scrolling
 	visibleRows := maxHeight - 2
 	startIdx := 0
 	endIdx := len(filteredTasks)
-	
+
 	// Adjust cursor if it's out of bounds
 	if m.taskCursor >= len(filteredTasks) {
 		m.taskCursor = len(filteredTasks) - 1
@@ -1161,14 +1158,14 @@ func (m Model) renderTasksList(maxHeight int) string {
 			m.taskCursor = 0
 		}
 	}
-	
+
 	if m.taskCursor >= visibleRows {
 		startIdx = m.taskCursor - visibleRows + 1
 	}
-	if endIdx > startIdx + visibleRows {
+	if endIdx > startIdx+visibleRows {
 		endIdx = startIdx + visibleRows
 	}
-	
+
 	for i := startIdx; i < endIdx; i++ {
 		task := filteredTasks[i]
 		// Format values
@@ -1179,19 +1176,19 @@ func (m Model) renderTasksList(maxHeight int) string {
 		memory := task.Memory
 		ip := task.IP
 		age := formatDuration(task.Age)
-		
+
 		// Handle pending tasks
 		if status == "PENDING" {
 			cpu = "-"
 			memory = "-"
 			ip = "-"
 		}
-		
+
 		// Truncate long values
 		if len(id) > idWidth {
 			id = id[:idWidth-3] + "..."
 		}
-		
+
 		// Create row
 		row := fmt.Sprintf(
 			"%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
@@ -1203,7 +1200,7 @@ func (m Model) renderTasksList(maxHeight int) string {
 			ipWidth, ip,
 			ageWidth, age,
 		)
-		
+
 		// Apply styles
 		if i == m.taskCursor {
 			// Apply full-row highlight with consistent width
@@ -1231,16 +1228,16 @@ func (m Model) renderTasksList(maxHeight int) string {
 				row = lipgloss.NewStyle().Foreground(unknownColor).Render(row)
 			}
 		}
-		
+
 		rows = append(rows, row)
 	}
-	
+
 	// Add scroll indicator if needed
 	if len(filteredTasks) > visibleRows {
 		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d tasks]", startIdx+1, endIdx, len(filteredTasks))
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(scrollInfo))
 	}
-	
+
 	// Add search indicator if searching
 	if m.searchMode || m.searchQuery != "" {
 		searchInfo := fmt.Sprintf("\n[Search: %s]", m.searchQuery)
@@ -1249,7 +1246,7 @@ func (m Model) renderTasksList(maxHeight int) string {
 		}
 		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00")).Render(searchInfo))
 	}
-	
+
 	return strings.Join(rows, "\n")
 }
 
@@ -1258,7 +1255,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 	// Style for k9s-like shortcuts
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true)
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9399b2"))
-	
+
 	// Container style for shortcuts column
 	columnStyle := lipgloss.NewStyle().
 		BorderLeft(true).
@@ -1266,9 +1263,9 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		BorderForeground(lipgloss.Color("#45475a")).
 		PaddingLeft(1).
 		Width(width)
-	
+
 	shortcuts := []string{}
-	
+
 	// Add view-specific shortcuts
 	switch m.currentView {
 	case ViewInstances:
@@ -1345,7 +1342,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 			)
 		}
 	}
-	
+
 	// Add common shortcuts
 	shortcuts = append(shortcuts,
 		"", // Empty line for separation
@@ -1354,10 +1351,10 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		keyStyle.Render("?")+" "+descStyle.Render("Help"),
 		keyStyle.Render("q")+" "+descStyle.Render("Quit"),
 	)
-	
+
 	// Join shortcuts vertically
 	shortcutsContent := strings.Join(shortcuts, "\n")
-	
+
 	return columnStyle.Height(height).Render(shortcutsContent)
 }
 
@@ -1376,33 +1373,33 @@ func (m Model) renderLogsContent(maxHeight int) string {
 	errorColor := lipgloss.Color("#ff0000")
 	debugColor := lipgloss.Color("#808080")
 	timestampColor := lipgloss.Color("#00ffff")
-	
+
 	// Styles for logs
 	infoStyle := lipgloss.NewStyle().
-			Foreground(infoColor)
-			
+		Foreground(infoColor)
+
 	warnStyle := lipgloss.NewStyle().
-			Foreground(warnColor)
-			
+		Foreground(warnColor)
+
 	errorStyle := lipgloss.NewStyle().
-			Foreground(errorColor)
-			
+		Foreground(errorColor)
+
 	debugStyle := lipgloss.NewStyle().
-			Foreground(debugColor)
-			
+		Foreground(debugColor)
+
 	timestampStyle := lipgloss.NewStyle().
-			Foreground(timestampColor)
-	
+		Foreground(timestampColor)
+
 	// Calculate available space
 	availableWidth := m.width - 8 // Account for padding and borders
 	availableHeight := maxHeight
-	
+
 	// Build log lines
 	lines := []string{}
-	
+
 	// Get filtered logs
 	filteredLogs := m.filterLogs(m.logs)
-	
+
 	// Adjust cursor if it's out of bounds
 	if m.logCursor >= len(filteredLogs) {
 		m.logCursor = len(filteredLogs) - 1
@@ -1410,21 +1407,21 @@ func (m Model) renderLogsContent(maxHeight int) string {
 			m.logCursor = 0
 		}
 	}
-	
+
 	// Process logs
 	startIdx := m.logCursor
 	endIdx := startIdx + availableHeight
 	if endIdx > len(filteredLogs) {
 		endIdx = len(filteredLogs)
 	}
-	
+
 	for i := startIdx; i < endIdx && i < len(filteredLogs); i++ {
 		log := filteredLogs[i]
-		
+
 		// Format timestamp
 		timestamp := log.Timestamp.Format("2006-01-02 15:04:05")
 		timestampStr := timestampStyle.Render(timestamp)
-		
+
 		// Format level
 		levelStr := fmt.Sprintf("[%-5s]", log.Level)
 		switch log.Level {
@@ -1437,17 +1434,17 @@ func (m Model) renderLogsContent(maxHeight int) string {
 		case "DEBUG":
 			levelStr = debugStyle.Render(levelStr)
 		}
-		
+
 		// Format message
 		message := log.Message
 		maxMessageWidth := availableWidth - len(timestamp) - len("[DEBUG]") - 4
 		if len(message) > maxMessageWidth {
 			message = message[:maxMessageWidth-3] + "..."
 		}
-		
+
 		// Combine parts
 		logLine := fmt.Sprintf("%s %s %s", timestampStr, levelStr, message)
-		
+
 		// Apply selection if this is the current line
 		if i == m.logCursor {
 			// Apply full-row highlight with consistent width
@@ -1455,16 +1452,16 @@ func (m Model) renderLogsContent(maxHeight int) string {
 		} else {
 			logLine = "  " + logLine
 		}
-		
+
 		lines = append(lines, logLine)
 	}
-	
+
 	// Add scroll indicator if needed
 	if len(filteredLogs) > availableHeight {
 		scrollInfo := fmt.Sprintf("\n[Showing %d-%d of %d log entries]", startIdx+1, endIdx, len(filteredLogs))
 		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(scrollInfo))
 	}
-	
+
 	// Add search indicator if searching
 	if m.searchMode || m.searchQuery != "" {
 		searchInfo := fmt.Sprintf("\n[Search: %s]", m.searchQuery)
@@ -1473,7 +1470,7 @@ func (m Model) renderLogsContent(maxHeight int) string {
 		}
 		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00")).Render(searchInfo))
 	}
-	
+
 	return strings.Join(lines, "\n")
 }
 
@@ -1487,32 +1484,32 @@ func (m Model) renderTaskDescribeView() string {
 			break
 		}
 	}
-	
+
 	if selectedTask == nil {
 		return "Task not found"
 	}
-	
+
 	// Header style
 	headerStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("#1e1e2e")).
 		Foreground(lipgloss.Color("#cdd6f4")).
 		Padding(0, 1).
 		Bold(true)
-	
+
 	// Section style
 	sectionStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#a6e3a1")).
 		Bold(true).
 		MarginTop(1)
-	
+
 	// Label style
 	labelStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#9399b2"))
-	
+
 	// Value style
 	valueStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#cdd6f4"))
-	
+
 	// Status styles
 	runningStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#a6e3a1"))
@@ -1520,7 +1517,7 @@ func (m Model) renderTaskDescribeView() string {
 		Foreground(lipgloss.Color("#f38ba8"))
 	pendingStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#fab387"))
-	
+
 	// Health styles
 	healthyStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#a6e3a1"))
@@ -1528,19 +1525,19 @@ func (m Model) renderTaskDescribeView() string {
 		Foreground(lipgloss.Color("#f38ba8"))
 	unknownStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#9399b2"))
-	
+
 	// Build content
 	content := []string{}
-	
+
 	// Header
 	header := headerStyle.Width(m.width).Render("Task Details - Press ESC to go back")
 	content = append(content, header)
-	
+
 	// Basic Information
 	content = append(content, sectionStyle.Render("\n▸ Basic Information"))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Task ID:"), valueStyle.Render(selectedTask.ID)))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Service:"), valueStyle.Render(selectedTask.Service)))
-	
+
 	// Status
 	statusStr := selectedTask.Status
 	switch selectedTask.Status {
@@ -1552,7 +1549,7 @@ func (m Model) renderTaskDescribeView() string {
 		statusStr = pendingStyle.Render("◐ " + statusStr)
 	}
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Status:"), statusStr))
-	
+
 	// Health
 	healthStr := selectedTask.Health
 	switch selectedTask.Health {
@@ -1564,45 +1561,45 @@ func (m Model) renderTaskDescribeView() string {
 		healthStr = unknownStyle.Render("? " + healthStr)
 	}
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Health:"), healthStr))
-	
+
 	// Resource Information
 	content = append(content, sectionStyle.Render("\n▸ Resource Usage"))
 	content = append(content, fmt.Sprintf("  %s %.2f%%", labelStyle.Render("CPU:"), selectedTask.CPU))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Memory:"), valueStyle.Render(selectedTask.Memory)))
-	
+
 	// Network Information
 	content = append(content, sectionStyle.Render("\n▸ Network Information"))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("IP Address:"), valueStyle.Render(selectedTask.IP)))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Port Mappings:"), valueStyle.Render("80:8080, 443:8443")))
-	
+
 	// Container Information (Mock)
 	content = append(content, sectionStyle.Render("\n▸ Container Information"))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Image:"), valueStyle.Render("nginx:latest")))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Container ID:"), valueStyle.Render("abc123def456")))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Runtime:"), valueStyle.Render("docker")))
-	
+
 	// Environment Variables (Mock)
 	content = append(content, sectionStyle.Render("\n▸ Environment Variables"))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("ENV:"), valueStyle.Render("production")))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("LOG_LEVEL:"), valueStyle.Render("info")))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("DATABASE_URL:"), valueStyle.Render("postgres://...")))
-	
+
 	// Timestamps
 	content = append(content, sectionStyle.Render("\n▸ Timestamps"))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Age:"), valueStyle.Render(selectedTask.Age.String())))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Created:"), valueStyle.Render("2024-01-15 10:30:00")))
 	content = append(content, fmt.Sprintf("  %s %s", labelStyle.Render("Started:"), valueStyle.Render("2024-01-15 10:30:15")))
-	
+
 	// Footer with shortcuts
 	footerStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("#313244")).
 		Foreground(lipgloss.Color("#9399b2")).
 		Padding(0, 1).
 		MarginTop(2)
-	
+
 	footer := footerStyle.Width(m.width).Render("ESC: Back  |  l: View Logs  |  r: Restart  |  s: Stop")
 	content = append(content, footer)
-	
+
 	// Join all content
 	return lipgloss.JoinVertical(lipgloss.Top, content...)
 }
@@ -1674,7 +1671,6 @@ Press any key to close help...`
 		Render(helpText)
 }
 
-
 func (m Model) renderHelpView() string {
 	return m.renderHelpContent(m.height - 1)
 }
@@ -1710,7 +1706,7 @@ func (m Model) renderConfirmDialogOverlay() string {
 		// Fallback to normal view if no dialog
 		return m.View()
 	}
-	
+
 	// Simply render the dialog centered on screen
 	return m.confirmDialog.Render(m.width, m.height)
 }
@@ -1721,11 +1717,10 @@ func (m Model) renderInstanceSwitcherOverlay() string {
 		// Safety check - fallback to regular view
 		return m.View()
 	}
-	
+
 	// Simply render the switcher centered on screen
 	return m.instanceSwitcher.Render(m.width, m.height)
 }
-
 
 // renderTaskDefFamiliesList renders the list of task definition families
 func (m Model) renderTaskDefFamiliesList(maxHeight int) string {
@@ -1735,7 +1730,7 @@ func (m Model) renderTaskDefFamiliesList(maxHeight int) string {
 			Italic(true).
 			Render("No task definition families found.")
 	}
-	
+
 	// Filter families
 	filteredFamilies := m.filterTaskDefFamilies(m.taskDefFamilies)
 	if len(filteredFamilies) == 0 {
@@ -1744,43 +1739,43 @@ func (m Model) renderTaskDefFamiliesList(maxHeight int) string {
 			Italic(true).
 			Render("No families match the search criteria.")
 	}
-	
+
 	// Column headers
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#00ff00")).
 		BorderBottom(true).
 		BorderStyle(lipgloss.NormalBorder())
-		
+
 	headers := fmt.Sprintf("%-30s %4s %6s %6s %12s",
 		"FAMILY NAME", "REV", "ACTIVE", "TOTAL", "UPDATED")
-	
+
 	// Styles
 	selectedStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("#2a2a4a")).
 		Foreground(lipgloss.Color("#ffffff")).
 		Bold(true)
-		
+
 	normalStyle := lipgloss.NewStyle()
-	
+
 	// Build rows
 	var rows []string
 	rows = append(rows, headerStyle.Render(headers))
-	
+
 	visibleRows := maxHeight - 2 // Header and spacing
 	startIdx := 0
 	if m.taskDefFamilyCursor >= visibleRows {
 		startIdx = m.taskDefFamilyCursor - visibleRows + 1
 	}
-	
+
 	endIdx := startIdx + visibleRows
 	if endIdx > len(filteredFamilies) {
 		endIdx = len(filteredFamilies)
 	}
-	
+
 	for i := startIdx; i < endIdx; i++ {
 		family := filteredFamilies[i]
-		
+
 		// Format row
 		row := fmt.Sprintf("%-30s %4d %6d %6d %12s",
 			truncateString(family.Family, 30),
@@ -1789,17 +1784,17 @@ func (m Model) renderTaskDefFamiliesList(maxHeight int) string {
 			family.TotalCount,
 			formatDuration(time.Since(family.LastUpdated)),
 		)
-		
+
 		// Apply style
 		if i == m.taskDefFamilyCursor {
 			row = selectedStyle.Render("▸ " + row)
 		} else {
 			row = normalStyle.Render("  " + row)
 		}
-		
+
 		rows = append(rows, row)
 	}
-	
+
 	// Add scroll indicator
 	if len(filteredFamilies) > visibleRows {
 		scrollInfo := fmt.Sprintf("Showing %d-%d of %d families", startIdx+1, endIdx, len(filteredFamilies))
@@ -1807,7 +1802,7 @@ func (m Model) renderTaskDefFamiliesList(maxHeight int) string {
 			Foreground(lipgloss.Color("#666666")).
 			Render(scrollInfo))
 	}
-	
+
 	return lipgloss.JoinVertical(lipgloss.Left, rows...)
 }
 
@@ -1818,11 +1813,11 @@ func (m Model) renderTaskDefRevisionsTwoColumn(maxHeight int) string {
 	// Calculate dimensions
 	leftWidth := m.width / 3
 	rightWidth := m.width - leftWidth - 1 // -1 for border
-	
+
 	// Render components
 	leftColumn := m.renderTaskDefRevisionsList(maxHeight, leftWidth)
 	rightColumn := m.renderTaskDefJSON(maxHeight, rightWidth)
-	
+
 	// Combine columns
 	return lipgloss.JoinHorizontal(
 		lipgloss.Top,
@@ -1836,7 +1831,6 @@ func (m Model) renderTaskDefRevisionsTwoColumn(maxHeight int) string {
 	)
 }
 
-
 // renderTaskDefRevisionsList renders the list of revisions
 func (m Model) renderTaskDefRevisionsList(maxHeight int, width int) string {
 	if len(m.taskDefRevisions) == 0 {
@@ -1846,50 +1840,50 @@ func (m Model) renderTaskDefRevisionsList(maxHeight int, width int) string {
 			Width(width).
 			Render("No revisions found.")
 	}
-	
+
 	// Column headers
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#00ff00")).
 		BorderBottom(true).
 		BorderStyle(lipgloss.NormalBorder())
-		
+
 	headers := fmt.Sprintf("%-4s %-10s %-10s %-12s",
 		"REV", "STATUS", "CPU/MEM", "CREATED")
-	
+
 	// Styles
 	selectedStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("#2a2a4a")).
 		Foreground(lipgloss.Color("#ffffff")).
 		Bold(true).
 		Width(width)
-		
+
 	activeStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#00ff00"))
-		
+
 	inactiveStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#999999"))
-		
+
 	normalStyle := lipgloss.NewStyle()
-	
+
 	// Build rows
 	var rows []string
 	rows = append(rows, headerStyle.Width(width).Render(headers))
-	
+
 	visibleRows := maxHeight - 2
 	startIdx := 0
 	if m.taskDefRevisionCursor >= visibleRows {
 		startIdx = m.taskDefRevisionCursor - visibleRows + 1
 	}
-	
+
 	endIdx := startIdx + visibleRows
 	if endIdx > len(m.taskDefRevisions) {
 		endIdx = len(m.taskDefRevisions)
 	}
-	
+
 	for i := startIdx; i < endIdx; i++ {
 		rev := m.taskDefRevisions[i]
-		
+
 		// Format row
 		cpuMem := fmt.Sprintf("%s/%s", rev.CPU, rev.Memory)
 		row := fmt.Sprintf("%-4d %-10s %-10s %-12s",
@@ -1898,7 +1892,7 @@ func (m Model) renderTaskDefRevisionsList(maxHeight int, width int) string {
 			cpuMem,
 			formatDuration(time.Since(rev.CreatedAt)),
 		)
-		
+
 		// Apply style
 		if i == m.taskDefRevisionCursor {
 			if m.showTaskDefJSON {
@@ -1915,17 +1909,17 @@ func (m Model) renderTaskDefRevisionsList(maxHeight int, width int) string {
 			}
 			row = style.Width(width).Render("  " + row)
 		}
-		
+
 		rows = append(rows, row)
 	}
-	
+
 	// Add help text
 	if !m.showTaskDefJSON {
 		helpStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#666666"))
 		rows = append(rows, "", helpStyle.Render("[Enter] View JSON"))
 	}
-	
+
 	return lipgloss.JoinVertical(lipgloss.Left, rows...)
 }
 
@@ -1934,9 +1928,9 @@ func (m Model) renderTaskDefJSON(maxHeight int, width int) string {
 	if m.taskDefRevisionCursor >= len(m.taskDefRevisions) {
 		return ""
 	}
-	
+
 	selectedRev := m.taskDefRevisions[m.taskDefRevisionCursor]
-	
+
 	// Get JSON from cache or show loading message
 	jsonContent, cached := m.taskDefJSONCache[selectedRev.Revision]
 	if !cached {
@@ -1948,18 +1942,18 @@ func (m Model) renderTaskDefJSON(maxHeight int, width int) string {
 			Padding(1).
 			Render("Loading task definition JSON...")
 	}
-	
+
 	// JSON style
 	jsonStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#cccccc")).
-		Width(width-2).
-		Height(maxHeight-2).
+		Width(width - 2).
+		Height(maxHeight - 2).
 		Padding(1)
-	
+
 	// Add scroll indicator if needed
 	lines := strings.Split(jsonContent, "\n")
 	visibleLines := maxHeight - 4 // Leave room for scroll indicator
-	
+
 	// Adjust scroll position
 	maxScroll := len(lines) - visibleLines
 	if maxScroll < 0 {
@@ -1971,14 +1965,14 @@ func (m Model) renderTaskDefJSON(maxHeight int, width int) string {
 	if m.taskDefJSONScroll < 0 {
 		m.taskDefJSONScroll = 0
 	}
-	
+
 	endLine := m.taskDefJSONScroll + visibleLines
 	if endLine > len(lines) {
 		endLine = len(lines)
 	}
-	
+
 	visibleJSON := strings.Join(lines[m.taskDefJSONScroll:endLine], "\n")
-	
+
 	// Add scroll indicator
 	if len(lines) > visibleLines {
 		scrollPercent := 0
@@ -1987,15 +1981,15 @@ func (m Model) renderTaskDefJSON(maxHeight int, width int) string {
 		}
 		scrollInfo := fmt.Sprintf(" Lines %d-%d of %d (%d%%) | Scroll: J/K, PgUp/PgDn, g/G, Ctrl+U/D ",
 			m.taskDefJSONScroll+1, endLine, len(lines), scrollPercent)
-		
+
 		scrollStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#888888")).
 			Align(lipgloss.Center).
-			Width(width-2)
-		
+			Width(width - 2)
+
 		visibleJSON = visibleJSON + "\n" + scrollStyle.Render(scrollInfo)
 	}
-	
+
 	return jsonStyle.Render(visibleJSON)
 }
 
@@ -2006,4 +2000,3 @@ func truncateString(s string, maxLen int) string {
 	}
 	return s[:maxLen-3] + "..."
 }
-

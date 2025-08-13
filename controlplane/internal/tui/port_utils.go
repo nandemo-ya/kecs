@@ -48,7 +48,7 @@ func SuggestAvailablePorts(instances []Instance, preferredAPIPort, preferredAdmi
 		usedPorts[inst.APIPort] = true
 		usedPorts[inst.APIPort+1] = true // Reserve adjacent port for admin
 	}
-	
+
 	// Find available API port
 	apiPort = preferredAPIPort
 	if usedPorts[apiPort] || !IsPortAvailable(apiPort) {
@@ -60,26 +60,26 @@ func SuggestAvailablePorts(instances []Instance, preferredAPIPort, preferredAdmi
 				break
 			}
 		}
-		
+
 		// If still not found, scan from 8080
 		if usedPorts[apiPort] || !IsPortAvailable(apiPort) {
 			apiPort = FindAvailablePort(8080)
 		}
 	}
-	
+
 	// Admin port is typically API port + 1
 	adminPort = apiPort + 1
 	if usedPorts[adminPort] || !IsPortAvailable(adminPort) {
 		adminPort = FindAvailablePort(apiPort + 1)
 	}
-	
+
 	return apiPort, adminPort
 }
 
 // GetNextInstanceNumber gets the next available instance number for naming
 func GetNextInstanceNumber(instances []Instance, prefix string) int {
 	numbers := make([]int, 0)
-	
+
 	// Extract numbers from instance names with the given prefix
 	for _, inst := range instances {
 		if len(inst.Name) > len(prefix) && inst.Name[:len(prefix)] == prefix {
@@ -93,11 +93,11 @@ func GetNextInstanceNumber(instances []Instance, prefix string) int {
 			}
 		}
 	}
-	
+
 	if len(numbers) == 0 {
 		return 1
 	}
-	
+
 	// Sort numbers and find the first gap
 	sort.Ints(numbers)
 	for i := 0; i < len(numbers); i++ {
@@ -105,6 +105,6 @@ func GetNextInstanceNumber(instances []Instance, prefix string) int {
 			return i + 1
 		}
 	}
-	
+
 	return numbers[len(numbers)-1] + 1
 }

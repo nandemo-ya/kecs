@@ -29,8 +29,8 @@ import (
 
 // HTTPClient implements the Client interface using HTTP
 type HTTPClient struct {
-	baseURL    string
-	httpClient *http.Client
+	baseURL     string
+	httpClient  *http.Client
 	k3dProvider *K3dInstanceProvider // For direct k3d access when API is not available
 }
 
@@ -38,7 +38,7 @@ type HTTPClient struct {
 func NewHTTPClient(baseURL string) *HTTPClient {
 	// Create k3d provider for direct instance listing
 	k3dProvider, _ := NewK3dInstanceProvider() // Ignore error, will fallback to API
-	
+
 	return &HTTPClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
@@ -102,7 +102,7 @@ func (c *HTTPClient) ListInstances(ctx context.Context) ([]Instance, error) {
 	if c.k3dProvider != nil {
 		return c.k3dProvider.ListInstances(ctx)
 	}
-	
+
 	// Fallback to API if k3d provider is not available
 	var instances []Instance
 	err := c.doRequest(ctx, "GET", "/api/instances", nil, &instances)
@@ -114,7 +114,7 @@ func (c *HTTPClient) GetInstance(ctx context.Context, name string) (*Instance, e
 	if c.k3dProvider != nil {
 		return c.k3dProvider.GetInstance(ctx, name)
 	}
-	
+
 	// Fallback to API if k3d provider is not available
 	var instance Instance
 	path := fmt.Sprintf("/api/instances/%s", url.PathEscape(name))
@@ -131,7 +131,7 @@ func (c *HTTPClient) CreateInstance(ctx context.Context, opts CreateInstanceOpti
 	if c.k3dProvider != nil {
 		return c.k3dProvider.CreateInstance(ctx, opts)
 	}
-	
+
 	// Fallback to API if k3d provider is not available
 	var instance Instance
 	err := c.doRequest(ctx, "POST", "/api/instances", opts, &instance)
@@ -146,7 +146,7 @@ func (c *HTTPClient) DeleteInstance(ctx context.Context, name string) error {
 	if c.k3dProvider != nil {
 		return c.k3dProvider.DeleteInstance(ctx, name)
 	}
-	
+
 	// Fallback to API if k3d provider is not available
 	path := fmt.Sprintf("/api/instances/%s", url.PathEscape(name))
 	return c.doRequest(ctx, "DELETE", path, nil, nil)
@@ -157,7 +157,7 @@ func (c *HTTPClient) GetInstanceLogs(ctx context.Context, name string, follow bo
 	if c.k3dProvider != nil {
 		return c.k3dProvider.GetInstanceLogs(ctx, name, follow)
 	}
-	
+
 	// Fallback: streaming logs not implemented for HTTP API
 	ch := make(chan LogEntry)
 	close(ch)
@@ -173,29 +173,29 @@ func (c *HTTPClient) ListClusters(ctx context.Context, instanceName string) ([]s
 		if err != nil {
 			return nil, fmt.Errorf("failed to get instance: %w", err)
 		}
-		
+
 		// Call the instance's API directly
 		url := fmt.Sprintf("http://localhost:%d/v1/ListClusters", inst.APIPort)
 		client := &http.Client{Timeout: 5 * time.Second}
-		
+
 		resp, err := client.Post(url, "application/json", bytes.NewReader([]byte("{}")))
 		if err != nil {
 			return nil, fmt.Errorf("failed to call ListClusters: %w", err)
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("ListClusters returned status %d", resp.StatusCode)
 		}
-		
+
 		var result ListClustersResponse
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
-		
+
 		return result.ClusterArns, nil
 	}
-	
+
 	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/clusters", url.PathEscape(instanceName))
 	req := ListClustersRequest{}
@@ -214,30 +214,30 @@ func (c *HTTPClient) DescribeClusters(ctx context.Context, instanceName string, 
 		if err != nil {
 			return nil, fmt.Errorf("failed to get instance: %w", err)
 		}
-		
+
 		// Call the instance's API directly
 		url := fmt.Sprintf("http://localhost:%d/v1/DescribeClusters", inst.APIPort)
 		client := &http.Client{Timeout: 5 * time.Second}
-		
+
 		reqBody, _ := json.Marshal(DescribeClustersRequest{Clusters: clusterNames})
 		resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
 		if err != nil {
 			return nil, fmt.Errorf("failed to call DescribeClusters: %w", err)
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("DescribeClusters returned status %d", resp.StatusCode)
 		}
-		
+
 		var result DescribeClustersResponse
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
-		
+
 		return result.Clusters, nil
 	}
-	
+
 	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/clusters/describe", url.PathEscape(instanceName))
 	req := DescribeClustersRequest{
@@ -276,30 +276,30 @@ func (c *HTTPClient) ListServices(ctx context.Context, instanceName, clusterName
 		if err != nil {
 			return nil, fmt.Errorf("failed to get instance: %w", err)
 		}
-		
+
 		// Call the instance's API directly
 		url := fmt.Sprintf("http://localhost:%d/v1/ListServices", inst.APIPort)
 		client := &http.Client{Timeout: 5 * time.Second}
-		
+
 		reqBody, _ := json.Marshal(ListServicesRequest{Cluster: clusterName})
 		resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
 		if err != nil {
 			return nil, fmt.Errorf("failed to call ListServices: %w", err)
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("ListServices returned status %d", resp.StatusCode)
 		}
-		
+
 		var result ListServicesResponse
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
-		
+
 		return result.ServiceArns, nil
 	}
-	
+
 	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/services", url.PathEscape(instanceName))
 	req := ListServicesRequest{
@@ -320,11 +320,11 @@ func (c *HTTPClient) DescribeServices(ctx context.Context, instanceName, cluster
 		if err != nil {
 			return nil, fmt.Errorf("failed to get instance: %w", err)
 		}
-		
+
 		// Call the instance's API directly
 		url := fmt.Sprintf("http://localhost:%d/v1/DescribeServices", inst.APIPort)
 		client := &http.Client{Timeout: 5 * time.Second}
-		
+
 		reqBody, _ := json.Marshal(DescribeServicesRequest{
 			Cluster:  clusterName,
 			Services: serviceNames,
@@ -334,19 +334,19 @@ func (c *HTTPClient) DescribeServices(ctx context.Context, instanceName, cluster
 			return nil, fmt.Errorf("failed to call DescribeServices: %w", err)
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("DescribeServices returned status %d", resp.StatusCode)
 		}
-		
+
 		var result DescribeServicesResponse
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
-		
+
 		return result.Services, nil
 	}
-	
+
 	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/services/describe", url.PathEscape(instanceName))
 	req := DescribeServicesRequest{
@@ -398,11 +398,11 @@ func (c *HTTPClient) ListTasks(ctx context.Context, instanceName, clusterName st
 		if err != nil {
 			return nil, fmt.Errorf("failed to get instance: %w", err)
 		}
-		
+
 		// Call the instance's API directly
 		url := fmt.Sprintf("http://localhost:%d/v1/ListTasks", inst.APIPort)
 		client := &http.Client{Timeout: 5 * time.Second}
-		
+
 		reqBody, _ := json.Marshal(ListTasksRequest{
 			Cluster:     clusterName,
 			ServiceName: serviceName,
@@ -412,19 +412,19 @@ func (c *HTTPClient) ListTasks(ctx context.Context, instanceName, clusterName st
 			return nil, fmt.Errorf("failed to call ListTasks: %w", err)
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("ListTasks returned status %d", resp.StatusCode)
 		}
-		
+
 		var result ListTasksResponse
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
-		
+
 		return result.TaskArns, nil
 	}
-	
+
 	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/tasks", url.PathEscape(instanceName))
 	req := ListTasksRequest{
@@ -446,11 +446,11 @@ func (c *HTTPClient) DescribeTasks(ctx context.Context, instanceName, clusterNam
 		if err != nil {
 			return nil, fmt.Errorf("failed to get instance: %w", err)
 		}
-		
+
 		// Call the instance's API directly
 		url := fmt.Sprintf("http://localhost:%d/v1/DescribeTasks", inst.APIPort)
 		client := &http.Client{Timeout: 5 * time.Second}
-		
+
 		reqBody, _ := json.Marshal(DescribeTasksRequest{
 			Cluster: clusterName,
 			Tasks:   taskArns,
@@ -460,19 +460,19 @@ func (c *HTTPClient) DescribeTasks(ctx context.Context, instanceName, clusterNam
 			return nil, fmt.Errorf("failed to call DescribeTasks: %w", err)
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("DescribeTasks returned status %d", resp.StatusCode)
 		}
-		
+
 		var result DescribeTasksResponse
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
-		
+
 		return result.Tasks, nil
 	}
-	
+
 	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/tasks/describe", url.PathEscape(instanceName))
 	req := DescribeTasksRequest{
@@ -538,30 +538,30 @@ func (c *HTTPClient) ListTaskDefinitionFamilies(ctx context.Context, instanceNam
 		if err != nil {
 			return nil, fmt.Errorf("failed to get instance: %w", err)
 		}
-		
+
 		// Call the instance's API directly
 		url := fmt.Sprintf("http://localhost:%d/v1/ListTaskDefinitionFamilies", inst.APIPort)
 		client := &http.Client{Timeout: 5 * time.Second}
-		
+
 		reqBody, _ := json.Marshal(map[string]interface{}{})
 		resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
 		if err != nil {
 			return nil, fmt.Errorf("failed to call ListTaskDefinitionFamilies: %w", err)
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("ListTaskDefinitionFamilies returned status %d", resp.StatusCode)
 		}
-		
+
 		var result map[string][]string
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
-		
+
 		return result["families"], nil
 	}
-	
+
 	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/task-definition-families", url.PathEscape(instanceName))
 	var families []string
@@ -576,11 +576,11 @@ func (c *HTTPClient) ListTaskDefinitionRevisions(ctx context.Context, instanceNa
 		if err != nil {
 			return nil, fmt.Errorf("failed to get instance: %w", err)
 		}
-		
+
 		// Call the instance's API directly to list task definitions for this family
 		url := fmt.Sprintf("http://localhost:%d/v1/ListTaskDefinitions", inst.APIPort)
 		client := &http.Client{Timeout: 5 * time.Second}
-		
+
 		reqBody, _ := json.Marshal(map[string]interface{}{
 			"familyPrefix": family,
 		})
@@ -589,16 +589,16 @@ func (c *HTTPClient) ListTaskDefinitionRevisions(ctx context.Context, instanceNa
 			return nil, fmt.Errorf("failed to call ListTaskDefinitions: %w", err)
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("ListTaskDefinitions returned status %d", resp.StatusCode)
 		}
-		
+
 		var result map[string][]string
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
-		
+
 		// Convert task definition ARNs to revisions
 		var revisions []TaskDefinitionRevision
 		for _, arn := range result["taskDefinitionArns"] {
@@ -616,10 +616,10 @@ func (c *HTTPClient) ListTaskDefinitionRevisions(ctx context.Context, instanceNa
 				})
 			}
 		}
-		
+
 		return revisions, nil
 	}
-	
+
 	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/task-definition-families/%s/revisions", url.PathEscape(instanceName), url.PathEscape(family))
 	var revisions []TaskDefinitionRevision
@@ -634,11 +634,11 @@ func (c *HTTPClient) DescribeTaskDefinition(ctx context.Context, instanceName st
 		if err != nil {
 			return nil, fmt.Errorf("failed to get instance: %w", err)
 		}
-		
+
 		// Call the instance's API directly
 		url := fmt.Sprintf("http://localhost:%d/v1/DescribeTaskDefinition", inst.APIPort)
 		client := &http.Client{Timeout: 5 * time.Second}
-		
+
 		reqBody, _ := json.Marshal(map[string]interface{}{
 			"taskDefinition": taskDefArn,
 		})
@@ -647,16 +647,16 @@ func (c *HTTPClient) DescribeTaskDefinition(ctx context.Context, instanceName st
 			return nil, fmt.Errorf("failed to call DescribeTaskDefinition: %w", err)
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("DescribeTaskDefinition returned status %d", resp.StatusCode)
 		}
-		
+
 		var result map[string]interface{}
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
-		
+
 		// Extract taskDefinition from response
 		if td, ok := result["taskDefinition"].(map[string]interface{}); ok {
 			// Convert to TaskDefinition struct
@@ -667,10 +667,10 @@ func (c *HTTPClient) DescribeTaskDefinition(ctx context.Context, instanceName st
 			}
 			return &taskDef, nil
 		}
-		
+
 		return nil, fmt.Errorf("task definition not found in response")
 	}
-	
+
 	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/task-definitions/%s", url.PathEscape(instanceName), url.PathEscape(taskDefArn))
 	var taskDef TaskDefinition
@@ -680,8 +680,6 @@ func (c *HTTPClient) DescribeTaskDefinition(ctx context.Context, instanceName st
 	}
 	return &taskDef, nil
 }
-
-
 
 // Health check
 
@@ -697,7 +695,7 @@ func (c *HTTPClient) GetInstanceCreationStatus(ctx context.Context, name string)
 	if c.k3dProvider != nil {
 		return c.k3dProvider.GetInstanceCreationStatus(ctx, name)
 	}
-	
+
 	// Fallback to API if k3d provider is not available
 	path := fmt.Sprintf("/api/instances/%s/creation-status", url.PathEscape(name))
 	var status CreationStatus

@@ -13,15 +13,15 @@ type Runtime interface {
 	StartContainer(ctx context.Context, id string) error
 	StopContainer(ctx context.Context, id string, timeout *int) error
 	RemoveContainer(ctx context.Context, id string, force bool) error
-	
+
 	// Container information
 	GetContainer(ctx context.Context, id string) (*Container, error)
 	ListContainers(ctx context.Context, opts ListContainersOptions) ([]*Container, error)
 	ContainerLogs(ctx context.Context, id string, opts LogsOptions) (io.ReadCloser, error)
-	
+
 	// Image operations
 	PullImage(ctx context.Context, image string, opts PullImageOptions) (io.ReadCloser, error)
-	
+
 	// Runtime information
 	Name() string
 	IsAvailable() bool
@@ -34,42 +34,42 @@ type ContainerConfig struct {
 	Env    []string
 	Cmd    []string
 	Labels map[string]string
-	
+
 	// Port bindings
 	Ports []PortBinding
-	
+
 	// Volume mounts
 	Mounts []Mount
-	
+
 	// Resource limits
 	Resources *Resources
-	
+
 	// Restart policy
 	RestartPolicy RestartPolicy
-	
+
 	// Network configuration
 	NetworkMode string
 	Networks    []string
-	
+
 	// Health check
 	HealthCheck *HealthCheck
-	
+
 	// User and group settings
-	User       string   // User or UID
-	GroupAdd   []string // Additional groups
+	User     string   // User or UID
+	GroupAdd []string // Additional groups
 }
 
 // Container represents a container
 type Container struct {
-	ID        string
-	Name      string
-	Image     string
-	State     string
-	Status    string
-	Created   time.Time
-	Labels    map[string]string
-	Ports     []PortBinding
-	Networks  []string
+	ID       string
+	Name     string
+	Image    string
+	State    string
+	Status   string
+	Created  time.Time
+	Labels   map[string]string
+	Ports    []PortBinding
+	Networks []string
 }
 
 // PortBinding represents a port binding
@@ -82,19 +82,19 @@ type PortBinding struct {
 
 // Mount represents a volume mount
 type Mount struct {
-	Type   string // bind, volume, tmpfs
-	Source string
-	Target string
+	Type     string // bind, volume, tmpfs
+	Source   string
+	Target   string
 	ReadOnly bool
 }
 
 // Resources represents resource constraints
 type Resources struct {
-	CPUShares    int64
-	Memory       int64
-	MemorySwap   int64
-	CPUQuota     int64
-	CPUPeriod    int64
+	CPUShares  int64
+	Memory     int64
+	MemorySwap int64
+	CPUQuota   int64
+	CPUPeriod  int64
 }
 
 // RestartPolicy represents container restart policy
@@ -114,9 +114,9 @@ type HealthCheck struct {
 
 // ListContainersOptions represents options for listing containers
 type ListContainersOptions struct {
-	All     bool
-	Labels  map[string]string
-	Names   []string
+	All    bool
+	Labels map[string]string
+	Names  []string
 }
 
 // LogsOptions represents options for getting container logs
@@ -138,8 +138,8 @@ type PullImageOptions struct {
 
 // AuthConfig represents authentication configuration
 type AuthConfig struct {
-	Username string
-	Password string
-	Auth     string
+	Username      string
+	Password      string
+	Auth          string
 	ServerAddress string
 }

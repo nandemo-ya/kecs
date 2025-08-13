@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // EnvironmentVariableProxy handles environment variable injection for AWS SDK configuration

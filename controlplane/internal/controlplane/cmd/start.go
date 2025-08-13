@@ -16,25 +16,25 @@ import (
 
 // Error messages
 const (
-	errCreateClusterManager = "failed to create cluster manager: %w"
-	errCreateInstanceManager = "failed to create instance manager: %w"
+	errCreateClusterManager   = "failed to create cluster manager: %w"
+	errCreateInstanceManager  = "failed to create instance manager: %w"
 	errCheckInstanceExistence = "failed to check instance existence: %w"
-	errCheckInstanceStatus = "failed to check instance status: %w"
-	errListInstances = "failed to list instances: %w"
-	errGenerateName = "failed to generate instance name: %w"
+	errCheckInstanceStatus    = "failed to check instance status: %w"
+	errListInstances          = "failed to list instances: %w"
+	errGenerateName           = "failed to generate instance name: %w"
 )
 
 // Display messages
 const (
 	msgInstanceAlreadyRunning = "⚠️  Instance '%s' is already running\n"
-	msgRestartingInstance = "Restarting stopped instance: %s\n"
-	msgCreatingInstance = "\n=== Creating KECS instance '%s' ===\n"
-	msgInstanceReady = "\n🎉 KECS instance '%s' is ready!\n"
-	msgFetchingInstances = "Fetching KECS instances..."
-	msgCreatingNewInstance = "Creating new KECS instance: %s\n"
-	msgExistingInstances = "\nExisting KECS instances:"
-	msgUseExistingHint = "\nTo use an existing instance, specify it with --instance flag"
-	msgNextSteps = "\n=== Next steps ==="
+	msgRestartingInstance     = "Restarting stopped instance: %s\n"
+	msgCreatingInstance       = "\n=== Creating KECS instance '%s' ===\n"
+	msgInstanceReady          = "\n🎉 KECS instance '%s' is ready!\n"
+	msgFetchingInstances      = "Fetching KECS instances..."
+	msgCreatingNewInstance    = "Creating new KECS instance: %s\n"
+	msgExistingInstances      = "\nExisting KECS instances:"
+	msgUseExistingHint        = "\nTo use an existing instance, specify it with --instance flag"
+	msgNextSteps              = "\n=== Next steps ==="
 )
 
 var (
@@ -86,7 +86,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	if !shouldStart {
 		return nil // Instance is already running or user canceled
 	}
-	
+
 	startInstanceName = instanceName
 
 	// Show header
@@ -100,14 +100,14 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	// Set up start options
 	opts := instance.StartOptions{
-		InstanceName:  startInstanceName,
-		DataDir:       startDataDir,
-		ConfigFile:    startConfigFile,
-		NoLocalStack:  startNoLocalStack,
-		NoTraefik:     startNoTraefik,
-		ApiPort:       startApiPort,
-		AdminPort:     startAdminPort,
-		DevMode:       startDevMode,
+		InstanceName: startInstanceName,
+		DataDir:      startDataDir,
+		ConfigFile:   startConfigFile,
+		NoLocalStack: startNoLocalStack,
+		NoTraefik:    startNoTraefik,
+		ApiPort:      startApiPort,
+		AdminPort:    startAdminPort,
+		DevMode:      startDevMode,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), startTimeout)
@@ -117,10 +117,10 @@ func runStart(cmd *cobra.Command, args []string) error {
 	if err := instanceManager.Start(ctx, opts); err != nil {
 		return err
 	}
-	
+
 	// Show completion message
 	showStartCompletionMessage(opts)
-	
+
 	return nil
 }
 
@@ -129,7 +129,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 func determineInstanceToStart(manager *kubernetes.K3dClusterManager) (string, bool, error) {
 	var instanceName string
 	var isNew bool
-	
+
 	// If instance name is not provided, show selection
 	if startInstanceName == "" {
 		name, new, err := selectOrCreateInstance(manager)
@@ -147,7 +147,7 @@ func determineInstanceToStart(manager *kubernetes.K3dClusterManager) (string, bo
 		instanceName = startInstanceName
 		isNew = !exists
 	}
-	
+
 	// Check if instance is already running (only for existing instances)
 	if !isNew {
 		running, err := checkInstanceRunning(manager, instanceName)
@@ -161,7 +161,7 @@ func determineInstanceToStart(manager *kubernetes.K3dClusterManager) (string, bo
 		// For stopped instances, we'll restart them
 		fmt.Printf(msgRestartingInstance, instanceName)
 	}
-	
+
 	return instanceName, true, nil
 }
 
@@ -180,23 +180,23 @@ func showStartCompletionMessage(opts instance.StartOptions) {
 // selectOrCreateInstance shows an interactive selection for existing instances or creates a new one
 func selectOrCreateInstance(manager *kubernetes.K3dClusterManager) (string, bool, error) {
 	ctx := context.Background()
-	
+
 	fmt.Println(msgFetchingInstances)
-	
+
 	// Get list of clusters
 	clusters, err := manager.ListClusters(ctx)
 	if err != nil {
 		return "", false, fmt.Errorf(errListInstances, err)
 	}
-	
+
 	if len(clusters) == 0 {
 		return createNewInstance()
 	}
-	
+
 	// Display existing instances
 	displayExistingInstances(manager, clusters)
-	
-	// Since we can't do interactive selection without pterm, 
+
+	// Since we can't do interactive selection without pterm,
 	// we'll auto-generate a new instance name
 	return createNewInstance()
 }
@@ -217,10 +217,10 @@ func displayExistingInstances(manager *kubernetes.K3dClusterManager, clusters []
 	for i, cluster := range clusters {
 		status := getInstanceStatus(manager, cluster.Name)
 		dataInfo := getInstanceDataInfo(cluster.Name)
-		
+
 		fmt.Printf("  %d. %s (%s%s)\n", i+1, cluster.Name, status, dataInfo)
 	}
-	
+
 	fmt.Println(msgUseExistingHint)
 }
 
@@ -246,7 +246,7 @@ func getInstanceDataInfo(instanceName string) string {
 // checkInstanceRunning checks if a KECS instance is currently running
 func checkInstanceRunning(manager *kubernetes.K3dClusterManager, instanceName string) (bool, error) {
 	ctx := context.Background()
-	
+
 	// Use the new IsClusterRunning method to check status without triggering warnings
 	return manager.IsClusterRunning(ctx, instanceName)
 }

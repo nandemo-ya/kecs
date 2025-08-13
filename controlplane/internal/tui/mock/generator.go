@@ -1,8 +1,8 @@
 package mock
 
 import (
-	"time"
 	tea "github.com/charmbracelet/bubbletea"
+	"time"
 )
 
 // DataMsg represents loaded mock data
@@ -77,7 +77,7 @@ type LogMsg struct {
 func LoadAllData(selectedInstance, selectedCluster, selectedService, selectedTask string) tea.Cmd {
 	return func() tea.Msg {
 		result := DataMsg{}
-		
+
 		// Always load instances
 		instanceData := GetInstances()
 		result.Instances = make([]InstanceMsg, len(instanceData))
@@ -96,7 +96,7 @@ func LoadAllData(selectedInstance, selectedCluster, selectedService, selectedTas
 				Age:        data.Age,
 			}
 		}
-		
+
 		// Load clusters if instance is selected
 		if selectedInstance != "" {
 			clusterData := GetClusters(selectedInstance)
@@ -116,7 +116,7 @@ func LoadAllData(selectedInstance, selectedCluster, selectedService, selectedTas
 				}
 			}
 		}
-		
+
 		// Load services if cluster is selected
 		if selectedCluster != "" {
 			serviceData := GetServices(selectedInstance, selectedCluster)
@@ -133,7 +133,7 @@ func LoadAllData(selectedInstance, selectedCluster, selectedService, selectedTas
 				}
 			}
 		}
-		
+
 		// Load tasks if service is selected
 		if selectedService != "" {
 			taskData := GetTasks(selectedInstance, selectedCluster, selectedService)
@@ -151,7 +151,7 @@ func LoadAllData(selectedInstance, selectedCluster, selectedService, selectedTas
 				}
 			}
 		}
-		
+
 		// Load logs if task is selected
 		if selectedTask != "" {
 			logData := GetLogs(selectedTask, 100)
@@ -164,7 +164,7 @@ func LoadAllData(selectedInstance, selectedCluster, selectedService, selectedTas
 				}
 			}
 		}
-		
+
 		return result
 	}
 }

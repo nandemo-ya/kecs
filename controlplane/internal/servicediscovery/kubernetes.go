@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // updateKubernetesEndpoints updates Kubernetes endpoints for service discovery

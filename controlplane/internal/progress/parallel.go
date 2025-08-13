@@ -24,14 +24,14 @@ type ParallelTracker struct {
 
 // Task represents a single task in parallel execution
 type Task struct {
-	Name        string
-	Status      TaskStatus
-	Progress    int
-	Total       int
-	Message     string
-	StartTime   time.Time
-	EndTime     time.Time
-	Error       error
+	Name      string
+	Status    TaskStatus
+	Progress  int
+	Total     int
+	Message   string
+	StartTime time.Time
+	EndTime   time.Time
+	Error     error
 }
 
 // TaskStatus represents the current status of a task
@@ -178,7 +178,7 @@ func (pt *ParallelTracker) Stop() {
 	close(pt.stopChan)
 	pt.wg.Wait()
 	pt.area.Stop()
-	
+
 	// Flush any captured logs
 	if pt.logCapture != nil {
 		pt.logCapture.Flush()
@@ -228,7 +228,7 @@ func (pt *ParallelTracker) render() {
 
 	// Title with elapsed time
 	elapsed := time.Since(pt.startTime).Round(time.Second)
-	
+
 	// Simple title without box styling
 	titleLine := fmt.Sprintf("🚀 %s (%s)", pt.title, elapsed)
 	output.WriteString(titleLine)

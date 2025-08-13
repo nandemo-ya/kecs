@@ -28,18 +28,18 @@ type InstanceConfig struct {
 	// Basic information
 	Name      string    `yaml:"name"`
 	CreatedAt time.Time `yaml:"createdAt"`
-	
+
 	// Port configuration
 	APIPort   int `yaml:"apiPort"`
 	AdminPort int `yaml:"adminPort"`
-	
+
 	// Feature toggles
 	LocalStack bool `yaml:"localStack"`
 	Traefik    bool `yaml:"traefik"`
-	
+
 	// Development settings
 	DevMode bool `yaml:"devMode"`
-	
+
 	// Data directory
 	DataDir string `yaml:"dataDir"`
 }
@@ -51,12 +51,12 @@ func SaveInstanceConfig(instanceName string, opts StartOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to get home directory: %w", err)
 	}
-	
+
 	instanceDir := filepath.Join(home, ".kecs", "instances", instanceName)
 	if err := os.MkdirAll(instanceDir, 0755); err != nil {
 		return fmt.Errorf("failed to create instance directory: %w", err)
 	}
-	
+
 	// Create config
 	config := InstanceConfig{
 		Name:       instanceName,
@@ -68,24 +68,24 @@ func SaveInstanceConfig(instanceName string, opts StartOptions) error {
 		DevMode:    opts.DevMode,
 		DataDir:    opts.DataDir,
 	}
-	
+
 	// If DataDir is empty, set default
 	if config.DataDir == "" {
 		config.DataDir = filepath.Join(instanceDir, "data")
 	}
-	
+
 	// Marshal to YAML
 	data, err := yaml.Marshal(&config)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-	
+
 	// Write to file
 	configPath := filepath.Join(instanceDir, "config.yaml")
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -95,9 +95,9 @@ func LoadInstanceConfig(instanceName string) (*InstanceConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
-	
+
 	configPath := filepath.Join(home, ".kecs", "instances", instanceName, "config.yaml")
-	
+
 	// Read file
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -106,13 +106,13 @@ func LoadInstanceConfig(instanceName string) (*InstanceConfig, error) {
 		}
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
-	
+
 	// Unmarshal YAML
 	var config InstanceConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
-	
+
 	return &config, nil
 }
 
@@ -122,35 +122,35 @@ func ListInstanceConfigs() ([]InstanceConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
-	
+
 	instancesDir := filepath.Join(home, ".kecs", "instances")
-	
+
 	// Check if instances directory exists
 	if _, err := os.Stat(instancesDir); os.IsNotExist(err) {
 		return []InstanceConfig{}, nil
 	}
-	
+
 	// Read directory entries
 	entries, err := os.ReadDir(instancesDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read instances directory: %w", err)
 	}
-	
+
 	var configs []InstanceConfig
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-		
+
 		// Try to load config
 		config, err := LoadInstanceConfig(entry.Name())
 		if err != nil {
 			// Skip instances without config
 			continue
 		}
-		
+
 		configs = append(configs, *config)
 	}
-	
+
 	return configs, nil
 }

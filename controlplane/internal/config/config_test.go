@@ -40,7 +40,7 @@ var _ = Describe("Config", func() {
 		It("should allow disabling LocalStack and Traefik via environment variables", func() {
 			// Reset config
 			config.ResetConfig()
-			
+
 			// Set environment variables to disable features
 			os.Setenv("KECS_LOCALSTACK_ENABLED", "false")
 			os.Setenv("KECS_LOCALSTACK_USE_TRAEFIK", "false")
@@ -51,7 +51,7 @@ var _ = Describe("Config", func() {
 				os.Unsetenv("KECS_FEATURES_TRAEFIK")
 				config.ResetConfig()
 			}()
-			
+
 			cfg := config.DefaultConfig()
 			Expect(cfg).NotTo(BeNil())
 			// Features should be disabled via environment variables
@@ -77,11 +77,11 @@ var _ = Describe("Config", func() {
 				configPath := filepath.Join(tempDir, "noaccess.yaml")
 				err := os.WriteFile(configPath, []byte("test"), 0644)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				// Make file inaccessible
 				err = os.Chmod(configPath, 0000)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				_, err = config.LoadConfig(configPath)
 				Expect(err).To(HaveOccurred())
 				// The error can be either "failed to access config file" or "failed to read config file"
@@ -91,7 +91,7 @@ var _ = Describe("Config", func() {
 					ContainSubstring("failed to read config file"),
 				))
 				Expect(err.Error()).To(ContainSubstring("permission denied"))
-				
+
 				// Restore permissions for cleanup
 				os.Chmod(configPath, 0644)
 			})
@@ -180,7 +180,7 @@ server:
 
 		It("should validate LocalStack config when enabled", func() {
 			cfg := config.DefaultConfig()
-			cfg.Server.Port = 8080 // Ensure valid port is set
+			cfg.Server.Port = 8080      // Ensure valid port is set
 			cfg.Server.AdminPort = 8081 // Ensure valid admin port is set
 			cfg.LocalStack.Enabled = true
 			cfg.LocalStack.Services = []string{"invalid-service"}

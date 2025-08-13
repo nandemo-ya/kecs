@@ -43,7 +43,7 @@ func (c *SyncController) syncService(ctx context.Context, key string) error {
 	mapper := mappers.NewServiceStateMapper(c.accountID, c.region)
 	serviceName := mapper.ExtractServiceNameFromDeployment(name)
 	clusterName, region := mapper.ExtractClusterInfoFromNamespace(namespace)
-	
+
 	klog.Infof("Extracted service info - service: %s, cluster: %s, region: %s", serviceName, clusterName, region)
 
 	if clusterName == "" || region == "" {
@@ -66,7 +66,7 @@ func (c *SyncController) syncService(ctx context.Context, key string) error {
 
 	// Update service ARN if not set
 	if service.ARN == "" {
-		service.ARN = fmt.Sprintf("arn:aws:ecs:%s:%s:service/%s/%s", 
+		service.ARN = fmt.Sprintf("arn:aws:ecs:%s:%s:service/%s/%s",
 			region, c.accountID, clusterName, serviceName)
 	}
 
@@ -119,7 +119,6 @@ func (c *SyncController) handleDeletedDeployment(ctx context.Context, namespace,
 func isNotFound(err error) bool {
 	// Check for storage-specific not found error
 	// This should be implemented based on your storage interface
-	return strings.Contains(err.Error(), "not found") || 
+	return strings.Contains(err.Error(), "not found") ||
 		strings.Contains(err.Error(), "does not exist")
 }
-

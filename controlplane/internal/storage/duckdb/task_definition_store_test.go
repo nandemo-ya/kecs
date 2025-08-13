@@ -24,12 +24,12 @@ func TestTaskDefinitionStore_GetLatest(t *testing.T) {
 	// Test case 2: Register multiple revisions
 	taskDef1 := &storage.TaskDefinition{
 		Family:               "test-family",
-		TaskRoleARN:         "arn:aws:iam::123456789012:role/test-role",
-		ExecutionRoleARN:    "arn:aws:iam::123456789012:role/test-exec-role",
-		NetworkMode:         "bridge",
+		TaskRoleARN:          "arn:aws:iam::123456789012:role/test-role",
+		ExecutionRoleARN:     "arn:aws:iam::123456789012:role/test-exec-role",
+		NetworkMode:          "bridge",
 		ContainerDefinitions: `[{"name":"test","image":"nginx"}]`,
-		Region:              "us-east-1",
-		AccountID:           "123456789012",
+		Region:               "us-east-1",
+		AccountID:            "123456789012",
 	}
 
 	// Register first revision
@@ -40,12 +40,12 @@ func TestTaskDefinitionStore_GetLatest(t *testing.T) {
 	// Register second revision
 	taskDef2 := &storage.TaskDefinition{
 		Family:               "test-family",
-		TaskRoleARN:         "arn:aws:iam::123456789012:role/test-role-v2",
-		ExecutionRoleARN:    "arn:aws:iam::123456789012:role/test-exec-role",
-		NetworkMode:         "awsvpc",
+		TaskRoleARN:          "arn:aws:iam::123456789012:role/test-role-v2",
+		ExecutionRoleARN:     "arn:aws:iam::123456789012:role/test-exec-role",
+		NetworkMode:          "awsvpc",
 		ContainerDefinitions: `[{"name":"test","image":"nginx:1.19"}]`,
-		Region:              "us-east-1",
-		AccountID:           "123456789012",
+		Region:               "us-east-1",
+		AccountID:            "123456789012",
 	}
 	registered2, err := taskDefStore.Register(ctx, taskDef2)
 	require.NoError(t, err)
@@ -80,10 +80,10 @@ func TestTaskDefinitionStore_GetLatest(t *testing.T) {
 	// Test case 6: Multiple families
 	taskDefOther := &storage.TaskDefinition{
 		Family:               "other-family",
-		NetworkMode:         "host",
+		NetworkMode:          "host",
 		ContainerDefinitions: `[{"name":"other","image":"redis"}]`,
-		Region:              "us-east-1",
-		AccountID:           "123456789012",
+		Region:               "us-east-1",
+		AccountID:            "123456789012",
 	}
 	_, err = taskDefStore.Register(ctx, taskDefOther)
 	require.NoError(t, err)

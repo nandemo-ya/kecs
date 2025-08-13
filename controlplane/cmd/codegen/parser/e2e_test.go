@@ -76,10 +76,10 @@ func TestPascalCasePreservation(t *testing.T) {
 // TestGeneratedStructTags verifies the generated struct tags use PascalCase
 func TestGeneratedStructTags(t *testing.T) {
 	member := &SmithyMember{}
-	
+
 	testCases := []struct {
-		fieldName    string
-		expectedTag  string
+		fieldName   string
+		expectedTag string
 	}{
 		{"SecretId", `json:"SecretId"`},
 		{"ARN", `json:"ARN,omitempty"`},
@@ -89,7 +89,7 @@ func TestGeneratedStructTags(t *testing.T) {
 
 	for _, tc := range testCases {
 		jsonName := member.GetJSONName(tc.fieldName)
-		
+
 		// Simulate struct tag generation
 		tag := `json:"` + jsonName
 		if !strings.Contains(tc.fieldName, "SecretId") { // Required fields don't have omitempty
@@ -100,7 +100,7 @@ func TestGeneratedStructTags(t *testing.T) {
 		if !strings.Contains(tag, jsonName) {
 			t.Errorf("Field %s: generated tag should contain %s, got %s", tc.fieldName, jsonName, tag)
 		}
-		
+
 		// Verify PascalCase is preserved
 		if jsonName != tc.fieldName {
 			t.Errorf("Field %s: PascalCase not preserved, got %s", tc.fieldName, jsonName)

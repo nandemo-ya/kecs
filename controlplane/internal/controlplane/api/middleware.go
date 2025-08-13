@@ -84,10 +84,10 @@ func LocalStackProxyMiddleware(next http.Handler, server *Server) http.Handler {
 			logging.Debug("[LocalStackProxyMiddleware] Request",
 				"method", r.Method, "path", r.URL.Path, "target", target, "hasAuth", r.Header.Get("Authorization") != "")
 		}
-		
+
 		// Dynamically check if awsProxyRouter is available
-		if server.awsProxyRouter != nil && server.awsProxyRouter.LocalStackManager != nil && 
-		   ShouldProxyToLocalStack(r, server.awsProxyRouter.LocalStackManager) {
+		if server.awsProxyRouter != nil && server.awsProxyRouter.LocalStackManager != nil &&
+			ShouldProxyToLocalStack(r, server.awsProxyRouter.LocalStackManager) {
 			logging.Debug("[LocalStackProxyMiddleware] Proxying to LocalStack", "method", r.Method, "path", r.URL.Path)
 			server.awsProxyRouter.AWSProxyHandler.ServeHTTP(w, r)
 			return

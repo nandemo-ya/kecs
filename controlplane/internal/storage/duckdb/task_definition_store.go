@@ -316,7 +316,6 @@ func (s *taskDefinitionStore) Deregister(ctx context.Context, family string, rev
 	return nil
 }
 
-
 // GetByARN retrieves a task definition by its ARN
 func (s *taskDefinitionStore) GetByARN(ctx context.Context, arn string) (*storage.TaskDefinition, error) {
 	// Parse ARN to extract family and revision

@@ -105,7 +105,7 @@ func (i *integration) GetConfigMapNameForParameter(parameterName string) string 
 	cleanName := strings.Trim(parameterName, "/")
 	cleanName = strings.ReplaceAll(cleanName, "/", "-")
 	cleanName = strings.ToLower(cleanName)
-	
+
 	// Remove any non-alphanumeric characters except hyphens
 	var result strings.Builder
 	for _, ch := range cleanName {
@@ -115,7 +115,7 @@ func (i *integration) GetConfigMapNameForParameter(parameterName string) string 
 			result.WriteRune('-')
 		}
 	}
-	
+
 	cleanName = result.String()
 	// Remove consecutive hyphens
 	for strings.Contains(cleanName, "--") {
@@ -167,10 +167,10 @@ func (i *integration) DeleteConfigMap(ctx context.Context, parameterName, namesp
 // flattenJSON attempts to flatten a JSON string into key-value pairs
 func (i *integration) flattenJSON(jsonStr string) map[string]string {
 	result := make(map[string]string)
-	
+
 	// Simple JSON flattening - in production, use a proper JSON parser
 	// This is a placeholder implementation
 	// TODO: Implement proper JSON flattening
-	
+
 	return result
 }

@@ -49,11 +49,11 @@ func TestMigration_LocalStackStateColumn(t *testing.T) {
 		defer os.RemoveAll(tmpDir2)
 
 		dbPath2 := filepath.Join(tmpDir2, "test2.db")
-		
+
 		// Create old schema without localstack_state
 		db, err := sql.Open("duckdb", dbPath2)
 		require.NoError(t, err)
-		
+
 		// Create old clusters table without localstack_state
 		_, err = db.ExecContext(ctx, `
 			CREATE TABLE clusters (
@@ -78,7 +78,7 @@ func TestMigration_LocalStackStateColumn(t *testing.T) {
 			)
 		`)
 		require.NoError(t, err)
-		
+
 		// Insert test data
 		_, err = db.ExecContext(ctx, `
 			INSERT INTO clusters (
@@ -91,7 +91,7 @@ func TestMigration_LocalStackStateColumn(t *testing.T) {
 			)
 		`)
 		require.NoError(t, err)
-		
+
 		db.Close()
 
 		// Now open with our storage which should trigger migration

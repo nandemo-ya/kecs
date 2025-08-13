@@ -74,7 +74,7 @@ func (k *K3dClusterManager) CreateCluster(ctx context.Context, clusterName strin
 		logging.Info("CI/TEST MODE: Simulating cluster creation", "cluster", clusterName)
 		return nil
 	}
-	
+
 	// Use optimized creation for test mode or when explicitly requested
 	if config.GetBool("features.testMode") || config.GetBool("kubernetes.k3dOptimized") {
 		return k.CreateClusterOptimized(ctx, clusterName)
@@ -516,7 +516,7 @@ func (k *K3dClusterManager) StopCluster(ctx context.Context, clusterName string)
 		logging.Info("CI/TEST MODE: Simulating cluster stop", "cluster", clusterName)
 		return nil
 	}
-	
+
 	normalizedName := k.normalizeClusterName(clusterName)
 
 	// Check if cluster exists
@@ -564,7 +564,7 @@ func (k *K3dClusterManager) StartCluster(ctx context.Context, clusterName string
 		logging.Info("CI/TEST MODE: Simulating cluster start", "cluster", clusterName)
 		return nil
 	}
-	
+
 	normalizedName := k.normalizeClusterName(clusterName)
 
 	// Check if cluster exists
@@ -651,7 +651,7 @@ func (k *K3dClusterManager) DeleteCluster(ctx context.Context, clusterName strin
 		logging.Info("CI/TEST MODE: Simulating cluster deletion", "cluster", clusterName)
 		return nil
 	}
-	
+
 	normalizedName := k.normalizeClusterName(clusterName)
 
 	// Check if cluster exists
@@ -705,7 +705,7 @@ func (k *K3dClusterManager) ClusterExists(ctx context.Context, clusterName strin
 	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
 		return false, nil
 	}
-	
+
 	normalizedName := k.normalizeClusterName(clusterName)
 
 	clusters, err := client.ClusterList(ctx, k.runtime)
@@ -728,7 +728,7 @@ func (k *K3dClusterManager) ListClusters(ctx context.Context) ([]ClusterInfo, er
 	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
 		return []ClusterInfo{}, nil
 	}
-	
+
 	clusters, err := client.ClusterList(ctx, k.runtime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list clusters: %w", err)
@@ -757,7 +757,7 @@ func (k *K3dClusterManager) IsClusterRunning(ctx context.Context, clusterName st
 	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
 		return false, nil
 	}
-	
+
 	normalizedName := k.normalizeClusterName(clusterName)
 
 	// Get cluster
@@ -800,7 +800,7 @@ func (k *K3dClusterManager) GetKubeClient(ctx context.Context, clusterName strin
 	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
 		return fake.NewSimpleClientset(), nil
 	}
-	
+
 	return k.getKubeClientInternal(clusterName)
 }
 
@@ -921,7 +921,7 @@ func (k *K3dClusterManager) GetKubeConfig(ctx context.Context, clusterName strin
 			Host: "https://mock-cluster:6443",
 		}, nil
 	}
-	
+
 	return k.getRESTConfig(clusterName)
 }
 
@@ -932,10 +932,10 @@ func (k *K3dClusterManager) WaitForClusterReady(ctx context.Context, clusterName
 		logging.Info("CI/TEST MODE: Cluster ready", "cluster", clusterName)
 		return nil
 	}
-	
+
 	startTime := time.Now()
 	normalizedName := k.normalizeClusterName(clusterName)
-	timeout := 2 * time.Minute  // Default timeout
+	timeout := 2 * time.Minute // Default timeout
 
 	logging.Info("Waiting for k3d cluster to be ready", "cluster", normalizedName)
 
@@ -1039,15 +1039,15 @@ func (k *K3dClusterManager) GetTraefikPort(ctx context.Context, clusterName stri
 	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
 		return 8080, nil
 	}
-	
+
 	k.portMutex.Lock()
 	defer k.portMutex.Unlock()
-	
+
 	normalizedName := k.normalizeClusterName(clusterName)
 	if port, ok := k.traefikPorts[normalizedName]; ok {
 		return port, nil
 	}
-	
+
 	return 0, fmt.Errorf("traefik port not found for cluster %s", clusterName)
 }
 
@@ -1064,7 +1064,7 @@ func (k *K3dClusterManager) GetClusterInfo(ctx context.Context, clusterName stri
 			Running:   true,
 		}, nil
 	}
-	
+
 	normalizedName := k.normalizeClusterName(clusterName)
 
 	exists, err := k.ClusterExists(ctx, clusterName)

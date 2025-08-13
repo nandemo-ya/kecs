@@ -110,16 +110,16 @@ func (m Model) filterTaskDefFamilies(families []TaskDefinitionFamily) []TaskDefi
 	if m.searchQuery == "" {
 		return families
 	}
-	
+
 	query := strings.ToLower(m.searchQuery)
 	filtered := make([]TaskDefinitionFamily, 0)
-	
+
 	for _, family := range families {
 		if matchesSearch(family.Family, query) {
 			filtered = append(filtered, family)
 		}
 	}
-	
+
 	return filtered
 }
 

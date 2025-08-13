@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // SNIManager manages SNI configuration for HTTPS listeners
@@ -77,7 +77,7 @@ func (s *SNIManager) UpdateSNIConfiguration(ctx context.Context, ingressRouteNam
 // extractHostsFromRules extracts unique hostnames from Traefik match rules
 func (s *SNIManager) extractHostsFromRules(rules []string) []string {
 	hostMap := make(map[string]bool)
-	
+
 	for _, rule := range rules {
 		// Extract Host(`hostname`) patterns
 		if strings.Contains(rule, "Host(`") {
@@ -88,7 +88,7 @@ func (s *SNIManager) extractHostsFromRules(rules []string) []string {
 				hostMap[host] = true
 			}
 		}
-		
+
 		// Extract HostRegexp patterns and convert to wildcard
 		if strings.Contains(rule, "HostRegexp(`") {
 			start := strings.Index(rule, "HostRegexp(`") + 12
@@ -105,13 +105,13 @@ func (s *SNIManager) extractHostsFromRules(rules []string) []string {
 			}
 		}
 	}
-	
+
 	// Convert map to slice
 	var hosts []string
 	for host := range hostMap {
 		hosts = append(hosts, host)
 	}
-	
+
 	return hosts
 }
 
@@ -123,37 +123,37 @@ func (s *SNIManager) buildTLSConfig(hosts []string) map[string]interface{} {
 
 	// Group hosts by certificate
 	certGroups := s.groupHostsByCertificate(hosts)
-	
+
 	// Build TLS domains configuration
 	var domains []interface{}
 	for _, group := range certGroups {
 		domain := map[string]interface{}{
 			"main": group.main,
 		}
-		
+
 		// Add SANs if multiple hosts share the same certificate
 		if len(group.sans) > 0 {
 			domain["sans"] = group.sans
 		}
-		
+
 		// Set secret name based on the main domain
 		secretName := s.getSecretNameForHost(group.main)
 		if secretName != "" {
 			domain["secretName"] = secretName
 		}
-		
+
 		domains = append(domains, domain)
 	}
-	
+
 	tlsConfig := map[string]interface{}{
 		"domains": domains,
 		// Enable SNI strict mode
 		"options": map[string]interface{}{
-			"name": "default",
+			"name":      "default",
 			"sniStrict": true,
 		},
 	}
-	
+
 	return tlsConfig
 }
 
@@ -167,7 +167,7 @@ type CertificateGroup struct {
 func (s *SNIManager) groupHostsByCertificate(hosts []string) []CertificateGroup {
 	var groups []CertificateGroup
 	wildcardMap := make(map[string]*CertificateGroup)
-	
+
 	for _, host := range hosts {
 		if strings.HasPrefix(host, "*.") {
 			// Wildcard certificate
@@ -193,7 +193,7 @@ func (s *SNIManager) groupHostsByCertificate(hosts []string) []CertificateGroup 
 					continue
 				}
 			}
-			
+
 			// Individual certificate
 			groups = append(groups, CertificateGroup{
 				main: host,
@@ -201,12 +201,12 @@ func (s *SNIManager) groupHostsByCertificate(hosts []string) []CertificateGroup 
 			})
 		}
 	}
-	
+
 	// Add wildcard groups to the result
 	for _, group := range wildcardMap {
 		groups = append(groups, *group)
 	}
-	
+
 	return groups
 }
 

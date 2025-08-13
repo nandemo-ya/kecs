@@ -12,10 +12,10 @@ func TestMapPodPhaseToTaskStatus(t *testing.T) {
 	mapper := NewTaskStateMapper("123456789012", "us-east-1")
 
 	tests := []struct {
-		name           string
-		pod            *corev1.Pod
-		wantDesired    string
-		wantLast       string
+		name        string
+		pod         *corev1.Pod
+		wantDesired string
+		wantLast    string
 	}{
 		{
 			name: "Pod Running with all containers ready",

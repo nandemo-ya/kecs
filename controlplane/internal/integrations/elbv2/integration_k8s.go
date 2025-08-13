@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -18,15 +19,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // k8sIntegration implements the Integration interface using Kubernetes Services
 // instead of actual ELBv2 API calls. This avoids the need for LocalStack Pro.
 type k8sIntegration struct {
-	region    string
-	accountID string
-	kubeClient kubernetes.Interface
+	region        string
+	accountID     string
+	kubeClient    kubernetes.Interface
 	dynamicClient dynamic.Interface
 	ruleManager   *RuleManager
 
@@ -294,14 +294,14 @@ func (i *k8sIntegration) DeleteListener(ctx context.Context, arn string) error {
 		i.mu.Unlock()
 		return fmt.Errorf("listener not found: %s", arn)
 	}
-	
+
 	// Get load balancer info for IngressRoute deletion
 	lb, lbExists := i.loadBalancers[listener.LoadBalancerArn]
 	var lbName string
 	if lbExists {
 		lbName = lb.Name
 	}
-	
+
 	delete(i.listeners, arn)
 	i.mu.Unlock()
 
@@ -358,12 +358,12 @@ func (i *k8sIntegration) GetTargetHealth(ctx context.Context, targetGroupArn str
 // CheckTargetHealthWithK8s performs health check using Kubernetes pod status
 func (i *k8sIntegration) CheckTargetHealthWithK8s(ctx context.Context, targetIP string, targetPort int32, targetGroupArn string) (string, error) {
 	logging.Debug("Checking target health with Kubernetes", "targetIP", targetIP, "targetPort", targetPort)
-	
+
 	if i.kubeClient == nil {
 		logging.Debug("No kubeClient available, falling back to basic connectivity check")
 		return i.performBasicConnectivityCheck(targetIP, targetPort)
 	}
-	
+
 	// Find pod by IP address
 	pod, err := i.findPodByIP(ctx, targetIP)
 	if err != nil {
@@ -371,12 +371,12 @@ func (i *k8sIntegration) CheckTargetHealthWithK8s(ctx context.Context, targetIP 
 		// Fallback to basic connectivity check if pod not found
 		return i.performBasicConnectivityCheck(targetIP, targetPort)
 	}
-	
+
 	if pod == nil {
 		logging.Debug("No pod found with IP, performing basic connectivity check", "targetIP", targetIP)
 		return i.performBasicConnectivityCheck(targetIP, targetPort)
 	}
-	
+
 	// Check pod readiness status
 	return i.checkPodReadiness(pod, targetPort)
 }
@@ -388,13 +388,13 @@ func (i *k8sIntegration) findPodByIP(ctx context.Context, targetIP string) (*cor
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pods: %w", err)
 	}
-	
+
 	for _, pod := range pods.Items {
 		if pod.Status.PodIP == targetIP {
 			return &pod, nil
 		}
 	}
-	
+
 	return nil, nil // Pod not found
 }
 
@@ -405,13 +405,13 @@ func (i *k8sIntegration) checkPodReadiness(pod *corev1.Pod, targetPort int32) (s
 		logging.Debug("Pod is not running", "namespace", pod.Namespace, "name", pod.Name, "phase", pod.Status.Phase)
 		return "unhealthy", nil
 	}
-	
+
 	// Check pod readiness conditions
 	for _, condition := range pod.Status.Conditions {
 		if condition.Type == corev1.PodReady {
 			if condition.Status == corev1.ConditionTrue {
 				logging.Debug("Pod is ready", "namespace", pod.Namespace, "name", pod.Name)
-				
+
 				// Additionally check if the target port is exposed by the pod
 				if i.isPodPortExposed(pod, targetPort) {
 					return "healthy", nil
@@ -425,7 +425,7 @@ func (i *k8sIntegration) checkPodReadiness(pod *corev1.Pod, targetPort int32) (s
 			}
 		}
 	}
-	
+
 	// If no readiness condition found, consider it unhealthy
 	logging.Debug("Pod has no readiness condition", "namespace", pod.Namespace, "name", pod.Name)
 	return "unhealthy", nil
@@ -779,8 +779,8 @@ func (i *k8sIntegration) deployTargetGroupResources(ctx context.Context, tgName,
 			Name:      serviceName,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				"kecs.io/elbv2-target-group-name": tgName,
-				"kecs.io/elbv2-target-group-arn":  tgArn,
+				"kecs.io/elbv2-target-group-name":     tgName,
+				"kecs.io/elbv2-target-group-arn":      tgArn,
 				"kecs.io/elbv2-target-group-protocol": protocol,
 			},
 			Labels: map[string]string{
@@ -823,7 +823,7 @@ func (i *k8sIntegration) updateTraefikConfigForListener(ctx context.Context, lbN
 
 	namespace := "kecs-system"
 	traefikName := fmt.Sprintf("traefik-elbv2-%s", lbName)
-	
+
 	// Update the ConfigMap with new listener configuration
 	cm, err := i.kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, fmt.Sprintf("%s-config", traefikName), metav1.GetOptions{})
 	if err != nil {
@@ -837,11 +837,11 @@ func (i *k8sIntegration) updateTraefikConfigForListener(ctx context.Context, lbN
 		newEntry := fmt.Sprintf(`
   listener%d:
     address: ":%d"`, port, port)
-		
+
 		// Insert after the existing entryPoints
 		traefikYaml = strings.Replace(traefikYaml, "entryPoints:", "entryPoints:"+newEntry, 1)
 		cm.Data["traefik.yml"] = traefikYaml
-		
+
 		// Update ConfigMap
 		_, err = i.kubeClient.CoreV1().ConfigMaps(namespace).Update(ctx, cm, metav1.UpdateOptions{})
 		if err != nil {
@@ -880,9 +880,9 @@ func (i *k8sIntegration) createIngressRoute(ctx context.Context, lbName, listene
 				"name":      ingressRouteName,
 				"namespace": namespace,
 				"annotations": map[string]interface{}{
-					"kecs.io/elbv2-listener-arn":      listenerArn,
-					"kecs.io/elbv2-load-balancer":     lbName,
-					"kecs.io/elbv2-target-group":      targetGroupName,
+					"kecs.io/elbv2-listener-arn":  listenerArn,
+					"kecs.io/elbv2-load-balancer": lbName,
+					"kecs.io/elbv2-target-group":  targetGroupName,
 				},
 				"labels": map[string]interface{}{
 					"kecs.io/elbv2-load-balancer": lbName,
@@ -893,8 +893,8 @@ func (i *k8sIntegration) createIngressRoute(ctx context.Context, lbName, listene
 				"entryPoints": []string{fmt.Sprintf("listener%d", port)},
 				"routes": []interface{}{
 					map[string]interface{}{
-						"match": "PathPrefix(`/`)", // Default catch-all route
-						"kind":  "Rule",
+						"match":    "PathPrefix(`/`)", // Default catch-all route
+						"kind":     "Rule",
 						"priority": 50000, // Very low priority for default rule
 						"services": []interface{}{
 							map[string]interface{}{
@@ -1031,17 +1031,17 @@ func (i *k8sIntegration) SyncRulesToListener(ctx context.Context, storageInstanc
 	if !ok {
 		return fmt.Errorf("invalid storage type")
 	}
-	
+
 	// Initialize rule manager if not already done
 	if i.ruleManager == nil && i.dynamicClient != nil {
 		i.ruleManager = NewRuleManager(i.dynamicClient, storageImpl.ELBv2Store())
 	}
-	
+
 	if i.ruleManager == nil {
 		logging.Debug("No rule manager available, skipping rule sync")
 		return nil
 	}
-	
+
 	// Sync rules using the rule manager
 	return i.ruleManager.SyncRulesForListener(ctx, storageImpl, listenerArn, lbName, port)
 }

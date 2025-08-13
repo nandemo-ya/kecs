@@ -2,7 +2,7 @@ package elbv2_test
 
 import (
 	"strings"
-	
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -33,7 +33,7 @@ var _ = Describe("HeaderRoutingValidator", func() {
 				issues, err := validator.ValidateHeaderConditions(conditions)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(issues).To(HaveLen(2)) // Security warning + known header error
-				
+
 				// Check for authentication warning
 				var hasAuthWarning bool
 				for _, issue := range issues {
@@ -58,7 +58,7 @@ var _ = Describe("HeaderRoutingValidator", func() {
 				issues, err := validator.ValidateHeaderConditions(conditions)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(issues).To(HaveLen(3)) // Security warning + wildcard warning + known header error
-				
+
 				// Check for security warning
 				var hasSecurityWarning bool
 				for _, issue := range issues {
@@ -83,7 +83,7 @@ var _ = Describe("HeaderRoutingValidator", func() {
 				issues, err := validator.ValidateHeaderConditions(conditions)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(issues).NotTo(BeEmpty())
-				
+
 				// Check for cookie warning
 				var hasCookieWarning bool
 				for _, issue := range issues {
@@ -125,7 +125,7 @@ var _ = Describe("HeaderRoutingValidator", func() {
 				issues, err := validator.ValidateHeaderConditions(conditions)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(issues).NotTo(BeEmpty())
-				
+
 				var hasFormatError bool
 				for _, issue := range issues {
 					if issue.Severity == elbv2.IssueSeverityError && issue.Message == "Invalid header name format" {
@@ -168,7 +168,7 @@ var _ = Describe("HeaderRoutingValidator", func() {
 				issues, err := validator.ValidateHeaderConditions(conditions)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(issues).NotTo(BeEmpty())
-				
+
 				var hasInvalidChars bool
 				for _, issue := range issues {
 					if issue.Message == "Header value contains invalid characters (CR/LF)" {
@@ -192,7 +192,7 @@ var _ = Describe("HeaderRoutingValidator", func() {
 				issues, err := validator.ValidateHeaderConditions(conditions)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(issues).NotTo(BeEmpty())
-				
+
 				var hasWildcardWarning bool
 				for _, issue := range issues {
 					if issue.Message == "Using wildcard '*' matches all values" {
@@ -216,7 +216,7 @@ var _ = Describe("HeaderRoutingValidator", func() {
 				issues, err := validator.ValidateHeaderConditions(conditions)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(issues).NotTo(BeEmpty())
-				
+
 				var hasComplexityWarning bool
 				for _, issue := range issues {
 					if issue.Message == "Complex wildcard patterns may impact performance" {
@@ -233,7 +233,7 @@ var _ = Describe("HeaderRoutingValidator", func() {
 		It("should provide API version suggestions", func() {
 			suggestions := validator.GetHeaderSuggestions("api-version")
 			Expect(suggestions).NotTo(BeEmpty())
-			
+
 			var hasApiVersionHeader bool
 			for _, suggestion := range suggestions {
 				if suggestion.Header == "X-API-Version" {
@@ -248,7 +248,7 @@ var _ = Describe("HeaderRoutingValidator", func() {
 		It("should provide feature flag suggestions", func() {
 			suggestions := validator.GetHeaderSuggestions("feature-flag")
 			Expect(suggestions).NotTo(BeEmpty())
-			
+
 			var hasFeatureFlagHeader bool
 			for _, suggestion := range suggestions {
 				if suggestion.Header == "X-Feature-Flag" {
@@ -262,7 +262,7 @@ var _ = Describe("HeaderRoutingValidator", func() {
 		It("should provide tenant routing suggestions", func() {
 			suggestions := validator.GetHeaderSuggestions("tenant")
 			Expect(suggestions).NotTo(BeEmpty())
-			
+
 			var hasTenantHeader bool
 			for _, suggestion := range suggestions {
 				if suggestion.Header == "X-Tenant-ID" {
@@ -277,7 +277,7 @@ var _ = Describe("HeaderRoutingValidator", func() {
 		It("should provide mobile routing suggestions", func() {
 			suggestions := validator.GetHeaderSuggestions("mobile")
 			Expect(suggestions).NotTo(BeEmpty())
-			
+
 			var hasUserAgentHeader bool
 			for _, suggestion := range suggestions {
 				if suggestion.Header == "User-Agent" {

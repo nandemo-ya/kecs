@@ -232,13 +232,13 @@ func Warning(format string, a ...interface{}) {
 // FormatError formats an error with additional context and suggestions
 func FormatError(err error, context string, suggestions ...string) string {
 	var result string
-	
+
 	// Error header
-	result += pterm.Error.Sprint("Failed: " + context) + "\n\n"
-	
+	result += pterm.Error.Sprint("Failed: "+context) + "\n\n"
+
 	// Error details
 	result += pterm.DefaultBox.Sprint(fmt.Sprintf("Error: %v", err)) + "\n"
-	
+
 	// Suggestions if provided
 	if len(suggestions) > 0 {
 		result += "\n" + pterm.Info.Sprint("Suggestions:") + "\n"
@@ -246,6 +246,6 @@ func FormatError(err error, context string, suggestions ...string) string {
 			result += fmt.Sprintf("  • %s\n", suggestion)
 		}
 	}
-	
+
 	return result
 }

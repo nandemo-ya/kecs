@@ -15,7 +15,7 @@ func GenerateTaskID() (string, error) {
 	if _, err := rand.Read(bytes); err != nil {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
-	
+
 	// Convert to hexadecimal string (32 characters)
 	return hex.EncodeToString(bytes), nil
 }
@@ -26,7 +26,7 @@ func GenerateTaskID() (string, error) {
 func GenerateTaskIDFromString(input string) string {
 	// Create SHA256 hash of the input
 	hash := sha256.Sum256([]byte(input))
-	
+
 	// Take first 16 bytes and convert to hex (32 characters)
 	return hex.EncodeToString(hash[:16])
 }

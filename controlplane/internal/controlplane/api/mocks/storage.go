@@ -21,7 +21,7 @@ type MockStorage struct {
 	taskSetStore           storage.TaskSetStore
 	containerInstanceStore storage.ContainerInstanceStore
 	attributeStore         storage.AttributeStore
-	elbv2Store            storage.ELBv2Store
+	elbv2Store             storage.ELBv2Store
 }
 
 func NewMockStorage() *MockStorage {

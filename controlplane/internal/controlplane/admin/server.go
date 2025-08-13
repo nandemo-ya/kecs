@@ -27,7 +27,7 @@ type Server struct {
 // NewServer creates a new admin server instance
 func NewServer(port int, storage storage.Storage) *Server {
 	cfg := config.GetConfig()
-	
+
 	s := &Server{
 		port:             port,
 		metricsCollector: NewMetricsCollector(),
@@ -50,7 +50,7 @@ func NewServer(port int, storage storage.Storage) *Server {
 	} else {
 		s.instanceAPI = instanceAPI
 	}
-	
+
 	// Initialize ECS proxy with instance manager if available
 	if s.instanceAPI != nil && s.instanceAPI.manager != nil {
 		s.ecsProxy = NewECSProxy(cfg, s.instanceAPI.manager)
@@ -109,12 +109,12 @@ func (s *Server) setupRoutes() http.Handler {
 
 	// Add middleware
 	handler := http.Handler(router)
-	
+
 	// Add CORS middleware if allowed origins are configured
 	if len(s.config.Server.AllowedOrigins) > 0 {
 		handler = CORSMiddleware(s.config.Server.AllowedOrigins)(handler)
 	}
-	
+
 	// Add API key middleware if configured
 	// TODO: Add APIKey field to config
 	// if s.config.Server.APIKey != "" {
@@ -155,20 +155,20 @@ type ConfigResponse struct {
 
 // ServerConfigResponse represents the server configuration in the response
 type ServerConfigResponse struct {
-	Port           int    `json:"port"`
-	AdminPort      int    `json:"adminPort"`
-	DataDir        string `json:"dataDir"`
-	LogLevel       string `json:"logLevel"`
-	Endpoint       string `json:"endpoint,omitempty"`
+	Port           int      `json:"port"`
+	AdminPort      int      `json:"adminPort"`
+	DataDir        string   `json:"dataDir"`
+	LogLevel       string   `json:"logLevel"`
+	Endpoint       string   `json:"endpoint,omitempty"`
 	AllowedOrigins []string `json:"allowedOrigins,omitempty"`
 }
 
 // LocalStackConfigResponse represents the LocalStack configuration in the response
 type LocalStackConfigResponse struct {
-	Enabled    bool   `json:"enabled"`
-	UseTraefik bool   `json:"useTraefik"`
-	Port       int    `json:"port,omitempty"`
-	EdgePort   int    `json:"edgePort,omitempty"`
+	Enabled    bool `json:"enabled"`
+	UseTraefik bool `json:"useTraefik"`
+	Port       int  `json:"port,omitempty"`
+	EdgePort   int  `json:"edgePort,omitempty"`
 }
 
 // KubernetesConfigResponse represents the Kubernetes configuration in the response

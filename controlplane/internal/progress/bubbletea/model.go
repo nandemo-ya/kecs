@@ -23,14 +23,14 @@ const (
 
 // Task represents a single task being tracked
 type Task struct {
-	ID          string
-	Name        string
-	Status      TaskStatus
-	Progress    float64
-	Message     string
-	StartTime   time.Time
-	EndTime     time.Time
-	Error       error
+	ID        string
+	Name      string
+	Status    TaskStatus
+	Progress  float64
+	Message   string
+	StartTime time.Time
+	EndTime   time.Time
+	Error     error
 }
 
 // LogEntry represents a log message
@@ -42,30 +42,30 @@ type LogEntry struct {
 
 // Model represents the Bubble Tea model for progress tracking
 type Model struct {
-	title      string
-	tasks      map[string]*Task
-	taskOrder  []string // Maintain task order
-	logs       []LogEntry
-	
+	title     string
+	tasks     map[string]*Task
+	taskOrder []string // Maintain task order
+	logs      []LogEntry
+
 	// UI components
 	progressBars map[string]progress.Model
 	logViewport  viewport.Model
-	
+
 	// Layout
-	width       int
-	height      int
-	splitRatio  float64 // How much of the screen is for progress (0.5 = 50%)
-	
+	width      int
+	height     int
+	splitRatio float64 // How much of the screen is for progress (0.5 = 50%)
+
 	// Styling
-	titleStyle    lipgloss.Style
-	taskStyle     lipgloss.Style
-	logStyle      lipgloss.Style
-	borderStyle   lipgloss.Style
-	
+	titleStyle  lipgloss.Style
+	taskStyle   lipgloss.Style
+	logStyle    lipgloss.Style
+	borderStyle lipgloss.Style
+
 	// State
-	startTime    time.Time
-	completed    bool
-	showLogs     bool
+	startTime time.Time
+	completed bool
+	showLogs  bool
 }
 
 // New creates a new progress model
@@ -79,19 +79,19 @@ func New(title string) Model {
 		splitRatio:   0.5,
 		startTime:    time.Now(),
 		showLogs:     true,
-		
+
 		// Styling
 		titleStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("86")).
 			MarginBottom(1),
-		
+
 		taskStyle: lipgloss.NewStyle().
 			PaddingLeft(2),
-		
+
 		logStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240")),
-		
+
 		borderStyle: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("240")),
@@ -113,15 +113,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		
+
 		// Update viewport size
 		headerHeight := 4 // Title + borders
 		progressHeight := int(float64(m.height-headerHeight) * m.splitRatio)
 		logHeight := m.height - headerHeight - progressHeight - 1 // -1 for separator
-		
+
 		m.logViewport = viewport.New(m.width-4, logHeight) // -4 for borders
 		m.logViewport.SetContent(m.renderLogs())
-		
+
 	case tickMsg:
 		// Update progress bars animation
 		for id, bar := range m.progressBars {
@@ -134,21 +134,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		cmds = append(cmds, tickCmd())
-		
+
 	case AddTaskMsg:
 		m.addTask(msg.ID, msg.Name, msg.Total)
-		
+
 	case UpdateTaskMsg:
 		m.updateTask(msg.ID, msg.Progress, msg.Message, msg.Status)
-		
+
 	case AddLogMsg:
 		m.addLog(msg.Level, msg.Message)
 		m.logViewport.SetContent(m.renderLogs())
 		m.logViewport.GotoBottom()
-		
+
 	case CompleteMsg:
 		m.completed = true
-		
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "esc", "ctrl+c":
@@ -174,7 +174,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Go to bottom
 			m.logViewport.GotoBottom()
 		}
-		
+
 		// Handle viewport scrolling for other keys
 		var cmd tea.Cmd
 		m.logViewport, cmd = m.logViewport.Update(msg)
@@ -207,7 +207,7 @@ func (m Model) View() string {
 			Foreground(lipgloss.Color("240")).
 			Render(strings.Repeat("─", m.width))
 		sections = append(sections, separator)
-		
+
 		logSection := m.renderLogSection()
 		sections = append(sections, logSection)
 	}
@@ -229,10 +229,10 @@ func (m *Model) addTask(id, name string, total float64) {
 		Progress:  0,
 		StartTime: time.Now(),
 	}
-	
+
 	m.tasks[id] = task
 	m.taskOrder = append(m.taskOrder, id)
-	
+
 	// Create progress bar
 	bar := progress.New(progress.WithDefaultGradient())
 	bar.Width = m.width - 40 // Leave room for labels
@@ -244,11 +244,11 @@ func (m *Model) updateTask(id string, prog float64, message string, status TaskS
 		task.Progress = prog
 		task.Message = message
 		task.Status = status
-		
+
 		if status == TaskStatusCompleted || status == TaskStatusFailed {
 			task.EndTime = time.Now()
 		}
-		
+
 		// Update progress bar percentage
 		// The progress bar will animate to the new percentage in its Update method
 		if _, ok := m.progressBars[id]; ok {
@@ -268,27 +268,27 @@ func (m *Model) addLog(level, message string) {
 
 func (m Model) renderProgress() string {
 	var lines []string
-	
+
 	for _, id := range m.taskOrder {
 		task := m.tasks[id]
 		line := m.renderTask(task)
 		lines = append(lines, line)
 	}
-	
+
 	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
-	
+
 	// Wrap in a box
 	box := m.borderStyle.
 		Width(m.width - 2).
 		Render(content)
-	
+
 	return box
 }
 
 func (m Model) renderTask(task *Task) string {
 	var icon string
 	var color lipgloss.Color
-	
+
 	switch task.Status {
 	case TaskStatusPending:
 		icon = "⏳"
@@ -303,13 +303,13 @@ func (m Model) renderTask(task *Task) string {
 		icon = "❌"
 		color = lipgloss.Color("196")
 	}
-	
+
 	nameStyle := lipgloss.NewStyle().
 		Foreground(color).
 		Width(20)
-	
+
 	name := nameStyle.Render(fmt.Sprintf("%s %s", icon, task.Name))
-	
+
 	// Progress bar or status message
 	var progressPart string
 	if task.Status == TaskStatusRunning || task.Status == TaskStatusCompleted {
@@ -326,13 +326,13 @@ func (m Model) renderTask(task *Task) string {
 			Foreground(lipgloss.Color("240")).
 			Render(task.Message)
 	}
-	
+
 	// Progress percentage
 	percentage := lipgloss.NewStyle().
 		Width(5).
 		Align(lipgloss.Right).
 		Render(fmt.Sprintf("%3.0f%%", task.Progress))
-	
+
 	return m.taskStyle.Render(
 		lipgloss.JoinHorizontal(lipgloss.Left, name, " ", progressPart, " ", percentage),
 	)
@@ -340,10 +340,10 @@ func (m Model) renderTask(task *Task) string {
 
 func (m Model) renderLogs() string {
 	var lines []string
-	
+
 	for _, log := range m.logs {
 		timestamp := log.Timestamp.Format("15:04:05")
-		
+
 		var levelColor lipgloss.Color
 		switch log.Level {
 		case "ERROR":
@@ -355,17 +355,17 @@ func (m Model) renderLogs() string {
 		default:
 			levelColor = lipgloss.Color("240")
 		}
-		
+
 		line := fmt.Sprintf(
 			"%s %s %s",
 			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(timestamp),
 			lipgloss.NewStyle().Foreground(levelColor).Width(5).Render(log.Level),
 			log.Message,
 		)
-		
+
 		lines = append(lines, line)
 	}
-	
+
 	return strings.Join(lines, "\n")
 }
 
@@ -374,12 +374,12 @@ func (m Model) renderLogSection() string {
 		Bold(true).
 		Foreground(lipgloss.Color("86")).
 		Render("📋 Logs")
-	
+
 	logs := m.borderStyle.
 		Width(m.width - 2).
 		Height(m.logViewport.Height + 2).
 		Render(m.logViewport.View())
-	
+
 	return lipgloss.JoinVertical(lipgloss.Left, title, logs)
 }
 
@@ -388,7 +388,7 @@ func (m Model) renderFooter() string {
 	if m.showLogs {
 		help = "↑/↓/j/k: scroll • PgUp/PgDn: page • Home/End: top/bottom • " + help
 	}
-	
+
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
 		MarginTop(1).

@@ -33,7 +33,7 @@ func init() {
 
 func runDestroy(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	
+
 	// Create instance manager
 	manager, err := instance.NewManager()
 	if err != nil {
@@ -43,24 +43,24 @@ func runDestroy(cmd *cobra.Command, args []string) error {
 	// If instance name is not provided, list available instances
 	if destroyInstanceName == "" {
 		fmt.Println("Fetching KECS instances...")
-		
+
 		// Get list of instances
 		instances, err := manager.List(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to list instances: %w", err)
 		}
-		
+
 		if len(instances) == 0 {
 			fmt.Println("No KECS instances found")
 			return nil
 		}
-		
+
 		// List available instances
 		fmt.Println("\nAvailable KECS instances:")
 		for i, inst := range instances {
 			fmt.Printf("  %d. %s (%s)\n", i+1, inst.Name, strings.ToLower(inst.Status))
 		}
-		
+
 		return fmt.Errorf("please specify an instance to destroy with --instance flag")
 	}
 
@@ -86,7 +86,7 @@ func runDestroy(cmd *cobra.Command, args []string) error {
 		}
 		return fmt.Errorf("failed to destroy instance: %w", err)
 	}
-	
+
 	fmt.Printf("✅ KECS instance '%s' has been destroyed\n", destroyInstanceName)
 
 	if destroyDeleteData {

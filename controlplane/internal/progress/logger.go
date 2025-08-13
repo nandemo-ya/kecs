@@ -56,7 +56,7 @@ func (lc *LogCapture) Add(timestamp time.Time, level LogLevel, message string) {
 	// Only capture if it meets minimum level
 	if level >= lc.minLevel {
 		lc.entries = append(lc.entries, entry)
-		
+
 		// Also write immediately if we're at warning or error level
 		if level >= LogLevelWarning {
 			lc.writeEntry(entry)
@@ -97,7 +97,7 @@ func (lc *LogCapture) writeEntry(entry LogEntry) {
 	case LogLevelDebug:
 		prefix = "🔍 DEBUG: "
 	}
-	
+
 	fmt.Fprintf(lc.output, "\n%s%s\n", prefix, entry.Message)
 }
 
@@ -179,7 +179,7 @@ type logCaptureWriter struct {
 func (w *logCaptureWriter) Write(p []byte) (n int, err error) {
 	// Append to buffer
 	w.buffer = append(w.buffer, p...)
-	
+
 	// Look for newlines to create log entries
 	for {
 		idx := -1
@@ -189,20 +189,20 @@ func (w *logCaptureWriter) Write(p []byte) (n int, err error) {
 				break
 			}
 		}
-		
+
 		if idx == -1 {
 			break
 		}
-		
+
 		// Extract the line
 		line := string(w.buffer[:idx])
 		w.buffer = w.buffer[idx+1:]
-		
+
 		// Skip empty lines
 		if strings.TrimSpace(line) != "" {
 			w.capture.Log(w.level, "%s", line)
 		}
 	}
-	
+
 	return len(p), nil
 }

@@ -3,10 +3,10 @@ package proxy
 import (
 	"fmt"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // SidecarProxy handles sidecar injection for AWS proxy

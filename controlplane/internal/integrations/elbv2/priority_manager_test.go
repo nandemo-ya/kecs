@@ -48,30 +48,68 @@ func (m *mockELBv2Store) UpdateRule(ctx context.Context, rule *storage.ELBv2Rule
 }
 
 // Implement other required methods
-func (m *mockELBv2Store) CreateListener(ctx context.Context, listener *storage.ELBv2Listener) error { return nil }
-func (m *mockELBv2Store) GetListener(ctx context.Context, arn string) (*storage.ELBv2Listener, error) { return nil, nil }
-func (m *mockELBv2Store) UpdateListener(ctx context.Context, listener *storage.ELBv2Listener) error { return nil }
+func (m *mockELBv2Store) CreateListener(ctx context.Context, listener *storage.ELBv2Listener) error {
+	return nil
+}
+func (m *mockELBv2Store) GetListener(ctx context.Context, arn string) (*storage.ELBv2Listener, error) {
+	return nil, nil
+}
+func (m *mockELBv2Store) UpdateListener(ctx context.Context, listener *storage.ELBv2Listener) error {
+	return nil
+}
 func (m *mockELBv2Store) DeleteListener(ctx context.Context, arn string) error { return nil }
-func (m *mockELBv2Store) ListListeners(ctx context.Context, lbArn string) ([]*storage.ELBv2Listener, error) { return nil, nil }
-func (m *mockELBv2Store) CreateLoadBalancer(ctx context.Context, lb *storage.ELBv2LoadBalancer) error { return nil }
-func (m *mockELBv2Store) GetLoadBalancer(ctx context.Context, arn string) (*storage.ELBv2LoadBalancer, error) { return nil, nil }
-func (m *mockELBv2Store) UpdateLoadBalancer(ctx context.Context, lb *storage.ELBv2LoadBalancer) error { return nil }
+func (m *mockELBv2Store) ListListeners(ctx context.Context, lbArn string) ([]*storage.ELBv2Listener, error) {
+	return nil, nil
+}
+func (m *mockELBv2Store) CreateLoadBalancer(ctx context.Context, lb *storage.ELBv2LoadBalancer) error {
+	return nil
+}
+func (m *mockELBv2Store) GetLoadBalancer(ctx context.Context, arn string) (*storage.ELBv2LoadBalancer, error) {
+	return nil, nil
+}
+func (m *mockELBv2Store) UpdateLoadBalancer(ctx context.Context, lb *storage.ELBv2LoadBalancer) error {
+	return nil
+}
 func (m *mockELBv2Store) DeleteLoadBalancer(ctx context.Context, arn string) error { return nil }
-func (m *mockELBv2Store) ListLoadBalancers(ctx context.Context, prefix string) ([]*storage.ELBv2LoadBalancer, error) { return nil, nil }
-func (m *mockELBv2Store) CreateTargetGroup(ctx context.Context, tg *storage.ELBv2TargetGroup) error { return nil }
-func (m *mockELBv2Store) GetTargetGroup(ctx context.Context, arn string) (*storage.ELBv2TargetGroup, error) { return nil, nil }
-func (m *mockELBv2Store) UpdateTargetGroup(ctx context.Context, tg *storage.ELBv2TargetGroup) error { return nil }
+func (m *mockELBv2Store) ListLoadBalancers(ctx context.Context, prefix string) ([]*storage.ELBv2LoadBalancer, error) {
+	return nil, nil
+}
+func (m *mockELBv2Store) CreateTargetGroup(ctx context.Context, tg *storage.ELBv2TargetGroup) error {
+	return nil
+}
+func (m *mockELBv2Store) GetTargetGroup(ctx context.Context, arn string) (*storage.ELBv2TargetGroup, error) {
+	return nil, nil
+}
+func (m *mockELBv2Store) UpdateTargetGroup(ctx context.Context, tg *storage.ELBv2TargetGroup) error {
+	return nil
+}
 func (m *mockELBv2Store) DeleteTargetGroup(ctx context.Context, arn string) error { return nil }
-func (m *mockELBv2Store) ListTargetGroups(ctx context.Context, prefix string) ([]*storage.ELBv2TargetGroup, error) { return nil, nil }
+func (m *mockELBv2Store) ListTargetGroups(ctx context.Context, prefix string) ([]*storage.ELBv2TargetGroup, error) {
+	return nil, nil
+}
 func (m *mockELBv2Store) CreateRule(ctx context.Context, rule *storage.ELBv2Rule) error { return nil }
-func (m *mockELBv2Store) DeleteRule(ctx context.Context, arn string) error { return nil }
-func (m *mockELBv2Store) RegisterTargets(ctx context.Context, tgArn string, targets []*storage.ELBv2Target) error { return nil }
-func (m *mockELBv2Store) DeregisterTargets(ctx context.Context, tgArn string, targets []string) error { return nil }
-func (m *mockELBv2Store) GetTargetHealth(ctx context.Context, tgArn string) ([]storage.ELBv2TargetHealth, error) { return nil, nil }
-func (m *mockELBv2Store) UpdateTargetHealth(ctx context.Context, tgArn string, targetId string, health *storage.ELBv2TargetHealth) error { return nil }
-func (m *mockELBv2Store) GetLoadBalancerByName(ctx context.Context, name string) (*storage.ELBv2LoadBalancer, error) { return nil, nil }
-func (m *mockELBv2Store) GetTargetGroupByName(ctx context.Context, name string) (*storage.ELBv2TargetGroup, error) { return nil, nil }
-func (m *mockELBv2Store) ListTargets(ctx context.Context, tgArn string) ([]*storage.ELBv2Target, error) { return nil, nil }
+func (m *mockELBv2Store) DeleteRule(ctx context.Context, arn string) error              { return nil }
+func (m *mockELBv2Store) RegisterTargets(ctx context.Context, tgArn string, targets []*storage.ELBv2Target) error {
+	return nil
+}
+func (m *mockELBv2Store) DeregisterTargets(ctx context.Context, tgArn string, targets []string) error {
+	return nil
+}
+func (m *mockELBv2Store) GetTargetHealth(ctx context.Context, tgArn string) ([]storage.ELBv2TargetHealth, error) {
+	return nil, nil
+}
+func (m *mockELBv2Store) UpdateTargetHealth(ctx context.Context, tgArn string, targetId string, health *storage.ELBv2TargetHealth) error {
+	return nil
+}
+func (m *mockELBv2Store) GetLoadBalancerByName(ctx context.Context, name string) (*storage.ELBv2LoadBalancer, error) {
+	return nil, nil
+}
+func (m *mockELBv2Store) GetTargetGroupByName(ctx context.Context, name string) (*storage.ELBv2TargetGroup, error) {
+	return nil, nil
+}
+func (m *mockELBv2Store) ListTargets(ctx context.Context, tgArn string) ([]*storage.ELBv2Target, error) {
+	return nil, nil
+}
 
 var _ = Describe("PriorityManager", func() {
 	var (
@@ -181,7 +219,7 @@ var _ = Describe("PriorityManager", func() {
 
 			err := manager.SetRulePriorities(ctx, updates)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			Expect(store.rules["rule1"].Priority).To(Equal(int32(150)))
 			Expect(store.rules["rule2"].Priority).To(Equal(int32(250)))
 		})
@@ -224,7 +262,7 @@ var _ = Describe("PriorityManager", func() {
 
 			analysis, err := manager.AnalyzeRulePriorities(ctx, listenerArn)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			Expect(analysis.TotalRules).To(Equal(4))
 			Expect(analysis.PriorityRanges["critical"]).To(Equal(1))
 			Expect(analysis.PriorityRanges["specific"]).To(Equal(1))
@@ -246,7 +284,7 @@ var _ = Describe("PriorityManager", func() {
 
 			analysis, err := manager.AnalyzeRulePriorities(ctx, listenerArn)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			Expect(analysis.Gaps).To(HaveLen(1))
 			Expect(analysis.Gaps[0].Start).To(Equal(int32(11)))
 			Expect(analysis.Gaps[0].End).To(Equal(int32(99)))
@@ -267,7 +305,7 @@ var _ = Describe("PriorityManager", func() {
 
 			analysis, err := manager.AnalyzeRulePriorities(ctx, listenerArn)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			Expect(analysis.Conflicts).To(HaveLen(1))
 			Expect(analysis.Conflicts[0].Message).To(ContainSubstring("Adjacent priorities"))
 		})
@@ -293,7 +331,7 @@ var _ = Describe("PriorityManager", func() {
 
 			updates, err := manager.ReorderRulesForClarity(ctx, listenerArn, 10)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			Expect(updates).To(HaveLen(3))
 			Expect(updates[0].Priority).To(Equal(int32(10)))
 			Expect(updates[1].Priority).To(Equal(int32(20)))
@@ -350,7 +388,7 @@ var _ = Describe("PriorityManager", func() {
 				},
 			}
 			conditionsJSON, _ := json.Marshal([]generated_elbv2.RuleCondition{pathCondition})
-			
+
 			store.rules["rule1"] = &storage.ELBv2Rule{
 				ARN:         "rule1",
 				ListenerArn: listenerArn,
@@ -361,7 +399,7 @@ var _ = Describe("PriorityManager", func() {
 			suggestions, err := manager.OptimizePriorities(ctx, listenerArn)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(suggestions).NotTo(BeEmpty())
-			
+
 			// Should suggest moving to specific range
 			Expect(suggestions[0].Priority).To(BeNumerically("<", 1000))
 		})

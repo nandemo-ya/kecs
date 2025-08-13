@@ -26,11 +26,11 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"gopkg.in/yaml.v3"
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"gopkg.in/yaml.v3"
 )
 
 // InstanceAPI handles instance-related API requests
@@ -145,17 +145,17 @@ func (api *InstanceAPI) handleListInstances(w http.ResponseWriter, r *http.Reque
 		clusters, services, tasks := api.getInstanceCounts(config.APIPort)
 
 		instances = append(instances, Instance{
-			Name:      config.Name,
-			Status:    "running", // TODO: Check actual status
-			Clusters:  clusters,
-			Services:  services,
-			Tasks:     tasks,
-			APIPort:   config.APIPort,
-			AdminPort: config.AdminPort,
+			Name:       config.Name,
+			Status:     "running", // TODO: Check actual status
+			Clusters:   clusters,
+			Services:   services,
+			Tasks:      tasks,
+			APIPort:    config.APIPort,
+			AdminPort:  config.AdminPort,
 			LocalStack: config.LocalStack,
-			Traefik:   config.Traefik,
-			DevMode:   config.DevMode,
-			CreatedAt: config.CreatedAt,
+			Traefik:    config.Traefik,
+			DevMode:    config.DevMode,
+			CreatedAt:  config.CreatedAt,
 		})
 	}
 
@@ -270,17 +270,17 @@ func (api *InstanceAPI) getInstanceCounts(apiPort int) (clusters, services, task
 		logging.Debug("Failed to get cluster count from instance", "port", apiPort, "error", err)
 		return 0, 0, 0
 	}
-	
+
 	// Parse cluster response
 	if clusterArns, ok := clustersResp["clusterArns"].([]interface{}); ok {
 		clusters = len(clusterArns)
-		
+
 		// For each cluster, get services and tasks
 		for _, arnInterface := range clusterArns {
 			if arn, ok := arnInterface.(string); ok {
 				// Extract cluster name from ARN
 				clusterName := extractClusterName(arn)
-				
+
 				// Get services count
 				servicesResp, err := api.callInstanceAPI(apiPort, "ListServices", map[string]interface{}{
 					"cluster": clusterName,
@@ -290,7 +290,7 @@ func (api *InstanceAPI) getInstanceCounts(apiPort int) (clusters, services, task
 						services += len(serviceArns)
 					}
 				}
-				
+
 				// Get tasks count
 				tasksResp, err := api.callInstanceAPI(apiPort, "ListTasks", map[string]interface{}{
 					"cluster": clusterName,
@@ -303,45 +303,45 @@ func (api *InstanceAPI) getInstanceCounts(apiPort int) (clusters, services, task
 			}
 		}
 	}
-	
+
 	return clusters, services, tasks
 }
 
 // callInstanceAPI makes an API call to a specific instance
 func (api *InstanceAPI) callInstanceAPI(apiPort int, action string, params map[string]interface{}) (map[string]interface{}, error) {
 	url := fmt.Sprintf("http://localhost:%d/v1/%s", apiPort, action)
-	
+
 	body, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	
+
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	client := &http.Client{
 		Timeout: 2 * time.Second,
 	}
-	
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
-	
+
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	
+
 	return result, nil
 }
 
@@ -360,7 +360,7 @@ func (api *InstanceAPI) getClusterCount() int {
 	if api.storage == nil {
 		return 0
 	}
-	
+
 	ctx := context.Background()
 	clusters, err := api.storage.ClusterStore().List(ctx)
 	if err != nil {
@@ -374,7 +374,7 @@ func (api *InstanceAPI) getServiceCount() int {
 	if api.storage == nil {
 		return 0
 	}
-	
+
 	ctx := context.Background()
 	// Count services across all clusters
 	count := 0
@@ -383,7 +383,7 @@ func (api *InstanceAPI) getServiceCount() int {
 		logging.Error("Failed to list clusters for service count", "error", err)
 		return 0
 	}
-	
+
 	for _, cluster := range clusters {
 		// List all services in the cluster (no filtering)
 		services, _, err := api.storage.ServiceStore().List(ctx, cluster.Name, "", "", 1000, "")
@@ -400,7 +400,7 @@ func (api *InstanceAPI) getTaskCount() int {
 	if api.storage == nil {
 		return 0
 	}
-	
+
 	ctx := context.Background()
 	// Count tasks across all clusters
 	count := 0
@@ -409,7 +409,7 @@ func (api *InstanceAPI) getTaskCount() int {
 		logging.Error("Failed to list clusters for task count", "error", err)
 		return 0
 	}
-	
+
 	for _, cluster := range clusters {
 		// List all tasks in the cluster
 		tasks, err := api.storage.TaskStore().List(ctx, cluster.Name, storage.TaskFilters{
@@ -436,7 +436,7 @@ func (api *InstanceAPI) sendJSON(w http.ResponseWriter, data interface{}) {
 func (api *InstanceAPI) handleGetCreationStatus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	instanceName := vars["name"]
-	
+
 	// Get creation status from manager
 	status := api.manager.GetCreationStatus(instanceName)
 	if status == nil {
@@ -444,7 +444,7 @@ func (api *InstanceAPI) handleGetCreationStatus(w http.ResponseWriter, r *http.R
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	
+
 	// Return status as JSON
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(status); err != nil {

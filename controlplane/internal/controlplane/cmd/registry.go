@@ -73,7 +73,7 @@ func init() {
 
 func startRegistry(ctx context.Context) error {
 	registryName := "k3d-kecs-registry.localhost"
-	
+
 	// Initialize runtime
 	runtime, err := runtimes.GetRuntime("docker")
 	if err != nil {
@@ -93,7 +93,7 @@ func startRegistry(ctx context.Context) error {
 						logging.Info("Registry is already running", "name", registryName, "port", registryPort)
 						return nil
 					}
-					
+
 					// Start the registry
 					logging.Info("Starting existing registry", "name", registryName)
 					if err := runtime.StartNode(ctx, node); err != nil {
@@ -109,7 +109,7 @@ func startRegistry(ctx context.Context) error {
 
 	// Create new registry
 	logging.Info("Creating k3d registry", "name", registryName, "port", registryPort)
-	
+
 	registry := &k3d.Registry{
 		Host:  registryName,
 		Image: "docker.io/library/registry:2",
@@ -124,19 +124,19 @@ func startRegistry(ctx context.Context) error {
 			},
 		},
 	}
-	
+
 	// Create the registry
 	registryNode, err := client.RegistryCreate(ctx, runtime, registry)
 	if err != nil {
 		return fmt.Errorf("failed to create registry: %w", err)
 	}
-	
+
 	// Start the registry
 	logging.Info("Starting registry", "name", registryName)
 	if err := runtime.StartNode(ctx, registryNode); err != nil {
 		logging.Warn("Failed to start registry after creation", "error", err)
 	}
-	
+
 	logging.Info("Registry created and started successfully", "name", registryName, "port", registryPort)
 	printRegistryInfo()
 	return nil
@@ -144,7 +144,7 @@ func startRegistry(ctx context.Context) error {
 
 func stopRegistry(ctx context.Context) error {
 	registryName := "k3d-kecs-registry.localhost"
-	
+
 	// Initialize runtime
 	runtime, err := runtimes.GetRuntime("docker")
 	if err != nil {
@@ -175,7 +175,7 @@ func stopRegistry(ctx context.Context) error {
 
 func showRegistryStatus(ctx context.Context) error {
 	registryName := "k3d-kecs-registry.localhost"
-	
+
 	// Initialize runtime
 	runtime, err := runtimes.GetRuntime("docker")
 	if err != nil {
@@ -204,11 +204,11 @@ func showRegistryStatus(ctx context.Context) error {
 			if node.State.Running {
 				status = "Running"
 			}
-			
+
 			fmt.Printf("Registry Status: %s\n", status)
 			fmt.Printf("Registry Name: %s\n", registryName)
 			fmt.Printf("Registry Port: %d\n", registryPort)
-			
+
 			if status == "Running" {
 				fmt.Println("\nRegistry is ready for use!")
 				fmt.Println("Push images with: make docker-push-dev")
