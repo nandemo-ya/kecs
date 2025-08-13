@@ -733,33 +733,7 @@ func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 		kubeClient = client.(*k8s.Clientset)
 	}
 
-	// Ensure FluentBit is deployed to kecs-system (once per KECS instance)
-	localstackEndpoint := apiconfig.GetString("localstack.endpoint")
-	if localstackEndpoint == "" {
-		// Try environment variable
-		localstackEndpoint = os.Getenv("LOCALSTACK_ENDPOINT")
-	}
-	if localstackEndpoint == "" {
-		// Default to cluster-internal endpoint
-		localstackEndpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
-	}
-
-	// Get region
-	region := cluster.Region
-	if region == "" {
-		region = "us-east-1"
-	}
-
-	// Deploy FluentBit to kecs-system namespace (singleton pattern ensures it's only done once)
-	// Skip in test mode to avoid RBAC permission issues
-	if !apiconfig.GetBool("features.testMode") {
-		if err := kubernetes.EnsureFluentBitDaemonSet(ctx, kubeClient, localstackEndpoint, region); err != nil {
-			logging.Warn("Failed to ensure FluentBit DaemonSet", "error", err)
-			// Don't fail namespace creation if FluentBit deployment fails
-		}
-	}
-
-	// Create namespace without FluentBit (since it's now in kecs-system)
+	// Create namespace
 	namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
 	if err := namespaceManager.CreateNamespace(ctx, cluster.Name, cluster.Region); err != nil {
 		logging.Error("Failed to create namespace", "cluster", cluster.Name, "error", err)

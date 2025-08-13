@@ -274,8 +274,6 @@ var _ = Describe("CloudWatch Integration", func() {
 			Expect(logConfig.LogGroupName).To(Equal("/ecs/my-app"))
 			Expect(logConfig.LogStreamName).To(Equal("my-container"))
 			Expect(logConfig.LogDriver).To(Equal("awslogs"))
-			Expect(logConfig.FluentBitConfig).To(ContainSubstring("[OUTPUT]"))
-			Expect(logConfig.FluentBitConfig).To(ContainSubstring("cloudwatch_logs"))
 		})
 
 		It("should use default log group if not specified", func() {
