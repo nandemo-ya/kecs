@@ -29,7 +29,7 @@ func NewDockerRuntime() (*DockerRuntime, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &DockerRuntime{
 		client: cli,
 	}, nil
@@ -45,10 +45,10 @@ func (d *DockerRuntime) IsAvailable() bool {
 	if d.client == nil {
 		return false
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	_, err := d.client.Ping(ctx)
 	return err == nil
 }
@@ -58,11 +58,11 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *ContainerCo
 	// Convert port bindings
 	exposedPorts := nat.PortSet{}
 	portBindings := nat.PortMap{}
-	
+
 	for _, port := range config.Ports {
 		containerPort := nat.Port(fmt.Sprintf("%d/%s", port.ContainerPort, port.Protocol))
 		exposedPorts[containerPort] = struct{}{}
-		
+
 		portBindings[containerPort] = []nat.PortBinding{
 			{
 				HostIP:   port.HostIP,
@@ -70,7 +70,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *ContainerCo
 			},
 		}
 	}
-	
+
 	// Convert mounts
 	mounts := []mount.Mount{}
 	for _, m := range config.Mounts {
@@ -81,7 +81,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *ContainerCo
 		case "tmpfs":
 			mountType = mount.TypeTmpfs
 		}
-		
+
 		mounts = append(mounts, mount.Mount{
 			Type:     mountType,
 			Source:   m.Source,
@@ -89,7 +89,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *ContainerCo
 			ReadOnly: m.ReadOnly,
 		})
 	}
-	
+
 	// Container configuration
 	containerConfig := &container.Config{
 		Image:        config.Image,
@@ -99,7 +99,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *ContainerCo
 		ExposedPorts: exposedPorts,
 		User:         config.User,
 	}
-	
+
 	// Host configuration
 	hostConfig := &container.HostConfig{
 		PortBindings: portBindings,
@@ -110,7 +110,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *ContainerCo
 		},
 		GroupAdd: config.GroupAdd,
 	}
-	
+
 	// Set resource limits if specified
 	if config.Resources != nil {
 		hostConfig.Resources = container.Resources{
@@ -121,7 +121,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *ContainerCo
 			CPUPeriod:  config.Resources.CPUPeriod,
 		}
 	}
-	
+
 	// Network configuration
 	networkConfig := &network.NetworkingConfig{}
 	if len(config.Networks) > 0 {
@@ -130,7 +130,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *ContainerCo
 			networkConfig.EndpointsConfig[net] = &network.EndpointSettings{}
 		}
 	}
-	
+
 	// Create container
 	resp, err := d.client.ContainerCreate(
 		ctx,
@@ -143,7 +143,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *ContainerCo
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}
-	
+
 	// Get container info
 	return d.GetContainer(ctx, resp.ID)
 }
@@ -173,24 +173,24 @@ func (d *DockerRuntime) GetContainer(ctx context.Context, id string) (*Container
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return d.dockerContainerToContainer(inspect), nil
 }
 
 // ListContainers lists containers
 func (d *DockerRuntime) ListContainers(ctx context.Context, opts ListContainersOptions) ([]*Container, error) {
 	filterArgs := filters.NewArgs()
-	
+
 	// Add label filters
 	for k, v := range opts.Labels {
 		filterArgs.Add("label", fmt.Sprintf("%s=%s", k, v))
 	}
-	
+
 	// Add name filters
 	for _, name := range opts.Names {
 		filterArgs.Add("name", name)
 	}
-	
+
 	containers, err := d.client.ContainerList(ctx, container.ListOptions{
 		All:     opts.All,
 		Filters: filterArgs,
@@ -198,12 +198,12 @@ func (d *DockerRuntime) ListContainers(ctx context.Context, opts ListContainersO
 	if err != nil {
 		return nil, err
 	}
-	
+
 	result := make([]*Container, 0, len(containers))
 	for _, c := range containers {
 		result = append(result, d.dockerSummaryToContainer(c))
 	}
-	
+
 	return result, nil
 }
 
@@ -223,11 +223,11 @@ func (d *DockerRuntime) ContainerLogs(ctx context.Context, id string, opts LogsO
 // PullImage pulls an image
 func (d *DockerRuntime) PullImage(ctx context.Context, imageName string, opts PullImageOptions) (io.ReadCloser, error) {
 	pullOpts := image.PullOptions{}
-	
+
 	if opts.Auth != nil {
 		// TODO: Implement auth encoding
 	}
-	
+
 	return d.client.ImagePull(ctx, imageName, pullOpts)
 }
 
@@ -244,7 +244,7 @@ func (d *DockerRuntime) dockerContainerToContainer(inspect types.ContainerJSON) 
 		Labels:   inspect.Config.Labels,
 		Networks: make([]string, 0),
 	}
-	
+
 	// Extract port bindings
 	for port, bindings := range inspect.HostConfig.PortBindings {
 		for _, binding := range bindings {
@@ -257,12 +257,12 @@ func (d *DockerRuntime) dockerContainerToContainer(inspect types.ContainerJSON) 
 			})
 		}
 	}
-	
+
 	// Extract networks
 	for name := range inspect.NetworkSettings.Networks {
 		c.Networks = append(c.Networks, name)
 	}
-	
+
 	return c
 }
 
@@ -276,17 +276,17 @@ func (d *DockerRuntime) dockerSummaryToContainer(summary types.Container) *Conta
 		Labels:   summary.Labels,
 		Networks: make([]string, 0),
 	}
-	
+
 	// Use first name without leading slash
 	if len(summary.Names) > 0 {
 		c.Name = strings.TrimPrefix(summary.Names[0], "/")
 	}
-	
+
 	// Extract networks
 	for name := range summary.NetworkSettings.Networks {
 		c.Networks = append(c.Networks, name)
 	}
-	
+
 	return c
 }
 

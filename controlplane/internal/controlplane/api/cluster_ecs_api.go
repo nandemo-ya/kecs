@@ -71,7 +71,7 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 	// In the new design, all ECS clusters share the same k3d cluster (the KECS instance)
 	// We need to determine the KECS instance name
 	var k8sClusterName string
-	
+
 	// Try to get the KECS instance name from the existing k3d clusters
 	if api.clusterManager != nil {
 		// For now, we'll use a simple approach - look for a k3d cluster
@@ -82,7 +82,7 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 			k8sClusterName = fmt.Sprintf("kecs-%s", instanceName)
 		}
 	}
-	
+
 	if k8sClusterName == "" {
 		// Fallback to a default name if we can't determine the instance name
 		k8sClusterName = "kecs-default"
@@ -743,13 +743,13 @@ func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 		// Default to cluster-internal endpoint
 		localstackEndpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 	}
-	
+
 	// Get region
 	region := cluster.Region
 	if region == "" {
 		region = "us-east-1"
 	}
-	
+
 	// Deploy FluentBit to kecs-system namespace (singleton pattern ensures it's only done once)
 	// Skip in test mode to avoid RBAC permission issues
 	if !apiconfig.GetBool("features.testMode") {
@@ -758,7 +758,7 @@ func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 			// Don't fail namespace creation if FluentBit deployment fails
 		}
 	}
-	
+
 	// Create namespace without FluentBit (since it's now in kecs-system)
 	namespaceManager := kubernetes.NewNamespaceManager(kubeClient)
 	if err := namespaceManager.CreateNamespace(ctx, cluster.Name, cluster.Region); err != nil {
@@ -774,7 +774,7 @@ func (api *DefaultECSAPI) ensureK8sClusterExists(cluster *storage.Cluster) {
 	// In the new design, we only need to ensure the namespace exists
 	// The k3d cluster is managed by the KECS instance itself
 	logging.Debug("Ensuring namespace exists", "ecsCluster", cluster.Name, "kecsInstance", cluster.K8sClusterName)
-	
+
 	// Just ensure the namespace exists
 	api.createNamespaceForCluster(cluster)
 }
@@ -833,13 +833,13 @@ func extractClusterNameFromARN(identifier string) string {
 // deployLocalStackIfEnabled deploys LocalStack to the k3d cluster if enabled
 func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 	logging.Debug("deployLocalStackIfEnabled called", "cluster", cluster.Name)
-	
+
 	// Skip in CI/test mode
 	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
 		logging.Info("CI/TEST MODE: Skipping LocalStack deployment", "cluster", cluster.Name)
 		return
 	}
-	
+
 	// Skip if cluster manager is not available
 	if api.clusterManager == nil {
 		logging.Warn("Cluster manager not available, cannot deploy LocalStack", "cluster", cluster.Name)
@@ -880,12 +880,12 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 			logging.Debug("Container mode is enabled for LocalStack")
 		}
 	}
-	
+
 	if config == nil || !config.Enabled {
 		logging.Debug("LocalStack is not enabled in configuration")
 		return
 	}
-	
+
 	// If Traefik is enabled, get the dynamic port from cluster manager
 	if config.UseTraefik && api.clusterManager != nil {
 		if port, err := api.clusterManager.GetTraefikPort(context.Background(), cluster.K8sClusterName); err == nil {
@@ -914,12 +914,12 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		config.Environment["EAGER_SERVICE_LOADING"] = "0"
 		logging.Debug("Container mode: Disabled eager service loading for faster LocalStack startup")
 	}
-	
+
 	// Try to create Kubernetes client
 	// First, try in-cluster config (when running inside Kubernetes)
 	var kubeClient k8s.Interface
 	var kubeConfig *rest.Config
-	
+
 	// Try in-cluster config first
 	inClusterClient, err := kubernetes.GetInClusterClient()
 	if err == nil {
@@ -933,7 +933,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 	} else {
 		// If in-cluster fails, try using cluster manager (for local development)
 		logging.Debug("In-cluster config failed (expected in local development)", "error", err)
-		
+
 		// Get Kubernetes client for the specific k3d cluster
 		client, err := api.clusterManager.GetKubeClient(ctx, cluster.K8sClusterName)
 		if err != nil {
@@ -967,7 +967,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 	logging.Info("Starting LocalStack", "cluster", cluster.Name)
 	// Update LocalStack state to deploying
 	api.updateLocalStackState(cluster, "deploying", "")
-	
+
 	if err := clusterLocalStackManager.Start(ctx); err != nil {
 		logging.Error("Failed to start LocalStack", "cluster", cluster.Name, "error", err)
 		// Update LocalStack state to failed
@@ -977,7 +977,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 
 	// Wait for LocalStack to be ready (monitoring logs for "Ready." message)
 	logging.Info("Waiting for LocalStack to be ready (monitoring logs)", "cluster", cluster.Name)
-	
+
 	// Check LocalStack status - the manager now monitors logs for "Ready."
 	status, err := clusterLocalStackManager.GetStatus()
 	if err != nil {
@@ -985,7 +985,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		api.updateLocalStackState(cluster, "failed", err.Error())
 		return
 	}
-	
+
 	if status.Running && status.Healthy {
 		logging.Info("LocalStack successfully deployed and ready", "cluster", cluster.Name)
 		api.updateLocalStackState(cluster, "running", "")
@@ -997,10 +997,10 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		logging.Error("LocalStack failed to start", "cluster", cluster.Name)
 		api.updateLocalStackState(cluster, "failed", "Failed to start")
 	}
-	
+
 	// Update the global LocalStack manager reference and notify server to re-initialize AWS proxy router
 	api.localStackManager = clusterLocalStackManager
-	
+
 	// Call the update callback if set
 	if api.localStackUpdateCallback != nil {
 		logging.Debug("Notifying server about LocalStack manager update")
@@ -1011,16 +1011,16 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 // updateLocalStackState updates the LocalStack deployment state in storage
 func (api *DefaultECSAPI) updateLocalStackState(cluster *storage.Cluster, status string, errorMsg string) {
 	ctx := context.Background()
-	
+
 	// Create LocalStack state
 	now := time.Now()
 	state := &storage.LocalStackState{
-		Deployed: true,
-		Status:   status,
+		Deployed:   true,
+		Status:     status,
 		DeployedAt: &now,
-		Namespace: "kecs-system",
+		Namespace:  "kecs-system",
 	}
-	
+
 	// Add error message if status is failed
 	if status == "failed" && errorMsg != "" {
 		state.HealthStatus = errorMsg
@@ -1028,14 +1028,14 @@ func (api *DefaultECSAPI) updateLocalStackState(cluster *storage.Cluster, status
 		// If running but with warnings (e.g., DNS issues), record as warning
 		state.HealthStatus = "warning: " + errorMsg
 	}
-	
+
 	// Serialize state
 	stateJSON, err := storage.SerializeLocalStackState(state)
 	if err != nil {
 		logging.Error("Failed to serialize LocalStack state", "error", err)
 		return
 	}
-	
+
 	// Update cluster
 	cluster.LocalStackState = stateJSON
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
@@ -1047,12 +1047,12 @@ func (api *DefaultECSAPI) updateLocalStackState(cluster *storage.Cluster, status
 func (api *DefaultECSAPI) getKecsInstanceName() string {
 	// In the container-based deployment model, there should be a single k3d cluster
 	// that hosts the KECS control plane and all ECS clusters as namespaces
-	
+
 	// For now, we'll use the environment variable if set
 	if instanceName := os.Getenv("KECS_INSTANCE_NAME"); instanceName != "" {
 		return instanceName
 	}
-	
+
 	// Otherwise, try to detect from the current environment
 	// When running inside k3d, the hostname typically follows the pattern k3d-<instance>-server-0
 	hostname, err := os.Hostname()
@@ -1068,7 +1068,7 @@ func (api *DefaultECSAPI) getKecsInstanceName() string {
 			}
 		}
 	}
-	
+
 	// If we still can't determine it, return empty string
 	return ""
 }

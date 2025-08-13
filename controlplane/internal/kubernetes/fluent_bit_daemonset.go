@@ -17,17 +17,17 @@ import (
 
 // FluentBitManager manages FluentBit DaemonSets for log collection
 type FluentBitManager struct {
-	clientset         kubernetes.Interface
+	clientset          kubernetes.Interface
 	localstackEndpoint string
-	region            string
+	region             string
 }
 
 // NewFluentBitManager creates a new FluentBitManager
 func NewFluentBitManager(clientset kubernetes.Interface, localstackEndpoint, region string) *FluentBitManager {
 	return &FluentBitManager{
-		clientset:         clientset,
+		clientset:          clientset,
 		localstackEndpoint: localstackEndpoint,
-		region:            region,
+		region:             region,
 	}
 }
 
@@ -59,8 +59,8 @@ func (m *FluentBitManager) createOrUpdateConfigMap(ctx context.Context, namespac
 			},
 		},
 		Data: map[string]string{
-			"fluent-bit.conf": m.generateFluentBitConfig(namespace),
-			"parsers.conf":    m.generateParsersConfig(),
+			"fluent-bit.conf":       m.generateFluentBitConfig(namespace),
+			"parsers.conf":          m.generateParsersConfig(),
 			"parse-annotations.lua": m.generateLuaScript(),
 		},
 	}

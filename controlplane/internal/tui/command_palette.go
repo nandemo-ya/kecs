@@ -10,39 +10,39 @@ import (
 type CommandCategory string
 
 const (
-	CommandCategoryGeneral   CommandCategory = "General"
-	CommandCategoryCreate    CommandCategory = "Create"
-	CommandCategoryManage    CommandCategory = "Manage"
-	CommandCategoryScale     CommandCategory = "Scale"
-	CommandCategoryDebug     CommandCategory = "Debug"
-	CommandCategoryExport    CommandCategory = "Export"
+	CommandCategoryGeneral    CommandCategory = "General"
+	CommandCategoryCreate     CommandCategory = "Create"
+	CommandCategoryManage     CommandCategory = "Manage"
+	CommandCategoryScale      CommandCategory = "Scale"
+	CommandCategoryDebug      CommandCategory = "Debug"
+	CommandCategoryExport     CommandCategory = "Export"
 	CommandCategoryNavigation CommandCategory = "Navigation"
 )
 
 // Command represents a command in the palette
 type Command struct {
-	Name        string          // Command name
-	Description string          // Command description
-	Category    CommandCategory // Command category
-	Shortcut    string          // Optional keyboard shortcut
-	Aliases     []string        // Alternative names for the command
+	Name        string                       // Command name
+	Description string                       // Command description
+	Category    CommandCategory              // Command category
+	Shortcut    string                       // Optional keyboard shortcut
+	Aliases     []string                     // Alternative names for the command
 	Handler     func(*Model) (string, error) // Command handler
 	Available   func(*Model) bool            // Check if command is available in current context
 }
 
 // CommandPalette manages the command palette state
 type CommandPalette struct {
-	commands       []Command
-	filteredCmds   []Command
-	selectedIndex  int
-	query          string
-	history        []string
-	historyIndex   int
-	maxHistory     int
-	lastResult     string
-	showResult     bool
-	resultTimeout  time.Duration
-	resultShownAt  time.Time
+	commands      []Command
+	filteredCmds  []Command
+	selectedIndex int
+	query         string
+	history       []string
+	historyIndex  int
+	maxHistory    int
+	lastResult    string
+	showResult    bool
+	resultTimeout time.Duration
+	resultShownAt time.Time
 }
 
 // GetFilteredCommands returns the currently filtered commands (for testing)
@@ -67,14 +67,14 @@ func NewCommandPalette() *CommandPalette {
 		resultTimeout: 3 * time.Second,
 	}
 	cp.initCommands()
-	
+
 	// Set default Available function for commands that don't have one
 	for i := range cp.commands {
 		if cp.commands[i].Available == nil {
 			cp.commands[i].Available = func(m *Model) bool { return true }
 		}
 	}
-	
+
 	return cp
 }
 
@@ -149,11 +149,11 @@ func (cp *CommandPalette) initCommands() {
 				m.selectedCluster = ""
 				return fmt.Sprintf("Navigated to clusters in %s", m.selectedInstance), nil
 			},
-			Available: func(m *Model) bool { 
+			Available: func(m *Model) bool {
 				if m == nil {
 					return false
 				}
-				return m.selectedInstance != "" 
+				return m.selectedInstance != ""
 			},
 		},
 		{
@@ -250,11 +250,11 @@ func (cp *CommandPalette) initCommands() {
 				}
 				// Mock implementation
 				newCluster := Cluster{
-					Name:      fmt.Sprintf("cluster-%d", time.Now().Unix()),
-					Status:    "ACTIVE",
-					Services:  0,
-					Tasks:     0,
-					Age:       0,
+					Name:     fmt.Sprintf("cluster-%d", time.Now().Unix()),
+					Status:   "ACTIVE",
+					Services: 0,
+					Tasks:    0,
+					Age:      0,
 				}
 				m.clusters = append(m.clusters, newCluster)
 				return fmt.Sprintf("Created cluster %s", newCluster.Name), nil
@@ -536,12 +536,12 @@ func (cp *CommandPalette) FilterCommands(query string, model *Model) {
 		cp.filteredCmds = []Command{}
 		return
 	}
-	
+
 	cp.query = query
 	cp.filteredCmds = []Command{}
-	
+
 	queryLower := strings.ToLower(query)
-	
+
 	for _, cmd := range cp.commands {
 		// Check if command is available in current context
 		if cmd.Available != nil {
@@ -554,19 +554,19 @@ func (cp *CommandPalette) FilterCommands(query string, model *Model) {
 				continue
 			}
 		}
-		
+
 		// If no query, show all available commands
 		if query == "" {
 			cp.filteredCmds = append(cp.filteredCmds, cmd)
 			continue
 		}
-		
+
 		// Check if query matches command name or aliases
 		if strings.Contains(strings.ToLower(cmd.Name), queryLower) {
 			cp.filteredCmds = append(cp.filteredCmds, cmd)
 			continue
 		}
-		
+
 		// Check aliases
 		for _, alias := range cmd.Aliases {
 			if strings.Contains(strings.ToLower(alias), queryLower) {
@@ -575,7 +575,7 @@ func (cp *CommandPalette) FilterCommands(query string, model *Model) {
 			}
 		}
 	}
-	
+
 	// Reset selection if needed
 	if cp.selectedIndex >= len(cp.filteredCmds) {
 		cp.selectedIndex = 0
@@ -587,38 +587,38 @@ func (cp *CommandPalette) ExecuteCommand(model *Model) (string, error) {
 	if len(cp.filteredCmds) == 0 {
 		return "", fmt.Errorf("no matching commands")
 	}
-	
+
 	if cp.selectedIndex >= len(cp.filteredCmds) {
 		return "", fmt.Errorf("invalid command selection")
 	}
-	
+
 	cmd := cp.filteredCmds[cp.selectedIndex]
-	
+
 	// Add to history
 	cp.addToHistory(cmd.Name)
-	
+
 	// Execute the command
 	result, err := cmd.Handler(model)
 	if err != nil {
 		return "", err
 	}
-	
+
 	cp.lastResult = result
 	cp.showResult = true
 	cp.resultShownAt = time.Now()
-	
+
 	return result, nil
 }
 
 // ExecuteByName executes a command by name or alias
 func (cp *CommandPalette) ExecuteByName(name string, model *Model) (string, error) {
 	nameLower := strings.ToLower(strings.TrimSpace(name))
-	
+
 	for _, cmd := range cp.commands {
 		if !cmd.Available(model) {
 			continue
 		}
-		
+
 		if strings.ToLower(cmd.Name) == nameLower {
 			cp.addToHistory(cmd.Name)
 			result, err := cmd.Handler(model)
@@ -629,7 +629,7 @@ func (cp *CommandPalette) ExecuteByName(name string, model *Model) (string, erro
 			}
 			return result, err
 		}
-		
+
 		for _, alias := range cmd.Aliases {
 			if strings.ToLower(alias) == nameLower {
 				cp.addToHistory(cmd.Name)
@@ -643,7 +643,7 @@ func (cp *CommandPalette) ExecuteByName(name string, model *Model) (string, erro
 			}
 		}
 	}
-	
+
 	return "", fmt.Errorf("unknown command: %s", name)
 }
 
@@ -675,15 +675,15 @@ func (cp *CommandPalette) addToHistory(command string) {
 			break
 		}
 	}
-	
+
 	// Add to front
 	cp.history = append([]string{command}, cp.history...)
-	
+
 	// Trim to max size
 	if len(cp.history) > cp.maxHistory {
 		cp.history = cp.history[:cp.maxHistory]
 	}
-	
+
 	cp.historyIndex = -1
 }
 
@@ -691,12 +691,12 @@ func (cp *CommandPalette) PreviousFromHistory() string {
 	if len(cp.history) == 0 {
 		return ""
 	}
-	
+
 	if cp.historyIndex < len(cp.history)-1 {
 		cp.historyIndex++
 		return cp.history[cp.historyIndex]
 	}
-	
+
 	return cp.history[cp.historyIndex]
 }
 
@@ -705,7 +705,7 @@ func (cp *CommandPalette) NextFromHistory() string {
 		cp.historyIndex--
 		return cp.history[cp.historyIndex]
 	}
-	
+
 	cp.historyIndex = -1
 	return ""
 }
@@ -715,14 +715,14 @@ func (cp *CommandPalette) ShouldShowResult() bool {
 	if !cp.showResult {
 		return false
 	}
-	
+
 	// Hide result after timeout
 	if time.Since(cp.resultShownAt) > cp.resultTimeout {
 		cp.showResult = false
 		cp.lastResult = ""
 		return false
 	}
-	
+
 	return true
 }
 

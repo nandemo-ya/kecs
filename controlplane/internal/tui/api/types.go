@@ -35,23 +35,23 @@ type Instance struct {
 
 // CreateInstanceOptions contains options for creating a new instance
 type CreateInstanceOptions struct {
-	Name        string `json:"name"`
-	APIPort     int    `json:"apiPort"`
-	AdminPort   int    `json:"adminPort"`
-	LocalStack  bool   `json:"localStack"`
-	Traefik     bool   `json:"traefik"`
-	DevMode     bool   `json:"devMode"`
+	Name       string `json:"name"`
+	APIPort    int    `json:"apiPort"`
+	AdminPort  int    `json:"adminPort"`
+	LocalStack bool   `json:"localStack"`
+	Traefik    bool   `json:"traefik"`
+	DevMode    bool   `json:"devMode"`
 }
 
 // Cluster represents an ECS cluster
 type Cluster struct {
-	ClusterArn                string `json:"clusterArn"`
-	ClusterName               string `json:"clusterName"`
-	Status                    string `json:"status"`
-	RegisteredContainerInstancesCount int `json:"registeredContainerInstancesCount"`
-	RunningTasksCount         int    `json:"runningTasksCount"`
-	PendingTasksCount         int    `json:"pendingTasksCount"`
-	ActiveServicesCount       int    `json:"activeServicesCount"`
+	ClusterArn                        string `json:"clusterArn"`
+	ClusterName                       string `json:"clusterName"`
+	Status                            string `json:"status"`
+	RegisteredContainerInstancesCount int    `json:"registeredContainerInstancesCount"`
+	RunningTasksCount                 int    `json:"runningTasksCount"`
+	PendingTasksCount                 int    `json:"pendingTasksCount"`
+	ActiveServicesCount               int    `json:"activeServicesCount"`
 }
 
 // Service represents an ECS service
@@ -69,18 +69,18 @@ type Service struct {
 
 // Task represents an ECS task
 type Task struct {
-	TaskArn           string    `json:"taskArn"`
-	ClusterArn        string    `json:"clusterArn"`
-	TaskDefinitionArn string    `json:"taskDefinitionArn"`
-	ServiceName       string    `json:"serviceName,omitempty"`
-	LastStatus        string    `json:"lastStatus"`
-	DesiredStatus     string    `json:"desiredStatus"`
-	HealthStatus      string    `json:"healthStatus,omitempty"`
-	Cpu               string    `json:"cpu,omitempty"`
-	Memory            string    `json:"memory,omitempty"`
-	CreatedAt         time.Time `json:"createdAt"`
-	StartedAt         *time.Time `json:"startedAt,omitempty"`
-	StoppedAt         *time.Time `json:"stoppedAt,omitempty"`
+	TaskArn           string      `json:"taskArn"`
+	ClusterArn        string      `json:"clusterArn"`
+	TaskDefinitionArn string      `json:"taskDefinitionArn"`
+	ServiceName       string      `json:"serviceName,omitempty"`
+	LastStatus        string      `json:"lastStatus"`
+	DesiredStatus     string      `json:"desiredStatus"`
+	HealthStatus      string      `json:"healthStatus,omitempty"`
+	Cpu               string      `json:"cpu,omitempty"`
+	Memory            string      `json:"memory,omitempty"`
+	CreatedAt         time.Time   `json:"createdAt"`
+	StartedAt         *time.Time  `json:"startedAt,omitempty"`
+	StoppedAt         *time.Time  `json:"stoppedAt,omitempty"`
 	Containers        []Container `json:"containers,omitempty"`
 }
 
@@ -128,11 +128,11 @@ type DescribeClustersResponse struct {
 
 // ListServicesRequest represents the request for ListServices
 type ListServicesRequest struct {
-	Cluster     string  `json:"cluster"`
-	NextToken   *string `json:"nextToken,omitempty"`
-	MaxResults  *int    `json:"maxResults,omitempty"`
-	LaunchType  string  `json:"launchType,omitempty"`
-	SchedulingStrategy string `json:"schedulingStrategy,omitempty"`
+	Cluster            string  `json:"cluster"`
+	NextToken          *string `json:"nextToken,omitempty"`
+	MaxResults         *int    `json:"maxResults,omitempty"`
+	LaunchType         string  `json:"launchType,omitempty"`
+	SchedulingStrategy string  `json:"schedulingStrategy,omitempty"`
 }
 
 // ListServicesResponse represents the response from ListServices
@@ -196,32 +196,32 @@ type ErrorResponse struct {
 
 // TaskDefinition represents an ECS task definition
 type TaskDefinition struct {
-	TaskDefinitionArn    string                 `json:"taskDefinitionArn"`
-	Family               string                 `json:"family"`
-	Revision             int                    `json:"revision"`
-	Status               string                 `json:"status"`
-	TaskRoleArn          string                 `json:"taskRoleArn,omitempty"`
-	ExecutionRoleArn     string                 `json:"executionRoleArn,omitempty"`
-	NetworkMode          string                 `json:"networkMode"`
-	ContainerDefinitions []ContainerDefinition  `json:"containerDefinitions"`
-	RequiresCompatibilities []string            `json:"requiresCompatibilities"`
-	Cpu                  string                 `json:"cpu,omitempty"`
-	Memory               string                 `json:"memory,omitempty"`
-	RegisteredAt         time.Time              `json:"registeredAt"`
+	TaskDefinitionArn       string                `json:"taskDefinitionArn"`
+	Family                  string                `json:"family"`
+	Revision                int                   `json:"revision"`
+	Status                  string                `json:"status"`
+	TaskRoleArn             string                `json:"taskRoleArn,omitempty"`
+	ExecutionRoleArn        string                `json:"executionRoleArn,omitempty"`
+	NetworkMode             string                `json:"networkMode"`
+	ContainerDefinitions    []ContainerDefinition `json:"containerDefinitions"`
+	RequiresCompatibilities []string              `json:"requiresCompatibilities"`
+	Cpu                     string                `json:"cpu,omitempty"`
+	Memory                  string                `json:"memory,omitempty"`
+	RegisteredAt            time.Time             `json:"registeredAt"`
 }
 
 // ContainerDefinition represents a container within a task definition
 type ContainerDefinition struct {
-	Name         string                 `json:"name"`
-	Image        string                 `json:"image"`
-	Cpu          int                    `json:"cpu,omitempty"`
-	Memory       int                    `json:"memory,omitempty"`
-	MemoryReservation int               `json:"memoryReservation,omitempty"`
-	PortMappings []PortMapping          `json:"portMappings,omitempty"`
-	Essential    bool                   `json:"essential"`
-	Environment  []EnvironmentVariable  `json:"environment,omitempty"`
-	MountPoints  []MountPoint           `json:"mountPoints,omitempty"`
-	VolumesFrom  []VolumeFrom           `json:"volumesFrom,omitempty"`
+	Name              string                `json:"name"`
+	Image             string                `json:"image"`
+	Cpu               int                   `json:"cpu,omitempty"`
+	Memory            int                   `json:"memory,omitempty"`
+	MemoryReservation int                   `json:"memoryReservation,omitempty"`
+	PortMappings      []PortMapping         `json:"portMappings,omitempty"`
+	Essential         bool                  `json:"essential"`
+	Environment       []EnvironmentVariable `json:"environment,omitempty"`
+	MountPoints       []MountPoint          `json:"mountPoints,omitempty"`
+	VolumesFrom       []VolumeFrom          `json:"volumesFrom,omitempty"`
 }
 
 // PortMapping represents a port mapping for a container

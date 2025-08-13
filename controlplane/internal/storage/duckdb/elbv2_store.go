@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // elbv2Store implements storage.ELBv2Store using DuckDB

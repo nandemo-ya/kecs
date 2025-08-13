@@ -52,7 +52,7 @@ var _ = Describe("CommandPalette", func() {
 
 		It("should only show available commands", func() {
 			cp := model.GetCommandPalette()
-			
+
 			// When no instance is selected, cluster commands should not be available
 			model.SetSelectedInstance("")
 			cp.FilterCommands("goto clusters", model)
@@ -100,7 +100,7 @@ var _ = Describe("CommandPalette", func() {
 	Describe("History Navigation", func() {
 		It("should navigate through command history", func() {
 			cp := model.GetCommandPalette()
-			
+
 			// Execute some commands to build history
 			_, _ = cp.ExecuteByName("help", model)
 			_, _ = cp.ExecuteByName("refresh", model)
@@ -119,10 +119,10 @@ var _ = Describe("CommandPalette", func() {
 
 		It("should not duplicate commands in history", func() {
 			cp := model.GetCommandPalette()
-			
+
 			_, _ = cp.ExecuteByName("help", model)
 			_, _ = cp.ExecuteByName("help", model)
-			
+
 			Expect(cp.PreviousFromHistory()).To(Equal("help"))
 			Expect(cp.PreviousFromHistory()).To(Equal("help")) // Should stay at the same position
 		})
@@ -131,9 +131,9 @@ var _ = Describe("CommandPalette", func() {
 	Describe("Result Display", func() {
 		It("should show results temporarily", func() {
 			cp := model.GetCommandPalette()
-			
+
 			_, _ = cp.ExecuteByName("help", model)
-			
+
 			Expect(cp.IsShowingResult()).To(BeTrue())
 			Expect(cp.GetLastResult()).To(Equal("Showing help"))
 			Expect(cp.ShouldShowResult()).To(BeTrue())

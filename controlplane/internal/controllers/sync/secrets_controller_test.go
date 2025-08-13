@@ -21,14 +21,14 @@ func TestSecretsController(t *testing.T) {
 
 var _ = Describe("SecretsController", func() {
 	var (
-		ctx            context.Context
-		kubeClient     *fake.Clientset
+		ctx        context.Context
+		kubeClient *fake.Clientset
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
 		kubeClient = fake.NewSimpleClientset()
-		
+
 		// Create kecs-system namespace
 		_, err := kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{

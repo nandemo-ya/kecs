@@ -48,7 +48,7 @@ func (a *Adapter) AddTask(id, name string, total int) {
 	a.mu.Lock()
 	a.tasks[id] = struct{ total int }{total: total}
 	a.mu.Unlock()
-	
+
 	if a.program != nil {
 		a.program.AddTask(id, name, float64(total))
 	} else {
@@ -105,7 +105,7 @@ func (a *Adapter) Log(level progress.LogLevel, format string, args ...interface{
 	case progress.LogLevelError:
 		levelStr = "ERROR"
 	}
-	
+
 	if a.program != nil {
 		a.program.Log(levelStr, format, args...)
 	} else {
@@ -137,21 +137,21 @@ func (a *Adapter) WithLogCapture(logCapture *progress.LogCapture) *Adapter {
 // RunWithBubbleTea is a helper function to run a function with Bubble Tea progress
 func RunWithBubbleTea(ctx context.Context, title string, fn func(*Adapter) error) error {
 	adapter := NewAdapter(title)
-	
+
 	if err := adapter.Start(); err != nil {
 		return fmt.Errorf("failed to start progress display: %w", err)
 	}
 	defer adapter.Stop()
-	
+
 	// Run the function
 	if err := fn(adapter); err != nil {
 		return err
 	}
-	
+
 	// Mark as complete
 	if adapter.program != nil {
 		adapter.program.Complete()
 	}
-	
+
 	return nil
 }

@@ -32,7 +32,7 @@ func NewAWSProxyHandler(localStackManager localstack.Manager) (*AWSProxyHandler,
 			// Use the proxy endpoint from configuration
 			endpoint := config.ProxyEndpoint
 			logging.Info("Using Traefik endpoint from LocalStack config", "endpoint", endpoint)
-			
+
 			if err := handler.updateProxyTarget(endpoint); err != nil {
 				logging.Warn("Failed to initialize proxy target", "error", err)
 			}
@@ -45,7 +45,7 @@ func NewAWSProxyHandler(localStackManager localstack.Manager) (*AWSProxyHandler,
 				endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 			}
 			logging.Info("Using LocalStack endpoint", "endpoint", endpoint)
-			
+
 			if err := handler.updateProxyTarget(endpoint); err != nil {
 				logging.Warn("Failed to initialize proxy target", "error", err)
 			}
@@ -97,7 +97,7 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "LocalStack is not available", http.StatusServiceUnavailable)
 		return
 	}
-	
+
 	// TODO: Fix health check to use Traefik endpoint
 	// For now, we'll assume LocalStack is healthy if the manager exists
 	// This is a temporary workaround until the health check is fixed
@@ -108,7 +108,7 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Get the configuration from LocalStack manager
 		config := h.localStackManager.GetConfig()
 		var endpoint string
-		
+
 		if config != nil && config.UseTraefik && config.ProxyEndpoint != "" {
 			// Use the proxy endpoint from configuration
 			endpoint = config.ProxyEndpoint
@@ -124,7 +124,7 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			logging.Info("Initializing proxy with LocalStack endpoint", "endpoint", endpoint)
 		}
-		
+
 		if err := h.updateProxyTarget(endpoint); err != nil {
 			http.Error(w, "Failed to initialize proxy", http.StatusInternalServerError)
 			return
@@ -217,4 +217,3 @@ func (h *AWSProxyHandler) HealthCheck() (bool, error) {
 
 	return h.localStackManager.IsHealthy(), nil
 }
-

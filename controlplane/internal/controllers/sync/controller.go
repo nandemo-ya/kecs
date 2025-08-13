@@ -133,7 +133,7 @@ func (c *SyncController) Run(ctx context.Context) error {
 
 	// Wait for informer caches to sync
 	klog.Info("Waiting for informer caches to sync")
-	
+
 	// Check cache sync status periodically
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
@@ -148,7 +148,7 @@ func (c *SyncController) Run(ctx context.Context) error {
 			}
 		}
 	}()
-	
+
 	if !cache.WaitForCacheSync(ctx.Done(),
 		c.deploymentsSynced,
 		c.replicaSetsSynced,
@@ -191,7 +191,7 @@ func (c *SyncController) processNextDeployment(ctx context.Context) bool {
 		return false
 	}
 	defer c.deploymentQueue.Done(key)
-	
+
 	klog.Infof("Processing deployment from queue: %s", key)
 
 	err := c.syncDeployment(ctx, key.(string))
@@ -221,7 +221,7 @@ func (c *SyncController) processNextPod(ctx context.Context) bool {
 		return false
 	}
 	defer c.podQueue.Done(key)
-	
+
 	klog.Infof("Processing pod from queue: %s", key)
 
 	err := c.syncTask(ctx, key.(string))
@@ -250,7 +250,6 @@ func (c *SyncController) syncDeployment(ctx context.Context, key string) error {
 	return c.syncService(ctx, key)
 }
 
-
 // Deployment event handlers
 func (c *SyncController) handleDeploymentAdd(obj interface{}) {
 	deployment := obj.(*appsv1.Deployment)
@@ -271,14 +270,14 @@ func (c *SyncController) handleDeploymentAdd(obj interface{}) {
 func (c *SyncController) handleDeploymentUpdate(oldObj, newObj interface{}) {
 	oldDep := oldObj.(*appsv1.Deployment)
 	newDep := newObj.(*appsv1.Deployment)
-	
+
 	// Add debug logging
 	klog.Infof("Deployment update event: %s/%s, managed: %v", newDep.Namespace, newDep.Name, isECSManagedDeployment(newDep))
-	
+
 	if !isECSManagedDeployment(newDep) {
 		return
 	}
-	
+
 	// Only sync if status changed or scaling occurred
 	if oldDep.Status.Replicas != newDep.Status.Replicas ||
 		oldDep.Status.ReadyReplicas != newDep.Status.ReadyReplicas ||
@@ -290,7 +289,7 @@ func (c *SyncController) handleDeploymentUpdate(oldObj, newObj interface{}) {
 			runtime.HandleError(err)
 			return
 		}
-		klog.V(4).Infof("ECS deployment updated: %s (replicas: %d/%d ready)", 
+		klog.V(4).Infof("ECS deployment updated: %s (replicas: %d/%d ready)",
 			newDep.Name, newDep.Status.ReadyReplicas, newDep.Status.Replicas)
 		c.deploymentQueue.Add(key)
 	}
@@ -329,13 +328,13 @@ func (c *SyncController) handlePodAdd(obj interface{}) {
 func (c *SyncController) handlePodUpdate(oldObj, newObj interface{}) {
 	oldPod := oldObj.(*corev1.Pod)
 	newPod := newObj.(*corev1.Pod)
-	
+
 	klog.Infof("Pod update event: %s/%s, managed: %v", newPod.Namespace, newPod.Name, isECSManagedPod(newPod))
-	
+
 	if !isECSManagedPod(newPod) {
 		return
 	}
-	
+
 	// Only sync if status changed
 	if oldPod.Status.Phase != newPod.Status.Phase ||
 		len(oldPod.Status.ContainerStatuses) != len(newPod.Status.ContainerStatuses) {
@@ -382,17 +381,17 @@ func isECSManagedDeployment(deployment *appsv1.Deployment) bool {
 	if strings.HasPrefix(deployment.Name, "ecs-service-") {
 		return true
 	}
-	
+
 	// Check labels
 	if val, exists := deployment.Labels["kecs.dev/managed-by"]; exists && val == "kecs" {
 		return true
 	}
-	
+
 	// Check for ECS-specific annotations
 	if _, exists := deployment.Annotations["ecs.amazonaws.com/task-definition"]; exists {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -402,13 +401,13 @@ func hasDeploymentConditionChanged(oldDep, newDep *appsv1.Deployment) bool {
 	if len(oldDep.Status.Conditions) != len(newDep.Status.Conditions) {
 		return true
 	}
-	
+
 	// Create a map of old conditions for comparison
 	oldConditions := make(map[appsv1.DeploymentConditionType]appsv1.DeploymentCondition)
 	for _, c := range oldDep.Status.Conditions {
 		oldConditions[c.Type] = c
 	}
-	
+
 	// Compare each new condition with old
 	for _, newCond := range newDep.Status.Conditions {
 		if oldCond, exists := oldConditions[newCond.Type]; exists {
@@ -420,6 +419,6 @@ func hasDeploymentConditionChanged(oldDep, newDep *appsv1.Deployment) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }

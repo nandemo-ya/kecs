@@ -25,10 +25,10 @@ type SecretsWatcher struct {
 	syncInterval   time.Duration
 	stopCh         chan struct{}
 	wg             sync.WaitGroup
-	
+
 	// Track last sync time for each secret
-	lastSyncMap    map[string]time.Time
-	mu             sync.RWMutex
+	lastSyncMap map[string]time.Time
+	mu          sync.RWMutex
 }
 
 // NewSecretsWatcher creates a new secrets watcher
@@ -41,7 +41,7 @@ func NewSecretsWatcher(
 	if syncInterval == 0 {
 		syncInterval = 30 * time.Second // Default sync interval
 	}
-	
+
 	return &SecretsWatcher{
 		kubeClient:     kubeClient,
 		smIntegration:  smIntegration,
@@ -124,7 +124,7 @@ func (w *SecretsWatcher) parseNamespace(namespace string) (clusterName, region s
 	if lastDash == -1 {
 		return "", ""
 	}
-	
+
 	// Check if the last part looks like a region
 	possibleRegion := namespace[lastDash+1:]
 	if strings.Contains(possibleRegion, "-") {
@@ -140,7 +140,7 @@ func (w *SecretsWatcher) parseNamespace(namespace string) (clusterName, region s
 		clusterName = namespace[:lastDash]
 		region = possibleRegion
 	}
-	
+
 	return clusterName, region
 }
 
@@ -200,11 +200,11 @@ func (w *SecretsWatcher) syncSecretsManagerSecret(ctx context.Context, k8sSecret
 	if err != nil {
 		if isNotFoundError(err) {
 			// Secret was deleted in LocalStack, delete from K8s
-			logging.Info("Secret deleted in LocalStack, removing from K8s", 
-				"namespace", namespace, 
+			logging.Info("Secret deleted in LocalStack, removing from K8s",
+				"namespace", namespace,
 				"secret", k8sSecret.GetName(),
 				"localStackSecret", localStackSecretName)
-			
+
 			err = w.kubeClient.CoreV1().Secrets(namespace).Delete(ctx, k8sSecret.GetName(), metav1.DeleteOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				logging.Error("Failed to delete secret", "namespace", namespace, "secret", (*k8sSecret).GetName(), "error", err)
@@ -226,11 +226,11 @@ func (w *SecretsWatcher) syncSecretsManagerSecret(ctx context.Context, k8sSecret
 	}
 
 	// Update the secret
-	logging.Info("Updating secret from Secrets Manager", 
-		"namespace", namespace, 
+	logging.Info("Updating secret from Secrets Manager",
+		"namespace", namespace,
 		"k8sSecret", k8sSecret.GetName(),
 		"localStackSecret", localStackSecretName)
-	
+
 	// Extract JSON key if specified
 	jsonKey := annotations["kecs.io/sm-json-key"]
 	err = w.smIntegration.CreateOrUpdateSecret(ctx, secret, jsonKey, namespace)
@@ -256,11 +256,11 @@ func (w *SecretsWatcher) syncSSMSecret(ctx context.Context, k8sSecret *corev1.Se
 	if err != nil {
 		if isNotFoundError(err) {
 			// Parameter was deleted in LocalStack, delete from K8s
-			logging.Info("Parameter deleted in LocalStack, removing secret from K8s", 
-				"namespace", namespace, 
+			logging.Info("Parameter deleted in LocalStack, removing secret from K8s",
+				"namespace", namespace,
 				"secret", k8sSecret.GetName(),
 				"localStackParam", localStackParamName)
-			
+
 			err = w.kubeClient.CoreV1().Secrets(namespace).Delete(ctx, k8sSecret.GetName(), metav1.DeleteOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				logging.Error("Failed to delete secret", "namespace", namespace, "secret", (*k8sSecret).GetName(), "error", err)
@@ -282,11 +282,11 @@ func (w *SecretsWatcher) syncSSMSecret(ctx context.Context, k8sSecret *corev1.Se
 	}
 
 	// Update the secret
-	logging.Info("Updating secret from SSM parameter", 
-		"namespace", namespace, 
+	logging.Info("Updating secret from SSM parameter",
+		"namespace", namespace,
 		"k8sSecret", k8sSecret.GetName(),
 		"localStackParam", localStackParamName)
-	
+
 	err = w.ssmIntegration.CreateOrUpdateSecret(ctx, parameter, namespace)
 	if err != nil {
 		logging.Error("Failed to update secret", "namespace", namespace, "secret", k8sSecret.GetName(), "error", err)
@@ -310,11 +310,11 @@ func (w *SecretsWatcher) syncSSMConfigMap(ctx context.Context, k8sCM *corev1.Con
 	if err != nil {
 		if isNotFoundError(err) {
 			// Parameter was deleted in LocalStack, delete from K8s
-			logging.Info("Parameter deleted in LocalStack, removing ConfigMap from K8s", 
-				"namespace", namespace, 
+			logging.Info("Parameter deleted in LocalStack, removing ConfigMap from K8s",
+				"namespace", namespace,
 				"configmap", k8sCM.GetName(),
 				"localStackParam", localStackParamName)
-			
+
 			err = w.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, k8sCM.GetName(), metav1.DeleteOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				logging.Error("Failed to delete ConfigMap", "namespace", namespace, "configmap", (*k8sCM).GetName(), "error", err)
@@ -336,11 +336,11 @@ func (w *SecretsWatcher) syncSSMConfigMap(ctx context.Context, k8sCM *corev1.Con
 	}
 
 	// Update the ConfigMap
-	logging.Info("Updating ConfigMap from SSM parameter", 
-		"namespace", namespace, 
+	logging.Info("Updating ConfigMap from SSM parameter",
+		"namespace", namespace,
 		"configMap", k8sCM.GetName(),
 		"localStackParam", localStackParamName)
-	
+
 	err = w.ssmIntegration.CreateOrUpdateConfigMap(ctx, parameter, namespace)
 	if err != nil {
 		logging.Error("Failed to update ConfigMap", "namespace", namespace, "configmap", (*k8sCM).GetName(), "error", err)
@@ -354,7 +354,7 @@ func isNotFoundError(err error) bool {
 	}
 	// Check for common "not found" error patterns
 	errStr := strings.ToLower(err.Error())
-	return strings.Contains(errStr, "not found") || 
+	return strings.Contains(errStr, "not found") ||
 		strings.Contains(errStr, "does not exist") ||
 		strings.Contains(errStr, "resourcenotfoundexception")
 }

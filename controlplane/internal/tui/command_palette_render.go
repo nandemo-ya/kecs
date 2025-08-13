@@ -9,62 +9,62 @@ import (
 var (
 	// Command palette styles
 	overlayStyle = lipgloss.NewStyle().
-		Background(lipgloss.Color("#000000")).
-		Foreground(lipgloss.Color("#ffffff"))
+			Background(lipgloss.Color("#000000")).
+			Foreground(lipgloss.Color("#ffffff"))
 
 	paletteStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#666666")).
-		Background(lipgloss.Color("#1a1a1a")).
-		Foreground(lipgloss.Color("#ffffff")).
-		Padding(1, 2).
-		MarginTop(5)
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#666666")).
+			Background(lipgloss.Color("#1a1a1a")).
+			Foreground(lipgloss.Color("#ffffff")).
+			Padding(1, 2).
+			MarginTop(5)
 
 	paletteHeaderStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#00ff00")).
-		Bold(true)
+				Foreground(lipgloss.Color("#00ff00")).
+				Bold(true)
 
 	paletteInputStyle = lipgloss.NewStyle().
-		Background(lipgloss.Color("#2a2a2a")).
-		Foreground(lipgloss.Color("#ffffff")).
-		Padding(0, 1)
+				Background(lipgloss.Color("#2a2a2a")).
+				Foreground(lipgloss.Color("#ffffff")).
+				Padding(0, 1)
 
 	commandListStyle = lipgloss.NewStyle().
-		MarginTop(1).
-		MarginBottom(1)
+				MarginTop(1).
+				MarginBottom(1)
 
 	commandItemStyle = lipgloss.NewStyle().
-		PaddingLeft(2)
+				PaddingLeft(2)
 
 	selectedCommandStyle = lipgloss.NewStyle().
-		Background(lipgloss.Color("#2a2a4a")).
-		Foreground(lipgloss.Color("#ffffff")).
-		Bold(true).
-		PaddingLeft(1).
-		PaddingRight(1)
+				Background(lipgloss.Color("#2a2a4a")).
+				Foreground(lipgloss.Color("#ffffff")).
+				Bold(true).
+				PaddingLeft(1).
+				PaddingRight(1)
 
 	commandNameStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#00ff00")).
-		Bold(true)
+				Foreground(lipgloss.Color("#00ff00")).
+				Bold(true)
 
 	commandDescStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#808080"))
+				Foreground(lipgloss.Color("#808080"))
 
 	commandShortcutStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#ffff00"))
+				Foreground(lipgloss.Color("#ffff00"))
 
 	commandCategoryStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#00ffff")).
-		Bold(true).
-		Underline(true)
+				Foreground(lipgloss.Color("#00ffff")).
+				Bold(true).
+				Underline(true)
 
 	errorStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#ff0000")).
-		Bold(true)
+			Foreground(lipgloss.Color("#ff0000")).
+			Bold(true)
 
 	successStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#00ff00")).
-		Bold(true)
+			Foreground(lipgloss.Color("#00ff00")).
+			Bold(true)
 )
 
 func (m Model) renderCommandPaletteOverlay() string {
@@ -73,10 +73,10 @@ func (m Model) renderCommandPaletteOverlay() string {
 
 	// Create a semi-transparent overlay background
 	_ = overlayStyle.Width(m.width).Height(m.height).Render("")
-	
+
 	// Place the palette in the center-top of the overlay
 	return lipgloss.Place(
-		m.width, 
+		m.width,
 		m.height,
 		lipgloss.Center,
 		lipgloss.Top,
@@ -139,11 +139,11 @@ func (m Model) renderCommandPalette() string {
 	if m.commandMode {
 		inputContent += "_"
 	}
-	input := paletteInputStyle.Width(maxWidth-4).Render(inputContent)
+	input := paletteInputStyle.Width(maxWidth - 4).Render(inputContent)
 
 	// Build command list
 	var commandList []string
-	
+
 	// Group commands by category if no query
 	if cp.query == "" {
 		categoryMap := make(map[CommandCategory][]Command)
@@ -196,7 +196,7 @@ func (m Model) renderCommandPalette() string {
 	if availableLines > 15 {
 		availableLines = 15
 	}
-	
+
 	// Limit the number of commands shown
 	if len(commandList) > availableLines {
 		commandList = commandList[:availableLines]
@@ -233,7 +233,7 @@ func (m Model) renderCommandPalette() string {
 
 	// Join and apply palette style
 	paletteContent := strings.Join(content, "\n")
-	
+
 	// Apply width constraint
 	palette := paletteStyle.Width(maxWidth).MaxHeight(maxHeight).Render(paletteContent)
 
@@ -248,7 +248,7 @@ func (m Model) renderCommandItem(cmd Command, selected bool) string {
 	}
 
 	desc := " - " + cmd.Description
-	
+
 	// Truncate if too long
 	maxLineWidth := 65
 	fullLine := nameAndShortcut + desc

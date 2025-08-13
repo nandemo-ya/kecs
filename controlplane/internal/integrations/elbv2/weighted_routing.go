@@ -71,7 +71,7 @@ func (w *WeightedRoutingManager) ConvertActionsToWeightedServices(actions []gene
 // convertForwardConfig converts ELBv2 ForwardConfig to Traefik weighted services
 func (w *WeightedRoutingManager) convertForwardConfig(config *generated_elbv2.ForwardActionConfig, resolver TargetGroupResolver) ([]TraefikWeightedService, error) {
 	var services []TraefikWeightedService
-	
+
 	// Validate total weight
 	totalWeight := int32(0)
 	for _, tg := range config.TargetGroups {
@@ -79,7 +79,7 @@ func (w *WeightedRoutingManager) convertForwardConfig(config *generated_elbv2.Fo
 			totalWeight += *tg.Weight
 		}
 	}
-	
+
 	if totalWeight == 0 {
 		logging.Debug("Total weight is 0, normalizing weights")
 		// If all weights are 0, distribute equally
@@ -146,7 +146,7 @@ func (w *WeightedRoutingManager) createServiceFromTargetGroup(targetGroupArn str
 // createStickyConfig creates sticky session configuration
 func (w *WeightedRoutingManager) createStickyConfig(config *generated_elbv2.TargetGroupStickinessConfig) *TraefikSticky {
 	cookieName := "kecs-sticky"
-	
+
 	// Use duration to generate a unique cookie name if needed
 	if config.DurationSeconds != nil {
 		cookieName = fmt.Sprintf("kecs-sticky-%d", *config.DurationSeconds)
@@ -195,7 +195,7 @@ func (w *WeightedRoutingManager) validateForwardConfig(config *generated_elbv2.F
 		if tg.TargetGroupArn == nil {
 			return fmt.Errorf("target group ARN is required")
 		}
-		
+
 		if tg.Weight != nil {
 			if *tg.Weight < 0 || *tg.Weight > 999 {
 				return fmt.Errorf("weight must be between 0 and 999")
@@ -240,7 +240,7 @@ func (w *WeightedRoutingManager) NormalizeWeights(services []TraefikWeightedServ
 		for i := range services {
 			services[i].Weight = (services[i].Weight * 100) / totalWeight
 		}
-		
+
 		// Adjust for rounding errors
 		currentTotal := int32(0)
 		for _, service := range services {
@@ -257,24 +257,24 @@ func (w *WeightedRoutingManager) NormalizeWeights(services []TraefikWeightedServ
 // CalculateWeightDistribution calculates expected request distribution
 func (w *WeightedRoutingManager) CalculateWeightDistribution(services []TraefikWeightedService, totalRequests int) map[string]int {
 	distribution := make(map[string]int)
-	
+
 	normalizedServices := w.NormalizeWeights(services)
-	
+
 	for _, service := range normalizedServices {
 		expectedRequests := (totalRequests * int(service.Weight)) / 100
 		distribution[service.Name] = expectedRequests
 	}
-	
+
 	// Adjust for rounding
 	totalDistributed := 0
 	for _, count := range distribution {
 		totalDistributed += count
 	}
-	
+
 	if diff := totalRequests - totalDistributed; diff > 0 && len(services) > 0 {
 		distribution[services[0].Name] += diff
 	}
-	
+
 	return distribution
 }
 
@@ -285,17 +285,17 @@ func extractResourceNameFromArn(arn string, resourceType string) string {
 	if len(parts) < 6 {
 		return ""
 	}
-	
+
 	resourcePart := parts[5]
 	resourceParts := strings.Split(resourcePart, "/")
 	if len(resourceParts) < 2 {
 		return ""
 	}
-	
+
 	if resourceParts[0] != resourceType {
 		return ""
 	}
-	
+
 	return resourceParts[1]
 }
 
@@ -307,14 +307,14 @@ func (w *WeightedRoutingManager) GenerateTraefikServiceYAML(services []TraefikWe
 
 	var lines []string
 	lines = append(lines, "services:")
-	
+
 	for _, service := range services {
 		lines = append(lines, fmt.Sprintf("  - name: %s", service.Name))
 		lines = append(lines, fmt.Sprintf("    port: %d", service.Port))
 		if service.Weight != 100 || len(services) > 1 {
 			lines = append(lines, fmt.Sprintf("    weight: %d", service.Weight))
 		}
-		
+
 		if service.Sticky != nil && service.Sticky.Cookie != nil {
 			lines = append(lines, "    sticky:")
 			lines = append(lines, "      cookie:")
@@ -324,6 +324,6 @@ func (w *WeightedRoutingManager) GenerateTraefikServiceYAML(services []TraefikWe
 			lines = append(lines, fmt.Sprintf("        sameSite: %s", service.Sticky.Cookie.SameSite))
 		}
 	}
-	
+
 	return strings.Join(lines, "\n")
 }

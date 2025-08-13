@@ -2,7 +2,7 @@ package converters
 
 import (
 	"fmt"
-	
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -212,7 +212,7 @@ func addSecretAnnotationsToPodTemplate(podTemplate *corev1.PodTemplateSpec, cont
 	if podTemplate.Annotations == nil {
 		podTemplate.Annotations = make(map[string]string)
 	}
-	
+
 	secretIndex := 0
 	for _, containerDef := range containerDefs {
 		if containerDef.Secrets != nil {
@@ -227,7 +227,7 @@ func addSecretAnnotationsToPodTemplate(podTemplate *corev1.PodTemplateSpec, cont
 			}
 		}
 	}
-	
+
 	// Add total count of secrets
 	if secretIndex > 0 {
 		podTemplate.Annotations["kecs.dev/secret-count"] = fmt.Sprintf("%d", secretIndex)

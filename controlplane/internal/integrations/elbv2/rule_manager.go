@@ -6,29 +6,29 @@ import (
 	"strings"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // RuleManager manages the synchronization between ELBv2 rules and Traefik IngressRoute rules
 type RuleManager struct {
-	dynamicClient    dynamic.Interface
-	converter        *RuleConverter
-	weightedManager  *WeightedRoutingManager
-	priorityManager  *PriorityManager
+	dynamicClient      dynamic.Interface
+	converter          *RuleConverter
+	weightedManager    *WeightedRoutingManager
+	priorityManager    *PriorityManager
 	conditionalManager *ConditionalRoutingManager
 }
 
 // NewRuleManager creates a new rule manager
 func NewRuleManager(dynamicClient dynamic.Interface, store storage.ELBv2Store) *RuleManager {
 	return &RuleManager{
-		dynamicClient:    dynamicClient,
-		converter:        NewRuleConverter(),
-		weightedManager:  NewWeightedRoutingManager(),
-		priorityManager:  NewPriorityManager(store),
+		dynamicClient:      dynamicClient,
+		converter:          NewRuleConverter(),
+		weightedManager:    NewWeightedRoutingManager(),
+		priorityManager:    NewPriorityManager(store),
 		conditionalManager: NewConditionalRoutingManager(store),
 	}
 }
@@ -107,7 +107,7 @@ func (r *RuleManager) convertRulesToRoutes(rules []*storage.ELBv2Rule, storageIn
 	// In Traefik, we'll map this to route order (first match wins)
 	sortedRules := make([]*storage.ELBv2Rule, len(rules))
 	copy(sortedRules, rules)
-	
+
 	// Simple bubble sort for now
 	for i := 0; i < len(sortedRules)-1; i++ {
 		for j := 0; j < len(sortedRules)-i-1; j++ {
@@ -191,12 +191,12 @@ func (r *RuleManager) convertRuleToRoute(rule *storage.ELBv2Rule, storageInstanc
 			"name": service.Name,
 			"port": service.Port,
 		}
-		
+
 		// Add weight if multiple services or weight is not 100
 		if len(services) > 1 || service.Weight != 100 {
 			svc["weight"] = service.Weight
 		}
-		
+
 		// Add sticky configuration if present
 		if service.Sticky != nil && service.Sticky.Cookie != nil {
 			svc["sticky"] = map[string]interface{}{
@@ -208,7 +208,7 @@ func (r *RuleManager) convertRuleToRoute(rule *storage.ELBv2Rule, storageInstanc
 				},
 			}
 		}
-		
+
 		traefikServices = append(traefikServices, svc)
 	}
 
@@ -242,13 +242,13 @@ func extractNameFromArn(arn string, resourceType string) string {
 	if len(parts) < 6 {
 		return "unknown"
 	}
-	
+
 	resourcePart := parts[5]
 	resourceParts := strings.Split(resourcePart, "/")
 	if len(resourceParts) >= 2 {
 		return resourceParts[1]
 	}
-	
+
 	return "unknown"
 }
 
@@ -261,12 +261,12 @@ func GetListenerInfoFromArn(listenerArn string) (lbName string, port int32, err 
 	}
 
 	lbName = parts[2]
-	
+
 	// For now, we'll need to look up the port from storage
 	// In a real implementation, we'd query the listener details
 	// TODO: Implement proper listener lookup
 	port = 80 // Default port
-	
+
 	return lbName, port, nil
 }
 
@@ -281,7 +281,7 @@ func (s *storageTargetGroupResolver) GetTargetGroupInfo(arn string) (*generated_
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Convert storage TargetGroup to generated TargetGroup
 	protocol := generated_elbv2.ProtocolEnum(tg.Protocol)
 	return &generated_elbv2.TargetGroup{

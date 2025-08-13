@@ -312,8 +312,6 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					}
 				}
 
-
-
 				// Initialize S3 integration if LocalStack is available
 				if kubeClient != nil {
 					s3Config := &s3.Config{
@@ -365,7 +363,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 			"",  // Empty string means watch all namespaces
 		)
 		s.secretsController = secretsController
-		
+
 		// Set integrations if already available
 		if s.secretsManagerIntegration != nil {
 			s.secretsController.SetSecretsManagerIntegration(s.secretsManagerIntegration)
@@ -373,7 +371,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		if s.ssmIntegration != nil {
 			s.secretsController.SetSSMIntegration(s.ssmIntegration)
 		}
-		
+
 		logging.Info("SecretsController initialized and will start watching pods")
 	} else {
 		logging.Warn("Kubernetes client not available for SecretsController")
@@ -444,7 +442,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 					logging.Info("AWS proxy router re-initialized successfully")
 					logging.Info("LocalStackProxyMiddleware will now use the updated awsProxyRouter")
 				}
-				
+
 				// Update SecretsController integrations if available
 				if s.secretsController != nil {
 					if s.secretsManagerIntegration != nil {

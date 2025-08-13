@@ -24,7 +24,7 @@ func CORSMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			
+
 			// Check if origin is allowed
 			allowed := false
 			if len(allowedOrigins) == 0 || contains(allowedOrigins, "*") {
@@ -32,24 +32,24 @@ func CORSMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 			} else if origin != "" && contains(allowedOrigins, origin) {
 				allowed = true
 			}
-			
+
 			if allowed && origin != "" {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 			} else if contains(allowedOrigins, "*") {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 			}
-			
+
 			// Set other CORS headers
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Amz-Target, X-Amz-User-Agent")
 			w.Header().Set("Access-Control-Max-Age", "86400") // 24 hours
-			
+
 			// Handle preflight requests
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -70,32 +70,32 @@ func APIKeyMiddleware(apiKey string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip auth for health checks
-			if strings.HasPrefix(r.URL.Path, "/health") || 
-			   strings.HasPrefix(r.URL.Path, "/live") || 
-			   strings.HasPrefix(r.URL.Path, "/ready") {
+			if strings.HasPrefix(r.URL.Path, "/health") ||
+				strings.HasPrefix(r.URL.Path, "/live") ||
+				strings.HasPrefix(r.URL.Path, "/ready") {
 				next.ServeHTTP(w, r)
 				return
 			}
-			
+
 			// If no API key is configured, allow all requests
 			if apiKey == "" {
 				next.ServeHTTP(w, r)
 				return
 			}
-			
+
 			// Check API key
 			providedKey := r.Header.Get("X-API-Key")
 			if providedKey == "" {
 				providedKey = r.URL.Query().Get("api_key")
 			}
-			
+
 			if providedKey != apiKey {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
 				w.Write([]byte(`{"__type":"UnauthorizedError","message":"Invalid or missing API key"}`))
 				return
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}

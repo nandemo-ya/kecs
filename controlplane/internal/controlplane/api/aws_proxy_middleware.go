@@ -48,7 +48,7 @@ func ShouldProxyToLocalStack(r *http.Request, localStackManager localstack.Manag
 	if localStackManager == nil {
 		return false
 	}
-	
+
 	// TODO: Fix health check to use Traefik endpoint
 	// For now, we'll assume LocalStack is healthy if the manager exists
 	// This is a temporary workaround until the health check is fixed
@@ -57,13 +57,13 @@ func ShouldProxyToLocalStack(r *http.Request, localStackManager localstack.Manag
 	// Check if this is an AWS API call (not ECS)
 	isAWS := isAWSAPIRequest(r)
 	isECS := isECSRequest(r)
-	
+
 	// Debug log
 	if r.Header.Get("X-Amz-Target") != "" {
 		logging.Debug("ShouldProxyToLocalStack",
 			"healthy", healthy, "isAWS", isAWS, "isECS", isECS, "target", r.Header.Get("X-Amz-Target"))
 	}
-	
+
 	if !healthy || !isAWS || isECS {
 		return false
 	}
@@ -81,7 +81,7 @@ func isAWSAPIRequest(r *http.Request) bool {
 			return true
 		}
 	}
-	
+
 	// Check for AWS signature in Authorization header
 	auth := r.Header.Get("Authorization")
 	if strings.Contains(auth, "AWS4-HMAC-SHA256") {
@@ -90,7 +90,7 @@ func isAWSAPIRequest(r *http.Request) bool {
 			return true
 		}
 	}
-	
+
 	// Check for other AWS headers
 	if r.Header.Get("X-Amz-Date") != "" || r.Header.Get("X-Amz-Security-Token") != "" {
 		// These headers indicate AWS API calls

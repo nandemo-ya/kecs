@@ -99,10 +99,10 @@ func (api *DefaultECSAPI) HandleGetTaskLogs(w http.ResponseWriter, r *http.Reque
 	// Task ARN format: arn:aws:ecs:region:account:task/namespace/pod-name
 	// or just namespace/pod-name
 	namespace, podName := extractNamespaceAndPodName(req.TaskArn)
-	
-	logging.Debug("Fetching logs for task", 
+
+	logging.Debug("Fetching logs for task",
 		"taskArn", req.TaskArn,
-		"namespace", namespace, 
+		"namespace", namespace,
 		"podName", podName)
 
 	// Get pod logs
@@ -130,15 +130,15 @@ func getPodLogs(ctx context.Context, clientset kubernetes.Interface, namespace, 
 	pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
 		// If not found, try to find by task-id label
-		logging.Debug("Pod not found by name, trying to find by task-id label", 
-			"namespace", namespace, 
+		logging.Debug("Pod not found by name, trying to find by task-id label",
+			"namespace", namespace,
 			"podName", podName)
-		
+
 		labelSelector := fmt.Sprintf("kecs.dev/task-id=%s", podName)
 		pods, listErr := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
-		
+
 		if listErr != nil || len(pods.Items) == 0 {
 			// Last attempt: find pod with matching name pattern
 			// For service tasks, the pod name might be a deployment pod
@@ -146,7 +146,7 @@ func getPodLogs(ctx context.Context, clientset kubernetes.Interface, namespace, 
 			if listErr != nil {
 				return nil, fmt.Errorf("failed to list pods: %w", listErr)
 			}
-			
+
 			// Find pod that contains the task ID or matches the pattern
 			for _, p := range pods.Items {
 				if p.Name == podName || strings.Contains(p.Name, podName) {
@@ -154,7 +154,7 @@ func getPodLogs(ctx context.Context, clientset kubernetes.Interface, namespace, 
 					break
 				}
 			}
-			
+
 			if pod == nil {
 				return nil, fmt.Errorf("pod not found: %s in namespace %s", podName, namespace)
 			}
@@ -162,8 +162,8 @@ func getPodLogs(ctx context.Context, clientset kubernetes.Interface, namespace, 
 			pod = &pods.Items[0]
 		}
 	}
-	
-	logging.Debug("Found pod for logs", 
+
+	logging.Debug("Found pod for logs",
 		"podName", pod.Name,
 		"namespace", pod.Namespace,
 		"containerCount", len(pod.Spec.Containers))
@@ -206,7 +206,7 @@ func getPodLogs(ctx context.Context, clientset kubernetes.Interface, namespace, 
 		scanner := bufio.NewScanner(stream)
 		for scanner.Scan() {
 			line := scanner.Text()
-			
+
 			// Parse log entry
 			entry := parseLogLine(line, container.Name, req.Timestamps)
 			allLogs = append(allLogs, entry)
@@ -279,14 +279,14 @@ func extractNamespaceAndPodName(arn string) (namespace, podName string) {
 	// KECS Task ARN format: arn:aws:ecs:region:account:task/namespace/pod-name
 	// where namespace is typically "{cluster-name}-{region}" format
 	// e.g., arn:aws:ecs:us-east-1:000000000000:task/default-us-east-1/ecs-service-single-task-nginx-6b48b86448-4czhg
-	
+
 	// Extract the part after "task/"
 	parts := strings.Split(arn, "task/")
 	if len(parts) < 2 {
 		// Fallback to default namespace and use the whole ARN as pod name
 		return "default", arn
 	}
-	
+
 	// Split by "/" to get namespace and pod name
 	// In KECS, the namespace contains both cluster name and region
 	taskParts := strings.Split(parts[1], "/")
@@ -295,12 +295,12 @@ func extractNamespaceAndPodName(arn string) (namespace, podName string) {
 		// taskParts[1] is the pod name
 		return taskParts[0], taskParts[1]
 	}
-	
+
 	// If only one part, assume default namespace
 	if len(taskParts) == 1 {
 		return "default", taskParts[0]
 	}
-	
+
 	return "default", arn
 }
 
@@ -317,10 +317,10 @@ func (api *DefaultECSAPI) getKubernetesClient() (kubernetes.Interface, error) {
 	if api.taskManagerInstance == nil {
 		return nil, fmt.Errorf("task manager not initialized")
 	}
-	
+
 	if api.taskManagerInstance.Clientset == nil {
 		return nil, fmt.Errorf("kubernetes client not initialized")
 	}
-	
+
 	return api.taskManagerInstance.Clientset, nil
 }

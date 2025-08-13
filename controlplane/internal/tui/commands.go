@@ -30,7 +30,7 @@ func (m Model) loadMockDataCmd() tea.Cmd {
 	if m.useMockData {
 		return mock.LoadAllData(m.selectedInstance, m.selectedCluster, m.selectedService, m.selectedTask)
 	}
-	
+
 	// Use API client to load data
 	return m.loadDataFromAPI()
 }
@@ -119,11 +119,11 @@ func (m Model) loadDataFromAPI() tea.Cmd {
 					tuiTasks = make([]Task, len(tasks))
 					for i, task := range tasks {
 						tuiTasks[i] = Task{
-							ID:         extractTaskID(task.TaskArn),
-							Status:     task.LastStatus,
-							CPU:        parseCPU(task.Cpu),
-							Memory:     task.Memory,
-							Age:        time.Since(task.CreatedAt),
+							ID:     extractTaskID(task.TaskArn),
+							Status: task.LastStatus,
+							CPU:    parseCPU(task.Cpu),
+							Memory: task.Memory,
+							Age:    time.Since(task.CreatedAt),
 						}
 					}
 				}
@@ -278,13 +278,13 @@ func (m Model) monitorInstanceCreation(instanceName string, hasLocalStack, hasTr
 	return func() tea.Msg {
 		// Start a background monitoring goroutine
 		startTime := time.Now()
-		
+
 		// Define initial steps
 		steps := []CreationStep{
 			{Name: "Creating k3d cluster", Status: "running"},
 			{Name: "Deploying control plane", Status: "pending"},
 		}
-		
+
 		if hasLocalStack {
 			steps = append(steps, CreationStep{Name: "Starting LocalStack", Status: "pending"})
 		}
@@ -292,7 +292,7 @@ func (m Model) monitorInstanceCreation(instanceName string, hasLocalStack, hasTr
 			steps = append(steps, CreationStep{Name: "Configuring Traefik", Status: "pending"})
 		}
 		steps = append(steps, CreationStep{Name: "Finalizing", Status: "pending"})
-		
+
 		// Return initial status immediately
 		elapsed := time.Since(startTime)
 		return instanceCreationStatusMsg{
@@ -314,18 +314,18 @@ func (m Model) checkCreationStatusCmd(instanceName string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		
+
 		status, err := m.apiClient.GetInstanceCreationStatus(ctx, instanceName)
 		if err != nil {
 			// Ignore errors during status check
 			return nil
 		}
-		
+
 		if status == nil {
 			// No status means creation is complete or not started
 			return nil
 		}
-		
+
 		return actualCreationStatusMsg{
 			instanceName: instanceName,
 			status:       status,
@@ -412,7 +412,7 @@ func extractTaskID(taskArn string) string {
 	if current != "" {
 		parts = append(parts, current)
 	}
-	
+
 	if len(parts) > 0 {
 		return parts[len(parts)-1]
 	}
@@ -428,17 +428,17 @@ func (m Model) updateInstanceStatusCmd() tea.Cmd {
 			return instanceStatusUpdateMsg{instances: m.instances}
 		}
 	}
-	
+
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		instances, err := m.apiClient.ListInstances(ctx)
 		if err != nil {
 			// Don't show error for status updates, just return current state
 			return instanceStatusUpdateMsg{instances: m.instances}
 		}
-		
+
 		// Convert API instances to TUI instances
 		tuiInstances := make([]Instance, len(instances))
 		for i, inst := range instances {
@@ -449,7 +449,7 @@ func (m Model) updateInstanceStatusCmd() tea.Cmd {
 					inst.Status = "unhealthy"
 				}
 			}
-			
+
 			tuiInstances[i] = Instance{
 				Name:       inst.Name,
 				Status:     inst.Status,
@@ -464,7 +464,7 @@ func (m Model) updateInstanceStatusCmd() tea.Cmd {
 				Age:        time.Since(inst.CreatedAt),
 			}
 		}
-		
+
 		return instanceStatusUpdateMsg{instances: tuiInstances}
 	}
 }
@@ -474,13 +474,13 @@ func (m Model) loadTaskDefinitionFamiliesCmd() tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		
+
 		// Get families list
 		families, err := m.apiClient.ListTaskDefinitionFamilies(ctx, m.selectedInstance)
 		if err != nil {
 			return errMsg{err: fmt.Errorf("failed to list task definition families: %w", err)}
 		}
-		
+
 		// Get details for each family
 		taskDefFamilies := make([]TaskDefinitionFamily, 0, len(families))
 		for _, family := range families {
@@ -489,11 +489,11 @@ func (m Model) loadTaskDefinitionFamiliesCmd() tea.Cmd {
 			if err != nil {
 				continue // Skip on error
 			}
-			
+
 			if len(revisions) == 0 {
 				continue
 			}
-			
+
 			// Count active revisions
 			activeCount := 0
 			for _, rev := range revisions {
@@ -501,11 +501,11 @@ func (m Model) loadTaskDefinitionFamiliesCmd() tea.Cmd {
 					activeCount++
 				}
 			}
-			
+
 			// Latest revision is the first one (assuming sorted by revision desc)
 			latestRevision := revisions[0].Revision
 			lastUpdated := revisions[0].CreatedAt
-			
+
 			taskDefFamilies = append(taskDefFamilies, TaskDefinitionFamily{
 				Family:         family,
 				LatestRevision: latestRevision,
@@ -514,7 +514,7 @@ func (m Model) loadTaskDefinitionFamiliesCmd() tea.Cmd {
 				LastUpdated:    lastUpdated,
 			})
 		}
-		
+
 		return taskDefFamiliesLoadedMsg{families: taskDefFamilies}
 	}
 }
@@ -524,12 +524,12 @@ func (m Model) loadTaskDefinitionRevisionsCmd() tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		apiRevisions, err := m.apiClient.ListTaskDefinitionRevisions(ctx, m.selectedInstance, m.selectedFamily)
 		if err != nil {
 			return errMsg{err: fmt.Errorf("failed to list task definition revisions: %w", err)}
 		}
-		
+
 		// Convert API revisions to TUI revisions
 		tuiRevisions := make([]TaskDefinitionRevision, len(apiRevisions))
 		for i, rev := range apiRevisions {
@@ -542,7 +542,7 @@ func (m Model) loadTaskDefinitionRevisionsCmd() tea.Cmd {
 				CreatedAt: rev.CreatedAt,
 			}
 		}
-		
+
 		return taskDefRevisionsLoadedMsg{revisions: tuiRevisions}
 	}
 }
@@ -566,29 +566,29 @@ func (m Model) loadTaskDefinitionJSONCmd(taskDefArn string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		taskDef, err := m.apiClient.DescribeTaskDefinition(ctx, m.selectedInstance, taskDefArn)
 		if err != nil {
 			return errMsg{err: fmt.Errorf("failed to describe task definition: %w", err)}
 		}
-		
+
 		// Convert to JSON
 		jsonBytes, err := json.MarshalIndent(taskDef, "", "  ")
 		if err != nil {
 			return errMsg{err: fmt.Errorf("failed to marshal task definition: %w", err)}
 		}
-		
+
 		// Find revision number from ARN
 		revision := 0
 		for _, rev := range m.taskDefRevisions {
 			if rev.Family+":"+fmt.Sprintf("%d", rev.Revision) == taskDefArn ||
-			   fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s:%d", 
-			   	"us-east-1", "123456789012", rev.Family, rev.Revision) == taskDefArn {
+				fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s:%d",
+					"us-east-1", "123456789012", rev.Family, rev.Revision) == taskDefArn {
 				revision = rev.Revision
 				break
 			}
 		}
-		
+
 		return taskDefJSONLoadedMsg{
 			revision: revision,
 			json:     string(jsonBytes),

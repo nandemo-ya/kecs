@@ -96,7 +96,6 @@ func runServer(cmd *cobra.Command) {
 		log.Fatalf("Invalid configuration: %v", err)
 	}
 
-
 	// Initialize logging with configured level
 	logging.SetLevel(logging.ParseLevel(cfg.Server.LogLevel))
 

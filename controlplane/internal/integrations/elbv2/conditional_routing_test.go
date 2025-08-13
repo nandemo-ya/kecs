@@ -71,7 +71,7 @@ var _ = Describe("ConditionalRoutingManager", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(rule).NotTo(BeNil())
 			Expect(rule.Priority).To(BeNumerically(">=", 100))
-			
+
 			// Verify conditions were properly stored
 			var conditions []generated_elbv2.RuleCondition
 			err = json.Unmarshal([]byte(rule.Conditions), &conditions)
@@ -173,7 +173,7 @@ var _ = Describe("ConditionalRoutingManager", func() {
 			rules, err := manager.CreateIfThenElseRoutes(ctx, listenerArn, routes)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(rules).To(HaveLen(2))
-			
+
 			// More specific route should have lower priority
 			Expect(rules[0].Priority).To(BeNumerically("<", rules[1].Priority))
 		})
@@ -195,7 +195,7 @@ var _ = Describe("ConditionalRoutingManager", func() {
 			rule, err := manager.CreateCanaryRoute(ctx, listenerArn, config)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(rule).NotTo(BeNil())
-			
+
 			// Verify actions contain weighted routing
 			var actions []generated_elbv2.Action
 			err = json.Unmarshal([]byte(rule.Actions), &actions)
@@ -238,7 +238,7 @@ var _ = Describe("ConditionalRoutingManager", func() {
 			rules, err := manager.CreateMultiStageRoute(ctx, listenerArn, stages)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(rules).To(HaveLen(3))
-			
+
 			// Verify priority ordering
 			Expect(rules[0].Priority).To(BeNumerically("<", rules[1].Priority))
 			Expect(rules[1].Priority).To(BeNumerically("<", rules[2].Priority))
@@ -257,7 +257,7 @@ var _ = Describe("ConditionalRoutingManager", func() {
 				},
 			}
 			conditions1JSON, _ := json.Marshal(conditions1)
-			
+
 			conditions2 := []generated_elbv2.RuleCondition{
 				{
 					Field: utils.Ptr("path-pattern"),
@@ -274,14 +274,14 @@ var _ = Describe("ConditionalRoutingManager", func() {
 				},
 			}
 			conditions2JSON, _ := json.Marshal(conditions2)
-			
+
 			store.rules["rule1"] = &storage.ELBv2Rule{
 				ARN:         "rule1",
 				ListenerArn: listenerArn,
 				Priority:    100,
 				Conditions:  string(conditions1JSON),
 			}
-			
+
 			store.rules["rule2"] = &storage.ELBv2Rule{
 				ARN:         "rule2",
 				ListenerArn: listenerArn,
@@ -293,7 +293,7 @@ var _ = Describe("ConditionalRoutingManager", func() {
 		It("should analyze conditional routing complexity", func() {
 			analysis, err := manager.AnalyzeConditionalRoutes(ctx, listenerArn)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			Expect(analysis.TotalRules).To(Equal(2))
 			Expect(analysis.ConditionalRules).To(Equal(1)) // Only rule2 has multiple conditions
 			Expect(analysis.AverageConditions).To(BeNumerically("==", 1.5))
@@ -304,7 +304,7 @@ var _ = Describe("ConditionalRoutingManager", func() {
 		It("should detect potential conflicts", func() {
 			analysis, err := manager.AnalyzeConditionalRoutes(ctx, listenerArn)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Should detect that rule1 might catch traffic intended for rule2
 			Expect(analysis.PotentialConflicts).NotTo(BeEmpty())
 		})
@@ -323,7 +323,7 @@ var _ = Describe("ConditionalRoutingManager", func() {
 					})
 				}
 				conditionsJSON, _ := json.Marshal(conditions)
-				
+
 				store.rules[fmt.Sprintf("complex-rule%d", i)] = &storage.ELBv2Rule{
 					ARN:         fmt.Sprintf("complex-rule%d", i),
 					ListenerArn: listenerArn,
@@ -331,10 +331,10 @@ var _ = Describe("ConditionalRoutingManager", func() {
 					Conditions:  string(conditionsJSON),
 				}
 			}
-			
+
 			analysis, err := manager.AnalyzeConditionalRoutes(ctx, listenerArn)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			Expect(analysis.OptimizationTips).NotTo(BeEmpty())
 			Expect(analysis.OptimizationTips[0]).To(ContainSubstring("simplifying rules"))
 		})

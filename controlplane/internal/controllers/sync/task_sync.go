@@ -45,7 +45,7 @@ func (c *SyncController) syncTask(ctx context.Context, key string) error {
 	if task == nil {
 		return fmt.Errorf("failed to map pod to task")
 	}
-	
+
 	klog.Infof("Mapped pod to task - taskArn: %s, status: %s", task.ARN, task.LastStatus)
 
 	// Add to batch updater for efficient storage update
@@ -67,13 +67,13 @@ func (c *SyncController) handleDeletedPod(ctx context.Context, namespace, podNam
 	if region == "" {
 		region = c.region
 	}
-	
+
 	// Generate cluster ARN
 	clusterARN := fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", region, c.accountID, clusterName)
-	
+
 	// Generate the task ARN that would have been used
 	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", region, c.accountID, namespace, podName)
-	
+
 	task, err := c.storage.TaskStore().Get(ctx, clusterARN, taskARN)
 	if err != nil {
 		if isNotFound(err) {

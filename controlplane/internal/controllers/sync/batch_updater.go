@@ -5,8 +5,8 @@ import (
 	stdsync "sync"
 	"time"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // Type aliases to avoid any potential confusion
@@ -112,7 +112,7 @@ func (b *BatchUpdater) AddTaskUpdate(task *StorageTask) {
 // flush performs the actual batch update
 func (b *BatchUpdater) flush(ctx context.Context) {
 	b.mu.Lock()
-	
+
 	// Copy and clear the caches
 	services := make([]*StorageService, 0, len(b.serviceCache))
 	for _, svc := range b.serviceCache {
@@ -125,7 +125,7 @@ func (b *BatchUpdater) flush(ctx context.Context) {
 		tasks = append(tasks, task)
 	}
 	b.taskCache = make(map[string]*StorageTask)
-	
+
 	b.mu.Unlock()
 
 	// Update services
@@ -152,7 +152,7 @@ func (b *BatchUpdater) flush(ctx context.Context) {
 // updateService updates a single service in storage
 func (b *BatchUpdater) updateService(ctx context.Context, service *StorageService) error {
 	logging.Info("Updating service", "serviceName", service.ServiceName, "clusterARN", service.ClusterARN)
-	
+
 	// Check if service exists
 	existingService, err := b.storage.ServiceStore().Get(ctx, service.ClusterARN, service.ServiceName)
 	if err != nil {
@@ -163,7 +163,7 @@ func (b *BatchUpdater) updateService(ctx context.Context, service *StorageServic
 
 	// Merge with existing service to preserve fields we don't sync
 	mergedService := b.mergeServices(existingService, service)
-	logging.Info("Updating existing service with new state", 
+	logging.Info("Updating existing service with new state",
 		"serviceName", service.ServiceName, "runningCount", mergedService.RunningCount, "pendingCount", mergedService.PendingCount)
 	return b.storage.ServiceStore().Update(ctx, mergedService)
 }
@@ -191,13 +191,13 @@ func (b *BatchUpdater) mergeServices(existing, updated *StorageService) *Storage
 // updateTask updates a single task in storage
 func (b *BatchUpdater) updateTask(ctx context.Context, task *StorageTask) error {
 	logging.Info("Updating task", "taskARN", task.ARN, "clusterARN", task.ClusterARN)
-	
+
 	// Use CreateOrUpdate to avoid duplicate key errors
 	if err := b.storage.TaskStore().CreateOrUpdate(ctx, task); err != nil {
 		logging.Error("Failed to create or update task", "taskARN", task.ARN, "error", err)
 		return err
 	}
-	
+
 	logging.Debug("Successfully created or updated task", "taskARN", task.ARN, "lastStatus", task.LastStatus)
 	return nil
 }

@@ -46,11 +46,11 @@ func (c *HTTPClient) GetTaskLogs(ctx context.Context, instanceName, clusterName,
 		if err != nil {
 			return nil, fmt.Errorf("failed to get instance: %w", err)
 		}
-		
+
 		// Call the instance's API directly
 		url := fmt.Sprintf("http://localhost:%d/v1/GetTaskLogs", inst.APIPort)
 		client := &http.Client{Timeout: 10 * time.Second}
-		
+
 		// Build request
 		reqBody := GetTaskLogsRequest{
 			Cluster:    clusterName,
@@ -58,26 +58,26 @@ func (c *HTTPClient) GetTaskLogs(ctx context.Context, instanceName, clusterName,
 			Timestamps: true,
 			Tail:       &tail,
 		}
-		
+
 		body, _ := json.Marshal(reqBody)
 		resp, err := client.Post(url, "application/json", bytes.NewReader(body))
 		if err != nil {
 			return nil, fmt.Errorf("failed to call GetTaskLogs: %w", err)
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("GetTaskLogs returned status %d", resp.StatusCode)
 		}
-		
+
 		var result GetTaskLogsResponse
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
-		
+
 		return result.Logs, nil
 	}
-	
+
 	// Fallback to mock data if k3d provider is not available
 	return generateMockLogs(taskArn), nil
 }

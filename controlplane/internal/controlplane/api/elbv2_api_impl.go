@@ -20,14 +20,14 @@ import (
 
 // Target health states
 const (
-	TargetHealthStateInitial     = "initial"
-	TargetHealthStateHealthy     = "healthy"
-	TargetHealthStateUnhealthy   = "unhealthy"
-	TargetHealthStateUnused      = "unused"
-	TargetHealthStateRegistering = "registering"
+	TargetHealthStateInitial       = "initial"
+	TargetHealthStateHealthy       = "healthy"
+	TargetHealthStateUnhealthy     = "unhealthy"
+	TargetHealthStateUnused        = "unused"
+	TargetHealthStateRegistering   = "registering"
 	TargetHealthStateDeregistering = "deregistering"
-	TargetHealthStateDraining    = "draining"
-	TargetHealthStateUnavailable = "unavailable"
+	TargetHealthStateDraining      = "draining"
+	TargetHealthStateUnavailable   = "unavailable"
 )
 
 // ELBv2APIImpl implements the generated ElasticLoadBalancing_v10API interface
@@ -114,22 +114,22 @@ func (api *ELBv2APIImpl) CreateLoadBalancer(ctx context.Context, input *generate
 	// Create load balancer in storage
 	now := time.Now()
 	dbLB := &storage.ELBv2LoadBalancer{
-		ARN:               arn,
-		Name:              input.Name,
-		DNSName:           dnsName,
+		ARN:                   arn,
+		Name:                  input.Name,
+		DNSName:               dnsName,
 		CanonicalHostedZoneID: "Z215JYRZR1TBD5",
-		CreatedAt:         now,
-		UpdatedAt:         now,
-		Scheme:            scheme,
-		VpcID:             "vpc-default",
-		State:             "provisioning",
-		Type:              lbType,
-		IpAddressType:     ipAddressType,
-		Subnets:           subnets,
-		SecurityGroups:    securityGroups,
-		Tags:              make(map[string]string),
-		Region:            api.region,
-		AccountID:         api.accountID,
+		CreatedAt:             now,
+		UpdatedAt:             now,
+		Scheme:                scheme,
+		VpcID:                 "vpc-default",
+		State:                 "provisioning",
+		Type:                  lbType,
+		IpAddressType:         ipAddressType,
+		Subnets:               subnets,
+		SecurityGroups:        securityGroups,
+		Tags:                  make(map[string]string),
+		Region:                api.region,
+		AccountID:             api.accountID,
 	}
 
 	if err := api.storage.ELBv2Store().CreateLoadBalancer(ctx, dbLB); err != nil {
@@ -146,18 +146,18 @@ func (api *ELBv2APIImpl) CreateLoadBalancer(ctx context.Context, input *generate
 	output := &generated_elbv2.CreateLoadBalancerOutput{
 		LoadBalancers: []generated_elbv2.LoadBalancer{
 			{
-				LoadBalancerArn:           &arn,
-				DNSName:                   &dnsName,
-				CanonicalHostedZoneId:     utils.Ptr("Z215JYRZR1TBD5"),
-				CreatedTime:               &now,
-				LoadBalancerName:          &input.Name,
-				Scheme:                    (*generated_elbv2.LoadBalancerSchemeEnum)(&scheme),
-				VpcId:                     utils.Ptr("vpc-default"),
-				State:                     &generated_elbv2.LoadBalancerState{Code: &state},
-				Type:                      (*generated_elbv2.LoadBalancerTypeEnum)(&lbType),
-				IpAddressType:             (*generated_elbv2.IpAddressType)(&ipAddressType),
-				SecurityGroups:            input.SecurityGroups,
-				AvailabilityZones:         []generated_elbv2.AvailabilityZone{},
+				LoadBalancerArn:       &arn,
+				DNSName:               &dnsName,
+				CanonicalHostedZoneId: utils.Ptr("Z215JYRZR1TBD5"),
+				CreatedTime:           &now,
+				LoadBalancerName:      &input.Name,
+				Scheme:                (*generated_elbv2.LoadBalancerSchemeEnum)(&scheme),
+				VpcId:                 utils.Ptr("vpc-default"),
+				State:                 &generated_elbv2.LoadBalancerState{Code: &state},
+				Type:                  (*generated_elbv2.LoadBalancerTypeEnum)(&lbType),
+				IpAddressType:         (*generated_elbv2.IpAddressType)(&ipAddressType),
+				SecurityGroups:        input.SecurityGroups,
+				AvailabilityZones:     []generated_elbv2.AvailabilityZone{},
 			},
 		},
 	}
@@ -258,27 +258,27 @@ func (api *ELBv2APIImpl) CreateTargetGroup(ctx context.Context, input *generated
 	// Create target group in storage
 	now := time.Now()
 	dbTG := &storage.ELBv2TargetGroup{
-		ARN:                       arn,
-		Name:                      input.Name,
-		Protocol:                  string(*input.Protocol),
-		Port:                      *input.Port,
-		VpcID:                     *input.VpcId,
-		TargetType:                "instance",
-		HealthCheckEnabled:        true,
-		HealthCheckPath:           "/",
-		HealthCheckProtocol:       healthCheckProtocol,
-		HealthCheckPort:           "traffic-port",
-		HealthyThresholdCount:     2,
-		UnhealthyThresholdCount:   5,
-		HealthCheckTimeoutSeconds: 5,
+		ARN:                        arn,
+		Name:                       input.Name,
+		Protocol:                   string(*input.Protocol),
+		Port:                       *input.Port,
+		VpcID:                      *input.VpcId,
+		TargetType:                 "instance",
+		HealthCheckEnabled:         true,
+		HealthCheckPath:            "/",
+		HealthCheckProtocol:        healthCheckProtocol,
+		HealthCheckPort:            "traffic-port",
+		HealthyThresholdCount:      2,
+		UnhealthyThresholdCount:    5,
+		HealthCheckTimeoutSeconds:  5,
 		HealthCheckIntervalSeconds: 30,
-		Matcher:                   "200",
-		LoadBalancerArns:          []string{},
-		Tags:                      make(map[string]string),
-		Region:                    api.region,
-		AccountID:                 api.accountID,
-		CreatedAt:                 now,
-		UpdatedAt:                 now,
+		Matcher:                    "200",
+		LoadBalancerArns:           []string{},
+		Tags:                       make(map[string]string),
+		Region:                     api.region,
+		AccountID:                  api.accountID,
+		CreatedAt:                  now,
+		UpdatedAt:                  now,
 	}
 
 	if err := api.storage.ELBv2Store().CreateTargetGroup(ctx, dbTG); err != nil {
@@ -294,19 +294,19 @@ func (api *ELBv2APIImpl) CreateTargetGroup(ctx context.Context, input *generated
 	output := &generated_elbv2.CreateTargetGroupOutput{
 		TargetGroups: []generated_elbv2.TargetGroup{
 			{
-				TargetGroupArn:              &arn,
-				TargetGroupName:             &input.Name,
-				Protocol:                    input.Protocol,
-				Port:                        input.Port,
-				VpcId:                       input.VpcId,
-				HealthCheckPath:             utils.Ptr("/"),
-				HealthCheckProtocol:         (*generated_elbv2.ProtocolEnum)(&healthCheckProtocol),
-				HealthCheckPort:             utils.Ptr("traffic-port"),
-				HealthyThresholdCount:       utils.Ptr(int32(2)),
-				UnhealthyThresholdCount:     utils.Ptr(int32(5)),
-				HealthCheckTimeoutSeconds:   utils.Ptr(int32(5)),
-				HealthCheckIntervalSeconds:  utils.Ptr(int32(30)),
-				LoadBalancerArns:            []string{},
+				TargetGroupArn:             &arn,
+				TargetGroupName:            &input.Name,
+				Protocol:                   input.Protocol,
+				Port:                       input.Port,
+				VpcId:                      input.VpcId,
+				HealthCheckPath:            utils.Ptr("/"),
+				HealthCheckProtocol:        (*generated_elbv2.ProtocolEnum)(&healthCheckProtocol),
+				HealthCheckPort:            utils.Ptr("traffic-port"),
+				HealthyThresholdCount:      utils.Ptr(int32(2)),
+				UnhealthyThresholdCount:    utils.Ptr(int32(5)),
+				HealthCheckTimeoutSeconds:  utils.Ptr(int32(5)),
+				HealthCheckIntervalSeconds: utils.Ptr(int32(30)),
+				LoadBalancerArns:           []string{},
 			},
 		},
 	}
@@ -361,15 +361,15 @@ func (api *ELBv2APIImpl) RegisterTargets(ctx context.Context, input *generated_e
 		}
 
 		dbTarget := &storage.ELBv2Target{
-			TargetGroupArn:   input.TargetGroupArn,
-			ID:               target.Id,
-			Port:             port,
-			AvailabilityZone: az,
-			HealthState:      TargetHealthStateRegistering,
-			HealthReason:     "Target.RegistrationInProgress",
+			TargetGroupArn:    input.TargetGroupArn,
+			ID:                target.Id,
+			Port:              port,
+			AvailabilityZone:  az,
+			HealthState:       TargetHealthStateRegistering,
+			HealthReason:      "Target.RegistrationInProgress",
 			HealthDescription: "Target registration is in progress",
-			RegisteredAt:     time.Now(),
-			UpdatedAt:        time.Now(),
+			RegisteredAt:      time.Now(),
+			UpdatedAt:         time.Now(),
 		}
 		targets = append(targets, dbTarget)
 	}
@@ -413,7 +413,7 @@ func (api *ELBv2APIImpl) DeregisterTargets(ctx context.Context, input *generated
 		if target.Id == "" {
 			continue
 		}
-		
+
 		// Update target health to deregistering
 		targetHealth := &storage.ELBv2TargetHealth{
 			State:       TargetHealthStateDeregistering,
@@ -481,7 +481,7 @@ func (api *ELBv2APIImpl) DescribeTargetHealth(ctx context.Context, input *genera
 	for _, target := range targets {
 		// Perform health check and update target health
 		healthState := api.performHealthCheck(ctx, target, targetGroup)
-		
+
 		// Update target health in storage
 		targetHealth := &storage.ELBv2TargetHealth{
 			State:       healthState,
@@ -489,7 +489,7 @@ func (api *ELBv2APIImpl) DescribeTargetHealth(ctx context.Context, input *genera
 			Description: api.getHealthDescription(healthState),
 		}
 		api.storage.ELBv2Store().UpdateTargetHealth(ctx, input.TargetGroupArn, target.ID, targetHealth)
-		
+
 		// Convert port to pointer
 		port := target.Port
 		az := target.AvailabilityZone
@@ -823,7 +823,7 @@ func (api *ELBv2APIImpl) CreateRule(ctx context.Context, input *generated_elbv2.
 				}
 				// TODO: Get actual port from listener - for now use port 80
 				port := int32(80)
-				
+
 				// Sync rules to IngressRoute
 				if err := ruleSyncable.SyncRulesToListener(ctx, api.storage, rule.ListenerArn, lbName, port); err != nil {
 					logging.Debug("Failed to sync rules to IngressRoute", "error", err)
@@ -836,11 +836,11 @@ func (api *ELBv2APIImpl) CreateRule(ctx context.Context, input *generated_elbv2.
 	output := &generated_elbv2.CreateRuleOutput{
 		Rules: []generated_elbv2.Rule{
 			{
-				RuleArn:     &ruleArn,
-				Priority:    utils.Ptr(fmt.Sprintf("%d", rule.Priority)),
-				Conditions:  input.Conditions,
-				Actions:     input.Actions,
-				IsDefault:   utils.Ptr(false),
+				RuleArn:    &ruleArn,
+				Priority:   utils.Ptr(fmt.Sprintf("%d", rule.Priority)),
+				Conditions: input.Conditions,
+				Actions:    input.Actions,
+				IsDefault:  utils.Ptr(false),
 			},
 		},
 	}
@@ -873,7 +873,7 @@ func (api *ELBv2APIImpl) DeleteRule(ctx context.Context, input *generated_elbv2.
 
 	// Get listener ARN before deleting the rule
 	listenerArn := rule.ListenerArn
-	
+
 	// Delete rule from storage
 	if err := api.storage.ELBv2Store().DeleteRule(ctx, input.RuleArn); err != nil {
 		return nil, fmt.Errorf("failed to delete rule: %w", err)
@@ -893,7 +893,7 @@ func (api *ELBv2APIImpl) DeleteRule(ctx context.Context, input *generated_elbv2.
 				}
 				// TODO: Get actual port from listener - for now use port 80
 				port := int32(80)
-				
+
 				// Sync rules to IngressRoute
 				if err := ruleSyncable.SyncRulesToListener(ctx, api.storage, listenerArn, lbName, port); err != nil {
 					logging.Debug("Failed to sync rules to IngressRoute after delete", "error", err)
@@ -1261,13 +1261,13 @@ func (api *ELBv2APIImpl) ModifyRule(ctx context.Context, input *generated_elbv2.
 	// Return updated rule
 	var conditions []generated_elbv2.RuleCondition
 	var actions []generated_elbv2.Action
-	
+
 	if input.Conditions != nil {
 		conditions = input.Conditions
 	} else {
 		json.Unmarshal([]byte(rule.Conditions), &conditions)
 	}
-	
+
 	if input.Actions != nil {
 		actions = input.Actions
 	} else {
@@ -1277,11 +1277,11 @@ func (api *ELBv2APIImpl) ModifyRule(ctx context.Context, input *generated_elbv2.
 	output := &generated_elbv2.ModifyRuleOutput{
 		Rules: []generated_elbv2.Rule{
 			{
-				RuleArn:     &rule.ARN,
-				Priority:    utils.Ptr(fmt.Sprintf("%d", rule.Priority)),
-				Conditions:  conditions,
-				Actions:     actions,
-				IsDefault:   utils.Ptr(rule.IsDefault),
+				RuleArn:    &rule.ARN,
+				Priority:   utils.Ptr(fmt.Sprintf("%d", rule.Priority)),
+				Conditions: conditions,
+				Actions:    actions,
+				IsDefault:  utils.Ptr(rule.IsDefault),
 			},
 		},
 	}
@@ -1478,7 +1478,6 @@ func (api *ELBv2APIImpl) SetSubnets(ctx context.Context, input *generated_elbv2.
 	return &generated_elbv2.SetSubnetsOutput{}, nil
 }
 
-
 func convertToLoadBalancer(lb *storage.ELBv2LoadBalancer) generated_elbv2.LoadBalancer {
 	state := generated_elbv2.LoadBalancerStateEnumACTIVE
 	if lb.State == "provisioning" {
@@ -1508,14 +1507,14 @@ func (api *ELBv2APIImpl) performHealthCheck(ctx context.Context, target *storage
 		// If health check is disabled or target group is nil, consider target healthy
 		return TargetHealthStateHealthy
 	}
-	
+
 	// Determine health check port
 	healthCheckPort := target.Port
 	if targetGroup.HealthCheckPort != "" && targetGroup.HealthCheckPort != "traffic-port" {
 		// Parse the health check port if it's not "traffic-port"
 		fmt.Sscanf(targetGroup.HealthCheckPort, "%d", &healthCheckPort)
 	}
-	
+
 	// Try Kubernetes-based health check first if integration is available
 	if api.elbv2Integration != nil {
 		healthState, err := api.elbv2Integration.CheckTargetHealthWithK8s(ctx, target.ID, healthCheckPort, targetGroup.ARN)
@@ -1526,7 +1525,7 @@ func (api *ELBv2APIImpl) performHealthCheck(ctx context.Context, target *storage
 			return healthState
 		}
 	}
-	
+
 	// Fallback to legacy HTTP/TCP health check
 	return api.performLegacyHealthCheck(ctx, target, targetGroup)
 }
@@ -1538,30 +1537,30 @@ func (api *ELBv2APIImpl) performLegacyHealthCheck(ctx context.Context, target *s
 	if timeout == 0 {
 		timeout = 5 * time.Second // Default timeout
 	}
-	
+
 	client := &http.Client{
 		Timeout: timeout,
 	}
-	
+
 	// Determine health check port
 	healthCheckPort := target.Port
 	if targetGroup.HealthCheckPort != "" && targetGroup.HealthCheckPort != "traffic-port" {
 		// Parse the health check port if it's not "traffic-port"
 		fmt.Sscanf(targetGroup.HealthCheckPort, "%d", &healthCheckPort)
 	}
-	
+
 	// Construct health check URL based on protocol
 	var url string
 	protocol := targetGroup.HealthCheckProtocol
 	if protocol == "" {
 		protocol = targetGroup.Protocol // Use target group protocol if health check protocol not specified
 	}
-	
+
 	path := targetGroup.HealthCheckPath
 	if path == "" {
 		path = "/" // Default path
 	}
-	
+
 	switch protocol {
 	case "HTTP":
 		url = fmt.Sprintf("http://%s:%d%s", target.ID, healthCheckPort, path)
@@ -1580,7 +1579,7 @@ func (api *ELBv2APIImpl) performLegacyHealthCheck(ctx context.Context, target *s
 		// Default to HTTP
 		url = fmt.Sprintf("http://%s:%d%s", target.ID, healthCheckPort, path)
 	}
-	
+
 	// For HTTP/HTTPS health checks
 	if protocol == "HTTP" || protocol == "HTTPS" {
 		resp, err := client.Get(url)
@@ -1588,7 +1587,7 @@ func (api *ELBv2APIImpl) performLegacyHealthCheck(ctx context.Context, target *s
 			return TargetHealthStateUnhealthy
 		}
 		defer resp.Body.Close()
-		
+
 		// Check if response matches expected status codes
 		if targetGroup.Matcher != "" {
 			// Parse matcher (e.g., "200", "200-299", "200,202,301")
@@ -1602,7 +1601,7 @@ func (api *ELBv2APIImpl) performLegacyHealthCheck(ctx context.Context, target *s
 			}
 		}
 	}
-	
+
 	return TargetHealthStateUnhealthy
 }
 
@@ -1610,7 +1609,7 @@ func (api *ELBv2APIImpl) performLegacyHealthCheck(ctx context.Context, target *s
 func MatchesHealthCheckResponse(statusCode int, matcher string) bool {
 	// Remove any whitespace
 	matcher = strings.TrimSpace(matcher)
-	
+
 	// Handle comma-separated values (e.g., "200,202,301")
 	if strings.Contains(matcher, ",") {
 		codes := strings.Split(matcher, ",")
@@ -1622,7 +1621,7 @@ func MatchesHealthCheckResponse(statusCode int, matcher string) bool {
 		}
 		return false
 	}
-	
+
 	// Handle range (e.g., "200-299")
 	if strings.Contains(matcher, "-") {
 		parts := strings.Split(matcher, "-")
@@ -1635,12 +1634,12 @@ func MatchesHealthCheckResponse(statusCode int, matcher string) bool {
 		}
 		return false
 	}
-	
+
 	// Handle single value (e.g., "200")
 	if expected, err := strconv.Atoi(matcher); err == nil {
 		return statusCode == expected
 	}
-	
+
 	return false
 }
 
@@ -1704,37 +1703,37 @@ func (api *ELBv2APIImpl) updateLoadBalancerToActive(ctx context.Context, arn str
 	if err != nil {
 		return err
 	}
-	
+
 	if lb == nil {
 		return fmt.Errorf("load balancer not found: %s", arn)
 	}
-	
+
 	if lb.State != "provisioning" {
 		return nil // Already active or in another state
 	}
-	
+
 	lb.State = "active"
 	lb.UpdatedAt = time.Now()
-	
+
 	return api.storage.ELBv2Store().UpdateLoadBalancer(ctx, lb)
 }
 
 // convertToTargetGroup converts storage target group to API response format
 func (api *ELBv2APIImpl) convertToTargetGroup(tg *storage.ELBv2TargetGroup) generated_elbv2.TargetGroup {
 	return generated_elbv2.TargetGroup{
-		TargetGroupArn:       &tg.ARN,
-		TargetGroupName:      &tg.Name,
-		Protocol:             (*generated_elbv2.ProtocolEnum)(&tg.Protocol),
-		Port:                 &tg.Port,
-		VpcId:                &tg.VpcID,
-		HealthCheckPath:      &tg.HealthCheckPath,
-		HealthCheckProtocol:  (*generated_elbv2.ProtocolEnum)(&tg.HealthCheckProtocol),
-		HealthCheckPort:      &tg.HealthCheckPort,
-		HealthyThresholdCount: &tg.HealthyThresholdCount,
-		UnhealthyThresholdCount: &tg.UnhealthyThresholdCount,
-		HealthCheckTimeoutSeconds: &tg.HealthCheckTimeoutSeconds,
+		TargetGroupArn:             &tg.ARN,
+		TargetGroupName:            &tg.Name,
+		Protocol:                   (*generated_elbv2.ProtocolEnum)(&tg.Protocol),
+		Port:                       &tg.Port,
+		VpcId:                      &tg.VpcID,
+		HealthCheckPath:            &tg.HealthCheckPath,
+		HealthCheckProtocol:        (*generated_elbv2.ProtocolEnum)(&tg.HealthCheckProtocol),
+		HealthCheckPort:            &tg.HealthCheckPort,
+		HealthyThresholdCount:      &tg.HealthyThresholdCount,
+		UnhealthyThresholdCount:    &tg.UnhealthyThresholdCount,
+		HealthCheckTimeoutSeconds:  &tg.HealthCheckTimeoutSeconds,
 		HealthCheckIntervalSeconds: &tg.HealthCheckIntervalSeconds,
-		TargetType:           (*generated_elbv2.TargetTypeEnum)(&tg.TargetType),
+		TargetType:                 (*generated_elbv2.TargetTypeEnum)(&tg.TargetType),
 	}
 }
 
@@ -1745,10 +1744,10 @@ func (api *ELBv2APIImpl) convertToListener(listener *storage.ELBv2Listener) gene
 	// TODO: Parse and convert stored default actions JSON
 
 	return generated_elbv2.Listener{
-		ListenerArn:      &listener.ARN,
-		LoadBalancerArn:  &listener.LoadBalancerArn,
-		Port:             &listener.Port,
-		Protocol:         (*generated_elbv2.ProtocolEnum)(&listener.Protocol),
-		DefaultActions:   defaultActions,
+		ListenerArn:     &listener.ARN,
+		LoadBalancerArn: &listener.LoadBalancerArn,
+		Port:            &listener.Port,
+		Protocol:        (*generated_elbv2.ProtocolEnum)(&listener.Protocol),
+		DefaultActions:  defaultActions,
 	}
 }

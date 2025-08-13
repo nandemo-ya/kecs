@@ -22,14 +22,14 @@ import (
 
 // SecretsController watches for pods with secret annotations and synchronizes secrets
 type SecretsController struct {
-	kubeClient    kubernetes.Interface
-	smIntegration secretsmanager.Integration
+	kubeClient     kubernetes.Interface
+	smIntegration  secretsmanager.Integration
 	ssmIntegration ssm.Integration
-	namespace     string
-	replicator    *SecretsReplicator
-	stopCh        chan struct{}
-	wg            sync.WaitGroup
-	mu            sync.RWMutex // Protect integration updates
+	namespace      string
+	replicator     *SecretsReplicator
+	stopCh         chan struct{}
+	wg             sync.WaitGroup
+	mu             sync.RWMutex // Protect integration updates
 }
 
 // NewSecretsController creates a new secrets synchronization controller
@@ -40,12 +40,12 @@ func NewSecretsController(
 	namespace string,
 ) *SecretsController {
 	return &SecretsController{
-		kubeClient:    kubeClient,
-		smIntegration: smIntegration,
+		kubeClient:     kubeClient,
+		smIntegration:  smIntegration,
 		ssmIntegration: ssmIntegration,
-		namespace:     namespace,
-		replicator:    NewSecretsReplicator(kubeClient),
-		stopCh:        make(chan struct{}),
+		namespace:      namespace,
+		replicator:     NewSecretsReplicator(kubeClient),
+		stopCh:         make(chan struct{}),
 	}
 }
 
@@ -123,7 +123,7 @@ func (c *SecretsController) handlePodCreate(ctx context.Context, pod *corev1.Pod
 	}
 
 	logging.Info("Processing new pod with secrets", "pod", pod.Name, "secretCount", secretCount)
-	
+
 	// Extract and sync secrets
 	if err := c.syncPodsSecrets(ctx, pod); err != nil {
 		logging.Error("Failed to sync secrets for pod", "pod", pod.Name, "error", err)
@@ -149,7 +149,7 @@ func (c *SecretsController) handlePodUpdate(ctx context.Context, pod *corev1.Pod
 	}
 
 	logging.Info("Re-syncing secrets for pending pod", "pod", pod.Name, "secretCount", secretCount)
-	
+
 	// Retry syncing secrets
 	if err := c.syncPodsSecrets(ctx, pod); err != nil {
 		logging.Error("Failed to sync secrets for pod", "pod", pod.Name, "error", err)
@@ -205,7 +205,7 @@ func (c *SecretsController) syncPodsSecrets(ctx context.Context, pod *corev1.Pod
 		go func(container, envVar, secretArn string) {
 			defer wg.Done()
 			if err := c.syncSecret(ctx, secretArn, pod.Namespace); err != nil {
-				errCh <- fmt.Errorf("failed to sync secret %s for container %s env %s: %w", 
+				errCh <- fmt.Errorf("failed to sync secret %s for container %s env %s: %w",
 					secretArn, container, envVar, err)
 			}
 		}(containerName, envVarName, arn)
@@ -237,7 +237,7 @@ func (c *SecretsController) syncSecret(ctx context.Context, arn string, namespac
 	}
 
 	service := parts[2]
-	
+
 	switch service {
 	case "secretsmanager":
 		return c.syncSecretsManagerSecret(ctx, arn, namespace)
@@ -254,11 +254,11 @@ func (c *SecretsController) syncSecretsManagerSecret(ctx context.Context, arn st
 	c.mu.RLock()
 	smIntegration := c.smIntegration
 	c.mu.RUnlock()
-	
+
 	if smIntegration == nil {
 		return fmt.Errorf("Secrets Manager integration not available yet")
 	}
-	
+
 	// Extract secret name and key from ARN
 	// Format: arn:aws:secretsmanager:region:account-id:secret:name-6RandomChars:key::
 	parts := strings.Split(arn, ":")
@@ -287,7 +287,7 @@ func (c *SecretsController) syncSecretsManagerSecret(ctx context.Context, arn st
 			}
 		}
 	}
-	
+
 	jsonKey := ""
 	if len(parts) > 7 && parts[7] != "" && parts[7] != "*" {
 		jsonKey = parts[7]
@@ -326,11 +326,11 @@ func (c *SecretsController) syncSSMParameter(ctx context.Context, arn string, po
 	c.mu.RLock()
 	ssmIntegration := c.ssmIntegration
 	c.mu.RUnlock()
-	
+
 	if ssmIntegration == nil {
 		return fmt.Errorf("SSM integration not available yet")
 	}
-	
+
 	// Extract parameter name from ARN
 	// Format: arn:aws:ssm:region:account-id:parameter/path/to/param
 	parts := strings.Split(arn, ":")
@@ -340,7 +340,7 @@ func (c *SecretsController) syncSSMParameter(ctx context.Context, arn string, po
 
 	resourcePart := parts[5]
 	parameterName := ""
-	
+
 	if strings.HasPrefix(resourcePart, "parameter/") {
 		// Keep the leading slash for SSM parameter names
 		parameterName = "/" + strings.TrimPrefix(resourcePart, "parameter/")
@@ -377,7 +377,7 @@ func (c *SecretsController) syncSSMParameter(ctx context.Context, arn string, po
 // areSecretssSynced checks if all secrets for a pod are already synced
 func (c *SecretsController) areSecretssSynced(ctx context.Context, pod *corev1.Pod) bool {
 	secretCount := c.getSecretCount(pod)
-	
+
 	for i := 0; i < secretCount; i++ {
 		annotationKey := fmt.Sprintf("kecs.dev/secret-%d-arn", i)
 		annotationValue, exists := pod.Annotations[annotationKey]
@@ -392,7 +392,7 @@ func (c *SecretsController) areSecretssSynced(ctx context.Context, pod *corev1.P
 		}
 
 		arn := parts[2]
-		
+
 		// Check if the corresponding Kubernetes secret exists
 		secretName := c.getK8sSecretNameFromARN(arn)
 		_, err := c.kubeClient.CoreV1().Secrets(pod.Namespace).Get(ctx, secretName, metav1.GetOptions{})
@@ -420,7 +420,7 @@ func (c *SecretsController) isSSMParameterSensitive(parameterName string) bool {
 func (c *SecretsController) getK8sSecretName(service, resourceName string) string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	switch service {
 	case "secretsmanager":
 		if c.smIntegration != nil {
@@ -442,10 +442,10 @@ func (c *SecretsController) getK8sSecretNameFromARN(arn string) string {
 	}
 
 	service := parts[2]
-	
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	switch service {
 	case "secretsmanager":
 		if c.smIntegration != nil && len(parts) >= 7 {
@@ -474,7 +474,7 @@ func (c *SecretsController) getK8sSecretNameFromARN(arn string) string {
 func (c *SecretsController) updatePodContainers(ctx context.Context, pod *corev1.Pod) error {
 	// Parse secret annotations and build a map of container -> env vars
 	containerEnvMap := make(map[string][]corev1.EnvVar)
-	
+
 	secretCount := c.getSecretCount(pod)
 	for i := 0; i < secretCount; i++ {
 		annotationKey := fmt.Sprintf("kecs.dev/secret-%d-arn", i)
@@ -535,14 +535,14 @@ func (c *SecretsController) updatePodContainers(ctx context.Context, pod *corev1
 
 	if len(containerEnvMap) > 0 {
 		logging.Info("Secrets synchronized for pod", "pod", pod.Name, "containers", len(containerEnvMap))
-		
+
 		// Add an annotation to indicate secrets are ready
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
 		pod.Annotations["kecs.dev/secrets-synced"] = "true"
 		pod.Annotations["kecs.dev/secrets-synced-at"] = time.Now().UTC().Format(time.RFC3339)
-		
+
 		// Update the pod annotations
 		_, err := c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, metav1.UpdateOptions{})
 		if err != nil {

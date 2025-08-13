@@ -37,13 +37,13 @@ func TestClusterStore_LocalStackState(t *testing.T) {
 		// Create LocalStack state
 		now := time.Now()
 		localStackState := &storage.LocalStackState{
-			Deployed:    true,
-			Status:      "running",
-			Version:     "2.3.0",
-			Namespace:   "kecs-system",
-			PodName:     "localstack-0",
-			Endpoint:    "http://localstack.kecs-system.svc.cluster.local:4566",
-			DeployedAt:  &now,
+			Deployed:     true,
+			Status:       "running",
+			Version:      "2.3.0",
+			Namespace:    "kecs-system",
+			PodName:      "localstack-0",
+			Endpoint:     "http://localstack.kecs-system.svc.cluster.local:4566",
+			DeployedAt:   &now,
 			HealthStatus: "healthy",
 		}
 
@@ -97,9 +97,9 @@ func TestClusterStore_LocalStackState(t *testing.T) {
 		// Update LocalStack state to failed
 		now := time.Now()
 		newState := &storage.LocalStackState{
-			Deployed:    true,
-			Status:      "failed",
-			DeployedAt:  &now,
+			Deployed:     true,
+			Status:       "failed",
+			DeployedAt:   &now,
 			HealthStatus: "connection refused",
 		}
 
@@ -179,9 +179,9 @@ func TestLocalStackState_Serialization(t *testing.T) {
 	t.Run("full_state", func(t *testing.T) {
 		now := time.Now()
 		lastCheck := now.Add(5 * time.Minute)
-		
+
 		state := &storage.LocalStackState{
-			Deployed:         true,
+			Deployed:        true,
 			Status:          "running",
 			Version:         "2.3.0",
 			Namespace:       "kecs-system",

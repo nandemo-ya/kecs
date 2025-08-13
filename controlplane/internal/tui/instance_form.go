@@ -38,23 +38,23 @@ type InstanceForm struct {
 	localStack   bool
 	traefik      bool
 	devMode      bool
-	
+
 	// UI state
 	focusedField FormField
 	errorMsg     string
 	successMsg   string
 	isCreating   bool
-	
+
 	// Creation status tracking
-	creationSteps    []CreationStep
-	creationElapsed  string     // Time elapsed (deprecated - use elapsedTime)
+	creationSteps     []CreationStep
+	creationElapsed   string    // Time elapsed (deprecated - use elapsedTime)
 	showTimeoutPrompt bool      // Show continue/abort prompt on timeout
-	startTime        time.Time // When creation started
-	elapsedTime      string    // Time elapsed as string
-	
+	startTime         time.Time // When creation started
+	elapsedTime       string    // Time elapsed as string
+
 	// Validation state
-	nameError    string
-	apiPortError string
+	nameError      string
+	apiPortError   string
 	adminPortError string
 }
 
@@ -62,7 +62,7 @@ type InstanceForm struct {
 func NewInstanceForm() *InstanceForm {
 	// Generate a default name
 	defaultName, _ := utils.GenerateRandomName()
-	
+
 	return &InstanceForm{
 		instanceName: defaultName,
 		apiPort:      "8080",
@@ -78,10 +78,10 @@ func NewInstanceForm() *InstanceForm {
 func NewInstanceFormWithSuggestions(instances []Instance) *InstanceForm {
 	// Generate a default name
 	defaultName, _ := utils.GenerateRandomName()
-	
+
 	// Suggest available ports
 	apiPort, adminPort := SuggestAvailablePorts(instances, 8080, 8081)
-	
+
 	return &InstanceForm{
 		instanceName: defaultName,
 		apiPort:      fmt.Sprintf("%d", apiPort),
@@ -182,7 +182,7 @@ func (f *InstanceForm) RemoveLastChar() {
 func (f *InstanceForm) Validate() bool {
 	f.clearValidationErrors()
 	valid := true
-	
+
 	// Validate instance name
 	if strings.TrimSpace(f.instanceName) == "" {
 		f.nameError = "Instance name is required"
@@ -191,14 +191,14 @@ func (f *InstanceForm) Validate() bool {
 		f.nameError = "Instance name must be 50 characters or less"
 		valid = false
 	}
-	
+
 	// Validate API port
 	apiPort, err := strconv.Atoi(f.apiPort)
 	if err != nil || apiPort < 1 || apiPort > 65535 {
 		f.apiPortError = "API port must be between 1 and 65535"
 		valid = false
 	}
-	
+
 	// Validate Admin port
 	adminPort, err := strconv.Atoi(f.adminPort)
 	if err != nil || adminPort < 1 || adminPort > 65535 {
@@ -208,7 +208,7 @@ func (f *InstanceForm) Validate() bool {
 		f.adminPortError = "Admin port must be different from API port"
 		valid = false
 	}
-	
+
 	return valid
 }
 
@@ -216,7 +216,7 @@ func (f *InstanceForm) Validate() bool {
 func (f *InstanceForm) GetFormData() map[string]interface{} {
 	apiPort, _ := strconv.Atoi(f.apiPort)
 	adminPort, _ := strconv.Atoi(f.adminPort)
-	
+
 	return map[string]interface{}{
 		"instanceName": f.instanceName,
 		"apiPort":      apiPort,
@@ -232,9 +232,9 @@ func (f *InstanceForm) CreateMockInstance() (*Instance, error) {
 	if !f.Validate() {
 		return nil, fmt.Errorf("validation failed")
 	}
-	
+
 	data := f.GetFormData()
-	
+
 	// Create mock instance
 	instance := &Instance{
 		Name:     data["instanceName"].(string),
@@ -245,7 +245,7 @@ func (f *InstanceForm) CreateMockInstance() (*Instance, error) {
 		APIPort:  data["apiPort"].(int),
 		Age:      0,
 	}
-	
+
 	f.successMsg = fmt.Sprintf("Instance '%s' created successfully", instance.Name)
 	return instance, nil
 }

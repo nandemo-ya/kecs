@@ -40,12 +40,12 @@ func (r *SecretsReplicator) ReplicateSecretToNamespace(ctx context.Context, secr
 			Name:      secretName,
 			Namespace: targetNamespace,
 			Labels: map[string]string{
-				"kecs.io/managed-by":     "kecs",
+				"kecs.io/managed-by":      "kecs",
 				"kecs.io/replicated-from": "kecs-system",
 				"kecs.io/source":          sourceSecret.Labels["kecs.io/source"],
 			},
 			Annotations: map[string]string{
-				"kecs.io/last-replicated": time.Now().UTC().Format(time.RFC3339),
+				"kecs.io/last-replicated":  time.Now().UTC().Format(time.RFC3339),
 				"kecs.io/source-namespace": "kecs-system",
 			},
 		},
@@ -84,12 +84,12 @@ func (r *SecretsReplicator) ReplicateSecretToNamespace(ctx context.Context, secr
 	existing.Data = targetSecret.Data
 	existing.Labels = targetSecret.Labels
 	existing.Annotations = targetSecret.Annotations
-	
+
 	_, err = r.kubeClient.CoreV1().Secrets(targetNamespace).Update(ctx, existing, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update secret %s in namespace %s: %w", secretName, targetNamespace, err)
 	}
-	
+
 	logging.Info("Updated replicated secret in namespace", "secret", secretName, "namespace", targetNamespace)
 	return nil
 }
@@ -109,12 +109,12 @@ func (r *SecretsReplicator) ReplicateConfigMapToNamespace(ctx context.Context, c
 			Name:      configMapName,
 			Namespace: targetNamespace,
 			Labels: map[string]string{
-				"kecs.io/managed-by":     "kecs",
+				"kecs.io/managed-by":      "kecs",
 				"kecs.io/replicated-from": "kecs-system",
 				"kecs.io/source":          sourceConfigMap.Labels["kecs.io/source"],
 			},
 			Annotations: map[string]string{
-				"kecs.io/last-replicated": time.Now().UTC().Format(time.RFC3339),
+				"kecs.io/last-replicated":  time.Now().UTC().Format(time.RFC3339),
 				"kecs.io/source-namespace": "kecs-system",
 			},
 		},
@@ -152,12 +152,12 @@ func (r *SecretsReplicator) ReplicateConfigMapToNamespace(ctx context.Context, c
 	existing.Data = targetConfigMap.Data
 	existing.Labels = targetConfigMap.Labels
 	existing.Annotations = targetConfigMap.Annotations
-	
+
 	_, err = r.kubeClient.CoreV1().ConfigMaps(targetNamespace).Update(ctx, existing, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update configmap %s in namespace %s: %w", configMapName, targetNamespace, err)
 	}
-	
+
 	logging.Info("Updated replicated configmap in namespace", "configmap", configMapName, "namespace", targetNamespace)
 	return nil
 }

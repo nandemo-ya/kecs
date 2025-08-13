@@ -79,13 +79,13 @@ type Config struct {
 	DataDir         string            `yaml:"data_dir" json:"data_dir"`
 	DockerHost      string            `yaml:"docker_host" json:"docker_host"`
 	CustomEndpoints map[string]string `yaml:"custom_endpoints" json:"custom_endpoints"`
-	
+
 	// Runtime configuration
 	UseExternalAccess bool   `yaml:"use_external_access" json:"use_external_access"`
 	ProxyEndpoint     string `yaml:"proxy_endpoint" json:"proxy_endpoint"`
 	UseTraefik        bool   `yaml:"use_traefik" json:"use_traefik"`
 	ContainerMode     bool   `yaml:"container_mode" json:"container_mode"`
-	
+
 	// Initialization configuration
 	InitScripts []InitScript `yaml:"init_scripts" json:"init_scripts"`
 }

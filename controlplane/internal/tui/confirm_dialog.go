@@ -23,11 +23,11 @@ import (
 
 // ConfirmDialog represents a confirmation dialog
 type ConfirmDialog struct {
-	title    string
-	message  string
-	onYes    func() error
-	onNo     func()
-	focused  bool // true = Yes, false = No
+	title   string
+	message string
+	onYes   func() error
+	onNo    func()
+	focused bool // true = Yes, false = No
 }
 
 // NewConfirmDialog creates a new confirmation dialog
@@ -91,17 +91,17 @@ func (d *ConfirmDialog) Render(width, height int) string {
 
 	// Build content
 	var content strings.Builder
-	
+
 	// Title
 	if d.title != "" {
 		content.WriteString(titleStyle.Render(d.title))
 		content.WriteString("\n\n")
 	}
-	
+
 	// Message
 	content.WriteString(messageStyle.Render(d.message))
 	content.WriteString("\n")
-	
+
 	// Buttons
 	var yesButton, noButton string
 	if d.focused {
@@ -111,23 +111,23 @@ func (d *ConfirmDialog) Render(width, height int) string {
 		yesButton = inactiveButtonStyle.Render("Yes")
 		noButton = activeButtonStyle.Render("No")
 	}
-	
+
 	buttons := lipgloss.JoinHorizontal(
 		lipgloss.Center,
 		yesButton,
 		"  ", // Space between buttons
 		noButton,
 	)
-	
+
 	content.WriteString(lipgloss.PlaceHorizontal(
 		dialogStyle.GetHorizontalFrameSize()+30,
 		lipgloss.Center,
 		buttons,
 	))
-	
+
 	// Apply dialog style
 	dialog := dialogStyle.Render(content.String())
-	
+
 	// Center the dialog
 	return lipgloss.Place(
 		width,

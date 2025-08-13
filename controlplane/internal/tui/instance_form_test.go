@@ -72,12 +72,12 @@ var _ = Describe("InstanceForm", func() {
 			form.MoveFocusDown() // API port
 			form.MoveFocusDown() // Admin port
 			form.MoveFocusDown() // LocalStack
-			
+
 			// Toggle
 			form.ToggleCheckbox()
 			data := form.GetFormData()
 			Expect(data["localStack"]).To(BeFalse())
-			
+
 			// Toggle back
 			form.ToggleCheckbox()
 			data = form.GetFormData()
@@ -139,10 +139,10 @@ var _ = Describe("InstanceForm", func() {
 			form.UpdateField("custom-name")
 			form.MoveFocusDown()
 			form.UpdateField("9999")
-			
+
 			// Reset
 			form.Reset()
-			
+
 			// Check defaults restored
 			data := form.GetFormData()
 			Expect(data["instanceName"]).NotTo(Equal("custom-name"))

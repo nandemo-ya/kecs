@@ -54,10 +54,10 @@ func (v *HeaderRoutingValidator) ValidateHeaderConditions(conditions []generated
 
 // ValidationIssue represents a validation problem
 type ValidationIssue struct {
-	Severity    IssueSeverity
-	Header      string
-	Message     string
-	Suggestion  string
+	Severity   IssueSeverity
+	Header     string
+	Message    string
+	Suggestion string
 }
 
 // IssueSeverity indicates the severity of a validation issue
@@ -210,20 +210,20 @@ func (v *HeaderRoutingValidator) validateHeaderValue(headerName, value string) *
 // isStandardHeader checks if a header is a standard HTTP header
 func (v *HeaderRoutingValidator) isStandardHeader(headerName string) bool {
 	standardHeaders := map[string]bool{
-		"Accept":              true,
-		"Accept-Encoding":     true,
-		"Accept-Language":     true,
-		"Authorization":       true,
-		"Cache-Control":       true,
-		"Content-Type":        true,
-		"Cookie":              true,
-		"Host":                true,
-		"Referer":             true,
-		"User-Agent":          true,
-		"Content-Length":      true,
-		"Content-Encoding":    true,
-		"If-None-Match":       true,
-		"If-Modified-Since":   true,
+		"Accept":            true,
+		"Accept-Encoding":   true,
+		"Accept-Language":   true,
+		"Authorization":     true,
+		"Cache-Control":     true,
+		"Content-Type":      true,
+		"Cookie":            true,
+		"Host":              true,
+		"Referer":           true,
+		"User-Agent":        true,
+		"Content-Length":    true,
+		"Content-Encoding":  true,
+		"If-None-Match":     true,
+		"If-Modified-Since": true,
 	}
 
 	return standardHeaders[headerName]
@@ -362,10 +362,10 @@ func initKnownHeaders() map[string]HeaderInfo {
 // AnalyzeHeaderRoutingComplexity analyzes the complexity of header-based routing rules
 func (v *HeaderRoutingValidator) AnalyzeHeaderRoutingComplexity(rules []generated_elbv2.Rule) ComplexityReport {
 	report := ComplexityReport{
-		TotalRules:      len(rules),
+		TotalRules:       len(rules),
 		HeaderBasedRules: 0,
-		UniqueHeaders:   make(map[string]int),
-		ComplexityScore: 0,
+		UniqueHeaders:    make(map[string]int),
+		ComplexityScore:  0,
 	}
 
 	for _, rule := range rules {
@@ -375,7 +375,7 @@ func (v *HeaderRoutingValidator) AnalyzeHeaderRoutingComplexity(rules []generate
 					report.HeaderBasedRules++
 					headerName := *condition.HttpHeaderConfig.HttpHeaderName
 					report.UniqueHeaders[headerName]++
-					
+
 					// Add complexity for wildcards
 					for _, value := range condition.HttpHeaderConfig.Values {
 						if strings.Contains(value, "*") {
@@ -391,7 +391,7 @@ func (v *HeaderRoutingValidator) AnalyzeHeaderRoutingComplexity(rules []generate
 
 	// Calculate overall complexity
 	report.ComplexityScore += len(report.UniqueHeaders) * 5
-	
+
 	return report
 }
 

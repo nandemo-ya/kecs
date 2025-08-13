@@ -49,8 +49,8 @@ echo "Secret synchronization completed successfully"
 `
 
 	return &corev1.Container{
-		Name:  "secret-sync",
-		Image: "bitnami/kubectl:latest",
+		Name:    "secret-sync",
+		Image:   "bitnami/kubectl:latest",
 		Command: []string{"/bin/sh", "-c", script},
 		Env: []corev1.EnvVar{
 			{

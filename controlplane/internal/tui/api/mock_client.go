@@ -36,7 +36,7 @@ func NewMockClient() *MockClient {
 		services: make(map[string][]Service),
 		tasks:    make(map[string][]Task),
 	}
-	
+
 	// Initialize with mock data
 	client.initMockData()
 	return client
@@ -70,22 +70,22 @@ func (c *MockClient) initMockData() {
 	// Mock clusters for dev instance
 	c.clusters["dev"] = []Cluster{
 		{
-			ClusterArn:                "arn:aws:ecs:us-east-1:123456789012:cluster/default",
-			ClusterName:               "default",
-			Status:                    "ACTIVE",
+			ClusterArn:                        "arn:aws:ecs:us-east-1:123456789012:cluster/default",
+			ClusterName:                       "default",
+			Status:                            "ACTIVE",
 			RegisteredContainerInstancesCount: 3,
-			RunningTasksCount:         8,
-			PendingTasksCount:         0,
-			ActiveServicesCount:       3,
+			RunningTasksCount:                 8,
+			PendingTasksCount:                 0,
+			ActiveServicesCount:               3,
 		},
 		{
-			ClusterArn:                "arn:aws:ecs:us-east-1:123456789012:cluster/production",
-			ClusterName:               "production",
-			Status:                    "ACTIVE",
+			ClusterArn:                        "arn:aws:ecs:us-east-1:123456789012:cluster/production",
+			ClusterName:                       "production",
+			Status:                            "ACTIVE",
 			RegisteredContainerInstancesCount: 2,
-			RunningTasksCount:         4,
-			PendingTasksCount:         0,
-			ActiveServicesCount:       2,
+			RunningTasksCount:                 4,
+			PendingTasksCount:                 0,
+			ActiveServicesCount:               2,
 		},
 	}
 
@@ -190,7 +190,7 @@ func (c *MockClient) CreateInstance(ctx context.Context, opts CreateInstanceOpti
 			return nil, fmt.Errorf("instance with name '%s' already exists", opts.Name)
 		}
 	}
-	
+
 	// Check for port conflicts
 	for _, inst := range c.instances {
 		if inst.APIPort == opts.APIPort {
@@ -200,7 +200,7 @@ func (c *MockClient) CreateInstance(ctx context.Context, opts CreateInstanceOpti
 			return nil, fmt.Errorf("Admin port %d is already in use by instance '%s'", opts.AdminPort, inst.Name)
 		}
 	}
-	
+
 	instance := Instance{
 		Name:      opts.Name,
 		Status:    "pending",
@@ -212,7 +212,7 @@ func (c *MockClient) CreateInstance(ctx context.Context, opts CreateInstanceOpti
 		CreatedAt: time.Now(),
 	}
 	c.instances = append(c.instances, instance)
-	
+
 	// Simulate instance becoming ready after creation
 	go func() {
 		time.Sleep(2 * time.Second)
@@ -223,7 +223,7 @@ func (c *MockClient) CreateInstance(ctx context.Context, opts CreateInstanceOpti
 			}
 		}
 	}()
-	
+
 	return &instance, nil
 }
 
@@ -253,10 +253,10 @@ func (c *MockClient) DeleteInstance(ctx context.Context, name string) error {
 
 func (c *MockClient) GetInstanceLogs(ctx context.Context, name string, follow bool) (<-chan LogEntry, error) {
 	ch := make(chan LogEntry)
-	
+
 	go func() {
 		defer close(ch)
-		
+
 		// Send some mock log entries
 		for i := 0; i < 10; i++ {
 			select {
@@ -268,13 +268,13 @@ func (c *MockClient) GetInstanceLogs(ctx context.Context, name string, follow bo
 				Message:   fmt.Sprintf("Mock log entry %d for instance %s", i, name),
 			}:
 			}
-			
+
 			if follow {
 				time.Sleep(1 * time.Second)
 			}
 		}
 	}()
-	
+
 	return ch, nil
 }
 
@@ -295,13 +295,13 @@ func (c *MockClient) DescribeClusters(ctx context.Context, instanceName string, 
 
 func (c *MockClient) CreateCluster(ctx context.Context, instanceName, clusterName string) (*Cluster, error) {
 	cluster := Cluster{
-		ClusterArn:                fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/%s", clusterName),
-		ClusterName:               clusterName,
-		Status:                    "ACTIVE",
+		ClusterArn:                        fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:cluster/%s", clusterName),
+		ClusterName:                       clusterName,
+		Status:                            "ACTIVE",
 		RegisteredContainerInstancesCount: 0,
-		RunningTasksCount:         0,
-		PendingTasksCount:         0,
-		ActiveServicesCount:       0,
+		RunningTasksCount:                 0,
+		PendingTasksCount:                 0,
+		ActiveServicesCount:               0,
 	}
 	c.clusters[instanceName] = append(c.clusters[instanceName], cluster)
 	return &cluster, nil

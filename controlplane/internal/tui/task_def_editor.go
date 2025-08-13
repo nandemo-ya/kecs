@@ -93,14 +93,14 @@ func (e *TaskDefinitionEditor) handleNormalMode(msg tea.KeyMsg) (*TaskDefinition
 				e.cursorCol = len(lines[e.cursorLine])
 			}
 		}
-		
+
 	case "enter", "+":
 		// Move to beginning of next line (Vim behavior)
 		if e.cursorLine < len(lines)-1 {
 			e.cursorLine++
 			e.cursorCol = 0
 		}
-		
+
 	case "-":
 		// Move to beginning of previous line (Vim behavior)
 		if e.cursorLine > 0 {
@@ -127,7 +127,7 @@ func (e *TaskDefinitionEditor) handleNormalMode(msg tea.KeyMsg) (*TaskDefinition
 		if e.cursorLine < len(lines) {
 			e.cursorCol = len(lines[e.cursorLine])
 		}
-		
+
 	case "^":
 		// Move to first non-blank character of line
 		if e.cursorLine < len(lines) {
@@ -141,13 +141,13 @@ func (e *TaskDefinitionEditor) handleNormalMode(msg tea.KeyMsg) (*TaskDefinition
 			// If all spaces, stay at beginning
 			e.cursorCol = 0
 		}
-		
+
 	case "w":
 		// Move to next word
 		if e.cursorLine < len(lines) {
 			e.moveToNextWord(lines)
 		}
-		
+
 	case "b":
 		// Move to previous word
 		if e.cursorLine < len(lines) {
@@ -179,7 +179,7 @@ func (e *TaskDefinitionEditor) handleNormalMode(msg tea.KeyMsg) (*TaskDefinition
 	case "ctrl+f":
 		// Format JSON
 		return e, e.formatJSON()
-		
+
 	case "ctrl+q":
 		// Quick quit without saving
 		return e, func() tea.Msg {
@@ -681,16 +681,16 @@ func (e *TaskDefinitionEditor) moveToNextWord(lines []string) {
 	if e.cursorLine >= len(lines) {
 		return
 	}
-	
+
 	line := lines[e.cursorLine]
 	inWord := false
-	
+
 	// Start from current position
 	for i := e.cursorCol; i < len(line); i++ {
 		ch := line[i]
-		isWordChar := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || 
-		             (ch >= '0' && ch <= '9') || ch == '_'
-		
+		isWordChar := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') || ch == '_'
+
 		if !inWord && isWordChar {
 			// Found start of word after current position
 			if i > e.cursorCol {
@@ -703,7 +703,7 @@ func (e *TaskDefinitionEditor) moveToNextWord(lines []string) {
 			inWord = false
 		}
 	}
-	
+
 	// If no word found on current line, try next line
 	if e.cursorLine < len(lines)-1 {
 		e.cursorLine++
@@ -711,8 +711,8 @@ func (e *TaskDefinitionEditor) moveToNextWord(lines []string) {
 		// Find first word on new line
 		line = lines[e.cursorLine]
 		for i, ch := range line {
-			isWordChar := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || 
-			             (ch >= '0' && ch <= '9') || ch == '_'
+			isWordChar := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+				(ch >= '0' && ch <= '9') || ch == '_'
 			if isWordChar {
 				e.cursorCol = i
 				return
@@ -726,7 +726,7 @@ func (e *TaskDefinitionEditor) moveToPrevWord(lines []string) {
 	if e.cursorLine >= len(lines) {
 		return
 	}
-	
+
 	// If at beginning of line, go to previous line
 	if e.cursorCol == 0 && e.cursorLine > 0 {
 		e.cursorLine--
@@ -734,14 +734,14 @@ func (e *TaskDefinitionEditor) moveToPrevWord(lines []string) {
 		// Find last word on previous line
 		for i := len(line) - 1; i >= 0; i-- {
 			ch := line[i]
-			isWordChar := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || 
-			             (ch >= '0' && ch <= '9') || ch == '_'
+			isWordChar := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+				(ch >= '0' && ch <= '9') || ch == '_'
 			if isWordChar {
 				// Found end of word, find beginning
 				for j := i; j >= 0; j-- {
 					ch2 := line[j]
-					isWordChar2 := (ch2 >= 'a' && ch2 <= 'z') || (ch2 >= 'A' && ch2 <= 'Z') || 
-					              (ch2 >= '0' && ch2 <= '9') || ch2 == '_'
+					isWordChar2 := (ch2 >= 'a' && ch2 <= 'z') || (ch2 >= 'A' && ch2 <= 'Z') ||
+						(ch2 >= '0' && ch2 <= '9') || ch2 == '_'
 					if !isWordChar2 || j == 0 {
 						if !isWordChar2 {
 							e.cursorCol = j + 1
@@ -756,16 +756,16 @@ func (e *TaskDefinitionEditor) moveToPrevWord(lines []string) {
 		e.cursorCol = 0
 		return
 	}
-	
+
 	// Search backwards on current line
 	line := lines[e.cursorLine]
 	foundWord := false
-	
+
 	for i := e.cursorCol - 1; i >= 0; i-- {
 		ch := line[i]
-		isWordChar := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || 
-		             (ch >= '0' && ch <= '9') || ch == '_'
-		
+		isWordChar := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') || ch == '_'
+
 		if isWordChar && !foundWord {
 			foundWord = true
 		} else if !isWordChar && foundWord {
@@ -774,7 +774,7 @@ func (e *TaskDefinitionEditor) moveToPrevWord(lines []string) {
 			return
 		}
 	}
-	
+
 	// If found word that extends to beginning of line
 	if foundWord {
 		e.cursorCol = 0

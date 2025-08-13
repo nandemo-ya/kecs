@@ -76,7 +76,7 @@ func (m *RBACManager) SetupNamespaceRBAC(ctx context.Context, namespace string) 
 			Name:      roleBindingName,
 			Namespace: "kecs-system",
 			Labels: map[string]string{
-				"kecs.io/managed-by":   "kecs",
+				"kecs.io/managed-by":    "kecs",
 				"kecs.io/for-namespace": namespace,
 			},
 		},

@@ -163,7 +163,7 @@ func (c *RuleConverter) convertHttpHeaderToMatch(config *generated_elbv2.HttpHea
 
 	var headerMatches []string
 	headerName := *config.HttpHeaderName
-	
+
 	for _, value := range config.Values {
 		if strings.Contains(value, "*") {
 			// Wildcard value - use HeaderRegexp

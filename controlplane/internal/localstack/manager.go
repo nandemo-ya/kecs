@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // localStackManager implements the Manager interface
@@ -33,7 +33,7 @@ func NewManager(config *Config, kubeClient kubernetes.Interface, kubeConfig *res
 	}
 
 	kubeManager := NewKubernetesManager(kubeClient, kubeConfig, config.Namespace)
-	
+
 	// Determine health check endpoint based on runtime configuration
 	var healthEndpoint string
 	if config.UseTraefik && config.ProxyEndpoint != "" {
@@ -132,7 +132,7 @@ func (m *localStackManager) Start(ctx context.Context) error {
 		healthEndpoint = fmt.Sprintf("http://localhost:%d", m.config.Port)
 		logging.Info("Host mode without Traefik: using localhost endpoint", "endpoint", healthEndpoint)
 	}
-	
+
 	// Update the health checker with the correct endpoint
 	m.healthChecker.UpdateEndpoint(healthEndpoint)
 
@@ -412,7 +412,7 @@ func (m *localStackManager) WaitForReady(ctx context.Context, timeout time.Durat
 		}
 		return err
 	}
-	
+
 	return nil
 }
 

@@ -27,7 +27,7 @@ func main() {
 			return
 		}
 	}
-	
+
 	// Get API endpoint from environment
 	endpoint := os.Getenv("KECS_API_ENDPOINT")
 	if endpoint == "" {

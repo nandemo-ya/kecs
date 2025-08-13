@@ -846,7 +846,6 @@ type Attribute struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-
 // ELBv2Store defines ELBv2-specific storage operations
 type ELBv2Store interface {
 	// Load Balancer operations
@@ -888,48 +887,48 @@ type ELBv2Store interface {
 
 // ELBv2LoadBalancer represents a stored load balancer
 type ELBv2LoadBalancer struct {
-	ARN               string            `json:"arn"`
-	Name              string            `json:"name"`
-	DNSName           string            `json:"dnsName"`
-	CanonicalHostedZoneID string        `json:"canonicalHostedZoneId"`
-	State             string            `json:"state"`
-	Type              string            `json:"type"`
-	Scheme            string            `json:"scheme"`
-	VpcID             string            `json:"vpcId"`
-	Subnets           []string          `json:"subnets"`
-	AvailabilityZones []string          `json:"availabilityZones"`
-	SecurityGroups    []string          `json:"securityGroups"`
-	IpAddressType     string            `json:"ipAddressType"`
-	Tags              map[string]string `json:"tags"`
-	Region            string            `json:"region"`
-	AccountID         string            `json:"accountId"`
-	CreatedAt         time.Time         `json:"createdAt"`
-	UpdatedAt         time.Time         `json:"updatedAt"`
+	ARN                   string            `json:"arn"`
+	Name                  string            `json:"name"`
+	DNSName               string            `json:"dnsName"`
+	CanonicalHostedZoneID string            `json:"canonicalHostedZoneId"`
+	State                 string            `json:"state"`
+	Type                  string            `json:"type"`
+	Scheme                string            `json:"scheme"`
+	VpcID                 string            `json:"vpcId"`
+	Subnets               []string          `json:"subnets"`
+	AvailabilityZones     []string          `json:"availabilityZones"`
+	SecurityGroups        []string          `json:"securityGroups"`
+	IpAddressType         string            `json:"ipAddressType"`
+	Tags                  map[string]string `json:"tags"`
+	Region                string            `json:"region"`
+	AccountID             string            `json:"accountId"`
+	CreatedAt             time.Time         `json:"createdAt"`
+	UpdatedAt             time.Time         `json:"updatedAt"`
 }
 
 // ELBv2TargetGroup represents a stored target group
 type ELBv2TargetGroup struct {
-	ARN                     string            `json:"arn"`
-	Name                    string            `json:"name"`
-	Protocol                string            `json:"protocol"`
-	Port                    int32             `json:"port"`
-	VpcID                   string            `json:"vpcId"`
-	TargetType              string            `json:"targetType"`
-	HealthCheckEnabled      bool              `json:"healthCheckEnabled"`
-	HealthCheckProtocol     string            `json:"healthCheckProtocol"`
-	HealthCheckPort         string            `json:"healthCheckPort"`
-	HealthCheckPath         string            `json:"healthCheckPath"`
-	HealthCheckIntervalSeconds int32          `json:"healthCheckIntervalSeconds"`
-	HealthCheckTimeoutSeconds  int32          `json:"healthCheckTimeoutSeconds"`
-	HealthyThresholdCount   int32             `json:"healthyThresholdCount"`
-	UnhealthyThresholdCount int32             `json:"unhealthyThresholdCount"`
-	Matcher                 string            `json:"matcher"`
-	LoadBalancerArns        []string          `json:"loadBalancerArns"`
-	Tags                    map[string]string `json:"tags"`
-	Region                  string            `json:"region"`
-	AccountID               string            `json:"accountId"`
-	CreatedAt               time.Time         `json:"createdAt"`
-	UpdatedAt               time.Time         `json:"updatedAt"`
+	ARN                        string            `json:"arn"`
+	Name                       string            `json:"name"`
+	Protocol                   string            `json:"protocol"`
+	Port                       int32             `json:"port"`
+	VpcID                      string            `json:"vpcId"`
+	TargetType                 string            `json:"targetType"`
+	HealthCheckEnabled         bool              `json:"healthCheckEnabled"`
+	HealthCheckProtocol        string            `json:"healthCheckProtocol"`
+	HealthCheckPort            string            `json:"healthCheckPort"`
+	HealthCheckPath            string            `json:"healthCheckPath"`
+	HealthCheckIntervalSeconds int32             `json:"healthCheckIntervalSeconds"`
+	HealthCheckTimeoutSeconds  int32             `json:"healthCheckTimeoutSeconds"`
+	HealthyThresholdCount      int32             `json:"healthyThresholdCount"`
+	UnhealthyThresholdCount    int32             `json:"unhealthyThresholdCount"`
+	Matcher                    string            `json:"matcher"`
+	LoadBalancerArns           []string          `json:"loadBalancerArns"`
+	Tags                       map[string]string `json:"tags"`
+	Region                     string            `json:"region"`
+	AccountID                  string            `json:"accountId"`
+	CreatedAt                  time.Time         `json:"createdAt"`
+	UpdatedAt                  time.Time         `json:"updatedAt"`
 }
 
 // ELBv2Listener represents a stored listener
@@ -951,15 +950,15 @@ type ELBv2Listener struct {
 
 // ELBv2Target represents a registered target
 type ELBv2Target struct {
-	TargetGroupArn   string    `json:"targetGroupArn"`
-	ID               string    `json:"id"`
-	Port             int32     `json:"port"`
-	AvailabilityZone string    `json:"availabilityZone"`
-	HealthState      string    `json:"healthState"`
-	HealthReason     string    `json:"healthReason"`
-	HealthDescription string   `json:"healthDescription"`
-	RegisteredAt     time.Time `json:"registeredAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
+	TargetGroupArn    string    `json:"targetGroupArn"`
+	ID                string    `json:"id"`
+	Port              int32     `json:"port"`
+	AvailabilityZone  string    `json:"availabilityZone"`
+	HealthState       string    `json:"healthState"`
+	HealthReason      string    `json:"healthReason"`
+	HealthDescription string    `json:"healthDescription"`
+	RegisteredAt      time.Time `json:"registeredAt"`
+	UpdatedAt         time.Time `json:"updatedAt"`
 }
 
 // ELBv2TargetHealth represents target health information

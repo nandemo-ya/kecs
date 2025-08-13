@@ -12,7 +12,7 @@ var _ = Describe("SNIManager", func() {
 			// Test the concept of host extraction
 			// In real implementation, we would test through public methods
 			expectedHosts := []string{"api.example.com", "www.example.com", "blog.example.com", "news.example.com"}
-			
+
 			// The actual implementation would extract these hosts from rules like:
 			// "Host(`api.example.com`)"
 			// "(Host(`blog.example.com`) || Host(`news.example.com`))"
@@ -23,7 +23,7 @@ var _ = Describe("SNIManager", func() {
 			// Test wildcard host extraction concept
 			// Rules like "HostRegexp(`^[^.]+.example.com$`)" should be converted to "*.example.com"
 			expectedHosts := []string{"*.example.com", "*.app.com"}
-			
+
 			Expect(len(expectedHosts)).To(Equal(2))
 		})
 
@@ -31,7 +31,7 @@ var _ = Describe("SNIManager", func() {
 			// Test extraction from complex rules
 			// Rules with both host and path conditions should extract only the host part
 			expectedHosts := []string{"admin.example.com", "api.example.com"}
-			
+
 			// PathPrefix-only rules should be ignored
 			Expect(len(expectedHosts)).To(Equal(2))
 		})
@@ -53,7 +53,7 @@ var _ = Describe("SNIManager", func() {
 			// Group 1: *.example.com (main) with api, www, blog as SANs
 			// Group 2: *.app.com (main) with dev as SAN
 			// Group 3: other.domain.com (standalone)
-			
+
 			// In the actual implementation, this would be tested through public methods
 			Expect(len(hosts)).To(Equal(7))
 		})
@@ -95,11 +95,11 @@ var _ = Describe("SNIManager", func() {
 			// Test TLS configuration structure
 			// Expected structure should have domains and options
 			expectedKeys := []string{"domains", "options"}
-			
+
 			for _, key := range expectedKeys {
 				Expect(key).NotTo(BeEmpty())
 			}
-			
+
 			// Test that SNI strict mode would be enabled
 			Expect(true).To(BeTrue()) // sniStrict should be true
 		})

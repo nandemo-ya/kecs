@@ -58,7 +58,7 @@ type Client interface {
 
 	// Health check
 	HealthCheck(ctx context.Context, instanceName string) error
-	
+
 	// Cleanup
 	Close() error
 }

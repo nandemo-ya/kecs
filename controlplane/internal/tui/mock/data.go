@@ -104,19 +104,19 @@ var (
 	}
 
 	taskDefVersions = map[string]int{
-		"web-app":        5,
-		"api":            12,
-		"worker":         3,
-		"db-migrate":     1,
-		"cache":          2,
-		"auth":           8,
-		"notification":   4,
-		"search":         6,
-		"analytics":      2,
-		"batch":          1,
-		"stream":         3,
-		"scheduler":      2,
-		"monitoring":     1,
+		"web-app":      5,
+		"api":          12,
+		"worker":       3,
+		"db-migrate":   1,
+		"cache":        2,
+		"auth":         8,
+		"notification": 4,
+		"search":       6,
+		"analytics":    2,
+		"batch":        1,
+		"stream":       3,
+		"scheduler":    2,
+		"monitoring":   1,
 	}
 
 	logTemplates = []string{
@@ -157,7 +157,7 @@ func GetInstances() []InstanceData {
 	// Simulate some dynamic changes
 	instances := make([]InstanceData, len(mockInstances))
 	copy(instances, mockInstances)
-	
+
 	// Randomly update some metrics
 	for i := range instances {
 		if instances[i].Status == "ACTIVE" {
@@ -168,7 +168,7 @@ func GetInstances() []InstanceData {
 			}
 		}
 	}
-	
+
 	return instances
 }
 
@@ -178,7 +178,7 @@ func GetClusters(instanceName string) []ClusterData {
 	if !ok {
 		return []ClusterData{}
 	}
-	
+
 	// Simulate dynamic CPU/Memory changes
 	result := make([]ClusterData, len(clusters))
 	for i, cluster := range clusters {
@@ -190,14 +190,14 @@ func GetClusters(instanceName string) []ClusterData {
 			result[i].CPUUsed = cluster.CPUTotal * 0.95
 		}
 	}
-	
+
 	return result
 }
 
 // GetServices returns mock service data for a cluster
 func GetServices(instanceName, clusterName string) []ServiceData {
 	services := []ServiceData{}
-	
+
 	// Generate services based on cluster
 	numServices := 3 + rand.Intn(8)
 	for i := 0; i < numServices; i++ {
@@ -206,17 +206,17 @@ func GetServices(instanceName, clusterName string) []ServiceData {
 		if rand.Float64() > 0.5 {
 			taskDefBase = serviceTemplates[rand.Intn(len(serviceTemplates))]
 		}
-		
+
 		version := 1
 		if v, ok := taskDefVersions[taskDefBase]; ok {
 			version = v
 		}
-		
+
 		desired := 1 + rand.Intn(5)
 		running := desired
 		pending := 0
 		status := "ACTIVE"
-		
+
 		// Simulate some services with issues
 		roll := rand.Float64()
 		if roll < 0.1 {
@@ -233,7 +233,7 @@ func GetServices(instanceName, clusterName string) []ServiceData {
 			pending = desired - running
 			status = "PROVISIONING"
 		}
-		
+
 		services = append(services, ServiceData{
 			Name:    fmt.Sprintf("%s-%d", template, i+1),
 			Desired: desired,
@@ -244,14 +244,14 @@ func GetServices(instanceName, clusterName string) []ServiceData {
 			Age:     time.Duration(rand.Intn(30*24)) * time.Hour,
 		})
 	}
-	
+
 	return services
 }
 
 // GetTasks returns mock task data for a service
 func GetTasks(instanceName, clusterName, serviceName string) []TaskData {
 	tasks := []TaskData{}
-	
+
 	// Generate tasks based on service
 	numTasks := 1 + rand.Intn(5)
 	for i := 0; i < numTasks; i++ {
@@ -260,7 +260,7 @@ func GetTasks(instanceName, clusterName, serviceName string) []TaskData {
 		cpu := rand.Float64() * 2.0
 		memory := fmt.Sprintf("%dM", 128+rand.Intn(896))
 		ip := fmt.Sprintf("10.0.%d.%d", rand.Intn(10), rand.Intn(255))
-		
+
 		// Simulate different task states
 		roll := rand.Float64()
 		if roll < 0.1 {
@@ -277,7 +277,7 @@ func GetTasks(instanceName, clusterName, serviceName string) []TaskData {
 		} else if roll < 0.3 {
 			health = "UNKNOWN"
 		}
-		
+
 		tasks = append(tasks, TaskData{
 			ID:      fmt.Sprintf("%08x-%04x-%04x", rand.Uint32(), rand.Intn(65536), rand.Intn(65536)),
 			Service: serviceName,
@@ -289,14 +289,14 @@ func GetTasks(instanceName, clusterName, serviceName string) []TaskData {
 			Age:     time.Duration(rand.Intn(48)) * time.Hour,
 		})
 	}
-	
+
 	return tasks
 }
 
 // GetLogs returns mock log entries
 func GetLogs(taskID string, count int) []LogData {
 	logs := []LogData{}
-	
+
 	now := time.Now()
 	for i := 0; i < count; i++ {
 		level := "INFO"
@@ -308,10 +308,10 @@ func GetLogs(taskID string, count int) []LogData {
 		} else if roll < 0.05 {
 			level = "DEBUG"
 		}
-		
+
 		var message string
 		template := logTemplates[rand.Intn(len(logTemplates))]
-		
+
 		switch template {
 		case "Server started on port %d":
 			message = fmt.Sprintf(template, 8080+rand.Intn(20))
@@ -350,26 +350,26 @@ func GetLogs(taskID string, count int) []LogData {
 		default:
 			message = template
 		}
-		
+
 		logs = append(logs, LogData{
 			Timestamp: now.Add(-time.Duration(i) * time.Second),
 			Level:     level,
 			Message:   message,
 		})
 	}
-	
+
 	return logs
 }
 
 // StreamLogs generates new log entries continuously
 func StreamLogs(taskID string) <-chan LogData {
 	ch := make(chan LogData)
-	
+
 	go func() {
 		ticker := time.NewTicker(time.Duration(500+rand.Intn(2000)) * time.Millisecond)
 		defer ticker.Stop()
 		defer close(ch)
-		
+
 		for range ticker.C {
 			logs := GetLogs(taskID, 1)
 			if len(logs) > 0 {
@@ -377,6 +377,6 @@ func StreamLogs(taskID string) <-chan LogData {
 			}
 		}
 	}()
-	
+
 	return ch
 }

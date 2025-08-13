@@ -30,17 +30,17 @@ kind: Config`
 				// Mock getK3dAPIPort to return a known port
 				// For now, we'll test the regex replacement directly
 				fixed := strings.ReplaceAll(input, "0.0.0.0", "127.0.0.1")
-				
+
 				// The updated regex pattern
 				re := regexp.MustCompile(`(https://127\.0\.0\.1)(:\d+)?(:)?`)
 				result := re.ReplaceAllStringFunc(fixed, func(match string) string {
 					return "https://127.0.0.1:6443"
 				})
-				
+
 				// Debug output
 				GinkgoWriter.Printf("Input after 0.0.0.0 replacement:\n%s\n", fixed)
 				GinkgoWriter.Printf("Result after regex replacement:\n%s\n", result)
-				
+
 				Expect(result).To(ContainSubstring("server: https://127.0.0.1:6443"))
 				// Check that we don't have trailing colon without port
 				Expect(result).NotTo(MatchRegexp(`server: https://127\.0\.0\.1:\s*\n`))
@@ -49,36 +49,36 @@ kind: Config`
 			It("should fix server URL with existing port", func() {
 				input := `server: https://0.0.0.0:12345`
 				fixed := strings.ReplaceAll(input, "0.0.0.0", "127.0.0.1")
-				
+
 				re := regexp.MustCompile(`(https://127\.0\.0\.1)(:\d+)?(:)?`)
 				result := re.ReplaceAllStringFunc(fixed, func(match string) string {
 					return "https://127.0.0.1:6443"
 				})
-				
+
 				Expect(result).To(Equal("server: https://127.0.0.1:6443"))
 			})
 
 			It("should handle quoted URLs in YAML", func() {
 				input := `server: 'https://0.0.0.0:'`
 				fixed := strings.ReplaceAll(input, "0.0.0.0", "127.0.0.1")
-				
+
 				re := regexp.MustCompile(`(https://127\.0\.0\.1)(:\d+)?(:)?`)
 				result := re.ReplaceAllStringFunc(fixed, func(match string) string {
 					return "https://127.0.0.1:6443"
 				})
-				
+
 				Expect(result).To(Equal("server: 'https://127.0.0.1:6443'"))
 			})
 
 			It("should handle double-quoted URLs in YAML", func() {
 				input := `server: "https://0.0.0.0:"`
 				fixed := strings.ReplaceAll(input, "0.0.0.0", "127.0.0.1")
-				
+
 				re := regexp.MustCompile(`(https://127\.0\.0\.1)(:\d+)?(:)?`)
 				result := re.ReplaceAllStringFunc(fixed, func(match string) string {
 					return "https://127.0.0.1:6443"
 				})
-				
+
 				Expect(result).To(Equal(`server: "https://127.0.0.1:6443"`))
 			})
 		})

@@ -247,7 +247,7 @@ func fixKubeconfig(kubeconfigContent string, k3dClusterName string) (string, err
 
 	// Replace host.docker.internal with 127.0.0.1
 	fixedContent := strings.ReplaceAll(kubeconfigContent, "host.docker.internal", "127.0.0.1")
-	
+
 	// Also replace 0.0.0.0 with 127.0.0.1
 	fixedContent = strings.ReplaceAll(fixedContent, "0.0.0.0", "127.0.0.1")
 
@@ -289,10 +289,10 @@ func getK3dAPIPort(k3dClusterName string) (string, error) {
 	// Look for the loadbalancer container
 	lines := strings.Split(string(output), "\n")
 	lbName := fmt.Sprintf("k3d-%s-serverlb", k3dClusterName)
-	
+
 	// Debug: log docker ps output
 	fmt.Fprintf(os.Stderr, "DEBUG: Looking for container %s\n", lbName)
-	
+
 	for _, line := range lines {
 		if strings.HasPrefix(line, lbName) {
 			// Debug: log the line we found

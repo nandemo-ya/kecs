@@ -29,7 +29,7 @@ func init() {
 
 func runStop(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	
+
 	// Create instance manager
 	manager, err := instance.NewManager()
 	if err != nil {
@@ -39,24 +39,24 @@ func runStop(cmd *cobra.Command, args []string) error {
 	// If instance name is not provided, list available instances
 	if stopInstanceName == "" {
 		fmt.Println("Fetching KECS instances...")
-		
+
 		// Get list of instances
 		instances, err := manager.List(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to list instances: %w", err)
 		}
-		
+
 		if len(instances) == 0 {
 			fmt.Println("No KECS instances found")
 			return nil
 		}
-		
+
 		// List available instances
 		fmt.Println("\nAvailable KECS instances:")
 		for i, inst := range instances {
 			fmt.Printf("  %d. %s (%s)\n", i+1, inst.Name, strings.ToLower(inst.Status))
 		}
-		
+
 		return fmt.Errorf("please specify an instance to stop with --instance flag")
 	}
 
@@ -79,7 +79,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 		}
 		return fmt.Errorf("failed to stop instance: %w", err)
 	}
-	
+
 	fmt.Printf("✅ KECS instance '%s' has been stopped\n", stopInstanceName)
 	fmt.Println("Instance data preserved. Use 'kecs start' to restart the instance.")
 

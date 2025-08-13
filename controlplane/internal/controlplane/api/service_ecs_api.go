@@ -67,7 +67,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 			parts := strings.SplitN(taskDefArn, ":", 2)
 			family := parts[0]
 			revision := parts[1]
-			
+
 			if revision == "latest" {
 				// KECS extension: support for family:latest
 				logging.Debug("Resolving 'latest' tag for task definition family", "family", family)
@@ -118,13 +118,13 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		if existingService.Status != "DRAINING" && existingService.Status != "INACTIVE" && existingService.Status != "FAILED" {
 			// Service already exists - return the existing service for idempotency
 			// This helps with client retries and matches common AWS behavior
-			logging.Info("Service already exists, returning existing service", 
-				"service", req.ServiceName, 
+			logging.Info("Service already exists, returning existing service",
+				"service", req.ServiceName,
 				"cluster", cluster.Name)
-			
+
 			// Convert storage service to API response
 			responseService := storageServiceToGeneratedService(existingService)
-			
+
 			return &generated.CreateServiceResponse{
 				Service: responseService,
 			}, nil
@@ -292,7 +292,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	if err := api.storage.ServiceStore().Create(ctx, storageService); err != nil {
 		return nil, fmt.Errorf("failed to create service: %w", err)
 	}
-	
+
 	logging.Info("Service created in storage, proceeding with Kubernetes deployment",
 		"service", storageService.ServiceName)
 
@@ -457,7 +457,7 @@ func (api *DefaultECSAPI) DescribeServices(ctx context.Context, req *generated.D
 				serviceName = parts[len(parts)-1]
 			}
 		}
-		
+
 		storageService, err := api.storage.ServiceStore().Get(ctx, clusterARN, serviceName)
 		if err != nil {
 			failures = append(failures, generated.Failure{
@@ -1407,13 +1407,13 @@ func (api *DefaultECSAPI) createTasksForService(ctx context.Context, service *st
 	if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
 		return fmt.Errorf("failed to parse container definitions: %w", err)
 	}
-	
+
 	// In test mode, we create tasks directly in storage without kubernetes resources
 	for i := 0; i < service.DesiredCount; i++ {
 		// Generate task ID
 		taskID := uuid.New().String()
 		taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", api.region, api.accountID, cluster.Name, taskID)
-		
+
 		// Build initial container status using generated.Container type
 		var containers []generated.Container
 		for _, containerDef := range containerDefs {
@@ -1426,7 +1426,7 @@ func (api *DefaultECSAPI) createTasksForService(ctx context.Context, service *st
 			if memory, ok := containerDef["memory"].(float64); ok {
 				containerMemory = fmt.Sprintf("%d", int(memory))
 			}
-			
+
 			container := generated.Container{
 				ContainerArn: ptr.String(fmt.Sprintf("%s/container-%s", taskARN, containerName)),
 				TaskArn:      ptr.String(taskARN),
@@ -1437,46 +1437,46 @@ func (api *DefaultECSAPI) createTasksForService(ctx context.Context, service *st
 			}
 			containers = append(containers, container)
 		}
-		
+
 		containersJSON, _ := json.Marshal(containers)
-		
+
 		// Create storage task
 		now := time.Now()
 		task := &storage.Task{
-			ID:                 taskID,
-			ARN:                taskARN,
-			ClusterARN:         cluster.ARN,
-			TaskDefinitionARN:  taskDef.ARN,
-			LastStatus:         "PROVISIONING",
-			DesiredStatus:      "RUNNING",
-			LaunchType:         service.LaunchType,
-			StartedBy:          fmt.Sprintf("ecs-svc/%s", service.ServiceName),
-			CreatedAt:          now,
-			Version:            1,
-			CPU:                taskDef.CPU,
-			Memory:             taskDef.Memory,
+			ID:                   taskID,
+			ARN:                  taskARN,
+			ClusterARN:           cluster.ARN,
+			TaskDefinitionARN:    taskDef.ARN,
+			LastStatus:           "PROVISIONING",
+			DesiredStatus:        "RUNNING",
+			LaunchType:           service.LaunchType,
+			StartedBy:            fmt.Sprintf("ecs-svc/%s", service.ServiceName),
+			CreatedAt:            now,
+			Version:              1,
+			CPU:                  taskDef.CPU,
+			Memory:               taskDef.Memory,
 			ContainerInstanceARN: "", // Empty in test mode
-			Group:              fmt.Sprintf("service:%s", service.ServiceName),
-			Containers:         string(containersJSON),
+			Group:                fmt.Sprintf("service:%s", service.ServiceName),
+			Containers:           string(containersJSON),
 		}
-		
+
 		// Save task to storage
 		if err := api.storage.TaskStore().Create(ctx, task); err != nil {
 			return fmt.Errorf("failed to create task %d: %w", i, err)
 		}
-		
+
 		logging.Debug("Created task for service in test mode", "taskId", taskID, "service", service.ServiceName)
 	}
-	
+
 	// Update service counts
 	service.RunningCount = service.DesiredCount
 	service.PendingCount = 0
 	service.Status = "ACTIVE"
 	service.UpdatedAt = time.Now()
-	
+
 	if err := api.storage.ServiceStore().Update(ctx, service); err != nil {
 		return fmt.Errorf("failed to update service counts: %w", err)
 	}
-	
+
 	return nil
 }

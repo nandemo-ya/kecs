@@ -82,7 +82,7 @@ func (w *TestModeTaskWorker) processTasks(ctx context.Context) {
 			logging.Error("Test mode worker: Failed to list tasks for cluster", "cluster", cluster.Name, "error", err)
 			continue
 		}
-		
+
 		if len(tasks) > 0 {
 			logging.Debug("Test mode worker: Processing tasks for cluster", "count", len(tasks), "cluster", cluster.Name)
 		}

@@ -9,28 +9,28 @@ import (
 type LocalStackState struct {
 	// Whether LocalStack is deployed
 	Deployed bool `json:"deployed"`
-	
+
 	// Deployment status (pending, running, failed, stopped)
 	Status string `json:"status"`
-	
+
 	// LocalStack version
 	Version string `json:"version,omitempty"`
-	
+
 	// LocalStack namespace
 	Namespace string `json:"namespace,omitempty"`
-	
+
 	// LocalStack pod name
 	PodName string `json:"podName,omitempty"`
-	
+
 	// LocalStack service endpoint
 	Endpoint string `json:"endpoint,omitempty"`
-	
+
 	// Deployment timestamp
 	DeployedAt *time.Time `json:"deployedAt,omitempty"`
-	
+
 	// Last health check timestamp
 	LastHealthCheck *time.Time `json:"lastHealthCheck,omitempty"`
-	
+
 	// Health status
 	HealthStatus string `json:"healthStatus,omitempty"`
 }

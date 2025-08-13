@@ -27,14 +27,14 @@ func getRunningKECSContainers(ctx context.Context, cli *client.Client) ([]types.
 	filters := filters.NewArgs()
 	filters.Add("label", "app=kecs")
 	filters.Add("status", "running")
-	
+
 	containers, err := cli.ContainerList(ctx, container.ListOptions{
 		Filters: filters,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
-	
+
 	return containers, nil
 }
 
@@ -44,21 +44,21 @@ func getUsedPorts(ctx context.Context, cli *client.Client) (map[int]string, erro
 	if err != nil {
 		return nil, err
 	}
-	
+
 	usedPorts := make(map[int]string)
 	for _, c := range containers {
 		containerName := c.Names[0]
 		if len(containerName) > 0 && containerName[0] == '/' {
 			containerName = containerName[1:]
 		}
-		
+
 		for _, p := range c.Ports {
 			if p.PublicPort != 0 {
 				usedPorts[int(p.PublicPort)] = containerName
 			}
 		}
 	}
-	
+
 	return usedPorts, nil
 }
 
@@ -66,14 +66,14 @@ func getUsedPorts(ctx context.Context, cli *client.Client) (map[int]string, erro
 func findAvailablePort(startPort int, usedPorts map[int]string) int {
 	port := startPort
 	maxAttempts := 100
-	
+
 	for i := 0; i < maxAttempts; i++ {
 		if _, used := usedPorts[port]; !used && isPortAvailable(port) {
 			return port
 		}
 		port++
 	}
-	
+
 	return -1
 }
 
@@ -91,7 +91,7 @@ func parsePortMapping(portStr string) (hostPort, containerPort int, err error) {
 		}
 		return hostPort, containerPort, nil
 	}
-	
+
 	// Single port - use same for host and container
 	port, err := strconv.Atoi(portStr)
 	if err != nil {

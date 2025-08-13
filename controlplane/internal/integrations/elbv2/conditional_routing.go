@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // ConditionalRoutingManager manages complex conditional routing patterns
@@ -40,7 +40,7 @@ type ConditionalRoute struct {
 
 // ConditionalGroup represents a group of conditions that must all match
 type ConditionalGroup struct {
-	Operator   string                          // "AND" or "OR"
+	Operator   string // "AND" or "OR"
 	Conditions []generated_elbv2.RuleCondition
 }
 
@@ -48,7 +48,7 @@ type ConditionalGroup struct {
 func (c *ConditionalRoutingManager) CreateConditionalRoute(ctx context.Context, listenerArn string, route ConditionalRoute) (*storage.ELBv2Rule, error) {
 	// Flatten conditions for ELBv2 (all conditions in a rule are AND'ed)
 	flatConditions := c.flattenConditions(route.Conditions)
-	
+
 	// Determine priority if not specified
 	if route.Priority == nil {
 		priority, err := c.priorityManager.FindPriorityForConditions(ctx, listenerArn, flatConditions)
@@ -63,7 +63,7 @@ func (c *ConditionalRoutingManager) CreateConditionalRoute(ctx context.Context, 
 			return nil, fmt.Errorf("invalid priority: %w", err)
 		}
 	}
-	
+
 	// Create the rule
 	rule := &storage.ELBv2Rule{
 		ARN:         generateRuleArn(listenerArn),
@@ -72,7 +72,7 @@ func (c *ConditionalRoutingManager) CreateConditionalRoute(ctx context.Context, 
 		Conditions:  c.serializeConditions(flatConditions),
 		Actions:     c.serializeActions(route.Actions),
 	}
-	
+
 	// Add metadata as tags
 	if route.Name != "" || route.Description != "" {
 		rule.Tags = map[string]string{
@@ -80,12 +80,12 @@ func (c *ConditionalRoutingManager) CreateConditionalRoute(ctx context.Context, 
 			"Description": route.Description,
 		}
 	}
-	
+
 	err := c.store.CreateRule(ctx, rule)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	logging.Debug("Created conditional route", "name", route.Name, "priority", *route.Priority)
 	return rule, nil
 }
@@ -98,9 +98,9 @@ func (c *ConditionalRoutingManager) CreateIfThenElseRoutes(ctx context.Context, 
 		scoreJ := c.calculateRouteSpecificity(routes[j])
 		return scoreI > scoreJ
 	})
-	
+
 	var rules []*storage.ELBv2Rule
-	
+
 	for i, route := range routes {
 		// Auto-assign priorities in order
 		if route.Priority == nil {
@@ -108,7 +108,7 @@ func (c *ConditionalRoutingManager) CreateIfThenElseRoutes(ctx context.Context, 
 			basePriority := int32(100 + i*10)
 			route.Priority = &basePriority
 		}
-		
+
 		rule, err := c.CreateConditionalRoute(ctx, listenerArn, route)
 		if err != nil {
 			// Rollback created rules on error
@@ -117,10 +117,10 @@ func (c *ConditionalRoutingManager) CreateIfThenElseRoutes(ctx context.Context, 
 			}
 			return nil, fmt.Errorf("failed to create route %s: %w", route.Name, err)
 		}
-		
+
 		rules = append(rules, rule)
 	}
-	
+
 	return rules, nil
 }
 
@@ -128,7 +128,7 @@ func (c *ConditionalRoutingManager) CreateIfThenElseRoutes(ctx context.Context, 
 func (c *ConditionalRoutingManager) CreateCanaryRoute(ctx context.Context, listenerArn string, config CanaryConfig) (*storage.ELBv2Rule, error) {
 	// Build conditions for canary
 	var conditions []generated_elbv2.RuleCondition
-	
+
 	// Add path condition if specified
 	if len(config.Paths) > 0 {
 		conditions = append(conditions, generated_elbv2.RuleCondition{
@@ -138,7 +138,7 @@ func (c *ConditionalRoutingManager) CreateCanaryRoute(ctx context.Context, liste
 			},
 		})
 	}
-	
+
 	// Add header conditions for canary selection
 	if config.HeaderName != "" && len(config.HeaderValues) > 0 {
 		conditions = append(conditions, generated_elbv2.RuleCondition{
@@ -149,7 +149,7 @@ func (c *ConditionalRoutingManager) CreateCanaryRoute(ctx context.Context, liste
 			},
 		})
 	}
-	
+
 	// Create weighted forward action
 	actionType := generated_elbv2.ActionTypeEnumFORWARD
 	action := generated_elbv2.Action{
@@ -167,7 +167,7 @@ func (c *ConditionalRoutingManager) CreateCanaryRoute(ctx context.Context, liste
 			},
 		},
 	}
-	
+
 	route := ConditionalRoute{
 		Name:        fmt.Sprintf("canary-%s", config.Name),
 		Description: fmt.Sprintf("Canary deployment: %d%% to new version", config.CanaryWeight),
@@ -180,7 +180,7 @@ func (c *ConditionalRoutingManager) CreateCanaryRoute(ctx context.Context, liste
 		Actions:  []generated_elbv2.Action{action},
 		Priority: config.Priority,
 	}
-	
+
 	return c.CreateConditionalRoute(ctx, listenerArn, route)
 }
 
@@ -200,10 +200,10 @@ type CanaryConfig struct {
 // CreateMultiStageRoute creates a multi-stage feature rollout
 func (c *ConditionalRoutingManager) CreateMultiStageRoute(ctx context.Context, listenerArn string, stages []StageConfig) ([]*storage.ELBv2Rule, error) {
 	var routes []ConditionalRoute
-	
+
 	for _, stage := range stages {
 		conditions := []generated_elbv2.RuleCondition{}
-		
+
 		// Add path conditions
 		if len(stage.Paths) > 0 {
 			conditions = append(conditions, generated_elbv2.RuleCondition{
@@ -213,7 +213,7 @@ func (c *ConditionalRoutingManager) CreateMultiStageRoute(ctx context.Context, l
 				},
 			})
 		}
-		
+
 		// Add source IP conditions for internal users
 		if len(stage.SourceIPs) > 0 {
 			conditions = append(conditions, generated_elbv2.RuleCondition{
@@ -223,7 +223,7 @@ func (c *ConditionalRoutingManager) CreateMultiStageRoute(ctx context.Context, l
 				},
 			})
 		}
-		
+
 		// Add header conditions
 		for headerName, headerValues := range stage.Headers {
 			conditions = append(conditions, generated_elbv2.RuleCondition{
@@ -234,13 +234,13 @@ func (c *ConditionalRoutingManager) CreateMultiStageRoute(ctx context.Context, l
 				},
 			})
 		}
-		
+
 		actionType := generated_elbv2.ActionTypeEnumFORWARD
 		action := generated_elbv2.Action{
 			Type:           actionType,
 			TargetGroupArn: &stage.TargetGroup,
 		}
-		
+
 		routes = append(routes, ConditionalRoute{
 			Name:        stage.Name,
 			Description: stage.Description,
@@ -254,7 +254,7 @@ func (c *ConditionalRoutingManager) CreateMultiStageRoute(ctx context.Context, l
 			Priority: stage.Priority,
 		})
 	}
-	
+
 	return c.CreateIfThenElseRoutes(ctx, listenerArn, routes)
 }
 
@@ -275,53 +275,53 @@ func (c *ConditionalRoutingManager) AnalyzeConditionalRoutes(ctx context.Context
 	if err != nil {
 		return nil, fmt.Errorf("failed to list rules: %w", err)
 	}
-	
+
 	analysis := &ConditionalRoutingAnalysis{
-		TotalRules:          len(rules),
-		ConditionalRules:    0,
-		ComplexityScore:     0,
-		ConditionTypes:      make(map[string]int),
-		AverageConditions:   0,
-		PotentialConflicts:  []ConflictInfo{},
-		OptimizationTips:    []string{},
+		TotalRules:         len(rules),
+		ConditionalRules:   0,
+		ComplexityScore:    0,
+		ConditionTypes:     make(map[string]int),
+		AverageConditions:  0,
+		PotentialConflicts: []ConflictInfo{},
+		OptimizationTips:   []string{},
 	}
-	
+
 	totalConditions := 0
-	
+
 	for _, rule := range rules {
 		conditions, err := c.ruleConverter.ConvertRuleConditionsFromJSON(rule.Conditions)
 		if err != nil {
 			logging.Debug("Failed to parse conditions for rule", "ruleArn", rule.ARN, "error", err)
 			continue
 		}
-		
+
 		if len(conditions) > 1 {
 			analysis.ConditionalRules++
 		}
-		
+
 		totalConditions += len(conditions)
-		
+
 		// Count condition types
 		for _, condition := range conditions {
 			if condition.Field != nil {
 				analysis.ConditionTypes[*condition.Field]++
 			}
 		}
-		
+
 		// Calculate complexity score
 		analysis.ComplexityScore += len(conditions) * len(conditions)
 	}
-	
+
 	if len(rules) > 0 {
 		analysis.AverageConditions = float32(totalConditions) / float32(len(rules))
 	}
-	
+
 	// Detect potential conflicts
 	analysis.PotentialConflicts = c.detectConflicts(rules)
-	
+
 	// Generate optimization tips
 	analysis.OptimizationTips = c.generateOptimizationTips(analysis)
-	
+
 	return analysis, nil
 }
 
@@ -349,7 +349,7 @@ func (c *ConditionalRoutingManager) flattenConditions(groups []ConditionalGroup)
 	// For now, we only support AND operations (ELBv2 limitation)
 	// OR operations would require creating multiple rules
 	var conditions []generated_elbv2.RuleCondition
-	
+
 	for _, group := range groups {
 		if group.Operator == "AND" || group.Operator == "" {
 			conditions = append(conditions, group.Conditions...)
@@ -360,7 +360,7 @@ func (c *ConditionalRoutingManager) flattenConditions(groups []ConditionalGroup)
 			}
 		}
 	}
-	
+
 	return conditions
 }
 
@@ -371,12 +371,12 @@ func (c *ConditionalRoutingManager) calculateRouteSpecificity(route ConditionalR
 
 func (c *ConditionalRoutingManager) detectConflicts(rules []*storage.ELBv2Rule) []ConflictInfo {
 	var conflicts []ConflictInfo
-	
+
 	// Sort rules by priority
 	sort.Slice(rules, func(i, j int) bool {
 		return rules[i].Priority < rules[j].Priority
 	})
-	
+
 	// Check for overlapping conditions
 	for i := 0; i < len(rules)-1; i++ {
 		for j := i + 1; j < len(rules); j++ {
@@ -389,7 +389,7 @@ func (c *ConditionalRoutingManager) detectConflicts(rules []*storage.ELBv2Rule) 
 			}
 		}
 	}
-	
+
 	return conflicts
 }
 
@@ -397,7 +397,7 @@ func (c *ConditionalRoutingManager) rulesOverlap(rule1, rule2 *storage.ELBv2Rule
 	// Simple overlap detection - could be enhanced
 	conditions1, _ := c.ruleConverter.ConvertRuleConditionsFromJSON(rule1.Conditions)
 	conditions2, _ := c.ruleConverter.ConvertRuleConditionsFromJSON(rule2.Conditions)
-	
+
 	// Check if rule1's conditions are a subset of rule2's conditions
 	pathMatch := false
 	for _, c1 := range conditions1 {
@@ -416,7 +416,7 @@ func (c *ConditionalRoutingManager) rulesOverlap(rule1, rule2 *storage.ELBv2Rule
 			}
 		}
 	}
-	
+
 	return pathMatch
 }
 
@@ -425,40 +425,40 @@ func pathsOverlap(path1, path2 string) bool {
 	if path1 == path2 {
 		return true
 	}
-	
+
 	// Check if one is a prefix of the other
 	if strings.HasSuffix(path1, "*") {
 		prefix := strings.TrimSuffix(path1, "*")
 		return strings.HasPrefix(path2, prefix)
 	}
-	
+
 	if strings.HasSuffix(path2, "*") {
 		prefix := strings.TrimSuffix(path2, "*")
 		return strings.HasPrefix(path1, prefix)
 	}
-	
+
 	return false
 }
 
 func (c *ConditionalRoutingManager) generateOptimizationTips(analysis *ConditionalRoutingAnalysis) []string {
 	var tips []string
-	
+
 	if analysis.AverageConditions > 3 {
 		tips = append(tips, "Consider simplifying rules with many conditions for better performance")
 	}
-	
+
 	if analysis.ComplexityScore > 100 {
 		tips = append(tips, "High complexity score indicates potential for rule consolidation")
 	}
-	
+
 	if len(analysis.PotentialConflicts) > 0 {
 		tips = append(tips, fmt.Sprintf("Found %d potential conflicts that may cause unexpected routing", len(analysis.PotentialConflicts)))
 	}
-	
+
 	if headerCount, exists := analysis.ConditionTypes["http-header"]; exists && headerCount > 10 {
 		tips = append(tips, "Consider using fewer header conditions for better performance")
 	}
-	
+
 	return tips
 }
 

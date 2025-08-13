@@ -43,12 +43,12 @@ tasks, and task definitions with real-time updates.`,
 		if err := config.InitConfig(); err != nil {
 			return err
 		}
-		
+
 		// Set endpoint in viper if provided via flag
 		if tuiEndpoint != "" {
 			config.Set("server.endpoint", tuiEndpoint)
 		}
-		
+
 		// Run the new TUI implementation
 		return tui.Run()
 	},

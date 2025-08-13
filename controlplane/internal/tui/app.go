@@ -18,7 +18,7 @@ func Run() error {
 	// Suppress logging output while in TUI mode
 	// This prevents k3d and other components from writing logs to the terminal
 	logging.SetOutput(io.Discard)
-	
+
 	// Load configuration
 	cfg := LoadConfig()
 
@@ -185,14 +185,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.instances = append(m.instances, msg.instance)
 		// Select the new instance
 		m.selectedInstance = msg.instance.Name
-		
+
 		// Reset instance form and close it
 		if m.instanceForm != nil {
 			m.instanceForm.successMsg = fmt.Sprintf("Instance '%s' created successfully!", msg.instance.Name)
 			m.instanceForm.isCreating = false
 			m.instanceForm.errorMsg = ""
 			m.instanceForm.creationSteps = nil
-			
+
 			// Show success message briefly then close
 			cmds = append(cmds, tea.Sequence(
 				tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
@@ -252,7 +252,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Reload instances list
 			cmds = append(cmds, m.loadMockDataCmd())
 		}
-	
+
 	case instanceCreationStatusMsg:
 		// Update creation steps status
 		if m.instanceForm != nil && m.instanceForm.isCreating {
@@ -261,14 +261,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Start ticker for status updates
 			cmds = append(cmds, m.updateCreationStatusCmd())
 		}
-	
+
 	case actualCreationStatusMsg:
 		// Update creation steps based on actual status from API
 		if m.instanceForm != nil && m.instanceForm.isCreating && msg.status != nil {
 			// Find the step that matches the current status
 			for i := range m.instanceForm.creationSteps {
 				step := &m.instanceForm.creationSteps[i]
-				
+
 				// Update matching step
 				if step.Name == msg.status.Step {
 					step.Status = msg.status.Status
@@ -282,20 +282,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-	
+
 	case creationStatusTickMsg:
 		// Update creation progress every second
 		if m.instanceForm != nil && m.instanceForm.isCreating {
 			elapsed := time.Since(m.instanceForm.startTime)
 			m.instanceForm.elapsedTime = fmt.Sprintf("%.0fs", elapsed.Seconds())
-			
+
 			// Get the instance name from form
 			instanceName := m.instanceForm.instanceName
 			if instanceName != "" {
 				// Start async status check
 				cmds = append(cmds, m.checkCreationStatusCmd(instanceName))
 			}
-			
+
 			// Check all steps status
 			allDone := true
 			hasFailed := false
@@ -308,7 +308,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					allDone = false
 				}
 			}
-			
+
 			// If all done, failed, or timeout, stop ticking
 			if allDone || hasFailed || elapsed > 3*time.Minute {
 				if allDone && !hasFailed {
@@ -331,14 +331,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, m.updateCreationStatusCmd())
 			}
 		}
-	
+
 	case instanceCreationTimeoutMsg:
 		// Show timeout prompt
 		if m.instanceForm != nil && m.instanceForm.isCreating {
 			m.instanceForm.showTimeoutPrompt = true
 			m.instanceForm.elapsedTime = msg.elapsed
 		}
-	
+
 	case instanceCreationContinueMsg:
 		// Handle timeout response
 		if m.instanceForm != nil {
@@ -379,11 +379,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clusters = make([]Cluster, len(msg.Clusters))
 		for i, cl := range msg.Clusters {
 			m.clusters[i] = Cluster{
-				Name:        cl.Name,
-				Status:      cl.Status,
-				Services:    cl.Services,
-				Tasks:       cl.Tasks,
-				Age:         cl.Age,
+				Name:     cl.Name,
+				Status:   cl.Status,
+				Services: cl.Services,
+				Tasks:    cl.Tasks,
+				Age:      cl.Age,
 			}
 		}
 
@@ -1081,14 +1081,14 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				steps = append(steps, CreationStep{Name: "Configuring Traefik", Status: "pending"})
 			}
 			steps = append(steps, CreationStep{Name: "Finalizing", Status: "pending"})
-			
+
 			// Set initial state
 			m.instanceForm.successMsg = "Creating instance..."
 			m.instanceForm.isCreating = true
 			m.instanceForm.errorMsg = ""
 			m.instanceForm.creationSteps = steps
 			m.instanceForm.startTime = time.Now()
-			
+
 			// Start creation and monitoring
 			return m, tea.Batch(
 				m.createInstanceCmd(opts),
@@ -1138,14 +1138,14 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				steps = append(steps, CreationStep{Name: "Configuring Traefik", Status: "pending"})
 			}
 			steps = append(steps, CreationStep{Name: "Finalizing", Status: "pending"})
-			
+
 			// Set initial state
 			m.instanceForm.successMsg = "Creating instance..."
 			m.instanceForm.isCreating = true
 			m.instanceForm.errorMsg = ""
 			m.instanceForm.creationSteps = steps
 			m.instanceForm.startTime = time.Now()
-			
+
 			// Start creation and monitoring
 			return m, tea.Batch(
 				m.createInstanceCmd(opts),

@@ -163,7 +163,6 @@ type ElasticLoadBalancing_v10API interface {
 	SetSubnets(ctx context.Context, input *SetSubnetsInput) (*SetSubnetsOutput, error)
 }
 
-
 // Operation names
 const (
 	OperationAddListenerCertificates = "AddListenerCertificates"
