@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
@@ -233,7 +234,7 @@ func (c *TaskConverter) ConvertTaskToPod(
 		c.applyCloudWatchLogsConfiguration(pod, containerDefs, taskDef)
 
 		// Add FluentBit sidecar if needed
-		sidecar, configMap := c.createCloudWatchSidecar(containerDefs, taskDef, taskID)
+		sidecar, configMap := c.createCloudWatchSidecar(containerDefs, taskDef, cluster, taskID)
 		if sidecar != nil {
 			pod.Spec.Containers = append(pod.Spec.Containers, *sidecar)
 
@@ -379,7 +380,15 @@ func (c *TaskConverter) convertContainers(
 
 		// Health check
 		if def.HealthCheck != nil {
+			// Use the same probe for both liveness and readiness
 			container.LivenessProbe = c.convertHealthCheck(def.HealthCheck)
+			// Create a copy for readiness probe with potentially different settings
+			readinessProbe := c.convertHealthCheck(def.HealthCheck)
+			// Readiness probe can have shorter initial delay for faster service availability
+			if readinessProbe.InitialDelaySeconds > 10 {
+				readinessProbe.InitialDelaySeconds = 10
+			}
+			container.ReadinessProbe = readinessProbe
 		}
 
 		// User
@@ -585,29 +594,82 @@ func (c *TaskConverter) convertMountPoints(mountPoints []types.MountPoint) []cor
 
 // convertHealthCheck converts ECS health check to Kubernetes probe
 func (c *TaskConverter) convertHealthCheck(hc *types.HealthCheck) *corev1.Probe {
-	probe := &corev1.Probe{
-		ProbeHandler: corev1.ProbeHandler{
-			Exec: &corev1.ExecAction{
+	probe := &corev1.Probe{}
+
+	// Process command based on format
+	if hc.Command != nil && len(hc.Command) > 0 {
+		cmdType := hc.Command[0]
+
+		switch cmdType {
+		case "CMD-SHELL":
+			// Shell command - use exec probe with sh -c
+			if len(hc.Command) > 1 {
+				probe.Exec = &corev1.ExecAction{
+					Command: []string{"sh", "-c", hc.Command[1]},
+				}
+			}
+		case "CMD":
+			// Direct command - use exec probe
+			if len(hc.Command) > 1 {
+				probe.Exec = &corev1.ExecAction{
+					Command: hc.Command[1:],
+				}
+			}
+		case "HTTP":
+			// HTTP health check
+			if len(hc.Command) > 1 {
+				// Parse URL from command
+				path := hc.Command[1]
+				port := int32(80) // Default port
+
+				// Extract port if specified
+				if len(hc.Command) > 2 {
+					// Try to parse port from command
+					if p, err := strconv.Atoi(hc.Command[2]); err == nil {
+						port = int32(p)
+					}
+				}
+
+				probe.HTTPGet = &corev1.HTTPGetAction{
+					Path: path,
+					Port: intstr.FromInt(int(port)),
+				}
+			}
+		default:
+			// Assume direct command format
+			probe.Exec = &corev1.ExecAction{
 				Command: hc.Command,
-			},
-		},
+			}
+		}
 	}
 
+	// Set timing parameters
 	if hc.Interval != nil {
 		probe.PeriodSeconds = int32(*hc.Interval)
+	} else {
+		probe.PeriodSeconds = 30 // Default
 	}
 
 	if hc.Timeout != nil {
 		probe.TimeoutSeconds = int32(*hc.Timeout)
+	} else {
+		probe.TimeoutSeconds = 5 // Default
 	}
 
 	if hc.Retries != nil {
 		probe.FailureThreshold = int32(*hc.Retries)
+	} else {
+		probe.FailureThreshold = 3 // Default
 	}
 
 	if hc.StartPeriod != nil {
 		probe.InitialDelaySeconds = int32(*hc.StartPeriod)
+	} else {
+		probe.InitialDelaySeconds = 30 // Default
 	}
+
+	// Kubernetes successThreshold is always 1 for liveness probe
+	probe.SuccessThreshold = 1
 
 	return probe
 }
@@ -1470,7 +1532,7 @@ func (c *TaskConverter) sanitizeLabelKey(key string) string {
 }
 
 // createCloudWatchSidecar creates a FluentBit sidecar container for CloudWatch logging
-func (c *TaskConverter) createCloudWatchSidecar(containerDefs []types.ContainerDefinition, taskDef *storage.TaskDefinition, taskID string) (*corev1.Container, *corev1.ConfigMap) {
+func (c *TaskConverter) createCloudWatchSidecar(containerDefs []types.ContainerDefinition, taskDef *storage.TaskDefinition, cluster *storage.Cluster, taskID string) (*corev1.Container, *corev1.ConfigMap) {
 	if c.cloudWatchIntegration == nil {
 		return nil, nil
 	}
@@ -1555,7 +1617,7 @@ func (c *TaskConverter) createCloudWatchSidecar(containerDefs []types.ContainerD
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("fluent-bit-config-%s", taskID),
-			Namespace: c.getNamespace(nil),
+			Namespace: c.getNamespace(cluster),
 			Labels: map[string]string{
 				"kecs.dev/task-id":    taskID,
 				"kecs.dev/managed-by": "kecs",
@@ -2020,7 +2082,7 @@ func (c *TaskConverter) isSSMParameterSensitive(parameterName string) bool {
 func (c *TaskConverter) getPlaceholderSecretValue(source, secretName, key string) string {
 	// Generate deterministic placeholder values based on the secret name and key
 	// This ensures consistency across deployments while being obviously fake
-	
+
 	switch source {
 	case "secretsmanager":
 		// Generate different placeholder values for different secret types
@@ -2039,7 +2101,7 @@ func (c *TaskConverter) getPlaceholderSecretValue(source, secretName, key string
 			return "placeholder-encryption-key-from-secrets-manager"
 		}
 		return fmt.Sprintf("placeholder-secret-from-secrets-manager-%s-%s", secretName, key)
-		
+
 	case "ssm":
 		// Generate placeholder values for SSM parameters
 		if strings.Contains(strings.ToLower(secretName), "database") {
@@ -2052,7 +2114,7 @@ func (c *TaskConverter) getPlaceholderSecretValue(source, secretName, key string
 			return `{"new_ui": true, "beta_features": true, "maintenance_mode": false}`
 		}
 		return fmt.Sprintf("placeholder-parameter-from-ssm-%s", secretName)
-		
+
 	default:
 		return fmt.Sprintf("placeholder-unknown-secret-%s", secretName)
 	}
