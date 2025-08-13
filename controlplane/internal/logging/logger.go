@@ -13,7 +13,7 @@ var (
 	// global logger instance
 	globalLogger *slog.Logger
 	globalMu     sync.RWMutex
-	
+
 	// default text handler options
 	defaultTextOptions = &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -100,10 +100,10 @@ func Operation(name string) *slog.Logger {
 func SetOutput(w io.Writer) {
 	globalMu.Lock()
 	defer globalMu.Unlock()
-	
+
 	// Get current handler options from the existing logger if possible
 	opts := defaultTextOptions
-	
+
 	// Create new logger with the specified writer
 	globalLogger = slog.New(slog.NewTextHandler(w, opts))
 }
