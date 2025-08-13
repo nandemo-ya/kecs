@@ -21,6 +21,7 @@ type MockStorage struct {
 	taskSetStore           storage.TaskSetStore
 	containerInstanceStore storage.ContainerInstanceStore
 	attributeStore         storage.AttributeStore
+	elbv2Store            storage.ELBv2Store
 }
 
 func NewMockStorage() *MockStorage {
@@ -67,6 +68,10 @@ func (m *MockStorage) AttributeStore() storage.AttributeStore {
 	return m.attributeStore
 }
 
+func (m *MockStorage) ELBv2Store() storage.ELBv2Store {
+	return m.elbv2Store
+}
+
 func (m *MockStorage) BeginTx(ctx context.Context) (storage.Transaction, error) {
 	return nil, nil
 }
@@ -109,6 +114,11 @@ func (m *MockStorage) SetContainerInstanceStore(store storage.ContainerInstanceS
 // SetAttributeStore sets the attribute store
 func (m *MockStorage) SetAttributeStore(store storage.AttributeStore) {
 	m.attributeStore = store
+}
+
+// SetELBv2Store sets the ELBv2 store
+func (m *MockStorage) SetELBv2Store(store storage.ELBv2Store) {
+	m.elbv2Store = store
 }
 
 // MockClusterStore implements storage.ClusterStore for testing
@@ -436,12 +446,30 @@ func (m *MockTaskStore) Create(ctx context.Context, task *storage.Task) error {
 }
 
 func (m *MockTaskStore) Get(ctx context.Context, cluster, taskID string) (*storage.Task, error) {
-	key := fmt.Sprintf("%s:%s", cluster, taskID)
-	task, exists := m.tasks[key]
-	if !exists {
+	// Handle both short task ID and full ARN (like DuckDB implementation)
+	if strings.Contains(taskID, "arn:aws:ecs:") {
+		// Full ARN provided - search by ARN
+		for _, task := range m.tasks {
+			if task.ARN == taskID {
+				return task, nil
+			}
+		}
 		return nil, errors.New("task not found")
+	} else {
+		// Short ID provided - need cluster context
+		key := fmt.Sprintf("%s:%s", cluster, taskID)
+		task, exists := m.tasks[key]
+		if !exists {
+			// Also check if taskID matches the ID field
+			for k, t := range m.tasks {
+				if strings.HasPrefix(k, cluster+":") && t.ID == taskID {
+					return t, nil
+				}
+			}
+			return nil, errors.New("task not found")
+		}
+		return task, nil
 	}
-	return task, nil
 }
 
 func (m *MockTaskStore) List(ctx context.Context, cluster string, filters storage.TaskFilters) ([]*storage.Task, error) {
@@ -503,6 +531,15 @@ func (m *MockTaskStore) GetByARNs(ctx context.Context, arns []string) ([]*storag
 		}
 	}
 	return results, nil
+}
+
+func (m *MockTaskStore) CreateOrUpdate(ctx context.Context, task *storage.Task) error {
+	if m.tasks == nil {
+		m.tasks = make(map[string]*storage.Task)
+	}
+	key := fmt.Sprintf("%s:%s", task.ClusterARN, task.ID)
+	m.tasks[key] = task
+	return nil
 }
 
 // MockTaskSetStore implements storage.TaskSetStore for testing

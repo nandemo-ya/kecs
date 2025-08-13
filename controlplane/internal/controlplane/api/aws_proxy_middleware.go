@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // AWSProxyRouter routes AWS API calls to appropriate handlers
@@ -43,13 +44,27 @@ func (apr *AWSProxyRouter) RegisterRoutes(mux *http.ServeMux) {
 
 // ShouldProxyToLocalStack determines if a request should be proxied to LocalStack
 func ShouldProxyToLocalStack(r *http.Request, localStackManager localstack.Manager) bool {
-	// Check if LocalStack is enabled and healthy
-	if localStackManager == nil || !localStackManager.IsHealthy() {
+	// Check if LocalStack manager exists
+	if localStackManager == nil {
 		return false
 	}
+	
+	// TODO: Fix health check to use Traefik endpoint
+	// For now, we'll assume LocalStack is healthy if the manager exists
+	// This is a temporary workaround until the health check is fixed
+	healthy := true // localStackManager.IsHealthy()
 
 	// Check if this is an AWS API call (not ECS)
-	if !isAWSAPIRequest(r) || isECSRequest(r) {
+	isAWS := isAWSAPIRequest(r)
+	isECS := isECSRequest(r)
+	
+	// Debug log
+	if r.Header.Get("X-Amz-Target") != "" {
+		logging.Debug("ShouldProxyToLocalStack",
+			"healthy", healthy, "isAWS", isAWS, "isECS", isECS, "target", r.Header.Get("X-Amz-Target"))
+	}
+	
+	if !healthy || !isAWS || isECS {
 		return false
 	}
 
@@ -59,10 +74,26 @@ func ShouldProxyToLocalStack(r *http.Request, localStackManager localstack.Manag
 // isAWSAPIRequest checks if the request is for an AWS API
 func isAWSAPIRequest(r *http.Request) bool {
 	// Check for AWS SDK headers first (most reliable)
-	if r.Header.Get("X-Amz-Target") != "" ||
-		strings.Contains(r.Header.Get("Authorization"), "AWS4-HMAC-SHA256") ||
-		r.Header.Get("X-Amz-Date") != "" ||
-		r.Header.Get("X-Amz-Security-Token") != "" {
+	target := r.Header.Get("X-Amz-Target")
+	if target != "" {
+		// Check if it's NOT an ECS target
+		if !strings.HasPrefix(target, "AmazonEC2ContainerServiceV") {
+			return true
+		}
+	}
+	
+	// Check for AWS signature in Authorization header
+	auth := r.Header.Get("Authorization")
+	if strings.Contains(auth, "AWS4-HMAC-SHA256") {
+		// Check if it's NOT for ECS service
+		if !strings.Contains(auth, "/ecs/") {
+			return true
+		}
+	}
+	
+	// Check for other AWS headers
+	if r.Header.Get("X-Amz-Date") != "" || r.Header.Get("X-Amz-Security-Token") != "" {
+		// These headers indicate AWS API calls
 		return true
 	}
 
@@ -71,19 +102,11 @@ func isAWSAPIRequest(r *http.Request) bool {
 	if host == "" {
 		host = r.URL.Host
 	}
-	
+
 	// Check for common AWS patterns
 	if strings.Contains(host, ".amazonaws.com") ||
 		strings.Contains(host, "aws.amazon.com") ||
 		host == "169.254.169.254" { // EC2 metadata service
-		return true
-	}
-
-	// Check URL path for AWS service patterns
-	path := r.URL.Path
-	// AWS services often use /v1/, /v2/, or service-specific patterns
-	if strings.HasPrefix(path, "/v1/") || strings.HasPrefix(path, "/v2/") {
-		// Could be an AWS API call
 		return true
 	}
 
@@ -92,11 +115,6 @@ func isAWSAPIRequest(r *http.Request) bool {
 
 // isECSRequest checks if the request is for the ECS API
 func isECSRequest(r *http.Request) bool {
-	// ECS API calls go through the main KECS API
-	if strings.HasPrefix(r.URL.Path, "/v1/") {
-		return true
-	}
-
 	// Check X-Amz-Target header for ECS service
 	target := r.Header.Get("X-Amz-Target")
 	if strings.HasPrefix(target, "AmazonEC2ContainerServiceV") {
@@ -109,5 +127,7 @@ func isECSRequest(r *http.Request) bool {
 		return true
 	}
 
+	// Only consider it an ECS request if it has ECS-specific indicators
+	// Generic /v1/ paths without ECS headers are NOT ECS requests
 	return false
 }

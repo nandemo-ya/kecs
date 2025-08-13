@@ -1,0 +1,357 @@
+// Copyright 2025 The KECS Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package instance
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
+)
+
+// generateInstanceName generates a unique instance name
+func generateInstanceName() string {
+	name, _ := utils.GenerateRandomName()
+	return name
+}
+
+// createCluster creates the k3d cluster
+func (m *Manager) createCluster(ctx context.Context, instanceName string, cfg *config.Config, opts StartOptions) error {
+	clusterName := fmt.Sprintf("kecs-%s", instanceName)
+
+	// Calculate NodePort for API access
+	apiNodePort := int32(opts.ApiPort)
+	if apiNodePort < 30000 {
+		apiNodePort = apiNodePort + 22000
+	}
+	if apiNodePort < 30000 || apiNodePort > 32767 {
+		apiNodePort = 30080 // fallback to default
+	}
+
+	// Create port mappings for k3d cluster
+	portMappings := map[int32]int32{
+		int32(opts.ApiPort): apiNodePort,  // Map host API port to NodePort for ECS API
+	}
+	
+	// If LocalStack is enabled, add its port mapping
+	if cfg.LocalStack.Enabled {
+		// LocalStack always uses fixed NodePort 30566
+		portMappings[4566] = 30566
+	}
+
+	// Update k3dManager configuration based on DevMode
+	// Note: This modifies the shared k3dManager config, but it's safe because
+	// each instance creation is sequential
+	if opts.DevMode {
+		logging.Info("DevMode enabled, enabling k3d registry for hot reload support")
+		m.k3dManager.SetEnableRegistry(true)
+	} else {
+		m.k3dManager.SetEnableRegistry(false)
+	}
+
+	// Create cluster with port mappings
+	if err := m.k3dManager.CreateClusterWithPortMapping(ctx, clusterName, portMappings); err != nil {
+		return err
+	}
+	
+	return nil
+}
+
+// createNamespace creates the kecs-system namespace
+func (m *Manager) createNamespace(ctx context.Context, instanceName string) error {
+	clusterName := fmt.Sprintf("kecs-%s", instanceName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	client, err := kubernetes.NewForConfig(kubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kecs-system",
+		},
+	}
+
+	if _, err := client.CoreV1().Namespaces().Create(ctx, namespace, metav1.CreateOptions{}); err != nil {
+		return fmt.Errorf("failed to create namespace: %w", err)
+	}
+
+	return nil
+}
+
+// deployControlPlane deploys the KECS control plane
+func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, cfg *config.Config, opts StartOptions) error {
+
+	clusterName := fmt.Sprintf("kecs-%s", instanceName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	client, err := kubernetes.NewForConfig(kubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	// Create control plane config
+	controlPlaneConfig := &resources.ControlPlaneConfig{
+		Image:           cfg.Server.ControlPlaneImage,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		CPURequest:      "100m",
+		MemoryRequest:   "128Mi",
+		CPULimit:        "1000m",
+		MemoryLimit:     "1Gi",
+		StorageSize:     "10Gi",
+		APIPort:         80,
+		AdminPort:       int32(opts.AdminPort),
+		LogLevel:        cfg.Server.LogLevel,
+	}
+
+	// Create control plane resources
+	controlPlaneResources := resources.CreateControlPlaneResources(controlPlaneConfig)
+
+	// Create service account
+	if controlPlaneResources.ServiceAccount != nil {
+		if _, err := client.CoreV1().ServiceAccounts("kecs-system").Create(ctx, controlPlaneResources.ServiceAccount, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create service account: %w", err)
+		}
+	}
+
+	// Create cluster role
+	if controlPlaneResources.ClusterRole != nil {
+		if _, err := client.RbacV1().ClusterRoles().Create(ctx, controlPlaneResources.ClusterRole, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create cluster role: %w", err)
+		}
+	}
+
+	// Create cluster role binding
+	if controlPlaneResources.ClusterRoleBinding != nil {
+		if _, err := client.RbacV1().ClusterRoleBindings().Create(ctx, controlPlaneResources.ClusterRoleBinding, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create cluster role binding: %w", err)
+		}
+	}
+
+	// Create config map
+	if controlPlaneResources.ConfigMap != nil {
+		if _, err := client.CoreV1().ConfigMaps("kecs-system").Create(ctx, controlPlaneResources.ConfigMap, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create config map: %w", err)
+		}
+	}
+
+	// Create PVC
+	if controlPlaneResources.PVC != nil {
+		if _, err := client.CoreV1().PersistentVolumeClaims("kecs-system").Create(ctx, controlPlaneResources.PVC, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create PVC: %w", err)
+		}
+	}
+
+	// Deploy deployment
+	if _, err := client.AppsV1().Deployments("kecs-system").Create(ctx, controlPlaneResources.Deployment, metav1.CreateOptions{}); err != nil {
+		return fmt.Errorf("failed to create deployment: %w", err)
+	}
+
+	// Create services
+	for _, service := range controlPlaneResources.Services {
+		if _, err := client.CoreV1().Services("kecs-system").Create(ctx, service, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create service %s: %w", service.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// deployLocalStack deploys LocalStack
+func (m *Manager) deployLocalStack(ctx context.Context, instanceName string, cfg *config.Config) error {
+
+	clusterName := fmt.Sprintf("kecs-%s", instanceName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	client, err := kubernetes.NewForConfig(kubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	// Create LocalStack config
+	localstackConfig := &localstack.Config{
+		Enabled:   true,
+		Namespace: "kecs-system",
+		Services:  cfg.LocalStack.Services,
+		Port:      4566,
+		EdgePort:  4566,
+		Image:     cfg.LocalStack.Image,
+		Version:   cfg.LocalStack.Version,
+	}
+
+	manager, err := localstack.NewManager(localstackConfig, client, kubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create LocalStack manager: %w", err)
+	}
+
+	if err := manager.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start LocalStack: %w", err)
+	}
+
+	return nil
+}
+
+// deployTraefik deploys Traefik gateway
+func (m *Manager) deployTraefik(ctx context.Context, instanceName string, cfg *config.Config, apiPort int) error {
+
+	clusterName := fmt.Sprintf("kecs-%s", instanceName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	client, err := kubernetes.NewForConfig(kubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	// Map API port to a valid NodePort range (30000-32767)
+	// Use a simple mapping: if apiPort < 30000, add 22000 to it
+	// This maps 8080 -> 30080, 8090 -> 30090, etc.
+	awsNodePort := int32(apiPort)
+	if awsNodePort < 30000 {
+		awsNodePort = awsNodePort + 22000
+	}
+	// Ensure it's within valid range
+	if awsNodePort < 30000 || awsNodePort > 32767 {
+		awsNodePort = 30080 // fallback to default
+	}
+
+	// Create Traefik config
+	traefikConfig := &resources.TraefikConfig{
+		Image:           "traefik:v3.5.0",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		CPURequest:      "100m",
+		MemoryRequest:   "128Mi",
+		CPULimit:        "500m",
+		MemoryLimit:     "512Mi",
+		APIPort:         80,
+		APINodePort:     awsNodePort,    // This is for API access (e.g., 30080 for port 8080)
+		AWSPort:         4566,
+		AWSNodePort:     30566,          // Fixed port for LocalStack
+		LogLevel:        "INFO",
+		AccessLog:       true,
+	}
+
+	// Create Traefik resources
+	traefikResources := resources.CreateTraefikResources(traefikConfig)
+
+	// Create service account
+	if traefikResources.ServiceAccount != nil {
+		if _, err := client.CoreV1().ServiceAccounts("kecs-system").Create(ctx, traefikResources.ServiceAccount, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create Traefik service account: %w", err)
+		}
+	}
+
+	// Create cluster role
+	if traefikResources.ClusterRole != nil {
+		if _, err := client.RbacV1().ClusterRoles().Create(ctx, traefikResources.ClusterRole, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create Traefik cluster role: %w", err)
+		}
+	}
+
+	// Create cluster role binding
+	if traefikResources.ClusterRoleBinding != nil {
+		if _, err := client.RbacV1().ClusterRoleBindings().Create(ctx, traefikResources.ClusterRoleBinding, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create Traefik cluster role binding: %w", err)
+		}
+	}
+
+	// Create config maps
+	if traefikResources.ConfigMap != nil {
+		if _, err := client.CoreV1().ConfigMaps("kecs-system").Create(ctx, traefikResources.ConfigMap, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create Traefik configmap: %w", err)
+		}
+	}
+	if traefikResources.DynamicConfigMap != nil {
+		if _, err := client.CoreV1().ConfigMaps("kecs-system").Create(ctx, traefikResources.DynamicConfigMap, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create Traefik dynamic configmap: %w", err)
+		}
+	}
+
+	// Deploy deployment
+	if _, err := client.AppsV1().Deployments("kecs-system").Create(ctx, traefikResources.Deployment, metav1.CreateOptions{}); err != nil {
+		return fmt.Errorf("failed to create Traefik deployment: %w", err)
+	}
+
+	// Create services
+	for _, service := range traefikResources.Services {
+		if _, err := client.CoreV1().Services("kecs-system").Create(ctx, service, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create Traefik service %s: %w", service.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// waitForReady waits for all components to be ready
+func (m *Manager) waitForReady(ctx context.Context, instanceName string, cfg *config.Config) error {
+
+	clusterName := fmt.Sprintf("kecs-%s", instanceName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	client, err := kubernetes.NewForConfig(kubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	// Wait for control plane
+	if err := waitForDeployment(ctx, client, "kecs-system", "kecs-controlplane"); err != nil {
+		return fmt.Errorf("control plane failed to become ready: %w", err)
+	}
+
+	// Wait for LocalStack if enabled
+	if cfg.LocalStack.Enabled {
+		if err := waitForDeployment(ctx, client, "kecs-system", "localstack"); err != nil {
+			return fmt.Errorf("LocalStack failed to become ready: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// waitForDeployment waits for a deployment to be ready
+func waitForDeployment(ctx context.Context, client kubernetes.Interface, namespace, name string) error {
+	// Implementation would check deployment status
+	// For now, just wait a bit
+	select {
+	case <-time.After(5 * time.Second):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}

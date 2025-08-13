@@ -60,8 +60,40 @@ func (c *AWSCLIClient) runCommand(args ...string) ([]byte, error) {
 
 // CreateCluster creates a new ECS cluster
 func (c *AWSCLIClient) CreateCluster(name string) error {
-	_, err := c.runCommand("create-cluster", "--cluster-name", name)
-	return err
+	args := []string{"create-cluster"}
+	if name != "" {
+		args = append(args, "--cluster-name", name)
+	}
+	output, err := c.runCommand(args...)
+	if err != nil {
+		// AWS CLI returns exit code 255 for validation errors
+		// Parse the output to get the actual error message
+		if len(output) > 0 {
+			// Try AWS error format
+			var awsError struct {
+				Type    string `json:"__type"`
+				Message string `json:"message"`
+			}
+			if jsonErr := json.Unmarshal(output, &awsError); jsonErr == nil && awsError.Message != "" {
+				return fmt.Errorf(awsError.Message)
+			}
+			
+			// Try CLI error format
+			var errorResponse struct {
+				Error struct {
+					Code    string `json:"Code"`
+					Message string `json:"Message"`
+				} `json:"error"`
+			}
+			if jsonErr := json.Unmarshal(output, &errorResponse); jsonErr == nil && errorResponse.Error.Message != "" {
+				return fmt.Errorf(errorResponse.Error.Message)
+			}
+			// If not JSON, return the raw output
+			return fmt.Errorf(string(output))
+		}
+		return err
+	}
+	return nil
 }
 
 // DescribeCluster describes an ECS cluster
@@ -249,6 +281,11 @@ func (c *AWSCLIClient) ListServices(clusterName string) ([]string, error) {
 		return nil, err
 	}
 
+	// Handle empty response
+	if len(output) == 0 {
+		return []string{}, nil
+	}
+
 	var result struct {
 		ServiceArns []string `json:"serviceArns"`
 	}
@@ -260,18 +297,16 @@ func (c *AWSCLIClient) ListServices(clusterName string) ([]string, error) {
 	return result.ServiceArns, nil
 }
 
-// UpdateService updates an ECS service
-func (c *AWSCLIClient) UpdateService(clusterName, serviceName string, desiredCount *int, taskDef string) error {
-	args := []string{"update-service", "--cluster", clusterName, "--service", serviceName}
-	
-	if desiredCount != nil {
-		args = append(args, "--desired-count", fmt.Sprintf("%d", *desiredCount))
-	}
-	
-	if taskDef != "" {
-		args = append(args, "--task-definition", taskDef)
-	}
-	
+// UpdateService updates an ECS service desired count
+func (c *AWSCLIClient) UpdateService(clusterName, serviceName string, desiredCount int) error {
+	args := []string{"update-service", "--cluster", clusterName, "--service", serviceName, "--desired-count", fmt.Sprintf("%d", desiredCount)}
+	_, err := c.runCommand(args...)
+	return err
+}
+
+// UpdateServiceTaskDefinition updates an ECS service task definition
+func (c *AWSCLIClient) UpdateServiceTaskDefinition(clusterName, serviceName, taskDef string) error {
+	args := []string{"update-service", "--cluster", clusterName, "--service", serviceName, "--task-definition", taskDef}
 	_, err := c.runCommand(args...)
 	return err
 }
@@ -279,8 +314,7 @@ func (c *AWSCLIClient) UpdateService(clusterName, serviceName string, desiredCou
 // DeleteService deletes an ECS service
 func (c *AWSCLIClient) DeleteService(clusterName, serviceName string) error {
 	// First, scale down to 0
-	zero := 0
-	if err := c.UpdateService(clusterName, serviceName, &zero, ""); err != nil {
+	if err := c.UpdateService(clusterName, serviceName, 0); err != nil {
 		return fmt.Errorf("failed to scale down service: %w", err)
 	}
 	
@@ -447,7 +481,191 @@ func (c *AWSCLIClient) DeleteAttributes(clusterName string, attributes []Attribu
 
 // GetLocalStackStatus gets the LocalStack status
 func (c *AWSCLIClient) GetLocalStackStatus(clusterName string) (string, error) {
-	// Note: This is a KECS-specific extension, not part of standard ECS API
-	// For now, we'll return "unknown" as AWS CLI doesn't support this
-	return "unknown", nil
+	// This is a KECS-specific API endpoint
+	url := fmt.Sprintf("%s/api/localstack/status", c.endpoint)
+	
+	cmd := exec.Command("curl", "-s", "-X", "GET", url)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to get LocalStack status: %w\nOutput: %s", err, output)
+	}
+
+	var result struct {
+		Running bool   `json:"running"`
+		Enabled bool   `json:"enabled"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return "", fmt.Errorf("failed to parse LocalStack status: %w", err)
+	}
+
+	if result.Running {
+		return "healthy", nil
+	} else if result.Enabled {
+		return "enabled", nil
+	}
+	return "disabled", nil
+}
+
+// UpdateClusterSettings updates cluster settings
+func (c *AWSCLIClient) UpdateClusterSettings(clusterName string, settings []map[string]string) error {
+	args := []string{"update-cluster-settings", "--cluster", clusterName, "--settings"}
+	for _, setting := range settings {
+		args = append(args, fmt.Sprintf("name=%s,value=%s", setting["name"], setting["value"]))
+	}
+	_, err := c.runCommand(args...)
+	return err
+}
+
+// UpdateCluster updates a cluster configuration
+func (c *AWSCLIClient) UpdateCluster(clusterName string, configuration map[string]interface{}) error {
+	args := []string{"update-cluster", "--cluster", clusterName}
+	
+	if config, ok := configuration["configuration"]; ok {
+		configJSON, err := json.Marshal(config)
+		if err != nil {
+			return fmt.Errorf("failed to marshal configuration: %w", err)
+		}
+		args = append(args, "--configuration", string(configJSON))
+	}
+	
+	_, err := c.runCommand(args...)
+	return err
+}
+
+// PutClusterCapacityProviders sets capacity providers on a cluster
+func (c *AWSCLIClient) PutClusterCapacityProviders(clusterName string, providers []string, strategy []map[string]interface{}) error {
+	args := []string{"put-cluster-capacity-providers", "--cluster", clusterName}
+	
+	if len(providers) > 0 {
+		args = append(args, "--capacity-providers")
+		args = append(args, providers...)
+	}
+	
+	if len(strategy) > 0 {
+		// Convert strategy to CLI format
+		for _, s := range strategy {
+			strategyStr := fmt.Sprintf("capacityProvider=%s", s["capacityProvider"])
+			if weight, ok := s["weight"]; ok {
+				strategyStr += fmt.Sprintf(",weight=%v", weight)
+			}
+			if base, ok := s["base"]; ok {
+				strategyStr += fmt.Sprintf(",base=%v", base)
+			}
+			args = append(args, "--default-capacity-provider-strategy", strategyStr)
+		}
+	}
+	
+	_, err := c.runCommand(args...)
+	return err
+}
+
+// DescribeClustersWithInclude describes clusters with additional information
+func (c *AWSCLIClient) DescribeClustersWithInclude(clusters []string, include []string) ([]Cluster, error) {
+	args := []string{"describe-clusters"}
+	
+	if len(clusters) > 0 {
+		args = append(args, "--clusters")
+		args = append(args, clusters...)
+	}
+	
+	if len(include) > 0 {
+		args = append(args, "--include")
+		args = append(args, include...)
+	}
+	
+	output, err := c.runCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	
+	var result struct {
+		Clusters []Cluster `json:"clusters"`
+		Failures []struct {
+			Arn    string `json:"arn"`
+			Reason string `json:"reason"`
+		} `json:"failures"`
+	}
+	
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+	
+	if len(result.Failures) > 0 {
+		return nil, fmt.Errorf("describe clusters failed: %s", result.Failures[0].Reason)
+	}
+	
+	return result.Clusters, nil
+}
+
+// ListClustersWithPagination lists clusters with pagination support
+func (c *AWSCLIClient) ListClustersWithPagination(maxResults int, nextToken string) (clusters []string, newNextToken string, err error) {
+	args := []string{"list-clusters"}
+	
+	if maxResults > 0 {
+		args = append(args, "--max-results", fmt.Sprintf("%d", maxResults))
+	}
+	
+	if nextToken != "" {
+		args = append(args, "--next-token", nextToken)
+	}
+	
+	output, err := c.runCommand(args...)
+	if err != nil {
+		return nil, "", err
+	}
+	
+	var result struct {
+		ClusterArns []string `json:"clusterArns"`
+		NextToken   string   `json:"nextToken"`
+	}
+	
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, "", fmt.Errorf("failed to parse response: %w", err)
+	}
+	
+	return result.ClusterArns, result.NextToken, nil
+}
+
+// RegisterTaskDefinitionFromJSON registers a task definition from JSON
+func (c *AWSCLIClient) RegisterTaskDefinitionFromJSON(jsonDefinition string) (*TaskDefinition, error) {
+	// Create temporary file for the JSON definition
+	tmpFile, err := os.CreateTemp("", "taskdef-*.json")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	
+	if _, err := tmpFile.WriteString(jsonDefinition); err != nil {
+		return nil, fmt.Errorf("failed to write task definition: %w", err)
+	}
+	tmpFile.Close()
+	
+	output, err := c.runCommand("register-task-definition", "--cli-input-json", fmt.Sprintf("file://%s", tmpFile.Name()))
+	if err != nil {
+		return nil, err
+	}
+	
+	var result struct {
+		TaskDefinition TaskDefinition `json:"taskDefinition"`
+	}
+	
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+	
+	return &result.TaskDefinition, nil
+}
+
+// DescribeTask describes a single task
+func (c *AWSCLIClient) DescribeTask(clusterName, taskArn string) (*Task, error) {
+	tasks, err := c.DescribeTasks(clusterName, []string{taskArn})
+	if err != nil {
+		return nil, err
+	}
+	
+	if len(tasks) == 0 {
+		return nil, fmt.Errorf("task not found: %s", taskArn)
+	}
+	
+	return &tasks[0], nil
 }

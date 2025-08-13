@@ -11,7 +11,7 @@ env:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, medium]
     permissions:
       contents: read
       packages: write
@@ -19,19 +19,6 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: web-ui/package-lock.json
-
-    - name: Build Web UI
-      working-directory: ./web-ui
-      run: |
-        npm ci
-        npm run build
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -60,7 +47,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ./controlplane/Dockerfile.production
+        file: ./controlplane/Dockerfile
         platforms: linux/amd64,linux/arm64
         push: true
         tags: ${{ steps.meta.outputs.tags }}
@@ -72,7 +59,7 @@ jobs:
 
   create-release:
     needs: build-and-push
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, small]
     permissions:
       contents: write
       

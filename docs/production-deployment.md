@@ -1,14 +1,28 @@
 # Production Deployment Guide
 
-This guide covers deploying KECS in production environments.
+## ⚠️ CRITICAL WARNING
 
-## Overview
+**KECS is NOT designed for production use.**
 
-KECS can be deployed in various production environments:
-- Kubernetes clusters
-- Docker Swarm
-- Standalone Docker hosts
-- Cloud platforms (AWS ECS, GKE, AKS, etc.)
+KECS requires Docker daemon access which provides root-equivalent privileges. This makes it unsuitable for:
+- Production environments
+- Public-facing deployments  
+- Multi-tenant systems
+- Any environment with untrusted users
+
+**This guide is provided for educational purposes only. Using KECS in production environments is strongly discouraged and poses significant security risks.**
+
+If you need ECS compatibility in production, consider using:
+- Amazon ECS itself
+- ECS Anywhere for hybrid deployments
+- Other production-grade container orchestration solutions
+
+## Overview (Educational Only)
+
+The following information shows how KECS *could* be deployed, but should only be used in:
+- Isolated development environments
+- CI/CD pipelines
+- Testing environments with no external access
 
 ## Prerequisites
 
@@ -45,7 +59,6 @@ cp .env.production.example .env.production
 Key environment variables:
 - `PORT`: API server port (default: 8080)
 - `ADMIN_PORT`: Admin server port (default: 8081)
-- `KECS_UI_BASE_PATH`: Web UI base path (default: /ui)
 - `KECS_STORAGE_PATH`: Database file path (default: /data/kecs.db)
 - `KECS_LOG_LEVEL`: Logging level (default: info)
 
@@ -85,7 +98,6 @@ services:
       - "8081:8081"
     environment:
       - KECS_LOG_LEVEL=info
-      - KECS_UI_ENABLED=true
     volumes:
       - kecs-data:/data
     healthcheck:

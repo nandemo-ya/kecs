@@ -9,11 +9,6 @@ server:
   idleTimeout: 120s
   shutdownTimeout: 30s
 
-# Web UI configuration
-webui:
-  enabled: true
-  basePath: "/ui"
-  
 # WebSocket configuration
 websocket:
   allowedOrigins:
@@ -81,19 +76,23 @@ health:
   readinessPath: /ready
   livenessPath: /live
 
+# Feature flags
+features:
+  traefik: true  # Traefik is now enabled by default
+
 # LocalStack configuration
 localstack:
-  enabled: false  # Set to true to enable LocalStack integration
+  enabled: true  # LocalStack is now enabled by default
+  useTraefik: true  # Use Traefik for LocalStack routing
   services:
     - iam
     - logs
     - ssm
     - secretsmanager
-    - elbv2
   persistence: true
   image: "localstack/localstack"
   version: "latest"
-  namespace: "aws-services"
+  namespace: "kecs-system"
   port: 4566
   edgePort: 4566
   resources:
@@ -113,9 +112,9 @@ localstack:
   
 # AWS Proxy configuration  
 proxy:
-  mode: "environment"  # Options: environment, sidecar, ebpf, disabled
-  localstackEndpoint: "http://localstack.aws-services.svc.cluster.local:4566"
-  fallbackEnabled: true
+  mode: "disabled"  # Options: environment, sidecar, ebpf, disabled
+  localstackEndpoint: "http://localstack.kecs-system.svc.cluster.local:4566"
+  fallbackEnabled: false
   fallbackOrder:
     - sidecar
     - environment

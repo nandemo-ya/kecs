@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/fake"
+
+	s3api "github.com/nandemo-ya/kecs/controlplane/internal/s3/generated"
 
 	kecsS3 "github.com/nandemo-ya/kecs/controlplane/internal/integrations/s3"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
@@ -18,44 +19,44 @@ import (
 
 // Mock S3 client
 type mockS3Client struct {
-	getObjectFunc    func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
-	putObjectFunc    func(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
-	headObjectFunc   func(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
-	createBucketFunc func(ctx context.Context, params *s3.CreateBucketInput, optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error)
-	deleteObjectFunc func(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
+	getObjectFunc    func(ctx context.Context, params *s3api.GetObjectRequest) (*s3api.GetObjectOutput, error)
+	putObjectFunc    func(ctx context.Context, params *s3api.PutObjectRequest) (*s3api.PutObjectOutput, error)
+	headObjectFunc   func(ctx context.Context, params *s3api.HeadObjectRequest) (*s3api.HeadObjectOutput, error)
+	createBucketFunc func(ctx context.Context, params *s3api.CreateBucketRequest) (*s3api.CreateBucketOutput, error)
+	deleteObjectFunc func(ctx context.Context, params *s3api.DeleteObjectRequest) (*s3api.DeleteObjectOutput, error)
 }
 
-func (m *mockS3Client) GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+func (m *mockS3Client) GetObject(ctx context.Context, params *s3api.GetObjectRequest) (*s3api.GetObjectOutput, error) {
 	if m.getObjectFunc != nil {
-		return m.getObjectFunc(ctx, params, optFns...)
+		return m.getObjectFunc(ctx, params)
 	}
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockS3Client) PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
+func (m *mockS3Client) PutObject(ctx context.Context, params *s3api.PutObjectRequest) (*s3api.PutObjectOutput, error) {
 	if m.putObjectFunc != nil {
-		return m.putObjectFunc(ctx, params, optFns...)
+		return m.putObjectFunc(ctx, params)
 	}
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockS3Client) HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
+func (m *mockS3Client) HeadObject(ctx context.Context, params *s3api.HeadObjectRequest) (*s3api.HeadObjectOutput, error) {
 	if m.headObjectFunc != nil {
-		return m.headObjectFunc(ctx, params, optFns...)
+		return m.headObjectFunc(ctx, params)
 	}
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockS3Client) CreateBucket(ctx context.Context, params *s3.CreateBucketInput, optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error) {
+func (m *mockS3Client) CreateBucket(ctx context.Context, params *s3api.CreateBucketRequest) (*s3api.CreateBucketOutput, error) {
 	if m.createBucketFunc != nil {
-		return m.createBucketFunc(ctx, params, optFns...)
+		return m.createBucketFunc(ctx, params)
 	}
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockS3Client) DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error) {
+func (m *mockS3Client) DeleteObject(ctx context.Context, params *s3api.DeleteObjectRequest) (*s3api.DeleteObjectOutput, error) {
 	if m.deleteObjectFunc != nil {
-		return m.deleteObjectFunc(ctx, params, optFns...)
+		return m.deleteObjectFunc(ctx, params)
 	}
 	return nil, errors.New("not implemented")
 }
@@ -99,7 +100,33 @@ func (m *mockLocalStackManager) IsHealthy() bool {
 	return true
 }
 
+func (m *mockLocalStackManager) IsRunning() bool {
+	return true
+}
+
 func (m *mockLocalStackManager) WaitForReady(ctx context.Context, timeout time.Duration) error {
+	return nil
+}
+
+func (m *mockLocalStackManager) CheckServiceHealth(service string) error {
+	return nil
+}
+
+func (m *mockLocalStackManager) GetConfig() *localstack.Config {
+	return &localstack.Config{
+		Enabled: true,
+	}
+}
+
+func (m *mockLocalStackManager) GetContainer() *localstack.LocalStackContainer {
+	return nil
+}
+
+func (m *mockLocalStackManager) EnableService(service string) error {
+	return nil
+}
+
+func (m *mockLocalStackManager) DisableService(service string) error {
 	return nil
 }
 
@@ -118,21 +145,21 @@ var _ = Describe("S3 Integration", func() {
 		lsManager = &mockLocalStackManager{}
 		config = &kecsS3.Config{
 			LocalStackEndpoint: "http://localstack:4566",
-			Region:            "us-east-1",
-			ForcePathStyle:    true,
+			Region:             "us-east-1",
+			ForcePathStyle:     true,
 		}
-		
+
 		integration = kecsS3.NewIntegrationWithClient(kubeClient, lsManager, config, mockClient)
 	})
 
 	Describe("DownloadFile", func() {
 		It("should download a file from S3", func() {
 			content := "test file content"
-			mockClient.getObjectFunc = func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
-				Expect(*params.Bucket).To(Equal("test-bucket"))
-				Expect(*params.Key).To(Equal("test-key"))
-				return &s3.GetObjectOutput{
-					Body: io.NopCloser(strings.NewReader(content)),
+			mockClient.getObjectFunc = func(ctx context.Context, params *s3api.GetObjectRequest) (*s3api.GetObjectOutput, error) {
+				Expect(params.Bucket).To(Equal("test-bucket"))
+				Expect(params.Key).To(Equal("test-key"))
+				return &s3api.GetObjectOutput{
+					Body: []byte(content),
 				}, nil
 			}
 
@@ -146,7 +173,7 @@ var _ = Describe("S3 Integration", func() {
 		})
 
 		It("should return error when download fails", func() {
-			mockClient.getObjectFunc = func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+			mockClient.getObjectFunc = func(ctx context.Context, params *s3api.GetObjectRequest) (*s3api.GetObjectOutput, error) {
 				return nil, errors.New("download failed")
 			}
 
@@ -159,16 +186,14 @@ var _ = Describe("S3 Integration", func() {
 	Describe("UploadFile", func() {
 		It("should upload a file to S3", func() {
 			content := "test upload content"
-			mockClient.putObjectFunc = func(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
-				Expect(*params.Bucket).To(Equal("test-bucket"))
-				Expect(*params.Key).To(Equal("test-key"))
-				
-				// Read the body to verify content
-				data, err := io.ReadAll(params.Body)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(string(data)).To(Equal(content))
-				
-				return &s3.PutObjectOutput{}, nil
+			mockClient.putObjectFunc = func(ctx context.Context, params *s3api.PutObjectRequest) (*s3api.PutObjectOutput, error) {
+				Expect(params.Bucket).To(Equal("test-bucket"))
+				Expect(params.Key).To(Equal("test-key"))
+
+				// Verify body content
+				Expect(string(params.Body)).To(Equal(content))
+
+				return &s3api.PutObjectOutput{}, nil
 			}
 
 			err := integration.UploadFile(context.Background(), "test-bucket", "test-key", strings.NewReader(content))
@@ -176,7 +201,7 @@ var _ = Describe("S3 Integration", func() {
 		})
 
 		It("should return error when upload fails", func() {
-			mockClient.putObjectFunc = func(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
+			mockClient.putObjectFunc = func(ctx context.Context, params *s3api.PutObjectRequest) (*s3api.PutObjectOutput, error) {
 				return nil, errors.New("upload failed")
 			}
 
@@ -191,11 +216,11 @@ var _ = Describe("S3 Integration", func() {
 			etag := "123456789"
 			contentType := "text/plain"
 			contentLength := int64(100)
-			
-			mockClient.headObjectFunc = func(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
-				Expect(*params.Bucket).To(Equal("test-bucket"))
-				Expect(*params.Key).To(Equal("test-key"))
-				return &s3.HeadObjectOutput{
+
+			mockClient.headObjectFunc = func(ctx context.Context, params *s3api.HeadObjectRequest) (*s3api.HeadObjectOutput, error) {
+				Expect(params.Bucket).To(Equal("test-bucket"))
+				Expect(params.Key).To(Equal("test-key"))
+				return &s3api.HeadObjectOutput{
 					ContentLength: &contentLength,
 					ContentType:   &contentType,
 					ETag:          &etag,
@@ -210,7 +235,7 @@ var _ = Describe("S3 Integration", func() {
 		})
 
 		It("should return error when head fails", func() {
-			mockClient.headObjectFunc = func(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
+			mockClient.headObjectFunc = func(ctx context.Context, params *s3api.HeadObjectRequest) (*s3api.HeadObjectOutput, error) {
 				return nil, errors.New("head failed")
 			}
 
@@ -222,9 +247,9 @@ var _ = Describe("S3 Integration", func() {
 
 	Describe("CreateBucket", func() {
 		It("should create a bucket", func() {
-			mockClient.createBucketFunc = func(ctx context.Context, params *s3.CreateBucketInput, optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error) {
-				Expect(*params.Bucket).To(Equal("new-bucket"))
-				return &s3.CreateBucketOutput{}, nil
+			mockClient.createBucketFunc = func(ctx context.Context, params *s3api.CreateBucketRequest) (*s3api.CreateBucketOutput, error) {
+				Expect(params.Bucket).To(Equal("new-bucket"))
+				return &s3api.CreateBucketOutput{}, nil
 			}
 
 			err := integration.CreateBucket(context.Background(), "new-bucket")
@@ -232,7 +257,7 @@ var _ = Describe("S3 Integration", func() {
 		})
 
 		It("should not return error if bucket already exists", func() {
-			mockClient.createBucketFunc = func(ctx context.Context, params *s3.CreateBucketInput, optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error) {
+			mockClient.createBucketFunc = func(ctx context.Context, params *s3api.CreateBucketRequest) (*s3api.CreateBucketOutput, error) {
 				return nil, errors.New("BucketAlreadyExists")
 			}
 
@@ -244,15 +269,17 @@ var _ = Describe("S3 Integration", func() {
 			// Create integration with different region
 			regionalConfig := &kecsS3.Config{
 				LocalStackEndpoint: "http://localstack:4566",
-				Region:            "eu-west-1",
-				ForcePathStyle:    true,
+				Region:             "eu-west-1",
+				ForcePathStyle:     true,
 			}
 			regionalIntegration := kecsS3.NewIntegrationWithClient(kubeClient, lsManager, regionalConfig, mockClient)
 
-			mockClient.createBucketFunc = func(ctx context.Context, params *s3.CreateBucketInput, optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error) {
+			mockClient.createBucketFunc = func(ctx context.Context, params *s3api.CreateBucketRequest) (*s3api.CreateBucketOutput, error) {
 				Expect(params.CreateBucketConfiguration).NotTo(BeNil())
-				Expect(string(params.CreateBucketConfiguration.LocationConstraint)).To(Equal("eu-west-1"))
-				return &s3.CreateBucketOutput{}, nil
+				Expect(params.CreateBucketConfiguration.LocationConstraint).NotTo(BeNil())
+				// LocationConstraint is now of type *BucketLocationConstraint
+				Expect(string(*params.CreateBucketConfiguration.LocationConstraint)).To(Equal("eu-west-1"))
+				return &s3api.CreateBucketOutput{}, nil
 			}
 
 			err := regionalIntegration.CreateBucket(context.Background(), "regional-bucket")
@@ -262,10 +289,10 @@ var _ = Describe("S3 Integration", func() {
 
 	Describe("DeleteObject", func() {
 		It("should delete an object", func() {
-			mockClient.deleteObjectFunc = func(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error) {
-				Expect(*params.Bucket).To(Equal("test-bucket"))
-				Expect(*params.Key).To(Equal("test-key"))
-				return &s3.DeleteObjectOutput{}, nil
+			mockClient.deleteObjectFunc = func(ctx context.Context, params *s3api.DeleteObjectRequest) (*s3api.DeleteObjectOutput, error) {
+				Expect(params.Bucket).To(Equal("test-bucket"))
+				Expect(params.Key).To(Equal("test-key"))
+				return &s3api.DeleteObjectOutput{}, nil
 			}
 
 			err := integration.DeleteObject(context.Background(), "test-bucket", "test-key")
@@ -273,7 +300,7 @@ var _ = Describe("S3 Integration", func() {
 		})
 
 		It("should return error when delete fails", func() {
-			mockClient.deleteObjectFunc = func(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error) {
+			mockClient.deleteObjectFunc = func(ctx context.Context, params *s3api.DeleteObjectRequest) (*s3api.DeleteObjectOutput, error) {
 				return nil, errors.New("delete failed")
 			}
 

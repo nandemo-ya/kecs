@@ -15,7 +15,7 @@ var _ = Describe("TaskConverter", func() {
 	var converter *TaskConverter
 
 	BeforeEach(func() {
-		converter = NewTaskConverter("ap-northeast-1", "123456789012")
+		converter = NewTaskConverter("us-east-1", "123456789012")
 	})
 
 	Describe("parseSecretARN", func() {
@@ -37,7 +37,7 @@ var _ = Describe("TaskConverter", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).NotTo(BeNil())
 			Expect(result.SecretName).To(Equal("my-secret-AbCdEf"))
-			Expect(result.Key).To(Equal("default"))
+			Expect(result.Key).To(Equal("value"))
 			Expect(result.Source).To(Equal("secretsmanager"))
 		})
 
@@ -58,7 +58,6 @@ var _ = Describe("TaskConverter", func() {
 			Expect(result).To(BeNil())
 		})
 	})
-
 
 	Describe("ConvertTaskToPod", func() {
 		var (
@@ -90,7 +89,7 @@ var _ = Describe("TaskConverter", func() {
 			taskDef = &storage.TaskDefinition{
 				Family:               "test-task",
 				Revision:             1,
-				ARN:                  "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/test-task:1",
+				ARN:                  "arn:aws:ecs:us-east-1:123456789012:task-definition/test-task:1",
 				ContainerDefinitions: string(containerDefsJSON),
 				TaskRoleARN:          "",
 				Memory:               "1024",
@@ -102,7 +101,7 @@ var _ = Describe("TaskConverter", func() {
 			runTaskJSON = []byte(`{}`)
 			cluster = &storage.Cluster{
 				Name:   "test-cluster",
-				Region: "ap-northeast-1",
+				Region: "us-east-1",
 			}
 			taskID = "test-task-id"
 		})
@@ -113,7 +112,7 @@ var _ = Describe("TaskConverter", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pod).NotTo(BeNil())
 			Expect(pod.Name).To(Equal("ecs-task-test-task-id"))
-			Expect(pod.Namespace).To(Equal("test-cluster-ap-northeast-1"))
+			Expect(pod.Namespace).To(Equal("test-cluster-us-east-1"))
 			Expect(pod.Labels).To(HaveKeyWithValue("kecs.dev/task-family", "test-task"))
 			Expect(pod.Labels).To(HaveKeyWithValue("kecs.dev/task-revision", "1"))
 
@@ -183,10 +182,12 @@ var _ = Describe("TaskConverter", func() {
 			container := pod.Spec.Containers[0]
 			Expect(container.Env).To(HaveLen(1))
 			Expect(container.Env[0].Name).To(Equal("DB_PASSWORD"))
+			// Phase 2 implementation uses Kubernetes secret references
+			Expect(container.Env[0].Value).To(BeEmpty())
 			Expect(container.Env[0].ValueFrom).NotTo(BeNil())
 			Expect(container.Env[0].ValueFrom.SecretKeyRef).NotTo(BeNil())
-			Expect(container.Env[0].ValueFrom.SecretKeyRef.Name).To(Equal("kecs-secret-db-pass"))
-			Expect(container.Env[0].ValueFrom.SecretKeyRef.Key).To(Equal("default"))
+			Expect(container.Env[0].ValueFrom.SecretKeyRef.Name).To(Equal("sm-db-pass"))
+			Expect(container.Env[0].ValueFrom.SecretKeyRef.Key).To(Equal("value"))
 		})
 
 		It("should handle overrides from RunTask request", func() {

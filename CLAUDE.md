@@ -15,6 +15,19 @@ make run            # Build and run the application
 make all            # Clean, format, vet, test, and build
 ```
 
+### Container-based Execution
+```bash
+kecs start          # Start KECS in a Docker container
+kecs stop           # Stop and remove KECS container
+kecs status         # Show container status
+kecs logs -f        # Follow container logs
+
+# Multiple instances
+kecs start --name dev --api-port 8080
+kecs start --name staging --api-port 8090 --auto-port
+kecs instances list # List all instances
+```
+
 ### Testing and Code Quality
 ```bash
 make test           # Run tests with race detection
@@ -52,7 +65,29 @@ make docker-push    # Build and push Docker image
 ```bash
 make deps           # Download and verify dependencies
 make clean          # Clean build artifacts and coverage files
+
+# Hot reload development workflow
+./bin/kecs start    # Start KECS instance
+make dev            # Build and hot reload controlplane
+make dev-logs       # Build, hot reload, and tail logs
+
+# For specific instance
+KECS_INSTANCE=myinstance make dev
 ```
+
+### Hot Reload Development
+KECS supports hot reloading of the controlplane during development:
+1. **Start KECS**: Run `./bin/kecs start` to create a k3d cluster with KECS
+2. **Make changes**: Edit your Go code in the controlplane
+3. **Hot reload**: Run `make dev` to build and deploy changes
+4. **View logs**: Use `make dev-logs` to reload and tail logs in real-time
+
+The Docker hot reload workflow:
+- Builds a new Docker image with your changes
+- Pushes it to the local k3d registry
+- Updates the running deployment without cluster restart
+- Maintains all existing ECS resources and state
+
 
 ## Architecture Overview
 
@@ -61,7 +96,6 @@ KECS implements a clean architecture with the following key components:
 ### Dual Server Design
 - **API Server (port 8080)**: Handles ECS-compatible API requests at `/v1/<action>` endpoints
 - **Admin Server (port 8081)**: Provides operational endpoints like `/health`
-- **Web UI (embedded)**: React-based dashboard served at `/` (when enabled)
 
 ### Directory Structure
 - `cmd/controlplane/`: Entry point for the control plane binary
@@ -72,7 +106,6 @@ KECS implements a clean architecture with the following key components:
 - `internal/kubernetes/`: Kubernetes client and resource managers
 - `internal/storage/`: Storage interfaces and DuckDB implementation
 - `docs/adr/records/`: Architectural Decision Records
-- `web-ui/`: React/TypeScript Web UI application
 - `docs-site/`: VitePress-based documentation site
 
 ### API Implementation Pattern
@@ -88,34 +121,7 @@ Each ECS resource type has its own file in `internal/controlplane/api/` with:
 - DuckDB for persistence (storage layer implemented)
 - Kubernetes client for container operations (Kind integration)
 - WebSocket support for real-time updates
-- Embedded Web UI with conditional compilation
 
-## Web UI Development
-
-KECS includes a modern React/TypeScript Web UI for managing ECS resources:
-
-### Web UI Features
-- **Dashboard**: Real-time overview of clusters, services, tasks
-- **Resource Management**: Create, view, update services and task definitions
-- **Real-time Updates**: WebSocket integration for live status updates
-- **Visualization**: Service topology, metrics charts, log viewer
-- **Responsive Design**: Works on desktop and mobile devices
-
-### Web UI Build Process
-```bash
-# Build Web UI (from web-ui directory)
-cd web-ui && npm run build
-
-# Build control plane with embedded UI
-./scripts/build-webui.sh  # Builds UI and embeds into binary
-```
-
-### Web UI Architecture
-- React 19 with TypeScript for type safety
-- React Router for SPA navigation
-- Custom hooks for API integration and WebSocket connections
-- Component-based architecture with reusable UI elements
-- Real-time data synchronization with control plane
 
 ## Documentation Site
 
@@ -163,13 +169,10 @@ cd docs-site && npm run docs:build
    cd controlplane && ginkgo -r
    # Or using go test
    cd controlplane && go test ./...
-   
-   # Web UI tests
-   cd web-ui && npm test
    ```
 
 3. **Only create PR after all tests pass**
-   - Both controlplane and web-ui unit tests must pass
+   - Control plane unit tests must pass
    - Fix any failing tests before proceeding with PR
 
 4. **Test CI/CD changes locally with act before committing**
@@ -185,9 +188,7 @@ cd docs-site && npm run docs:build
 2. Implement the handler function following existing patterns
 3. Register the handler in `api/server.go`
 4. Follow AWS ECS API naming conventions exactly
-5. Update Web UI types in `web-ui/src/types/` if needed
-6. Add corresponding UI components if user-facing
-7. Write Ginkgo tests for the new endpoint covering:
+5. Write Ginkgo tests for the new endpoint covering:
    - Success cases
    - Error cases
    - Edge cases (e.g., idempotency, empty inputs)
@@ -197,9 +198,17 @@ cd docs-site && npm run docs:build
 - **Implemented**: Clusters, Services, Tasks, Task Definitions, Tags, Attributes
 - **Storage**: DuckDB integration for persistence
 - **Kubernetes**: Task converter with secret management
-- **Web UI**: Dashboard, detail views, WebSocket support
 - **MCP Server**: TypeScript-based Model Context Protocol server for AI assistant integration
+- **Container Commands**: Docker-based background execution with multiple instance support
 - **In Progress**: Full Kubernetes task lifecycle management
+
+### Container Commands Implementation
+KECS includes Docker container management commands similar to kind/k3d:
+- `start`, `stop`, `status`, `logs` commands for container lifecycle
+- Multiple instance support with configuration files
+- Automatic port conflict detection and resolution
+- Data persistence through volume mounts
+- See `docs/container-commands.md` for detailed usage
 
 ## MCP Server Development
 

@@ -31,9 +31,8 @@ var _ = Describe("Service ECS API", func() {
 		mockStorage.SetClusterStore(mockClusterStore)
 
 		server = &Server{
-			storage:     mockStorage,
-			kindManager: nil,
-			ecsAPI:      NewDefaultECSAPI(mockStorage, nil),
+			storage: mockStorage,
+			ecsAPI:  NewDefaultECSAPI(mockStorage),
 		}
 		ctx = context.Background()
 
@@ -41,10 +40,10 @@ var _ = Describe("Service ECS API", func() {
 		// Add a default cluster
 		cluster := &storage.Cluster{
 			Name:      "default",
-			ARN:       "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
+			ARN:       "arn:aws:ecs:us-east-1:000000000000:cluster/default",
 			Status:    "ACTIVE",
-			Region:    "ap-northeast-1",
-			AccountID: "123456789012",
+			Region:    "us-east-1",
+			AccountID: "000000000000",
 		}
 		err := mockClusterStore.Create(ctx, cluster)
 		Expect(err).To(BeNil())
@@ -52,18 +51,18 @@ var _ = Describe("Service ECS API", func() {
 		// Add test services
 		testService := &storage.Service{
 			ID:                "service-1",
-			ARN:               "arn:aws:ecs:ap-northeast-1:123456789012:service/default/test-service",
+			ARN:               "arn:aws:ecs:us-east-1:000000000000:service/default/test-service",
 			ServiceName:       "test-service",
 			ClusterARN:        cluster.ARN,
-			TaskDefinitionARN: "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/nginx:1",
+			TaskDefinitionARN: "arn:aws:ecs:us-east-1:000000000000:task-definition/nginx:1",
 			DesiredCount:      2,
 			RunningCount:      2,
 			PendingCount:      0,
 			LaunchType:        "FARGATE",
 			Status:            "ACTIVE",
 			Namespace:         "test-namespace",
-			Region:            "ap-northeast-1",
-			AccountID:         "123456789012",
+			Region:            "us-east-1",
+			AccountID:         "000000000000",
 			CreatedAt:         time.Now().Add(-1 * time.Hour),
 			UpdatedAt:         time.Now().Add(-30 * time.Minute),
 		}
@@ -77,9 +76,9 @@ var _ = Describe("Service ECS API", func() {
 				// Add more services with different namespaces
 				service2 := &storage.Service{
 					ID:          "service-2",
-					ARN:         "arn:aws:ecs:ap-northeast-1:123456789012:service/default/test-service-2",
+					ARN:         "arn:aws:ecs:us-east-1:000000000000:service/default/test-service-2",
 					ServiceName: "test-service-2",
-					ClusterARN:  "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
+					ClusterARN:  "arn:aws:ecs:us-east-1:000000000000:cluster/default",
 					Namespace:   "test-namespace",
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
@@ -89,9 +88,9 @@ var _ = Describe("Service ECS API", func() {
 
 				service3 := &storage.Service{
 					ID:          "service-3",
-					ARN:         "arn:aws:ecs:ap-northeast-1:123456789012:service/default/other-service",
+					ARN:         "arn:aws:ecs:us-east-1:000000000000:service/default/other-service",
 					ServiceName: "other-service",
-					ClusterARN:  "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
+					ClusterARN:  "arn:aws:ecs:us-east-1:000000000000:cluster/default",
 					Namespace:   "other-namespace",
 					CreatedAt:   time.Now(),
 					UpdatedAt:   time.Now(),
@@ -103,7 +102,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should list services in specified namespace", func() {
 				namespace := "test-namespace"
 				req := &generated.ListServicesByNamespaceRequest{
-					Namespace: &namespace,
+					Namespace: namespace,
 				}
 
 				resp, err := server.ecsAPI.ListServicesByNamespace(ctx, req)
@@ -119,7 +118,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should return empty list for non-existent namespace", func() {
 				namespace := "non-existent"
 				req := &generated.ListServicesByNamespaceRequest{
-					Namespace: &namespace,
+					Namespace: namespace,
 				}
 
 				resp, err := server.ecsAPI.ListServicesByNamespace(ctx, req)
@@ -149,11 +148,11 @@ var _ = Describe("Service ECS API", func() {
 			// Create a task set for testing
 			taskSet := &storage.TaskSet{
 				ID:                   "new-task-set",
-				ARN:                  "arn:aws:ecs:ap-northeast-1:123456789012:task-set/default/test-service/new-task-set",
-				ServiceARN:           "arn:aws:ecs:ap-northeast-1:123456789012:service/default/test-service",
-				ClusterARN:           "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
+				ARN:                  "arn:aws:ecs:us-east-1:000000000000:task-set/default/test-service/new-task-set",
+				ServiceARN:           "arn:aws:ecs:us-east-1:000000000000:service/default/test-service",
+				ClusterARN:           "arn:aws:ecs:us-east-1:000000000000:cluster/default",
 				Status:               "ACTIVE",
-				TaskDefinition:       "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/nginx:1",
+				TaskDefinition:       "arn:aws:ecs:us-east-1:000000000000:task-definition/nginx:1",
 				LaunchType:           "FARGATE",
 				Scale:                `{"value":100.0,"unit":"PERCENT"}`,
 				StabilityStatus:      "STEADY_STATE",
@@ -172,8 +171,8 @@ var _ = Describe("Service ECS API", func() {
 				serviceName := "test-service"
 				taskSetId := "new-task-set"
 				req := &generated.UpdateServicePrimaryTaskSetRequest{
-					Service:        &serviceName,
-					PrimaryTaskSet: &taskSetId,
+					Service:        serviceName,
+					PrimaryTaskSet: taskSetId,
 				}
 
 				resp, err := server.ecsAPI.UpdateServicePrimaryTaskSet(ctx, req)
@@ -188,7 +187,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should fail without service name", func() {
 				taskSetId := "new-task-set"
 				req := &generated.UpdateServicePrimaryTaskSetRequest{
-					PrimaryTaskSet: &taskSetId,
+					PrimaryTaskSet: taskSetId,
 				}
 
 				_, err := server.ecsAPI.UpdateServicePrimaryTaskSet(ctx, req)
@@ -199,7 +198,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should fail without primary task set", func() {
 				serviceName := "test-service"
 				req := &generated.UpdateServicePrimaryTaskSetRequest{
-					Service: &serviceName,
+					Service: serviceName,
 				}
 
 				_, err := server.ecsAPI.UpdateServicePrimaryTaskSet(ctx, req)
@@ -212,7 +211,7 @@ var _ = Describe("Service ECS API", func() {
 	Describe("DescribeServiceDeployments", func() {
 		Context("when describing service deployments", func() {
 			It("should describe deployment successfully", func() {
-				deploymentArn := "arn:aws:ecs:ap-northeast-1:123456789012:service-deployment/default/test-service/deployment-1"
+				deploymentArn := "arn:aws:ecs:us-east-1:000000000000:service-deployment/default/test-service/deployment-1"
 				req := &generated.DescribeServiceDeploymentsRequest{
 					ServiceDeploymentArns: []string{deploymentArn},
 				}
@@ -226,7 +225,7 @@ var _ = Describe("Service ECS API", func() {
 
 				deployment := resp.ServiceDeployments[0]
 				Expect(*deployment.ServiceDeploymentArn).To(Equal(deploymentArn))
-				Expect(*deployment.Status).To(Equal(generated.ServiceDeploymentStatusSuccessful))
+				Expect(*deployment.Status).To(Equal(generated.ServiceDeploymentStatusSUCCESSFUL))
 			})
 
 			It("should report failure for invalid ARN format", func() {
@@ -257,7 +256,7 @@ var _ = Describe("Service ECS API", func() {
 	Describe("DescribeServiceRevisions", func() {
 		Context("when describing service revisions", func() {
 			It("should describe revision successfully", func() {
-				revisionArn := "arn:aws:ecs:ap-northeast-1:123456789012:service-revision/default/test-service/revision-1"
+				revisionArn := "arn:aws:ecs:us-east-1:000000000000:service-revision/default/test-service/revision-1"
 				req := &generated.DescribeServiceRevisionsRequest{
 					ServiceRevisionArns: []string{revisionArn},
 				}
@@ -289,7 +288,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should list deployments for a service", func() {
 				serviceName := "test-service"
 				req := &generated.ListServiceDeploymentsRequest{
-					Service: &serviceName,
+					Service: serviceName,
 				}
 
 				resp, err := server.ecsAPI.ListServiceDeployments(ctx, req)
@@ -301,14 +300,14 @@ var _ = Describe("Service ECS API", func() {
 				// Check current deployment
 				current := resp.ServiceDeployments[0]
 				Expect(*current.ServiceDeploymentArn).To(ContainSubstring("current"))
-				Expect(*current.Status).To(Equal(generated.ServiceDeploymentStatusSuccessful))
+				Expect(*current.Status).To(Equal(generated.ServiceDeploymentStatusSUCCESSFUL))
 			})
 
 			It("should filter by status", func() {
 				serviceName := "test-service"
-				status := []generated.ServiceDeploymentStatus{generated.ServiceDeploymentStatusSuccessful}
+				status := []generated.ServiceDeploymentStatus{generated.ServiceDeploymentStatusSUCCESSFUL}
 				req := &generated.ListServiceDeploymentsRequest{
-					Service: &serviceName,
+					Service: serviceName,
 					Status:  status,
 				}
 
@@ -332,9 +331,9 @@ var _ = Describe("Service ECS API", func() {
 	Describe("StopServiceDeployment", func() {
 		Context("when stopping a deployment", func() {
 			It("should stop deployment successfully", func() {
-				deploymentArn := "arn:aws:ecs:ap-northeast-1:123456789012:service-deployment/default/test-service/deployment-1"
+				deploymentArn := "arn:aws:ecs:us-east-1:000000000000:service-deployment/default/test-service/deployment-1"
 				req := &generated.StopServiceDeploymentRequest{
-					ServiceDeploymentArn: &deploymentArn,
+					ServiceDeploymentArn: deploymentArn,
 				}
 
 				resp, err := server.ecsAPI.StopServiceDeployment(ctx, req)
@@ -347,7 +346,7 @@ var _ = Describe("Service ECS API", func() {
 			It("should fail with invalid ARN format", func() {
 				deploymentArn := "invalid-arn"
 				req := &generated.StopServiceDeploymentRequest{
-					ServiceDeploymentArn: &deploymentArn,
+					ServiceDeploymentArn: deploymentArn,
 				}
 
 				_, err := server.ecsAPI.StopServiceDeployment(ctx, req)

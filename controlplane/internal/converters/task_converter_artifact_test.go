@@ -20,7 +20,7 @@ var _ = Describe("TaskConverter Artifact Support", func() {
 		It("should set the artifact manager", func() {
 			// Create a mock artifact manager
 			artifactManager := artifacts.NewManager(nil)
-			
+
 			// This should not panic
 			converter.SetArtifactManager(artifactManager)
 		})
@@ -29,7 +29,7 @@ var _ = Describe("TaskConverter Artifact Support", func() {
 	Describe("GetArtifactScript", func() {
 		It("should generate shell script for artifacts", func() {
 			artifactManager := artifacts.NewManager(nil)
-			
+
 			artifacts := []types.Artifact{
 				{
 					ArtifactUrl: stringPtr("https://example.com/file.txt"),

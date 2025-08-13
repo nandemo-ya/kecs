@@ -8,6 +8,8 @@ const (
 	CurlMode ClientMode = "curl"
 	// AWSCLIMode uses AWS CLI for API calls
 	AWSCLIMode ClientMode = "awscli"
+	// HTTPMode uses net/http for API calls
+	HTTPMode ClientMode = "http"
 )
 
 // ECSClientInterface defines the interface for ECS operations
@@ -17,15 +19,18 @@ type ECSClientInterface interface {
 	ListClusters() ([]string, error)
 	DeleteCluster(name string) error
 	RegisterTaskDefinition(family string, definition string) (*TaskDefinition, error)
+	RegisterTaskDefinitionFromJSON(jsonDefinition string) (*TaskDefinition, error)
 	DescribeTaskDefinition(taskDefArn string) (*TaskDefinition, error)
 	ListTaskDefinitions() ([]string, error)
 	DeregisterTaskDefinition(taskDefArn string) error
 	CreateService(clusterName, serviceName, taskDef string, desiredCount int) error
 	DescribeService(clusterName, serviceName string) (*Service, error)
 	ListServices(clusterName string) ([]string, error)
-	UpdateService(clusterName, serviceName string, desiredCount *int, taskDef string) error
+	UpdateService(clusterName, serviceName string, desiredCount int) error
+	UpdateServiceTaskDefinition(clusterName, serviceName, taskDef string) error
 	DeleteService(clusterName, serviceName string) error
 	RunTask(clusterName, taskDefArn string, count int) (*RunTaskResponse, error)
+	DescribeTask(clusterName, taskArn string) (*Task, error)
 	DescribeTasks(clusterName string, taskArns []string) ([]Task, error)
 	ListTasks(clusterName string, serviceName string) ([]string, error)
 	StopTask(clusterName, taskArn, reason string) error

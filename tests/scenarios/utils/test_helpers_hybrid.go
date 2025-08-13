@@ -9,8 +9,9 @@ import (
 // TestWithBothClients runs a test function with both curl and AWS CLI clients
 func TestWithBothClients(t *testing.T, testName string, testFunc func(t *testing.T, client ECSClientInterface, mode ClientMode)) {
 	t.Run(testName+"_Curl", func(t *testing.T) {
-		// Start KECS container
-		kecs := StartKECS(t)
+		// Start KECS container using Ginkgo adapter
+		ginkgoT := &GinkgoTAdapter{T: t}
+		kecs := StartKECSForTest(ginkgoT, testName)
 		defer kecs.Cleanup()
 		
 		// Create curl client
@@ -26,8 +27,9 @@ func TestWithBothClients(t *testing.T, testName string, testFunc func(t *testing
 				t.Skip("AWS CLI not installed")
 			}
 			
-			// Start KECS container
-			kecs := StartKECS(t)
+			// Start KECS container using Ginkgo adapter
+			ginkgoT := &GinkgoTAdapter{T: t}
+			kecs := StartKECSForTest(ginkgoT, testName)
 			defer kecs.Cleanup()
 			
 			// Create AWS CLI client

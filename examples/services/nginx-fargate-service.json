@@ -19,14 +19,14 @@
   },
   "loadBalancers": [
     {
-      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/nginx-tg/1234567890123456",
+      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/nginx-tg/1234567890123456",
       "containerName": "nginx",
       "containerPort": 80
     }
   ],
   "serviceRegistries": [
     {
-      "registryArn": "arn:aws:servicediscovery:us-east-1:123456789012:service/srv-nginx",
+      "registryArn": "arn:aws:servicediscovery:us-east-1:000000000000:service/srv-nginx",
       "containerName": "nginx",
       "containerPort": 80
     }

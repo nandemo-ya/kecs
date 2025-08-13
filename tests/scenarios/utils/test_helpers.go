@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 )
@@ -26,6 +27,7 @@ func DefaultTestConfig() *TestConfig {
 type TestingT interface {
 	Logf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
+	Cleanup(f func())
 }
 
 // WaitForCondition waits for a condition to be true
@@ -43,7 +45,7 @@ func WaitForCondition(t TestingT, condition func() bool, timeout time.Duration, 
 }
 
 // AssertClusterActive asserts that a cluster is in ACTIVE state
-func AssertClusterActive(t TestingT, client *ECSClient, clusterName string) {
+func AssertClusterActive(t TestingT, client ECSClientInterface, clusterName string) {
 	WaitForCondition(t, func() bool {
 		cluster, err := client.DescribeCluster(clusterName)
 		if err != nil {
@@ -55,7 +57,7 @@ func AssertClusterActive(t TestingT, client *ECSClient, clusterName string) {
 }
 
 // AssertClusterDeleted asserts that a cluster has been deleted
-func AssertClusterDeleted(t TestingT, client *ECSClient, clusterName string) {
+func AssertClusterDeleted(t TestingT, client ECSClientInterface, clusterName string) {
 	WaitForCondition(t, func() bool {
 		_, err := client.DescribeCluster(clusterName)
 		return err != nil && (containsString(err.Error(), "not found") || containsString(err.Error(), "MISSING"))
@@ -63,7 +65,7 @@ func AssertClusterDeleted(t TestingT, client *ECSClient, clusterName string) {
 }
 
 // CleanupCluster safely deletes a cluster, ignoring errors if it doesn't exist
-func CleanupCluster(t TestingT, client *ECSClient, clusterName string) {
+func CleanupCluster(t TestingT, client ECSClientInterface, clusterName string) {
 	err := client.DeleteCluster(clusterName)
 	if err != nil && !containsString(err.Error(), "not found") {
 		t.Logf("Warning: failed to cleanup cluster %s: %v", clusterName, err)
@@ -98,7 +100,7 @@ func (l *TestLogger) Info(format string, args ...interface{}) {
 
 // Debug logs a debug message
 func (l *TestLogger) Debug(format string, args ...interface{}) {
-	if getEnvOrDefault("KECS_LOG_LEVEL", "info") == "debug" {
+	if os.Getenv("KECS_LOG_LEVEL") == "debug" {
 		l.t.Logf("[DEBUG] "+format, args...)
 	}
 }

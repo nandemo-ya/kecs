@@ -3,7 +3,6 @@ package converters
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -12,10 +11,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/proxy"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
@@ -26,13 +29,8 @@ type TaskConverter struct {
 	accountID             string
 	cloudWatchIntegration cloudwatch.Integration
 	artifactManager       *artifacts.Manager
-}
-
-// SecretInfo holds parsed information from a secret ARN
-type SecretInfo struct {
-	SecretName string
-	Key        string
-	Source     string // "secretsmanager" or "ssm"
+	proxyManager          *proxy.Manager
+	networkConverter      *NetworkConverter
 }
 
 // NewTaskConverter creates a new task converter
@@ -49,12 +47,18 @@ func NewTaskConverterWithCloudWatch(region, accountID string, cwIntegration clou
 		region:                region,
 		accountID:             accountID,
 		cloudWatchIntegration: cwIntegration,
+		networkConverter:      NewNetworkConverter(region, accountID),
 	}
 }
 
 // SetArtifactManager sets the artifact manager for the task converter
 func (c *TaskConverter) SetArtifactManager(am *artifacts.Manager) {
 	c.artifactManager = am
+}
+
+// SetProxyManager sets the proxy manager for the task converter
+func (c *TaskConverter) SetProxyManager(pm *proxy.Manager) {
+	c.proxyManager = pm
 }
 
 // ConvertTaskToPod converts an ECS task definition and RunTask request to a Kubernetes Pod
@@ -64,8 +68,31 @@ func (c *TaskConverter) ConvertTaskToPod(
 	cluster *storage.Cluster,
 	taskID string,
 ) (*corev1.Pod, error) {
-	// Parse the request JSON
-	var runTaskReq types.RunTaskRequest
+	// Import the generated types to properly handle network configuration
+	var runTaskReq struct {
+		Cluster              *string `json:"cluster,omitempty"`
+		TaskDefinition       *string `json:"taskDefinition"`
+		Count                *int    `json:"count,omitempty"`
+		Group                *string `json:"group,omitempty"`
+		StartedBy            *string `json:"startedBy,omitempty"`
+		LaunchType           *string `json:"launchType,omitempty"`
+		NetworkConfiguration *struct {
+			AwsvpcConfiguration *struct {
+				Subnets        []string `json:"subnets"`
+				SecurityGroups []string `json:"securityGroups,omitempty"`
+				AssignPublicIp *string  `json:"assignPublicIp,omitempty"`
+			} `json:"awsvpcConfiguration,omitempty"`
+		} `json:"networkConfiguration,omitempty"`
+		PlacementConstraints []types.PlacementConstraint `json:"placementConstraints,omitempty"`
+		PlacementStrategy    []types.PlacementStrategy   `json:"placementStrategy,omitempty"`
+		PlatformVersion      *string                     `json:"platformVersion,omitempty"`
+		EnableECSManagedTags *bool                       `json:"enableECSManagedTags,omitempty"`
+		PropagateTags        *string                     `json:"propagateTags,omitempty"`
+		ReferenceId          *string                     `json:"referenceId,omitempty"`
+		Tags                 []types.Tag                 `json:"tags,omitempty"`
+		EnableExecuteCommand *bool                       `json:"enableExecuteCommand,omitempty"`
+		Overrides            *types.TaskOverride         `json:"overrides,omitempty"`
+	}
 	if err := json.Unmarshal(runTaskReqJSON, &runTaskReq); err != nil {
 		return nil, fmt.Errorf("failed to parse RunTask request: %w", err)
 	}
@@ -93,7 +120,7 @@ func (c *TaskConverter) ConvertTaskToPod(
 				"kecs.dev/task-id":       taskID,
 				"kecs.dev/task-family":   taskDef.Family,
 				"kecs.dev/task-revision": fmt.Sprintf("%d", taskDef.Revision),
-				"kecs.dev/launch-type":   c.getLaunchType(&runTaskReq),
+				"kecs.dev/launch-type":   c.getLaunchTypeFromRequest(runTaskReq.LaunchType),
 				"kecs.dev/managed-by":    "kecs",
 			},
 			Annotations: map[string]string{
@@ -103,7 +130,7 @@ func (c *TaskConverter) ConvertTaskToPod(
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyNever, // ECS tasks don't restart by default
-			Containers:    c.convertContainers(containerDefs, taskDef, &runTaskReq),
+			Containers:    c.convertContainersWithOverrides(containerDefs, taskDef, runTaskReq.Overrides),
 			Volumes:       c.convertVolumes(volumes),
 		},
 	}
@@ -118,8 +145,32 @@ func (c *TaskConverter) ConvertTaskToPod(
 	}
 
 	// Apply network mode
-	if taskDef.NetworkMode == "host" {
+	networkMode := types.GetNetworkMode(&taskDef.NetworkMode)
+	if networkMode == types.NetworkModeHost {
 		pod.Spec.HostNetwork = true
+	}
+
+	// Add network configuration annotations
+	if runTaskReq.NetworkConfiguration != nil && c.networkConverter != nil {
+		// Add network mode annotation
+		pod.Annotations["ecs.amazonaws.com/network-mode"] = string(networkMode)
+
+		// Add awsvpc configuration if present
+		if runTaskReq.NetworkConfiguration.AwsvpcConfiguration != nil {
+			awsvpc := runTaskReq.NetworkConfiguration.AwsvpcConfiguration
+			if len(awsvpc.Subnets) > 0 {
+				pod.Annotations["ecs.amazonaws.com/subnets"] = strings.Join(awsvpc.Subnets, ",")
+			}
+			if len(awsvpc.SecurityGroups) > 0 {
+				pod.Annotations["ecs.amazonaws.com/security-groups"] = strings.Join(awsvpc.SecurityGroups, ",")
+			}
+			if awsvpc.AssignPublicIp != nil {
+				pod.Annotations["ecs.amazonaws.com/assign-public-ip"] = *awsvpc.AssignPublicIp
+			}
+		}
+	} else {
+		// Just add the network mode from task definition
+		pod.Annotations["ecs.amazonaws.com/network-mode"] = string(networkMode)
 	}
 
 	// Apply PID mode
@@ -127,15 +178,15 @@ func (c *TaskConverter) ConvertTaskToPod(
 		pod.Spec.HostPID = true
 	}
 
-	// Apply task role via ServiceAccount
-	if taskDef.TaskRoleARN != "" {
+	// Apply task role via ServiceAccount only if IAM integration is enabled
+	if taskDef.TaskRoleARN != "" && config.GetBool("features.iamIntegration") {
 		// Extract role name from ARN
 		roleName := c.extractRoleNameFromARN(taskDef.TaskRoleARN)
 		if roleName != "" {
 			// ServiceAccount name is typically rolename-sa
 			serviceAccountName := fmt.Sprintf("%s-sa", roleName)
 			pod.Spec.ServiceAccountName = serviceAccountName
-			
+
 			// Add annotations for tracking
 			pod.Annotations["kecs.dev/task-role-arn"] = taskDef.TaskRoleARN
 			pod.Annotations["kecs.dev/task-role-name"] = roleName
@@ -170,10 +221,10 @@ func (c *TaskConverter) ConvertTaskToPod(
 	// Add volume configuration annotations
 	c.addVolumeAnnotations(pod, volumes)
 
-	// Apply IAM role if specified
-	if taskDef.TaskRoleARN != "" {
-		c.applyIAMRole(pod, taskDef.TaskRoleARN)
-	}
+	// Add secret annotations
+	c.addSecretAnnotations(pod, containerDefs)
+
+	// Apply IAM role annotations if specified (for tracking purposes)
 	if taskDef.ExecutionRoleARN != "" {
 		pod.ObjectMeta.Annotations["kecs.dev/execution-role-arn"] = taskDef.ExecutionRoleARN
 	}
@@ -181,7 +232,48 @@ func (c *TaskConverter) ConvertTaskToPod(
 	// Apply CloudWatch logs configuration
 	if c.cloudWatchIntegration != nil {
 		c.applyCloudWatchLogsConfiguration(pod, containerDefs, taskDef)
-		// DaemonSet will handle log collection - no sidecar needed
+
+		// Add FluentBit sidecar if needed
+		sidecar, configMap := c.createCloudWatchSidecar(containerDefs, taskDef, cluster, taskID)
+		if sidecar != nil {
+			pod.Spec.Containers = append(pod.Spec.Containers, *sidecar)
+
+			// Add host path volumes for logs
+			pod.Spec.Volumes = append(pod.Spec.Volumes,
+				corev1.Volume{
+					Name: "varlog",
+					VolumeSource: corev1.VolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{
+							Path: "/var/log",
+						},
+					},
+				},
+				corev1.Volume{
+					Name: "varlibdockercontainers",
+					VolumeSource: corev1.VolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{
+							Path: "/var/lib/docker/containers",
+						},
+					},
+				},
+			)
+
+			// Store config map info for later creation
+			if configMap != nil {
+				pod.Annotations["kecs.dev/fluent-bit-configmap"] = configMap.Name
+				pod.Annotations["kecs.dev/fluent-bit-config"] = configMap.Data["fluent-bit.conf"]
+			}
+		}
+	}
+
+	// Add AWS proxy sidecar if proxy manager is available
+	if c.proxyManager != nil && c.proxyManager.GetSidecarProxy() != nil {
+		sidecarProxy := c.proxyManager.GetSidecarProxy()
+		if sidecarProxy.ShouldInjectSidecar(pod) {
+			if err := sidecarProxy.InjectSidecar(pod); err != nil {
+				logging.Warn("Failed to inject AWS proxy sidecar", "error", err)
+			}
+		}
 	}
 
 	return pod, nil
@@ -194,7 +286,7 @@ func (c *TaskConverter) convertContainers(
 	runTaskReq *types.RunTaskRequest,
 ) []corev1.Container {
 	containers := make([]corev1.Container, 0, len(containerDefs))
-	
+
 	// Generate task ARN for logging
 	taskArn := taskDef.ARN
 
@@ -288,7 +380,15 @@ func (c *TaskConverter) convertContainers(
 
 		// Health check
 		if def.HealthCheck != nil {
+			// Use the same probe for both liveness and readiness
 			container.LivenessProbe = c.convertHealthCheck(def.HealthCheck)
+			// Create a copy for readiness probe with potentially different settings
+			readinessProbe := c.convertHealthCheck(def.HealthCheck)
+			// Readiness probe can have shorter initial delay for faster service availability
+			if readinessProbe.InitialDelaySeconds > 10 {
+				readinessProbe.InitialDelaySeconds = 10
+			}
+			container.ReadinessProbe = readinessProbe
 		}
 
 		// User
@@ -407,6 +507,19 @@ func (c *TaskConverter) convertPortMappings(mappings []types.PortMapping) []core
 	return ports
 }
 
+// convertContainersWithOverrides converts ECS container definitions to Kubernetes containers with overrides
+func (c *TaskConverter) convertContainersWithOverrides(
+	containerDefs []types.ContainerDefinition,
+	taskDef *storage.TaskDefinition,
+	overrides *types.TaskOverride,
+) []corev1.Container {
+	// Create a minimal RunTaskRequest with just the overrides
+	runTaskReq := &types.RunTaskRequest{
+		Overrides: overrides,
+	}
+	return c.convertContainers(containerDefs, taskDef, runTaskReq)
+}
+
 // convertVolumes converts ECS volumes to Kubernetes volumes
 func (c *TaskConverter) convertVolumes(volumes []types.Volume) []corev1.Volume {
 	k8sVolumes := make([]corev1.Volume, 0, len(volumes))
@@ -481,29 +594,82 @@ func (c *TaskConverter) convertMountPoints(mountPoints []types.MountPoint) []cor
 
 // convertHealthCheck converts ECS health check to Kubernetes probe
 func (c *TaskConverter) convertHealthCheck(hc *types.HealthCheck) *corev1.Probe {
-	probe := &corev1.Probe{
-		ProbeHandler: corev1.ProbeHandler{
-			Exec: &corev1.ExecAction{
+	probe := &corev1.Probe{}
+
+	// Process command based on format
+	if hc.Command != nil && len(hc.Command) > 0 {
+		cmdType := hc.Command[0]
+
+		switch cmdType {
+		case "CMD-SHELL":
+			// Shell command - use exec probe with sh -c
+			if len(hc.Command) > 1 {
+				probe.Exec = &corev1.ExecAction{
+					Command: []string{"sh", "-c", hc.Command[1]},
+				}
+			}
+		case "CMD":
+			// Direct command - use exec probe
+			if len(hc.Command) > 1 {
+				probe.Exec = &corev1.ExecAction{
+					Command: hc.Command[1:],
+				}
+			}
+		case "HTTP":
+			// HTTP health check
+			if len(hc.Command) > 1 {
+				// Parse URL from command
+				path := hc.Command[1]
+				port := int32(80) // Default port
+
+				// Extract port if specified
+				if len(hc.Command) > 2 {
+					// Try to parse port from command
+					if p, err := strconv.Atoi(hc.Command[2]); err == nil {
+						port = int32(p)
+					}
+				}
+
+				probe.HTTPGet = &corev1.HTTPGetAction{
+					Path: path,
+					Port: intstr.FromInt(int(port)),
+				}
+			}
+		default:
+			// Assume direct command format
+			probe.Exec = &corev1.ExecAction{
 				Command: hc.Command,
-			},
-		},
+			}
+		}
 	}
 
+	// Set timing parameters
 	if hc.Interval != nil {
 		probe.PeriodSeconds = int32(*hc.Interval)
+	} else {
+		probe.PeriodSeconds = 30 // Default
 	}
 
 	if hc.Timeout != nil {
 		probe.TimeoutSeconds = int32(*hc.Timeout)
+	} else {
+		probe.TimeoutSeconds = 5 // Default
 	}
 
 	if hc.Retries != nil {
 		probe.FailureThreshold = int32(*hc.Retries)
+	} else {
+		probe.FailureThreshold = 3 // Default
 	}
 
 	if hc.StartPeriod != nil {
 		probe.InitialDelaySeconds = int32(*hc.StartPeriod)
+	} else {
+		probe.InitialDelaySeconds = 30 // Default
 	}
+
+	// Kubernetes successThreshold is always 1 for liveness probe
+	probe.SuccessThreshold = 1
 
 	return probe
 }
@@ -544,6 +710,14 @@ func (c *TaskConverter) getLaunchType(req *types.RunTaskRequest) string {
 	}
 	if req.CapacityProviderStrategy != nil && len(req.CapacityProviderStrategy) > 0 {
 		return "CAPACITY_PROVIDER"
+	}
+	return "EC2"
+}
+
+// getLaunchTypeFromRequest determines the launch type from a string pointer
+func (c *TaskConverter) getLaunchTypeFromRequest(launchType *string) string {
+	if launchType != nil {
+		return *launchType
 	}
 	return "EC2"
 }
@@ -651,7 +825,7 @@ func (c *TaskConverter) applyResourceConstraints(pod *corev1.Pod, taskCPU, taskM
 					}
 				}
 			}
-			
+
 			if memoryMi > 0 && totalRequestedMemory > 0 {
 				memScale := float64(memoryMi) / float64(totalRequestedMemory)
 				for i := range pod.Spec.Containers {
@@ -1147,26 +1321,49 @@ func (c *TaskConverter) addVolumeAnnotations(pod *corev1.Pod, volumes []types.Vo
 	}
 }
 
+// addSecretAnnotations adds annotations for secrets used by the task
+func (c *TaskConverter) addSecretAnnotations(pod *corev1.Pod, containerDefs []types.ContainerDefinition) {
+	secretIndex := 0
+	for _, containerDef := range containerDefs {
+		if containerDef.Secrets != nil {
+			for _, secret := range containerDef.Secrets {
+				if secret.Name != nil && secret.ValueFrom != nil {
+					// Add annotation for each secret with container and environment variable info
+					annotationKey := fmt.Sprintf("kecs.dev/secret-%d-arn", secretIndex)
+					annotationValue := fmt.Sprintf("%s:%s:%s", *containerDef.Name, *secret.Name, *secret.ValueFrom)
+					pod.Annotations[annotationKey] = annotationValue
+					secretIndex++
+				}
+			}
+		}
+	}
+
+	// Add total count of secrets
+	if secretIndex > 0 {
+		pod.Annotations["kecs.dev/secret-count"] = fmt.Sprintf("%d", secretIndex)
+	}
+}
+
 // applyIAMRole applies IAM role configuration to the pod
 func (c *TaskConverter) applyIAMRole(pod *corev1.Pod, roleArn string) {
 	// Add role ARN annotation
 	pod.ObjectMeta.Annotations["kecs.dev/task-role-arn"] = roleArn
-	
+
 	// Extract role name from ARN
 	// ARN format: arn:aws:iam::account-id:role/role-name
 	parts := strings.Split(roleArn, "/")
 	if len(parts) >= 2 {
 		roleName := parts[len(parts)-1]
-		
+
 		// ServiceAccount name would be created by IAM integration
 		serviceAccountName := fmt.Sprintf("%s-sa", roleName)
-		
+
 		// Set ServiceAccount on the pod
 		pod.Spec.ServiceAccountName = serviceAccountName
-		
+
 		// Add label for easier querying
 		pod.ObjectMeta.Labels["kecs.dev/iam-role"] = roleName
-		
+
 		// Inject AWS credentials for LocalStack
 		c.injectAWSCredentials(pod)
 	}
@@ -1189,17 +1386,17 @@ func (c *TaskConverter) injectAWSCredentials(pod *corev1.Pod) {
 			Value: c.region,
 		},
 	}
-	
+
 	// Add credentials to all containers
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
-		
+
 		// Check if env vars already exist to avoid duplicates
 		envMap := make(map[string]bool)
 		for _, env := range container.Env {
 			envMap[env.Name] = true
 		}
-		
+
 		// Add AWS env vars if not already present
 		for _, envVar := range awsEnvVars {
 			if !envMap[envVar.Name] {
@@ -1234,7 +1431,7 @@ func (c *TaskConverter) applyCloudWatchLogsConfiguration(pod *corev1.Pod, contai
 			if def.Name == nil {
 				continue
 			}
-			
+
 			options := def.LogConfiguration.Options
 			if options == nil {
 				options = make(map[string]string)
@@ -1245,15 +1442,15 @@ func (c *TaskConverter) applyCloudWatchLogsConfiguration(pod *corev1.Pod, contai
 			if logGroupName == "" {
 				logGroupName = c.cloudWatchIntegration.GetLogGroupForTask(taskDef.ARN)
 			}
-			
+
 			logStreamName := c.cloudWatchIntegration.GetLogStreamForContainer(taskDef.ARN, *def.Name)
-			
+
 			// Add annotations for each container's log configuration
 			annotationPrefix := fmt.Sprintf("kecs.dev/container-%s-logs", *def.Name)
 			pod.Annotations[annotationPrefix+"-driver"] = "awslogs"
 			pod.Annotations[annotationPrefix+"-group"] = logGroupName
 			pod.Annotations[annotationPrefix+"-stream"] = logStreamName
-			
+
 			if region, ok := options["awslogs-region"]; ok {
 				pod.Annotations[annotationPrefix+"-region"] = region
 			}
@@ -1262,29 +1459,29 @@ func (c *TaskConverter) applyCloudWatchLogsConfiguration(pod *corev1.Pod, contai
 
 	// Add global CloudWatch logs enabled annotation
 	pod.Annotations["kecs.dev/cloudwatch-logs-enabled"] = "true"
-	
+
 	// Create log streams for each container
 	for _, def := range containerDefs {
-		if def.LogConfiguration != nil && def.LogConfiguration.LogDriver != nil && 
-		   *def.LogConfiguration.LogDriver == "awslogs" && def.Name != nil {
+		if def.LogConfiguration != nil && def.LogConfiguration.LogDriver != nil &&
+			*def.LogConfiguration.LogDriver == "awslogs" && def.Name != nil {
 			options := def.LogConfiguration.Options
 			if options == nil {
 				options = make(map[string]string)
 			}
-			
+
 			logGroupName := options["awslogs-group"]
 			if logGroupName == "" {
 				logGroupName = c.cloudWatchIntegration.GetLogGroupForTask(taskDef.ARN)
 			}
-			
+
 			logStreamName := c.cloudWatchIntegration.GetLogStreamForContainer(taskDef.ARN, *def.Name)
-			
+
 			// Create log group and stream
 			if err := c.cloudWatchIntegration.CreateLogGroup(logGroupName); err != nil {
-				log.Printf("Warning: Failed to create log group %s: %v", logGroupName, err)
+				logging.Warn("Failed to create log group", "logGroup", logGroupName, "error", err)
 			}
 			if err := c.cloudWatchIntegration.CreateLogStream(logGroupName, logStreamName); err != nil {
-				log.Printf("Warning: Failed to create log stream %s/%s: %v", logGroupName, logStreamName, err)
+				logging.Warn("Failed to create log stream", "logGroup", logGroupName, "logStream", logStreamName, "error", err)
 			}
 		}
 	}
@@ -1334,6 +1531,105 @@ func (c *TaskConverter) sanitizeLabelKey(key string) string {
 	return key
 }
 
+// createCloudWatchSidecar creates a FluentBit sidecar container for CloudWatch logging
+func (c *TaskConverter) createCloudWatchSidecar(containerDefs []types.ContainerDefinition, taskDef *storage.TaskDefinition, cluster *storage.Cluster, taskID string) (*corev1.Container, *corev1.ConfigMap) {
+	if c.cloudWatchIntegration == nil {
+		return nil, nil
+	}
+
+	// Check if any container uses awslogs
+	var awslogsConfigs []types.LogConfiguration
+	for _, def := range containerDefs {
+		if def.LogConfiguration != nil && def.LogConfiguration.LogDriver != nil && *def.LogConfiguration.LogDriver == "awslogs" {
+			awslogsConfigs = append(awslogsConfigs, *def.LogConfiguration)
+		}
+	}
+
+	if len(awslogsConfigs) == 0 {
+		return nil, nil
+	}
+
+	// Get the first awslogs configuration as the primary one
+	primaryConfig := awslogsConfigs[0]
+	options := primaryConfig.Options
+	if options == nil {
+		options = make(map[string]string)
+	}
+
+	// Configure CloudWatch logging
+	logConfig, err := c.cloudWatchIntegration.ConfigureContainerLogging(
+		taskDef.ARN,
+		"fluent-bit",
+		"awslogs",
+		options,
+	)
+	if err != nil {
+		return nil, nil
+	}
+
+	// Create FluentBit sidecar container
+	sidecar := &corev1.Container{
+		Name:  "fluent-bit",
+		Image: "amazon/aws-for-fluent-bit:latest",
+		Env: []corev1.EnvVar{
+			{
+				Name:  "AWS_DEFAULT_REGION",
+				Value: c.region,
+			},
+			{
+				Name:  "AWS_ACCESS_KEY_ID",
+				Value: "test", // LocalStack default
+			},
+			{
+				Name:  "AWS_SECRET_ACCESS_KEY",
+				Value: "test", // LocalStack default
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "varlog",
+				MountPath: "/var/log",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "varlibdockercontainers",
+				MountPath: "/var/lib/docker/containers",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "fluent-bit-config",
+				MountPath: "/fluent-bit/etc/",
+			},
+		},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("128Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+		},
+	}
+
+	// Create ConfigMap for FluentBit configuration
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("fluent-bit-config-%s", taskID),
+			Namespace: c.getNamespace(cluster),
+			Labels: map[string]string{
+				"kecs.dev/task-id":    taskID,
+				"kecs.dev/managed-by": "kecs",
+			},
+		},
+		Data: map[string]string{
+			"fluent-bit.conf": logConfig.FluentBitConfig,
+		},
+	}
+
+	return sidecar, configMap
+}
 
 // sanitizeLabelValue converts a tag value to a valid Kubernetes label value
 func (c *TaskConverter) sanitizeLabelValue(value string) string {
@@ -1367,10 +1663,10 @@ func (c *TaskConverter) sanitizeLabelValue(value string) string {
 func (c *TaskConverter) convertECSAttributeToK8sLabel(attribute string) string {
 	// Common ECS attributes mapping
 	mappings := map[string]string{
-		"ecs.instance-type":      "node.kubernetes.io/instance-type",
-		"ecs.availability-zone":  "topology.kubernetes.io/zone",
+		"ecs.instance-type":     "node.kubernetes.io/instance-type",
+		"ecs.availability-zone": "topology.kubernetes.io/zone",
 		"ecs.os-type":           "kubernetes.io/os",
-		"ecs.cpu-architecture":   "kubernetes.io/arch",
+		"ecs.cpu-architecture":  "kubernetes.io/arch",
 		"ecs.ami-id":            "kecs.dev/ami-id",
 		"ecs.instance-id":       "kecs.dev/instance-id",
 		"ecs.subnet-id":         "kecs.dev/subnet-id",
@@ -1411,24 +1707,25 @@ func (c *TaskConverter) convertSecrets(secrets []types.Secret) []corev1.EnvVar {
 
 		switch secretInfo.Source {
 		case "secretsmanager":
-			// Reference Kubernetes secret created from Secrets Manager
+			// Reference the synced Kubernetes secret in kecs-system namespace
+			// Note: Cross-namespace secret reference requires proper RBAC setup
 			envVar.ValueFrom = &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: c.sanitizeSecretName(secretInfo.SecretName),
+						Name: c.getK8sSecretName("secretsmanager", secretInfo.SecretName),
 					},
 					Key: secretInfo.Key,
 				},
 			}
 
 		case "ssm":
-			// Reference Kubernetes secret created from SSM Parameter Store
+			// All SSM parameters are now stored as Secrets for consistency
 			envVar.ValueFrom = &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: c.sanitizeSecretName(secretInfo.SecretName),
+						Name: c.getK8sSecretName("ssm", secretInfo.SecretName),
 					},
-					Key: "value", // SSM parameters typically have a single value
+					Key: "value",
 				},
 			}
 		}
@@ -1460,15 +1757,16 @@ func (c *TaskConverter) parseSecretArn(arn string) (*SecretInfo, error) {
 		// Format: arn:aws:secretsmanager:region:account-id:secret:name-6RandomChars:key::
 		if len(parts) >= 7 {
 			info.SecretName = parts[6]
-			if len(parts) >= 8 && parts[7] != "" {
+			// Check if a JSON key is specified at index 7
+			if len(parts) > 7 && parts[7] != "" && parts[7] != "*" {
 				info.Key = parts[7]
 			} else {
-				info.Key = "default"
+				// No JSON key specified, the entire secret value will be used
+				// When synced by Secrets Manager integration, JSON secrets will have all keys available
+				info.Key = "value"
 			}
 		} else {
-			// No JSON key specified
-			info.SecretName = parts[6]
-			info.Key = "default"
+			return nil, fmt.Errorf("invalid Secrets Manager ARN format: %s", arn)
 		}
 
 	case "ssm":
@@ -1494,8 +1792,20 @@ func (c *TaskConverter) parseSecretArn(arn string) (*SecretInfo, error) {
 	return info, nil
 }
 
+// getNamespacedSecretName returns the namespace-aware secret name for LocalStack
+func (c *TaskConverter) getNamespacedSecretName(cluster *storage.Cluster, secretName string) string {
+	// Format: <namespace>/<secret-name>
+	// The namespace already contains cluster and region information
+	namespace := c.getNamespace(cluster)
+	return fmt.Sprintf("%s/%s", namespace, secretName)
+}
+
 // sanitizeSecretName converts a secret name to be Kubernetes-compatible
 func (c *TaskConverter) sanitizeSecretName(name string) string {
+	// Determine the prefix based on the source
+	// The integration modules will handle the actual prefixing,
+	// but we need to ensure consistency here
+
 	// Remove the random suffix from Secrets Manager secret names
 	// Format: my-secret-AbCdEf -> my-secret
 	if idx := strings.LastIndex(name, "-"); idx > 0 && len(name)-idx == 7 {
@@ -1505,14 +1815,18 @@ func (c *TaskConverter) sanitizeSecretName(name string) string {
 			name = name[:idx]
 		}
 	}
-	
+
+	// Handle path separators for hierarchical secrets
+	name = strings.ReplaceAll(name, "/", "-")
+
 	// Similar to volume names, but for secrets
 	name = strings.ToLower(name)
 	name = regexp.MustCompile(`[^a-z0-9-]`).ReplaceAllString(name, "-")
 	name = strings.Trim(name, "-")
 
-	// Prefix with kecs-secret to avoid conflicts
-	return fmt.Sprintf("kecs-secret-%s", name)
+	// Return the sanitized name without prefix
+	// The actual prefix (sm- or ssm-) will be added by the integration modules
+	return name
 }
 
 // extractRoleNameFromARN extracts the role name from an IAM role ARN
@@ -1520,7 +1834,7 @@ func (c *TaskConverter) extractRoleNameFromARN(arn string) string {
 	if arn == "" {
 		return ""
 	}
-	
+
 	// ARN format: arn:aws:iam::account-id:role/role-name
 	parts := strings.Split(arn, ":")
 	if len(parts) >= 6 && parts[2] == "iam" {
@@ -1530,12 +1844,12 @@ func (c *TaskConverter) extractRoleNameFromARN(arn string) string {
 			return strings.TrimPrefix(resourcePart, "role/")
 		}
 	}
-	
+
 	// If it's not a valid ARN, assume it's already a role name
 	if !strings.HasPrefix(arn, "arn:") {
 		return arn
 	}
-	
+
 	return ""
 }
 
@@ -1634,10 +1948,10 @@ func (c *TaskConverter) createArtifactInitContainers(containerDefs []types.Conta
 
 		// Create init container for downloading artifacts
 		initContainer := corev1.Container{
-			Name:  fmt.Sprintf("artifact-downloader-%s", *def.Name),
-			Image: "busybox:latest", // In production, use a custom artifact downloader image
+			Name:    fmt.Sprintf("artifact-downloader-%s", *def.Name),
+			Image:   "amazon/aws-cli:latest", // Use AWS CLI image for S3 support
 			Command: []string{"/bin/sh", "-c"},
-			Args: []string{c.generateArtifactDownloadScript(def.Artifacts)},
+			Args:    []string{c.generateArtifactDownloadScript(def.Artifacts)},
 			VolumeMounts: []corev1.VolumeMount{
 				{
 					Name:      volumeName,
@@ -1671,14 +1985,11 @@ func (c *TaskConverter) generateArtifactDownloadScript(artifacts []types.Artifac
 
 		// Download based on URL type
 		if strings.HasPrefix(url, "s3://") {
-			// For S3, we would use AWS CLI in a real implementation
-			// For now, use a placeholder that shows the intent
-			commands = append(commands, fmt.Sprintf("echo 'Downloading %s to %s'", url, targetPath))
-			commands = append(commands, fmt.Sprintf("echo 'S3 download would happen here with AWS CLI'"))
-			// In production: aws s3 cp ${url} ${targetPath}
+			// Use AWS CLI to download from S3
+			commands = append(commands, fmt.Sprintf("aws s3 cp %s %s", url, targetPath))
 		} else if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
-			// Use wget for HTTP/HTTPS
-			commands = append(commands, fmt.Sprintf("wget -q -O %s %s", targetPath, url))
+			// Use curl for HTTP/HTTPS (available in aws-cli image)
+			commands = append(commands, fmt.Sprintf("curl -s -L -o %s %s", targetPath, url))
 		}
 
 		// Set permissions if specified
@@ -1695,8 +2006,7 @@ func (c *TaskConverter) generateArtifactDownloadScript(artifacts []types.Artifac
 func (c *TaskConverter) getArtifactEnvironment() []corev1.EnvVar {
 	var env []corev1.EnvVar
 
-	// If using LocalStack, set AWS endpoint
-	// This would be configured based on the proxy mode
+	// Basic AWS credentials
 	env = append(env, corev1.EnvVar{
 		Name:  "AWS_ACCESS_KEY_ID",
 		Value: "test",
@@ -1710,5 +2020,102 @@ func (c *TaskConverter) getArtifactEnvironment() []corev1.EnvVar {
 		Value: c.region,
 	})
 
+	// Add LocalStack S3 endpoint if available
+	// In proxy mode, use http://localstack-proxy.default.svc.cluster.local:4566
+	// Otherwise, use direct LocalStack endpoint
+	if c.artifactManager != nil {
+		// Add S3 endpoint for LocalStack
+		env = append(env, corev1.EnvVar{
+			Name:  "AWS_ENDPOINT_URL_S3",
+			Value: "http://localstack-proxy.default.svc.cluster.local:4566",
+		})
+		// For aws-cli v1 compatibility
+		env = append(env, corev1.EnvVar{
+			Name:  "S3_ENDPOINT_URL",
+			Value: "http://localstack-proxy.default.svc.cluster.local:4566",
+		})
+	}
+
 	return env
+}
+
+// getK8sSecretName returns the Kubernetes secret name for a given source and secret name
+func (c *TaskConverter) getK8sSecretName(source, secretName string) string {
+	switch source {
+	case "secretsmanager":
+		// Remove the random suffix that Secrets Manager adds (e.g., -AbCdEf)
+		re := regexp.MustCompile(`-[A-Za-z0-9]{6}$`)
+		cleanName := re.ReplaceAllString(secretName, "")
+		cleanName = strings.ToLower(cleanName)
+		cleanName = strings.ReplaceAll(cleanName, "/", "-")
+		cleanName = strings.Trim(cleanName, "-")
+		return "sm-" + cleanName
+	case "ssm":
+		cleanName := strings.Trim(secretName, "/")
+		cleanName = strings.ReplaceAll(cleanName, "/", "-")
+		cleanName = strings.ToLower(cleanName)
+		return "ssm-" + cleanName
+	default:
+		return "unknown-" + strings.ToLower(secretName)
+	}
+}
+
+// getK8sConfigMapName returns the Kubernetes ConfigMap name for a given SSM parameter
+// DEPRECATED: All SSM parameters are now stored as Secrets for consistency
+func (c *TaskConverter) getK8sConfigMapName(parameterName string) string {
+	cleanName := strings.Trim(parameterName, "/")
+	cleanName = strings.ReplaceAll(cleanName, "/", "-")
+	cleanName = strings.ToLower(cleanName)
+	return "ssm-cm-" + cleanName
+}
+
+// isSSMParameterSensitive determines if an SSM parameter should be treated as sensitive
+// DEPRECATED: All SSM parameters are now stored as Secrets for consistency
+func (c *TaskConverter) isSSMParameterSensitive(parameterName string) bool {
+	// All SSM parameters are now treated as sensitive and stored as Secrets
+	return true
+}
+
+// getPlaceholderSecretValue returns placeholder values for secrets
+// NOTE: This is now deprecated in favor of actual Kubernetes secret references
+// Kept for backward compatibility and testing
+func (c *TaskConverter) getPlaceholderSecretValue(source, secretName, key string) string {
+	// Generate deterministic placeholder values based on the secret name and key
+	// This ensures consistency across deployments while being obviously fake
+
+	switch source {
+	case "secretsmanager":
+		// Generate different placeholder values for different secret types
+		if strings.Contains(strings.ToLower(secretName), "db") || strings.Contains(strings.ToLower(secretName), "database") {
+			// Check if key or secretName contains password/pass
+			if strings.Contains(strings.ToLower(key), "password") || strings.Contains(strings.ToLower(key), "pass") ||
+				strings.Contains(strings.ToLower(secretName), "password") || strings.Contains(strings.ToLower(secretName), "pass") {
+				return "placeholder-db-password-from-secrets-manager"
+			}
+			return "placeholder-db-connection-from-secrets-manager"
+		}
+		if strings.Contains(strings.ToLower(secretName), "jwt") {
+			return "placeholder-jwt-secret-from-secrets-manager"
+		}
+		if strings.Contains(strings.ToLower(secretName), "encrypt") {
+			return "placeholder-encryption-key-from-secrets-manager"
+		}
+		return fmt.Sprintf("placeholder-secret-from-secrets-manager-%s-%s", secretName, key)
+
+	case "ssm":
+		// Generate placeholder values for SSM parameters
+		if strings.Contains(strings.ToLower(secretName), "database") {
+			return "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+		}
+		if strings.Contains(strings.ToLower(secretName), "api_key") {
+			return "placeholder-api-key-from-ssm"
+		}
+		if strings.Contains(strings.ToLower(secretName), "feature") {
+			return `{"new_ui": true, "beta_features": true, "maintenance_mode": false}`
+		}
+		return fmt.Sprintf("placeholder-parameter-from-ssm-%s", secretName)
+
+	default:
+		return fmt.Sprintf("placeholder-unknown-secret-%s", secretName)
+	}
 }

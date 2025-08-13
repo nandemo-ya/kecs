@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes/fake"
+
+	cloudwatchlogsapi "github.com/nandemo-ya/kecs/controlplane/internal/cloudwatchlogs/generated"
 	kecsCloudWatch "github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
-	"k8s.io/client-go/kubernetes/fake"
 )
 
 // mockCloudWatchLogsClient is a mock implementation of CloudWatchLogsClient
@@ -27,48 +27,48 @@ func newMockCloudWatchLogsClient() *mockCloudWatchLogsClient {
 	}
 }
 
-func (m *mockCloudWatchLogsClient) CreateLogGroup(ctx context.Context, params *cloudwatchlogs.CreateLogGroupInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.CreateLogGroupOutput, error) {
-	groupName := aws.ToString(params.LogGroupName)
+func (m *mockCloudWatchLogsClient) CreateLogGroup(ctx context.Context, params *cloudwatchlogsapi.CreateLogGroupRequest) (*cloudwatchlogsapi.Unit, error) {
+	groupName := params.LogGroupName
 	if m.logGroups[groupName] {
 		return nil, fmt.Errorf("ResourceAlreadyExistsException: log group already exists")
 	}
 	m.logGroups[groupName] = true
 	m.logStreams[groupName] = make(map[string]bool)
-	return &cloudwatchlogs.CreateLogGroupOutput{}, nil
+	return &cloudwatchlogsapi.Unit{}, nil
 }
 
-func (m *mockCloudWatchLogsClient) DeleteLogGroup(ctx context.Context, params *cloudwatchlogs.DeleteLogGroupInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DeleteLogGroupOutput, error) {
-	groupName := aws.ToString(params.LogGroupName)
+func (m *mockCloudWatchLogsClient) DeleteLogGroup(ctx context.Context, params *cloudwatchlogsapi.DeleteLogGroupRequest) (*cloudwatchlogsapi.Unit, error) {
+	groupName := params.LogGroupName
 	if !m.logGroups[groupName] {
 		return nil, fmt.Errorf("ResourceNotFoundException: log group not found")
 	}
 	delete(m.logGroups, groupName)
 	delete(m.logStreams, groupName)
-	return &cloudwatchlogs.DeleteLogGroupOutput{}, nil
+	return &cloudwatchlogsapi.Unit{}, nil
 }
 
-func (m *mockCloudWatchLogsClient) CreateLogStream(ctx context.Context, params *cloudwatchlogs.CreateLogStreamInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.CreateLogStreamOutput, error) {
-	groupName := aws.ToString(params.LogGroupName)
-	streamName := aws.ToString(params.LogStreamName)
-	
+func (m *mockCloudWatchLogsClient) CreateLogStream(ctx context.Context, params *cloudwatchlogsapi.CreateLogStreamRequest) (*cloudwatchlogsapi.Unit, error) {
+	groupName := params.LogGroupName
+	streamName := params.LogStreamName
+
 	if !m.logGroups[groupName] {
 		return nil, fmt.Errorf("ResourceNotFoundException: log group not found")
 	}
-	
+
 	if m.logStreams[groupName][streamName] {
 		return nil, fmt.Errorf("ResourceAlreadyExistsException: log stream already exists")
 	}
-	
+
 	m.logStreams[groupName][streamName] = true
-	return &cloudwatchlogs.CreateLogStreamOutput{}, nil
+	return &cloudwatchlogsapi.Unit{}, nil
 }
 
-func (m *mockCloudWatchLogsClient) PutRetentionPolicy(ctx context.Context, params *cloudwatchlogs.PutRetentionPolicyInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.PutRetentionPolicyOutput, error) {
-	groupName := aws.ToString(params.LogGroupName)
+func (m *mockCloudWatchLogsClient) PutRetentionPolicy(ctx context.Context, params *cloudwatchlogsapi.PutRetentionPolicyRequest) (*cloudwatchlogsapi.Unit, error) {
+	groupName := params.LogGroupName
 	if !m.logGroups[groupName] {
 		return nil, fmt.Errorf("ResourceNotFoundException: log group not found")
 	}
-	return &cloudwatchlogs.PutRetentionPolicyOutput{}, nil
+	return &cloudwatchlogsapi.Unit{}, nil
 }
 
 // mockLocalStackManager is a mock implementation of localstack.Manager
@@ -139,6 +139,10 @@ func (m *mockLocalStackManager) WaitForReady(ctx context.Context, timeout time.D
 	return nil
 }
 
+func (m *mockLocalStackManager) CheckServiceHealth(service string) error {
+	return nil
+}
+
 var _ = Describe("CloudWatch Integration", func() {
 	var (
 		integration       kecsCloudWatch.Integration
@@ -159,7 +163,7 @@ var _ = Describe("CloudWatch Integration", func() {
 		}
 
 		logsClient = newMockCloudWatchLogsClient()
-		
+
 		// Use the test constructor with mocked client
 		integration = kecsCloudWatch.NewIntegrationWithClient(
 			kubeClient,
@@ -180,7 +184,7 @@ var _ = Describe("CloudWatch Integration", func() {
 			// Create first time
 			err := integration.CreateLogGroup("my-app")
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Create again
 			err = integration.CreateLogGroup("my-app")
 			Expect(err).NotTo(HaveOccurred())
@@ -214,7 +218,7 @@ var _ = Describe("CloudWatch Integration", func() {
 			// Create stream first time
 			err = integration.CreateLogStream("my-app", "container-1/task-123")
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Create again
 			err = integration.CreateLogStream("my-app", "container-1/task-123")
 			Expect(err).NotTo(HaveOccurred())
@@ -226,7 +230,7 @@ var _ = Describe("CloudWatch Integration", func() {
 			// Create log group
 			err := integration.CreateLogGroup("my-app")
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Delete it
 			err = integration.DeleteLogGroup("my-app")
 			Expect(err).NotTo(HaveOccurred())
@@ -241,7 +245,7 @@ var _ = Describe("CloudWatch Integration", func() {
 
 	Describe("GetLogGroupForTask", func() {
 		It("should return log group name for task", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/1234567890"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/1234567890"
 			groupName := integration.GetLogGroupForTask(taskArn)
 			Expect(groupName).To(Equal("/ecs/kecs-tasks"))
 		})
@@ -249,7 +253,7 @@ var _ = Describe("CloudWatch Integration", func() {
 
 	Describe("GetLogStreamForContainer", func() {
 		It("should return log stream name for container", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/1234567890"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/1234567890"
 			streamName := integration.GetLogStreamForContainer(taskArn, "my-container")
 			Expect(streamName).To(Equal("my-container/1234567890"))
 		})
@@ -257,7 +261,7 @@ var _ = Describe("CloudWatch Integration", func() {
 
 	Describe("ConfigureContainerLogging", func() {
 		It("should configure awslogs driver", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/1234567890"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/1234567890"
 			options := map[string]string{
 				"awslogs-group":         "/ecs/my-app",
 				"awslogs-region":        "us-east-1",
@@ -275,7 +279,7 @@ var _ = Describe("CloudWatch Integration", func() {
 		})
 
 		It("should use default log group if not specified", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/1234567890"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/1234567890"
 			options := map[string]string{}
 
 			logConfig, err := integration.ConfigureContainerLogging(taskArn, "my-container", "awslogs", options)
@@ -285,7 +289,7 @@ var _ = Describe("CloudWatch Integration", func() {
 		})
 
 		It("should error on unsupported log driver", func() {
-			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/default/1234567890"
+			taskArn := "arn:aws:ecs:us-east-1:000000000000:task/default/1234567890"
 			_, err := integration.ConfigureContainerLogging(taskArn, "my-container", "json-file", nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("unsupported log driver"))

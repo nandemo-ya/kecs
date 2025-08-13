@@ -14,18 +14,23 @@ type Manager interface {
 	Stop(ctx context.Context) error
 	Restart(ctx context.Context) error
 	GetStatus() (*Status, error)
-	
+
 	// Service management
 	UpdateServices(services []string) error
 	GetEnabledServices() ([]string, error)
-	
+
 	// Endpoint management
 	GetEndpoint() (string, error)
 	GetServiceEndpoint(service string) (string, error)
-	
+
 	// Health checks
 	IsHealthy() bool
+	IsRunning() bool
 	WaitForReady(ctx context.Context, timeout time.Duration) error
+	CheckServiceHealth(service string) error
+
+	// Configuration
+	GetConfig() *Config
 }
 
 // Status represents the current status of LocalStack
@@ -52,58 +57,74 @@ type ServiceInfo struct {
 // Config represents LocalStack configuration
 type Config struct {
 	// Basic configuration
-	Enabled    bool     `yaml:"enabled" json:"enabled"`
-	Services   []string `yaml:"services" json:"services"`
-	Persistence bool    `yaml:"persistence" json:"persistence"`
-	
+	Enabled     bool     `yaml:"enabled" json:"enabled"`
+	Services    []string `yaml:"services" json:"services"`
+	Persistence bool     `yaml:"persistence" json:"persistence"`
+
 	// Deployment configuration
-	Image           string            `yaml:"image" json:"image"`
-	Version         string            `yaml:"version" json:"version"`
-	Namespace       string            `yaml:"namespace" json:"namespace"`
-	Port            int               `yaml:"port" json:"port"`
-	EdgePort        int               `yaml:"edge_port" json:"edge_port"`
-	
+	Image     string `yaml:"image" json:"image"`
+	Version   string `yaml:"version" json:"version"`
+	Namespace string `yaml:"namespace" json:"namespace"`
+	Port      int    `yaml:"port" json:"port"`
+	EdgePort  int    `yaml:"edge_port" json:"edge_port"`
+
 	// Resource limits
-	Resources       ResourceLimits    `yaml:"resources" json:"resources"`
-	
+	Resources ResourceLimits `yaml:"resources" json:"resources"`
+
 	// Custom environment variables
-	Environment     map[string]string `yaml:"environment" json:"environment"`
-	
+	Environment map[string]string `yaml:"environment" json:"environment"`
+
 	// Advanced configuration
 	Debug           bool              `yaml:"debug" json:"debug"`
 	DataDir         string            `yaml:"data_dir" json:"data_dir"`
 	DockerHost      string            `yaml:"docker_host" json:"docker_host"`
 	CustomEndpoints map[string]string `yaml:"custom_endpoints" json:"custom_endpoints"`
+	
+	// Runtime configuration
+	UseExternalAccess bool   `yaml:"use_external_access" json:"use_external_access"`
+	ProxyEndpoint     string `yaml:"proxy_endpoint" json:"proxy_endpoint"`
+	UseTraefik        bool   `yaml:"use_traefik" json:"use_traefik"`
+	ContainerMode     bool   `yaml:"container_mode" json:"container_mode"`
+	
+	// Initialization configuration
+	InitScripts []InitScript `yaml:"init_scripts" json:"init_scripts"`
+}
+
+// InitScript represents an initialization script to run on LocalStack startup
+type InitScript struct {
+	Name    string `yaml:"name" json:"name"`
+	Content string `yaml:"content" json:"content"`
 }
 
 // ResourceLimits defines resource constraints for LocalStack
 type ResourceLimits struct {
-	Memory          string `yaml:"memory" json:"memory"`
-	CPU             string `yaml:"cpu" json:"cpu"`
-	StorageSize     string `yaml:"storage_size" json:"storage_size"`
+	Memory      string `yaml:"memory" json:"memory"`
+	CPU         string `yaml:"cpu" json:"cpu"`
+	StorageSize string `yaml:"storage_size" json:"storage_size"`
 }
 
 // HealthChecker provides health checking functionality
 type HealthChecker interface {
 	CheckHealth(ctx context.Context) (*HealthStatus, error)
 	WaitForHealthy(ctx context.Context, timeout time.Duration) error
+	UpdateEndpoint(endpoint string)
 }
 
 // HealthStatus represents the health check result
 type HealthStatus struct {
-	Healthy         bool                        `json:"healthy"`
-	Message         string                      `json:"message"`
-	ServiceHealth   map[string]ServiceHealth    `json:"service_health"`
-	LastCheck       time.Time                   `json:"last_check"`
-	ConsecutiveFails int                        `json:"consecutive_fails"`
+	Healthy          bool                     `json:"healthy"`
+	Message          string                   `json:"message"`
+	ServiceHealth    map[string]ServiceHealth `json:"service_health"`
+	LastCheck        time.Time                `json:"last_check"`
+	ConsecutiveFails int                      `json:"consecutive_fails"`
 }
 
 // ServiceHealth represents health status of a specific service
 type ServiceHealth struct {
-	Service  string        `json:"service"`
-	Healthy  bool          `json:"healthy"`
-	Latency  time.Duration `json:"latency"`
-	Error    string        `json:"error,omitempty"`
+	Service string        `json:"service"`
+	Healthy bool          `json:"healthy"`
+	Latency time.Duration `json:"latency"`
+	Error   string        `json:"error,omitempty"`
 }
 
 // KubernetesManager handles Kubernetes resource management
@@ -114,16 +135,17 @@ type KubernetesManager interface {
 	GetLocalStackPod() (string, error)
 	GetServiceEndpoint() (string, error)
 	UpdateDeployment(ctx context.Context, config *Config) error
+	GetExternalEndpoint(ctx context.Context) (string, error)
 }
 
 // LocalStackContainer represents the LocalStack container state
 type LocalStackContainer struct {
-	PodName      string
-	Namespace    string
-	Endpoint     string
-	InternalIP   string
-	StartedAt    time.Time
-	KubeClient   kubernetes.Interface
+	PodName    string
+	Namespace  string
+	Endpoint   string
+	InternalIP string
+	StartedAt  time.Time
+	KubeClient kubernetes.Interface
 }
 
 // ProxyMode represents the AWS proxy mode
@@ -138,38 +160,38 @@ const (
 
 // ProxyConfig represents proxy configuration
 type ProxyConfig struct {
-	Mode              ProxyMode         `yaml:"mode" json:"mode"`
-	LocalStackEndpoint string           `yaml:"localstack_endpoint" json:"localstack_endpoint"`
-	FallbackEnabled   bool             `yaml:"fallback_enabled" json:"fallback_enabled"`
-	FallbackOrder     []ProxyMode      `yaml:"fallback_order" json:"fallback_order"`
-	CustomEndpoints   map[string]string `yaml:"custom_endpoints" json:"custom_endpoints"`
+	Mode               ProxyMode         `yaml:"mode" json:"mode"`
+	LocalStackEndpoint string            `yaml:"localstack_endpoint" json:"localstack_endpoint"`
+	FallbackEnabled    bool              `yaml:"fallback_enabled" json:"fallback_enabled"`
+	FallbackOrder      []ProxyMode       `yaml:"fallback_order" json:"fallback_order"`
+	CustomEndpoints    map[string]string `yaml:"custom_endpoints" json:"custom_endpoints"`
 }
 
 // Constants for LocalStack
 const (
-	DefaultNamespace     = "aws-services"
+	DefaultNamespace     = "kecs-system"
 	DefaultImage         = "localstack/localstack"
 	DefaultVersion       = "latest"
 	DefaultPort          = 4566
 	DefaultEdgePort      = 4566
 	DefaultHealthTimeout = 2 * time.Minute
-	
+
 	// Labels and annotations
-	LabelApp             = "app"
-	LabelComponent       = "component"
-	LabelManagedBy       = "app.kubernetes.io/managed-by"
-	
+	LabelApp       = "app"
+	LabelComponent = "component"
+	LabelManagedBy = "app.kubernetes.io/managed-by"
+
 	// LocalStack environment variables
-	EnvServices          = "SERVICES"
-	EnvDebug             = "DEBUG"
-	EnvPersistence       = "PERSISTENCE"
-	EnvDataDir           = "DATA_DIR"
-	EnvDockerHost        = "DOCKER_HOST"
-	EnvEdgePort          = "EDGE_PORT"
-	
+	EnvServices    = "SERVICES"
+	EnvDebug       = "DEBUG"
+	EnvPersistence = "PERSISTENCE"
+	EnvDataDir     = "DATA_DIR"
+	EnvDockerHost  = "DOCKER_HOST"
+	EnvEdgePort    = "EDGE_PORT"
+
 	// Health check paths
-	HealthCheckPath      = "/_localstack/health"
-	ServiceHealthPath    = "/_localstack/health/services"
+	HealthCheckPath   = "/_localstack/health"
+	ServiceHealthPath = "/_localstack/health/services"
 )
 
 // Default services to enable

@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
 // Manager manages AWS proxy modes for LocalStack integration
@@ -16,6 +17,7 @@ type Manager struct {
 	localStackEndpoint string
 	kubeClient         kubernetes.Interface
 	envProxy           *EnvironmentVariableProxy
+	sidecarProxy       *SidecarProxy
 	webhookServer      *WebhookServer
 }
 
@@ -35,7 +37,7 @@ func NewManager(kubeClient kubernetes.Interface, config *localstack.ProxyConfig)
 
 // Start starts the proxy manager with the configured mode
 func (m *Manager) Start(ctx context.Context) error {
-	klog.Infof("Starting proxy manager with mode: %s", m.mode)
+	logging.Info("Starting proxy manager", "mode", m.mode)
 
 	switch m.mode {
 	case localstack.ProxyModeEnvironment:
@@ -43,7 +45,7 @@ func (m *Manager) Start(ctx context.Context) error {
 	case localstack.ProxyModeSidecar:
 		return m.startSidecarMode(ctx)
 	case localstack.ProxyModeDisabled:
-		klog.Info("Proxy mode is disabled")
+		logging.Info("Proxy mode is disabled")
 		return nil
 	default:
 		return fmt.Errorf("unsupported proxy mode: %s", m.mode)
@@ -52,7 +54,7 @@ func (m *Manager) Start(ctx context.Context) error {
 
 // Stop stops the proxy manager
 func (m *Manager) Stop(ctx context.Context) error {
-	klog.Info("Stopping proxy manager")
+	logging.Info("Stopping proxy manager")
 
 	if m.webhookServer != nil {
 		if err := m.webhookServer.Stop(); err != nil {
@@ -65,7 +67,7 @@ func (m *Manager) Stop(ctx context.Context) error {
 
 // startEnvironmentMode starts the environment variable injection mode
 func (m *Manager) startEnvironmentMode(ctx context.Context) error {
-	klog.Info("Starting environment variable proxy mode")
+	logging.Info("Starting environment variable proxy mode")
 
 	// Create environment variable proxy
 	m.envProxy = NewEnvironmentVariableProxy(m.localStackEndpoint)
@@ -89,9 +91,21 @@ func (m *Manager) startEnvironmentMode(ctx context.Context) error {
 
 // startSidecarMode starts the sidecar proxy mode
 func (m *Manager) startSidecarMode(ctx context.Context) error {
-	klog.Info("Starting sidecar proxy mode")
-	// TODO: Implement sidecar mode
-	return fmt.Errorf("sidecar mode not yet implemented")
+	logging.Info("Starting sidecar proxy mode")
+
+	// Create sidecar proxy
+	sidecarProxy := NewSidecarProxy(m.localStackEndpoint)
+
+	// Set custom proxy image if configured
+	if proxyImage := config.GetString("aws.proxyImage"); proxyImage != "" {
+		sidecarProxy.SetProxyImage(proxyImage)
+	}
+
+	// Store reference for later use
+	m.sidecarProxy = sidecarProxy
+
+	logging.Info("Sidecar proxy mode initialized successfully")
+	return nil
 }
 
 // GetMode returns the current proxy mode
@@ -102,8 +116,17 @@ func (m *Manager) GetMode() localstack.ProxyMode {
 // UpdateEndpoint updates the LocalStack endpoint
 func (m *Manager) UpdateEndpoint(endpoint string) {
 	m.localStackEndpoint = endpoint
-	
+
 	if m.envProxy != nil {
 		m.envProxy.UpdateEndpoint(endpoint)
 	}
+
+	if m.sidecarProxy != nil {
+		m.sidecarProxy.UpdateEndpoint(endpoint)
+	}
+}
+
+// GetSidecarProxy returns the sidecar proxy if available
+func (m *Manager) GetSidecarProxy() *SidecarProxy {
+	return m.sidecarProxy
 }

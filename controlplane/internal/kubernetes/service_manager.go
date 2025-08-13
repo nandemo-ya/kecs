@@ -2,9 +2,8 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"log"
-	"os"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -12,22 +11,79 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // ServiceManager manages Kubernetes Deployments and Services for ECS services
 type ServiceManager struct {
-	storage     storage.Storage
-	kindManager *KindManager
+	storage        storage.Storage
+	clusterManager ClusterManager
+	clientset      kubernetes.Interface
+	taskManager    *TaskManager
 }
 
 // NewServiceManager creates a new ServiceManager
-func NewServiceManager(storage storage.Storage, kindManager *KindManager) *ServiceManager {
-	return &ServiceManager{
-		storage:     storage,
-		kindManager: kindManager,
+func NewServiceManager(storage storage.Storage, clusterManager ClusterManager) *ServiceManager {
+	// Create TaskManager if storage is available
+	var taskManager *TaskManager
+	if storage != nil {
+		tm, err := NewTaskManager(storage)
+		if err != nil {
+			logging.Warn("Failed to create TaskManager for ServiceManager", "error", err)
+		} else {
+			taskManager = tm
+		}
 	}
+
+	sm := &ServiceManager{
+		storage:        storage,
+		clusterManager: clusterManager,
+		taskManager:    taskManager,
+	}
+
+	// Initialize kubernetes client
+	if err := sm.initializeClient(); err != nil {
+		logging.Warn("Failed to initialize kubernetes client", "error", err)
+		// Don't fail creation - client will be initialized on first use
+	}
+
+	return sm
+}
+
+// initializeClient initializes the kubernetes client
+func (sm *ServiceManager) initializeClient() error {
+	if sm.clientset != nil {
+		return nil // Already initialized
+	}
+
+	// Check if running in test mode
+	if config.GetBool("features.testMode") {
+		logging.Debug("Test mode enabled - skipping kubernetes client initialization")
+		return nil
+	}
+
+	// Try in-cluster config first
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		// Fall back to kubeconfig
+		cfg, err = GetKubeConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get kubernetes config: %w", err)
+		}
+	}
+
+	clientset, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	sm.clientset = clientset
+	logging.Debug("ServiceManager kubernetes client initialized")
+	return nil
 }
 
 // CreateService creates a Kubernetes Deployment and Service for an ECS service
@@ -38,10 +94,16 @@ func (sm *ServiceManager) CreateService(
 	cluster *storage.Cluster,
 	storageService *storage.Service,
 ) error {
+	logging.Info("ServiceManager.CreateService called",
+		"service", storageService.ServiceName,
+		"cluster", cluster.Name,
+		"namespace", deployment.Namespace)
 	// Check if running in test mode
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if config.GetBool("features.testMode") {
 		// In test mode, simulate service creation
-		log.Printf("TEST MODE: Simulated service creation for %s in namespace %s", storageService.ServiceName, deployment.Namespace)
+		logging.Debug("TEST MODE: Simulated service creation",
+			"serviceName", storageService.ServiceName,
+			"namespace", deployment.Namespace)
 
 		// Update service status to ACTIVE
 		storageService.Status = "ACTIVE"
@@ -70,9 +132,13 @@ func (sm *ServiceManager) CreateService(
 				}
 
 				if err := taskStore.Create(ctx, task); err != nil {
-					log.Printf("TEST MODE: Failed to create task for service %s: %v", storageService.ServiceName, err)
+					logging.Debug("TEST MODE: Failed to create task for service",
+						"serviceName", storageService.ServiceName,
+						"error", err)
 				} else {
-					log.Printf("TEST MODE: Created task %s for service %s", taskID, storageService.ServiceName)
+					logging.Debug("TEST MODE: Created task for service",
+						"taskID", taskID,
+						"serviceName", storageService.ServiceName)
 				}
 			}
 		}
@@ -80,11 +146,17 @@ func (sm *ServiceManager) CreateService(
 		return nil
 	}
 
-	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.kindManager.GetKubeClient(cluster.KindClusterName)
-	if err != nil {
-		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	// Ensure kubernetes client is initialized
+	if err := sm.initializeClient(); err != nil {
+		return fmt.Errorf("failed to initialize kubernetes client: %w", err)
 	}
+
+	// Use the service manager's client
+	kubeClient := sm.clientset
+
+	logging.Info("Kubernetes client initialized, proceeding with deployment creation",
+		"service", storageService.ServiceName,
+		"clientNil", kubeClient == nil)
 
 	// Ensure namespace exists
 	if err := sm.ensureNamespace(ctx, kubeClient, deployment.Namespace); err != nil {
@@ -100,21 +172,31 @@ func (sm *ServiceManager) CreateService(
 	if kubeService != nil {
 		if err := sm.createKubernetesService(ctx, kubeClient, kubeService); err != nil {
 			// Don't fail the entire operation if service creation fails
-			log.Printf("Warning: failed to create kubernetes service: %v", err)
+			logging.Warn("Failed to create kubernetes service",
+				"error", err)
 		}
+	}
+
+	// Start watching pods for this deployment to create ECS tasks
+	if sm.taskManager != nil {
+		go sm.watchServicePods(context.Background(), deployment, cluster, storageService)
 	}
 
 	// Update service status to ACTIVE after successful deployment using transaction
 	if err := sm.updateServiceStatusSafely(ctx, cluster, storageService); err != nil {
-		log.Printf("Warning: failed to update service status to ACTIVE: %v", err)
+		logging.Warn("Failed to update service status to ACTIVE",
+			"error", err)
 		// Don't fail the entire operation for status update issues
 	} else {
-		log.Printf("Updated service status to ACTIVE for service %s (ID: %s)",
-			storageService.ServiceName, storageService.ID)
+		logging.Info("Updated service status to ACTIVE",
+			"serviceName", storageService.ServiceName,
+			"serviceID", storageService.ID)
 	}
 
-	log.Printf("Successfully created service %s as deployment %s in namespace %s",
-		storageService.ServiceName, deployment.Name, deployment.Namespace)
+	logging.Info("Successfully created service",
+		"serviceName", storageService.ServiceName,
+		"deploymentName", deployment.Name,
+		"namespace", deployment.Namespace)
 
 	return nil
 }
@@ -128,9 +210,11 @@ func (sm *ServiceManager) UpdateService(
 	storageService *storage.Service,
 ) error {
 	// Check if running in test mode
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if config.GetBool("features.testMode") {
 		// In test mode, simulate service update
-		log.Printf("TEST MODE: Simulated service update for %s in namespace %s", storageService.ServiceName, deployment.Namespace)
+		logging.Debug("TEST MODE: Simulated service update",
+			"serviceName", storageService.ServiceName,
+			"namespace", deployment.Namespace)
 
 		// Update service counts based on replica changes
 		if deployment.Spec.Replicas != nil {
@@ -163,7 +247,8 @@ func (sm *ServiceManager) UpdateService(
 							}
 
 							if err := taskStore.Create(ctx, task); err != nil {
-								log.Printf("TEST MODE: Failed to create task during scale-up: %v", err)
+								logging.Debug("TEST MODE: Failed to create task during scale-up",
+									"error", err)
 							}
 						}
 					} else if newDesiredCount < oldDesiredCount {
@@ -182,9 +267,12 @@ func (sm *ServiceManager) UpdateService(
 									task.LastStatus = "STOPPED"
 									task.StoppedReason = "Service scaled down"
 									if err := taskStore.Update(ctx, task); err != nil {
-										log.Printf("TEST MODE: Failed to stop task %s: %v", task.ARN, err)
+										logging.Debug("TEST MODE: Failed to stop task",
+											"taskARN", task.ARN,
+											"error", err)
 									} else {
-										log.Printf("TEST MODE: Stopped task %s for scale down", task.ARN)
+										logging.Debug("TEST MODE: Stopped task for scale down",
+											"taskARN", task.ARN)
 									}
 								}
 							}
@@ -195,8 +283,10 @@ func (sm *ServiceManager) UpdateService(
 				// Update running count to match desired count
 				storageService.RunningCount = newDesiredCount
 				storageService.PendingCount = 0
-				log.Printf("TEST MODE: Service %s scaled from %d to %d replicas",
-					storageService.ServiceName, oldDesiredCount, newDesiredCount)
+				logging.Debug("TEST MODE: Service scaled",
+					"serviceName", storageService.ServiceName,
+					"oldDesiredCount", oldDesiredCount,
+					"newDesiredCount", newDesiredCount)
 			}
 		}
 
@@ -206,14 +296,16 @@ func (sm *ServiceManager) UpdateService(
 		return nil
 	}
 
-	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.kindManager.GetKubeClient(cluster.KindClusterName)
-	if err != nil {
-		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	// Ensure kubernetes client is initialized
+	if err := sm.initializeClient(); err != nil {
+		return fmt.Errorf("failed to initialize kubernetes client: %w", err)
 	}
 
+	// Use the service manager's client
+	kubeClient := sm.clientset
+
 	// Update Deployment
-	_, err = kubeClient.AppsV1().Deployments(deployment.Namespace).Update(
+	_, err := kubeClient.AppsV1().Deployments(deployment.Namespace).Update(
 		ctx, deployment, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update deployment: %w", err)
@@ -225,7 +317,8 @@ func (sm *ServiceManager) UpdateService(
 			ctx, kubeService.Name, metav1.GetOptions{})
 		if err != nil {
 			if !errors.IsNotFound(err) {
-				log.Printf("Warning: failed to get existing kubernetes service: %v", err)
+				logging.Warn("Failed to get existing kubernetes service",
+					"error", err)
 			}
 		} else {
 			// Preserve ClusterIP and update other fields
@@ -234,13 +327,16 @@ func (sm *ServiceManager) UpdateService(
 			_, err = kubeClient.CoreV1().Services(kubeService.Namespace).Update(
 				ctx, kubeService, metav1.UpdateOptions{})
 			if err != nil {
-				log.Printf("Warning: failed to update kubernetes service: %v", err)
+				logging.Warn("Failed to update kubernetes service",
+					"error", err)
 			}
 		}
 	}
 
-	log.Printf("Successfully updated service %s deployment %s in namespace %s",
-		storageService.ServiceName, deployment.Name, deployment.Namespace)
+	logging.Info("Successfully updated service",
+		"serviceName", storageService.ServiceName,
+		"deploymentName", deployment.Name,
+		"namespace", deployment.Namespace)
 
 	return nil
 }
@@ -252,9 +348,10 @@ func (sm *ServiceManager) DeleteService(
 	storageService *storage.Service,
 ) error {
 	// Check if running in test mode
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if config.GetBool("features.testMode") {
 		// In test mode, simulate service deletion
-		log.Printf("TEST MODE: Simulated service deletion for %s", storageService.ServiceName)
+		logging.Debug("TEST MODE: Simulated service deletion",
+			"serviceName", storageService.ServiceName)
 
 		// Update service status to INACTIVE
 		storageService.Status = "INACTIVE"
@@ -276,9 +373,12 @@ func (sm *ServiceManager) DeleteService(
 					task.LastStatus = "STOPPED"
 					task.StoppedReason = "Service deleted"
 					if err := taskStore.Update(ctx, task); err != nil {
-						log.Printf("TEST MODE: Failed to stop task %s: %v", task.ARN, err)
+						logging.Debug("TEST MODE: Failed to stop task",
+							"taskARN", task.ARN,
+							"error", err)
 					} else {
-						log.Printf("TEST MODE: Stopped task %s for service deletion", task.ARN)
+						logging.Debug("TEST MODE: Stopped task for service deletion",
+							"taskARN", task.ARN)
 					}
 				}
 			}
@@ -287,11 +387,13 @@ func (sm *ServiceManager) DeleteService(
 		return nil
 	}
 
-	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.kindManager.GetKubeClient(cluster.KindClusterName)
-	if err != nil {
-		return fmt.Errorf("failed to get kubernetes client: %w", err)
+	// Ensure kubernetes client is initialized
+	if err := sm.initializeClient(); err != nil {
+		return fmt.Errorf("failed to initialize kubernetes client: %w", err)
 	}
+
+	// Use the service manager's client
+	kubeClient := sm.clientset
 
 	namespace := storageService.Namespace
 	if namespace == "" {
@@ -304,10 +406,12 @@ func (sm *ServiceManager) DeleteService(
 	}
 
 	// Delete Deployment
-	err = kubeClient.AppsV1().Deployments(namespace).Delete(
+	err := kubeClient.AppsV1().Deployments(namespace).Delete(
 		ctx, deploymentName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		log.Printf("Warning: failed to delete deployment %s: %v", deploymentName, err)
+		logging.Warn("Failed to delete deployment",
+			"deploymentName", deploymentName,
+			"error", err)
 	}
 
 	// Delete Service (if exists)
@@ -315,11 +419,14 @@ func (sm *ServiceManager) DeleteService(
 	err = kubeClient.CoreV1().Services(namespace).Delete(
 		ctx, serviceName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		log.Printf("Warning: failed to delete kubernetes service %s: %v", serviceName, err)
+		logging.Warn("Failed to delete kubernetes service",
+			"serviceName", serviceName,
+			"error", err)
 	}
 
-	log.Printf("Successfully deleted service %s deployment and service in namespace %s",
-		storageService.ServiceName, namespace)
+	logging.Info("Successfully deleted service deployment and service",
+		"serviceName", storageService.ServiceName,
+		"namespace", namespace)
 
 	return nil
 }
@@ -331,9 +438,10 @@ func (sm *ServiceManager) GetServiceStatus(
 	storageService *storage.Service,
 ) (*ServiceStatus, error) {
 	// Check if running in test mode
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if config.GetBool("features.testMode") {
 		// In test mode, return simulated status based on stored service data
-		log.Printf("TEST MODE: Returning simulated status for service %s", storageService.ServiceName)
+		logging.Debug("TEST MODE: Returning simulated status",
+			"serviceName", storageService.ServiceName)
 
 		return &ServiceStatus{
 			Status:       storageService.Status,
@@ -344,7 +452,7 @@ func (sm *ServiceManager) GetServiceStatus(
 	}
 
 	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.kindManager.GetKubeClient(cluster.KindClusterName)
+	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.K8sClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
@@ -412,7 +520,8 @@ func (sm *ServiceManager) ensureNamespace(ctx context.Context, kubeClient kubern
 			if err != nil {
 				return fmt.Errorf("failed to create namespace: %w", err)
 			}
-			log.Printf("Created namespace: %s", namespace)
+			logging.Info("Created namespace",
+				"namespace", namespace)
 		} else {
 			return fmt.Errorf("failed to get namespace: %w", err)
 		}
@@ -432,12 +541,14 @@ func (sm *ServiceManager) createDeployment(ctx context.Context, kubeClient kuber
 			if err != nil {
 				return fmt.Errorf("failed to update existing deployment: %w", err)
 			}
-			log.Printf("Updated existing deployment: %s", deployment.Name)
+			logging.Info("Updated existing deployment",
+				"deploymentName", deployment.Name)
 		} else {
 			return fmt.Errorf("failed to create deployment: %w", err)
 		}
 	} else {
-		log.Printf("Created deployment: %s", deployment.Name)
+		logging.Info("Created deployment",
+			"deploymentName", deployment.Name)
 	}
 	return nil
 }
@@ -454,19 +565,23 @@ func (sm *ServiceManager) createKubernetesService(ctx context.Context, kubeClien
 			if err != nil {
 				return fmt.Errorf("failed to update existing service: %w", err)
 			}
-			log.Printf("Updated existing kubernetes service: %s", service.Name)
+			logging.Info("Updated existing kubernetes service",
+				"serviceName", service.Name)
 		} else {
 			return fmt.Errorf("failed to create kubernetes service: %w", err)
 		}
 	} else {
-		log.Printf("Created kubernetes service: %s", service.Name)
+		logging.Info("Created kubernetes service",
+			"serviceName", service.Name)
 	}
 	return nil
 }
 
 // updateServiceStatusSafely updates service status with safe error handling
 func (sm *ServiceManager) updateServiceStatusSafely(ctx context.Context, cluster *storage.Cluster, storageService *storage.Service) error {
-	log.Printf("DEBUG: Starting status update for service %s (ID: %s)", storageService.ServiceName, storageService.ID)
+	logging.Debug("Starting status update for service",
+		"serviceName", storageService.ServiceName,
+		"serviceID", storageService.ID)
 
 	// Get fresh service data from storage to avoid conflicts
 	freshService, err := sm.storage.ServiceStore().Get(ctx, cluster.ARN, storageService.ServiceName)
@@ -474,12 +589,16 @@ func (sm *ServiceManager) updateServiceStatusSafely(ctx context.Context, cluster
 		return fmt.Errorf("failed to get fresh service for status update: %w", err)
 	}
 
-	log.Printf("DEBUG: Retrieved fresh service ID: %s, current status: %s", freshService.ID, freshService.Status)
+	logging.Debug("Retrieved fresh service",
+		"serviceID", freshService.ID,
+		"currentStatus", freshService.Status)
 
 	// Update only the status field
 	freshService.Status = "ACTIVE"
 
-	log.Printf("DEBUG: About to update service ID: %s to status: ACTIVE", freshService.ID)
+	logging.Debug("About to update service status",
+		"serviceID", freshService.ID,
+		"newStatus", "ACTIVE")
 
 	// Use a simple approach: since we have the fresh service, just update it
 	return sm.storage.ServiceStore().Update(ctx, freshService)
@@ -491,4 +610,167 @@ type ServiceStatus struct {
 	DesiredCount int
 	RunningCount int
 	PendingCount int
+}
+
+// watchServicePods watches pods created by a deployment and registers them as ECS tasks
+func (sm *ServiceManager) watchServicePods(ctx context.Context, deployment *appsv1.Deployment, cluster *storage.Cluster, service *storage.Service) {
+	if sm.taskManager == nil {
+		logging.Warn("TaskManager not available, cannot watch service pods")
+		return
+	}
+
+	// Initialize TaskManager client if needed
+	if err := sm.taskManager.InitializeClient(); err != nil {
+		logging.Error("Failed to initialize TaskManager client", "error", err)
+		return
+	}
+
+	// Use labels to watch pods for this deployment
+	labelSelector := fmt.Sprintf("app=%s", deployment.Name)
+
+	// Get clientset
+	var clientset kubernetes.Interface
+	if sm.clientset != nil {
+		clientset = sm.clientset
+	} else if sm.taskManager.Clientset != nil {
+		clientset = sm.taskManager.Clientset
+	} else {
+		logging.Error("No kubernetes client available for watching pods")
+		return
+	}
+
+	// List existing pods first to register them
+	pods, err := clientset.CoreV1().Pods(deployment.Namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		logging.Error("Failed to list pods for service", "service", service.ServiceName, "error", err)
+		return
+	}
+
+	// Register existing pods as tasks
+	for _, pod := range pods.Items {
+		sm.registerPodAsTask(ctx, &pod, cluster, service)
+	}
+
+	// Watch for new pods
+	watcher, err := clientset.CoreV1().Pods(deployment.Namespace).Watch(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		logging.Error("Failed to watch pods for service", "service", service.ServiceName, "error", err)
+		return
+	}
+	defer watcher.Stop()
+
+	logging.Info("Started watching pods for service", "service", service.ServiceName, "namespace", deployment.Namespace)
+
+	for event := range watcher.ResultChan() {
+		pod, ok := event.Object.(*corev1.Pod)
+		if !ok {
+			continue
+		}
+
+		switch event.Type {
+		case "ADDED", "MODIFIED":
+			sm.registerPodAsTask(ctx, pod, cluster, service)
+		case "DELETED":
+			// Handle pod deletion - mark corresponding task as stopped
+			sm.handlePodDeletion(ctx, pod, cluster, service)
+		}
+	}
+}
+
+// registerPodAsTask registers a Kubernetes pod as an ECS task
+func (sm *ServiceManager) registerPodAsTask(ctx context.Context, pod *corev1.Pod, cluster *storage.Cluster, service *storage.Service) {
+	// Skip if pod is terminating
+	if pod.DeletionTimestamp != nil {
+		return
+	}
+
+	// Check if task already exists for this pod
+	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s",
+		service.Region, service.AccountID, cluster.Name, pod.Name)
+
+	existingTask, err := sm.storage.TaskStore().Get(ctx, cluster.ARN, taskARN)
+	if err == nil && existingTask != nil {
+		// Task already exists, update status if needed
+		if sm.taskManager != nil {
+			if err := sm.taskManager.UpdateTaskStatus(ctx, taskARN, pod); err != nil {
+				logging.Warn("Failed to update task status", "task", taskARN, "error", err)
+			}
+		}
+		return
+	}
+
+	// Create new task
+	now := time.Now()
+	task := &storage.Task{
+		ID:                pod.Name,
+		ARN:               taskARN,
+		ClusterARN:        cluster.ARN,
+		TaskDefinitionARN: service.TaskDefinitionARN,
+		LastStatus:        mapPodPhaseToTaskStatus(pod.Status.Phase),
+		DesiredStatus:     "RUNNING",
+		LaunchType:        service.LaunchType,
+		StartedBy:         fmt.Sprintf("ecs-svc/%s", service.ServiceName),
+		Group:             fmt.Sprintf("service:%s", service.ServiceName),
+		PodName:           pod.Name,
+		Namespace:         pod.Namespace,
+		CreatedAt:         now,
+		Region:            service.Region,
+		AccountID:         service.AccountID,
+		Version:           1,
+		Connectivity:      "CONNECTED",
+		ConnectivityAt:    &now,
+		CPU:               "", // Will be set from task definition
+		Memory:            "", // Will be set from task definition,
+	}
+
+	// Create containers info from pod
+	containers := sm.taskManager.GetContainerStatuses(pod)
+	if len(containers) > 0 {
+		containersJSON, err := json.Marshal(containers)
+		if err == nil {
+			task.Containers = string(containersJSON)
+		}
+	}
+
+	// Store the task
+	if err := sm.storage.TaskStore().Create(ctx, task); err != nil {
+		logging.Error("Failed to create task for pod", "pod", pod.Name, "error", err)
+		return
+	}
+
+	logging.Info("Registered pod as ECS task", "pod", pod.Name, "task", taskARN, "service", service.ServiceName)
+
+	// Start watching the pod for status updates
+	if sm.taskManager != nil {
+		go sm.taskManager.watchPodStatus(context.Background(), taskARN, pod.Namespace, pod.Name)
+	}
+}
+
+// handlePodDeletion handles when a pod is deleted
+func (sm *ServiceManager) handlePodDeletion(ctx context.Context, pod *corev1.Pod, cluster *storage.Cluster, service *storage.Service) {
+	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s",
+		service.Region, service.AccountID, cluster.Name, pod.Name)
+
+	task, err := sm.storage.TaskStore().Get(ctx, cluster.ARN, taskARN)
+	if err != nil || task == nil {
+		return
+	}
+
+	// Update task status to STOPPED
+	now := time.Now()
+	task.DesiredStatus = "STOPPED"
+	task.LastStatus = "STOPPED"
+	task.StoppedAt = &now
+	task.StoppedReason = "Service pod terminated"
+	task.Version++
+
+	if err := sm.storage.TaskStore().Update(ctx, task); err != nil {
+		logging.Error("Failed to update task status to STOPPED", "task", taskARN, "error", err)
+	}
+
+	logging.Info("Marked task as STOPPED due to pod deletion", "pod", pod.Name, "task", taskARN)
 }

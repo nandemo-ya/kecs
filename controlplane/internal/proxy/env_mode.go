@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // EnvironmentVariableProxy handles environment variable injection for AWS SDK configuration
@@ -63,7 +63,7 @@ func (evp *EnvironmentVariableProxy) InjectEnvironmentVariables(pod *corev1.Pod)
 		return nil, nil
 	}
 
-	klog.V(4).Infof("Injecting AWS environment variables into pod %s/%s", pod.Namespace, pod.Name)
+	logging.Debug("Injecting AWS environment variables into pod", "namespace", pod.Namespace, "name", pod.Name)
 
 	patches := []PatchOperation{}
 
@@ -93,7 +93,7 @@ func (evp *EnvironmentVariableProxy) InjectEnvironmentVariables(pod *corev1.Pod)
 	// Apply environment variables to all containers
 	for i := range pod.Spec.Containers {
 		containerPath := fmt.Sprintf("/spec/containers/%d/env", i)
-		
+
 		// Check if env array exists
 		if pod.Spec.Containers[i].Env == nil {
 			// Create env array
@@ -113,7 +113,7 @@ func (evp *EnvironmentVariableProxy) InjectEnvironmentVariables(pod *corev1.Pod)
 						break
 					}
 				}
-				
+
 				if !exists {
 					patches = append(patches, PatchOperation{
 						Op:    "add",

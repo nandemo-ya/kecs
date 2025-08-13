@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -23,6 +25,11 @@ func NewTaskDefinitionStore(db *sql.DB) storage.TaskDefinitionStore {
 
 // Register creates a new task definition revision
 func (s *taskDefinitionStore) Register(ctx context.Context, taskDef *storage.TaskDefinition) (*storage.TaskDefinition, error) {
+	// Generate ID if not provided
+	if taskDef.ID == "" {
+		taskDef.ID = uuid.New().String()
+	}
+
 	// Get the next revision number for this family
 	var nextRevision int
 	err := s.db.QueryRowContext(ctx, `
@@ -104,7 +111,7 @@ func (s *taskDefinitionStore) Get(ctx context.Context, family string, revision i
 
 // GetLatest retrieves the latest revision of a task definition family
 func (s *taskDefinitionStore) GetLatest(ctx context.Context, family string) (*storage.TaskDefinition, error) {
-	log.Printf("DEBUG: GetLatest called for family: %s", family)
+	logging.Debug("GetLatest called", "family", family)
 
 	var revision sql.NullInt64
 	err := s.db.QueryRowContext(ctx, `
@@ -113,17 +120,17 @@ func (s *taskDefinitionStore) GetLatest(ctx context.Context, family string) (*st
 		WHERE family = ? AND status = 'ACTIVE'
 	`, family).Scan(&revision)
 	if err != nil {
-		log.Printf("DEBUG: GetLatest query error: %v", err)
+		logging.Debug("GetLatest query error", "error", err)
 		return nil, fmt.Errorf("failed to get latest revision: %w", err)
 	}
 
 	// Check if we got a NULL (no active revisions found)
 	if !revision.Valid {
-		log.Printf("DEBUG: No active revisions found for family: %s", family)
-		return nil, fmt.Errorf("task definition family not found: %s", family)
+		logging.Debug("No active revisions found", "family", family)
+		return nil, fmt.Errorf("no active task definition found for family: %s", family)
 	}
 
-	log.Printf("DEBUG: Found latest revision %d for family %s", revision.Int64, family)
+	logging.Debug("Found latest revision", "revision", revision.Int64, "family", family)
 	return s.Get(ctx, family, int(revision.Int64))
 }
 
@@ -309,6 +316,7 @@ func (s *taskDefinitionStore) Deregister(ctx context.Context, family string, rev
 	return nil
 }
 
+
 // GetByARN retrieves a task definition by its ARN
 func (s *taskDefinitionStore) GetByARN(ctx context.Context, arn string) (*storage.TaskDefinition, error) {
 	// Parse ARN to extract family and revision
@@ -318,7 +326,7 @@ func (s *taskDefinitionStore) GetByARN(ctx context.Context, arn string) (*storag
 		return nil, fmt.Errorf("invalid task definition ARN: %s", arn)
 	}
 
-	// For an ARN like "arn:aws:ecs:us-east-1:123456789012:task-definition/nginx-fargate:2"
+	// For an ARN like "arn:aws:ecs:us-east-1:000000000000:task-definition/nginx-fargate:2"
 	// parts[5] = "task-definition/nginx-fargate"
 	// parts[6] = "2" (revision)
 	taskDefPart := parts[5]

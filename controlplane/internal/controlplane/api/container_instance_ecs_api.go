@@ -96,7 +96,7 @@ func (api *DefaultECSAPI) DeregisterContainerInstance(ctx context.Context, req *
 	// For now, return a mock response
 	resp := &generated.DeregisterContainerInstanceResponse{
 		ContainerInstance: &generated.ContainerInstance{
-			ContainerInstanceArn: req.ContainerInstance,
+			ContainerInstanceArn: ptr.String(req.ContainerInstance),
 			Status:               ptr.String("INACTIVE"),
 			StatusReason:         ptr.String("Instance deregistration forced"),
 			AgentConnected:       ptr.Bool(false),

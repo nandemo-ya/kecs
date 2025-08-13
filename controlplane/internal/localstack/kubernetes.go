@@ -14,19 +14,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	"k8s.io/client-go/rest"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // kubernetesManager implements KubernetesManager interface
 type kubernetesManager struct {
 	client    kubernetes.Interface
+	config    *rest.Config
 	namespace string
 }
 
 // NewKubernetesManager creates a new Kubernetes manager
-func NewKubernetesManager(client kubernetes.Interface, namespace string) KubernetesManager {
+func NewKubernetesManager(client kubernetes.Interface, config *rest.Config, namespace string) KubernetesManager {
 	return &kubernetesManager{
 		client:    client,
+		config:    config,
 		namespace: namespace,
 	}
 }
@@ -48,7 +51,7 @@ func (km *kubernetesManager) CreateNamespace(ctx context.Context) error {
 		return fmt.Errorf("failed to create namespace: %w", err)
 	}
 
-	klog.Infof("Namespace %s created or already exists", km.namespace)
+	logging.Info("Namespace created or already exists", "namespace", km.namespace)
 	return nil
 }
 
@@ -73,6 +76,8 @@ func (km *kubernetesManager) DeployLocalStack(ctx context.Context, config *Confi
 	if err := km.createService(ctx, config); err != nil {
 		return fmt.Errorf("failed to create service: %w", err)
 	}
+
+	// Note: When using Traefik, routing is handled by static TCP proxy configuration
 
 	return nil
 }
@@ -119,6 +124,15 @@ func (km *kubernetesManager) createPVC(ctx context.Context, config *Config) erro
 
 // createConfigMap creates a ConfigMap for LocalStack configuration
 func (km *kubernetesManager) createConfigMap(ctx context.Context, config *Config) error {
+	data := map[string]string{
+		"services": config.GetServicesString(),
+	}
+	
+	// Add init scripts to ConfigMap
+	for _, script := range config.InitScripts {
+		data[script.Name] = script.Content
+	}
+	
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "localstack-config",
@@ -128,9 +142,7 @@ func (km *kubernetesManager) createConfigMap(ctx context.Context, config *Config
 				LabelManagedBy: "kecs",
 			},
 		},
-		Data: map[string]string{
-			"services": config.GetServicesString(),
-		},
+		Data: data,
 	}
 
 	_, err := km.client.CoreV1().ConfigMaps(km.namespace).Create(ctx, configMap, metav1.CreateOptions{})
@@ -144,7 +156,7 @@ func (km *kubernetesManager) createConfigMap(ctx context.Context, config *Config
 // createDeployment creates the LocalStack deployment
 func (km *kubernetesManager) createDeployment(ctx context.Context, config *Config) error {
 	replicas := int32(1)
-	
+
 	// Parse resource limits
 	memoryQuantity, _ := resource.ParseQuantity(config.Resources.Memory)
 	cpuQuantity, _ := resource.ParseQuantity(config.Resources.CPU)
@@ -211,7 +223,7 @@ func (km *kubernetesManager) createDeployment(ctx context.Context, config *Confi
 										Port: intstr.FromInt(config.EdgePort),
 									},
 								},
-								InitialDelaySeconds: 60,
+								InitialDelaySeconds: 120, // Give LocalStack time to fully start
 								PeriodSeconds:       10,
 								TimeoutSeconds:      5,
 								FailureThreshold:    3,
@@ -223,10 +235,10 @@ func (km *kubernetesManager) createDeployment(ctx context.Context, config *Confi
 										Port: intstr.FromInt(config.EdgePort),
 									},
 								},
-								InitialDelaySeconds: 30,
+								InitialDelaySeconds: 10, // Reduced to allow faster detection
 								PeriodSeconds:       5,
 								TimeoutSeconds:      5,
-								FailureThreshold:    3,
+								FailureThreshold:    12, // Increased to allow more time (60 seconds total)
 							},
 						},
 					},
@@ -235,25 +247,51 @@ func (km *kubernetesManager) createDeployment(ctx context.Context, config *Confi
 		},
 	}
 
-	// Add volume mounts if persistence is enabled
+	// Add volumes
+	volumes := []corev1.Volume{}
+	volumeMounts := []corev1.VolumeMount{}
+
+	// Add persistence volume if enabled
 	if config.Persistence {
-		deployment.Spec.Template.Spec.Volumes = []corev1.Volume{
-			{
-				Name: "localstack-data",
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: "localstack-data",
-					},
+		volumes = append(volumes, corev1.Volume{
+			Name: "localstack-data",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: "localstack-data",
 				},
 			},
-		}
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "localstack-data",
+			MountPath: config.DataDir,
+		})
+	}
 
-		deployment.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
-			{
-				Name:      "localstack-data",
-				MountPath: config.DataDir,
+	// Add init scripts volume
+	if len(config.InitScripts) > 0 {
+		volumes = append(volumes, corev1.Volume{
+			Name: "init-scripts",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "localstack-config",
+					},
+					DefaultMode: &[]int32{0755}[0],
+				},
 			},
-		}
+		})
+		
+		// Mount init scripts to LocalStack's init directory
+		// LocalStack automatically executes scripts in /etc/localstack/init/ready.d/
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "init-scripts",
+			MountPath: "/etc/localstack/init/ready.d",
+		})
+	}
+
+	if len(volumes) > 0 {
+		deployment.Spec.Template.Spec.Volumes = volumes
+		deployment.Spec.Template.Spec.Containers[0].VolumeMounts = volumeMounts
 	}
 
 	_, err := km.client.AppsV1().Deployments(km.namespace).Create(ctx, deployment, metav1.CreateOptions{})
@@ -299,10 +337,16 @@ func (km *kubernetesManager) createService(ctx context.Context, config *Config) 
 	return nil
 }
 
+// GetExternalEndpoint returns the external endpoint for accessing LocalStack
+func (km *kubernetesManager) GetExternalEndpoint(ctx context.Context) (string, error) {
+	// For now, this returns an error as we're using port forwarding instead
+	return "", fmt.Errorf("external endpoint not available, use port forwarding")
+}
+
 // WaitForLocalStackReady waits for LocalStack to output "Ready." in its logs
 func (km *kubernetesManager) WaitForLocalStackReady(ctx context.Context, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
-	
+
 	// First, wait for pod to be running
 	for {
 		select {
@@ -312,29 +356,29 @@ func (km *kubernetesManager) WaitForLocalStackReady(ctx context.Context, timeout
 			if time.Now().After(deadline) {
 				return fmt.Errorf("timeout waiting for LocalStack to be ready")
 			}
-			
+
 			pods, err := km.client.CoreV1().Pods(km.namespace).List(ctx, metav1.ListOptions{
 				LabelSelector: "app=localstack",
 			})
 			if err != nil {
-				klog.Warningf("Failed to list pods: %v", err)
+				logging.Warn("Failed to list pods", "error", err)
 				time.Sleep(2 * time.Second)
 				continue
 			}
-			
+
 			if len(pods.Items) == 0 {
-				klog.Info("No LocalStack pods found yet")
+				logging.Info("No LocalStack pods found yet")
 				time.Sleep(2 * time.Second)
 				continue
 			}
-			
+
 			pod := &pods.Items[0]
 			if pod.Status.Phase == corev1.PodRunning {
 				// Pod is running, now check logs for "Ready."
 				return km.waitForReadyInLogs(ctx, pod.Name, deadline)
 			}
-			
-			klog.Infof("Pod status: %s", pod.Status.Phase)
+
+			logging.Info("Pod status", "phase", pod.Status.Phase)
 			time.Sleep(2 * time.Second)
 		}
 	}
@@ -343,16 +387,16 @@ func (km *kubernetesManager) WaitForLocalStackReady(ctx context.Context, timeout
 // waitForReadyInLogs monitors pod logs for the "Ready." message
 func (km *kubernetesManager) waitForReadyInLogs(ctx context.Context, podName string, deadline time.Time) error {
 	req := km.client.CoreV1().Pods(km.namespace).GetLogs(podName, &corev1.PodLogOptions{
-		Follow: true,
+		Follow:    true,
 		Container: "localstack",
 	})
-	
+
 	stream, err := req.Stream(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get log stream: %w", err)
 	}
 	defer stream.Close()
-	
+
 	scanner := bufio.NewScanner(stream)
 	for scanner.Scan() {
 		select {
@@ -362,22 +406,22 @@ func (km *kubernetesManager) waitForReadyInLogs(ctx context.Context, podName str
 			if time.Now().After(deadline) {
 				return fmt.Errorf("timeout waiting for LocalStack Ready message")
 			}
-			
+
 			line := scanner.Text()
-			klog.V(4).Infof("LocalStack log: %s", line)
-			
+			logging.Debug("LocalStack log", "line", line)
+
 			// Check for "Ready." in the log line
 			if strings.Contains(line, "Ready.") {
-				klog.Info("LocalStack is ready!")
+				logging.Info("LocalStack is ready!")
 				return nil
 			}
 		}
 	}
-	
+
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("error reading logs: %w", err)
 	}
-	
+
 	return fmt.Errorf("log stream ended without Ready message")
 }
 
@@ -405,6 +449,7 @@ func (km *kubernetesManager) DeleteLocalStack(ctx context.Context) error {
 
 	return nil
 }
+
 
 // GetLocalStackPod returns the name of the LocalStack pod
 func (km *kubernetesManager) GetLocalStackPod() (string, error) {
@@ -479,7 +524,30 @@ func (km *kubernetesManager) UpdateDeployment(ctx context.Context, config *Confi
 		return fmt.Errorf("failed to get configmap: %w", err)
 	}
 
+	// Update services
 	configMap.Data["services"] = config.GetServicesString()
+	
+	// Update init scripts
+	// First, remove old scripts that are no longer in config
+	for key := range configMap.Data {
+		if key != "services" {
+			found := false
+			for _, script := range config.InitScripts {
+				if script.Name == key {
+					found = true
+					break
+				}
+			}
+			if !found {
+				delete(configMap.Data, key)
+			}
+		}
+	}
+	
+	// Then add/update current scripts
+	for _, script := range config.InitScripts {
+		configMap.Data[script.Name] = script.Content
+	}
 
 	_, err = km.client.CoreV1().ConfigMaps(km.namespace).Update(ctx, configMap, metav1.UpdateOptions{})
 	if err != nil {

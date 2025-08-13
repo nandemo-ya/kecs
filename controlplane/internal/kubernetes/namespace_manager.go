@@ -7,15 +7,19 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/controllers/sync"
 )
 
 type NamespaceManager struct {
-	clientset *kubernetes.Clientset
+	clientset   *kubernetes.Clientset
+	rbacManager *sync.RBACManager
 }
 
 func NewNamespaceManager(clientset *kubernetes.Clientset) *NamespaceManager {
 	return &NamespaceManager{
-		clientset: clientset,
+		clientset:   clientset,
+		rbacManager: sync.NewRBACManager(clientset),
 	}
 }
 
@@ -47,13 +51,27 @@ func (n *NamespaceManager) CreateNamespace(ctx context.Context, clusterName, reg
 		return fmt.Errorf("failed to create namespace %s: %w", namespaceName, err)
 	}
 
+	// Setup RBAC for cross-namespace secret access
+	err = n.rbacManager.SetupNamespaceRBAC(ctx, namespaceName)
+	if err != nil {
+		// Log error but don't fail namespace creation
+		fmt.Printf("Warning: failed to setup RBAC for namespace %s: %v\n", namespaceName, err)
+	}
+
 	return nil
 }
 
 func (n *NamespaceManager) DeleteNamespace(ctx context.Context, clusterName, region string) error {
 	namespaceName := fmt.Sprintf("%s-%s", clusterName, region)
 
-	err := n.clientset.CoreV1().Namespaces().Delete(ctx, namespaceName, metav1.DeleteOptions{})
+	// Cleanup RBAC resources first
+	err := n.rbacManager.CleanupNamespaceRBAC(ctx, namespaceName)
+	if err != nil {
+		// Log error but continue with namespace deletion
+		fmt.Printf("Warning: failed to cleanup RBAC for namespace %s: %v\n", namespaceName, err)
+	}
+
+	err = n.clientset.CoreV1().Namespaces().Delete(ctx, namespaceName, metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to delete namespace %s: %w", namespaceName, err)
 	}

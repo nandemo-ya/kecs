@@ -9,7 +9,7 @@ import (
 // DefaultConfig returns the default LocalStack configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Enabled:     false,
+		Enabled:     true, // Enable LocalStack by default
 		Services:    DefaultServices,
 		Persistence: true,
 		Image:       DefaultImage,
@@ -34,6 +34,8 @@ func DefaultConfig() *Config {
 		Debug:           false,
 		DataDir:         "/var/lib/localstack",
 		CustomEndpoints: make(map[string]string),
+		UseTraefik:      true, // Enable Traefik for LocalStack by default
+		InitScripts:     getDefaultInitScripts(),
 	}
 }
 
@@ -47,7 +49,7 @@ func (c *Config) Validate() error {
 	if c.Image == "" {
 		return fmt.Errorf("image cannot be empty")
 	}
-	
+
 	// Validate version
 	if c.Version == "" {
 		return fmt.Errorf("version cannot be empty")
@@ -229,4 +231,41 @@ func boolToString(b bool) string {
 		return "1"
 	}
 	return "0"
+}
+
+// getDefaultInitScripts returns the default initialization scripts for LocalStack
+func getDefaultInitScripts() []InitScript {
+	return []InitScript{
+		{
+			Name: "create-ecs-iam-roles.sh",
+			Content: `#!/bin/bash
+set -e
+
+echo "Creating default ECS IAM role..."
+
+# Create ecsTaskExecutionRole
+awslocal iam create-role \
+  --role-name ecsTaskExecutionRole \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "ecs-tasks.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+      }
+    ]
+  }' 2>/dev/null || echo "Role ecsTaskExecutionRole already exists"
+
+# Attach AmazonECSTaskExecutionRolePolicy
+awslocal iam attach-role-policy \
+  --role-name ecsTaskExecutionRole \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy 2>/dev/null || true
+
+echo "ECS IAM role created successfully"
+`,
+		},
+	}
 }

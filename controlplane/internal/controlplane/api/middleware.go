@@ -3,6 +3,8 @@ package api
 import (
 	"net/http"
 	"strings"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // CORSMiddleware adds CORS headers to responses
@@ -74,14 +76,23 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 }
 
 // LocalStackProxyMiddleware intercepts AWS API calls and routes them to LocalStack
-func LocalStackProxyMiddleware(next http.Handler, awsProxyRouter *AWSProxyRouter) http.Handler {
+func LocalStackProxyMiddleware(next http.Handler, server *Server) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check if this request should be proxied to LocalStack
-		if ShouldProxyToLocalStack(r, awsProxyRouter.LocalStackManager) {
-			awsProxyRouter.AWSProxyHandler.ServeHTTP(w, r)
-			return
+		// Debug log
+		target := r.Header.Get("X-Amz-Target")
+		if target != "" {
+			logging.Debug("[LocalStackProxyMiddleware] Request",
+				"method", r.Method, "path", r.URL.Path, "target", target, "hasAuth", r.Header.Get("Authorization") != "")
 		}
 		
+		// Dynamically check if awsProxyRouter is available
+		if server.awsProxyRouter != nil && server.awsProxyRouter.LocalStackManager != nil && 
+		   ShouldProxyToLocalStack(r, server.awsProxyRouter.LocalStackManager) {
+			logging.Debug("[LocalStackProxyMiddleware] Proxying to LocalStack", "method", r.Method, "path", r.URL.Path)
+			server.awsProxyRouter.AWSProxyHandler.ServeHTTP(w, r)
+			return
+		}
+
 		// Not an AWS API call or LocalStack is not available
 		next.ServeHTTP(w, r)
 	})

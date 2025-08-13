@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -71,7 +71,7 @@ func (s *Server) createBasicPod(taskDef *storage.TaskDefinition, cluster *storag
 	}
 
 	// Create the pod in Kubernetes
-	kubeClient, err := s.getKubeClient(cluster.KindClusterName)
+	kubeClient, err := s.getKubeClient(cluster.K8sClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
@@ -81,15 +81,15 @@ func (s *Server) createBasicPod(taskDef *storage.TaskDefinition, cluster *storag
 		return nil, fmt.Errorf("failed to create pod in kubernetes: %w", err)
 	}
 
-	log.Printf("Successfully created pod %s in namespace %s", createdPod.Name, createdPod.Namespace)
+	logging.Info("Successfully created pod", "pod", createdPod.Name, "namespace", createdPod.Namespace)
 	return createdPod, nil
 }
 
-// getKubeClient gets a Kubernetes client for the specified kind cluster
-func (s *Server) getKubeClient(kindClusterName string) (kubernetes.Interface, error) {
-	if s.kindManager == nil {
-		return nil, fmt.Errorf("kind manager not available")
+// getKubeClient gets a Kubernetes client for the specified k3d cluster
+func (s *Server) getKubeClient(k8sClusterName string) (kubernetes.Interface, error) {
+	if s.clusterManager == nil {
+		return nil, fmt.Errorf("cluster manager not available")
 	}
 
-	return s.kindManager.GetKubeClient(kindClusterName)
+	return s.clusterManager.GetKubeClient(k8sClusterName)
 }

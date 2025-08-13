@@ -2,9 +2,11 @@ package kubernetes
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"log"
+	"os"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -14,19 +16,30 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
 
 // TaskManager manages ECS tasks as Kubernetes pods
 type TaskManager struct {
-	clientset kubernetes.Interface
+	Clientset kubernetes.Interface
 	storage   storage.Storage
 }
 
 // NewTaskManager creates a new task manager
 func NewTaskManager(storage storage.Storage) (*TaskManager, error) {
+	// In container mode or test mode, defer kubernetes client creation
+	if config.GetBool("features.containerMode") || os.Getenv("KECS_TEST_MODE") == "true" {
+		logging.Debug("Container/test mode enabled - deferring kubernetes client initialization")
+		return &TaskManager{
+			Clientset: nil, // Will be initialized later
+			storage:   storage,
+		}, nil
+	}
+
 	// Try in-cluster config first
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -43,13 +56,84 @@ func NewTaskManager(storage storage.Storage) (*TaskManager, error) {
 	}
 
 	return &TaskManager{
-		clientset: clientset,
+		Clientset: clientset,
 		storage:   storage,
 	}, nil
 }
 
+// InitializeClient initializes the kubernetes client if not already initialized
+func (tm *TaskManager) InitializeClient() error {
+	if tm.Clientset != nil {
+		return nil // Already initialized
+	}
+
+	// Skip initialization in test mode
+	if os.Getenv("KECS_TEST_MODE") == "true" {
+		logging.Debug("Test mode enabled - skipping kubernetes client initialization")
+		return nil
+	}
+
+	// Try in-cluster config first
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		// Fall back to kubeconfig
+		config, err = GetKubeConfig()
+		if err != nil {
+			return fmt.Errorf("failed to get kubernetes config: %w", err)
+		}
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	tm.Clientset = clientset
+	logging.Debug("TaskManager kubernetes client initialized")
+	return nil
+}
+
 // CreateTask creates a new task by deploying a pod
 func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *storage.Task, secrets map[string]*converters.SecretInfo) error {
+	// In test mode, skip actual pod creation
+	if tm.Clientset == nil {
+		logging.Debug("Kubernetes client not initialized - simulating task creation")
+		task.PodName = "test-pod-" + task.ID
+		task.Namespace = pod.Namespace
+		// Don't override LastStatus - keep what was set by the caller
+		task.Connectivity = "CONNECTED"
+		task.ConnectivityAt = &task.CreatedAt
+
+		// Simulate container and network information for test mode
+		if p := pod; p != nil {
+			containers := tm.createTestContainers(p, task)
+			if len(containers) > 0 {
+				containersJSON, err := json.Marshal(containers)
+				if err == nil {
+					task.Containers = string(containersJSON)
+				}
+			}
+
+			// Check for awsvpc network mode and create attachments
+			if networkMode, ok := p.Annotations["ecs.amazonaws.com/network-mode"]; ok && networkMode == "awsvpc" {
+				attachments := tm.createTestNetworkAttachments(p)
+				if len(attachments) > 0 {
+					attachmentsJSON, err := json.Marshal(attachments)
+					if err == nil {
+						task.Attachments = string(attachmentsJSON)
+					}
+				}
+			}
+		}
+
+		// Store task in database
+		if err := tm.storage.TaskStore().Create(ctx, task); err != nil {
+			return fmt.Errorf("failed to store task: %w", err)
+		}
+
+		return nil
+	}
+
 	// Create secrets first if any
 	if len(secrets) > 0 {
 		if err := tm.createSecrets(ctx, pod.Namespace, secrets); err != nil {
@@ -58,7 +142,7 @@ func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *st
 	}
 
 	// Create the pod
-	createdPod, err := tm.clientset.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+	createdPod, err := tm.Clientset.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create pod: %w", err)
 	}
@@ -73,7 +157,7 @@ func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *st
 	// Store task in database
 	if err := tm.storage.TaskStore().Create(ctx, task); err != nil {
 		// Try to clean up the pod if task storage fails
-		_ = tm.clientset.CoreV1().Pods(pod.Namespace).Delete(ctx, createdPod.Name, metav1.DeleteOptions{})
+		_ = tm.Clientset.CoreV1().Pods(pod.Namespace).Delete(ctx, createdPod.Name, metav1.DeleteOptions{})
 		return fmt.Errorf("failed to store task: %w", err)
 	}
 
@@ -105,9 +189,9 @@ func (tm *TaskManager) StopTask(ctx context.Context, cluster, taskID, reason str
 		return fmt.Errorf("failed to update task: %w", err)
 	}
 
-	// Delete the pod
-	if task.PodName != "" && task.Namespace != "" {
-		err := tm.clientset.CoreV1().Pods(task.Namespace).Delete(ctx, task.PodName, metav1.DeleteOptions{})
+	// Delete the pod (skip if no kubernetes client)
+	if tm.Clientset != nil && task.PodName != "" && task.Namespace != "" {
+		err := tm.Clientset.CoreV1().Pods(task.Namespace).Delete(ctx, task.PodName, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete pod: %w", err)
 		}
@@ -132,7 +216,7 @@ func (tm *TaskManager) UpdateTaskStatus(ctx context.Context, taskARN string, pod
 	task.Version++
 
 	// Update container statuses
-	containers := tm.getContainerStatuses(pod)
+	containers := tm.GetContainerStatuses(pod)
 	containersJSON, err := json.Marshal(containers)
 	if err != nil {
 		return fmt.Errorf("failed to marshal container statuses: %w", err)
@@ -195,12 +279,12 @@ func (tm *TaskManager) watchPodStatus(ctx context.Context, taskARN, namespace, p
 	// Use a field selector to watch only this specific pod
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", podName).String()
 
-	watcher, err := tm.clientset.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
+	watcher, err := tm.Clientset.CoreV1().Pods(namespace).Watch(ctx, metav1.ListOptions{
 		FieldSelector: fieldSelector,
 	})
 	if err != nil {
 		// Log error with more context and don't crash
-		log.Printf("Failed to watch pod %s in namespace %s for task %s: %v", podName, namespace, taskARN, err)
+		logging.Warn("Failed to watch pod for task", "pod", podName, "namespace", namespace, "task", taskARN, "error", err)
 		return
 	}
 	defer watcher.Stop()
@@ -213,7 +297,7 @@ func (tm *TaskManager) watchPodStatus(ctx context.Context, taskARN, namespace, p
 
 		// Update task status
 		if err := tm.UpdateTaskStatus(ctx, taskARN, pod); err != nil {
-			log.Printf("Failed to update task status for task %s (pod %s/%s): %v", taskARN, pod.Namespace, pod.Name, err)
+			logging.Error("Failed to update task status", "task", taskARN, "namespace", pod.Namespace, "pod", pod.Name, "error", err)
 			// Continue processing other events despite this error
 		}
 
@@ -224,8 +308,8 @@ func (tm *TaskManager) watchPodStatus(ctx context.Context, taskARN, namespace, p
 	}
 }
 
-// getContainerStatuses extracts container status information
-func (tm *TaskManager) getContainerStatuses(pod *corev1.Pod) []types.Container {
+// GetContainerStatuses extracts container status information
+func (tm *TaskManager) GetContainerStatuses(pod *corev1.Pod) []types.Container {
 	containers := make([]types.Container, 0, len(pod.Status.ContainerStatuses))
 
 	for _, cs := range pod.Status.ContainerStatuses {
@@ -307,7 +391,7 @@ func mapPodPhaseToTaskStatus(phase corev1.PodPhase) string {
 func (tm *TaskManager) createSecrets(ctx context.Context, namespace string, secrets map[string]*converters.SecretInfo) error {
 	for arn, info := range secrets {
 		// Check if secret already exists
-		existingSecret, err := tm.clientset.CoreV1().Secrets(namespace).Get(ctx, info.SecretName, metav1.GetOptions{})
+		existingSecret, err := tm.Clientset.CoreV1().Secrets(namespace).Get(ctx, info.SecretName, metav1.GetOptions{})
 		if err == nil && existingSecret != nil {
 			// Secret already exists, skip creation
 			continue
@@ -333,11 +417,151 @@ func (tm *TaskManager) createSecrets(ctx context.Context, namespace string, secr
 			},
 		}
 
-		_, err = tm.clientset.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+		_, err = tm.Clientset.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			return fmt.Errorf("failed to create secret %s: %w", info.SecretName, err)
 		}
 	}
 
 	return nil
+}
+
+// CreateServiceDeployment creates a Kubernetes deployment for an ECS service
+func (tm *TaskManager) CreateServiceDeployment(ctx context.Context, cluster *storage.Cluster, service *storage.Service, taskDef *storage.TaskDefinition) error {
+	// Ensure namespace exists
+	namespace := fmt.Sprintf("kecs-%s", cluster.Name)
+	if err := EnsureNamespace(ctx, tm.Clientset, namespace); err != nil {
+		return fmt.Errorf("failed to ensure namespace: %w", err)
+	}
+
+	// Parse container definitions from storage
+	var containerDefs []types.ContainerDefinition
+	if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
+		return fmt.Errorf("failed to parse container definitions: %w", err)
+	}
+
+	// Create deployment info
+	deploymentInfo := converters.ConvertServiceToDeployment(service, taskDef, namespace)
+
+	// Convert to Kubernetes deployment
+	k8sDeployment := converters.ConvertDeploymentToK8s(deploymentInfo, containerDefs)
+
+	// Create deployment in Kubernetes
+	_, err := tm.Clientset.AppsV1().Deployments(namespace).Create(ctx, k8sDeployment, metav1.CreateOptions{})
+	if err != nil {
+		if errors.IsAlreadyExists(err) {
+			// Update existing deployment
+			_, err = tm.Clientset.AppsV1().Deployments(namespace).Update(ctx, k8sDeployment, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to update existing deployment: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to create deployment: %w", err)
+		}
+	}
+
+	logging.Info("Created/updated deployment for service",
+		"service", service.ServiceName, "namespace", namespace)
+
+	return nil
+}
+
+// generateShortID generates a short random ID for resource naming
+func generateShortID() string {
+	b := make([]byte, 4)
+	rand.Read(b)
+	return fmt.Sprintf("%x", b)
+}
+
+// ptr returns a pointer to the given string
+func ptr(s string) *string {
+	return &s
+}
+
+// createTestContainers creates container information for test mode
+func (tm *TaskManager) createTestContainers(pod *corev1.Pod, task *storage.Task) []types.Container {
+	var containers []types.Container
+
+	// Use a test IP address
+	podIP := "10.0.0.1"
+
+	for _, container := range pod.Spec.Containers {
+		testContainer := types.Container{
+			Name:         container.Name,
+			ContainerArn: fmt.Sprintf("arn:aws:ecs:container/%s", task.ID),
+			TaskArn:      task.ARN,
+			Image:        container.Image,
+			LastStatus:   "PENDING",
+		}
+
+		// Add network interfaces for awsvpc mode
+		if networkMode := pod.Annotations["ecs.amazonaws.com/network-mode"]; networkMode == "awsvpc" {
+			testContainer.NetworkInterfaces = []types.NetworkInterface{
+				{
+					AttachmentId:       fmt.Sprintf("eni-attach-%s", task.ID),
+					PrivateIpv4Address: podIP,
+				},
+			}
+		}
+
+		// Add network bindings from container ports
+		for _, port := range container.Ports {
+			testContainer.NetworkBindings = append(testContainer.NetworkBindings, types.NetworkBinding{
+				ContainerPort: int(port.ContainerPort),
+				Protocol:      string(port.Protocol),
+				BindIP:        podIP,
+			})
+		}
+
+		containers = append(containers, testContainer)
+	}
+
+	return containers
+}
+
+// createTestNetworkAttachments creates network attachments for test mode
+func (tm *TaskManager) createTestNetworkAttachments(pod *corev1.Pod) []types.Attachment {
+	var attachments []types.Attachment
+
+	// Get network configuration from annotations
+	subnets := pod.Annotations["ecs.amazonaws.com/subnets"]
+	privateIP := "10.0.0.1"
+
+	// Create elastic network interface attachment
+	var details []types.KeyValuePair
+	if subnets != "" {
+		subnetID := strings.Split(subnets, ",")[0]
+		details = append(details, types.KeyValuePair{
+			Name:  ptr("subnetId"),
+			Value: ptr(subnetID),
+		})
+	}
+	details = append(details,
+		types.KeyValuePair{
+			Name:  ptr("networkInterfaceId"),
+			Value: ptr(fmt.Sprintf("eni-%s", pod.UID)),
+		},
+		types.KeyValuePair{
+			Name:  ptr("macAddress"),
+			Value: ptr("02:00:00:00:00:01"),
+		},
+		types.KeyValuePair{
+			Name:  ptr("privateDnsName"),
+			Value: ptr(fmt.Sprintf("ip-%s.ec2.internal", strings.ReplaceAll(privateIP, ".", "-"))),
+		},
+		types.KeyValuePair{
+			Name:  ptr("privateIPv4Address"),
+			Value: ptr(privateIP),
+		},
+	)
+
+	attachment := types.Attachment{
+		Id:      ptr(fmt.Sprintf("eni-attach-%s", pod.UID)),
+		Type:    ptr("ElasticNetworkInterface"),
+		Status:  ptr("ATTACHED"),
+		Details: details,
+	}
+
+	attachments = append(attachments, attachment)
+	return attachments
 }

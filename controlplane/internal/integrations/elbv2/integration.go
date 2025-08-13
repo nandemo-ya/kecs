@@ -4,19 +4,18 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/klog/v2"
-
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // NewIntegration creates a new ELBv2 integration
 func NewIntegration(cfg Config) (Integration, error) {
 	if !cfg.Enabled {
-		klog.Info("ELBv2 integration is disabled")
+		logging.Info("ELBv2 integration is disabled")
 		return &noOpIntegration{}, nil
 	}
 
-	klog.Info("Initializing ELBv2 integration with Kubernetes-based implementation")
+	logging.Info("Initializing ELBv2 integration with Kubernetes-based implementation")
 
 	// Use Kubernetes-based implementation instead of LocalStack
 	// This avoids the need for LocalStack Pro
@@ -74,4 +73,8 @@ func (n *noOpIntegration) GetLoadBalancer(ctx context.Context, arn string) (*Loa
 
 func (n *noOpIntegration) GetTargetHealth(ctx context.Context, targetGroupArn string) ([]TargetHealth, error) {
 	return nil, fmt.Errorf("ELBv2 integration is disabled")
+}
+
+func (n *noOpIntegration) CheckTargetHealthWithK8s(ctx context.Context, targetIP string, targetPort int32, targetGroupArn string) (string, error) {
+	return "", fmt.Errorf("ELBv2 integration is disabled")
 }

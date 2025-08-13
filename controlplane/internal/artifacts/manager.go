@@ -13,8 +13,8 @@ import (
 	"strings"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/s3"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
-	"k8s.io/klog/v2"
 )
 
 // Manager handles artifact downloads and management
@@ -42,7 +42,7 @@ func (m *Manager) DownloadArtifact(ctx context.Context, artifact *types.Artifact
 	artifactURL := *artifact.ArtifactUrl
 	targetPath := *artifact.TargetPath
 
-	klog.V(2).Infof("Downloading artifact from %s to %s", artifactURL, targetPath)
+	logging.Debug("Downloading artifact", "from", artifactURL, "to", targetPath)
 
 	// Create target directory if it doesn't exist
 	targetDir := filepath.Dir(targetPath)
@@ -65,7 +65,7 @@ func (m *Manager) downloadFromS3(ctx context.Context, artifact *types.Artifact) 
 	artifactURL := *artifact.ArtifactUrl
 	targetPath := *artifact.TargetPath
 
-	klog.V(2).Infof("Downloading artifact from S3: %s", artifactURL)
+	logging.Debug("Downloading artifact from S3", "url", artifactURL)
 
 	// Parse S3 URL (s3://bucket/key)
 	s3URL := strings.TrimPrefix(artifactURL, "s3://")
@@ -111,7 +111,7 @@ func (m *Manager) downloadFromS3(ctx context.Context, artifact *types.Artifact) 
 		}
 	}
 
-	klog.V(2).Infof("Successfully downloaded S3 artifact to %s", targetPath)
+	logging.Debug("Successfully downloaded S3 artifact", "targetPath", targetPath)
 	return nil
 }
 
@@ -120,7 +120,7 @@ func (m *Manager) downloadFromHTTP(ctx context.Context, artifact *types.Artifact
 	artifactURL := *artifact.ArtifactUrl
 	targetPath := *artifact.TargetPath
 
-	klog.V(2).Infof("Downloading artifact from HTTP: %s", artifactURL)
+	logging.Debug("Downloading artifact from HTTP", "url", artifactURL)
 
 	// Create HTTP request
 	req, err := http.NewRequestWithContext(ctx, "GET", artifactURL, nil)
@@ -166,7 +166,7 @@ func (m *Manager) downloadFromHTTP(ctx context.Context, artifact *types.Artifact
 		}
 	}
 
-	klog.V(2).Infof("Successfully downloaded HTTP artifact to %s", targetPath)
+	logging.Debug("Successfully downloaded HTTP artifact", "targetPath", targetPath)
 	return nil
 }
 
@@ -183,7 +183,7 @@ func (m *Manager) setFilePermissions(filePath, permissions string) error {
 		return fmt.Errorf("failed to set permissions %s on %s: %w", permissions, filePath, err)
 	}
 
-	klog.V(3).Infof("Set permissions %s on %s", permissions, filePath)
+	logging.Debug("Set file permissions", "permissions", permissions, "filePath", filePath)
 	return nil
 }
 
@@ -222,7 +222,7 @@ func (m *Manager) validateChecksum(filePath, expectedChecksum string, checksumTy
 		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, hash)
 	}
 
-	klog.V(3).Infof("Checksum validation passed for %s", filePath)
+	logging.Debug("Checksum validation passed", "filePath", filePath)
 	return nil
 }
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // AWSProxyHandler handles proxying AWS API calls to LocalStack
@@ -24,12 +24,30 @@ func NewAWSProxyHandler(localStackManager localstack.Manager) (*AWSProxyHandler,
 		localStackManager: localStackManager,
 	}
 
-	// Initialize the reverse proxy when LocalStack is ready
-	if localStackManager != nil && localStackManager.IsHealthy() {
-		endpoint, err := localStackManager.GetEndpoint()
-		if err == nil {
+	// Initialize the reverse proxy with the endpoint from LocalStack manager
+	if localStackManager != nil {
+		// Get the configuration from LocalStack manager
+		config := localStackManager.GetConfig()
+		if config != nil && config.UseTraefik && config.ProxyEndpoint != "" {
+			// Use the proxy endpoint from configuration
+			endpoint := config.ProxyEndpoint
+			logging.Info("Using Traefik endpoint from LocalStack config", "endpoint", endpoint)
+			
 			if err := handler.updateProxyTarget(endpoint); err != nil {
-				klog.Warningf("Failed to initialize proxy target: %v", err)
+				logging.Warn("Failed to initialize proxy target", "error", err)
+			}
+		} else {
+			// Fallback to getting endpoint from manager
+			endpoint, err := localStackManager.GetEndpoint()
+			if err != nil {
+				logging.Warn("Failed to get LocalStack endpoint", "error", err)
+				// Use cluster-internal endpoint as fallback
+				endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
+			}
+			logging.Info("Using LocalStack endpoint", "endpoint", endpoint)
+			
+			if err := handler.updateProxyTarget(endpoint); err != nil {
+				logging.Warn("Failed to initialize proxy target", "error", err)
 			}
 		}
 	}
@@ -51,21 +69,21 @@ func (h *AWSProxyHandler) updateProxyTarget(endpoint string) error {
 	originalDirector := h.reverseProxy.Director
 	h.reverseProxy.Director = func(req *http.Request) {
 		originalDirector(req)
-		
+
 		// Preserve the original host header for AWS SDK compatibility
 		req.Host = targetURL.Host
-		
+
 		// Add LocalStack specific headers
 		req.Header.Set("X-Forwarded-Host", req.Header.Get("Host"))
 		req.Header.Set("X-LocalStack-Edge", "1")
-		
+
 		// Log the proxied request
-		klog.V(4).Infof("Proxying AWS request: %s %s to %s", req.Method, req.URL.Path, targetURL.Host)
+		logging.Debug("Proxying AWS request", "method", req.Method, "path", req.URL.Path, "target", targetURL.Host)
 	}
 
 	// Custom error handler
 	h.reverseProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		klog.Errorf("Proxy error: %v", err)
+		logging.Error("Proxy error", "error", err)
 		http.Error(w, "Failed to proxy request to LocalStack", http.StatusBadGateway)
 	}
 
@@ -74,19 +92,39 @@ func (h *AWSProxyHandler) updateProxyTarget(endpoint string) error {
 
 // ServeHTTP handles incoming AWS API requests
 func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Check if LocalStack is healthy
-	if h.localStackManager == nil || !h.localStackManager.IsHealthy() {
+	// Check if LocalStack manager exists
+	if h.localStackManager == nil {
 		http.Error(w, "LocalStack is not available", http.StatusServiceUnavailable)
 		return
 	}
+	
+	// TODO: Fix health check to use Traefik endpoint
+	// For now, we'll assume LocalStack is healthy if the manager exists
+	// This is a temporary workaround until the health check is fixed
+	// Remove the IsHealthy() check temporarily to match aws_proxy_middleware.go
 
 	// Update proxy target if needed
 	if h.reverseProxy == nil {
-		endpoint, err := h.localStackManager.GetEndpoint()
-		if err != nil {
-			http.Error(w, "Failed to get LocalStack endpoint", http.StatusInternalServerError)
-			return
+		// Get the configuration from LocalStack manager
+		config := h.localStackManager.GetConfig()
+		var endpoint string
+		
+		if config != nil && config.UseTraefik && config.ProxyEndpoint != "" {
+			// Use the proxy endpoint from configuration
+			endpoint = config.ProxyEndpoint
+			logging.Info("Initializing proxy with Traefik endpoint from config", "endpoint", endpoint)
+		} else {
+			// Fallback to getting endpoint from manager
+			var err error
+			endpoint, err = h.localStackManager.GetEndpoint()
+			if err != nil {
+				logging.Warn("Failed to get LocalStack endpoint", "error", err)
+				// Use cluster-internal endpoint as last resort
+				endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
+			}
+			logging.Info("Initializing proxy with LocalStack endpoint", "endpoint", endpoint)
 		}
+		
 		if err := h.updateProxyTarget(endpoint); err != nil {
 			http.Error(w, "Failed to initialize proxy", http.StatusInternalServerError)
 			return
@@ -95,8 +133,8 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Extract service name from the request (for logging/debugging)
 	service := h.extractServiceFromRequest(r)
-	klog.V(3).Infof("Proxying request for AWS service: %s", service)
-	
+	logging.Debug("Proxying request for AWS service", "service", service)
+
 	// Note: We don't check if the service is enabled here anymore.
 	// LocalStack will handle unknown or disabled services appropriately.
 	// This allows for more flexibility and reduces maintenance.
@@ -153,7 +191,7 @@ func (h *AWSProxyHandler) extractServiceFromRequest(r *http.Request) string {
 	if host == "" {
 		host = r.URL.Host
 	}
-	
+
 	// Extract service from AWS endpoint pattern: service.region.amazonaws.com
 	if strings.Contains(host, ".amazonaws.com") {
 		parts := strings.Split(host, ".")
@@ -180,41 +218,3 @@ func (h *AWSProxyHandler) HealthCheck() (bool, error) {
 	return h.localStackManager.IsHealthy(), nil
 }
 
-
-// isAWSAPICall checks if the request is for an AWS API
-func isAWSAPICall(r *http.Request) bool {
-	path := r.URL.Path
-	
-	// Check for AWS API path patterns
-	awsAPIPrefixes := []string{
-		"/api/v1/s3/",
-		"/api/v1/iam/",
-		"/api/v1/logs/",
-		"/api/v1/ssm/",
-		"/api/v1/secretsmanager/",
-		"/api/v1/elbv2/",
-		"/api/v1/rds/",
-		"/api/v1/dynamodb/",
-	}
-
-	for _, prefix := range awsAPIPrefixes {
-		if strings.HasPrefix(path, prefix) {
-			return true
-		}
-	}
-
-	// Check for AWS SDK headers
-	if r.Header.Get("X-Amz-Target") != "" || 
-	   strings.Contains(r.Header.Get("Authorization"), "AWS4-HMAC-SHA256") {
-		return true
-	}
-
-	return false
-}
-
-// isECSAPICall checks if the request is for the ECS API
-func isECSAPICall(r *http.Request) bool {
-	// ECS API calls go through the main KECS API
-	return strings.HasPrefix(r.URL.Path, "/v1/") || 
-	       r.Header.Get("X-Amz-Target") == "AmazonEC2ContainerServiceV20141113"
-}

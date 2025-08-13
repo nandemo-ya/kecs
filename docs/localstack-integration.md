@@ -2,6 +2,8 @@
 
 KECS provides built-in integration with LocalStack to emulate AWS services locally, enabling comprehensive testing and development without requiring AWS credentials or incurring costs.
 
+> **Note**: As of KECS v1.0, LocalStack is enabled by default when creating clusters. This provides immediate access to essential AWS services like IAM, Systems Manager Parameter Store, and Secrets Manager that are commonly required for ECS workloads.
+
 ## Overview
 
 LocalStack integration in KECS provides:
@@ -20,7 +22,7 @@ LocalStack integration is configured in the KECS configuration file:
 ```yaml
 # LocalStack configuration in production.yaml or development.yaml
 localstack:
-  enabled: true  # Enable LocalStack integration
+  enabled: true  # Enabled by default since v1.0
   services:
     - iam
     - logs
@@ -29,7 +31,7 @@ localstack:
     - elbv2
   persistence: true
   image: "localstack/localstack:latest"
-  namespace: "aws-services"
+  namespace: "kecs-system"
   port: 4566
   edgePort: 4566
   resources:
@@ -46,7 +48,7 @@ You can also enable LocalStack using command line flags:
 
 ```bash
 # Start KECS with LocalStack enabled
-kecs server --localstack-enabled --config configs/production.yaml
+kecs server --localstack-enabled --config controlplane/configs/production.yaml
 
 # Or without a config file (uses defaults)
 kecs server --localstack-enabled
@@ -64,7 +66,7 @@ When starting the KECS server with LocalStack enabled:
 
 ```bash
 # Using config file
-kecs server --config configs/development.yaml
+kecs server --config controlplane/configs/development.yaml
 
 # Using command line flag
 kecs server --localstack-enabled
@@ -88,7 +90,7 @@ Configure how ECS tasks connect to LocalStack:
 # AWS Proxy configuration  
 proxy:
   mode: "environment"  # Options: environment, sidecar, disabled
-  localstackEndpoint: "http://localstack.aws-services.svc.cluster.local:4566"
+  localstackEndpoint: "http://localstack.kecs-system.svc.cluster.local:4566"
   fallbackEnabled: true
   fallbackOrder:
     - sidecar
@@ -133,7 +135,7 @@ kecs localstack status
 LocalStack Status:
   Running: true
   Healthy: true
-  Endpoint: http://localstack.aws-services.svc.cluster.local:4566
+  Endpoint: http://localstack.kecs-system.svc.cluster.local:4566
   Uptime: 2h30m
 
 Enabled Services:
@@ -145,11 +147,11 @@ Enabled Services:
 
 Service Health:
   SERVICE         HEALTHY  ENDPOINT
-  iam             true     http://localstack.aws-services.svc.cluster.local:4566
-  logs            true     http://localstack.aws-services.svc.cluster.local:4566
-  ssm             true     http://localstack.aws-services.svc.cluster.local:4566
-  secretsmanager  true     http://localstack.aws-services.svc.cluster.local:4566
-  elbv2           true     http://localstack.aws-services.svc.cluster.local:4566
+  iam             true     http://localstack.kecs-system.svc.cluster.local:4566
+  logs            true     http://localstack.kecs-system.svc.cluster.local:4566
+  ssm             true     http://localstack.kecs-system.svc.cluster.local:4566
+  secretsmanager  true     http://localstack.kecs-system.svc.cluster.local:4566
+  elbv2           true     http://localstack.kecs-system.svc.cluster.local:4566
 ```
 
 ## Proxy Modes
@@ -192,7 +194,7 @@ No automatic configuration - applications must manually configure AWS SDK endpoi
 ```json
 {
   "family": "my-app",
-  "taskDefinitionArn": "arn:aws:ecs:us-east-1:123456789012:task-definition/my-app:1",
+  "taskDefinitionArn": "arn:aws:ecs:us-east-1:000000000000:task-definition/my-app:1",
   "containerDefinitions": [
     {
       "name": "app",
@@ -240,8 +242,8 @@ If you need to deploy LocalStack manually:
 kubectl apply -f deployments/kubernetes/localstack/
 
 # Check deployment
-kubectl -n aws-services get pods
-kubectl -n aws-services get svc
+kubectl -n kecs-system get pods
+kubectl -n kecs-system get svc
 ```
 
 ## Troubleshooting
@@ -250,31 +252,31 @@ kubectl -n aws-services get svc
 
 1. Check pod status:
    ```bash
-   kubectl -n aws-services describe pod -l app=localstack
+   kubectl -n kecs-system describe pod -l app=localstack
    ```
 
 2. Check logs:
    ```bash
-   kubectl -n aws-services logs -l app=localstack
+   kubectl -n kecs-system logs -l app=localstack
    ```
 
 3. Verify resources:
    ```bash
-   kubectl -n aws-services get pvc
-   kubectl -n aws-services get events
+   kubectl -n kecs-system get pvc
+   kubectl -n kecs-system get events
    ```
 
 ### Connection Issues
 
 1. Verify service endpoint:
    ```bash
-   kubectl -n aws-services get svc localstack
+   kubectl -n kecs-system get svc localstack
    ```
 
 2. Test connectivity from a pod:
    ```bash
    kubectl run test --rm -it --image=curlimages/curl -- \
-     curl http://localstack.aws-services.svc.cluster.local:4566/_localstack/health
+     curl http://localstack.kecs-system.svc.cluster.local:4566/_localstack/health
    ```
 
 3. Check proxy configuration:
@@ -343,6 +345,32 @@ localstack:
 3. **Use Persistence**: Enable persistence for development continuity
 4. **Test Locally**: Verify LocalStack connectivity before deploying applications
 5. **Clean Up**: Stop LocalStack when not in use to free resources
+
+## Disabling LocalStack
+
+While LocalStack is enabled by default, you can disable it in specific scenarios:
+
+### For Unit Tests
+```bash
+# Set environment variable
+export KECS_LOCALSTACK_ENABLED=false
+
+# Or use test configuration
+kecs server --config controlplane/configs/test.yaml
+```
+
+### For Production without LocalStack
+```yaml
+# In your custom configuration file
+localstack:
+  enabled: false
+```
+
+### Via Command Line
+```bash
+# Explicitly disable LocalStack
+kecs server --localstack-enabled=false
+```
 
 ## Limitations
 

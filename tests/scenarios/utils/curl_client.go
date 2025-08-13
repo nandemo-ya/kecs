@@ -23,16 +23,28 @@ func NewCurlClient(endpoint string) *CurlClient {
 
 // executeCurl executes a curl command with ECS headers
 func (c *CurlClient) executeCurl(action string, payload string) ([]byte, error) {
-	cmd := exec.Command("curl", "-s", "-X", "POST",
-		fmt.Sprintf("%s/v1/%s", c.endpoint, action),
+	// Use -v for verbose output to debug empty responses
+	cmd := exec.Command("curl", "-s", "-S", "-X", "POST",
+		c.endpoint, // Remove /v1/{action} path - ECS uses X-Amz-Target header
 		"-H", "Content-Type: application/x-amz-json-1.1",
 		"-H", fmt.Sprintf("X-Amz-Target: AmazonEC2ContainerServiceV20141113.%s", action),
 		"-d", payload,
+		"--fail", // Fail on HTTP errors
 	)
 	
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("curl command failed: %w\nOutput: %s", err, output)
+	}
+	
+	// Check for empty response
+	if len(output) == 0 {
+		return nil, fmt.Errorf("empty response from server for action %s", action)
+	}
+	
+	if output[0] != '{' && output[0] != '[' {
+		// Not JSON, probably an error page
+		return nil, fmt.Errorf("non-JSON response received: %s", string(output))
 	}
 	
 	// Check if response contains error
@@ -88,12 +100,17 @@ func (c *CurlClient) ListClusters() ([]string, error) {
 		return nil, err
 	}
 
+	// Check for empty response
+	if len(output) == 0 {
+		return nil, fmt.Errorf("empty response from server")
+	}
+
 	var result struct {
 		ClusterArns []string `json:"clusterArns"`
 	}
 
 	if err := json.Unmarshal(output, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, fmt.Errorf("failed to parse response: %w\nOutput: %s", err, string(output))
 	}
 
 	return result.ClusterArns, nil
@@ -235,29 +252,11 @@ func (c *CurlClient) ListServices(clusterName string) ([]string, error) {
 	return result.ServiceArns, nil
 }
 
-// UpdateService updates an ECS service
-func (c *CurlClient) UpdateService(clusterName, serviceName string, desiredCount *int, taskDef string) error {
-	payload := fmt.Sprintf(`{"cluster": "%s", "service": "%s"`, clusterName, serviceName)
-	
-	if desiredCount != nil {
-		payload += fmt.Sprintf(`, "desiredCount": %d`, *desiredCount)
-	}
-	
-	if taskDef != "" {
-		payload += fmt.Sprintf(`, "taskDefinition": "%s"`, taskDef)
-	}
-	
-	payload += "}"
-	
-	_, err := c.executeCurl("UpdateService", payload)
-	return err
-}
 
 // DeleteService deletes an ECS service
 func (c *CurlClient) DeleteService(clusterName, serviceName string) error {
 	// First, scale down to 0
-	zero := 0
-	if err := c.UpdateService(clusterName, serviceName, &zero, ""); err != nil {
+	if err := c.UpdateService(clusterName, serviceName, 0); err != nil {
 		return fmt.Errorf("failed to scale down service: %w", err)
 	}
 	
@@ -470,26 +469,92 @@ func (c *CurlClient) DeleteAttributes(clusterName string, attributes []Attribute
 
 // GetLocalStackStatus gets the LocalStack status (KECS-specific)
 func (c *CurlClient) GetLocalStackStatus(clusterName string) (string, error) {
-	// This would be a custom KECS endpoint
-	url := fmt.Sprintf("%s/localstack/status?cluster=%s", c.endpoint, clusterName)
+	// KECS LocalStack status is global, not per-cluster
+	url := fmt.Sprintf("%s/api/localstack/status", c.endpoint)
 	
 	args := []string{
 		"-s", "-X", "GET",
 		url,
 	}
 
-	output, err := c.runCommand(args...)
+	cmd := exec.Command("curl", args...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("curl command failed: %w\nOutput: %s", err, output)
 	}
 
 	var result struct {
-		Status string `json:"status"`
+		Running bool   `json:"running"`
+		Enabled bool   `json:"enabled"`
 	}
 
 	if err := json.Unmarshal(output, &result); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	return result.Status, nil
+	if result.Running {
+		return "healthy", nil
+	} else if result.Enabled {
+		return "enabled", nil
+	}
+	return "disabled", nil
+}
+
+// RegisterTaskDefinitionFromJSON registers a task definition from JSON
+func (c *CurlClient) RegisterTaskDefinitionFromJSON(jsonDefinition string) (*TaskDefinition, error) {
+	// Parse the JSON to extract relevant fields
+	var taskDef map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonDefinition), &taskDef); err != nil {
+		return nil, fmt.Errorf("failed to parse task definition JSON: %w", err)
+	}
+	
+	// Convert back to JSON for the API call
+	output, err := c.executeCurl("RegisterTaskDefinition", jsonDefinition)
+	if err != nil {
+		return nil, err
+	}
+	
+	var result struct {
+		TaskDefinition *TaskDefinition `json:"taskDefinition"`
+	}
+	
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+	
+	if result.TaskDefinition == nil {
+		return nil, fmt.Errorf("no task definition in response")
+	}
+	
+	return result.TaskDefinition, nil
+}
+
+// UpdateService updates an ECS service desired count
+func (c *CurlClient) UpdateService(clusterName, serviceName string, desiredCount int) error {
+	payload := fmt.Sprintf(`{"cluster": "%s", "service": "%s", "desiredCount": %d}`, 
+		clusterName, serviceName, desiredCount)
+	_, err := c.executeCurl("UpdateService", payload)
+	return err
+}
+
+// UpdateServiceTaskDefinition updates an ECS service task definition
+func (c *CurlClient) UpdateServiceTaskDefinition(clusterName, serviceName, taskDef string) error {
+	payload := fmt.Sprintf(`{"cluster": "%s", "service": "%s", "taskDefinition": "%s"}`, 
+		clusterName, serviceName, taskDef)
+	_, err := c.executeCurl("UpdateService", payload)
+	return err
+}
+
+// DescribeTask describes a single task
+func (c *CurlClient) DescribeTask(clusterName, taskArn string) (*Task, error) {
+	tasks, err := c.DescribeTasks(clusterName, []string{taskArn})
+	if err != nil {
+		return nil, err
+	}
+	
+	if len(tasks) == 0 {
+		return nil, fmt.Errorf("task not found: %s", taskArn)
+	}
+	
+	return &tasks[0], nil
 }

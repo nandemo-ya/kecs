@@ -37,6 +37,9 @@ type Storage interface {
 	// Attribute operations
 	AttributeStore() AttributeStore
 
+	// ELBv2 operations
+	ELBv2Store() ELBv2Store
+
 	// Transaction support
 	BeginTx(ctx context.Context) (Transaction, error)
 }
@@ -97,8 +100,8 @@ type Cluster struct {
 	// Tags as JSON
 	Tags string `json:"tags,omitempty"`
 
-	// Kind cluster name (kecs-<cluster-name>)
-	KindClusterName string `json:"kindClusterName,omitempty"`
+	// K8s cluster name (kecs-<cluster-name>)
+	K8sClusterName string `json:"k8sClusterName,omitempty"`
 
 	// Statistics
 	RegisteredContainerInstancesCount int `json:"registeredContainerInstancesCount"`
@@ -111,6 +114,9 @@ type Cluster struct {
 
 	// Default capacity provider strategy as JSON
 	DefaultCapacityProviderStrategy string `json:"defaultCapacityProviderStrategy,omitempty"`
+
+	// LocalStack deployment state
+	LocalStackState string `json:"localStackState,omitempty"`
 
 	// Timestamps
 	CreatedAt time.Time `json:"createdAt"`
@@ -341,6 +347,9 @@ type Service struct {
 	DeploymentName string `json:"deploymentName,omitempty"`
 	Namespace      string `json:"namespace,omitempty"`
 
+	// Service registry metadata for service discovery
+	ServiceRegistryMetadata map[string]string `json:"serviceRegistryMetadata,omitempty"`
+
 	// Timestamps
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -365,6 +374,9 @@ type TaskStore interface {
 
 	// Get tasks by ARNs
 	GetByARNs(ctx context.Context, arns []string) ([]*Task, error)
+
+	// CreateOrUpdate creates a new task or updates if it already exists
+	CreateOrUpdate(ctx context.Context, task *Task) error
 }
 
 // TaskFilters defines filters for listing tasks
@@ -832,4 +844,142 @@ type Attribute struct {
 	// Timestamps
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+
+// ELBv2Store defines ELBv2-specific storage operations
+type ELBv2Store interface {
+	// Load Balancer operations
+	CreateLoadBalancer(ctx context.Context, lb *ELBv2LoadBalancer) error
+	GetLoadBalancer(ctx context.Context, arn string) (*ELBv2LoadBalancer, error)
+	GetLoadBalancerByName(ctx context.Context, name string) (*ELBv2LoadBalancer, error)
+	ListLoadBalancers(ctx context.Context, region string) ([]*ELBv2LoadBalancer, error)
+	UpdateLoadBalancer(ctx context.Context, lb *ELBv2LoadBalancer) error
+	DeleteLoadBalancer(ctx context.Context, arn string) error
+
+	// Target Group operations
+	CreateTargetGroup(ctx context.Context, tg *ELBv2TargetGroup) error
+	GetTargetGroup(ctx context.Context, arn string) (*ELBv2TargetGroup, error)
+	GetTargetGroupByName(ctx context.Context, name string) (*ELBv2TargetGroup, error)
+	ListTargetGroups(ctx context.Context, region string) ([]*ELBv2TargetGroup, error)
+	UpdateTargetGroup(ctx context.Context, tg *ELBv2TargetGroup) error
+	DeleteTargetGroup(ctx context.Context, arn string) error
+
+	// Listener operations
+	CreateListener(ctx context.Context, listener *ELBv2Listener) error
+	GetListener(ctx context.Context, arn string) (*ELBv2Listener, error)
+	ListListeners(ctx context.Context, loadBalancerArn string) ([]*ELBv2Listener, error)
+	UpdateListener(ctx context.Context, listener *ELBv2Listener) error
+	DeleteListener(ctx context.Context, arn string) error
+
+	// Target operations
+	RegisterTargets(ctx context.Context, targetGroupArn string, targets []*ELBv2Target) error
+	DeregisterTargets(ctx context.Context, targetGroupArn string, targetIDs []string) error
+	ListTargets(ctx context.Context, targetGroupArn string) ([]*ELBv2Target, error)
+	UpdateTargetHealth(ctx context.Context, targetGroupArn, targetID string, health *ELBv2TargetHealth) error
+
+	// Rule operations
+	CreateRule(ctx context.Context, rule *ELBv2Rule) error
+	GetRule(ctx context.Context, ruleArn string) (*ELBv2Rule, error)
+	ListRules(ctx context.Context, listenerArn string) ([]*ELBv2Rule, error)
+	UpdateRule(ctx context.Context, rule *ELBv2Rule) error
+	DeleteRule(ctx context.Context, ruleArn string) error
+}
+
+// ELBv2LoadBalancer represents a stored load balancer
+type ELBv2LoadBalancer struct {
+	ARN               string            `json:"arn"`
+	Name              string            `json:"name"`
+	DNSName           string            `json:"dnsName"`
+	CanonicalHostedZoneID string        `json:"canonicalHostedZoneId"`
+	State             string            `json:"state"`
+	Type              string            `json:"type"`
+	Scheme            string            `json:"scheme"`
+	VpcID             string            `json:"vpcId"`
+	Subnets           []string          `json:"subnets"`
+	AvailabilityZones []string          `json:"availabilityZones"`
+	SecurityGroups    []string          `json:"securityGroups"`
+	IpAddressType     string            `json:"ipAddressType"`
+	Tags              map[string]string `json:"tags"`
+	Region            string            `json:"region"`
+	AccountID         string            `json:"accountId"`
+	CreatedAt         time.Time         `json:"createdAt"`
+	UpdatedAt         time.Time         `json:"updatedAt"`
+}
+
+// ELBv2TargetGroup represents a stored target group
+type ELBv2TargetGroup struct {
+	ARN                     string            `json:"arn"`
+	Name                    string            `json:"name"`
+	Protocol                string            `json:"protocol"`
+	Port                    int32             `json:"port"`
+	VpcID                   string            `json:"vpcId"`
+	TargetType              string            `json:"targetType"`
+	HealthCheckEnabled      bool              `json:"healthCheckEnabled"`
+	HealthCheckProtocol     string            `json:"healthCheckProtocol"`
+	HealthCheckPort         string            `json:"healthCheckPort"`
+	HealthCheckPath         string            `json:"healthCheckPath"`
+	HealthCheckIntervalSeconds int32          `json:"healthCheckIntervalSeconds"`
+	HealthCheckTimeoutSeconds  int32          `json:"healthCheckTimeoutSeconds"`
+	HealthyThresholdCount   int32             `json:"healthyThresholdCount"`
+	UnhealthyThresholdCount int32             `json:"unhealthyThresholdCount"`
+	Matcher                 string            `json:"matcher"`
+	LoadBalancerArns        []string          `json:"loadBalancerArns"`
+	Tags                    map[string]string `json:"tags"`
+	Region                  string            `json:"region"`
+	AccountID               string            `json:"accountId"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	UpdatedAt               time.Time         `json:"updatedAt"`
+}
+
+// ELBv2Listener represents a stored listener
+type ELBv2Listener struct {
+	ARN             string            `json:"arn"`
+	LoadBalancerArn string            `json:"loadBalancerArn"`
+	Port            int32             `json:"port"`
+	Protocol        string            `json:"protocol"`
+	DefaultActions  string            `json:"defaultActions"` // JSON encoded actions
+	SslPolicy       string            `json:"sslPolicy"`
+	Certificates    string            `json:"certificates"` // JSON encoded certificates
+	AlpnPolicy      []string          `json:"alpnPolicy"`
+	Tags            map[string]string `json:"tags"`
+	Region          string            `json:"region"`
+	AccountID       string            `json:"accountId"`
+	CreatedAt       time.Time         `json:"createdAt"`
+	UpdatedAt       time.Time         `json:"updatedAt"`
+}
+
+// ELBv2Target represents a registered target
+type ELBv2Target struct {
+	TargetGroupArn   string    `json:"targetGroupArn"`
+	ID               string    `json:"id"`
+	Port             int32     `json:"port"`
+	AvailabilityZone string    `json:"availabilityZone"`
+	HealthState      string    `json:"healthState"`
+	HealthReason     string    `json:"healthReason"`
+	HealthDescription string   `json:"healthDescription"`
+	RegisteredAt     time.Time `json:"registeredAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
+}
+
+// ELBv2TargetHealth represents target health information
+type ELBv2TargetHealth struct {
+	State       string `json:"state"`
+	Reason      string `json:"reason"`
+	Description string `json:"description"`
+}
+
+// ELBv2Rule represents a stored listener rule
+type ELBv2Rule struct {
+	ARN         string            `json:"arn"`
+	ListenerArn string            `json:"listenerArn"`
+	Priority    int32             `json:"priority"`
+	Conditions  string            `json:"conditions"` // JSON encoded conditions
+	Actions     string            `json:"actions"`    // JSON encoded actions
+	IsDefault   bool              `json:"isDefault"`
+	Tags        map[string]string `json:"tags"`
+	Region      string            `json:"region"`
+	AccountID   string            `json:"accountId"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }

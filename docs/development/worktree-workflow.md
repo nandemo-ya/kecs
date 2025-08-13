@@ -42,7 +42,6 @@ kecs-worktrees/               # Worktree directory
 ├── feat/localstack-integration/
 │   ├── .claude/settings.local.json  # Claude settings with updated paths
 │   ├── controlplane/.env
-│   ├── web-ui/.env
 │   ├── mcp-server/.env
 │   └── kecs-feat-localstack-integration.code-workspace
 ├── feat/proxy-modes/
@@ -81,11 +80,7 @@ Each worktree has its own .env configuration with unique ports and database path
 cd ../kecs-worktrees/feat/localstack-integration/controlplane
 make run
 
-# Terminal 2: Web UI
-cd ../kecs-worktrees/feat/localstack-integration/web-ui
-npm run dev
-
-# Terminal 3: MCP Server
+# Terminal 2: MCP Server
 cd ../kecs-worktrees/feat/localstack-integration/mcp-server
 npm run dev
 ```
@@ -96,10 +91,6 @@ npm run dev
 # Run control plane tests
 cd ../kecs-worktrees/feat/taskset-implementation/controlplane
 make test
-
-# Run web UI tests
-cd ../kecs-worktrees/feat/taskset-implementation/web-ui
-npm test
 
 # Run scenario tests
 cd ../kecs-worktrees/feat/taskset-implementation/tests/scenarios
@@ -115,13 +106,6 @@ Each worktree gets its own set of .env files:
 KECS_API_PORT=8080
 KECS_ADMIN_PORT=8081
 KECS_STORAGE_PATH=/tmp/kecs-<branch-name>.db
-```
-
-### web-ui/.env
-```env
-VITE_API_URL=http://localhost:8080
-VITE_WS_URL=ws://localhost:8080
-VITE_APP_TITLE=KECS Dashboard (<branch-name>)
 ```
 
 ### mcp-server/.env
@@ -280,7 +264,6 @@ If dependencies are out of sync:
 cd controlplane && go mod download
 
 # Node dependencies
-cd web-ui && npm install
 cd mcp-server && npm install
 ```
 
@@ -308,7 +291,7 @@ sed "s|/path/to/main/repo|$(pwd)|g" /path/to/main/repo/.claude/settings.local.js
 
 # 5. Install dependencies
 cd controlplane && go mod download
-cd ../web-ui && npm install
+cd ../mcp-server && npm install
 
 # 6. Start development
 make run

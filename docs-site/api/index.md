@@ -67,7 +67,7 @@ All responses follow the standard AWS API response format:
 ```json
 {
   "clusterArns": [
-    "arn:aws:ecs:us-east-1:123456789012:cluster/default"
+    "arn:aws:ecs:us-east-1:000000000000:cluster/default"
   ],
   "nextToken": null
 }

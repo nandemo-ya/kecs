@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -23,6 +24,9 @@ var _ = Describe("Task ECS API", func() {
 	)
 
 	BeforeEach(func() {
+		// Set test mode to avoid requiring actual Kubernetes cluster
+		os.Setenv("KECS_TEST_MODE", "true")
+		
 		mockStorage = mocks.NewMockStorage()
 		mockTaskStore = mocks.NewMockTaskStore()
 		mockClusterStore = mocks.NewMockClusterStore()
@@ -31,9 +35,8 @@ var _ = Describe("Task ECS API", func() {
 		mockStorage.SetClusterStore(mockClusterStore)
 
 		server = &Server{
-			storage:     mockStorage,
-			kindManager: nil,
-			ecsAPI:      NewDefaultECSAPI(mockStorage, nil),
+			storage: mockStorage,
+			ecsAPI:  NewDefaultECSAPI(mockStorage),
 		}
 		ctx = context.Background()
 
@@ -41,10 +44,10 @@ var _ = Describe("Task ECS API", func() {
 		// Add a default cluster
 		cluster := &storage.Cluster{
 			Name:      "default",
-			ARN:       "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
+			ARN:       "arn:aws:ecs:us-east-1:000000000000:cluster/default",
 			Status:    "ACTIVE",
-			Region:    "ap-northeast-1",
-			AccountID: "123456789012",
+			Region:    "us-east-1",
+			AccountID: "000000000000",
 		}
 		err := mockClusterStore.Create(ctx, cluster)
 		Expect(err).To(BeNil())
@@ -54,19 +57,18 @@ var _ = Describe("Task ECS API", func() {
 		var mockTaskDefStore *mocks.MockTaskDefinitionStore
 
 		BeforeEach(func() {
-
 			mockTaskDefStore = mocks.NewMockTaskDefinitionStore()
 			mockStorage.SetTaskDefinitionStore(mockTaskDefStore)
 
 			// Add a task definition
 			taskDef := &storage.TaskDefinition{
-				ARN:                  "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/nginx:1",
+				ARN:                  "arn:aws:ecs:us-east-1:000000000000:task-definition/nginx:1",
 				Family:               "nginx",
 				Revision:             1,
 				Status:               "ACTIVE",
 				ContainerDefinitions: `[{"name":"nginx","image":"nginx:latest","memory":512}]`,
-				Region:               "ap-northeast-1",
-				AccountID:            "123456789012",
+				Region:               "us-east-1",
+				AccountID:            "000000000000",
 			}
 			_, err := mockTaskDefStore.Register(ctx, taskDef)
 			Expect(err).To(BeNil())
@@ -76,7 +78,7 @@ var _ = Describe("Task ECS API", func() {
 			It("should create a new task successfully", func() {
 				taskDef := "nginx:1"
 				req := &generated.RunTaskRequest{
-					TaskDefinition: &taskDef,
+					TaskDefinition: taskDef,
 				}
 
 				resp, err := server.ecsAPI.RunTask(ctx, req)
@@ -96,7 +98,7 @@ var _ = Describe("Task ECS API", func() {
 				taskDef := "nginx"
 				count := int32(3)
 				req := &generated.RunTaskRequest{
-					TaskDefinition: &taskDef,
+					TaskDefinition: taskDef,
 					Count:          &count,
 				}
 
@@ -111,7 +113,7 @@ var _ = Describe("Task ECS API", func() {
 			It("should fail when task definition not found", func() {
 				taskDef := "non-existent:1"
 				req := &generated.RunTaskRequest{
-					TaskDefinition: &taskDef,
+					TaskDefinition: taskDef,
 				}
 
 				_, err := server.ecsAPI.RunTask(ctx, req)
@@ -135,16 +137,16 @@ var _ = Describe("Task ECS API", func() {
 				// Add a running task
 				task := &storage.Task{
 					ID:                "task-123",
-					ARN:               "arn:aws:ecs:ap-northeast-1:123456789012:task/default/task-123",
-					ClusterARN:        "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
-					TaskDefinitionARN: "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/nginx:1",
+					ARN:               "arn:aws:ecs:us-east-1:000000000000:task/default/task-123",
+					ClusterARN:        "arn:aws:ecs:us-east-1:000000000000:cluster/default",
+					TaskDefinitionARN: "arn:aws:ecs:us-east-1:000000000000:task-definition/nginx:1",
 					LastStatus:        "RUNNING",
 					DesiredStatus:     "RUNNING",
 					LaunchType:        "EC2",
 					Version:           1,
 					CreatedAt:         time.Now(),
-					Region:            "ap-northeast-1",
-					AccountID:         "123456789012",
+					Region:            "us-east-1",
+					AccountID:         "000000000000",
 				}
 				err := mockTaskStore.Create(ctx, task)
 				Expect(err).To(BeNil())
@@ -154,7 +156,7 @@ var _ = Describe("Task ECS API", func() {
 				taskID := "task-123"
 				reason := "User requested stop"
 				req := &generated.StopTaskRequest{
-					Task:   &taskID,
+					Task:   taskID,
 					Reason: &reason,
 				}
 
@@ -168,7 +170,7 @@ var _ = Describe("Task ECS API", func() {
 
 			It("should be idempotent when task already stopped", func() {
 				// Get and update task to stopped
-				task, err := mockTaskStore.Get(ctx, "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default", "task-123")
+				task, err := mockTaskStore.Get(ctx, "arn:aws:ecs:us-east-1:000000000000:cluster/default", "task-123")
 				Expect(err).To(BeNil())
 				task.DesiredStatus = "STOPPED"
 				err = mockTaskStore.Update(ctx, task)
@@ -176,7 +178,7 @@ var _ = Describe("Task ECS API", func() {
 
 				taskID := "task-123"
 				req := &generated.StopTaskRequest{
-					Task: &taskID,
+					Task: taskID,
 				}
 
 				resp, err := server.ecsAPI.StopTask(ctx, req)
@@ -187,7 +189,7 @@ var _ = Describe("Task ECS API", func() {
 			It("should fail when task not found", func() {
 				taskID := "non-existent"
 				req := &generated.StopTaskRequest{
-					Task: &taskID,
+					Task: taskID,
 				}
 
 				_, err := server.ecsAPI.StopTask(ctx, req)
@@ -204,16 +206,16 @@ var _ = Describe("Task ECS API", func() {
 				for i := 1; i <= 3; i++ {
 					task := &storage.Task{
 						ID:                fmt.Sprintf("task-%d", i),
-						ARN:               fmt.Sprintf("arn:aws:ecs:ap-northeast-1:123456789012:task/default/task-%d", i),
-						ClusterARN:        "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
-						TaskDefinitionARN: "arn:aws:ecs:ap-northeast-1:123456789012:task-definition/nginx:1",
+						ARN:               fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:task/default/task-%d", i),
+						ClusterARN:        "arn:aws:ecs:us-east-1:000000000000:cluster/default",
+						TaskDefinitionARN: "arn:aws:ecs:us-east-1:000000000000:task-definition/nginx:1",
 						LastStatus:        "RUNNING",
 						DesiredStatus:     "RUNNING",
 						LaunchType:        "EC2",
 						Version:           1,
 						CreatedAt:         time.Now(),
-						Region:            "ap-northeast-1",
-						AccountID:         "123456789012",
+						Region:            "us-east-1",
+						AccountID:         "000000000000",
 						Tags:              `[{"key":"env","value":"test"}]`,
 					}
 					err := mockTaskStore.Create(ctx, task)
@@ -237,7 +239,7 @@ var _ = Describe("Task ECS API", func() {
 			It("should include tags when requested", func() {
 				req := &generated.DescribeTasksRequest{
 					Tasks:   []string{"task-1"},
-					Include: []generated.TaskField{generated.TaskFieldTags},
+					Include: []generated.TaskField{generated.TaskFieldTAGS},
 				}
 
 				resp, err := server.ecsAPI.DescribeTasks(ctx, req)
@@ -270,6 +272,64 @@ var _ = Describe("Task ECS API", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("tasks is required"))
 			})
+
+			It("should describe tasks using full ARN", func() {
+				// First verify the task exists with short ID
+				req1 := &generated.DescribeTasksRequest{
+					Tasks: []string{"task-1"},
+				}
+				resp1, err1 := server.ecsAPI.DescribeTasks(ctx, req1)
+				Expect(err1).NotTo(HaveOccurred())
+				Expect(resp1.Tasks).To(HaveLen(1))
+
+				// Now test with full ARN
+				req := &generated.DescribeTasksRequest{
+					Tasks: []string{
+						"arn:aws:ecs:us-east-1:000000000000:task/default/task-1",
+						"arn:aws:ecs:us-east-1:000000000000:task/default/task-2",
+					},
+				}
+
+				resp, err := server.ecsAPI.DescribeTasks(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Failures).To(BeEmpty())
+				Expect(resp.Tasks).To(HaveLen(2))
+			})
+
+			It("should handle mixed task identifiers (ARN and ID)", func() {
+				req := &generated.DescribeTasksRequest{
+					Tasks: []string{
+						"task-1",  // Short ID
+						"arn:aws:ecs:us-east-1:000000000000:task/default/task-2",  // Full ARN
+					},
+				}
+
+				resp, err := server.ecsAPI.DescribeTasks(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Tasks).To(HaveLen(2))
+				Expect(resp.Failures).To(BeEmpty())
+			})
+
+			It("should report failures for non-existent tasks with full ARN", func() {
+				req := &generated.DescribeTasksRequest{
+					Tasks: []string{
+						"arn:aws:ecs:us-east-1:000000000000:task/default/task-1",
+						"arn:aws:ecs:us-east-1:000000000000:task/default/non-existent",
+					},
+				}
+
+				resp, err := server.ecsAPI.DescribeTasks(ctx, req)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(resp).NotTo(BeNil())
+				Expect(resp.Tasks).To(HaveLen(1))
+				Expect(resp.Failures).To(HaveLen(1))
+				Expect(*resp.Failures[0].Reason).To(Equal("MISSING"))
+			})
 		})
 	})
 
@@ -294,16 +354,16 @@ var _ = Describe("Task ECS API", func() {
 				for _, t := range tasks {
 					task := &storage.Task{
 						ID:                t.id,
-						ARN:               fmt.Sprintf("arn:aws:ecs:ap-northeast-1:123456789012:task/default/%s", t.id),
-						ClusterARN:        "arn:aws:ecs:ap-northeast-1:123456789012:cluster/default",
-						TaskDefinitionARN: fmt.Sprintf("arn:aws:ecs:ap-northeast-1:123456789012:task-definition/%s:1", t.family),
+						ARN:               fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:task/default/%s", t.id),
+						ClusterARN:        "arn:aws:ecs:us-east-1:000000000000:cluster/default",
+						TaskDefinitionARN: fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:task-definition/%s:1", t.family),
 						LastStatus:        t.desiredStatus,
 						DesiredStatus:     t.desiredStatus,
 						LaunchType:        t.launchType,
 						Version:           1,
 						CreatedAt:         time.Now(),
-						Region:            "ap-northeast-1",
-						AccountID:         "123456789012",
+						Region:            "us-east-1",
+						AccountID:         "000000000000",
 					}
 					if t.serviceName != "" {
 						task.StartedBy = fmt.Sprintf("ecs-svc/%s", t.serviceName)
@@ -356,7 +416,7 @@ var _ = Describe("Task ECS API", func() {
 			})
 
 			It("should filter by launch type", func() {
-				launchType := generated.LaunchTypeFargate
+				launchType := generated.LaunchTypeFARGATE
 				req := &generated.ListTasksRequest{
 					LaunchType: &launchType,
 				}
@@ -369,7 +429,7 @@ var _ = Describe("Task ECS API", func() {
 			})
 
 			It("should filter by desired status", func() {
-				status := generated.DesiredStatusRunning
+				status := generated.DesiredStatusRUNNING
 				req := &generated.ListTasksRequest{
 					DesiredStatus: &status,
 				}

@@ -1,0 +1,183 @@
+# Traefik deployment for KECS proxy
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kecs-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traefik
+  namespace: kecs-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: traefik-elbv2-proxy
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+      - endpoints
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses
+      - ingressclasses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+  - apiGroups:
+      - traefik.io
+      - traefik.containo.us
+    resources:
+      - ingressroutes
+      - ingressroutetcps
+      - ingressrouteudps
+      - middlewares
+      - middlewaretcps
+      - serverstransports
+      - tlsoptions
+      - tlsstores
+      - traefikservices
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: traefik-elbv2-proxy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traefik-elbv2-proxy
+subjects:
+- kind: ServiceAccount
+  name: traefik
+  namespace: kecs-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-elbv2-proxy-config
+  namespace: kecs-system
+data:
+  traefik.yml: |
+    api:
+      dashboard: true
+      debug: true
+    entryPoints:
+      web:
+        address: ":80"
+      websecure:
+        address: ":443"
+      proxy:
+        address: ":8090"
+    providers:
+      file:
+        filename: /config/dynamic.yml
+    log:
+      level: DEBUG
+  dynamic.yml: |
+    tcp:
+      routers:
+        localstack:
+          entryPoints:
+            - proxy
+          rule: "HostSNI(`*`)"
+          service: localstack
+      services:
+        localstack:
+          loadBalancer:
+            servers:
+              - address: "localstack:4566"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik
+  namespace: kecs-system
+  labels:
+    app: traefik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traefik
+  template:
+    metadata:
+      labels:
+        app: traefik
+    spec:
+      serviceAccountName: traefik
+      containers:
+      - name: traefik
+        image: traefik:v3.5.0
+        args:
+          - --configfile=/config/traefik.yml
+        ports:
+        - name: web
+          containerPort: 80
+        - name: websecure
+          containerPort: 443
+        - name: dashboard
+          containerPort: 8080
+        - name: proxy
+          containerPort: 8090
+        volumeMounts:
+        - name: config
+          mountPath: /config
+          readOnly: true
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+      volumes:
+      - name: config
+        configMap:
+          name: traefik-elbv2-proxy-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: kecs-system
+spec:
+  type: NodePort
+  selector:
+    app: traefik-elbv2-proxy
+  ports:
+    - name: web
+      port: 80
+      targetPort: 80
+      nodePort: 30080
+    - name: websecure
+      port: 443
+      targetPort: 443
+      nodePort: 30443
+    - name: dashboard
+      port: 8080
+      targetPort: 8080
+      nodePort: 30808
+    - name: proxy
+      port: 8090
+      targetPort: 8090
+      nodePort: 30890

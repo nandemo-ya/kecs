@@ -1,0 +1,102 @@
+{
+  "family": "nginx-webapp",
+  "networkMode": "bridge",
+  "requiresCompatibilities": ["EC2"],
+  "cpu": "512",
+  "memory": "1024",
+  "containerDefinitions": [
+    {
+      "name": "nginx",
+      "image": "nginx:alpine",
+      "cpu": 128,
+      "memory": 256,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "volumesFrom": [
+        {
+          "sourceContainer": "webapp",
+          "readOnly": true
+        }
+      ],
+      "dependsOn": [
+        {
+          "containerName": "webapp",
+          "condition": "START"
+        }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/ || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "logConfiguration": {
+        "logDriver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    {
+      "name": "webapp",
+      "image": "python:3.9-alpine",
+      "cpu": 384,
+      "memory": 768,
+      "essential": true,
+      "command": [
+        "sh",
+        "-c",
+        "echo '<html><body><h1>Hello from Python Web App</h1></body></html>' > /usr/share/nginx/html/index.html && echo 'from http.server import HTTPServer, SimpleHTTPRequestHandler\nimport os\nos.chdir(\"/usr/share/nginx/html\")\nprint(\"Starting web server on port 8080\", flush=True)\nhttpd = HTTPServer((\"0.0.0.0\", 8080), SimpleHTTPRequestHandler)\nhttpd.serve_forever()' > server.py && mkdir -p /usr/share/nginx/html && python -u server.py"
+      ],
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "APP_ENV",
+          "value": "production"
+        },
+        {
+          "name": "APP_PORT",
+          "value": "8080"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "shared-content",
+          "containerPath": "/usr/share/nginx/html"
+        }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      },
+      "logConfiguration": {
+        "logDriver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    }
+  ],
+  "volumes": [
+    {
+      "name": "shared-content",
+      "host": {}
+    }
+  ]
+}

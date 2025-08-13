@@ -34,13 +34,33 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w" -o controlplane ./cmd/controlplane
 
-# Stage 3: Final image - use distroless/cc for CGO dependencies
-FROM gcr.io/distroless/cc-debian12:nonroot
+# Stage 3: Final image
+FROM debian:stable-slim
+
+# Install required runtime libraries
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libstdc++6 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -g 1000 kecs && \
+    useradd -u 1000 -g kecs -m -s /bin/bash kecs && \
+    mkdir -p /data && \
+    chown -R kecs:kecs /data
+
+# Copy the binary
 COPY --from=builder /app/controlplane /controlplane
+RUN chmod +x /controlplane
+
+USER kecs
+WORKDIR /data
 
 ENV PORT=8080
 ENV ADMIN_PORT=8081
+ENV KECS_DATA_DIR=/data
 
 EXPOSE 8080 8081
 
-ENTRYPOINT ["/controlplane", "server"]
+ENTRYPOINT ["/controlplane"]

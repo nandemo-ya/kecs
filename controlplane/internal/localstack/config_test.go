@@ -3,7 +3,7 @@ package localstack_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
@@ -17,12 +17,12 @@ var _ = Describe("LocalStack Configuration", func() {
 	Describe("DefaultConfig", func() {
 		It("should return valid default configuration", func() {
 			Expect(config).NotTo(BeNil())
-			Expect(config.Enabled).To(BeFalse())
+			Expect(config.Enabled).To(BeTrue())
 			Expect(config.Services).To(ConsistOf("iam", "logs", "ssm", "secretsmanager", "elbv2", "s3"))
 			Expect(config.Persistence).To(BeTrue())
 			Expect(config.Image).To(Equal("localstack/localstack"))
 			Expect(config.Version).To(Equal("latest"))
-			Expect(config.Namespace).To(Equal("aws-services"))
+			Expect(config.Namespace).To(Equal("kecs-system"))
 			Expect(config.Port).To(Equal(4566))
 			Expect(config.EdgePort).To(Equal(4566))
 		})
@@ -139,7 +139,7 @@ var _ = Describe("LocalStack Configuration", func() {
 				"CUSTOM_VAR": "value",
 				"DEBUG":      "1",
 			})
-			
+
 			Expect(config.Environment["CUSTOM_VAR"]).To(Equal("value"))
 			Expect(config.Environment["DEBUG"]).To(Equal("1"))
 		})
@@ -148,9 +148,9 @@ var _ = Describe("LocalStack Configuration", func() {
 			config.Services = []string{"s3", "iam"}
 			config.Debug = true
 			config.Persistence = false
-			
+
 			envVars := config.GetEnvironmentVars()
-			
+
 			Expect(envVars["SERVICES"]).To(Equal("s3,iam"))
 			Expect(envVars["DEBUG"]).To(Equal("1"))
 			Expect(envVars["PERSISTENCE"]).To(Equal("0"))

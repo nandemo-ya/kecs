@@ -4,17 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
 	_ "github.com/marcboeker/go-duckdb/v2" // DuckDB driver
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // DuckDBStorage implements storage.Storage using DuckDB
 type DuckDBStorage struct {
 	db                     *sql.DB
+	pool                   *ConnectionPool
 	dbPath                 string
 	clusterStore           *clusterStore
 	taskDefinitionStore    *taskDefinitionStore
@@ -24,6 +26,7 @@ type DuckDBStorage struct {
 	taskSetStore           *taskSetStore
 	containerInstanceStore *containerInstanceStore
 	attributeStore         *attributeStore
+	elbv2Store             *elbv2Store
 }
 
 // NewDuckDBStorage creates a new DuckDB storage instance
@@ -36,24 +39,24 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 		}
 	}
 
-	// Open DuckDB connection
-	db, err := sql.Open("duckdb", dbPath)
+	// Create connection pool with optimized settings
+	// maxConns: 25 - Allow up to 25 concurrent connections
+	// maxIdleConns: 5 - Keep 5 idle connections ready
+	pool, err := NewConnectionPool(dbPath, 25, 5)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open DuckDB: %w", err)
+		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
-	// Test connection
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping DuckDB: %w", err)
-	}
+	db := pool.DB()
 
 	s := &DuckDBStorage{
 		db:     db,
+		pool:   pool,
 		dbPath: dbPath,
 	}
 
-	// Create stores
-	s.clusterStore = &clusterStore{db: db}
+	// Create stores with the pooled connection
+	s.clusterStore = &clusterStore{db: db, pool: pool}
 	s.taskDefinitionStore = &taskDefinitionStore{db: db}
 	s.serviceStore = &serviceStore{db: db}
 	s.taskStore = &taskStore{db: db}
@@ -61,13 +64,14 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 	s.taskSetStore = &taskSetStore{db: db}
 	s.containerInstanceStore = &containerInstanceStore{db: db}
 	s.attributeStore = &attributeStore{db: db}
+	s.elbv2Store = &elbv2Store{db: db}
 
 	return s, nil
 }
 
 // Initialize creates all necessary tables and indexes
 func (s *DuckDBStorage) Initialize(ctx context.Context) error {
-	log.Println("Initializing DuckDB storage...")
+	logging.Info("Initializing DuckDB storage")
 
 	// Migrate existing tables if needed
 	if err := s.migrateSchema(ctx); err != nil {
@@ -114,14 +118,25 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 		return fmt.Errorf("failed to create attributes table: %w", err)
 	}
 
-	log.Println("DuckDB storage initialized successfully")
+	// Create ELBv2 tables
+	if err := s.createELBv2Tables(ctx); err != nil {
+		return fmt.Errorf("failed to create ELBv2 tables: %w", err)
+	}
+
+	// Initialize prepared statements for common queries
+	if err := s.pool.InitializeCommonStatements(ctx); err != nil {
+		logging.Warn("Failed to initialize prepared statements", "error", err)
+		// Non-fatal error - continue initialization
+	}
+
+	logging.Info("DuckDB storage initialized successfully")
 	return nil
 }
 
 // Close closes the database connection
 func (s *DuckDBStorage) Close() error {
-	if s.db != nil {
-		return s.db.Close()
+	if s.pool != nil {
+		return s.pool.Close()
 	}
 	return nil
 }
@@ -166,6 +181,11 @@ func (s *DuckDBStorage) AttributeStore() storage.AttributeStore {
 	return s.attributeStore
 }
 
+// ELBv2Store returns the ELBv2 store
+func (s *DuckDBStorage) ELBv2Store() storage.ELBv2Store {
+	return s.elbv2Store
+}
+
 // BeginTx starts a new transaction
 func (s *DuckDBStorage) BeginTx(ctx context.Context) (storage.Transaction, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -188,13 +208,14 @@ func (s *DuckDBStorage) createClustersTable(ctx context.Context) error {
 		configuration VARCHAR,
 		settings VARCHAR,
 		tags VARCHAR,
-		kind_cluster_name VARCHAR,
+		k8s_cluster_name VARCHAR,
 		registered_container_instances_count INTEGER DEFAULT 0,
 		running_tasks_count INTEGER DEFAULT 0,
 		pending_tasks_count INTEGER DEFAULT 0,
 		active_services_count INTEGER DEFAULT 0,
 		capacity_providers VARCHAR,
 		default_capacity_provider_strategy VARCHAR,
+		localstack_state VARCHAR,
 		created_at TIMESTAMP NOT NULL,
 		updated_at TIMESTAMP NOT NULL
 	)`
@@ -399,7 +420,7 @@ func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 		return nil
 	}
 
-	log.Println("Migrating clusters table from JSON to VARCHAR columns...")
+	logging.Info("Migrating clusters table from JSON to VARCHAR columns")
 
 	// Create a transaction for the migration
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -420,13 +441,14 @@ func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 			configuration VARCHAR,
 			settings VARCHAR,
 			tags VARCHAR,
-			kind_cluster_name VARCHAR,
+			k8s_cluster_name VARCHAR,
 			registered_container_instances_count INTEGER DEFAULT 0,
 			running_tasks_count INTEGER DEFAULT 0,
 			pending_tasks_count INTEGER DEFAULT 0,
 			active_services_count INTEGER DEFAULT 0,
 			capacity_providers VARCHAR,
 			default_capacity_provider_strategy VARCHAR,
+			localstack_state VARCHAR,
 			created_at TIMESTAMP NOT NULL,
 			updated_at TIMESTAMP NOT NULL
 		)
@@ -443,13 +465,14 @@ func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 			CAST(configuration AS VARCHAR),
 			CAST(settings AS VARCHAR),
 			CAST(tags AS VARCHAR),
-			kind_cluster_name,
+			k8s_cluster_name,
 			registered_container_instances_count,
 			running_tasks_count,
 			pending_tasks_count,
 			active_services_count,
 			CAST(capacity_providers AS VARCHAR),
 			CAST(default_capacity_provider_strategy AS VARCHAR),
+			NULL as localstack_state,
 			created_at, updated_at
 		FROM clusters
 	`)
@@ -488,7 +511,7 @@ func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 		return fmt.Errorf("failed to commit migration: %w", err)
 	}
 
-	log.Println("Successfully migrated clusters table")
+	logging.Info("Successfully migrated clusters table")
 	return nil
 }
 
@@ -631,6 +654,149 @@ func (s *DuckDBStorage) createAttributesTable(ctx context.Context) error {
 		"CREATE INDEX IF NOT EXISTS idx_attributes_region ON attributes(region)",
 		"CREATE INDEX IF NOT EXISTS idx_attributes_account_id ON attributes(account_id)",
 		"CREATE INDEX IF NOT EXISTS idx_attributes_created_at ON attributes(created_at)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
+	return nil
+}
+
+
+// createELBv2Tables creates all ELBv2-related tables
+func (s *DuckDBStorage) createELBv2Tables(ctx context.Context) error {
+	// Create load balancers table
+	lbQuery := `
+	CREATE TABLE IF NOT EXISTS elbv2_load_balancers (
+		arn VARCHAR PRIMARY KEY,
+		name VARCHAR NOT NULL UNIQUE,
+		dns_name VARCHAR NOT NULL,
+		canonical_hosted_zone_id VARCHAR,
+		state VARCHAR NOT NULL,
+		type VARCHAR NOT NULL,
+		scheme VARCHAR NOT NULL,
+		vpc_id VARCHAR,
+		subnets TEXT,
+		availability_zones TEXT,
+		security_groups TEXT,
+		ip_address_type VARCHAR,
+		tags TEXT,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		created_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL
+	)`
+
+	if _, err := s.db.ExecContext(ctx, lbQuery); err != nil {
+		return fmt.Errorf("failed to create load balancers table: %w", err)
+	}
+
+	// Create target groups table
+	tgQuery := `
+	CREATE TABLE IF NOT EXISTS elbv2_target_groups (
+		arn VARCHAR PRIMARY KEY,
+		name VARCHAR NOT NULL UNIQUE,
+		protocol VARCHAR NOT NULL,
+		port INTEGER NOT NULL,
+		vpc_id VARCHAR,
+		target_type VARCHAR NOT NULL,
+		health_check_enabled BOOLEAN NOT NULL,
+		health_check_protocol VARCHAR,
+		health_check_port VARCHAR,
+		health_check_path VARCHAR,
+		health_check_interval_seconds INTEGER,
+		health_check_timeout_seconds INTEGER,
+		healthy_threshold_count INTEGER,
+		unhealthy_threshold_count INTEGER,
+		matcher VARCHAR,
+		load_balancer_arns TEXT,
+		tags TEXT,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		created_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL
+	)`
+
+	if _, err := s.db.ExecContext(ctx, tgQuery); err != nil {
+		return fmt.Errorf("failed to create target groups table: %w", err)
+	}
+
+	// Create listeners table
+	listenerQuery := `
+	CREATE TABLE IF NOT EXISTS elbv2_listeners (
+		arn VARCHAR PRIMARY KEY,
+		load_balancer_arn VARCHAR NOT NULL,
+		port INTEGER NOT NULL,
+		protocol VARCHAR NOT NULL,
+		default_actions TEXT,
+		ssl_policy VARCHAR,
+		certificates TEXT,
+		alpn_policy TEXT,
+		tags TEXT,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		created_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL
+	)`
+
+	if _, err := s.db.ExecContext(ctx, listenerQuery); err != nil {
+		return fmt.Errorf("failed to create listeners table: %w", err)
+	}
+
+	// Create targets table
+	targetsQuery := `
+	CREATE TABLE IF NOT EXISTS elbv2_targets (
+		target_group_arn VARCHAR NOT NULL,
+		id VARCHAR NOT NULL,
+		port INTEGER NOT NULL,
+		availability_zone VARCHAR,
+		health_state VARCHAR NOT NULL,
+		health_reason VARCHAR,
+		health_description VARCHAR,
+		registered_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL,
+		PRIMARY KEY (target_group_arn, id)
+	)`
+
+	if _, err := s.db.ExecContext(ctx, targetsQuery); err != nil {
+		return fmt.Errorf("failed to create targets table: %w", err)
+	}
+
+	// Create ELBv2 rules table
+	rulesQuery := `
+	CREATE TABLE IF NOT EXISTS elbv2_rules (
+		arn VARCHAR PRIMARY KEY,
+		listener_arn VARCHAR NOT NULL,
+		priority INTEGER NOT NULL,
+		conditions TEXT NOT NULL,
+		actions TEXT NOT NULL,
+		is_default BOOLEAN NOT NULL DEFAULT FALSE,
+		tags TEXT,
+		region VARCHAR NOT NULL,
+		account_id VARCHAR NOT NULL,
+		created_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL
+	)`
+
+	if _, err := s.db.ExecContext(ctx, rulesQuery); err != nil {
+		return fmt.Errorf("failed to create rules table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_lb_name ON elbv2_load_balancers(name)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_lb_region ON elbv2_load_balancers(region)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_lb_state ON elbv2_load_balancers(state)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_tg_name ON elbv2_target_groups(name)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_tg_region ON elbv2_target_groups(region)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_listener_lb ON elbv2_listeners(load_balancer_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_targets_tg ON elbv2_targets(target_group_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_targets_health ON elbv2_targets(health_state)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_rules_listener ON elbv2_rules(listener_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_rules_priority ON elbv2_rules(listener_arn, priority)",
 	}
 
 	for _, idx := range indexes {

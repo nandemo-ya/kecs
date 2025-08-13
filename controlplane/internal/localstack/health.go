@@ -5,15 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // healthChecker implements the HealthChecker interface
 type healthChecker struct {
 	endpoint   string
 	httpClient *http.Client
+	mu         sync.RWMutex
 }
 
 // NewHealthChecker creates a new health checker instance
@@ -26,10 +28,23 @@ func NewHealthChecker(endpoint string) HealthChecker {
 	}
 }
 
+// UpdateEndpoint updates the health check endpoint
+func (hc *healthChecker) UpdateEndpoint(endpoint string) {
+	hc.mu.Lock()
+	defer hc.mu.Unlock()
+	hc.endpoint = endpoint
+	logging.Info("Updated health check endpoint", "endpoint", endpoint)
+}
+
 // CheckHealth performs a health check on LocalStack
 func (hc *healthChecker) CheckHealth(ctx context.Context) (*HealthStatus, error) {
-	healthURL := fmt.Sprintf("%s%s", hc.endpoint, HealthCheckPath)
+	hc.mu.RLock()
+	endpoint := hc.endpoint
+	hc.mu.RUnlock()
 	
+	healthURL := fmt.Sprintf("%s%s", endpoint, HealthCheckPath)
+	logging.Debug("Performing health check on LocalStack", "url", healthURL)
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -37,6 +52,7 @@ func (hc *healthChecker) CheckHealth(ctx context.Context) (*HealthStatus, error)
 
 	resp, err := hc.httpClient.Do(req)
 	if err != nil {
+		logging.Warn("Failed to connect to LocalStack", "url", healthURL, "error", err)
 		return &HealthStatus{
 			Healthy:   false,
 			Message:   fmt.Sprintf("failed to connect to LocalStack: %v", err),
@@ -79,7 +95,7 @@ func (hc *healthChecker) WaitForHealthy(ctx context.Context, timeout time.Durati
 
 			status, err := hc.CheckHealth(ctx)
 			if err != nil {
-				klog.Warningf("Health check error: %v", err)
+				logging.Warn("Health check error", "error", err)
 				consecutiveFails++
 				if consecutiveFails >= maxConsecutiveFails {
 					return fmt.Errorf("health check failed %d times: %w", consecutiveFails, err)
@@ -88,11 +104,11 @@ func (hc *healthChecker) WaitForHealthy(ctx context.Context, timeout time.Durati
 			}
 
 			if status.Healthy {
-				klog.Info("LocalStack is healthy")
+				logging.Info("LocalStack is healthy")
 				return nil
 			}
 
-			klog.Infof("Waiting for LocalStack to become healthy: %s", status.Message)
+			logging.Info("Waiting for LocalStack to become healthy", "message", status.Message)
 			consecutiveFails = 0
 		}
 	}
@@ -119,7 +135,7 @@ func (hc *healthChecker) checkServiceHealth(ctx context.Context) map[string]Serv
 func (hc *healthChecker) checkIndividualService(ctx context.Context, service string) ServiceHealth {
 	// LocalStack provides service-specific health endpoints
 	// For now, we'll do a simple check by trying to access the service endpoint
-	
+
 	serviceHealth := ServiceHealth{
 		Service: service,
 		Healthy: true, // Assume healthy by default

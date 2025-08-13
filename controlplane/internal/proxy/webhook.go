@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // WebhookConfig contains configuration for the webhook server
@@ -28,10 +28,10 @@ type WebhookConfig struct {
 
 // WebhookServer handles admission webhook requests
 type WebhookServer struct {
-	server      *http.Server
-	kubeClient  kubernetes.Interface
-	config      *WebhookConfig
-	envProxy    *EnvironmentVariableProxy
+	server       *http.Server
+	kubeClient   kubernetes.Interface
+	config       *WebhookConfig
+	envProxy     *EnvironmentVariableProxy
 	deserializer runtime.Decoder
 }
 
@@ -40,7 +40,7 @@ func NewWebhookServer(kubeClient kubernetes.Interface, config *WebhookConfig, en
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
 	_ = admissionv1.AddToScheme(scheme)
-	
+
 	return &WebhookServer{
 		kubeClient:   kubeClient,
 		config:       config,
@@ -71,9 +71,9 @@ func (ws *WebhookServer) Start(ctx context.Context) error {
 	}
 
 	go func() {
-		klog.Infof("Starting webhook server on port %d", ws.config.Port)
+		logging.Info("Starting webhook server", "port", ws.config.Port)
 		if err := ws.server.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-			klog.Errorf("Failed to start webhook server: %v", err)
+			logging.Error("Failed to start webhook server", "error", err)
 		}
 	}()
 
@@ -96,7 +96,7 @@ func (ws *WebhookServer) Stop() error {
 func (ws *WebhookServer) handleMutate(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		klog.Error(err)
+		logging.Error("Error reading webhook request body", "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -104,7 +104,7 @@ func (ws *WebhookServer) handleMutate(w http.ResponseWriter, r *http.Request) {
 	// Decode the admission review request
 	var admissionReview admissionv1.AdmissionReview
 	if _, _, err := ws.deserializer.Decode(body, nil, &admissionReview); err != nil {
-		klog.Errorf("Failed to decode admission review: %v", err)
+		logging.Error("Failed to decode admission review", "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -113,7 +113,7 @@ func (ws *WebhookServer) handleMutate(w http.ResponseWriter, r *http.Request) {
 	raw := admissionReview.Request.Object.Raw
 	pod := corev1.Pod{}
 	if _, _, err := ws.deserializer.Decode(raw, nil, &pod); err != nil {
-		klog.Errorf("Failed to decode pod: %v", err)
+		logging.Error("Failed to decode pod", "error", err)
 		sendAdmissionResponse(w, &admissionReview, false, err.Error())
 		return
 	}
@@ -121,7 +121,7 @@ func (ws *WebhookServer) handleMutate(w http.ResponseWriter, r *http.Request) {
 	// Inject environment variables
 	patches, err := ws.envProxy.InjectEnvironmentVariables(&pod)
 	if err != nil {
-		klog.Errorf("Failed to inject environment variables: %v", err)
+		logging.Error("Failed to inject environment variables", "error", err)
 		sendAdmissionResponse(w, &admissionReview, false, err.Error())
 		return
 	}
@@ -132,7 +132,7 @@ func (ws *WebhookServer) handleMutate(w http.ResponseWriter, r *http.Request) {
 	if len(patches) > 0 {
 		patchBytes, err = CreatePatch(patches)
 		if err != nil {
-			klog.Errorf("Failed to create patch: %v", err)
+			logging.Error("Failed to create patch", "error", err)
 			sendAdmissionResponse(w, &admissionReview, false, err.Error())
 			return
 		}
@@ -178,7 +178,7 @@ func sendAdmissionResponseWithPatch(w http.ResponseWriter, ar *admissionv1.Admis
 
 	responseBytes, err := json.Marshal(ar)
 	if err != nil {
-		klog.Error(err)
+		logging.Error("Error marshaling admission response", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

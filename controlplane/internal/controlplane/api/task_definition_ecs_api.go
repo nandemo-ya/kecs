@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -20,7 +21,7 @@ func extractRoleNameFromARN(arn string) string {
 	if arn == "" {
 		return ""
 	}
-	
+
 	// ARN format: arn:aws:iam::account-id:role/role-name
 	parts := strings.Split(arn, ":")
 	if len(parts) >= 6 && parts[2] == "iam" {
@@ -30,27 +31,27 @@ func extractRoleNameFromARN(arn string) string {
 			return strings.TrimPrefix(resourcePart, "role/")
 		}
 	}
-	
+
 	// If it's not a valid ARN, assume it's already a role name
 	if !strings.HasPrefix(arn, "arn:") {
 		return arn
 	}
-	
+
 	return ""
 }
 
 // RegisterTaskDefinition implements the RegisterTaskDefinition operation
 func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *generated.RegisterTaskDefinitionRequest) (*generated.RegisterTaskDefinitionResponse, error) {
 	// Validate required fields
-	if req.Family == nil || *req.Family == "" {
+	if req.Family == "" {
 		return nil, fmt.Errorf("family is required")
 	}
-	if req.ContainerDefinitions == nil || len(req.ContainerDefinitions) == 0 {
+	if len(req.ContainerDefinitions) == 0 {
 		return nil, fmt.Errorf("containerDefinitions is required")
 	}
 
 	// Set default values
-	networkMode := generated.NetworkModeBridge
+	networkMode := generated.NetworkModeBRIDGE
 	if req.NetworkMode != nil {
 		networkMode = *req.NetworkMode
 	}
@@ -62,7 +63,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	}
 
 	volumesJSON := "[]"
-	if req.Volumes != nil && len(req.Volumes) > 0 {
+	if len(req.Volumes) > 0 {
 		volumesData, err := json.Marshal(req.Volumes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal volumes: %w", err)
@@ -71,7 +72,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	}
 
 	placementConstraintsJSON := "[]"
-	if req.PlacementConstraints != nil && len(req.PlacementConstraints) > 0 {
+	if len(req.PlacementConstraints) > 0 {
 		placementData, err := json.Marshal(req.PlacementConstraints)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal placement constraints: %w", err)
@@ -80,7 +81,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	}
 
 	requiresCompatibilitiesJSON := "[]"
-	if req.RequiresCompatibilities != nil && len(req.RequiresCompatibilities) > 0 {
+	if len(req.RequiresCompatibilities) > 0 {
 		compatData, err := json.Marshal(req.RequiresCompatibilities)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal requires compatibilities: %w", err)
@@ -89,7 +90,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	}
 
 	tagsJSON := "[]"
-	if req.Tags != nil && len(req.Tags) > 0 {
+	if len(req.Tags) > 0 {
 		tagsData, err := json.Marshal(req.Tags)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal tags: %w", err)
@@ -107,7 +108,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	}
 
 	inferenceAcceleratorsJSON := ""
-	if req.InferenceAccelerators != nil && len(req.InferenceAccelerators) > 0 {
+	if len(req.InferenceAccelerators) > 0 {
 		acceleratorData, err := json.Marshal(req.InferenceAccelerators)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal inference accelerators: %w", err)
@@ -148,7 +149,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	// Create storage task definition
 	storageTaskDef := &storage.TaskDefinition{
 		ID:                      uuid.New().String(),
-		Family:                  *req.Family,
+		Family:                  req.Family,
 		TaskRoleARN:             taskRoleARN,
 		ExecutionRoleARN:        executionRoleARN,
 		NetworkMode:             string(networkMode),
@@ -174,44 +175,6 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 		return nil, fmt.Errorf("failed to register task definition: %w", err)
 	}
 
-	// Create IAM roles if IAM integration is available
-	if api.iamIntegration != nil {
-		// Create task role if specified
-		if registeredTaskDef.TaskRoleARN != "" {
-			roleName := extractRoleNameFromARN(registeredTaskDef.TaskRoleARN)
-			if roleName != "" {
-				// Default trust policy for ECS tasks
-				trustPolicy := `{
-					"Version": "2012-10-17",
-					"Statement": [{
-						"Effect": "Allow",
-						"Principal": {
-							"Service": "ecs-tasks.amazonaws.com"
-						},
-						"Action": "sts:AssumeRole"
-					}]
-				}`
-				if err := api.iamIntegration.CreateTaskRole(registeredTaskDef.ARN, roleName, trustPolicy); err != nil {
-					log.Printf("Warning: Failed to create task role %s: %v", roleName, err)
-				} else {
-					log.Printf("Created task role %s for task definition %s", roleName, registeredTaskDef.ARN)
-				}
-			}
-		}
-
-		// Create execution role if specified
-		if registeredTaskDef.ExecutionRoleARN != "" {
-			roleName := extractRoleNameFromARN(registeredTaskDef.ExecutionRoleARN)
-			if roleName != "" {
-				if err := api.iamIntegration.CreateTaskExecutionRole(roleName); err != nil {
-					log.Printf("Warning: Failed to create execution role %s: %v", roleName, err)
-				} else {
-					log.Printf("Created execution role %s for task definition %s", roleName, registeredTaskDef.ARN)
-				}
-			}
-		}
-	}
-
 	// Convert storage task definition to generated response
 	responseTaskDef := storageTaskDefinitionToGenerated(registeredTaskDef)
 
@@ -223,27 +186,26 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 
 // DeregisterTaskDefinition implements the DeregisterTaskDefinition operation
 func (api *DefaultECSAPI) DeregisterTaskDefinition(ctx context.Context, req *generated.DeregisterTaskDefinitionRequest) (*generated.DeregisterTaskDefinitionResponse, error) {
-	if req.TaskDefinition == nil || *req.TaskDefinition == "" {
+	if req.TaskDefinition == "" {
 		return nil, fmt.Errorf("taskDefinition is required")
 	}
 
-	taskDefIdentifier := *req.TaskDefinition
 	var family string
 	var revision int
 	var err error
 
 	// Check if it's an ARN or family:revision format
-	if strings.HasPrefix(taskDefIdentifier, "arn:aws:ecs:") {
+	if strings.HasPrefix(req.TaskDefinition, "arn:aws:ecs:") {
 		// Parse ARN to get family and revision
-		taskDef, err := api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefIdentifier)
+		taskDef, err := api.storage.TaskDefinitionStore().GetByARN(ctx, req.TaskDefinition)
 		if err != nil {
-			return nil, fmt.Errorf("task definition not found: %s", taskDefIdentifier)
+			return nil, fmt.Errorf("task definition not found: %s", req.TaskDefinition)
 		}
 		family = taskDef.Family
 		revision = taskDef.Revision
-	} else if strings.Contains(taskDefIdentifier, ":") {
+	} else if strings.Contains(req.TaskDefinition, ":") {
 		// family:revision format
-		parts := strings.SplitN(taskDefIdentifier, ":", 2)
+		parts := strings.SplitN(req.TaskDefinition, ":", 2)
 		family = parts[0]
 		revision, err = strconv.Atoi(parts[1])
 		if err != nil {
@@ -284,22 +246,21 @@ func (api *DefaultECSAPI) DeregisterTaskDefinition(ctx context.Context, req *gen
 
 // DescribeTaskDefinition implements the DescribeTaskDefinition operation
 func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *generated.DescribeTaskDefinitionRequest) (*generated.DescribeTaskDefinitionResponse, error) {
-	if req.TaskDefinition == nil || *req.TaskDefinition == "" {
+	if req.TaskDefinition == "" {
 		return nil, fmt.Errorf("taskDefinition is required")
 	}
 
-	taskDefIdentifier := *req.TaskDefinition
-	log.Printf("DEBUG: DescribeTaskDefinition called for: %s", taskDefIdentifier)
+	logging.Debug("DescribeTaskDefinition called", "taskDefinition", req.TaskDefinition)
 	var taskDef *storage.TaskDefinition
 	var err error
 
 	// Check if it's an ARN or family:revision format
-	if strings.HasPrefix(taskDefIdentifier, "arn:aws:ecs:") {
+	if strings.HasPrefix(req.TaskDefinition, "arn:aws:ecs:") {
 		// ARN format
-		taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefIdentifier)
-	} else if strings.Contains(taskDefIdentifier, ":") {
+		taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, req.TaskDefinition)
+	} else if strings.Contains(req.TaskDefinition, ":") {
 		// family:revision format
-		parts := strings.SplitN(taskDefIdentifier, ":", 2)
+		parts := strings.SplitN(req.TaskDefinition, ":", 2)
 		family := parts[0]
 		revision, parseErr := strconv.Atoi(parts[1])
 		if parseErr != nil {
@@ -308,15 +269,15 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 		taskDef, err = api.storage.TaskDefinitionStore().Get(ctx, family, revision)
 	} else {
 		// Just family name - get latest
-		taskDef, err = api.storage.TaskDefinitionStore().GetLatest(ctx, taskDefIdentifier)
+		taskDef, err = api.storage.TaskDefinitionStore().GetLatest(ctx, req.TaskDefinition)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("task definition not found: %s", taskDefIdentifier)
+		return nil, fmt.Errorf("task definition not found: %s", req.TaskDefinition)
 	}
 
-	log.Printf("DEBUG: Found task definition: family=%s, revision=%d, containerDefs=%s",
-		taskDef.Family, taskDef.Revision, taskDef.ContainerDefinitions)
+	logging.Debug("Found task definition", 
+		"family", taskDef.Family, "revision", taskDef.Revision, "containerDefs", taskDef.ContainerDefinitions)
 
 	// Convert to generated response
 	responseTaskDef := storageTaskDefinitionToGenerated(taskDef)
@@ -327,8 +288,8 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 	// Note: generated.TaskDefinition doesn't have a Tags field
 	// Tags are handled separately in the API response
 
-	log.Printf("DEBUG: Response task def has %d container definitions",
-		len(responseTaskDef.ContainerDefinitions))
+	logging.Debug("Response task definition container count",
+		"count", len(responseTaskDef.ContainerDefinitions))
 
 	return &generated.DescribeTaskDefinitionResponse{
 		TaskDefinition: responseTaskDef,
@@ -337,7 +298,7 @@ func (api *DefaultECSAPI) DescribeTaskDefinition(ctx context.Context, req *gener
 
 // DeleteTaskDefinitions implements the DeleteTaskDefinitions operation
 func (api *DefaultECSAPI) DeleteTaskDefinitions(ctx context.Context, req *generated.DeleteTaskDefinitionsRequest) (*generated.DeleteTaskDefinitionsResponse, error) {
-	if req.TaskDefinitions == nil || len(req.TaskDefinitions) == 0 {
+	if len(req.TaskDefinitions) == 0 {
 		return nil, fmt.Errorf("taskDefinitions is required")
 	}
 
@@ -404,7 +365,7 @@ func (api *DefaultECSAPI) DeleteTaskDefinitions(ctx context.Context, req *genera
 		taskDef, err := api.storage.TaskDefinitionStore().Get(ctx, family, revision)
 		if err != nil {
 			// Log but don't fail - the deletion succeeded
-			log.Printf("Failed to get deleted task definition %s:%d: %v", family, revision, err)
+			logging.Debug("Failed to get deleted task definition", "family", family, "revision", revision, "error", err)
 			continue
 		}
 
@@ -500,7 +461,7 @@ func (api *DefaultECSAPI) ListTaskDefinitions(ctx context.Context, req *generate
 	for _, family := range families {
 		revisions, _, err := api.storage.TaskDefinitionStore().ListRevisions(ctx, family.Family, status, 0, "")
 		if err != nil {
-			log.Printf("Failed to list revisions for family %s: %v", family.Family, err)
+			logging.Error("Failed to list revisions for family", "family", family.Family, "error", err)
 			continue
 		}
 		for _, rev := range revisions {
@@ -589,7 +550,7 @@ func storageTaskDefinitionToGenerated(taskDef *storage.TaskDefinition) *generate
 		if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err == nil {
 			response.ContainerDefinitions = containerDefs
 		} else {
-			log.Printf("Failed to unmarshal container definitions for task definition %s:%d: %v", taskDef.Family, taskDef.Revision, err)
+			logging.Error("Failed to unmarshal container definitions", "family", taskDef.Family, "revision", taskDef.Revision, "error", err)
 			// Return empty slice instead of nil to prevent nil pointer dereference
 			response.ContainerDefinitions = []generated.ContainerDefinition{}
 		}
@@ -602,7 +563,7 @@ func storageTaskDefinitionToGenerated(taskDef *storage.TaskDefinition) *generate
 		if err := json.Unmarshal([]byte(taskDef.Volumes), &volumes); err == nil {
 			response.Volumes = volumes
 		} else {
-			log.Printf("Failed to unmarshal volumes for task definition %s:%d: %v", taskDef.Family, taskDef.Revision, err)
+			logging.Error("Failed to unmarshal volumes", "family", taskDef.Family, "revision", taskDef.Revision, "error", err)
 			// Return empty slice instead of nil to prevent nil pointer dereference
 			response.Volumes = []generated.Volume{}
 		}

@@ -25,9 +25,8 @@ var _ = Describe("Task Definition ECS API", func() {
 		mockStorage.SetTaskDefinitionStore(mockTaskDefStore)
 
 		server = &Server{
-			storage:     mockStorage,
-			kindManager: nil, // Skip actual kind cluster creation in tests
-			ecsAPI:      NewDefaultECSAPI(mockStorage, nil),
+			storage: mockStorage,
+			ecsAPI:  NewDefaultECSAPI(mockStorage),
 		}
 		ctx = context.Background()
 	})
@@ -46,7 +45,7 @@ var _ = Describe("Task Definition ECS API", func() {
 				}
 
 				req := &generated.RegisterTaskDefinitionRequest{
-					Family:               &family,
+					Family:               family,
 					ContainerDefinitions: containerDefs,
 				}
 
@@ -57,7 +56,7 @@ var _ = Describe("Task Definition ECS API", func() {
 				Expect(resp.TaskDefinition).NotTo(BeNil())
 				Expect(*resp.TaskDefinition.Family).To(Equal("nginx"))
 				Expect(*resp.TaskDefinition.Revision).To(Equal(int32(1)))
-				Expect(*resp.TaskDefinition.Status).To(Equal(generated.TaskDefinitionStatusActive))
+				Expect(*resp.TaskDefinition.Status).To(Equal(generated.TaskDefinitionStatusACTIVE))
 			})
 
 			It("should increment revision for existing family", func() {
@@ -73,7 +72,7 @@ var _ = Describe("Task Definition ECS API", func() {
 
 				// Register first version
 				req1 := &generated.RegisterTaskDefinitionRequest{
-					Family:               &family,
+					Family:               family,
 					ContainerDefinitions: containerDefs,
 				}
 				resp1, err := server.ecsAPI.RegisterTaskDefinition(ctx, req1)
@@ -83,7 +82,7 @@ var _ = Describe("Task Definition ECS API", func() {
 				// Update container definition
 				containerDefs[0].Image = ptr.String("app:v2")
 				req2 := &generated.RegisterTaskDefinitionRequest{
-					Family:               &family,
+					Family:               family,
 					ContainerDefinitions: containerDefs,
 				}
 				resp2, err := server.ecsAPI.RegisterTaskDefinition(ctx, req2)
@@ -114,7 +113,7 @@ var _ = Describe("Task Definition ECS API", func() {
 					},
 				}
 				req := &generated.RegisterTaskDefinitionRequest{
-					Family:               &family,
+					Family:               family,
 					ContainerDefinitions: containerDefs,
 				}
 				_, err := server.ecsAPI.RegisterTaskDefinition(ctx, req)
@@ -124,7 +123,7 @@ var _ = Describe("Task Definition ECS API", func() {
 			It("should describe by family:revision", func() {
 				taskDef := "describe-test:1"
 				req := &generated.DescribeTaskDefinitionRequest{
-					TaskDefinition: &taskDef,
+					TaskDefinition: taskDef,
 				}
 
 				resp, err := server.ecsAPI.DescribeTaskDefinition(ctx, req)
@@ -139,7 +138,7 @@ var _ = Describe("Task Definition ECS API", func() {
 			It("should describe latest by family name only", func() {
 				taskDef := "describe-test"
 				req := &generated.DescribeTaskDefinitionRequest{
-					TaskDefinition: &taskDef,
+					TaskDefinition: taskDef,
 				}
 
 				resp, err := server.ecsAPI.DescribeTaskDefinition(ctx, req)
@@ -156,7 +155,7 @@ var _ = Describe("Task Definition ECS API", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				req := &generated.DescribeTaskDefinitionRequest{
-					TaskDefinition: &taskDef.ARN,
+					TaskDefinition: taskDef.ARN,
 				}
 
 				resp, err := server.ecsAPI.DescribeTaskDefinition(ctx, req)
@@ -170,7 +169,7 @@ var _ = Describe("Task Definition ECS API", func() {
 			It("should fail for non-existent task definition", func() {
 				taskDef := "non-existent:1"
 				req := &generated.DescribeTaskDefinitionRequest{
-					TaskDefinition: &taskDef,
+					TaskDefinition: taskDef,
 				}
 
 				_, err := server.ecsAPI.DescribeTaskDefinition(ctx, req)
@@ -194,7 +193,7 @@ var _ = Describe("Task Definition ECS API", func() {
 					},
 				}
 				req := &generated.RegisterTaskDefinitionRequest{
-					Family:               &family,
+					Family:               family,
 					ContainerDefinitions: containerDefs,
 				}
 				_, err := server.ecsAPI.RegisterTaskDefinition(ctx, req)
@@ -204,7 +203,7 @@ var _ = Describe("Task Definition ECS API", func() {
 			It("should deregister a task definition", func() {
 				taskDef := "deregister-test:1"
 				req := &generated.DeregisterTaskDefinitionRequest{
-					TaskDefinition: &taskDef,
+					TaskDefinition: taskDef,
 				}
 
 				resp, err := server.ecsAPI.DeregisterTaskDefinition(ctx, req)
@@ -212,13 +211,13 @@ var _ = Describe("Task Definition ECS API", func() {
 
 				Expect(resp).NotTo(BeNil())
 				Expect(resp.TaskDefinition).NotTo(BeNil())
-				Expect(*resp.TaskDefinition.Status).To(Equal(generated.TaskDefinitionStatusInactive))
+				Expect(*resp.TaskDefinition.Status).To(Equal(generated.TaskDefinitionStatusINACTIVE))
 			})
 
 			It("should be idempotent", func() {
 				taskDef := "deregister-test:1"
 				req := &generated.DeregisterTaskDefinitionRequest{
-					TaskDefinition: &taskDef,
+					TaskDefinition: taskDef,
 				}
 
 				// First deregister
@@ -234,7 +233,7 @@ var _ = Describe("Task Definition ECS API", func() {
 			It("should require revision number", func() {
 				taskDef := "deregister-test"
 				req := &generated.DeregisterTaskDefinitionRequest{
-					TaskDefinition: &taskDef,
+					TaskDefinition: taskDef,
 				}
 
 				_, err := server.ecsAPI.DeregisterTaskDefinition(ctx, req)
@@ -260,7 +259,7 @@ var _ = Describe("Task Definition ECS API", func() {
 						},
 					}
 					req := &generated.RegisterTaskDefinitionRequest{
-						Family:               &fam,
+						Family:               fam,
 						ContainerDefinitions: containerDefs,
 					}
 					_, err := server.ecsAPI.RegisterTaskDefinition(ctx, req)
@@ -324,7 +323,7 @@ var _ = Describe("Task Definition ECS API", func() {
 						},
 					}
 					req := &generated.RegisterTaskDefinitionRequest{
-						Family:               &fam,
+						Family:               fam,
 						ContainerDefinitions: containerDefs,
 					}
 					_, err := server.ecsAPI.RegisterTaskDefinition(ctx, req)
@@ -373,7 +372,7 @@ var _ = Describe("Task Definition ECS API", func() {
 						},
 					}
 					req := &generated.RegisterTaskDefinitionRequest{
-						Family:               &fam,
+						Family:               fam,
 						ContainerDefinitions: containerDefs,
 					}
 					_, err := server.ecsAPI.RegisterTaskDefinition(ctx, req)
@@ -396,7 +395,7 @@ var _ = Describe("Task Definition ECS API", func() {
 
 				// Verify all are inactive
 				for _, td := range resp.TaskDefinitions {
-					Expect(*td.Status).To(Equal(generated.TaskDefinitionStatusInactive))
+					Expect(*td.Status).To(Equal(generated.TaskDefinitionStatusINACTIVE))
 				}
 			})
 

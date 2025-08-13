@@ -32,7 +32,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		region = "us-east-1"
-		accountID = "123456789012"
+		accountID = "000000000000"
 		clusterName = "test-cluster"
 		serviceName = "test-service"
 		clusterARN = fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", region, accountID, clusterName)
@@ -45,8 +45,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 		mockStorage.SetTaskSetStore(mockTaskSetStore)
 		mockStorage.SetServiceStore(mockServiceStore)
 
-		// Use nil for KindManager as it's not needed for TaskSet tests
-		ecsAPI = NewDefaultECSAPI(mockStorage, nil)
+		ecsAPI = NewDefaultECSAPI(mockStorage)
 		// Set region and accountID on the underlying DefaultECSAPI
 		if defaultAPI, ok := ecsAPI.(*DefaultECSAPI); ok {
 			defaultAPI.region = region
@@ -59,16 +58,16 @@ var _ = Describe("TaskSetEcsApi", func() {
 
 		BeforeEach(func() {
 			req = &generated.CreateTaskSetRequest{
-				Cluster:        ptr.String(clusterName),
-				Service:        ptr.String(serviceName),
-				TaskDefinition: ptr.String("arn:aws:ecs:us-east-1:123456789012:task-definition/my-app:1"),
+				Cluster:        clusterName,
+				Service:        serviceName,
+				TaskDefinition: "arn:aws:ecs:us-east-1:000000000000:task-definition/my-app:1",
 				LaunchType:     (*generated.LaunchType)(ptr.String("EC2")),
 				Scale: &generated.Scale{
 					Value: ptr.Float64(100.0),
 					Unit:  (*generated.ScaleUnit)(ptr.String("PERCENT")),
 				},
 				Tags: []generated.Tag{
-					{Key: (*generated.TagKey)(ptr.String("Environment")), Value: (*generated.TagValue)(ptr.String("test"))},
+					{Key: ptr.String("Environment"), Value: ptr.String("test")},
 				},
 			}
 
@@ -97,7 +96,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 		})
 
 		It("should return error when service is missing", func() {
-			req.Service = nil
+			req.Service = ""
 			resp, err := ecsAPI.CreateTaskSet(ctx, req)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("service name is required"))
@@ -132,9 +131,9 @@ var _ = Describe("TaskSetEcsApi", func() {
 		BeforeEach(func() {
 			taskSetID = "ts-12345678"
 			req = &generated.DeleteTaskSetRequest{
-				Cluster: ptr.String(clusterName),
-				Service: ptr.String(serviceName),
-				TaskSet: ptr.String(taskSetID),
+				Cluster: clusterName,
+				Service: serviceName,
+				TaskSet: taskSetID,
 			}
 
 			// Mock task set exists
@@ -163,14 +162,14 @@ var _ = Describe("TaskSetEcsApi", func() {
 		})
 
 		It("should return error when service or taskSet is missing", func() {
-			req.Service = nil
+			req.Service = ""
 			resp, err := ecsAPI.DeleteTaskSet(ctx, req)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("service and taskSet are required"))
 			Expect(resp).To(BeNil())
 
-			req.Service = ptr.String(serviceName)
-			req.TaskSet = nil
+			req.Service = serviceName
+			req.TaskSet = ""
 			resp, err = ecsAPI.DeleteTaskSet(ctx, req)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("service and taskSet are required"))
@@ -194,8 +193,8 @@ var _ = Describe("TaskSetEcsApi", func() {
 
 		BeforeEach(func() {
 			req = &generated.DescribeTaskSetsRequest{
-				Cluster: ptr.String(clusterName),
-				Service: ptr.String(serviceName),
+				Cluster: clusterName,
+				Service: serviceName,
 			}
 
 			// Mock task sets
@@ -205,7 +204,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 				ServiceARN:           serviceARN,
 				ClusterARN:           clusterARN,
 				Status:               "ACTIVE",
-				TaskDefinition:       "arn:aws:ecs:us-east-1:123456789012:task-definition/my-app:1",
+				TaskDefinition:       "arn:aws:ecs:us-east-1:000000000000:task-definition/my-app:1",
 				LaunchType:           "EC2",
 				StabilityStatus:      "STEADY_STATE",
 				ComputedDesiredCount: 3,
@@ -222,7 +221,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 				ServiceARN:           serviceARN,
 				ClusterARN:           clusterARN,
 				Status:               "DRAINING",
-				TaskDefinition:       "arn:aws:ecs:us-east-1:123456789012:task-definition/my-app:2",
+				TaskDefinition:       "arn:aws:ecs:us-east-1:000000000000:task-definition/my-app:2",
 				LaunchType:           "FARGATE",
 				StabilityStatus:      "STABILIZING",
 				ComputedDesiredCount: 0,
@@ -284,7 +283,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 		})
 
 		It("should return error when service is missing", func() {
-			req.Service = nil
+			req.Service = ""
 			resp, err := ecsAPI.DescribeTaskSets(ctx, req)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("service is required"))
@@ -299,10 +298,10 @@ var _ = Describe("TaskSetEcsApi", func() {
 		BeforeEach(func() {
 			taskSetID = "ts-12345678"
 			req = &generated.UpdateTaskSetRequest{
-				Cluster: ptr.String(clusterName),
-				Service: ptr.String(serviceName),
-				TaskSet: ptr.String(taskSetID),
-				Scale: &generated.Scale{
+				Cluster: clusterName,
+				Service: serviceName,
+				TaskSet: taskSetID,
+				Scale: generated.Scale{
 					Value: ptr.Float64(50.0),
 					Unit:  (*generated.ScaleUnit)(ptr.String("PERCENT")),
 				},
@@ -315,7 +314,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 				ServiceARN:           serviceARN,
 				ClusterARN:           clusterARN,
 				Status:               "ACTIVE",
-				TaskDefinition:       "arn:aws:ecs:us-east-1:123456789012:task-definition/my-app:1",
+				TaskDefinition:       "arn:aws:ecs:us-east-1:000000000000:task-definition/my-app:1",
 				LaunchType:           "EC2",
 				StabilityStatus:      "STEADY_STATE",
 				ComputedDesiredCount: 3,
@@ -346,24 +345,17 @@ var _ = Describe("TaskSetEcsApi", func() {
 		})
 
 		It("should return error when required fields are missing", func() {
-			req.Service = nil
+			req.Service = ""
 			resp, err := ecsAPI.UpdateTaskSet(ctx, req)
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(ContainSubstring("service, taskSet, and scale are required"))
+			Expect(err.Error()).To(ContainSubstring("service and taskSet are required"))
 			Expect(resp).To(BeNil())
 
-			req.Service = ptr.String(serviceName)
-			req.TaskSet = nil
+			req.Service = serviceName
+			req.TaskSet = ""
 			resp, err = ecsAPI.UpdateTaskSet(ctx, req)
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(ContainSubstring("service, taskSet, and scale are required"))
-			Expect(resp).To(BeNil())
-
-			req.TaskSet = ptr.String(taskSetID)
-			req.Scale = nil
-			resp, err = ecsAPI.UpdateTaskSet(ctx, req)
-			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(ContainSubstring("service, taskSet, and scale are required"))
+			Expect(err.Error()).To(ContainSubstring("service and taskSet are required"))
 			Expect(resp).To(BeNil())
 		})
 

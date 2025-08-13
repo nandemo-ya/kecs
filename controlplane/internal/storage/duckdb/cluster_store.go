@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // clusterStore implements storage.ClusterStore using DuckDB
 type clusterStore struct {
-	db *sql.DB
+	db   *sql.DB
+	pool *ConnectionPool
 }
 
 // Create inserts a new cluster into the database
@@ -31,20 +33,22 @@ func (s *clusterStore) Create(ctx context.Context, cluster *storage.Cluster) err
 	query := `
 		INSERT INTO clusters (
 			id, arn, name, status, region, account_id,
-			configuration, settings, tags, kind_cluster_name,
+			configuration, settings, tags, k8s_cluster_name,
 			registered_container_instances_count, running_tasks_count,
 			pending_tasks_count, active_services_count,
 			capacity_providers, default_capacity_provider_strategy,
+			localstack_state,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	// Convert empty strings to NULL for JSON fields
 	configuration := sql.NullString{String: cluster.Configuration, Valid: cluster.Configuration != ""}
 	settings := sql.NullString{String: cluster.Settings, Valid: cluster.Settings != ""}
 	tags := sql.NullString{String: cluster.Tags, Valid: cluster.Tags != ""}
-	kindClusterName := sql.NullString{String: cluster.KindClusterName, Valid: cluster.KindClusterName != ""}
+	k8sClusterName := sql.NullString{String: cluster.K8sClusterName, Valid: cluster.K8sClusterName != ""}
 	capacityProviders := sql.NullString{String: cluster.CapacityProviders, Valid: cluster.CapacityProviders != ""}
 	defaultCapacityProviderStrategy := sql.NullString{String: cluster.DefaultCapacityProviderStrategy, Valid: cluster.DefaultCapacityProviderStrategy != ""}
+	localStackState := sql.NullString{String: cluster.LocalStackState, Valid: cluster.LocalStackState != ""}
 
 	_, err := s.db.ExecContext(ctx, query,
 		cluster.ID,
@@ -56,13 +60,14 @@ func (s *clusterStore) Create(ctx context.Context, cluster *storage.Cluster) err
 		configuration,
 		settings,
 		tags,
-		kindClusterName,
+		k8sClusterName,
 		cluster.RegisteredContainerInstancesCount,
 		cluster.RunningTasksCount,
 		cluster.PendingTasksCount,
 		cluster.ActiveServicesCount,
 		capacityProviders,
 		defaultCapacityProviderStrategy,
+		localStackState,
 		cluster.CreatedAt,
 		cluster.UpdatedAt,
 	)
@@ -76,19 +81,20 @@ func (s *clusterStore) Create(ctx context.Context, cluster *storage.Cluster) err
 
 // Get retrieves a cluster by name
 func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, error) {
+	cluster := &storage.Cluster{}
+	var configuration, settings, tags, k8sClusterName, capacityProviders, defaultCapacityProviderStrategy, localStackState sql.NullString
+
 	query := `
 		SELECT 
 			id, arn, name, status, region, account_id,
-			configuration, settings, tags, kind_cluster_name,
+			configuration, settings, tags, k8s_cluster_name,
 			registered_container_instances_count, running_tasks_count,
 			pending_tasks_count, active_services_count,
 			capacity_providers, default_capacity_provider_strategy,
+			localstack_state,
 			created_at, updated_at
 		FROM clusters
 		WHERE name = ?`
-
-	cluster := &storage.Cluster{}
-	var configuration, settings, tags, kindClusterName, capacityProviders, defaultCapacityProviderStrategy sql.NullString
 
 	err := s.db.QueryRowContext(ctx, query, name).Scan(
 		&cluster.ID,
@@ -100,13 +106,14 @@ func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, 
 		&configuration,
 		&settings,
 		&tags,
-		&kindClusterName,
+		&k8sClusterName,
 		&cluster.RegisteredContainerInstancesCount,
 		&cluster.RunningTasksCount,
 		&cluster.PendingTasksCount,
 		&cluster.ActiveServicesCount,
 		&capacityProviders,
 		&defaultCapacityProviderStrategy,
+		&localStackState,
 		&cluster.CreatedAt,
 		&cluster.UpdatedAt,
 	)
@@ -122,9 +129,10 @@ func (s *clusterStore) Get(ctx context.Context, name string) (*storage.Cluster, 
 	cluster.Configuration = configuration.String
 	cluster.Settings = settings.String
 	cluster.Tags = tags.String
-	cluster.KindClusterName = kindClusterName.String
+	cluster.K8sClusterName = k8sClusterName.String
 	cluster.CapacityProviders = capacityProviders.String
 	cluster.DefaultCapacityProviderStrategy = defaultCapacityProviderStrategy.String
+	cluster.LocalStackState = localStackState.String
 
 	return cluster, nil
 }
@@ -134,10 +142,11 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 	query := `
 		SELECT 
 			id, arn, name, status, region, account_id,
-			configuration, settings, tags, kind_cluster_name,
+			configuration, settings, tags, k8s_cluster_name,
 			registered_container_instances_count, running_tasks_count,
 			pending_tasks_count, active_services_count,
 			capacity_providers, default_capacity_provider_strategy,
+			localstack_state,
 			created_at, updated_at
 		FROM clusters
 		ORDER BY created_at DESC`
@@ -152,7 +161,7 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 
 	for rows.Next() {
 		cluster := &storage.Cluster{}
-		var configuration, settings, tags, kindClusterName, capacityProviders, defaultCapacityProviderStrategy sql.NullString
+		var configuration, settings, tags, k8sClusterName, capacityProviders, defaultCapacityProviderStrategy, localStackState sql.NullString
 
 		err := rows.Scan(
 			&cluster.ID,
@@ -164,13 +173,14 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 			&configuration,
 			&settings,
 			&tags,
-			&kindClusterName,
+			&k8sClusterName,
 			&cluster.RegisteredContainerInstancesCount,
 			&cluster.RunningTasksCount,
 			&cluster.PendingTasksCount,
 			&cluster.ActiveServicesCount,
 			&capacityProviders,
 			&defaultCapacityProviderStrategy,
+			&localStackState,
 			&cluster.CreatedAt,
 			&cluster.UpdatedAt,
 		)
@@ -182,9 +192,10 @@ func (s *clusterStore) List(ctx context.Context) ([]*storage.Cluster, error) {
 		cluster.Configuration = configuration.String
 		cluster.Settings = settings.String
 		cluster.Tags = tags.String
-		cluster.KindClusterName = kindClusterName.String
+		cluster.K8sClusterName = k8sClusterName.String
 		cluster.CapacityProviders = capacityProviders.String
 		cluster.DefaultCapacityProviderStrategy = defaultCapacityProviderStrategy.String
+		cluster.LocalStackState = localStackState.String
 
 		clusters = append(clusters, cluster)
 	}
@@ -203,10 +214,11 @@ func (s *clusterStore) ListWithPagination(ctx context.Context, limit int, nextTo
 	baseQuery := `
 		SELECT 
 			id, arn, name, status, region, account_id,
-			configuration, settings, tags, kind_cluster_name,
+			configuration, settings, tags, k8s_cluster_name,
 			registered_container_instances_count, running_tasks_count,
 			pending_tasks_count, active_services_count,
 			capacity_providers, default_capacity_provider_strategy,
+			localstack_state,
 			created_at, updated_at
 		FROM clusters`
 
@@ -241,7 +253,7 @@ func (s *clusterStore) ListWithPagination(ctx context.Context, limit int, nextTo
 
 	for rows.Next() {
 		cluster := &storage.Cluster{}
-		var configuration, settings, tags, kindClusterName, capacityProviders, defaultCapacityProviderStrategy sql.NullString
+		var configuration, settings, tags, k8sClusterName, capacityProviders, defaultCapacityProviderStrategy, localStackState sql.NullString
 
 		err := rows.Scan(
 			&cluster.ID,
@@ -253,13 +265,14 @@ func (s *clusterStore) ListWithPagination(ctx context.Context, limit int, nextTo
 			&configuration,
 			&settings,
 			&tags,
-			&kindClusterName,
+			&k8sClusterName,
 			&cluster.RegisteredContainerInstancesCount,
 			&cluster.RunningTasksCount,
 			&cluster.PendingTasksCount,
 			&cluster.ActiveServicesCount,
 			&capacityProviders,
 			&defaultCapacityProviderStrategy,
+			&localStackState,
 			&cluster.CreatedAt,
 			&cluster.UpdatedAt,
 		)
@@ -271,9 +284,10 @@ func (s *clusterStore) ListWithPagination(ctx context.Context, limit int, nextTo
 		cluster.Configuration = configuration.String
 		cluster.Settings = settings.String
 		cluster.Tags = tags.String
-		cluster.KindClusterName = kindClusterName.String
+		cluster.K8sClusterName = k8sClusterName.String
 		cluster.CapacityProviders = capacityProviders.String
 		cluster.DefaultCapacityProviderStrategy = defaultCapacityProviderStrategy.String
+		cluster.LocalStackState = localStackState.String
 
 		clusters = append(clusters, cluster)
 	}
@@ -310,13 +324,14 @@ func (s *clusterStore) Update(ctx context.Context, cluster *storage.Cluster) err
 			configuration = ?,
 			settings = ?,
 			tags = ?,
-			kind_cluster_name = ?,
+			k8s_cluster_name = ?,
 			registered_container_instances_count = ?,
 			running_tasks_count = ?,
 			pending_tasks_count = ?,
 			active_services_count = ?,
 			capacity_providers = ?,
 			default_capacity_provider_strategy = ?,
+			localstack_state = ?,
 			updated_at = ?
 		WHERE name = ?`
 
@@ -324,9 +339,10 @@ func (s *clusterStore) Update(ctx context.Context, cluster *storage.Cluster) err
 	configuration := sql.NullString{String: cluster.Configuration, Valid: cluster.Configuration != ""}
 	settings := sql.NullString{String: cluster.Settings, Valid: cluster.Settings != ""}
 	tags := sql.NullString{String: cluster.Tags, Valid: cluster.Tags != ""}
-	kindClusterName := sql.NullString{String: cluster.KindClusterName, Valid: cluster.KindClusterName != ""}
+	k8sClusterName := sql.NullString{String: cluster.K8sClusterName, Valid: cluster.K8sClusterName != ""}
 	capacityProviders := sql.NullString{String: cluster.CapacityProviders, Valid: cluster.CapacityProviders != ""}
 	defaultCapacityProviderStrategy := sql.NullString{String: cluster.DefaultCapacityProviderStrategy, Valid: cluster.DefaultCapacityProviderStrategy != ""}
+	localStackState := sql.NullString{String: cluster.LocalStackState, Valid: cluster.LocalStackState != ""}
 
 	result, err := s.db.ExecContext(ctx, query,
 		cluster.ARN,
@@ -336,13 +352,14 @@ func (s *clusterStore) Update(ctx context.Context, cluster *storage.Cluster) err
 		configuration,
 		settings,
 		tags,
-		kindClusterName,
+		k8sClusterName,
 		cluster.RegisteredContainerInstancesCount,
 		cluster.RunningTasksCount,
 		cluster.PendingTasksCount,
 		cluster.ActiveServicesCount,
 		capacityProviders,
 		defaultCapacityProviderStrategy,
+		localStackState,
 		cluster.UpdatedAt,
 		cluster.Name,
 	)

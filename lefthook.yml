@@ -1,0 +1,56 @@
+# Lefthook configuration
+# https://github.com/evilmartians/lefthook
+
+# YAML combined with Go templates
+min_version: 1.5.0
+
+pre-commit:
+  parallel: true
+  commands:
+    # Go formatting check
+    go-fmt:
+      tags: go fmt
+      glob: "controlplane/**/*.go"
+      run: |
+        files=$(echo {staged_files} | sed 's|controlplane/||g')
+        cd controlplane && gofmt -l $files | grep . && exit 1 || exit 0
+
+    # Go vet check
+    go-vet:
+      tags: go vet
+      glob: "*.go"
+      run: cd controlplane && go vet ./...
+
+    # Run unit tests for controlplane
+    controlplane-test:
+      tags: test unit
+      glob: "controlplane/**/*.go"
+      run: |
+        echo "Running controlplane unit tests..."
+        cd controlplane && go test ./... -short -race
+
+    # Check for console.log in TypeScript files
+    no-console-log:
+      tags: lint
+      glob: "*.{ts,tsx,js,jsx}"
+      exclude: "*.test.*|*.spec.*"
+      run: |
+        grep -n "console\\.log" {staged_files} && echo "Found console.log statements. Please remove them." && exit 1 || exit 0
+
+pre-push:
+  parallel: false
+  commands:
+    # Run full test suite before push
+    full-test:
+      tags: test
+      run: |
+        echo "Running full test suite..."
+        cd controlplane && go test ./... -race -coverprofile=coverage.out
+        echo "All tests passed!"
+
+# Skip hooks in CI environment
+skip_output:
+  - meta
+  - summary
+  - success
+  - skipped

@@ -7,10 +7,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
 var (
@@ -30,7 +31,7 @@ var localstackStartCmd = &cobra.Command{
 	Long:  `Start LocalStack with the configured services`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		
+
 		manager, err := getLocalStackManager()
 		if err != nil {
 			return err
@@ -52,7 +53,7 @@ var localstackStopCmd = &cobra.Command{
 	Long:  `Stop LocalStack and clean up resources`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		
+
 		manager, err := getLocalStackManager()
 		if err != nil {
 			return err
@@ -124,7 +125,7 @@ var localstackRestartCmd = &cobra.Command{
 	Long:  `Restart LocalStack with the current configuration`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		
+
 		manager, err := getLocalStackManager()
 		if err != nil {
 			return err
@@ -243,9 +244,9 @@ var localstackServicesCmd = &cobra.Command{
 	Long:  `List all available LocalStack services`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Available LocalStack services:")
-		
+
 		services := []string{
-			"s3", "iam", "logs", "ssm", "secretsmanager", 
+			"s3", "iam", "logs", "ssm", "secretsmanager",
 			"elbv2", "rds", "dynamodb",
 		}
 
@@ -261,7 +262,7 @@ func init() {
 	// Add persistent flags
 	localstackCmd.PersistentFlags().StringVar(&localstackVersion, "version", "", "LocalStack version to use (default: latest)")
 	localstackCmd.PersistentFlags().StringVar(&localstackImage, "image", "", "LocalStack image to use (default: localstack/localstack)")
-	
+
 	// Add subcommands
 	localstackCmd.AddCommand(localstackStartCmd)
 	localstackCmd.AddCommand(localstackStopCmd)
@@ -288,19 +289,19 @@ func getLocalStackManager() (localstack.Manager, error) {
 	// Create LocalStack configuration
 	lsConfig := localstack.DefaultConfig()
 	lsConfig.Enabled = true
-	
+
 	// Override version if specified
 	if localstackVersion != "" {
 		lsConfig.Version = localstackVersion
 	}
-	
+
 	// Override image if specified
 	if localstackImage != "" {
 		lsConfig.Image = localstackImage
 	}
 
 	// Create and return manager
-	manager, err := localstack.NewManager(lsConfig, clientset)
+	manager, err := localstack.NewManager(lsConfig, clientset, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LocalStack manager: %w", err)
 	}

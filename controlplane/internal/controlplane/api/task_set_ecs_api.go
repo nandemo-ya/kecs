@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
@@ -15,14 +16,11 @@ import (
 func (api *DefaultECSAPI) CreateTaskSet(ctx context.Context, req *generated.CreateTaskSetRequest) (*generated.CreateTaskSetResponse, error) {
 	// Validate cluster and service
 	cluster := "default"
-	if req.Cluster != nil {
-		cluster = *req.Cluster
+	if req.Cluster != "" {
+		cluster = req.Cluster
 	}
 
-	service := ""
-	if req.Service != nil {
-		service = *req.Service
-	}
+	service := req.Service
 
 	if service == "" {
 		return nil, fmt.Errorf("service name is required")
@@ -58,7 +56,7 @@ func (api *DefaultECSAPI) CreateTaskSet(ctx context.Context, req *generated.Crea
 		ServiceARN:           serviceARN,
 		ClusterARN:           clusterARN,
 		ExternalID:           ptr.ToString(req.ExternalId),
-		TaskDefinition:       ptr.ToString(req.TaskDefinition),
+		TaskDefinition:       req.TaskDefinition,
 		LaunchType:           ptr.ToString((*string)(req.LaunchType)),
 		PlatformVersion:      ptr.ToString(req.PlatformVersion),
 		Status:               "ACTIVE",
@@ -116,7 +114,7 @@ func (api *DefaultECSAPI) CreateTaskSet(ctx context.Context, req *generated.Crea
 			ClusterArn:               ptr.String(clusterARN),
 			ExternalId:               req.ExternalId,
 			Status:                   ptr.String("ACTIVE"),
-			TaskDefinition:           req.TaskDefinition,
+			TaskDefinition:           ptr.String(req.TaskDefinition),
 			LaunchType:               req.LaunchType,
 			Scale:                    scale,
 			StabilityStatus:          (*generated.StabilityStatus)(ptr.String("STEADY_STATE")),
@@ -140,19 +138,12 @@ func (api *DefaultECSAPI) CreateTaskSet(ctx context.Context, req *generated.Crea
 func (api *DefaultECSAPI) DeleteTaskSet(ctx context.Context, req *generated.DeleteTaskSetRequest) (*generated.DeleteTaskSetResponse, error) {
 	// Validate required fields
 	cluster := "default"
-	if req.Cluster != nil {
-		cluster = *req.Cluster
+	if req.Cluster != "" {
+		cluster = req.Cluster
 	}
 
-	service := ""
-	if req.Service != nil {
-		service = *req.Service
-	}
-
-	taskSet := ""
-	if req.TaskSet != nil {
-		taskSet = *req.TaskSet
-	}
+	service := req.Service
+	taskSet := req.TaskSet
 
 	if service == "" || taskSet == "" {
 		return nil, fmt.Errorf("service and taskSet are required")
@@ -192,14 +183,11 @@ func (api *DefaultECSAPI) DeleteTaskSet(ctx context.Context, req *generated.Dele
 func (api *DefaultECSAPI) DescribeTaskSets(ctx context.Context, req *generated.DescribeTaskSetsRequest) (*generated.DescribeTaskSetsResponse, error) {
 	// Validate required fields
 	cluster := "default"
-	if req.Cluster != nil {
-		cluster = *req.Cluster
+	if req.Cluster != "" {
+		cluster = req.Cluster
 	}
 
-	service := ""
-	if req.Service != nil {
-		service = *req.Service
-	}
+	service := req.Service
 
 	if service == "" {
 		return nil, fmt.Errorf("service is required")
@@ -324,22 +312,15 @@ func (api *DefaultECSAPI) DescribeTaskSets(ctx context.Context, req *generated.D
 func (api *DefaultECSAPI) UpdateTaskSet(ctx context.Context, req *generated.UpdateTaskSetRequest) (*generated.UpdateTaskSetResponse, error) {
 	// Validate required fields
 	cluster := "default"
-	if req.Cluster != nil {
-		cluster = *req.Cluster
+	if req.Cluster != "" {
+		cluster = req.Cluster
 	}
 
-	service := ""
-	if req.Service != nil {
-		service = *req.Service
-	}
+	service := req.Service
+	taskSet := req.TaskSet
 
-	taskSet := ""
-	if req.TaskSet != nil {
-		taskSet = *req.TaskSet
-	}
-
-	if service == "" || taskSet == "" || req.Scale == nil {
-		return nil, fmt.Errorf("service, taskSet, and scale are required")
+	if service == "" || taskSet == "" {
+		return nil, fmt.Errorf("service and taskSet are required")
 	}
 
 	// Build service ARN
@@ -368,7 +349,7 @@ func (api *DefaultECSAPI) UpdateTaskSet(ctx context.Context, req *generated.Upda
 		ClusterArn:           ptr.String(storageTaskSet.ClusterARN),
 		Status:               ptr.String(storageTaskSet.Status),
 		TaskDefinition:       ptr.String(storageTaskSet.TaskDefinition),
-		Scale:                req.Scale,
+		Scale:                &req.Scale,
 		StabilityStatus:      (*generated.StabilityStatus)(ptr.String("STABILIZING")),
 		UpdatedAt:            ptr.Time(storageTaskSet.UpdatedAt),
 		ComputedDesiredCount: ptr.Int32(storageTaskSet.ComputedDesiredCount),

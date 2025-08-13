@@ -25,9 +25,36 @@ brew install kayac/tap/ecspresso
 go mod download
 ```
 
+## Test Architecture
+
+KECS scenario tests run KECS directly as Docker containers on the host with:
+- Dynamic port allocation starting from base ports (35000/36000)
+- Isolated temporary data directories for each test
+- Automatic cleanup of containers, data directories, and k3d clusters
+- Support for parallel test execution without conflicts
+- Seamless GitHub Actions integration
+
 ## Running Tests
 
-### Run all scenario tests
+### Using Make (Recommended)
+
+```bash
+# Run all tests
+make test
+
+# Run specific phase
+make test-phase1    # Cluster Operations
+make test-phase2    # Task Definitions and Services
+make test-phase3    # LocalStack Integration
+
+# Run with debug logging
+make test-verbose
+
+# Clean up orphaned test resources
+make clean-test-resources
+```
+
+### Run all scenario tests (Direct)
 ```bash
 go test -v ./...
 ```
@@ -144,6 +171,62 @@ utils.AssertRollingUpdateComplete(t, client, cluster, service, newRevision, time
 utils.AssertTaskStatusTransitions(t, client, cluster, taskArn, []string{
     "PROVISIONING", "PENDING", "ACTIVATING", "RUNNING",
 })
+```
+
+## Environment Variables
+
+### Cluster Provider Selection
+```bash
+# Use k3d (default)
+KECS_CLUSTER_PROVIDER=k3d go test -v ./...
+
+# Use Kind
+KECS_CLUSTER_PROVIDER=kind go test -v ./...
+```
+
+## Test Execution Architecture
+
+KECS tests run in isolated containers with dynamic resource allocation:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Native Docker Host                     │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │ KECS Instance│  │ KECS Instance│  │ KECS Instance│ │
+│  │  test-001    │  │  test-002    │  │  test-003    │ │
+│  │              │  │              │  │              │ │
+│  │ API:  35421  │  │ API:  35422  │  │ API:  35423  │ │
+│  │ Admin:35431  │  │ Admin:35432  │  │ Admin:35433  │ │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘ │
+│         │                  │                  │         │
+│  ┌──────▼───────┐  ┌──────▼───────┐  ┌──────▼───────┐ │
+│  │ Temp Data Dir│  │ Temp Data Dir│  │ Temp Data Dir│ │
+│  │/tmp/kecs-xxx │  │/tmp/kecs-yyy │  │/tmp/kecs-zzz │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘ │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │              k3d clusters                        │  │
+│  │  kecs-test-001  kecs-test-002  kecs-test-003   │  │
+│  └─────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Key Features:
+- **Dynamic Port Allocation**: Starting from base ports (35000/36000), automatically finds available ports
+- **Isolated Data**: Each instance gets a unique temporary directory
+- **Proper Cleanup**: Automatic cleanup of containers, data directories, and k3d clusters
+- **Parallel Support**: Multiple tests can run concurrently without conflicts
+
+### Configuration:
+```bash
+# Set custom base ports
+export KECS_TEST_BASE_API_PORT=40000
+export KECS_TEST_BASE_ADMIN_PORT=41000
+
+# Use local build instead of pulling image
+export KECS_LOCAL_BUILD=true
 ```
 
 ## Debugging

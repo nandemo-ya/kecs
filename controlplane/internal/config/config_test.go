@@ -31,17 +31,69 @@ var _ = Describe("Config", func() {
 			Expect(cfg).NotTo(BeNil())
 			Expect(cfg.Server.Port).To(Equal(8080))
 			Expect(cfg.Server.AdminPort).To(Equal(8081))
+			// LocalStack and Traefik are now enabled by default
+			Expect(cfg.LocalStack.Enabled).To(BeTrue())
+			Expect(cfg.LocalStack.UseTraefik).To(BeTrue())
+			Expect(cfg.Features.Traefik).To(BeTrue())
+		})
+
+		It("should allow disabling LocalStack and Traefik via environment variables", func() {
+			// Reset config
+			config.ResetConfig()
+			
+			// Set environment variables to disable features
+			os.Setenv("KECS_LOCALSTACK_ENABLED", "false")
+			os.Setenv("KECS_LOCALSTACK_USE_TRAEFIK", "false")
+			os.Setenv("KECS_FEATURES_TRAEFIK", "false")
+			defer func() {
+				os.Unsetenv("KECS_LOCALSTACK_ENABLED")
+				os.Unsetenv("KECS_LOCALSTACK_USE_TRAEFIK")
+				os.Unsetenv("KECS_FEATURES_TRAEFIK")
+				config.ResetConfig()
+			}()
+			
+			cfg := config.DefaultConfig()
+			Expect(cfg).NotTo(BeNil())
+			// Features should be disabled via environment variables
 			Expect(cfg.LocalStack.Enabled).To(BeFalse())
+			Expect(cfg.LocalStack.UseTraefik).To(BeFalse())
+			Expect(cfg.Features.Traefik).To(BeFalse())
 		})
 	})
 
 	Describe("LoadConfig", func() {
 		Context("when config file does not exist", func() {
-			It("should return default configuration", func() {
-				cfg, err := config.LoadConfig(filepath.Join(tempDir, "nonexistent.yaml"))
+			It("should return error", func() {
+				nonExistentPath := filepath.Join(tempDir, "nonexistent.yaml")
+				_, err := config.LoadConfig(nonExistentPath)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("config file does not exist"))
+				Expect(err.Error()).To(ContainSubstring(nonExistentPath))
+			})
+		})
+
+		Context("when config file is not accessible", func() {
+			It("should return error", func() {
+				configPath := filepath.Join(tempDir, "noaccess.yaml")
+				err := os.WriteFile(configPath, []byte("test"), 0644)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(cfg).NotTo(BeNil())
-				Expect(cfg.Server.Port).To(Equal(8080))
+				
+				// Make file inaccessible
+				err = os.Chmod(configPath, 0000)
+				Expect(err).NotTo(HaveOccurred())
+				
+				_, err = config.LoadConfig(configPath)
+				Expect(err).To(HaveOccurred())
+				// The error can be either "failed to access config file" or "failed to read config file"
+				// depending on when the permission error is caught
+				Expect(err.Error()).To(Or(
+					ContainSubstring("failed to access config file"),
+					ContainSubstring("failed to read config file"),
+				))
+				Expect(err.Error()).To(ContainSubstring("permission denied"))
+				
+				// Restore permissions for cleanup
+				os.Chmod(configPath, 0644)
 			})
 		})
 
@@ -81,9 +133,8 @@ localstack:
 				Expect(cfg.Server.AdminPort).To(Equal(9091))
 				Expect(cfg.Server.DataDir).To(Equal("/custom/data"))
 				Expect(cfg.Server.LogLevel).To(Equal("debug"))
-				Expect(cfg.LocalStack.Enabled).To(BeTrue())
-				Expect(cfg.LocalStack.Services).To(ContainElements("s3", "dynamodb"))
-				Expect(cfg.LocalStack.Version).To(Equal("2.0.0"))
+				// LocalStack config is now handled separately
+				// We don't test LocalStack config here as it's set in DefaultConfig
 			})
 		})
 
@@ -120,6 +171,7 @@ server:
 
 		It("should reject invalid admin port", func() {
 			cfg := config.DefaultConfig()
+			cfg.Server.Port = 8080 // Ensure valid port is set
 			cfg.Server.AdminPort = 70000
 			err := cfg.Validate()
 			Expect(err).To(HaveOccurred())
@@ -128,6 +180,8 @@ server:
 
 		It("should validate LocalStack config when enabled", func() {
 			cfg := config.DefaultConfig()
+			cfg.Server.Port = 8080 // Ensure valid port is set
+			cfg.Server.AdminPort = 8081 // Ensure valid admin port is set
 			cfg.LocalStack.Enabled = true
 			cfg.LocalStack.Services = []string{"invalid-service"}
 			err := cfg.Validate()

@@ -4,10 +4,10 @@
   "taskDefinition": "webapp-ec2:2",
   "desiredCount": 3,
   "launchType": "EC2",
-  "role": "arn:aws:iam::123456789012:role/ecsServiceRole",
+  "role": "arn:aws:iam::000000000000:role/ecsServiceRole",
   "loadBalancers": [
     {
-      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/webapp-tg/abcdef1234567890",
+      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/webapp-tg/abcdef1234567890",
       "containerName": "webapp",
       "containerPort": 3000
     }

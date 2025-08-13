@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	cloudwatchlogsapi "github.com/nandemo-ya/kecs/controlplane/internal/cloudwatchlogs/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
 // integration implements the CloudWatch Integration interface
@@ -32,12 +30,13 @@ func NewIntegration(kubeClient kubernetes.Interface, localstackManager localstac
 	}
 
 	// Create CloudWatch Logs client configured for LocalStack
-	cfg, err := createLocalStackConfig(config.LocalStackEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create LocalStack config: %w", err)
+	endpoint := config.LocalStackEndpoint
+	if endpoint == "" {
+		// Use cluster-internal LocalStack service endpoint
+		endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 	}
 
-	logsClient := cloudwatchlogs.NewFromConfig(cfg)
+	logsClient := newCloudWatchLogsClient(endpoint)
 
 	return &integration{
 		logsClient:        logsClient,
@@ -75,13 +74,13 @@ func (i *integration) CreateLogGroup(groupName string) error {
 	}
 
 	// Create log group
-	_, err := i.logsClient.CreateLogGroup(ctx, &cloudwatchlogs.CreateLogGroupInput{
-		LogGroupName: aws.String(groupName),
+	_, err := i.logsClient.CreateLogGroup(ctx, &cloudwatchlogsapi.CreateLogGroupRequest{
+		LogGroupName: groupName,
 	})
 	if err != nil {
 		// Check if already exists
 		if strings.Contains(err.Error(), "ResourceAlreadyExistsException") {
-			klog.V(2).Infof("Log group %s already exists", groupName)
+			logging.Debug("Log group already exists", "groupName", groupName)
 			return nil
 		}
 		return fmt.Errorf("failed to create log group: %w", err)
@@ -89,16 +88,16 @@ func (i *integration) CreateLogGroup(groupName string) error {
 
 	// Set retention policy
 	if i.config.RetentionDays > 0 {
-		_, err = i.logsClient.PutRetentionPolicy(ctx, &cloudwatchlogs.PutRetentionPolicyInput{
-			LogGroupName:    aws.String(groupName),
-			RetentionInDays: aws.Int32(i.config.RetentionDays),
+		_, err = i.logsClient.PutRetentionPolicy(ctx, &cloudwatchlogsapi.PutRetentionPolicyRequest{
+			LogGroupName:    groupName,
+			RetentionInDays: i.config.RetentionDays,
 		})
 		if err != nil {
-			klog.Warningf("Failed to set retention policy for log group %s: %v", groupName, err)
+			logging.Warn("Failed to set retention policy for log group", "groupName", groupName, "error", err)
 		}
 	}
 
-	klog.Infof("Created CloudWatch log group: %s", groupName)
+	logging.Info("Created CloudWatch log group", "groupName", groupName)
 	return nil
 }
 
@@ -111,20 +110,20 @@ func (i *integration) CreateLogStream(groupName, streamName string) error {
 		groupName = i.config.LogGroupPrefix + groupName
 	}
 
-	_, err := i.logsClient.CreateLogStream(ctx, &cloudwatchlogs.CreateLogStreamInput{
-		LogGroupName:  aws.String(groupName),
-		LogStreamName: aws.String(streamName),
+	_, err := i.logsClient.CreateLogStream(ctx, &cloudwatchlogsapi.CreateLogStreamRequest{
+		LogGroupName:  groupName,
+		LogStreamName: streamName,
 	})
 	if err != nil {
 		// Check if already exists
 		if strings.Contains(err.Error(), "ResourceAlreadyExistsException") {
-			klog.V(2).Infof("Log stream %s already exists in group %s", streamName, groupName)
+			logging.Debug("Log stream already exists", "streamName", streamName, "groupName", groupName)
 			return nil
 		}
 		return fmt.Errorf("failed to create log stream: %w", err)
 	}
 
-	klog.Infof("Created CloudWatch log stream: %s/%s", groupName, streamName)
+	logging.Info("Created CloudWatch log stream", "groupName", groupName, "streamName", streamName)
 	return nil
 }
 
@@ -137,26 +136,26 @@ func (i *integration) DeleteLogGroup(groupName string) error {
 		groupName = i.config.LogGroupPrefix + groupName
 	}
 
-	_, err := i.logsClient.DeleteLogGroup(ctx, &cloudwatchlogs.DeleteLogGroupInput{
-		LogGroupName: aws.String(groupName),
+	_, err := i.logsClient.DeleteLogGroup(ctx, &cloudwatchlogsapi.DeleteLogGroupRequest{
+		LogGroupName: groupName,
 	})
 	if err != nil {
 		// Ignore if not found
 		if strings.Contains(err.Error(), "ResourceNotFoundException") {
-			klog.V(2).Infof("Log group %s not found", groupName)
+			logging.Debug("Log group not found", "groupName", groupName)
 			return nil
 		}
 		return fmt.Errorf("failed to delete log group: %w", err)
 	}
 
-	klog.Infof("Deleted CloudWatch log group: %s", groupName)
+	logging.Info("Deleted CloudWatch log group", "groupName", groupName)
 	return nil
 }
 
 // GetLogGroupForTask returns the log group name for a task
 func (i *integration) GetLogGroupForTask(taskArn string) string {
 	// Extract task family from ARN
-	// Example: arn:aws:ecs:us-east-1:123456789012:task/default/1234567890
+	// Example: arn:aws:ecs:us-east-1:000000000000:task/default/1234567890
 	parts := strings.Split(taskArn, "/")
 	if len(parts) >= 2 {
 		// For ECS tasks, we typically use the task definition family name
@@ -174,7 +173,7 @@ func (i *integration) GetLogStreamForContainer(taskArn, containerName string) st
 	if len(parts) >= 2 {
 		taskID = parts[len(parts)-1]
 	}
-	
+
 	// Format: <container-name>/<task-id>
 	return fmt.Sprintf("%s/%s", containerName, taskID)
 }
@@ -190,12 +189,12 @@ func (i *integration) ConfigureContainerLogging(taskArn string, containerName st
 	if logGroupName == "" {
 		logGroupName = i.GetLogGroupForTask(taskArn)
 	}
-	
+
 	logStreamName := options["awslogs-stream-prefix"]
 	if logStreamName == "" {
 		logStreamName = containerName
 	}
-	
+
 	// Ensure log group exists
 	if err := i.CreateLogGroup(logGroupName); err != nil {
 		return nil, fmt.Errorf("failed to create log group: %w", err)
@@ -223,7 +222,7 @@ func (i *integration) generateFluentBitConfig(logGroupName, logStreamPrefix stri
 
 	endpoint := i.config.LocalStackEndpoint
 	if endpoint == "" {
-		endpoint = "http://localstack.aws-services.svc.cluster.local:4566"
+		endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 	}
 
 	// FluentBit configuration for CloudWatch
@@ -263,18 +262,4 @@ func (i *integration) generateFluentBitConfig(logGroupName, logStreamPrefix stri
     tls                 Off
     net.keepalive       Off
 `, region, logGroupName, logStreamPrefix, endpoint)
-}
-
-// Helper functions
-
-func createLocalStackConfig(endpoint string) (aws.Config, error) {
-	if endpoint == "" {
-		return aws.Config{}, fmt.Errorf("no endpoint configured")
-	}
-	
-	return config.LoadDefaultConfig(context.Background(),
-		config.WithRegion("us-east-1"),
-		config.WithBaseEndpoint(endpoint),
-		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
-	)
 }

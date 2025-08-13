@@ -1,0 +1,29 @@
+features:
+  testMode: false
+  containerMode: false
+  autoRecoverState: true
+  localstack: true
+  traefik: true
+
+localstack:
+  enabled: true
+  useTraefik: true
+  services:
+    - s3
+    - ecs
+    - iam
+    - logs
+    - ssm
+    - secretsmanager
+
+server:
+  port: 8080
+  adminPort: 8081
+
+kubernetes:
+  provider: k3d
+  k3dOptimized: false
+
+aws:
+  defaultRegion: us-east-1
+  accountID: "000000000000"

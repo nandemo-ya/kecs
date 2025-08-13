@@ -3,7 +3,6 @@ package api
 import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
-	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -14,18 +13,17 @@ type DefaultECSAPIWithLB struct {
 }
 
 // NewDefaultECSAPIWithLB creates a new ECS API implementation with ELBv2 integration
+// Deprecated: Use cluster manager version instead
 func NewDefaultECSAPIWithLB(
 	storage storage.Storage,
-	kindManager *kubernetes.KindManager,
 	region, accountID string,
 	elbv2Integration elbv2.Integration,
 ) generated.ECSAPIInterface {
 	return &DefaultECSAPIWithLB{
 		DefaultECSAPI: &DefaultECSAPI{
-			storage:     storage,
-			kindManager: kindManager,
-			region:      region,
-			accountID:   accountID,
+			storage:   storage,
+			region:    region,
+			accountID: accountID,
 		},
 		elbv2Integration: elbv2Integration,
 	}

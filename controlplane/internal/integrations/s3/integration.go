@@ -1,19 +1,17 @@
 package s3
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	s3api "github.com/nandemo-ya/kecs/controlplane/internal/s3/generated"
 )
 
 // integration implements the S3 Integration interface
@@ -33,22 +31,9 @@ func NewIntegration(kubeClient kubernetes.Interface, localstackManager localstac
 		}
 	}
 
-	// Create S3 client configured for LocalStack
-	awsCfg, err := createLocalStackConfig(cfg.LocalStackEndpoint, cfg.Region)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create LocalStack config: %w", err)
-	}
-
-	s3Client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.UsePathStyle = cfg.ForcePathStyle
-	})
-
-	return &integration{
-		s3Client:          s3Client,
-		kubeClient:        kubeClient,
-		localstackManager: localstackManager,
-		config:            cfg,
-	}, nil
+	// TODO: Create S3 client implementation that talks to LocalStack
+	// For now, return error as this requires implementing the S3Client interface
+	return nil, fmt.Errorf("S3 integration with generated types not yet implemented")
 }
 
 // NewIntegrationWithClient creates a new S3 integration with custom client (for testing)
@@ -70,48 +55,55 @@ func NewIntegrationWithClient(kubeClient kubernetes.Interface, localstackManager
 
 // DownloadFile downloads a file from S3
 func (i *integration) DownloadFile(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
-	klog.V(2).Infof("Downloading S3 object: s3://%s/%s", bucket, key)
+	logging.Debug("Downloading S3 object", "bucket", bucket, "key", key)
 
-	result, err := i.s3Client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+	result, err := i.s3Client.GetObject(ctx, &s3api.GetObjectRequest{
+		Bucket: bucket,
+		Key:    key,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to download S3 object: %w", err)
 	}
 
-	return result.Body, nil
+	// Convert []byte to io.ReadCloser
+	return &bodyReadCloser{bytes.NewReader(result.Body)}, nil
 }
 
 // UploadFile uploads a file to S3
 func (i *integration) UploadFile(ctx context.Context, bucket, key string, reader io.Reader) error {
-	klog.V(2).Infof("Uploading S3 object: s3://%s/%s", bucket, key)
+	logging.Debug("Uploading S3 object", "bucket", bucket, "key", key)
 
-	_, err := i.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-		Body:   reader,
+	// Read all data from reader to []byte
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return fmt.Errorf("failed to read upload data: %w", err)
+	}
+
+	_, err = i.s3Client.PutObject(ctx, &s3api.PutObjectRequest{
+		Bucket: bucket,
+		Key:    key,
+		Body:   data,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to upload S3 object: %w", err)
 	}
 
-	klog.Infof("Successfully uploaded S3 object: s3://%s/%s", bucket, key)
+	logging.Info("Successfully uploaded S3 object", "bucket", bucket, "key", key)
 	return nil
 }
 
 // HeadObject gets metadata for an S3 object
 func (i *integration) HeadObject(ctx context.Context, bucket, key string) (*ObjectMetadata, error) {
-	result, err := i.s3Client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+	result, err := i.s3Client.HeadObject(ctx, &s3api.HeadObjectRequest{
+		Bucket: bucket,
+		Key:    key,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get S3 object metadata: %w", err)
 	}
 
 	metadata := &ObjectMetadata{}
-	
+
 	if result.ContentLength != nil {
 		metadata.Size = *result.ContentLength
 	}
@@ -133,59 +125,66 @@ func (i *integration) HeadObject(ctx context.Context, bucket, key string) (*Obje
 
 // CreateBucket creates an S3 bucket if it doesn't exist
 func (i *integration) CreateBucket(ctx context.Context, bucket string) error {
-	klog.V(2).Infof("Creating S3 bucket: %s", bucket)
+	logging.Debug("Creating S3 bucket", "bucket", bucket)
 
-	input := &s3.CreateBucketInput{
-		Bucket: aws.String(bucket),
+	input := &s3api.CreateBucketRequest{
+		Bucket: bucket,
 	}
 
 	// Don't set LocationConstraint for us-east-1
 	if i.config.Region != "us-east-1" {
-		input.CreateBucketConfiguration = &types.CreateBucketConfiguration{
-			LocationConstraint: types.BucketLocationConstraint(i.config.Region),
+		regionConstraint := s3api.BucketLocationConstraint(i.config.Region)
+		input.CreateBucketConfiguration = &s3api.CreateBucketConfiguration{
+			LocationConstraint: &regionConstraint,
 		}
 	}
 
 	_, err := i.s3Client.CreateBucket(ctx, input)
 	if err != nil {
 		// Check if bucket already exists
-		if strings.Contains(err.Error(), "BucketAlreadyExists") || 
-		   strings.Contains(err.Error(), "BucketAlreadyOwnedByYou") {
-			klog.V(2).Infof("S3 bucket already exists: %s", bucket)
+		if strings.Contains(err.Error(), "BucketAlreadyExists") ||
+			strings.Contains(err.Error(), "BucketAlreadyOwnedByYou") {
+			logging.Debug("S3 bucket already exists", "bucket", bucket)
 			return nil
 		}
 		return fmt.Errorf("failed to create S3 bucket: %w", err)
 	}
 
-	klog.Infof("Successfully created S3 bucket: %s", bucket)
+	logging.Info("Successfully created S3 bucket", "bucket", bucket)
 	return nil
 }
 
 // DeleteObject deletes an object from S3
 func (i *integration) DeleteObject(ctx context.Context, bucket, key string) error {
-	klog.V(2).Infof("Deleting S3 object: s3://%s/%s", bucket, key)
+	logging.Debug("Deleting S3 object", "bucket", bucket, "key", key)
 
-	_, err := i.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+	_, err := i.s3Client.DeleteObject(ctx, &s3api.DeleteObjectRequest{
+		Bucket: bucket,
+		Key:    key,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete S3 object: %w", err)
 	}
 
-	klog.Infof("Successfully deleted S3 object: s3://%s/%s", bucket, key)
+	logging.Info("Successfully deleted S3 object", "bucket", bucket, "key", key)
+	return nil
+}
+
+// bodyReadCloser wraps a bytes.Reader to implement io.ReadCloser
+type bodyReadCloser struct {
+	*bytes.Reader
+}
+
+func (b *bodyReadCloser) Close() error {
 	return nil
 }
 
 // Helper function to create LocalStack configuration
-func createLocalStackConfig(endpoint, region string) (aws.Config, error) {
+// TODO: Implement LocalStack HTTP client that uses generated types
+func createLocalStackConfig(endpoint, region string) error {
 	if endpoint == "" {
-		endpoint = "http://localstack.aws-services.svc.cluster.local:4566"
+		endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 	}
-
-	return config.LoadDefaultConfig(context.Background(),
-		config.WithRegion(region),
-		config.WithBaseEndpoint(endpoint),
-		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
-	)
+	// Implementation needed for LocalStack HTTP client
+	return fmt.Errorf("LocalStack configuration not implemented with generated types")
 }

@@ -1,0 +1,117 @@
+# Test configuration for KECS Control Plane
+# This configuration is used for unit tests and CI environments
+# LocalStack and Traefik are disabled by default for faster test execution
+
+# Server configuration
+server:
+  port: 8080
+  adminPort: 8081
+  readTimeout: 30s
+  writeTimeout: 30s
+  idleTimeout: 120s
+  shutdownTimeout: 30s
+
+# WebSocket configuration
+websocket:
+  allowedOrigins:
+    - "http://localhost:3000"
+    - "http://localhost:8080"
+  allowCredentials: true
+  
+# Security configuration
+security:
+  cors:
+    enabled: true
+    allowedOrigins:
+      - "*"
+    allowedMethods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+      - PATCH
+    allowedHeaders:
+      - Accept
+      - Authorization
+      - Content-Type
+      - X-CSRF-Token
+      - X-Amz-Target
+      - X-Amz-Date
+      - X-Amz-Security-Token
+      - X-Amz-User-Agent
+    allowCredentials: true
+    maxAge: 86400
+
+# Storage configuration
+storage:
+  type: duckdb
+  duckdb:
+    path: ":memory:"  # Use in-memory DB for tests
+    inMemory: true
+    readOnly: false
+
+# Kubernetes configuration
+kubernetes:
+  inCluster: false
+  kubeconfig: ""
+
+# Logging configuration
+logging:
+  level: debug
+  format: text
+  output: stdout
+
+# Metrics configuration
+metrics:
+  enabled: false  # Disable metrics in tests
+  path: /metrics
+  
+# Health check configuration
+health:
+  enabled: true
+  path: /health
+  readinessPath: /ready
+  livenessPath: /live
+
+# Feature flags
+features:
+  traefik: false  # Disabled for testing (default is true)
+  testMode: true  # Enable test mode
+  autoRecoverState: false  # Disable state recovery for clean test runs
+
+# LocalStack configuration
+localstack:
+  enabled: false  # Disabled for testing (default is true)
+  useTraefik: false  # Disabled for testing (default is true)
+  services:
+    - iam
+    - logs
+    - ssm
+    - secretsmanager
+  persistence: false
+  image: "localstack/localstack"
+  version: "latest"
+  namespace: "kecs-system"
+  port: 4566
+  edgePort: 4566
+  resources:
+    memory: "1Gi"
+    cpu: "500m"
+    storageSize: "1Gi"
+  environment:
+    DEFAULT_REGION: "us-east-1"
+    DOCKER_HOST: "unix:///var/run/docker.sock"
+    LAMBDA_EXECUTOR: "local"
+    DISABLE_CORS_CHECKS: "1"
+    DISABLE_CUSTOM_CORS_S3: "1"
+    EXTRA_CORS_ALLOWED_ORIGINS: "*"
+    EXTRA_CORS_ALLOWED_HEADERS: "x-amz-*"
+  debug: false
+  dataDir: "/var/lib/localstack"
+  
+# AWS Proxy configuration  
+proxy:
+  mode: "disabled"  # Disable proxy in tests
+  localstackEndpoint: "http://localstack.kecs-system.svc.cluster.local:4566"
+  fallbackEnabled: false

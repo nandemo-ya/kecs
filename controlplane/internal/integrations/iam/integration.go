@@ -5,16 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
-	iamTypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+
+	iamapi "github.com/nandemo-ya/kecs/controlplane/internal/iam/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 )
 
 // integration implements the IAM Integration interface
@@ -36,14 +33,15 @@ func NewIntegration(kubeClient kubernetes.Interface, localstackManager localstac
 		}
 	}
 
-	// Create IAM client configured for LocalStack
-	cfg, err := createLocalStackConfig(config.LocalStackEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create LocalStack config: %w", err)
+	// Create IAM and STS clients configured for LocalStack
+	endpoint := config.LocalStackEndpoint
+	if endpoint == "" {
+		// Use cluster-internal LocalStack service endpoint
+		endpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
 	}
 
-	iamClient := iam.NewFromConfig(cfg)
-	stsClient := sts.NewFromConfig(cfg)
+	iamClient := newIAMClient(endpoint)
+	stsClient := newSTSClient(endpoint)
 
 	return &integration{
 		iamClient:         iamClient,
@@ -55,8 +53,8 @@ func NewIntegration(kubeClient kubernetes.Interface, localstackManager localstac
 	}, nil
 }
 
-// NewIntegrationWithClients creates a new IAM integration with custom clients (for testing)
-func NewIntegrationWithClients(kubeClient kubernetes.Interface, localstackManager localstack.Manager, config *Config, iamClient IAMClient, stsClient STSClient) Integration {
+// NewIntegrationWithClient creates a new IAM integration with custom clients (for testing)
+func NewIntegrationWithClient(kubeClient kubernetes.Interface, iamClient IAMClient, stsClient STSClient, config *Config) Integration {
 	if config == nil {
 		config = &Config{
 			KubeNamespace: "default",
@@ -65,12 +63,11 @@ func NewIntegrationWithClients(kubeClient kubernetes.Interface, localstackManage
 	}
 
 	return &integration{
-		iamClient:         iamClient,
-		stsClient:         stsClient,
-		kubeClient:        kubeClient,
-		localstackManager: localstackManager,
-		config:            config,
-		roleMappings:      make(map[string]*TaskRoleMapping),
+		iamClient:    iamClient,
+		stsClient:    stsClient,
+		kubeClient:   kubeClient,
+		config:       config,
+		roleMappings: make(map[string]*TaskRoleMapping),
 	}
 }
 
@@ -84,26 +81,29 @@ func (i *integration) CreateTaskRole(taskDefArn, roleName string, trustPolicy st
 	}
 
 	// Create IAM role in LocalStack
-	createRoleOutput, err := i.iamClient.CreateRole(ctx, &iam.CreateRoleInput{
-		RoleName:                 aws.String(roleName),
-		AssumeRolePolicyDocument: aws.String(trustPolicy),
-		Description:              aws.String(fmt.Sprintf("Task role for %s", taskDefArn)),
-		Tags: []iamTypes.Tag{
-			{
-				Key:   aws.String("kecs:task-definition"),
-				Value: aws.String(taskDefArn),
-			},
-			{
-				Key:   aws.String("kecs:managed"),
-				Value: aws.String("true"),
-			},
+	tags := []iamapi.Tag{
+		{
+			Key:   "kecs:task-definition",
+			Value: taskDefArn,
 		},
+		{
+			Key:   "kecs:managed",
+			Value: "true",
+		},
+	}
+
+	description := fmt.Sprintf("Task role for %s", taskDefArn)
+	createRoleOutput, err := i.iamClient.CreateRole(ctx, &iamapi.CreateRoleRequest{
+		RoleName:                 roleName,
+		AssumeRolePolicyDocument: trustPolicy,
+		Description:              &description,
+		Tags:                     tags,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create IAM role: %w", err)
 	}
 
-	roleArn := aws.ToString(createRoleOutput.Role.Arn)
+	roleArn := createRoleOutput.Role.Arn
 
 	// Create ServiceAccount in Kubernetes
 	serviceAccountName := fmt.Sprintf("%s-sa", roleName)
@@ -112,13 +112,13 @@ func (i *integration) CreateTaskRole(taskDefArn, roleName string, trustPolicy st
 			Name:      serviceAccountName,
 			Namespace: i.config.KubeNamespace,
 			Annotations: map[string]string{
-				ServiceAccountAnnotations.RoleArn:          roleArn,
-				ServiceAccountAnnotations.RoleName:         roleName,
+				ServiceAccountAnnotations.RoleArn:           roleArn,
+				ServiceAccountAnnotations.RoleName:          roleName,
 				ServiceAccountAnnotations.TaskDefinitionArn: taskDefArn,
 			},
 			Labels: map[string]string{
 				"app.kubernetes.io/managed-by": "kecs",
-				"kecs.io/iam-role":            roleName,
+				"kecs.io/iam-role":             roleName,
 			},
 		},
 	}
@@ -126,8 +126,8 @@ func (i *integration) CreateTaskRole(taskDefArn, roleName string, trustPolicy st
 	_, err = i.kubeClient.CoreV1().ServiceAccounts(i.config.KubeNamespace).Create(ctx, serviceAccount, metav1.CreateOptions{})
 	if err != nil {
 		// Rollback IAM role creation
-		i.iamClient.DeleteRole(ctx, &iam.DeleteRoleInput{
-			RoleName: aws.String(roleName),
+		i.iamClient.DeleteRole(ctx, &iamapi.DeleteRoleRequest{
+			RoleName: roleName,
 		})
 		return fmt.Errorf("failed to create ServiceAccount: %w", err)
 	}
@@ -141,7 +141,7 @@ func (i *integration) CreateTaskRole(taskDefArn, roleName string, trustPolicy st
 		TaskDefinitionArn:  taskDefArn,
 	}
 
-	klog.Infof("Created IAM role %s and ServiceAccount %s for task definition %s", roleName, serviceAccountName, taskDefArn)
+	logging.Info("Created IAM role and ServiceAccount for task definition", "roleName", roleName, "serviceAccount", serviceAccountName, "taskDefArn", taskDefArn)
 	return nil
 }
 
@@ -167,32 +167,35 @@ func (i *integration) CreateTaskExecutionRole(roleName string) error {
 	}`
 
 	// Create the role
-	_, err := i.iamClient.CreateRole(ctx, &iam.CreateRoleInput{
-		RoleName:                 aws.String(roleName),
-		AssumeRolePolicyDocument: aws.String(trustPolicy),
-		Description:              aws.String("ECS task execution role"),
-		Tags: []iamTypes.Tag{
-			{
-				Key:   aws.String("kecs:role-type"),
-				Value: aws.String("execution"),
-			},
-			{
-				Key:   aws.String("kecs:managed"),
-				Value: aws.String("true"),
-			},
+	tags := []iamapi.Tag{
+		{
+			Key:   "kecs:role-type",
+			Value: "execution",
 		},
+		{
+			Key:   "kecs:managed",
+			Value: "true",
+		},
+	}
+
+	description := "ECS task execution role"
+	_, err := i.iamClient.CreateRole(ctx, &iamapi.CreateRoleRequest{
+		RoleName:                 roleName,
+		AssumeRolePolicyDocument: trustPolicy,
+		Description:              &description,
+		Tags:                     tags,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create execution role: %w", err)
 	}
 
 	// Attach AWS managed policy for ECS task execution
-	_, err = i.iamClient.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
-		RoleName:  aws.String(roleName),
-		PolicyArn: aws.String("arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"),
+	_, err = i.iamClient.AttachRolePolicy(ctx, &iamapi.AttachRolePolicyRequest{
+		RoleName:  roleName,
+		PolicyArn: "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
 	})
 	if err != nil {
-		klog.Warningf("Failed to attach managed policy (this may be normal in LocalStack): %v", err)
+		logging.Warn("Failed to attach managed policy (this may be normal in LocalStack)", "error", err)
 		// Create a custom policy instead
 		return i.createExecutionRolePolicy(roleName)
 	}
@@ -204,15 +207,15 @@ func (i *integration) CreateTaskExecutionRole(roleName string) error {
 func (i *integration) AttachPolicyToRole(roleName, policyArn string) error {
 	ctx := context.Background()
 
-	_, err := i.iamClient.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
-		RoleName:  aws.String(roleName),
-		PolicyArn: aws.String(policyArn),
+	_, err := i.iamClient.AttachRolePolicy(ctx, &iamapi.AttachRolePolicyRequest{
+		RoleName:  roleName,
+		PolicyArn: policyArn,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to attach policy: %w", err)
 	}
 
-	klog.Infof("Attached policy %s to role %s", policyArn, roleName)
+	logging.Info("Attached policy to role", "policyArn", policyArn, "roleName", roleName)
 	return nil
 }
 
@@ -220,16 +223,16 @@ func (i *integration) AttachPolicyToRole(roleName, policyArn string) error {
 func (i *integration) CreateInlinePolicy(roleName, policyName, policyDocument string) error {
 	ctx := context.Background()
 
-	_, err := i.iamClient.PutRolePolicy(ctx, &iam.PutRolePolicyInput{
-		RoleName:       aws.String(roleName),
-		PolicyName:     aws.String(policyName),
-		PolicyDocument: aws.String(policyDocument),
+	_, err := i.iamClient.PutRolePolicy(ctx, &iamapi.PutRolePolicyRequest{
+		RoleName:       roleName,
+		PolicyName:     policyName,
+		PolicyDocument: policyDocument,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create inline policy: %w", err)
 	}
 
-	klog.Infof("Created inline policy %s for role %s", policyName, roleName)
+	logging.Info("Created inline policy for role", "policyName", policyName, "roleName", roleName)
 	return nil
 }
 
@@ -255,41 +258,41 @@ func (i *integration) DeleteRole(roleName string) error {
 	if mapping != nil {
 		err := i.kubeClient.CoreV1().ServiceAccounts(mapping.Namespace).Delete(ctx, mapping.ServiceAccountName, metav1.DeleteOptions{})
 		if err != nil {
-			klog.Warningf("Failed to delete ServiceAccount: %v", err)
+			logging.Warn("Failed to delete ServiceAccount", "error", err)
 		}
 
 		delete(i.roleMappings, roleName)
 	}
 
 	// Detach all policies
-	policies, err := i.iamClient.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
-		RoleName: aws.String(roleName),
+	policies, err := i.iamClient.ListAttachedRolePolicies(ctx, &iamapi.ListAttachedRolePoliciesRequest{
+		RoleName: roleName,
 	})
-	if err == nil {
+	if err == nil && policies.AttachedPolicies != nil {
 		for _, policy := range policies.AttachedPolicies {
-			i.iamClient.DetachRolePolicy(ctx, &iam.DetachRolePolicyInput{
-				RoleName:  aws.String(roleName),
-				PolicyArn: policy.PolicyArn,
+			i.iamClient.DetachRolePolicy(ctx, &iamapi.DetachRolePolicyRequest{
+				RoleName:  roleName,
+				PolicyArn: getString(policy.PolicyArn),
 			})
 		}
 	}
 
 	// Delete inline policies
-	inlinePolicies, err := i.iamClient.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{
-		RoleName: aws.String(roleName),
+	inlinePolicies, err := i.iamClient.ListRolePolicies(ctx, &iamapi.ListRolePoliciesRequest{
+		RoleName: roleName,
 	})
-	if err == nil {
+	if err == nil && inlinePolicies.PolicyNames != nil {
 		for _, policyName := range inlinePolicies.PolicyNames {
-			i.iamClient.DeleteRolePolicy(ctx, &iam.DeleteRolePolicyInput{
-				RoleName:   aws.String(roleName),
-				PolicyName: aws.String(policyName),
+			i.iamClient.DeleteRolePolicy(ctx, &iamapi.DeleteRolePolicyRequest{
+				RoleName:   roleName,
+				PolicyName: policyName,
 			})
 		}
 	}
 
 	// Delete IAM role
-	_, err = i.iamClient.DeleteRole(ctx, &iam.DeleteRoleInput{
-		RoleName: aws.String(roleName),
+	_, err = i.iamClient.DeleteRole(ctx, &iamapi.DeleteRoleRequest{
+		RoleName: roleName,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete IAM role: %w", err)
@@ -325,18 +328,6 @@ func (i *integration) GetRoleCredentials(roleName string) (*Credentials, error) 
 
 // Helper functions
 
-func createLocalStackConfig(endpoint string) (aws.Config, error) {
-	if endpoint == "" {
-		return aws.Config{}, fmt.Errorf("no endpoint configured")
-	}
-	
-	return config.LoadDefaultConfig(context.Background(),
-		config.WithRegion("us-east-1"),
-		config.WithBaseEndpoint(endpoint),
-		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
-	)
-}
-
 func (i *integration) createExecutionRolePolicy(roleName string) error {
 	// Custom policy for task execution
 	policyDocument := `{
@@ -360,7 +351,6 @@ func (i *integration) createExecutionRolePolicy(roleName string) error {
 	return i.CreateInlinePolicy(roleName, "TaskExecutionPolicy", policyDocument)
 }
 
-
 func (i *integration) findServiceAccountByRole(roleName string) (*v1.ServiceAccount, error) {
 	ctx := context.Background()
 
@@ -381,3 +371,10 @@ func (i *integration) findServiceAccountByRole(roleName string) (*v1.ServiceAcco
 	return nil, nil
 }
 
+// Helper function to get string from pointer
+func getString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
