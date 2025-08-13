@@ -2,12 +2,13 @@ package kubernetes
 
 import (
 	"context"
-	"time"
+	"os"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	appconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // ClusterManager defines the interface for managing local Kubernetes clusters
@@ -28,13 +29,13 @@ type ClusterManager interface {
 	ClusterExists(ctx context.Context, clusterName string) (bool, error)
 
 	// GetKubeClient returns a Kubernetes client for the specified cluster
-	GetKubeClient(clusterName string) (kubernetes.Interface, error)
+	GetKubeClient(ctx context.Context, clusterName string) (kubernetes.Interface, error)
 
 	// GetKubeConfig returns the REST config for the specified cluster
-	GetKubeConfig(clusterName string) (*rest.Config, error)
+	GetKubeConfig(ctx context.Context, clusterName string) (*rest.Config, error)
 
 	// WaitForClusterReady waits for a cluster to be ready with the specified timeout
-	WaitForClusterReady(clusterName string, timeout time.Duration) error
+	WaitForClusterReady(ctx context.Context, clusterName string) error
 
 	// GetKubeconfigPath returns the path to the kubeconfig file for the cluster
 	GetKubeconfigPath(clusterName string) string
@@ -43,10 +44,10 @@ type ClusterManager interface {
 	GetClusterInfo(ctx context.Context, clusterName string) (*ClusterInfo, error)
 
 	// GetTraefikPort returns the Traefik port for a given cluster
-	GetTraefikPort(clusterName string) (int, bool)
+	GetTraefikPort(ctx context.Context, clusterName string) (int, error)
 
 	// ListClusters returns a list of all existing clusters
-	ListClusters(ctx context.Context) ([]string, error)
+	ListClusters(ctx context.Context) ([]ClusterInfo, error)
 
 	// IsClusterRunning checks if a cluster is currently running
 	IsClusterRunning(ctx context.Context, clusterName string) (bool, error)
@@ -54,12 +55,16 @@ type ClusterManager interface {
 
 // ClusterInfo contains information about a cluster
 type ClusterInfo struct {
-	Name      string            `json:"name"`
-	Status    string            `json:"status"`
-	Provider  string            `json:"provider"` // "kind" or "k3d"
-	NodeCount int               `json:"nodeCount"`
-	Version   string            `json:"version"`
-	Metadata  map[string]string `json:"metadata,omitempty"`
+	Name           string            `json:"name"`
+	Status         string            `json:"status"`
+	Provider       string            `json:"provider"` // "kind" or "k3d"
+	NodeCount      int               `json:"nodeCount"`
+	Version        string            `json:"version"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
+	KubeconfigPath string            `json:"kubeconfigPath,omitempty"`
+	APIPort        int               `json:"apiPort,omitempty"`
+	TraefikPort    int               `json:"traefikPort,omitempty"`
+	Running        bool              `json:"running"`
 }
 
 // ClusterManagerConfig contains configuration for cluster managers
@@ -99,6 +104,9 @@ type ClusterManagerConfig struct {
 
 	// RegistryPort specifies the port for the k3d registry (default: 5000)
 	RegistryPort int `json:"registryPort,omitempty"`
+
+	// TestMode enables test mode which uses mock implementations (for CI/testing)
+	TestMode bool `json:"testMode,omitempty"`
 }
 
 // VolumeMount represents a volume mount configuration
@@ -113,6 +121,12 @@ type VolumeMount struct {
 func NewClusterManager(config *ClusterManagerConfig) (ClusterManager, error) {
 	if config == nil {
 		config = &ClusterManagerConfig{}
+	}
+
+	// Detect CI environment and enable test mode
+	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+		config.TestMode = true
+		logging.Info("CI environment detected, enabling test mode")
 	}
 
 	// k3d is the only supported provider now

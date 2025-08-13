@@ -452,7 +452,7 @@ func (sm *ServiceManager) GetServiceStatus(
 	}
 
 	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.clusterManager.GetKubeClient(cluster.K8sClusterName)
+	kubeClient, err := sm.clusterManager.GetKubeClient(ctx, cluster.K8sClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
