@@ -745,9 +745,12 @@ func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 	}
 	
 	// Deploy FluentBit to kecs-system namespace (singleton pattern ensures it's only done once)
-	if err := kubernetes.EnsureFluentBitDaemonSet(ctx, kubeClient, localstackEndpoint, region); err != nil {
-		logging.Warn("Failed to ensure FluentBit DaemonSet", "error", err)
-		// Don't fail namespace creation if FluentBit deployment fails
+	// Skip in test mode to avoid RBAC permission issues
+	if !apiconfig.GetBool("features.testMode") {
+		if err := kubernetes.EnsureFluentBitDaemonSet(ctx, kubeClient, localstackEndpoint, region); err != nil {
+			logging.Warn("Failed to ensure FluentBit DaemonSet", "error", err)
+			// Don't fail namespace creation if FluentBit deployment fails
+		}
 	}
 	
 	// Create namespace without FluentBit (since it's now in kecs-system)
