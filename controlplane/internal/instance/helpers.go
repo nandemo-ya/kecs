@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	kecs "github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
@@ -354,4 +355,39 @@ func waitForDeployment(ctx context.Context, client kubernetes.Interface, namespa
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+// deployVector deploys Vector DaemonSet for log aggregation
+func (m *Manager) deployVector(ctx context.Context, instanceName string, cfg *config.Config) error {
+	clusterName := fmt.Sprintf("kecs-%s", instanceName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(context.Background(), clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	client, err := kubernetes.NewForConfig(kubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	// Get LocalStack endpoint if available
+	localstackEndpoint := ""
+	if cfg.LocalStack.Enabled {
+		// LocalStack endpoint is always the cluster-internal endpoint
+		localstackEndpoint = "http://localstack.kecs-system.svc.cluster.local:4566"
+	}
+
+	// Get region from config
+	region := cfg.AWS.DefaultRegion
+	if region == "" {
+		region = "us-east-1"
+	}
+
+	// Deploy Vector using singleton pattern
+	// This ensures Vector is only deployed once per KECS instance
+	if err := kecs.DeployVectorOnce(ctx, client, localstackEndpoint, region); err != nil {
+		return fmt.Errorf("failed to deploy Vector: %w", err)
+	}
+
+	return nil
 }

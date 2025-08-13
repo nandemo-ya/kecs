@@ -23,6 +23,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	kecs "github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // StartOptions contains options for starting a KECS instance
@@ -161,7 +162,7 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 
 	// Step 3: Deploy components in parallel
 	var wg sync.WaitGroup
-	errChan := make(chan error, 3)
+	errChan := make(chan error, 4) // Increased channel size for Vector
 
 	// Deploy Control Plane
 	wg.Add(1)
@@ -205,6 +206,22 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 			m.updateStatus(opts.InstanceName, "Configuring Traefik", "done")
 		}()
 	}
+
+	// Deploy Vector for log aggregation
+	// Vector is always deployed for CloudWatch Logs support
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		m.updateStatus(opts.InstanceName, "Deploying Vector", "running")
+		if err := m.deployVector(ctx, opts.InstanceName, cfg); err != nil {
+			m.updateStatus(opts.InstanceName, "Deploying Vector", "failed", err.Error())
+			// Vector deployment failure is not critical, just log warning
+			logging.Warn("Failed to deploy Vector DaemonSet", "error", err)
+			// Don't send to errChan to avoid failing the entire startup
+		} else {
+			m.updateStatus(opts.InstanceName, "Deploying Vector", "done")
+		}
+	}()
 
 	// Wait for deployments
 	wg.Wait()
