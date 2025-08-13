@@ -181,38 +181,7 @@ func (c *TaskConverter) ConvertTaskToPod(
 	// Apply CloudWatch logs configuration
 	if c.cloudWatchIntegration != nil {
 		c.applyCloudWatchLogsConfiguration(pod, containerDefs, taskDef)
-		
-		// Add FluentBit sidecar if needed
-		sidecar, configMap := c.createCloudWatchSidecar(containerDefs, taskDef, taskID)
-		if sidecar != nil {
-			pod.Spec.Containers = append(pod.Spec.Containers, *sidecar)
-			
-			// Add host path volumes for logs
-			pod.Spec.Volumes = append(pod.Spec.Volumes, 
-				corev1.Volume{
-					Name: "varlog",
-					VolumeSource: corev1.VolumeSource{
-						HostPath: &corev1.HostPathVolumeSource{
-							Path: "/var/log",
-						},
-					},
-				},
-				corev1.Volume{
-					Name: "varlibdockercontainers",
-					VolumeSource: corev1.VolumeSource{
-						HostPath: &corev1.HostPathVolumeSource{
-							Path: "/var/lib/docker/containers",
-						},
-					},
-				},
-			)
-			
-			// Store config map info for later creation
-			if configMap != nil {
-				pod.Annotations["kecs.dev/fluent-bit-configmap"] = configMap.Name
-				pod.Annotations["kecs.dev/fluent-bit-config"] = configMap.Data["fluent-bit.conf"]
-			}
-		}
+		// DaemonSet will handle log collection - no sidecar needed
 	}
 
 	return pod, nil
@@ -1365,105 +1334,6 @@ func (c *TaskConverter) sanitizeLabelKey(key string) string {
 	return key
 }
 
-// createCloudWatchSidecar creates a FluentBit sidecar container for CloudWatch logging
-func (c *TaskConverter) createCloudWatchSidecar(containerDefs []types.ContainerDefinition, taskDef *storage.TaskDefinition, taskID string) (*corev1.Container, *corev1.ConfigMap) {
-	if c.cloudWatchIntegration == nil {
-		return nil, nil
-	}
-
-	// Check if any container uses awslogs
-	var awslogsConfigs []types.LogConfiguration
-	for _, def := range containerDefs {
-		if def.LogConfiguration != nil && def.LogConfiguration.LogDriver != nil && *def.LogConfiguration.LogDriver == "awslogs" {
-			awslogsConfigs = append(awslogsConfigs, *def.LogConfiguration)
-		}
-	}
-
-	if len(awslogsConfigs) == 0 {
-		return nil, nil
-	}
-
-	// Get the first awslogs configuration as the primary one
-	primaryConfig := awslogsConfigs[0]
-	options := primaryConfig.Options
-	if options == nil {
-		options = make(map[string]string)
-	}
-
-	// Configure CloudWatch logging
-	logConfig, err := c.cloudWatchIntegration.ConfigureContainerLogging(
-		taskDef.ARN,
-		"fluent-bit",
-		"awslogs",
-		options,
-	)
-	if err != nil {
-		return nil, nil
-	}
-
-	// Create FluentBit sidecar container
-	sidecar := &corev1.Container{
-		Name:  "fluent-bit",
-		Image: "amazon/aws-for-fluent-bit:latest",
-		Env: []corev1.EnvVar{
-			{
-				Name:  "AWS_DEFAULT_REGION",
-				Value: c.region,
-			},
-			{
-				Name:  "AWS_ACCESS_KEY_ID",
-				Value: "test", // LocalStack default
-			},
-			{
-				Name:  "AWS_SECRET_ACCESS_KEY",
-				Value: "test", // LocalStack default
-			},
-		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "varlog",
-				MountPath: "/var/log",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "varlibdockercontainers",
-				MountPath: "/var/lib/docker/containers",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "fluent-bit-config",
-				MountPath: "/fluent-bit/etc/",
-			},
-		},
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("128Mi"),
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("200m"),
-				corev1.ResourceMemory: resource.MustParse("256Mi"),
-			},
-		},
-	}
-
-	// Create ConfigMap for FluentBit configuration
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("fluent-bit-config-%s", taskID),
-			Namespace: c.getNamespace(nil),
-			Labels: map[string]string{
-				"kecs.dev/task-id":    taskID,
-				"kecs.dev/managed-by": "kecs",
-			},
-		},
-		Data: map[string]string{
-			"fluent-bit.conf": logConfig.FluentBitConfig,
-		},
-	}
-
-	return sidecar, configMap
-}
 
 // sanitizeLabelValue converts a tag value to a valid Kubernetes label value
 func (c *TaskConverter) sanitizeLabelValue(value string) string {

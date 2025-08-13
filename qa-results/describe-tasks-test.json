@@ -1,0 +1,9 @@
+{
+  "failures": [
+    {
+      "arn": "arn:aws:ecs:us-east-1:000000000000:task/default/test-task-123",
+      "detail": "Task not found",
+      "reason": "MISSING"
+    }
+  ]
+}
