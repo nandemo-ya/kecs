@@ -570,36 +570,20 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			instanceStatus := strings.ToLower(m.instances[m.instanceCursor].Status)
 
 			// Toggle based on current status
-			ctx := context.Background()
-			var err error
-
 			if instanceStatus == "stopped" {
-				// Start the instance
-				err = m.apiClient.StartInstance(ctx, instanceName)
-				if err == nil {
-					// Update local status
-					m.instances[m.instanceCursor].Status = "Starting"
-				}
+				// Update local status immediately for UI feedback
+				m.instances[m.instanceCursor].Status = "Starting"
+				// Start the instance asynchronously
+				return m, m.startInstanceCmd(instanceName)
 			} else if instanceStatus == "running" {
-				// Stop the instance
-				err = m.apiClient.StopInstance(ctx, instanceName)
-				if err == nil {
-					// Update local status
-					m.instances[m.instanceCursor].Status = "Stopping"
-				}
+				// Update local status immediately for UI feedback
+				m.instances[m.instanceCursor].Status = "Stopping"
+				// Stop the instance asynchronously
+				return m, m.stopInstanceCmd(instanceName)
 			} else {
 				// Instance is in transition state, don't allow toggle
 				m.err = fmt.Errorf("Cannot start/stop instance in %s state", m.instances[m.instanceCursor].Status)
 				return m, nil
-			}
-
-			if err != nil {
-				m.err = fmt.Errorf("Failed to toggle instance: %v", err)
-			} else {
-				// Refresh instances list after a delay
-				return m, tea.Tick(time.Second, func(t time.Time) tea.Msg {
-					return refreshInstancesMsg{}
-				})
 			}
 		}
 	case "D":

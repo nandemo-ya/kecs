@@ -548,6 +548,40 @@ func (m Model) loadTaskDefinitionRevisionsCmd() tea.Cmd {
 	}
 }
 
+// startInstanceCmd starts a stopped instance asynchronously
+func (m Model) startInstanceCmd(instanceName string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		err := m.apiClient.StartInstance(ctx, instanceName)
+		if err != nil {
+			return errMsg{err: fmt.Errorf("failed to start instance %s: %w", instanceName, err)}
+		}
+
+		// Wait a bit before refreshing to allow the instance to transition
+		time.Sleep(2 * time.Second)
+		return refreshInstancesMsg{}
+	}
+}
+
+// stopInstanceCmd stops a running instance asynchronously
+func (m Model) stopInstanceCmd(instanceName string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		err := m.apiClient.StopInstance(ctx, instanceName)
+		if err != nil {
+			return errMsg{err: fmt.Errorf("failed to stop instance %s: %w", instanceName, err)}
+		}
+
+		// Wait a bit before refreshing to allow the instance to transition
+		time.Sleep(2 * time.Second)
+		return refreshInstancesMsg{}
+	}
+}
+
 // Message types for task definition operations
 type taskDefFamiliesLoadedMsg struct {
 	families []TaskDefinitionFamily
