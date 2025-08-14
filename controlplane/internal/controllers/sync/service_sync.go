@@ -20,12 +20,6 @@ func (c *SyncController) syncService(ctx context.Context, key string) error {
 		return fmt.Errorf("invalid resource key: %s", key)
 	}
 
-	// Check if this is an ECS-managed deployment
-	if !strings.HasPrefix(name, "ecs-service-") {
-		klog.Infof("Ignoring non-ECS deployment: %s", name)
-		return nil
-	}
-
 	// Get the deployment
 	klog.Infof("Getting deployment %s/%s", namespace, name)
 	deployment, err := c.deploymentLister.Deployments(namespace).Get(name)
@@ -38,6 +32,12 @@ func (c *SyncController) syncService(ctx context.Context, key string) error {
 		return fmt.Errorf("error fetching deployment: %v", err)
 	}
 	klog.Infof("Got deployment %s/%s successfully", namespace, name)
+
+	// Check if this is an ECS-managed deployment
+	if deployment.Labels["kecs.dev/managed-by"] != "kecs" {
+		klog.Infof("Ignoring non-ECS deployment: %s", name)
+		return nil
+	}
 
 	// Map deployment to service
 	mapper := mappers.NewServiceStateMapper(c.accountID, c.region)
