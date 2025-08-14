@@ -227,7 +227,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 
 	// Create storage service with deployment information
 	namespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
-	deploymentName := fmt.Sprintf("ecs-service-%s", req.ServiceName)
+	deploymentName := req.ServiceName
 
 	// Extract optional string values
 	var platformVersion, roleARN, propagateTags string

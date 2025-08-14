@@ -46,7 +46,7 @@ func (s *Server) createBasicPod(taskDef *storage.TaskDefinition, cluster *storag
 
 	// Create pod specification
 	namespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
-	podName := fmt.Sprintf("ecs-task-%s", taskID)
+	podName := taskID
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

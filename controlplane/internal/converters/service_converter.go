@@ -122,7 +122,7 @@ func (c *ServiceConverter) createDeployment(
 	namespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
 
 	// Create deployment name (ECS service name with prefix)
-	deploymentName := fmt.Sprintf("ecs-service-%s", service.ServiceName)
+	deploymentName := service.ServiceName
 
 	// Create containers from container definitions
 	containers, k8sVolumes, err := c.createContainersAndVolumes(containerDefs, volumes)
@@ -491,7 +491,7 @@ func (c *ServiceConverter) createKubernetesService(
 	namespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
 
 	// Create service name
-	serviceName := fmt.Sprintf("ecs-service-%s", service.ServiceName)
+	serviceName := service.ServiceName
 
 	// Extract ports from container definitions
 	var servicePorts []corev1.ServicePort
