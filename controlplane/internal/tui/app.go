@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -566,7 +567,7 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		// Start/Stop instance
 		if len(m.instances) > 0 && m.instanceCursor < len(m.instances) {
 			instanceName := m.instances[m.instanceCursor].Name
-			instanceStatus := m.instances[m.instanceCursor].Status
+			instanceStatus := strings.ToLower(m.instances[m.instanceCursor].Status)
 
 			// Toggle based on current status
 			ctx := context.Background()
@@ -577,18 +578,18 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 				err = m.apiClient.StartInstance(ctx, instanceName)
 				if err == nil {
 					// Update local status
-					m.instances[m.instanceCursor].Status = "starting"
+					m.instances[m.instanceCursor].Status = "Starting"
 				}
 			} else if instanceStatus == "running" {
 				// Stop the instance
 				err = m.apiClient.StopInstance(ctx, instanceName)
 				if err == nil {
 					// Update local status
-					m.instances[m.instanceCursor].Status = "stopping"
+					m.instances[m.instanceCursor].Status = "Stopping"
 				}
 			} else {
 				// Instance is in transition state, don't allow toggle
-				m.err = fmt.Errorf("Cannot start/stop instance in %s state", instanceStatus)
+				m.err = fmt.Errorf("Cannot start/stop instance in %s state", m.instances[m.instanceCursor].Status)
 				return m, nil
 			}
 

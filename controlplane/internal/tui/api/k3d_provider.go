@@ -332,12 +332,10 @@ func (p *K3dInstanceProvider) GetInstanceLogs(ctx context.Context, name string, 
 	return logChan, nil
 }
 
-// DeleteInstance deletes a KECS instance
+// StartInstance starts a stopped KECS instance
 func (p *K3dInstanceProvider) StartInstance(ctx context.Context, name string) error {
-	// Use instance manager to start the instance
-	return p.instanceManager.Start(ctx, instance.StartOptions{
-		InstanceName: name,
-	})
+	// Use instance manager to restart the instance (for already existing instances)
+	return p.instanceManager.Restart(ctx, name)
 }
 
 func (p *K3dInstanceProvider) StopInstance(ctx context.Context, name string) error {
