@@ -571,15 +571,43 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 			// Toggle based on current status
 			if instanceStatus == "stopped" {
-				// Update local status immediately for UI feedback
-				m.instances[m.instanceCursor].Status = "Starting"
-				// Start the instance asynchronously
-				return m, m.startInstanceCmd(instanceName)
+				// Create start confirmation dialog
+				m.confirmDialog = StartInstanceDialog(
+					instanceName,
+					func() error {
+						// Update local status immediately for UI feedback
+						m.instances[m.instanceCursor].Status = "Starting"
+						// Don't return error here, handle asynchronously
+						return nil
+					},
+					func() {
+						// Cancel - just close dialog
+					},
+				)
+				// Store the command to execute after confirmation
+				m.pendingCommand = m.startInstanceCmd(instanceName)
+				m.previousView = m.currentView
+				m.currentView = ViewConfirmDialog
+				return m, nil
 			} else if instanceStatus == "running" {
-				// Update local status immediately for UI feedback
-				m.instances[m.instanceCursor].Status = "Stopping"
-				// Stop the instance asynchronously
-				return m, m.stopInstanceCmd(instanceName)
+				// Create stop confirmation dialog
+				m.confirmDialog = StopInstanceDialog(
+					instanceName,
+					func() error {
+						// Update local status immediately for UI feedback
+						m.instances[m.instanceCursor].Status = "Stopping"
+						// Don't return error here, handle asynchronously
+						return nil
+					},
+					func() {
+						// Cancel - just close dialog
+					},
+				)
+				// Store the command to execute after confirmation
+				m.pendingCommand = m.stopInstanceCmd(instanceName)
+				m.previousView = m.currentView
+				m.currentView = ViewConfirmDialog
+				return m, nil
 			} else {
 				// Instance is in transition state, don't allow toggle
 				m.err = fmt.Errorf("Cannot start/stop instance in %s state", m.instances[m.instanceCursor].Status)
@@ -978,9 +1006,16 @@ func (m Model) handleConfirmDialogKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if err != nil {
 			m.err = err
 		}
-		// Clear dialog and go back
+		// Store pending command if any
+		cmd := m.pendingCommand
+		// Clear dialog and pending command
 		m.confirmDialog = nil
+		m.pendingCommand = nil
 		m.currentView = m.previousView
+		// Execute pending command if it exists, otherwise reload data
+		if cmd != nil {
+			return m, cmd
+		}
 		// Reload data after potential deletion
 		return m, m.loadDataFromAPI()
 	case "esc", "q":
@@ -989,6 +1024,7 @@ func (m Model) handleConfirmDialogKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.confirmDialog.onNo()
 		}
 		m.confirmDialog = nil
+		m.pendingCommand = nil // Clear pending command on cancel
 		m.currentView = m.previousView
 	}
 	return m, nil

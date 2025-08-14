@@ -144,3 +144,17 @@ func DeleteInstanceDialog(instanceName string, onDelete func() error, onCancel f
 	message := fmt.Sprintf("Are you sure you want to delete instance '%s'?\nThis action cannot be undone.", instanceName)
 	return NewConfirmDialog(title, message, onDelete, onCancel)
 }
+
+// StartInstanceDialog creates a dialog for instance start confirmation
+func StartInstanceDialog(instanceName string, onStart func() error, onCancel func()) *ConfirmDialog {
+	title := "Start Instance"
+	message := fmt.Sprintf("Start instance '%s'?", instanceName)
+	return NewConfirmDialog(title, message, onStart, onCancel)
+}
+
+// StopInstanceDialog creates a dialog for instance stop confirmation
+func StopInstanceDialog(instanceName string, onStop func() error, onCancel func()) *ConfirmDialog {
+	title := "Stop Instance"
+	message := fmt.Sprintf("Stop instance '%s'?\nAll running tasks will be terminated.", instanceName)
+	return NewConfirmDialog(title, message, onStop, onCancel)
+}
