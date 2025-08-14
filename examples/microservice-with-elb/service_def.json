@@ -1,7 +1,7 @@
 {
   "serviceName": "microservice-api",
   "cluster": "default",
-  "taskDefinition": "microservice-api:latest",
+  "taskDefinition": "microservice-api:1",
   "desiredCount": 3,
   "launchType": "FARGATE",
   "platformVersion": "LATEST",
