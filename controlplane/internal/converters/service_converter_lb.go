@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"

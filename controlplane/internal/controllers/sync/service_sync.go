@@ -6,10 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/controllers/sync/mappers"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/controllers/sync/mappers"
 )
 
 // syncService syncs a deployment to ECS service state

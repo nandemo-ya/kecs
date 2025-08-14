@@ -8,10 +8,14 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/mock"
 )
+
+// refreshInstancesMsg is sent to trigger instance list refresh
+type refreshInstancesMsg struct{}
 
 // Run starts the TUI application
 func Run() error {
@@ -559,9 +563,43 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.currentView = ViewInstanceCreate
 		return m, nil
 	case "S":
-		// Start/Stop instance (mock)
-		if len(m.instances) > 0 {
-			// Toggle status in mock
+		// Start/Stop instance
+		if len(m.instances) > 0 && m.instanceCursor < len(m.instances) {
+			instanceName := m.instances[m.instanceCursor].Name
+			instanceStatus := m.instances[m.instanceCursor].Status
+
+			// Toggle based on current status
+			ctx := context.Background()
+			var err error
+
+			if instanceStatus == "stopped" {
+				// Start the instance
+				err = m.apiClient.StartInstance(ctx, instanceName)
+				if err == nil {
+					// Update local status
+					m.instances[m.instanceCursor].Status = "starting"
+				}
+			} else if instanceStatus == "running" {
+				// Stop the instance
+				err = m.apiClient.StopInstance(ctx, instanceName)
+				if err == nil {
+					// Update local status
+					m.instances[m.instanceCursor].Status = "stopping"
+				}
+			} else {
+				// Instance is in transition state, don't allow toggle
+				m.err = fmt.Errorf("Cannot start/stop instance in %s state", instanceStatus)
+				return m, nil
+			}
+
+			if err != nil {
+				m.err = fmt.Errorf("Failed to toggle instance: %v", err)
+			} else {
+				// Refresh instances list after a delay
+				return m, tea.Tick(time.Second, func(t time.Time) tea.Msg {
+					return refreshInstancesMsg{}
+				})
+			}
 		}
 	case "D":
 		// Delete instance

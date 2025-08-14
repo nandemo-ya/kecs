@@ -227,6 +227,52 @@ func (c *MockClient) CreateInstance(ctx context.Context, opts CreateInstanceOpti
 	return &instance, nil
 }
 
+func (c *MockClient) StartInstance(ctx context.Context, name string) error {
+	for i, inst := range c.instances {
+		if inst.Name == name {
+			if inst.Status == "stopped" {
+				c.instances[i].Status = "starting"
+				// Simulate startup delay
+				go func() {
+					time.Sleep(2 * time.Second)
+					for j := range c.instances {
+						if c.instances[j].Name == name {
+							c.instances[j].Status = "running"
+							break
+						}
+					}
+				}()
+				return nil
+			}
+			return fmt.Errorf("instance %s is not stopped (status: %s)", name, inst.Status)
+		}
+	}
+	return fmt.Errorf("instance not found: %s", name)
+}
+
+func (c *MockClient) StopInstance(ctx context.Context, name string) error {
+	for i, inst := range c.instances {
+		if inst.Name == name {
+			if inst.Status == "running" {
+				c.instances[i].Status = "stopping"
+				// Simulate shutdown delay
+				go func() {
+					time.Sleep(2 * time.Second)
+					for j := range c.instances {
+						if c.instances[j].Name == name {
+							c.instances[j].Status = "stopped"
+							break
+						}
+					}
+				}()
+				return nil
+			}
+			return fmt.Errorf("instance %s is not running (status: %s)", name, inst.Status)
+		}
+	}
+	return fmt.Errorf("instance not found: %s", name)
+}
+
 func (c *MockClient) DeleteInstance(ctx context.Context, name string) error {
 	for i, inst := range c.instances {
 		if inst.Name == name {

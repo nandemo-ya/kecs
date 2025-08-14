@@ -8,10 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	s3api "github.com/nandemo-ya/kecs/controlplane/internal/s3/generated"
-	"k8s.io/client-go/kubernetes"
 )
 
 // integration implements the S3 Integration interface

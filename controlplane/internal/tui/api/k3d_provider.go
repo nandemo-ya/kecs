@@ -25,6 +25,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 )
@@ -332,6 +333,18 @@ func (p *K3dInstanceProvider) GetInstanceLogs(ctx context.Context, name string, 
 }
 
 // DeleteInstance deletes a KECS instance
+func (p *K3dInstanceProvider) StartInstance(ctx context.Context, name string) error {
+	// Use instance manager to start the instance
+	return p.instanceManager.Start(ctx, instance.StartOptions{
+		InstanceName: name,
+	})
+}
+
+func (p *K3dInstanceProvider) StopInstance(ctx context.Context, name string) error {
+	// Use instance manager to stop the instance
+	return p.instanceManager.Stop(ctx, name)
+}
+
 func (p *K3dInstanceProvider) DeleteInstance(ctx context.Context, name string) error {
 	// Use instance manager to destroy the instance (without deleting data)
 	return p.instanceManager.Destroy(ctx, name, false)

@@ -1,8 +1,9 @@
 package mock
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // DataMsg represents loaded mock data

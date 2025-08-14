@@ -9,16 +9,18 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/artifacts"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/secretsmanager"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
-	corev1 "k8s.io/api/core/v1"
 )
 
 // RunTask implements the RunTask operation

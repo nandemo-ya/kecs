@@ -24,6 +24,8 @@ type Client interface {
 	ListInstances(ctx context.Context) ([]Instance, error)
 	GetInstance(ctx context.Context, name string) (*Instance, error)
 	CreateInstance(ctx context.Context, opts CreateInstanceOptions) (*Instance, error)
+	StartInstance(ctx context.Context, name string) error
+	StopInstance(ctx context.Context, name string) error
 	DeleteInstance(ctx context.Context, name string) error
 	GetInstanceLogs(ctx context.Context, name string, follow bool) (<-chan LogEntry, error)
 	GetInstanceCreationStatus(ctx context.Context, name string) (*CreationStatus, error)

@@ -7,9 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // localStackManager implements the Manager interface
