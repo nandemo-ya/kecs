@@ -163,6 +163,9 @@ func (c *ServiceConverter) createDeployment(
 		podAnnotations[k] = v
 	}
 
+	// Add CloudWatch Logs annotations to pod template
+	c.addCloudWatchLogsAnnotations(podAnnotations, containerDefs)
+
 	// Add secret annotations to pod template
 	secretIndex := 0
 	logging.Info("Processing containers for secrets", "containerCount", len(containerDefs))
@@ -739,6 +742,80 @@ func (c *ServiceConverter) getK8sConfigMapName(parameterName string) string {
 	cleanName = strings.ReplaceAll(cleanName, "/", "-")
 	cleanName = strings.ToLower(cleanName)
 	return "ssm-cm-" + cleanName
+}
+
+// addCloudWatchLogsAnnotations adds CloudWatch Logs annotations to pod template
+func (c *ServiceConverter) addCloudWatchLogsAnnotations(podAnnotations map[string]string, containerDefs []map[string]interface{}) {
+	// Check if any container has awslogs driver
+	hasAwslogs := false
+	for _, containerDef := range containerDefs {
+		if logConfig, exists := containerDef["logConfiguration"]; exists {
+			if logConfigMap, ok := logConfig.(map[string]interface{}); ok {
+				if logDriver, exists := logConfigMap["logDriver"]; exists {
+					if driver, ok := logDriver.(string); ok && driver == "awslogs" {
+						hasAwslogs = true
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if !hasAwslogs {
+		return
+	}
+
+	// Add global CloudWatch logs enabled annotation
+	podAnnotations["kecs.dev/cloudwatch-logs-enabled"] = "true"
+	logging.Info("Added CloudWatch logs enabled annotation")
+
+	// Add container-specific log configurations
+	for _, containerDef := range containerDefs {
+		containerName, _ := containerDef["name"].(string)
+		if containerName == "" {
+			continue
+		}
+
+		if logConfig, exists := containerDef["logConfiguration"]; exists {
+			if logConfigMap, ok := logConfig.(map[string]interface{}); ok {
+				if logDriver, exists := logConfigMap["logDriver"]; exists {
+					if driver, ok := logDriver.(string); ok && driver == "awslogs" {
+						// Get options
+						if options, exists := logConfigMap["options"]; exists {
+							if optionsMap, ok := options.(map[string]interface{}); ok {
+								// Add log group annotation
+								if logGroup, exists := optionsMap["awslogs-group"]; exists {
+									if group, ok := logGroup.(string); ok && group != "" {
+										key := fmt.Sprintf("kecs.dev/container-%s-logs-group", containerName)
+										podAnnotations[key] = group
+										logging.Info("Added CloudWatch log group annotation", "container", containerName, "group", group)
+									}
+								}
+
+								// Add log stream prefix annotation
+								if streamPrefix, exists := optionsMap["awslogs-stream-prefix"]; exists {
+									if prefix, ok := streamPrefix.(string); ok && prefix != "" {
+										key := fmt.Sprintf("kecs.dev/container-%s-logs-stream-prefix", containerName)
+										podAnnotations[key] = prefix
+										logging.Info("Added CloudWatch stream prefix annotation", "container", containerName, "prefix", prefix)
+									}
+								}
+
+								// Add region annotation
+								if region, exists := optionsMap["awslogs-region"]; exists {
+									if r, ok := region.(string); ok && r != "" {
+										key := fmt.Sprintf("kecs.dev/container-%s-logs-region", containerName)
+										podAnnotations[key] = r
+										logging.Info("Added CloudWatch region annotation", "container", containerName, "region", r)
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 // isSSMParameterSensitive determines if an SSM parameter should be treated as sensitive
