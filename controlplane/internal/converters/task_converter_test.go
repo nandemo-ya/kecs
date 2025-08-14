@@ -111,7 +111,7 @@ var _ = Describe("TaskConverter", func() {
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pod).NotTo(BeNil())
-			Expect(pod.Name).To(Equal("ecs-task-test-task-id"))
+			Expect(pod.Name).To(Equal("test-task-id"))
 			Expect(pod.Namespace).To(Equal("test-cluster-us-east-1"))
 			Expect(pod.Labels).To(HaveKeyWithValue("kecs.dev/task-family", "test-task"))
 			Expect(pod.Labels).To(HaveKeyWithValue("kecs.dev/task-revision", "1"))

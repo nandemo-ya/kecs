@@ -402,7 +402,7 @@ func (sm *ServiceManager) DeleteService(
 
 	deploymentName := storageService.DeploymentName
 	if deploymentName == "" {
-		deploymentName = fmt.Sprintf("ecs-service-%s", storageService.ServiceName)
+		deploymentName = storageService.ServiceName
 	}
 
 	// Delete Deployment
@@ -415,7 +415,7 @@ func (sm *ServiceManager) DeleteService(
 	}
 
 	// Delete Service (if exists)
-	serviceName := fmt.Sprintf("ecs-service-%s", storageService.ServiceName)
+	serviceName := storageService.ServiceName
 	err = kubeClient.CoreV1().Services(namespace).Delete(
 		ctx, serviceName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
@@ -464,7 +464,7 @@ func (sm *ServiceManager) GetServiceStatus(
 
 	deploymentName := storageService.DeploymentName
 	if deploymentName == "" {
-		deploymentName = fmt.Sprintf("ecs-service-%s", storageService.ServiceName)
+		deploymentName = storageService.ServiceName
 	}
 
 	// Get Deployment status

@@ -113,7 +113,7 @@ func (c *TaskConverter) ConvertTaskToPod(
 	// Create pod spec
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("ecs-task-%s", taskID),
+			Name:      taskID,
 			Namespace: c.getNamespace(cluster),
 			Labels: map[string]string{
 				"kecs.dev/cluster":       cluster.Name,
