@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 
 	iamapi "github.com/nandemo-ya/kecs/controlplane/internal/iam/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"

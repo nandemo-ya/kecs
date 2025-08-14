@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/config"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -20,6 +18,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // SyncController manages the synchronization of Kubernetes resources to ECS state

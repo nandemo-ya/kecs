@@ -18,15 +18,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/nandemo-ya/kecs/controlplane/internal/config"
-	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
-	"gopkg.in/yaml.v3"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/gorilla/mux"
+	"gopkg.in/yaml.v3"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // ECSProxy proxies ECS API requests to the main API server

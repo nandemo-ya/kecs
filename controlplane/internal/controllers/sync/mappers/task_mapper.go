@@ -6,10 +6,11 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
-	corev1 "k8s.io/api/core/v1"
 )
 
 // TaskStateMapper maps Kubernetes pod state to ECS task state

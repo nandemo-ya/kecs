@@ -4,6 +4,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/mock"
 )
@@ -166,7 +167,8 @@ type Model struct {
 	instanceForm *InstanceForm
 
 	// Confirm dialog
-	confirmDialog *ConfirmDialog
+	confirmDialog  *ConfirmDialog
+	pendingCommand tea.Cmd // Command to execute after dialog confirmation
 
 	// Instance switcher
 	instanceSwitcher *InstanceSwitcher

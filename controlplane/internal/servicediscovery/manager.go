@@ -6,8 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // Manager manages service discovery operations

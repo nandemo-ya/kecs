@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
-	"k8s.io/client-go/kubernetes"
 )
 
 // Manager manages AWS proxy modes for LocalStack integration

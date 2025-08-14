@@ -141,6 +141,28 @@ func (c *HTTPClient) CreateInstance(ctx context.Context, opts CreateInstanceOpti
 	return &instance, nil
 }
 
+func (c *HTTPClient) StartInstance(ctx context.Context, name string) error {
+	// Always use k3d provider for starting instances
+	if c.k3dProvider != nil {
+		return c.k3dProvider.StartInstance(ctx, name)
+	}
+
+	// Fallback to API if k3d provider is not available
+	path := fmt.Sprintf("/api/instances/%s/start", url.PathEscape(name))
+	return c.doRequest(ctx, "POST", path, nil, nil)
+}
+
+func (c *HTTPClient) StopInstance(ctx context.Context, name string) error {
+	// Always use k3d provider for stopping instances
+	if c.k3dProvider != nil {
+		return c.k3dProvider.StopInstance(ctx, name)
+	}
+
+	// Fallback to API if k3d provider is not available
+	path := fmt.Sprintf("/api/instances/%s/stop", url.PathEscape(name))
+	return c.doRequest(ctx, "POST", path, nil, nil)
+}
+
 func (c *HTTPClient) DeleteInstance(ctx context.Context, name string) error {
 	// Always use k3d provider for deleting instances
 	if c.k3dProvider != nil {

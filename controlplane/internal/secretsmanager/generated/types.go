@@ -3,8 +3,9 @@
 package generated
 
 import (
-	"github.com/nandemo-ya/kecs/controlplane/internal/common"
 	"time"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/common"
 )
 
 // Unit represents an empty response

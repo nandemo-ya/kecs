@@ -15,9 +15,10 @@
 package cmd
 
 import (
+	"github.com/spf13/cobra"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui"
-	"github.com/spf13/cobra"
 )
 
 var (

@@ -8,9 +8,10 @@ import (
 	"os"
 	"sync"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/progress"
-	"github.com/sirupsen/logrus"
 )
 
 // silentWriter is a writer that discards all output until activated

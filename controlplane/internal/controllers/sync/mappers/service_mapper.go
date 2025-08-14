@@ -5,10 +5,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // ServiceStateMapper maps Kubernetes deployment state to ECS service state

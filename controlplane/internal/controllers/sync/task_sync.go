@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/controllers/sync/mappers"
-	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/controllers/sync/mappers"
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 )
 
 // syncTask syncs a pod to ECS task state

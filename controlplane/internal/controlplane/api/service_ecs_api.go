@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
@@ -214,7 +215,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 			"serviceName", req.ServiceName)
 		serviceConverter = converters.NewServiceConverter(api.region, api.accountID)
 	}
-	
+
 	serviceManager, err := api.getServiceManager()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create service manager: %w", err)

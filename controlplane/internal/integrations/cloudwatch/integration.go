@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/client-go/kubernetes"
+
 	cloudwatchlogsapi "github.com/nandemo-ya/kecs/controlplane/internal/cloudwatchlogs/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
-	"k8s.io/client-go/kubernetes"
 )
 
 // integration implements the CloudWatch Integration interface

@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 // RuleManager manages the synchronization between ELBv2 rules and Traefik IngressRoute rules
