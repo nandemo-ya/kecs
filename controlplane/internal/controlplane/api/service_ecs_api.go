@@ -203,7 +203,18 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	logging.Info("Creating service in namespace for ECS cluster", "cluster", cluster.Name)
 
 	// Create service converter and manager
-	serviceConverter := converters.NewServiceConverter(api.region, api.accountID)
+	// Use ServiceConverterWithLB if ELBv2 integration is available
+	var serviceConverter converters.ServiceConverterInterface
+	if api.elbv2Integration != nil {
+		logging.Info("Using ServiceConverterWithLB for ELBv2 integration",
+			"serviceName", req.ServiceName)
+		serviceConverter = converters.NewServiceConverterWithLB(api.region, api.accountID, api.elbv2Integration)
+	} else {
+		logging.Info("Using standard ServiceConverter",
+			"serviceName", req.ServiceName)
+		serviceConverter = converters.NewServiceConverter(api.region, api.accountID)
+	}
+	
 	serviceManager, err := api.getServiceManager()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create service manager: %w", err)
@@ -211,9 +222,10 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 
 	// Convert ECS service to Kubernetes Deployment
 	storageServiceTemp := &storage.Service{
-		ServiceName:  req.ServiceName,
-		DesiredCount: int(desiredCount),
-		LaunchType:   string(launchType),
+		ServiceName:   req.ServiceName,
+		DesiredCount:  int(desiredCount),
+		LaunchType:    string(launchType),
+		LoadBalancers: string(loadBalancersJSON),
 	}
 	deployment, kubeService, err := serviceConverter.ConvertServiceToDeploymentWithNetworkConfig(
 		storageServiceTemp,

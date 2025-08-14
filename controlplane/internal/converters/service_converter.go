@@ -471,9 +471,17 @@ func (c *ServiceConverter) createKubernetesService(
 	networkConfig *generated.NetworkConfiguration,
 	networkMode types.NetworkMode,
 ) (*corev1.Service, error) {
+	// Debug log for load balancers
+	logging.Info("Checking load balancers for Kubernetes Service",
+		"serviceName", service.ServiceName,
+		"loadBalancers", service.LoadBalancers,
+		"loadBalancersLen", len(service.LoadBalancers))
+
 	// Check if service has load balancers configured
 	if service.LoadBalancers == "" || service.LoadBalancers == "null" || service.LoadBalancers == "[]" {
 		// No load balancer configured, no need for Kubernetes Service
+		logging.Info("No load balancer configured, skipping Kubernetes Service creation",
+			"serviceName", service.ServiceName)
 		return nil, nil
 	}
 
@@ -561,8 +569,22 @@ func (c *ServiceConverter) createKubernetesService(
 		},
 	}
 
-	// Check for load balancer type
+	// Check for load balancer type and target group
+	hasTargetGroup := false
 	for _, lb := range loadBalancers {
+		// Check for targetGroupArn
+		if targetGroup, exists := lb["targetGroupArn"]; exists {
+			if tgArn, ok := targetGroup.(string); ok && tgArn != "" {
+				hasTargetGroup = true
+				logging.Info("Found target group ARN",
+					"serviceName", service.ServiceName,
+					"targetGroupArn", tgArn)
+				// Add annotation for target group
+				serviceAnnotations["kecs.dev/target-group-arn"] = tgArn
+			}
+		}
+
+		// Check for load balancer type
 		if lbType, exists := lb["type"]; exists {
 			if lbTypeStr, ok := lbType.(string); ok {
 				switch strings.ToLower(lbTypeStr) {
@@ -573,6 +595,18 @@ func (c *ServiceConverter) createKubernetesService(
 			}
 		}
 	}
+
+	// If we have target group but no explicit type, default to LoadBalancer
+	if hasTargetGroup && kubeService.Spec.Type == corev1.ServiceTypeClusterIP {
+		logging.Info("Target group found, defaulting to LoadBalancer type",
+			"serviceName", service.ServiceName)
+		kubeService.Spec.Type = corev1.ServiceTypeLoadBalancer
+	}
+
+	logging.Info("Created Kubernetes Service configuration",
+		"serviceName", service.ServiceName,
+		"serviceType", kubeService.Spec.Type,
+		"ports", len(servicePorts))
 
 	return kubeService, nil
 }

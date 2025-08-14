@@ -1,7 +1,7 @@
 {
   "serviceName": "single-task-nginx",
   "cluster": "default",
-  "taskDefinition": "single-task-nginx:latest",
+  "taskDefinition": "nginx-with-logs:1",
   "desiredCount": 1,
   "launchType": "FARGATE",
   "platformVersion": "LATEST",
