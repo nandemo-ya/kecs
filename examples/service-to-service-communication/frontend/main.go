@@ -114,13 +114,16 @@ const htmlTemplate = `
         </div>
         {{end}}
 
-        <h2>Service Discovery Test</h2>
-        <p>The frontend service discovers and communicates with the backend service using:</p>
-        <ul>
-            <li>ECS Service Discovery (AWS Cloud Map compatible)</li>
-            <li>DNS resolution via namespace: <code>backend-api.production.local</code></li>
-            <li>Automatic health checking and instance registration</li>
-        </ul>
+        <h2>How This Works</h2>
+        <p>This demo shows service-to-service communication in KECS:</p>
+        <ol>
+            <li><strong>Frontend Service</strong> (this page) runs as an ECS service</li>
+            <li><strong>Backend Service</strong> runs as another ECS service</li>
+            <li>Both services register with <strong>Service Discovery</strong></li>
+            <li>Frontend discovers backend using DNS name: <code>backend-api.production.local</code></li>
+            <li>No hardcoded IPs - services find each other automatically!</li>
+        </ol>
+        <p><strong>Note:</strong> This is running on KECS (Kubernetes-based ECS), not AWS!</p>
     </div>
 </body>
 </html>

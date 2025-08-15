@@ -4,10 +4,28 @@ This example demonstrates how services deployed on KECS can discover and communi
 
 ## Overview
 
-This demo includes:
-- **Backend API Service**: A simple REST API that returns JSON data
-- **Frontend Web Service**: A web UI that calls the backend API using service discovery
-- **Service Discovery**: Automatic DNS-based service discovery for inter-service communication
+This demo demonstrates service-to-service communication where:
+1. **Frontend Service** → calls → **Backend Service**
+2. Communication happens via Service Discovery DNS names
+3. No hardcoded IP addresses are used
+
+### Components
+
+- **Backend API Service** (`backend-api`): 
+  - REST API running on port 8080
+  - Provides `/api/data` endpoint
+  - Returns JSON responses with hostname and timestamp
+  
+- **Frontend Web Service** (`frontend-web`): 
+  - Web UI running on port 3000
+  - Has a button to call the backend API
+  - Discovers backend via DNS: `backend-api.production.local:8080`
+  - Displays the backend response in the UI
+
+- **Service Discovery**: 
+  - Automatic DNS-based service discovery
+  - Services register themselves when starting
+  - Health checks ensure only healthy instances are discoverable
 
 ## Architecture
 
@@ -52,34 +70,63 @@ kecs start --name service-demo
 export KECS_ENDPOINT=http://localhost:8080
 ```
 
-### 2. Deploy Services
+### 2. Build Docker Images
 
 ```bash
 # Navigate to example directory
 cd examples/service-to-service-communication
 
-# Deploy both services with service discovery
+# Build both service images
+docker build -t backend-api:latest ./backend
+docker build -t frontend-web:latest ./frontend
+```
+
+### 3. Deploy Services with Service Discovery
+
+```bash
+# Deploy both services (this will create namespace, services, and ECS services)
 ./scripts/deploy.sh
 ```
 
-### 3. Test Communication
+This script will:
+- Create ECS cluster (if not exists)
+- Create Service Discovery namespace `production.local`
+- Register both services in Service Discovery
+- Deploy ECS task definitions
+- Create ECS services with service registry configuration
+
+### 4. Test Communication
 
 ```bash
 # Test service discovery and communication
 ./scripts/test-communication.sh
 ```
 
-### 4. Access Frontend UI
+### 5. Access Frontend UI
+
+Since KECS runs tasks as Kubernetes pods, you can access the frontend:
 
 ```bash
-# Port forward the frontend service (in another terminal)
-kubectl port-forward service/frontend-web-service 3000:3000
+# Find the frontend pod
+kubectl get pods -l app=frontend-web-service
+
+# Port forward to access the UI
+kubectl port-forward pod/<frontend-pod-name> 3000:3000
 
 # Open in browser
 open http://localhost:3000
 ```
 
 Click the "Call Backend Service" button to test service-to-service communication.
+
+### What Happens When You Click "Call Backend Service"
+
+1. Frontend receives the button click
+2. Frontend resolves `backend-api.production.local` using Service Discovery
+3. DNS returns IP addresses of healthy backend instances
+4. Frontend makes HTTP request to `http://backend-api.production.local:8080/api/data`
+5. Backend responds with JSON data
+6. Frontend displays the response in the UI
 
 ## Service Discovery Details
 

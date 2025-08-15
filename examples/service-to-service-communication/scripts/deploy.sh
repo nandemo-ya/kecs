@@ -114,31 +114,31 @@ echo -e "\n${YELLOW}📝 Registering task definitions...${NC}"
 aws ecs register-task-definition --cli-input-json file://backend-task-def.json
 aws ecs register-task-definition --cli-input-json file://frontend-task-def.json
 
-# Step 6: Create ECS services with service discovery
+# Step 6: Update service definitions with actual Service Discovery ARNs
+echo -e "\n${YELLOW}📝 Updating service definitions with Service Discovery ARNs...${NC}"
+
+# Create temporary service definition files with actual ARNs
+sed "s|arn:aws:servicediscovery:us-east-1:000000000000:service/srv-backend|$BACKEND_SERVICE_ARN|" \
+    backend-service-def.json > /tmp/backend-service-def.json
+
+sed "s|arn:aws:servicediscovery:us-east-1:000000000000:service/srv-frontend|$FRONTEND_SERVICE_ARN|" \
+    frontend-service-def.json > /tmp/frontend-service-def.json
+
+# Step 7: Create ECS services with service discovery
 echo -e "\n${YELLOW}🔧 Creating ECS services...${NC}"
 
 # Create backend service
 echo "Creating backend ECS service..."
 aws ecs create-service \
+    --cli-input-json file:///tmp/backend-service-def.json \
     --cluster $CLUSTER_NAME \
-    --service-name backend-api-service \
-    --task-definition backend-api:1 \
-    --desired-count 2 \
-    --launch-type FARGATE \
-    --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],securityGroups=[sg-12345],assignPublicIp=ENABLED}" \
-    --service-registries "registryArn=$BACKEND_SERVICE_ARN,containerName=backend,containerPort=8080" \
     2>/dev/null || echo "Backend service already exists"
 
 # Create frontend service
 echo "Creating frontend ECS service..."
 aws ecs create-service \
+    --cli-input-json file:///tmp/frontend-service-def.json \
     --cluster $CLUSTER_NAME \
-    --service-name frontend-web-service \
-    --task-definition frontend-web:1 \
-    --desired-count 1 \
-    --launch-type FARGATE \
-    --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],securityGroups=[sg-12345],assignPublicIp=ENABLED}" \
-    --service-registries "registryArn=$FRONTEND_SERVICE_ARN,containerName=frontend,containerPort=3000" \
     2>/dev/null || echo "Frontend service already exists"
 
 # Step 7: Wait for services to be active
