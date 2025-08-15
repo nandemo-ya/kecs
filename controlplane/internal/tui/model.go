@@ -133,10 +133,12 @@ type Model struct {
 	height       int
 
 	// Navigation state
-	selectedInstance string
-	selectedCluster  string
-	selectedService  string
-	selectedTask     string
+	selectedInstance   string
+	selectedCluster    string
+	selectedService    string
+	selectedTask       string
+	selectedTaskDetail *TaskDetail // Detailed task information
+	taskDescribeScroll int         // Scroll position for task describe view
 
 	// List cursors
 	instanceCursor int

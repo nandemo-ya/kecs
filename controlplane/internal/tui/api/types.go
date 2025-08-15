@@ -210,6 +210,12 @@ type TaskDefinition struct {
 	RegisteredAt            time.Time             `json:"registeredAt"`
 }
 
+// KeyValuePair represents a key-value pair for environment variables
+type KeyValuePair struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 // ContainerDefinition represents a container within a task definition
 type ContainerDefinition struct {
 	Name              string                `json:"name"`
@@ -219,9 +225,10 @@ type ContainerDefinition struct {
 	MemoryReservation int                   `json:"memoryReservation,omitempty"`
 	PortMappings      []PortMapping         `json:"portMappings,omitempty"`
 	Essential         bool                  `json:"essential"`
-	Environment       []EnvironmentVariable `json:"environment,omitempty"`
+	Environment       []KeyValuePair        `json:"environment,omitempty"`
 	MountPoints       []MountPoint          `json:"mountPoints,omitempty"`
 	VolumesFrom       []VolumeFrom          `json:"volumesFrom,omitempty"`
+	DependsOn         []ContainerDependency `json:"dependsOn,omitempty"`
 }
 
 // PortMapping represents a port mapping for a container
@@ -229,12 +236,6 @@ type PortMapping struct {
 	ContainerPort int    `json:"containerPort"`
 	HostPort      int    `json:"hostPort,omitempty"`
 	Protocol      string `json:"protocol"`
-}
-
-// EnvironmentVariable represents an environment variable
-type EnvironmentVariable struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
 }
 
 // MountPoint represents a mount point
@@ -248,6 +249,12 @@ type MountPoint struct {
 type VolumeFrom struct {
 	SourceContainer string `json:"sourceContainer"`
 	ReadOnly        bool   `json:"readOnly,omitempty"`
+}
+
+// ContainerDependency represents a dependency between containers
+type ContainerDependency struct {
+	ContainerName string `json:"containerName"`
+	Condition     string `json:"condition"` // START, COMPLETE, SUCCESS, HEALTHY
 }
 
 // TaskDefinitionRevision represents summary info for a task definition revision

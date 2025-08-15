@@ -120,8 +120,8 @@ func (m Model) getHeaderShortcuts() string {
 		}
 	case ViewTasks:
 		shortcuts = []string{
+			keyStyle.Render("<↵>") + sepStyle.Render(" Describe"),
 			keyStyle.Render("<l>") + sepStyle.Render(" Logs"),
-			keyStyle.Render("<D>") + sepStyle.Render(" Describe"),
 			keyStyle.Render("<←>") + sepStyle.Render(" Back"),
 			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
 		}
@@ -430,6 +430,8 @@ func (m Model) renderResourcePanel() string {
 		content = m.renderServicesList(resourceHeight - 4)
 	case ViewTasks:
 		content = m.renderTasksList(resourceHeight - 4)
+	case ViewTaskDescribe:
+		content = m.renderTaskDescribe()
 	case ViewLogs:
 		content = m.renderLogsContent(resourceHeight - 4)
 	case ViewHelp:
@@ -1301,9 +1303,8 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		)
 	case ViewTasks:
 		shortcuts = append(shortcuts,
-			keyStyle.Render("↵")+" "+descStyle.Render("View logs"),
+			keyStyle.Render("↵")+" "+descStyle.Render("Describe"),
 			keyStyle.Render("l")+" "+descStyle.Render("Logs"),
-			keyStyle.Render("D")+" "+descStyle.Render("Describe"),
 			keyStyle.Render("←")+" "+descStyle.Render("Back"),
 			keyStyle.Render("T")+" "+descStyle.Render("Task defs"),
 		)
