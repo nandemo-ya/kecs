@@ -3,12 +3,14 @@ package servicediscovery
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/route53"
 )
 
 // Manager manages service discovery operations
@@ -45,11 +47,14 @@ type manager struct {
 
 	// DNS namespace to Kubernetes namespace mapping
 	dnsToK8sNamespace map[string]string
+
+	// Route53 integration (optional)
+	route53Manager *route53.Manager
 }
 
 // NewManager creates a new service discovery manager
 func NewManager(kubeClient kubernetes.Interface, region, accountID string) Manager {
-	return &manager{
+	mgr := &manager{
 		kubeClient:        kubeClient,
 		region:            region,
 		accountID:         accountID,
@@ -58,6 +63,30 @@ func NewManager(kubeClient kubernetes.Interface, region, accountID string) Manag
 		instances:         make(map[string]map[string]*Instance),
 		dnsToK8sNamespace: make(map[string]string),
 	}
+
+	// Initialize Route53 integration if LocalStack endpoint is configured
+	localstackEndpoint := os.Getenv("LOCALSTACK_ENDPOINT")
+	if localstackEndpoint == "" {
+		localstackEndpoint = os.Getenv("AWS_ENDPOINT_URL")
+	}
+
+	if localstackEndpoint != "" {
+		ctx := context.Background()
+		r53Client, err := route53.NewClient(ctx, localstackEndpoint)
+		if err != nil {
+			logging.Warn("Failed to initialize Route53 client", "error", err)
+		} else {
+			// Default VPC configuration for LocalStack
+			defaultVPC := &route53.VPCConfig{
+				VPCID:  "vpc-default",
+				Region: region,
+			}
+			mgr.route53Manager = route53.NewManager(r53Client, defaultVPC)
+			logging.Info("Route53 integration enabled", "endpoint", localstackEndpoint)
+		}
+	}
+
+	return mgr
 }
 
 // CreatePrivateDnsNamespace creates a private DNS namespace
@@ -107,6 +136,15 @@ func (m *manager) CreatePrivateDnsNamespace(ctx context.Context, name, vpc strin
 	}
 	m.dnsToK8sNamespace[name] = k8sNamespace
 
+	// Create Route53 hosted zone if integration is enabled
+	if m.route53Manager != nil {
+		_, err := m.route53Manager.CreateNamespaceZone(ctx, name)
+		if err != nil {
+			logging.Warn("Failed to create Route53 hosted zone", "namespace", name, "error", err)
+			// Continue anyway - Kubernetes DNS will still work
+		}
+	}
+
 	logging.Info("Created private DNS namespace", "name", name, "id", namespaceID)
 
 	return namespace, nil
@@ -155,6 +193,14 @@ func (m *manager) DeleteNamespace(ctx context.Context, namespaceID string) error
 
 	delete(m.namespaces, namespaceID)
 	delete(m.dnsToK8sNamespace, namespace.Name)
+
+	// Delete Route53 hosted zone if integration is enabled
+	if m.route53Manager != nil {
+		err := m.route53Manager.DeleteNamespaceZone(ctx, namespace.Name)
+		if err != nil {
+			logging.Warn("Failed to delete Route53 hosted zone", "namespace", namespace.Name, "error", err)
+		}
+	}
 
 	logging.Info("Deleted namespace", "namespaceID", namespaceID)
 
@@ -291,6 +337,21 @@ func (m *manager) RegisterInstance(ctx context.Context, serviceID string, instan
 		// Don't fail the registration, just log the error
 	}
 
+	// Update Route53 records if integration is enabled
+	if m.route53Manager != nil {
+		namespace := m.namespaces[service.NamespaceID]
+		if namespace != nil {
+			// Collect all IPs from instances
+			ips := m.collectInstanceIPs(m.instances[serviceID])
+			if len(ips) > 0 {
+				err := m.route53Manager.RegisterService(ctx, namespace.Name, service.Name, ips)
+				if err != nil {
+					logging.Warn("Failed to update Route53 records", "service", service.Name, "error", err)
+				}
+			}
+		}
+	}
+
 	return instance, nil
 }
 
@@ -316,6 +377,25 @@ func (m *manager) DeregisterInstance(ctx context.Context, serviceID string, inst
 	// Update Kubernetes Endpoints
 	if err := m.updateKubernetesEndpoints(ctx, service, m.instances[serviceID]); err != nil {
 		logging.Error("Failed to update Kubernetes endpoints", "error", err)
+	}
+
+	// Update Route53 records if integration is enabled
+	if m.route53Manager != nil {
+		namespace := m.namespaces[service.NamespaceID]
+		if namespace != nil {
+			// Collect remaining IPs from instances
+			ips := m.collectInstanceIPs(m.instances[serviceID])
+			var err error
+			if len(ips) > 0 {
+				err = m.route53Manager.RegisterService(ctx, namespace.Name, service.Name, ips)
+			} else {
+				// No more instances, remove the service from Route53
+				err = m.route53Manager.DeregisterService(ctx, namespace.Name, service.Name)
+			}
+			if err != nil {
+				logging.Warn("Failed to update Route53 records", "service", service.Name, "error", err)
+			}
+		}
 	}
 
 	return nil
