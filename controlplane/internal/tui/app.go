@@ -126,6 +126,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m, cmd = m.handleServicesKeys(msg)
 		case ViewTasks:
 			m, cmd = m.handleTasksKeys(msg)
+		case ViewTaskDescribe:
+			m, cmd = m.handleTaskDescribeKeys(msg)
 		case ViewLogs:
 			m, cmd = m.handleLogsKeys(msg)
 		case ViewHelp:
@@ -184,6 +186,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case logsLoadedMsg:
 		// Handle loaded logs
 		m.logs = msg.logs
+
+	case taskDetailLoadedMsg:
+		// Handle loaded task details
+		m.selectedTaskDetail = msg.detail
+		m.taskDescribeScroll = 0 // Reset scroll position when new details are loaded
 
 	case instanceCreatedMsg:
 		// Add new instance to list
@@ -456,7 +463,7 @@ func (m Model) View() string {
 
 	// For task describe, use full screen
 	if m.currentView == ViewTaskDescribe {
-		return m.renderTaskDescribeView()
+		return m.renderTaskDescribe()
 	}
 
 	// For confirm dialog, use overlay
@@ -802,13 +809,82 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleTaskDescribeKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	// Calculate content size for proper scroll limits
+	// This is a simplified check - the actual calculation happens in render
+	maxScroll := 100 // Default reasonable max
+	if m.selectedTaskDetail != nil {
+		// Rough estimate: each section has about 10-20 lines
+		estimatedLines := 30                                        // Overview + Network + Timestamps
+		estimatedLines += len(m.selectedTaskDetail.Containers) * 10 // Each container ~10 lines
+		maxScroll = estimatedLines
+	}
+
+	switch msg.String() {
+	case "up", "k":
+		if m.taskDescribeScroll > 0 {
+			m.taskDescribeScroll--
+		}
+	case "down", "j":
+		// Check against estimated max
+		if m.taskDescribeScroll < maxScroll {
+			m.taskDescribeScroll++
+		}
+	case "pgup", "ctrl+u":
+		// Page up
+		m.taskDescribeScroll -= 10
+		if m.taskDescribeScroll < 0 {
+			m.taskDescribeScroll = 0
+		}
+	case "pgdown", "ctrl+d":
+		// Page down
+		m.taskDescribeScroll += 10
+		if m.taskDescribeScroll > maxScroll {
+			m.taskDescribeScroll = maxScroll
+		}
+	case "home", "g":
+		// Go to top
+		m.taskDescribeScroll = 0
+	case "end", "G":
+		// Go to bottom (will be adjusted in render)
+		m.taskDescribeScroll = maxScroll
+	case "l":
+		// View logs
+		m.previousView = m.currentView
+		m.currentView = ViewLogs
+		return m, m.loadTaskLogsCmd()
+	case "esc", "backspace":
+		// Go back to tasks list
+		m.currentView = m.previousView
+		m.selectedTaskDetail = nil
+		m.taskDescribeScroll = 0
+	case "r":
+		// TODO: Implement restart task
+		// This would require calling StopTask and then RunTask
+	case "s":
+		// TODO: Implement stop task
+		// This would require calling StopTask API
+	}
+	return m, nil
+}
+
 func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		m.moveCursorUp()
 	case "down", "j":
 		m.moveCursorDown()
-	case "enter", "l":
+	case "enter":
+		// View task details
+		if len(m.tasks) > 0 && m.taskCursor < len(m.tasks) {
+			m.selectedTask = m.tasks[m.taskCursor].ID
+			m.previousView = m.currentView
+			m.currentView = ViewTaskDescribe
+			m.selectedTaskDetail = nil // Clear previous details
+			m.taskDescribeScroll = 0
+			return m, m.loadTaskDetailsCmd()
+		}
+	case "l":
 		// View logs for selected task
 		if len(m.tasks) > 0 {
 			m.selectedTask = m.tasks[m.taskCursor].ID

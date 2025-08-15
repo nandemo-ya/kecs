@@ -523,7 +523,7 @@ func (c *MockClient) DescribeTaskDefinition(ctx context.Context, instanceName st
 					{ContainerPort: 80, Protocol: "tcp"},
 				},
 				Essential: true,
-				Environment: []EnvironmentVariable{
+				Environment: []KeyValuePair{
 					{Name: "ENV", Value: "production"},
 				},
 			},
