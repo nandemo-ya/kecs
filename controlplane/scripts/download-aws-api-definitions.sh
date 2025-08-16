@@ -24,6 +24,7 @@ SERVICES=(
     "secrets-manager"
     "ssm"
     "sts"
+    "servicediscovery"
 )
 
 BASE_URL="https://raw.githubusercontent.com/aws/aws-sdk-go-v2/main/codegen/sdk-codegen/aws-models"
