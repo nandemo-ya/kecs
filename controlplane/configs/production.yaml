@@ -78,7 +78,6 @@ health:
 
 # Feature flags
 features:
-  traefik: false  # Traefik is now disabled (proxy is handled by controlplane)
 
 # LocalStack configuration
 localstack:

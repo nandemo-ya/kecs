@@ -155,8 +155,6 @@ func runServer(cmd *cobra.Command) {
 	if cfg.LocalStack.Enabled {
 		logging.Info("LocalStack integration is enabled")
 		localstackConfig = &cfg.LocalStack
-		// Set UseTraefik from features configuration
-		localstackConfig.UseTraefik = cfg.Features.Traefik
 	}
 
 	apiServer, err := api.NewServer(cfg.Server.Port, kubeconfig, storage, localstackConfig)

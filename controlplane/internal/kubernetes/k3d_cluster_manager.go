@@ -34,8 +34,7 @@ type K3dClusterManager struct {
 	runtime       runtimes.Runtime
 	config        *ClusterManagerConfig
 	portForwarder *PortForwarder
-	traefikPorts  map[string]int // cluster name -> traefik port mapping
-	portMutex     sync.Mutex     // protects port allocation
+	portMutex     sync.Mutex // protects port allocation
 }
 
 // NewK3dClusterManager creates a new k3d-based cluster manager
@@ -52,13 +51,11 @@ func NewK3dClusterManager(cfg *ClusterManagerConfig) (*K3dClusterManager, error)
 	runtime := runtimes.Docker
 
 	logging.Info("Creating K3dClusterManager with config",
-		"containerMode", cfg.ContainerMode,
-		"enableTraefik", cfg.EnableTraefik)
+		"containerMode", cfg.ContainerMode)
 
 	return &K3dClusterManager{
-		runtime:      runtime,
-		config:       cfg,
-		traefikPorts: make(map[string]int),
+		runtime: runtime,
+		config:  cfg,
 	}, nil
 }
 
@@ -149,40 +146,8 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 		logging.Info("Adding volume mounts", "volumes", volumes)
 	}
 
-	// Add port mapping for HTTP access (needed regardless of Traefik deployment)
-	// This maps host port to NodePort 30890 for accessing services in the cluster
-	{
-		// Lock for thread-safe port allocation
-		k.portMutex.Lock()
-
-		// Determine port for HTTP access
-		httpPort := k.config.TraefikPort
-		if httpPort == 0 {
-			// Find available port starting from 8090
-			port, err := k.findAvailablePort(8090)
-			if err != nil {
-				k.portMutex.Unlock()
-				return fmt.Errorf("failed to find available port for HTTP access: %w", err)
-			}
-			httpPort = port
-		}
-
-		// Store the port for this cluster
-		k.traefikPorts[normalizedName] = httpPort
-		k.portMutex.Unlock()
-
-		logging.Info("Adding port mapping for HTTP access",
-			"hostPort", httpPort,
-			"nodePort", 30890)
-		serverNode.Ports = nat.PortMap{
-			"30890/tcp": []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: fmt.Sprintf("%d", httpPort),
-				},
-			},
-		}
-	}
+	// Port mapping is handled by individual service NodePorts
+	// No additional port mapping needed since proxy is in controlplane
 
 	// Create cluster configuration with minimal required fields
 	// In container mode, check if KECS network is specified
@@ -375,39 +340,6 @@ func (k *K3dClusterManager) createClusterStandardWithPorts(ctx context.Context, 
 		}
 		serverNode.Ports = portMap
 
-		// Store the first port mapping as the main traefik port
-		for hostPort := range portMappings {
-			k.portMutex.Lock()
-			k.traefikPorts[normalizedName] = int(hostPort)
-			k.portMutex.Unlock()
-			break
-		}
-	} else {
-		// Fallback to default behavior if no port mappings provided
-		k.portMutex.Lock()
-		httpPort := k.config.TraefikPort
-		if httpPort == 0 {
-			port, err := k.findAvailablePort(8090)
-			if err != nil {
-				k.portMutex.Unlock()
-				return fmt.Errorf("failed to find available port for HTTP access: %w", err)
-			}
-			httpPort = port
-		}
-		k.traefikPorts[normalizedName] = httpPort
-		k.portMutex.Unlock()
-
-		logging.Info("Adding default port mapping",
-			"hostPort", httpPort,
-			"nodePort", 30890)
-		serverNode.Ports = nat.PortMap{
-			"30890/tcp": []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: fmt.Sprintf("%d", httpPort),
-				},
-			},
-		}
 	}
 
 	// Create cluster configuration with minimal required fields
@@ -1033,24 +965,6 @@ func (k *K3dClusterManager) GetHostKubeconfigPath(clusterName string) string {
 	return k.GetKubeconfigPath(clusterName)
 }
 
-// GetTraefikPort returns the Traefik port for a given cluster
-func (k *K3dClusterManager) GetTraefikPort(ctx context.Context, clusterName string) (int, error) {
-	// In CI/test mode, return a default port
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
-		return 8080, nil
-	}
-
-	k.portMutex.Lock()
-	defer k.portMutex.Unlock()
-
-	normalizedName := k.normalizeClusterName(clusterName)
-	if port, ok := k.traefikPorts[normalizedName]; ok {
-		return port, nil
-	}
-
-	return 0, fmt.Errorf("traefik port not found for cluster %s", clusterName)
-}
-
 // GetClusterInfo returns information about the cluster
 func (k *K3dClusterManager) GetClusterInfo(ctx context.Context, clusterName string) (*ClusterInfo, error) {
 	// In CI/test mode, return mock cluster info
@@ -1421,38 +1335,6 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		logging.Info("Adding volume mounts to optimized cluster", "volumes", volumes)
 	}
 
-	// Add port mapping for Traefik if enabled (even in optimized mode)
-	if k.config.EnableTraefik {
-		// Lock for thread-safe port allocation
-		k.portMutex.Lock()
-
-		// Determine Traefik port
-		traefikPort := k.config.TraefikPort
-		if traefikPort == 0 {
-			// Find available port starting from 8090
-			port, err := k.findAvailablePort(8090)
-			if err != nil {
-				k.portMutex.Unlock()
-				return fmt.Errorf("failed to find available port for Traefik: %w", err)
-			}
-			traefikPort = port
-		}
-
-		// Store the port for this cluster
-		k.traefikPorts[normalizedName] = traefikPort
-		k.portMutex.Unlock()
-
-		logging.Info("Adding port mapping for Traefik", "port", traefikPort)
-		serverNode.Ports = nat.PortMap{
-			"30890/tcp": []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: fmt.Sprintf("%d", traefikPort),
-				},
-			},
-		}
-	}
-
 	// Create minimal cluster configuration
 	// In container mode, check if KECS network is specified
 	networkName := fmt.Sprintf("k3d-%s", normalizedName)
@@ -1571,34 +1453,6 @@ func (k *K3dClusterManager) waitForClusterReadyOptimized(ctx context.Context, cl
 			}
 		}
 	}
-}
-
-// findAvailablePort finds an available port starting from the given port
-func (k *K3dClusterManager) findAvailablePort(startPort int) (int, error) {
-	// Try up to 100 ports
-	for i := 0; i < 100; i++ {
-		port := startPort + i
-
-		// Check if port is already allocated to another cluster
-		portInUse := false
-		for _, allocatedPort := range k.traefikPorts {
-			if allocatedPort == port {
-				portInUse = true
-				break
-			}
-		}
-
-		// Skip if already allocated
-		if portInUse {
-			continue
-		}
-
-		// Check if port is available on the host
-		if IsPortAvailable(port) {
-			return port, nil
-		}
-	}
-	return 0, fmt.Errorf("no available port found starting from %d", startPort)
 }
 
 // ensureRegistry ensures a k3d registry exists for dev mode (creates if necessary)

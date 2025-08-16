@@ -123,9 +123,6 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 	if opts.NoLocalStack {
 		cfg.LocalStack.Enabled = false
 	}
-	if opts.NoTraefik {
-		cfg.Features.Traefik = false
-	}
 
 	// Set up data directory
 	if opts.DataDir == "" {
@@ -189,21 +186,6 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 				return
 			}
 			m.updateStatus(opts.InstanceName, "Starting LocalStack", "done")
-		}()
-	}
-
-	// Deploy Traefik if enabled
-	if cfg.Features.Traefik {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			m.updateStatus(opts.InstanceName, "Configuring Traefik", "running")
-			if err := m.deployTraefik(ctx, opts.InstanceName, cfg, opts.ApiPort); err != nil {
-				m.updateStatus(opts.InstanceName, "Configuring Traefik", "failed", err.Error())
-				errChan <- fmt.Errorf("failed to deploy Traefik: %w", err)
-				return
-			}
-			m.updateStatus(opts.InstanceName, "Configuring Traefik", "done")
 		}()
 	}
 

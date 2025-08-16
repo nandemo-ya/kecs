@@ -99,10 +99,8 @@ func (d *ResourceDeployer) DeployControlPlane(ctx context.Context, config *resou
 	return nil
 }
 
-// DeployTraefik is deprecated - Traefik is no longer used
-// All proxying is now handled by the controlplane itself
+// DeployTraefik is deprecated and does nothing
 func (d *ResourceDeployer) DeployTraefik(ctx context.Context, config interface{}) error {
-	logging.Info("Traefik deployment skipped - proxy is now handled by controlplane")
 	return nil
 }
 

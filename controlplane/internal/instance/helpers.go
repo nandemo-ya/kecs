@@ -223,10 +223,8 @@ func (m *Manager) deployLocalStack(ctx context.Context, instanceName string, cfg
 	return nil
 }
 
-// deployTraefik is deprecated - Traefik is no longer used
-// All proxying is now handled by the controlplane itself
+// deployTraefik is deprecated and does nothing
 func (m *Manager) deployTraefik(ctx context.Context, instanceName string, cfg *config.Config, apiPort int) error {
-	// Traefik deployment is skipped - proxy is now handled by controlplane
 	return nil
 }
 

@@ -76,8 +76,6 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		clusterConfig := &kubernetes.ClusterManagerConfig{
 			ContainerMode:  apiconfig.GetBool("features.containerMode"),
 			KubeconfigPath: kubeconfig,
-			EnableTraefik:  apiconfig.GetBool("features.traefik"),
-			TraefikPort:    0, // 0 means dynamic port allocation
 		}
 
 		cm, err := kubernetes.NewClusterManager(clusterConfig)
@@ -206,12 +204,6 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 
 		if kubeClient != nil {
 			logging.Info("KubeClient created successfully, proceeding with LocalStack initialization...")
-			// Check if Traefik is enabled
-			if apiconfig.GetBool("features.traefik") {
-				localStackConfig.UseTraefik = true
-				// Don't set ProxyEndpoint here - it will be set dynamically when LocalStack is deployed
-				logging.Info("Traefik proxy enabled for LocalStack (port will be assigned dynamically)")
-			}
 
 			// Set container mode
 			localStackConfig.ContainerMode = apiconfig.GetBool("features.containerMode")
@@ -1038,11 +1030,6 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 		if appConfig.LocalStack.Enabled {
 			config.Enabled = true
 		}
-		// Check features.traefik configuration
-		if appConfig.Features.Traefik {
-			config.UseTraefik = true
-			logging.Info("Traefik is enabled for LocalStack recovery via features.traefik")
-		}
 		// Set container mode
 		if appConfig.Features.ContainerMode {
 			config.ContainerMode = true
@@ -1061,18 +1048,6 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 		return fmt.Errorf("failed to get Kubernetes client: %w", err)
 	}
 
-	// If Traefik is enabled, get the dynamic port from cluster manager
-	if config.UseTraefik && s.clusterManager != nil {
-		if port, err := s.clusterManager.GetTraefikPort(ctx, cluster.K8sClusterName); err == nil {
-			config.ProxyEndpoint = fmt.Sprintf("http://localhost:%d", port)
-			logging.Info("Using dynamic Traefik port for LocalStack proxy endpoint",
-				"port", port,
-				"proxyEndpoint", config.ProxyEndpoint)
-		} else {
-			logging.Warn("Traefik is enabled but no port found for cluster",
-				"k8sCluster", cluster.K8sClusterName)
-		}
-	}
 
 	// Get kube config
 	kubeConfig, err := s.clusterManager.GetKubeConfig(ctx, cluster.K8sClusterName)

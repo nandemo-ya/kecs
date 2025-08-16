@@ -47,7 +47,6 @@ type FeaturesConfig struct {
 	ContainerMode    bool `yaml:"containerMode" mapstructure:"containerMode"`
 	AutoRecoverState bool `yaml:"autoRecoverState" mapstructure:"autoRecoverState"`
 	DevMode          bool `yaml:"devMode" mapstructure:"devMode"`
-	Traefik          bool `yaml:"traefik" mapstructure:"traefik"`
 	IAMIntegration   bool `yaml:"iamIntegration" mapstructure:"iamIntegration"`
 	TUIMock          bool `yaml:"tuiMock" mapstructure:"tuiMock"`
 }
@@ -108,7 +107,6 @@ func InitConfig() error {
 		v.SetDefault("features.testMode", false)
 		v.SetDefault("features.containerMode", false)
 		v.SetDefault("features.autoRecoverState", true)
-		v.SetDefault("features.traefik", true)         // Enable Traefik by default
 		v.SetDefault("features.iamIntegration", false) // Disable IAM integration by default
 		v.SetDefault("features.tuiMock", true)         // Enable TUI mock mode by default
 
@@ -153,7 +151,6 @@ func bindLegacyEnvVars() {
 	v.BindEnv("kubernetes.keepClustersOnShutdown", "KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
 	v.BindEnv("features.autoRecoverState", "KECS_AUTO_RECOVER_STATE")
 	v.BindEnv("aws.proxyImage", "KECS_AWS_PROXY_IMAGE")
-	v.BindEnv("features.traefik", "KECS_ENABLE_TRAEFIK", "KECS_FEATURES_TRAEFIK")
 	v.BindEnv("features.devMode", "KECS_DEV_MODE")
 	v.BindEnv("features.iamIntegration", "KECS_IAM_INTEGRATION")
 	v.BindEnv("localstack.enabled", "KECS_LOCALSTACK_ENABLED")

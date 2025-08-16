@@ -34,7 +34,6 @@ func DefaultConfig() *Config {
 		Debug:           false,
 		DataDir:         "/var/lib/localstack",
 		CustomEndpoints: make(map[string]string),
-		UseTraefik:      true, // Enable Traefik for LocalStack by default
 		InitScripts:     getDefaultInitScripts(),
 	}
 }
