@@ -637,12 +637,15 @@ func (tm *TaskManager) registerWithServiceDiscovery(ctx context.Context, task *s
 				"AWS_INSTANCE_ID":   pod.Name,
 				"ECS_SERVICE_NAME":  service.ServiceName,
 				"ECS_TASK_ARN":      task.ARN,
+				"ECS_CLUSTER":       clusterName,
+				"K8S_NAMESPACE":     pod.Namespace,
 			},
 		}
 
 		// If container port is specified, add it to attributes
 		if metadata.ContainerPort > 0 {
 			instance.Attributes["AWS_INSTANCE_PORT"] = fmt.Sprintf("%d", metadata.ContainerPort)
+			instance.Attributes["PORT"] = fmt.Sprintf("%d", metadata.ContainerPort)
 		}
 
 		// Register the instance
