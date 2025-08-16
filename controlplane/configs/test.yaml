@@ -76,7 +76,7 @@ health:
 
 # Feature flags
 features:
-  traefik: false  # Disabled for testing (default is true)
+  traefik: false  # Traefik is now disabled (proxy is handled by controlplane)
   testMode: true  # Enable test mode
   autoRecoverState: false  # Disable state recovery for clean test runs
 

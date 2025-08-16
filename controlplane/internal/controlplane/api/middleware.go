@@ -3,8 +3,6 @@ package api
 import (
 	"net/http"
 	"strings"
-
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // CORSMiddleware adds CORS headers to responses
@@ -50,50 +48,11 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// APIProxyMiddleware handles proxying API requests from the Web UI
-func APIProxyMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// If the request is from the Web UI and targets an API endpoint
-		if strings.HasPrefix(r.URL.Path, "/api/") {
-			// Strip the /api prefix and forward to the ECS API handler
-			r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api")
-			if r.URL.Path == "" {
-				r.URL.Path = "/"
-			}
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
-
 // LoggingMiddleware logs HTTP requests
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Simple request logging
 		// In production, you might want to use a more sophisticated logging solution
-		next.ServeHTTP(w, r)
-	})
-}
-
-// LocalStackProxyMiddleware intercepts AWS API calls and routes them to LocalStack
-func LocalStackProxyMiddleware(next http.Handler, server *Server) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Debug log
-		target := r.Header.Get("X-Amz-Target")
-		if target != "" {
-			logging.Debug("[LocalStackProxyMiddleware] Request",
-				"method", r.Method, "path", r.URL.Path, "target", target, "hasAuth", r.Header.Get("Authorization") != "")
-		}
-
-		// Dynamically check if awsProxyRouter is available
-		if server.awsProxyRouter != nil && server.awsProxyRouter.LocalStackManager != nil &&
-			ShouldProxyToLocalStack(r, server.awsProxyRouter.LocalStackManager) {
-			logging.Debug("[LocalStackProxyMiddleware] Proxying to LocalStack", "method", r.Method, "path", r.URL.Path)
-			server.awsProxyRouter.AWSProxyHandler.ServeHTTP(w, r)
-			return
-		}
-
-		// Not an AWS API call or LocalStack is not available
 		next.ServeHTTP(w, r)
 	})
 }

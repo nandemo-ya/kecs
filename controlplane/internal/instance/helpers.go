@@ -223,96 +223,10 @@ func (m *Manager) deployLocalStack(ctx context.Context, instanceName string, cfg
 	return nil
 }
 
-// deployTraefik deploys Traefik gateway
+// deployTraefik is deprecated - Traefik is no longer used
+// All proxying is now handled by the controlplane itself
 func (m *Manager) deployTraefik(ctx context.Context, instanceName string, cfg *config.Config, apiPort int) error {
-
-	clusterName := fmt.Sprintf("kecs-%s", instanceName)
-	kubeconfig, err := m.k3dManager.GetKubeConfig(context.Background(), clusterName)
-	if err != nil {
-		return fmt.Errorf("failed to get kubeconfig: %w", err)
-	}
-
-	client, err := kubernetes.NewForConfig(kubeconfig)
-	if err != nil {
-		return fmt.Errorf("failed to create kubernetes client: %w", err)
-	}
-
-	// Map API port to a valid NodePort range (30000-32767)
-	// Use a simple mapping: if apiPort < 30000, add 22000 to it
-	// This maps 8080 -> 30080, 8090 -> 30090, etc.
-	awsNodePort := int32(apiPort)
-	if awsNodePort < 30000 {
-		awsNodePort = awsNodePort + 22000
-	}
-	// Ensure it's within valid range
-	if awsNodePort < 30000 || awsNodePort > 32767 {
-		awsNodePort = 30080 // fallback to default
-	}
-
-	// Create Traefik config
-	traefikConfig := &resources.TraefikConfig{
-		Image:           "traefik:v3.5.0",
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		CPURequest:      "100m",
-		MemoryRequest:   "128Mi",
-		CPULimit:        "500m",
-		MemoryLimit:     "512Mi",
-		APIPort:         80,
-		APINodePort:     awsNodePort, // This is for API access (e.g., 30080 for port 8080)
-		AWSPort:         4566,
-		AWSNodePort:     30566, // Fixed port for LocalStack
-		LogLevel:        "INFO",
-		AccessLog:       true,
-	}
-
-	// Create Traefik resources
-	traefikResources := resources.CreateTraefikResources(traefikConfig)
-
-	// Create service account
-	if traefikResources.ServiceAccount != nil {
-		if _, err := client.CoreV1().ServiceAccounts("kecs-system").Create(ctx, traefikResources.ServiceAccount, metav1.CreateOptions{}); err != nil {
-			return fmt.Errorf("failed to create Traefik service account: %w", err)
-		}
-	}
-
-	// Create cluster role
-	if traefikResources.ClusterRole != nil {
-		if _, err := client.RbacV1().ClusterRoles().Create(ctx, traefikResources.ClusterRole, metav1.CreateOptions{}); err != nil {
-			return fmt.Errorf("failed to create Traefik cluster role: %w", err)
-		}
-	}
-
-	// Create cluster role binding
-	if traefikResources.ClusterRoleBinding != nil {
-		if _, err := client.RbacV1().ClusterRoleBindings().Create(ctx, traefikResources.ClusterRoleBinding, metav1.CreateOptions{}); err != nil {
-			return fmt.Errorf("failed to create Traefik cluster role binding: %w", err)
-		}
-	}
-
-	// Create config maps
-	if traefikResources.ConfigMap != nil {
-		if _, err := client.CoreV1().ConfigMaps("kecs-system").Create(ctx, traefikResources.ConfigMap, metav1.CreateOptions{}); err != nil {
-			return fmt.Errorf("failed to create Traefik configmap: %w", err)
-		}
-	}
-	if traefikResources.DynamicConfigMap != nil {
-		if _, err := client.CoreV1().ConfigMaps("kecs-system").Create(ctx, traefikResources.DynamicConfigMap, metav1.CreateOptions{}); err != nil {
-			return fmt.Errorf("failed to create Traefik dynamic configmap: %w", err)
-		}
-	}
-
-	// Deploy deployment
-	if _, err := client.AppsV1().Deployments("kecs-system").Create(ctx, traefikResources.Deployment, metav1.CreateOptions{}); err != nil {
-		return fmt.Errorf("failed to create Traefik deployment: %w", err)
-	}
-
-	// Create services
-	for _, service := range traefikResources.Services {
-		if _, err := client.CoreV1().Services("kecs-system").Create(ctx, service, metav1.CreateOptions{}); err != nil {
-			return fmt.Errorf("failed to create Traefik service %s: %w", service.Name, err)
-		}
-	}
-
+	// Traefik deployment is skipped - proxy is now handled by controlplane
 	return nil
 }
 
