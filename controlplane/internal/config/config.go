@@ -141,6 +141,7 @@ func bindLegacyEnvVars() {
 	v.BindEnv("features.testMode", "KECS_TEST_MODE")
 	v.BindEnv("features.containerMode", "KECS_CONTAINER_MODE")
 	v.BindEnv("server.dataDir", "KECS_DATA_DIR")
+	v.BindEnv("server.logLevel", "KECS_LOG_LEVEL")
 	v.BindEnv("aws.defaultRegion", "KECS_DEFAULT_REGION")
 	v.BindEnv("aws.accountID", "KECS_ACCOUNT_ID")
 	v.BindEnv("server.allowedOrigins", "KECS_ALLOWED_ORIGINS")
@@ -356,11 +357,9 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("AWS account ID must be 12 digits: %s", c.AWS.AccountID)
 	}
 
-	// Validate LocalStack config if enabled
-	if c.LocalStack.Enabled {
-		if err := c.LocalStack.Validate(); err != nil {
-			return fmt.Errorf("invalid LocalStack config: %w", err)
-		}
+	// Validate LocalStack config (always required for KECS)
+	if err := c.LocalStack.Validate(); err != nil {
+		return fmt.Errorf("invalid LocalStack config: %w", err)
 	}
 
 	return nil

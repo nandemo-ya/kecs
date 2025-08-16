@@ -97,8 +97,8 @@ func (m *manager) getServicePorts(service *Service) []corev1.ServicePort {
 		Protocol:   corev1.ProtocolTCP,
 	}
 
-	if service.DnsConfig != nil && len(service.DnsConfig.DnsRecords) > 0 {
-		for _, record := range service.DnsConfig.DnsRecords {
+	if service.DNSConfig != nil && len(service.DNSConfig.DNSRecords) > 0 {
+		for _, record := range service.DNSConfig.DNSRecords {
 			if record.Type == "SRV" {
 				// For SRV records, we need to extract port from instance attributes
 				// This is handled in buildEndpointSubsets
@@ -164,8 +164,8 @@ func (m *manager) buildEndpointSubsets(instances map[string]*Instance, service *
 	ports := []corev1.EndpointPort{}
 
 	// Check if we have SRV records that specify ports
-	if service.DnsConfig != nil {
-		for _, record := range service.DnsConfig.DnsRecords {
+	if service.DNSConfig != nil {
+		for _, record := range service.DNSConfig.DNSRecords {
 			if record.Type == "SRV" {
 				// For SRV records, check instance attributes for port
 				for _, instance := range instances {

@@ -16,20 +16,22 @@ import (
 // Manager manages service discovery operations
 type Manager interface {
 	// Namespace operations
+	CreateNamespace(ctx context.Context, namespace *Namespace) error
 	CreatePrivateDnsNamespace(ctx context.Context, name, vpc string, properties *NamespaceProperties) (*Namespace, error)
 	GetNamespace(ctx context.Context, namespaceID string) (*Namespace, error)
 	ListNamespaces(ctx context.Context) ([]*Namespace, error)
 	DeleteNamespace(ctx context.Context, namespaceID string) error
 
 	// Service operations
-	CreateService(ctx context.Context, name, namespaceID string, dnsConfig *DnsConfig, healthCheck *HealthCheckConfig) (*Service, error)
+	CreateService(ctx context.Context, service *Service) error
 	GetService(ctx context.Context, serviceID string) (*Service, error)
+	ListServices(ctx context.Context, namespaceID string) ([]*Service, error)
 	DeleteService(ctx context.Context, serviceID string) error
 
 	// Instance operations
-	RegisterInstance(ctx context.Context, serviceID string, instanceID string, attributes map[string]string) (*Instance, error)
+	RegisterInstance(ctx context.Context, instance *Instance) error
 	DeregisterInstance(ctx context.Context, serviceID string, instanceID string) error
-	DiscoverInstances(ctx context.Context, req *DiscoverInstancesRequest) (*DiscoverInstancesResponse, error)
+	DiscoverInstances(ctx context.Context, namespaceName, serviceName string) ([]*Instance, error)
 	UpdateInstanceHealthStatus(ctx context.Context, serviceID, instanceID string, status string) error
 }
 
@@ -87,6 +89,55 @@ func NewManager(kubeClient kubernetes.Interface, region, accountID string) Manag
 	}
 
 	return mgr
+}
+
+// CreateNamespace creates a namespace (generic method for any type)
+func (m *manager) CreateNamespace(ctx context.Context, namespace *Namespace) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Check if namespace already exists
+	for _, ns := range m.namespaces {
+		if ns.Name == namespace.Name {
+			return fmt.Errorf("namespace with name %s already exists", namespace.Name)
+		}
+	}
+
+	// Generate ARN if not set
+	if namespace.ARN == "" {
+		namespace.ARN = fmt.Sprintf("arn:aws:servicediscovery:%s:%s:namespace/%s", m.region, m.accountID, namespace.ID)
+	}
+
+	// Set creation time if not set
+	if namespace.CreatedAt.IsZero() {
+		namespace.CreatedAt = time.Now()
+	}
+	namespace.UpdatedAt = time.Now()
+
+	// For DNS namespaces, create Route53 hosted zone if manager is available
+	if m.route53Manager != nil && (namespace.Type == NamespaceTypeDNSPrivate || namespace.Type == NamespaceTypeDNSPublic) {
+		// Determine if it's private or public
+		isPrivate := namespace.Type == NamespaceTypeDNSPrivate
+		
+		// Create hosted zone
+		hostedZoneID, err := m.route53Manager.CreateHostedZone(ctx, namespace.Name, isPrivate)
+		if err != nil {
+			return fmt.Errorf("failed to create Route53 hosted zone: %w", err)
+		}
+		namespace.HostedZoneID = hostedZoneID
+		
+		logging.Info("Created Route53 hosted zone for namespace", 
+			"namespace", namespace.Name, 
+			"hostedZoneID", hostedZoneID,
+			"type", namespace.Type)
+	}
+
+	// Store namespace
+	m.namespaces[namespace.ID] = namespace
+
+	logging.Info("Created namespace", "namespaceID", namespace.ID, "name", namespace.Name, "type", namespace.Type)
+
+	return nil
 }
 
 // CreatePrivateDnsNamespace creates a private DNS namespace
@@ -208,48 +259,43 @@ func (m *manager) DeleteNamespace(ctx context.Context, namespaceID string) error
 }
 
 // CreateService creates a service in a namespace
-func (m *manager) CreateService(ctx context.Context, name, namespaceID string, dnsConfig *DnsConfig, healthCheck *HealthCheckConfig) (*Service, error) {
+func (m *manager) CreateService(ctx context.Context, service *Service) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// Verify namespace exists
-	namespace, exists := m.namespaces[namespaceID]
+	namespace, exists := m.namespaces[service.NamespaceID]
 	if !exists {
-		return nil, fmt.Errorf("namespace not found: %s", namespaceID)
+		return fmt.Errorf("namespace not found: %s", service.NamespaceID)
 	}
 
 	// Check if service already exists in namespace
 	for _, svc := range m.services {
-		if svc.Name == name && svc.NamespaceID == namespaceID {
-			return nil, fmt.Errorf("service %s already exists in namespace %s", name, namespaceID)
+		if svc.Name == service.Name && svc.NamespaceID == service.NamespaceID {
+			return fmt.Errorf("service %s already exists in namespace %s", service.Name, service.NamespaceID)
 		}
 	}
 
-	// Generate IDs
-	serviceID := fmt.Sprintf("srv-%s", generateID())
-	arn := fmt.Sprintf("arn:aws:servicediscovery:%s:%s:service/%s", m.region, m.accountID, serviceID)
-
-	// Create service
-	service := &Service{
-		ID:            serviceID,
-		ARN:           arn,
-		Name:          name,
-		NamespaceID:   namespaceID,
-		InstanceCount: 0,
-		DnsConfig:     dnsConfig,
-		HealthCheck:   healthCheck,
-		CreatedAt:     time.Now(),
+	// Generate ARN if not set
+	if service.ARN == "" {
+		service.ARN = fmt.Sprintf("arn:aws:servicediscovery:%s:%s:service/%s", m.region, m.accountID, service.ID)
 	}
 
-	m.services[serviceID] = service
-	m.instances[serviceID] = make(map[string]*Instance)
+	// Set creation time if not set
+	if service.CreatedAt.IsZero() {
+		service.CreatedAt = time.Now()
+	}
+	service.UpdatedAt = time.Now()
+
+	m.services[service.ID] = service
+	m.instances[service.ID] = make(map[string]*Instance)
 
 	// Update namespace service count
 	namespace.ServiceCount++
 
-	logging.Info("Created service in namespace", "name", name, "namespaceID", namespaceID, "serviceID", serviceID)
+	logging.Info("Created service in namespace", "name", service.Name, "namespaceID", service.NamespaceID, "serviceID", service.ID)
 
-	return service, nil
+	return nil
 }
 
 // GetService retrieves a service by ID
@@ -263,6 +309,21 @@ func (m *manager) GetService(ctx context.Context, serviceID string) (*Service, e
 	}
 
 	return service, nil
+}
+
+// ListServices lists services in a namespace
+func (m *manager) ListServices(ctx context.Context, namespaceID string) ([]*Service, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var services []*Service
+	for _, svc := range m.services {
+		if namespaceID == "" || svc.NamespaceID == namespaceID {
+			services = append(services, svc)
+		}
+	}
+
+	return services, nil
 }
 
 // DeleteService deletes a service
@@ -294,29 +355,25 @@ func (m *manager) DeleteService(ctx context.Context, serviceID string) error {
 }
 
 // RegisterInstance registers an instance with a service
-func (m *manager) RegisterInstance(ctx context.Context, serviceID string, instanceID string, attributes map[string]string) (*Instance, error) {
+func (m *manager) RegisterInstance(ctx context.Context, instance *Instance) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	service, exists := m.services[serviceID]
+	service, exists := m.services[instance.ServiceID]
 	if !exists {
-		return nil, fmt.Errorf("service not found: %s", serviceID)
+		return fmt.Errorf("service not found: %s", instance.ServiceID)
 	}
 
 	// Check if instance already exists
-	if _, exists := m.instances[serviceID][instanceID]; exists {
-		return nil, fmt.Errorf("instance %s already registered", instanceID)
+	if _, exists := m.instances[instance.ServiceID][instance.ID]; exists {
+		return fmt.Errorf("instance %s already registered", instance.ID)
 	}
 
-	// Create instance
-	instance := &Instance{
-		ID:           instanceID,
-		ServiceID:    serviceID,
-		Attributes:   attributes,
-		HealthStatus: "UNKNOWN",
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+	// Set creation time if not set
+	if instance.CreatedAt.IsZero() {
+		instance.CreatedAt = time.Now()
 	}
+	instance.UpdatedAt = time.Now()
 
 	// Add required attributes
 	if instance.Attributes == nil {
@@ -324,15 +381,20 @@ func (m *manager) RegisterInstance(ctx context.Context, serviceID string, instan
 	}
 
 	// AWS SDK compatibility attributes
-	instance.Attributes["AWS_INSTANCE_ID"] = instanceID
+	instance.Attributes["AWS_INSTANCE_ID"] = instance.ID
 
-	m.instances[serviceID][instanceID] = instance
+	// Set default health status if not set
+	if instance.HealthStatus == "" {
+		instance.HealthStatus = "UNKNOWN"
+	}
+
+	m.instances[instance.ServiceID][instance.ID] = instance
 	service.InstanceCount++
 
-	logging.Info("Registered instance with service", "instanceID", instanceID, "serviceID", serviceID)
+	logging.Info("Registered instance with service", "instanceID", instance.ID, "serviceID", instance.ServiceID)
 
 	// Create/update Kubernetes Endpoints
-	if err := m.updateKubernetesEndpoints(ctx, service, m.instances[serviceID]); err != nil {
+	if err := m.updateKubernetesEndpoints(ctx, service, m.instances[instance.ServiceID]); err != nil {
 		logging.Error("Failed to update Kubernetes endpoints", "error", err)
 		// Don't fail the registration, just log the error
 	}
@@ -342,7 +404,7 @@ func (m *manager) RegisterInstance(ctx context.Context, serviceID string, instan
 		namespace := m.namespaces[service.NamespaceID]
 		if namespace != nil {
 			// Collect all IPs from instances
-			ips := m.collectInstanceIPs(m.instances[serviceID])
+			ips := m.collectInstanceIPs(m.instances[instance.ServiceID])
 			if len(ips) > 0 {
 				err := m.route53Manager.RegisterService(ctx, namespace.Name, service.Name, ips)
 				if err != nil {
@@ -352,7 +414,7 @@ func (m *manager) RegisterInstance(ctx context.Context, serviceID string, instan
 		}
 	}
 
-	return instance, nil
+	return nil
 }
 
 // DeregisterInstance deregisters an instance from a service
@@ -402,65 +464,43 @@ func (m *manager) DeregisterInstance(ctx context.Context, serviceID string, inst
 }
 
 // DiscoverInstances discovers instances for a service
-func (m *manager) DiscoverInstances(ctx context.Context, req *DiscoverInstancesRequest) (*DiscoverInstancesResponse, error) {
+func (m *manager) DiscoverInstances(ctx context.Context, namespaceName, serviceName string) ([]*Instance, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	// Find namespace by name
 	var namespaceID string
 	for id, ns := range m.namespaces {
-		if ns.Name == req.NamespaceName {
+		if ns.Name == namespaceName {
 			namespaceID = id
 			break
 		}
 	}
 
 	if namespaceID == "" {
-		return nil, fmt.Errorf("namespace not found: %s", req.NamespaceName)
+		return nil, fmt.Errorf("namespace not found: %s", namespaceName)
 	}
 
 	// Find service by name in namespace
 	var serviceID string
 	for id, svc := range m.services {
-		if svc.Name == req.ServiceName && svc.NamespaceID == namespaceID {
+		if svc.Name == serviceName && svc.NamespaceID == namespaceID {
 			serviceID = id
 			break
 		}
 	}
 
 	if serviceID == "" {
-		return nil, fmt.Errorf("service not found: %s in namespace %s", req.ServiceName, req.NamespaceName)
+		return nil, fmt.Errorf("service not found: %s in namespace %s", serviceName, namespaceName)
 	}
 
 	// Get instances
-	instances := make([]InstanceSummary, 0)
+	var instances []*Instance
 	for _, instance := range m.instances[serviceID] {
-		// Filter by health status if specified
-		if req.HealthStatus != "" && req.HealthStatus != "ALL" {
-			if instance.HealthStatus != req.HealthStatus {
-				continue
-			}
-		}
-
-		summary := InstanceSummary{
-			InstanceId:    instance.ID,
-			NamespaceName: req.NamespaceName,
-			ServiceName:   req.ServiceName,
-			HealthStatus:  instance.HealthStatus,
-			Attributes:    instance.Attributes,
-		}
-
-		instances = append(instances, summary)
-
-		// Apply max results limit
-		if req.MaxResults > 0 && int32(len(instances)) >= req.MaxResults {
-			break
-		}
+		instances = append(instances, instance)
 	}
 
-	return &DiscoverInstancesResponse{
-		Instances: instances,
-	}, nil
+	return instances, nil
 }
 
 // UpdateInstanceHealthStatus updates the health status of an instance
