@@ -47,6 +47,21 @@ Each example is self-contained with:
 - Parallel processing examples
 - Task chaining with dependencies
 
+### 6. [service-to-service-communication](./service-to-service-communication/)
+**Inter-service communication with Service Discovery**
+- Frontend and backend service architecture
+- DNS-based service discovery (AWS Cloud Map compatible)
+- Automatic instance registration and health checking
+- Cross-service API calls using DNS names
+- Load balancing across multiple instances
+
+### 7. [service-discovery-route53](./service-discovery-route53/)
+**Service Discovery with Route53 Integration**
+- LocalStack Route53 integration (OSS compatible)
+- Cross-cluster service communication
+- Private DNS namespaces
+- A and SRV record management
+
 ## Getting Started
 
 ### Prerequisites
