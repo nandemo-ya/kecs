@@ -19,24 +19,32 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
 
 // TaskManager manages ECS tasks as Kubernetes pods
 type TaskManager struct {
-	Clientset kubernetes.Interface
-	storage   storage.Storage
+	Clientset               kubernetes.Interface
+	storage                 storage.Storage
+	serviceDiscoveryManager servicediscovery.Manager
 }
 
 // NewTaskManager creates a new task manager
 func NewTaskManager(storage storage.Storage) (*TaskManager, error) {
+	return NewTaskManagerWithServiceDiscovery(storage, nil)
+}
+
+// NewTaskManagerWithServiceDiscovery creates a new task manager with optional service discovery
+func NewTaskManagerWithServiceDiscovery(storage storage.Storage, sdManager servicediscovery.Manager) (*TaskManager, error) {
 	// In container mode or test mode, defer kubernetes client creation
 	if config.GetBool("features.containerMode") || os.Getenv("KECS_TEST_MODE") == "true" {
 		logging.Debug("Container/test mode enabled - deferring kubernetes client initialization")
 		return &TaskManager{
-			Clientset: nil, // Will be initialized later
-			storage:   storage,
+			Clientset:               nil, // Will be initialized later
+			storage:                 storage,
+			serviceDiscoveryManager: sdManager,
 		}, nil
 	}
 
@@ -56,8 +64,9 @@ func NewTaskManager(storage storage.Storage) (*TaskManager, error) {
 	}
 
 	return &TaskManager{
-		Clientset: clientset,
-		storage:   storage,
+		Clientset:               clientset,
+		storage:                 storage,
+		serviceDiscoveryManager: sdManager,
 	}, nil
 }
 
@@ -270,6 +279,17 @@ func (tm *TaskManager) UpdateTaskStatus(ctx context.Context, taskARN string, pod
 
 	// Update health status
 	task.HealthStatus = tm.getHealthStatus(pod)
+
+	// Register/deregister with Service Discovery
+	if previousStatus != task.LastStatus {
+		if task.LastStatus == "RUNNING" && pod.Status.PodIP != "" {
+			// Task is now running with an IP - register with Service Discovery
+			go tm.registerWithServiceDiscovery(context.Background(), task, pod)
+		} else if task.LastStatus == "STOPPED" || task.LastStatus == "DEACTIVATING" {
+			// Task is stopping - deregister from Service Discovery
+			go tm.deregisterFromServiceDiscovery(context.Background(), task)
+		}
+	}
 
 	return tm.storage.TaskStore().Update(ctx, task)
 }
@@ -564,4 +584,128 @@ func (tm *TaskManager) createTestNetworkAttachments(pod *corev1.Pod) []types.Att
 
 	attachments = append(attachments, attachment)
 	return attachments
+}
+
+// registerWithServiceDiscovery registers a task with Service Discovery
+func (tm *TaskManager) registerWithServiceDiscovery(ctx context.Context, task *storage.Task, pod *corev1.Pod) {
+	// Check if Service Discovery manager is available
+	if tm.serviceDiscoveryManager == nil {
+		return
+	}
+
+	// Check if the task was started by a service
+	if !strings.HasPrefix(task.StartedBy, "ecs-svc/") {
+		return
+	}
+
+	// Extract service name from StartedBy field
+	serviceName := strings.TrimPrefix(task.StartedBy, "ecs-svc/")
+
+	// Extract cluster name from ClusterARN
+	clusterName := "default"
+	if task.ClusterARN != "" {
+		parts := strings.Split(task.ClusterARN, "/")
+		if len(parts) > 0 {
+			clusterName = parts[len(parts)-1]
+		}
+	}
+
+	// Get the service from storage to check for ServiceRegistry metadata
+	service, err := tm.storage.ServiceStore().Get(ctx, clusterName, serviceName)
+	if err != nil || service == nil || service.ServiceRegistryMetadata == nil {
+		return
+	}
+
+	// Register each service discovery service
+	for serviceID, metadataJSON := range service.ServiceRegistryMetadata {
+		// Parse metadata
+		var metadata struct {
+			ContainerName string `json:"containerName"`
+			ContainerPort int32  `json:"containerPort"`
+		}
+		if err := json.Unmarshal([]byte(metadataJSON), &metadata); err != nil {
+			logging.Warn("Failed to parse service registry metadata", "serviceID", serviceID, "error", err)
+			continue
+		}
+
+		// Create instance
+		instance := &servicediscovery.Instance{
+			ID:        pod.Name,
+			ServiceID: serviceID,
+			Attributes: map[string]string{
+				"AWS_INSTANCE_IPV4": pod.Status.PodIP,
+				"AWS_INSTANCE_ID":   pod.Name,
+				"ECS_SERVICE_NAME":  service.ServiceName,
+				"ECS_TASK_ARN":      task.ARN,
+			},
+		}
+
+		// If container port is specified, add it to attributes
+		if metadata.ContainerPort > 0 {
+			instance.Attributes["AWS_INSTANCE_PORT"] = fmt.Sprintf("%d", metadata.ContainerPort)
+		}
+
+		// Register the instance
+		if err := tm.serviceDiscoveryManager.RegisterInstance(ctx, instance); err != nil {
+			logging.Warn("Failed to register task with service discovery",
+				"task", task.ARN,
+				"serviceID", serviceID,
+				"instanceID", pod.Name,
+				"error", err)
+		} else {
+			logging.Info("Task registered with service discovery",
+				"task", task.ARN,
+				"serviceID", serviceID,
+				"instanceID", pod.Name,
+				"ip", pod.Status.PodIP)
+		}
+	}
+}
+
+// deregisterFromServiceDiscovery deregisters a task from Service Discovery
+func (tm *TaskManager) deregisterFromServiceDiscovery(ctx context.Context, task *storage.Task) {
+	// Check if Service Discovery manager is available
+	if tm.serviceDiscoveryManager == nil {
+		return
+	}
+
+	// Check if the task was started by a service
+	if !strings.HasPrefix(task.StartedBy, "ecs-svc/") {
+		return
+	}
+
+	// Extract service name from StartedBy field
+	serviceName := strings.TrimPrefix(task.StartedBy, "ecs-svc/")
+
+	// Extract cluster name from ClusterARN
+	clusterName := "default"
+	if task.ClusterARN != "" {
+		parts := strings.Split(task.ClusterARN, "/")
+		if len(parts) > 0 {
+			clusterName = parts[len(parts)-1]
+		}
+	}
+
+	// Get the service from storage to check for ServiceRegistry metadata
+	service, err := tm.storage.ServiceStore().Get(ctx, clusterName, serviceName)
+	if err != nil || service == nil || service.ServiceRegistryMetadata == nil {
+		return
+	}
+
+	// Deregister from each service discovery service
+	for serviceID := range service.ServiceRegistryMetadata {
+		// Deregister the instance (use pod name as instance ID)
+		if err := tm.serviceDiscoveryManager.DeregisterInstance(ctx, serviceID, task.PodName); err != nil {
+			logging.Warn("Failed to deregister task from service discovery",
+				"task", task.ARN,
+				"serviceID", serviceID,
+				"instanceID", task.PodName,
+				"error", err)
+		} else {
+			logging.Info("Task deregistered from service discovery",
+				"task", task.ARN,
+				"serviceID", serviceID,
+				"instanceID", task.PodName)
+		}
+	}
 }

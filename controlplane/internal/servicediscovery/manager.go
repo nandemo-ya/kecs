@@ -31,6 +31,7 @@ type Manager interface {
 	// Instance operations
 	RegisterInstance(ctx context.Context, instance *Instance) error
 	DeregisterInstance(ctx context.Context, serviceID string, instanceID string) error
+	ListInstances(ctx context.Context, serviceID string) ([]*Instance, error)
 	DiscoverInstances(ctx context.Context, namespaceName, serviceName string) ([]*Instance, error)
 	UpdateInstanceHealthStatus(ctx context.Context, serviceID, instanceID string, status string) error
 }
@@ -118,16 +119,16 @@ func (m *manager) CreateNamespace(ctx context.Context, namespace *Namespace) err
 	if m.route53Manager != nil && (namespace.Type == NamespaceTypeDNSPrivate || namespace.Type == NamespaceTypeDNSPublic) {
 		// Determine if it's private or public
 		isPrivate := namespace.Type == NamespaceTypeDNSPrivate
-		
+
 		// Create hosted zone
 		hostedZoneID, err := m.route53Manager.CreateHostedZone(ctx, namespace.Name, isPrivate)
 		if err != nil {
 			return fmt.Errorf("failed to create Route53 hosted zone: %w", err)
 		}
 		namespace.HostedZoneID = hostedZoneID
-		
-		logging.Info("Created Route53 hosted zone for namespace", 
-			"namespace", namespace.Name, 
+
+		logging.Info("Created Route53 hosted zone for namespace",
+			"namespace", namespace.Name,
 			"hostedZoneID", hostedZoneID,
 			"type", namespace.Type)
 	}
@@ -461,6 +462,27 @@ func (m *manager) DeregisterInstance(ctx context.Context, serviceID string, inst
 	}
 
 	return nil
+}
+
+// ListInstances lists all instances for a service
+func (m *manager) ListInstances(ctx context.Context, serviceID string) ([]*Instance, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Check if service exists
+	if _, exists := m.services[serviceID]; !exists {
+		return nil, fmt.Errorf("service not found: %s", serviceID)
+	}
+
+	// Get all instances for the service
+	instances := []*Instance{}
+	if serviceInstances, exists := m.instances[serviceID]; exists {
+		for _, instance := range serviceInstances {
+			instances = append(instances, instance)
+		}
+	}
+
+	return instances, nil
 }
 
 // DiscoverInstances discovers instances for a service
