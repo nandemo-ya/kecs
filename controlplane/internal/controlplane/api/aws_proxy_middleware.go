@@ -76,8 +76,10 @@ func isAWSAPIRequest(r *http.Request) bool {
 	// Check for AWS SDK headers first (most reliable)
 	target := r.Header.Get("X-Amz-Target")
 	if target != "" {
-		// Check if it's NOT an ECS target
-		if !strings.HasPrefix(target, "AmazonEC2ContainerServiceV") {
+		// Check if it's NOT an ECS or Service Discovery target
+		if !strings.HasPrefix(target, "AmazonEC2ContainerServiceV") &&
+			!strings.Contains(target, "ServiceDiscovery") &&
+			!strings.Contains(target, "Route53AutoNaming") {
 			return true
 		}
 	}
@@ -85,8 +87,10 @@ func isAWSAPIRequest(r *http.Request) bool {
 	// Check for AWS signature in Authorization header
 	auth := r.Header.Get("Authorization")
 	if strings.Contains(auth, "AWS4-HMAC-SHA256") {
-		// Check if it's NOT for ECS service
-		if !strings.Contains(auth, "/ecs/") {
+		// Check if it's NOT for ECS or Service Discovery service
+		if !strings.Contains(auth, "/ecs/") && 
+			!strings.Contains(auth, "/servicediscovery/") &&
+			!strings.Contains(auth, "/route53autonaming/") {
 			return true
 		}
 	}

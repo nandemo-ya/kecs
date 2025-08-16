@@ -35,6 +35,13 @@ func NewManager(client *Client, defaultVPC *VPCConfig) *Manager {
 	}
 }
 
+// CreateHostedZone creates a hosted zone for a namespace
+func (m *Manager) CreateHostedZone(ctx context.Context, namespace string, isPrivate bool) (string, error) {
+	// For now, just call CreateNamespaceZone
+	// TODO: Handle private vs public zone distinction
+	return m.CreateNamespaceZone(ctx, namespace)
+}
+
 // CreateNamespaceZone creates a hosted zone for a service discovery namespace
 func (m *Manager) CreateNamespaceZone(ctx context.Context, namespace string) (string, error) {
 	m.mu.Lock()

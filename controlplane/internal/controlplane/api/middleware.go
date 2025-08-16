@@ -81,8 +81,18 @@ func LocalStackProxyMiddleware(next http.Handler, server *Server) http.Handler {
 		// Debug log
 		target := r.Header.Get("X-Amz-Target")
 		if target != "" {
-			logging.Debug("[LocalStackProxyMiddleware] Request",
+			logging.Error("[LocalStackProxyMiddleware] Request",
 				"method", r.Method, "path", r.URL.Path, "target", target, "hasAuth", r.Header.Get("Authorization") != "")
+			
+			// Check if it's a Service Discovery request - handle it directly without proxying
+			if strings.Contains(target, "ServiceDiscovery") || strings.Contains(target, "Route53AutoNaming") {
+				logging.Error("[LocalStackProxyMiddleware] Service Discovery request detected",
+					"serviceDiscoveryAPI", server.serviceDiscoveryAPI != nil)
+				// Always pass Service Discovery requests to next handler
+				// The handler will check if serviceDiscoveryAPI is available
+				next.ServeHTTP(w, r)
+				return
+			}
 		}
 
 		// Dynamically check if awsProxyRouter is available
