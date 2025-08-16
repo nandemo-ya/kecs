@@ -180,9 +180,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		s.testModeWorker = NewTestModeTaskWorker(storage)
 	}
 
-	// Initialize LocalStack manager if configured
-	if localStackConfig != nil && localStackConfig.Enabled {
-		logging.Info("LocalStack config is enabled, initializing...")
+	// Initialize LocalStack manager (always required for KECS)
+	if localStackConfig != nil {
+		logging.Info("Initializing LocalStack manager...")
 		// Get Kubernetes client for LocalStack
 		var kubeClient k8s.Interface
 		if s.taskManager != nil {
@@ -457,24 +457,25 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		})
 
 		// Initialize Service Discovery if we have kubernetes client
-		if localStackConfig != nil && localStackConfig.Enabled {
-			var kubeClient k8s.Interface
-			if s.taskManager != nil {
-				kubeConfig, err := kubernetes.GetKubeConfig()
-				if err == nil {
-					kubeClient, _ = k8s.NewForConfig(kubeConfig)
-				}
+		// Service Discovery should work independently of LocalStack
+		var kubeClient k8s.Interface
+		if s.taskManager != nil {
+			kubeConfig, err := kubernetes.GetKubeConfig()
+			if err == nil {
+				kubeClient, _ = k8s.NewForConfig(kubeConfig)
 			}
+		}
 
-			if kubeClient != nil {
-				serviceDiscoveryManager := servicediscovery.NewManager(kubeClient, s.region, s.accountID)
-				defaultAPI.SetServiceDiscoveryManager(serviceDiscoveryManager)
+		if kubeClient != nil {
+			serviceDiscoveryManager := servicediscovery.NewManager(kubeClient, s.region, s.accountID)
+			defaultAPI.SetServiceDiscoveryManager(serviceDiscoveryManager)
 
-				// Create Service Discovery API handler
-				s.serviceDiscoveryAPI = NewServiceDiscoveryAPI(serviceDiscoveryManager, s.region, s.accountID)
+			// Create Service Discovery API handler
+			s.serviceDiscoveryAPI = NewServiceDiscoveryAPI(serviceDiscoveryManager, storage, s.region, s.accountID)
 
-				logging.Info("Service Discovery integration initialized successfully")
-			}
+			logging.Info("Service Discovery integration initialized successfully")
+		} else {
+			logging.Warn("Kubernetes client not available for Service Discovery")
 		}
 	}
 	s.ecsAPI = ecsAPI
@@ -1115,7 +1116,7 @@ func (s *Server) SetupRoutes() http.Handler {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Check if it's a Service Discovery request
 		target := r.Header.Get("X-Amz-Target")
-		if target != "" && strings.Contains(target, "ServiceDiscovery") && s.serviceDiscoveryAPI != nil {
+		if target != "" && (strings.Contains(target, "ServiceDiscovery") || strings.Contains(target, "Route53AutoNaming")) && s.serviceDiscoveryAPI != nil {
 			s.serviceDiscoveryAPI.HandleServiceDiscoveryRequest(w, r)
 			return
 		}

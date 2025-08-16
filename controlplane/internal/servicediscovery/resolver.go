@@ -138,9 +138,22 @@ func (r *dnsResolver) Resolve(ctx context.Context, query string) ([]string, erro
 // DiscoverInstancesWithResolver enhances the DiscoverInstances method with DNS resolution fallback
 func (r *dnsResolver) DiscoverInstancesWithResolver(ctx context.Context, req *DiscoverInstancesRequest) (*DiscoverInstancesResponse, error) {
 	// First try the standard discovery method
-	resp, err := r.manager.DiscoverInstances(ctx, req)
-	if err == nil && len(resp.Instances) > 0 {
-		return resp, nil
+	instances, err := r.manager.DiscoverInstances(ctx, req.NamespaceName, req.ServiceName)
+	if err == nil && len(instances) > 0 {
+		// Convert instances to InstanceSummary
+		var summaries []InstanceSummary
+		for _, inst := range instances {
+			summaries = append(summaries, InstanceSummary{
+				InstanceId:    inst.ID,
+				NamespaceName: req.NamespaceName,
+				ServiceName:   req.ServiceName,
+				HealthStatus:  inst.HealthStatus,
+				Attributes:    inst.Attributes,
+			})
+		}
+		return &DiscoverInstancesResponse{
+			Instances: summaries,
+		}, nil
 	}
 
 	// If no instances found, try DNS resolution
@@ -151,9 +164,9 @@ func (r *dnsResolver) DiscoverInstancesWithResolver(ctx context.Context, req *Di
 	}
 
 	// Convert IPs to instance summaries
-	instances := make([]InstanceSummary, 0, len(ips))
+	dnsInstances := make([]InstanceSummary, 0, len(ips))
 	for i, ip := range ips {
-		instances = append(instances, InstanceSummary{
+		dnsInstances = append(dnsInstances, InstanceSummary{
 			InstanceId:    fmt.Sprintf("dns-resolved-%d", i),
 			NamespaceName: req.NamespaceName,
 			ServiceName:   req.ServiceName,
@@ -166,6 +179,6 @@ func (r *dnsResolver) DiscoverInstancesWithResolver(ctx context.Context, req *Di
 	}
 
 	return &DiscoverInstancesResponse{
-		Instances: instances,
+		Instances: dnsInstances,
 	}, nil
 }
