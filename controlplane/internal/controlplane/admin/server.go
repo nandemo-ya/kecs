@@ -166,10 +166,9 @@ type ServerConfigResponse struct {
 
 // LocalStackConfigResponse represents the LocalStack configuration in the response
 type LocalStackConfigResponse struct {
-	Enabled    bool `json:"enabled"`
-	UseTraefik bool `json:"useTraefik"`
-	Port       int  `json:"port,omitempty"`
-	EdgePort   int  `json:"edgePort,omitempty"`
+	Enabled  bool `json:"enabled"`
+	Port     int  `json:"port,omitempty"`
+	EdgePort int  `json:"edgePort,omitempty"`
 }
 
 // KubernetesConfigResponse represents the Kubernetes configuration in the response
@@ -186,7 +185,6 @@ type FeaturesConfigResponse struct {
 	TestMode         bool `json:"testMode"`
 	ContainerMode    bool `json:"containerMode"`
 	AutoRecoverState bool `json:"autoRecoverState"`
-	Traefik          bool `json:"traefik"`
 }
 
 // AWSConfigResponse represents the AWS configuration in the response
@@ -220,10 +218,9 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			AllowedOrigins: cfg.Server.AllowedOrigins,
 		},
 		LocalStack: LocalStackConfigResponse{
-			Enabled:    cfg.LocalStack.Enabled,
-			UseTraefik: cfg.LocalStack.UseTraefik,
-			Port:       cfg.LocalStack.Port,
-			EdgePort:   cfg.LocalStack.EdgePort,
+			Enabled:  cfg.LocalStack.Enabled,
+			Port:     cfg.LocalStack.Port,
+			EdgePort: cfg.LocalStack.EdgePort,
 		},
 		Kubernetes: KubernetesConfigResponse{
 			KubeconfigPath:         cfg.Kubernetes.KubeconfigPath,
@@ -236,7 +233,6 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			TestMode:         cfg.Features.TestMode,
 			ContainerMode:    cfg.Features.ContainerMode,
 			AutoRecoverState: cfg.Features.AutoRecoverState,
-			Traefik:          cfg.Features.Traefik,
 		},
 		AWS: AWSConfigResponse{
 			DefaultRegion: cfg.AWS.DefaultRegion,

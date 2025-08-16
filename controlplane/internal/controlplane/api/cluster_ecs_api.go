@@ -832,7 +832,7 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		if apiconfig.GetBool("features.containerMode") {
 			config.ContainerMode = true
 		}
-		logging.Debug("Using LocalStack config from API", "enabled", config.Enabled, "useTraefik", config.UseTraefik, "containerMode", config.ContainerMode)
+		logging.Debug("Using LocalStack config from API", "enabled", config.Enabled, "containerMode", config.ContainerMode)
 	} else if api.localStackManager != nil {
 		config = api.localStackManager.GetConfig()
 	} else {
@@ -842,11 +842,6 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		appConfig := apiconfig.GetConfig()
 		if appConfig.LocalStack.Enabled {
 			config.Enabled = true
-		}
-		// Check features.traefik configuration
-		if appConfig.Features.Traefik {
-			config.UseTraefik = true
-			logging.Debug("Traefik is enabled for LocalStack via features.traefik")
 		}
 		// Set container mode
 		if appConfig.Features.ContainerMode {
@@ -860,24 +855,6 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		return
 	}
 
-	// If Traefik is enabled, get the dynamic port from cluster manager
-	if config.UseTraefik && api.clusterManager != nil {
-		if port, err := api.clusterManager.GetTraefikPort(context.Background(), cluster.K8sClusterName); err == nil {
-			// In container mode, use k3d node hostname with NodePort
-			if config.ContainerMode {
-				k3dNodeName := fmt.Sprintf("k3d-%s-server-0", cluster.K8sClusterName)
-				config.ProxyEndpoint = fmt.Sprintf("http://%s:30890", k3dNodeName)
-				logging.Info("Container mode: Using k3d node for LocalStack proxy", "node", k3dNodeName, "port", 30890, "endpoint", config.ProxyEndpoint)
-			} else {
-				config.ProxyEndpoint = fmt.Sprintf("http://localhost:%d", port)
-				logging.Info("Using dynamic Traefik port for LocalStack proxy", "port", port, "endpoint", config.ProxyEndpoint)
-			}
-		} else {
-			logging.Warn("Traefik is enabled but no port found", "cluster", cluster.K8sClusterName)
-		}
-	} else {
-		logging.Debug("Traefik disabled or cluster manager not available", "useTraefik", config.UseTraefik, "hasClusterManager", api.clusterManager != nil)
-	}
 
 	// Set lazy loading for faster startup in container mode
 	if config.ContainerMode {

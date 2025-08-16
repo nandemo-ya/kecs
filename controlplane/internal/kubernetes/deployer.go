@@ -99,54 +99,8 @@ func (d *ResourceDeployer) DeployControlPlane(ctx context.Context, config *resou
 	return nil
 }
 
-// DeployTraefik deploys all Traefik resources
-func (d *ResourceDeployer) DeployTraefik(ctx context.Context, config *resources.TraefikConfig) error {
-	logging.Info("Deploying Traefik gateway resources")
-
-	// Skip CRD deployment - using file-based configuration instead
-	// CRDs are not needed with file provider
-
-	// Create resources
-	res := resources.CreateTraefikResources(config)
-
-	// Deploy RBAC resources
-	if err := d.applyServiceAccount(ctx, res.ServiceAccount); err != nil {
-		return fmt.Errorf("failed to create service account: %w", err)
-	}
-
-	if err := d.applyClusterRole(ctx, res.ClusterRole); err != nil {
-		return fmt.Errorf("failed to create cluster role: %w", err)
-	}
-
-	if err := d.applyClusterRoleBinding(ctx, res.ClusterRoleBinding); err != nil {
-		return fmt.Errorf("failed to create cluster role binding: %w", err)
-	}
-
-	// Deploy ConfigMaps
-	if err := d.applyConfigMap(ctx, res.ConfigMap); err != nil {
-		return fmt.Errorf("failed to create config map: %w", err)
-	}
-
-	if err := d.applyConfigMap(ctx, res.DynamicConfigMap); err != nil {
-		return fmt.Errorf("failed to create dynamic config map: %w", err)
-	}
-
-	// Deploy Services
-	for _, svc := range res.Services {
-		if err := d.applyService(ctx, svc); err != nil {
-			return fmt.Errorf("failed to create service %s: %w", svc.Name, err)
-		}
-	}
-
-	// Deploy Deployment
-	if err := d.applyDeployment(ctx, res.Deployment); err != nil {
-		return fmt.Errorf("failed to create deployment: %w", err)
-	}
-
-	// Skip IngressRoute deployment - using file-based configuration
-	// Routes are defined in the dynamic ConfigMap instead
-
-	logging.Info("Traefik resources deployed successfully")
+// DeployTraefik is deprecated and does nothing
+func (d *ResourceDeployer) DeployTraefik(ctx context.Context, config interface{}) error {
 	return nil
 }
 

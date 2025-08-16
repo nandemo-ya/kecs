@@ -61,6 +61,7 @@ type Server struct {
 	syncCancelFunc            context.CancelFunc
 	secretsCancelFunc         context.CancelFunc
 	informerFactory           informers.SharedInformerFactory
+	proxyHandler              *ProxyHandler // New unified proxy handler
 }
 
 // NewServer creates a new API server instance
@@ -75,8 +76,6 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		clusterConfig := &kubernetes.ClusterManagerConfig{
 			ContainerMode:  apiconfig.GetBool("features.containerMode"),
 			KubeconfigPath: kubeconfig,
-			EnableTraefik:  apiconfig.GetBool("features.traefik"),
-			TraefikPort:    0, // 0 means dynamic port allocation
 		}
 
 		cm, err := kubernetes.NewClusterManager(clusterConfig)
@@ -205,12 +204,6 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 
 		if kubeClient != nil {
 			logging.Info("KubeClient created successfully, proceeding with LocalStack initialization...")
-			// Check if Traefik is enabled
-			if apiconfig.GetBool("features.traefik") {
-				localStackConfig.UseTraefik = true
-				// Don't set ProxyEndpoint here - it will be set dynamically when LocalStack is deployed
-				logging.Info("Traefik proxy enabled for LocalStack (port will be assigned dynamically)")
-			}
 
 			// Set container mode
 			localStackConfig.ContainerMode = apiconfig.GetBool("features.containerMode")
@@ -479,6 +472,56 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 	}
 	s.ecsAPI = ecsAPI
+
+	// Initialize proxy handler
+	// Create ECS handler
+	ecsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle custom KECS endpoints
+		if r.URL.Path == "/v1/GetTaskLogs" ||
+			(r.URL.Path == "/" && r.Header.Get("X-Amz-Target") == "AWSie.GetTaskLogs") {
+			if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {
+				defaultAPI.HandleGetTaskLogs(w, r)
+				return
+			}
+		}
+		// Otherwise handle as ECS request
+		router := generated.NewRouter(s.ecsAPI)
+		router.Route(w, r)
+	})
+
+	// Create ELBv2 handler
+	elbv2Handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.elbv2Router != nil {
+			s.elbv2Router.Route(w, r)
+		} else {
+			w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(w, `{"__type":"ServiceUnavailable","message":"ELBv2 API not available"}`)
+		}
+	})
+
+	// Create Service Discovery handler
+	sdHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.serviceDiscoveryAPI != nil {
+			s.serviceDiscoveryAPI.HandleServiceDiscoveryRequest(w, r)
+		} else {
+			w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(w, `{"__type":"ServiceUnavailable","message":"Service Discovery API not available"}`)
+		}
+	})
+
+	// Initialize proxy handler with LocalStack URL
+	localStackURL := "http://localstack:4566"
+	if localStackConfig != nil && localStackConfig.ProxyEndpoint != "" {
+		localStackURL = localStackConfig.ProxyEndpoint
+	}
+
+	proxyHandler, err := NewProxyHandler(localStackURL, ecsHandler, elbv2Handler, sdHandler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create proxy handler: %w", err)
+	}
+	s.proxyHandler = proxyHandler
 
 	return s, nil
 }
@@ -987,11 +1030,6 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 		if appConfig.LocalStack.Enabled {
 			config.Enabled = true
 		}
-		// Check features.traefik configuration
-		if appConfig.Features.Traefik {
-			config.UseTraefik = true
-			logging.Info("Traefik is enabled for LocalStack recovery via features.traefik")
-		}
 		// Set container mode
 		if appConfig.Features.ContainerMode {
 			config.ContainerMode = true
@@ -1010,18 +1048,6 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 		return fmt.Errorf("failed to get Kubernetes client: %w", err)
 	}
 
-	// If Traefik is enabled, get the dynamic port from cluster manager
-	if config.UseTraefik && s.clusterManager != nil {
-		if port, err := s.clusterManager.GetTraefikPort(ctx, cluster.K8sClusterName); err == nil {
-			config.ProxyEndpoint = fmt.Sprintf("http://localhost:%d", port)
-			logging.Info("Using dynamic Traefik port for LocalStack proxy endpoint",
-				"port", port,
-				"proxyEndpoint", config.ProxyEndpoint)
-		} else {
-			logging.Warn("Traefik is enabled but no port found for cluster",
-				"k8sCluster", cluster.K8sClusterName)
-		}
-	}
 
 	// Get kube config
 	kubeConfig, err := s.clusterManager.GetKubeConfig(ctx, cluster.K8sClusterName)
@@ -1112,35 +1138,8 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 func (s *Server) SetupRoutes() http.Handler {
 	mux := http.NewServeMux()
 
-	// AWS ECS API endpoint (AWS CLI format)
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Check if it's a Service Discovery request
-		target := r.Header.Get("X-Amz-Target")
-		if target != "" && (strings.Contains(target, "ServiceDiscovery") || strings.Contains(target, "Route53AutoNaming")) && s.serviceDiscoveryAPI != nil {
-			s.serviceDiscoveryAPI.HandleServiceDiscoveryRequest(w, r)
-			return
-		}
-		// Check if it's an ELBv2 request
-		if target != "" && strings.Contains(target, "ElasticLoadBalancing") {
-			s.handleELBv2Request(w, r)
-			return
-		}
-
-		// Handle custom KECS endpoints
-		// Check both URL path and X-Amz-Target header
-		if r.URL.Path == "/v1/GetTaskLogs" ||
-			(r.URL.Path == "/" && r.Header.Get("X-Amz-Target") == "AWSie.GetTaskLogs") {
-			if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {
-				defaultAPI.HandleGetTaskLogs(w, r)
-				return
-			}
-		}
-
-		// Otherwise handle as ECS request
-		// Create router and handle request
-		router := generated.NewRouter(s.ecsAPI)
-		router.Route(w, r)
-	})
+	// Main handler - use the proxy handler for all API requests
+	mux.Handle("/", s.proxyHandler)
 
 	// Health check endpoint
 	mux.HandleFunc("/health", s.handleHealthCheck)
@@ -1151,15 +1150,9 @@ func (s *Server) SetupRoutes() http.Handler {
 
 	// Apply middleware
 	handler := http.Handler(mux)
-	handler = APIProxyMiddleware(handler)
 	handler = SecurityHeadersMiddleware(handler)
 	handler = CORSMiddleware(handler)
 	handler = LoggingMiddleware(handler)
-
-	// Add LocalStack proxy middleware LAST so it runs FIRST
-	// This ensures AWS API calls are intercepted before reaching ECS handlers
-	// Pass the server instance so the middleware can dynamically check awsProxyRouter
-	handler = LocalStackProxyMiddleware(handler, s)
 
 	return handler
 }

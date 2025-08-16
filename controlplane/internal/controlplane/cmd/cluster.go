@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
@@ -88,11 +87,6 @@ func runClusterCreate(cmd *cobra.Command, args []string) error {
 		clusterName = args[0]
 	}
 
-	// Load configuration
-	cfg, err := config.LoadConfig(clusterConfigFile)
-	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
-	}
 
 	// Set up data directory
 	if clusterDataDir == "" {
@@ -114,8 +108,6 @@ func runClusterCreate(cmd *cobra.Command, args []string) error {
 	clusterConfig := &kubernetes.ClusterManagerConfig{
 		Provider:      "k3d",
 		ContainerMode: false, // Running on host
-		EnableTraefik: cfg.Features.Traefik,
-		TraefikPort:   clusterPort, // Use API port for Traefik
 	}
 
 	// Create k3d cluster manager
@@ -154,13 +146,6 @@ func runClusterCreate(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Version: %s\n", info.Version)
 	}
 
-	// Get Traefik port if enabled
-	if cfg.Features.Traefik {
-		port, err := manager.GetTraefikPort(ctx, clusterName)
-		if err == nil {
-			fmt.Printf("\nAWS API Endpoint: http://localhost:%d\n", port)
-		}
-	}
 
 	fmt.Printf("\nNext steps:\n")
 	fmt.Printf("1. Deploy KECS control plane: kecs deploy control-plane --cluster %s\n", clusterName)
@@ -291,11 +276,6 @@ func runClusterInfo(cmd *cobra.Command, args []string) error {
 	// Get kubeconfig path
 	fmt.Printf("\nKubeconfig: %s\n", manager.GetKubeconfigPath(clusterName))
 
-	// Get Traefik port if available
-	port, err := manager.GetTraefikPort(ctx, clusterName)
-	if err == nil {
-		fmt.Printf("AWS API Port: %d\n", port)
-	}
 
 	return nil
 }

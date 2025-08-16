@@ -76,7 +76,6 @@ health:
 
 # Feature flags
 features:
-  traefik: false  # Disabled for testing (default is true)
   testMode: true  # Enable test mode
   autoRecoverState: false  # Disable state recovery for clean test runs
 

@@ -28,10 +28,10 @@ func NewAWSProxyHandler(localStackManager localstack.Manager) (*AWSProxyHandler,
 	if localStackManager != nil {
 		// Get the configuration from LocalStack manager
 		config := localStackManager.GetConfig()
-		if config != nil && config.UseTraefik && config.ProxyEndpoint != "" {
+		if config != nil && config.ProxyEndpoint != "" {
 			// Use the proxy endpoint from configuration
 			endpoint := config.ProxyEndpoint
-			logging.Info("Using Traefik endpoint from LocalStack config", "endpoint", endpoint)
+			logging.Info("Using proxy endpoint from LocalStack config", "endpoint", endpoint)
 
 			if err := handler.updateProxyTarget(endpoint); err != nil {
 				logging.Warn("Failed to initialize proxy target", "error", err)
@@ -109,10 +109,10 @@ func (h *AWSProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		config := h.localStackManager.GetConfig()
 		var endpoint string
 
-		if config != nil && config.UseTraefik && config.ProxyEndpoint != "" {
+		if config != nil && config.ProxyEndpoint != "" {
 			// Use the proxy endpoint from configuration
 			endpoint = config.ProxyEndpoint
-			logging.Info("Initializing proxy with Traefik endpoint from config", "endpoint", endpoint)
+			logging.Info("Initializing proxy with endpoint from config", "endpoint", endpoint)
 		} else {
 			// Fallback to getting endpoint from manager
 			var err error

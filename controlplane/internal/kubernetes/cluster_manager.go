@@ -43,9 +43,6 @@ type ClusterManager interface {
 	// GetClusterInfo returns information about the cluster
 	GetClusterInfo(ctx context.Context, clusterName string) (*ClusterInfo, error)
 
-	// GetTraefikPort returns the Traefik port for a given cluster
-	GetTraefikPort(ctx context.Context, clusterName string) (int, error)
-
 	// ListClusters returns a list of all existing clusters
 	ListClusters(ctx context.Context) ([]ClusterInfo, error)
 
@@ -83,12 +80,6 @@ type ClusterManagerConfig struct {
 
 	// AdditionalOptions for provider-specific configuration
 	AdditionalOptions map[string]interface{} `json:"additionalOptions,omitempty"`
-
-	// EnableTraefik enables Traefik reverse proxy deployment
-	EnableTraefik bool `json:"enableTraefik"`
-
-	// TraefikPort specifies the port for Traefik proxy (0 for dynamic allocation)
-	TraefikPort int `json:"traefikPort,omitempty"`
 
 	// VolumeMounts specifies volume mounts for the cluster
 	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty"`

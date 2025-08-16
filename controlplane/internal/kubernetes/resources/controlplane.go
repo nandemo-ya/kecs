@@ -320,9 +320,10 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 						Port:       config.APIPort,
 						TargetPort: intstr.FromInt(8080),
 						Protocol:   corev1.ProtocolTCP,
+						NodePort:   30080, // Fixed NodePort for external access
 					},
 				},
-				Type: corev1.ServiceTypeClusterIP,
+				Type: corev1.ServiceTypeNodePort,
 			},
 		},
 		// Admin Service

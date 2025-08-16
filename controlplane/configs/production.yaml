@@ -78,7 +78,6 @@ health:
 
 # Feature flags
 features:
-  traefik: true  # Traefik is now enabled by default
 
 # LocalStack configuration
 localstack:
