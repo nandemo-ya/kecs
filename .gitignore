@@ -66,3 +66,5 @@ qa-results/
 # Serena MCP cache and memory
 .serena/cache/
 .serena/memory/
+# Serena cache files
+.serena/
