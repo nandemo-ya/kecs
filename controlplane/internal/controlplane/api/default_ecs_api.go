@@ -121,7 +121,7 @@ func (api *DefaultECSAPI) getClusterManager() kubernetes.ClusterManager {
 // taskManager returns the task manager, creating it if necessary
 func (api *DefaultECSAPI) taskManager() (*kubernetes.TaskManager, error) {
 	if api.taskManagerInstance == nil {
-		tm, err := kubernetes.NewTaskManager(api.storage)
+		tm, err := kubernetes.NewTaskManagerWithServiceDiscovery(api.storage, api.serviceDiscoveryManager)
 		if err != nil {
 			return nil, err
 		}

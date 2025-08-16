@@ -197,9 +197,9 @@ func (h *Handler) CreateService(ctx context.Context, input *generated.CreateServ
 	// Configure health check if provided
 	if input.HealthCheckConfig != nil {
 		service.HealthCheckConfig = &HealthCheckConfig{
-			Type:              string(ptrValue(&input.HealthCheckConfig.Type, generated.HealthCheckTypeTCP)),
-			ResourcePath:      stringValue(input.HealthCheckConfig.ResourcePath),
-			FailureThreshold:  int(ptrValue(input.HealthCheckConfig.FailureThreshold, 3)),
+			Type:             string(ptrValue(&input.HealthCheckConfig.Type, generated.HealthCheckTypeTCP)),
+			ResourcePath:     stringValue(input.HealthCheckConfig.ResourcePath),
+			FailureThreshold: int(ptrValue(input.HealthCheckConfig.FailureThreshold, 3)),
 		}
 	}
 
@@ -320,11 +320,11 @@ func (h *Handler) DiscoverInstances(ctx context.Context, input *generated.Discov
 	var httpInstances []generated.HttpInstanceSummary
 	for _, inst := range instances {
 		httpInstances = append(httpInstances, generated.HttpInstanceSummary{
-			Attributes:       inst.Attributes,
-			HealthStatus:     (*generated.HealthStatus)(stringPtr("HEALTHY")),
-			InstanceId:       &inst.ID,
-			NamespaceName:    &input.NamespaceName,
-			ServiceName:      &input.ServiceName,
+			Attributes:    inst.Attributes,
+			HealthStatus:  (*generated.HealthStatus)(stringPtr("HEALTHY")),
+			InstanceId:    &inst.ID,
+			NamespaceName: &input.NamespaceName,
+			ServiceName:   &input.ServiceName,
 		})
 	}
 
@@ -475,7 +475,28 @@ func (h *Handler) GetServiceAttributes(ctx context.Context, input *generated.Get
 }
 
 func (h *Handler) ListInstances(ctx context.Context, input *generated.ListInstancesRequest) (*generated.ListInstancesResponse, error) {
-	return &generated.ListInstancesResponse{}, nil
+	h.logger.WithField("serviceId", input.ServiceId).Info("Listing instances")
+
+	// Get instances from manager
+	instances, err := h.manager.ListInstances(ctx, input.ServiceId)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to list instances")
+		return nil, err
+	}
+
+	// Convert to API response format
+	summaries := []generated.InstanceSummary{}
+	for _, instance := range instances {
+		summary := generated.InstanceSummary{
+			Id:         &instance.ID,
+			Attributes: instance.Attributes,
+		}
+		summaries = append(summaries, summary)
+	}
+
+	return &generated.ListInstancesResponse{
+		Instances: summaries,
+	}, nil
 }
 
 func (h *Handler) ListOperations(ctx context.Context, input *generated.ListOperationsRequest) (*generated.ListOperationsResponse, error) {
@@ -542,7 +563,7 @@ func (h *Handler) convertServiceToGenerated(service *Service) *generated.Service
 
 	if service.DNSConfig != nil {
 		genService.DnsConfig = &generated.DnsConfig{
-			NamespaceId:   stringPtr(service.DNSConfig.NamespaceID),
+			NamespaceId: stringPtr(service.DNSConfig.NamespaceID),
 		}
 
 		if service.DNSConfig.RoutingPolicy != "" {
