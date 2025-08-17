@@ -513,6 +513,58 @@ func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 	}
 
 	logging.Info("Successfully migrated clusters table")
+
+	// Migrate tasks table to add service_registries column if needed
+	if err := s.migrateTasksTable(ctx); err != nil {
+		return fmt.Errorf("failed to migrate tasks table: %w", err)
+	}
+
+	return nil
+}
+
+// migrateTasksTable adds service_registries column to tasks table if it doesn't exist
+func (s *DuckDBStorage) migrateTasksTable(ctx context.Context) error {
+	// Check if tasks table exists
+	var tableExists bool
+	err := s.db.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.tables 
+			WHERE table_name = 'tasks'
+		)
+	`).Scan(&tableExists)
+	if err != nil || !tableExists {
+		// Table doesn't exist, no migration needed
+		return nil
+	}
+
+	// Check if service_registries column exists
+	var columnExists bool
+	err = s.db.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns 
+			WHERE table_name = 'tasks' AND column_name = 'service_registries'
+		)
+	`).Scan(&columnExists)
+	if err != nil {
+		return fmt.Errorf("failed to check for service_registries column: %w", err)
+	}
+
+	if columnExists {
+		// Column already exists, no migration needed
+		return nil
+	}
+
+	logging.Info("Adding service_registries column to tasks table")
+
+	// Add the column
+	_, err = s.db.ExecContext(ctx, `
+		ALTER TABLE tasks ADD COLUMN service_registries VARCHAR
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to add service_registries column: %w", err)
+	}
+
+	logging.Info("Successfully added service_registries column to tasks table")
 	return nil
 }
 
