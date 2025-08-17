@@ -1488,32 +1488,38 @@ func (k *K3dClusterManager) waitForClusterReadyOptimized(ctx context.Context, cl
 
 // ensureRegistry ensures a k3d registry exists (creates if necessary)
 func (k *K3dClusterManager) ensureRegistry(ctx context.Context) (*k3d.Node, error) {
-	registryName := "k3d-kecs-registry"
+	registryName := "kecs-registry" // Use name without k3d- prefix for RegistryGet
 
-	// First check if the registry container already exists by looking for the node
-	nodes, err := k.runtime.GetNodesByLabel(ctx, map[string]string{k3d.LabelRole: string(k3d.RegistryRole)})
-	if err == nil && len(nodes) > 0 {
-		// Look for our registry
-		for _, node := range nodes {
-			// Check both formats: "k3d-<name>" and just "<name>"
-			if node.Name == fmt.Sprintf("k3d-%s", registryName) || node.Name == registryName {
-				// Check if registry is running
-				if !node.State.Running {
-					logging.Info("Starting existing stopped registry", "name", registryName)
-					// Try to start the stopped registry
-					if err := k.runtime.StartNode(ctx, node); err != nil {
-						logging.Warn("Failed to start existing registry", "error", err)
-						return nil, fmt.Errorf("k3d registry exists but could not be started: %w", err)
+	// First try to get the registry using k3d's RegistryGet
+	// This is the official way to check if a registry exists
+	existingRegistry, err := client.RegistryGet(ctx, k.runtime, registryName)
+	if err == nil && existingRegistry != nil {
+		// Registry exists, find the node
+		nodes, err := k.runtime.GetNodesByLabel(ctx, map[string]string{k3d.LabelRole: string(k3d.RegistryRole)})
+		if err == nil && len(nodes) > 0 {
+			for _, node := range nodes {
+				// The node name will be k3d-kecs-registry
+				if node.Name == fmt.Sprintf("k3d-%s", registryName) || node.Name == registryName {
+					// Check if registry is running
+					if !node.State.Running {
+						logging.Info("Starting existing stopped registry", "name", registryName)
+						// Try to start the stopped registry
+						if err := k.runtime.StartNode(ctx, node); err != nil {
+							logging.Warn("Failed to start existing registry", "error", err)
+							return nil, fmt.Errorf("k3d registry exists but could not be started: %w", err)
+						}
 					}
+					logging.Info("Using existing k3d registry", "name", registryName, "nodeName", node.Name)
+					return node, nil
 				}
-				logging.Info("Using existing k3d registry", "name", registryName, "nodeName", node.Name)
-				return node, nil
 			}
 		}
+		// If we get here, registry exists in k3d but node not found - shouldn't happen
+		logging.Warn("Registry exists but node not found, will try to create", "registry", registryName)
 	}
 
-	// Registry doesn't exist, create it
-	logging.Info("k3d registry not found, creating new registry", "name", registryName)
+	// Registry doesn't exist or not found, create it
+	logging.Info("Creating new k3d registry", "name", registryName)
 
 	// Create registry configuration
 	reg := &k3d.Registry{
@@ -1534,24 +1540,36 @@ func (k *K3dClusterManager) ensureRegistry(ctx context.Context) (*k3d.Node, erro
 	// Create the registry
 	registryNode, err := client.RegistryCreate(ctx, k.runtime, reg)
 	if err != nil {
+		// Log detailed error for debugging
+		logging.Warn("Failed to create registry", "error", err, "registry", registryName)
+
 		// Check if it's an "already exists" error
-		if strings.Contains(err.Error(), "already exists") {
-			logging.Info("Registry already exists, trying to find it again")
-			// Try to find the registry again
+		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "name already exists") {
+			logging.Info("Registry creation failed with 'already exists', searching for existing registry")
+			// Try to find the registry node directly
 			nodes, err := k.runtime.GetNodesByLabel(ctx, map[string]string{k3d.LabelRole: string(k3d.RegistryRole)})
 			if err == nil && len(nodes) > 0 {
 				for _, node := range nodes {
-					if node.Name == fmt.Sprintf("k3d-%s", registryName) || node.Name == registryName {
+					// Check various name formats
+					nodeName := node.Name
+					if nodeName == fmt.Sprintf("k3d-%s", registryName) ||
+						nodeName == registryName ||
+						nodeName == "k3d-kecs-registry" || // Legacy name
+						strings.Contains(nodeName, "registry") {
+						logging.Info("Found existing registry node", "node", nodeName)
 						if !node.State.Running {
 							// Try to start it
+							logging.Info("Starting stopped registry", "node", nodeName)
 							if err := k.runtime.StartNode(ctx, node); err != nil {
-								logging.Warn("Failed to start existing registry", "error", err)
+								logging.Warn("Failed to start existing registry", "error", err, "node", nodeName)
 							}
 						}
 						return node, nil
 					}
 				}
 			}
+			// Last resort: return an error but suggest manual cleanup
+			return nil, fmt.Errorf("registry with name '%s' already exists but cannot be found. Try running 'docker rm -f k3d-%s' to clean up", registryName, registryName)
 		}
 		// Check if it's a port conflict error
 		if strings.Contains(err.Error(), "port is already allocated") {
@@ -1588,7 +1606,7 @@ func (k *K3dClusterManager) configureRegistryForCluster(ctx context.Context, clu
 	logging.Info("Configuring k3s to use registry with HTTP", "cluster", clusterName)
 
 	// Create registry configuration for k3s
-	// Use k3d-kecs-registry as the hostname for cluster-internal access
+	// Support both old and new registry names for compatibility
 	registryConfig := `mirrors:
   "k3d-kecs-registry.localhost:5000":
     endpoint:
@@ -1713,7 +1731,8 @@ func (k *K3dClusterManager) addRegistryToCoreDNS(ctx context.Context, clusterNam
 	}
 
 	// Check if registry entries already exist
-	registryHostname := "k3d-kecs-registry"
+	// Use the actual registry node name, ensuring it doesn't have k3d- prefix
+	registryHostname := strings.TrimPrefix(registryNode.Name, "k3d-")
 	if !strings.Contains(nodeHosts, registryHostname) {
 		// Add registry entries
 		registryEntries := fmt.Sprintf("\n%s %s %s.localhost", registryIP, registryHostname, registryHostname)
@@ -1807,7 +1826,8 @@ func (k *K3dClusterManager) addRegistryToNodeHosts(ctx context.Context, clusterN
 	}
 
 	// Add registry to each node's /etc/hosts
-	registryHostname := "k3d-kecs-registry"
+	// Use the actual registry node name, ensuring it doesn't have k3d- prefix
+	registryHostname := strings.TrimPrefix(registryNode.Name, "k3d-")
 	hostsEntry := fmt.Sprintf("%s %s", registryIP, registryHostname)
 
 	for _, node := range nodes {
