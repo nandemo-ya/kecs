@@ -38,6 +38,12 @@ func NewTaskManager(storage storage.Storage) (*TaskManager, error) {
 
 // NewTaskManagerWithServiceDiscovery creates a new task manager with optional service discovery
 func NewTaskManagerWithServiceDiscovery(storage storage.Storage, sdManager servicediscovery.Manager) (*TaskManager, error) {
+	if sdManager != nil {
+		logging.Info("Creating TaskManager with Service Discovery integration")
+	} else {
+		logging.Debug("Creating TaskManager without Service Discovery")
+	}
+
 	// In container mode or test mode, defer kubernetes client creation
 	if config.GetBool("features.containerMode") || os.Getenv("KECS_TEST_MODE") == "true" {
 		logging.Debug("Container/test mode enabled - deferring kubernetes client initialization")
@@ -285,9 +291,17 @@ func (tm *TaskManager) UpdateTaskStatus(ctx context.Context, taskARN string, pod
 	if previousStatus != task.LastStatus {
 		if task.LastStatus == "RUNNING" && pod.Status.PodIP != "" {
 			// Task is now running with an IP - register with Service Discovery
+			logging.Debug("Task status changed to RUNNING, registering with Service Discovery",
+				"task", task.ARN,
+				"pod", pod.Name,
+				"ip", pod.Status.PodIP,
+				"hasServiceDiscovery", tm.serviceDiscoveryManager != nil)
 			go tm.registerWithServiceDiscovery(context.Background(), task, pod)
 		} else if task.LastStatus == "STOPPED" || task.LastStatus == "DEACTIVATING" {
 			// Task is stopping - deregister from Service Discovery
+			logging.Debug("Task status changed to STOPPED/DEACTIVATING, deregistering from Service Discovery",
+				"task", task.ARN,
+				"pod", pod.Name)
 			go tm.deregisterFromServiceDiscovery(context.Background(), task)
 		}
 	}
@@ -596,6 +610,7 @@ func (tm *TaskManager) createTestNetworkAttachments(pod *corev1.Pod) []types.Att
 func (tm *TaskManager) registerWithServiceDiscovery(ctx context.Context, task *storage.Task, pod *corev1.Pod) {
 	// Check if Service Discovery manager is available
 	if tm.serviceDiscoveryManager == nil {
+		logging.Debug("Service Discovery manager not available, skipping registration")
 		return
 	}
 
@@ -618,70 +633,138 @@ func (tm *TaskManager) registerWithServiceDiscovery(ctx context.Context, task *s
 
 	// Get the service from storage to check for ServiceRegistry metadata
 	service, err := tm.storage.ServiceStore().Get(ctx, clusterName, serviceName)
-	if err != nil || service == nil || service.ServiceRegistryMetadata == nil {
+	if err != nil || service == nil {
+		logging.Debug("Service not found in storage",
+			"serviceName", serviceName,
+			"clusterName", clusterName,
+			"error", err)
 		return
 	}
 
-	// Register each service discovery service
-	for serviceID, metadataJSON := range service.ServiceRegistryMetadata {
-		// Parse metadata
-		var metadata struct {
-			ContainerName string `json:"containerName"`
-			ContainerPort int32  `json:"containerPort"`
+	// Try to get ServiceRegistries from task first (set from pod annotations)
+	var serviceRegistries []map[string]interface{}
+	if task.ServiceRegistries != "" {
+		if err := json.Unmarshal([]byte(task.ServiceRegistries), &serviceRegistries); err == nil {
+			logging.Debug("Using ServiceRegistries from task",
+				"task", task.ARN,
+				"serviceRegistries", task.ServiceRegistries)
 		}
-		if err := json.Unmarshal([]byte(metadataJSON), &metadata); err != nil {
-			logging.Warn("Failed to parse service registry metadata", "serviceID", serviceID, "error", err)
+	}
+
+	// Fallback to service.ServiceRegistries if not in task
+	if len(serviceRegistries) == 0 && service.ServiceRegistries != "" {
+		if err := json.Unmarshal([]byte(service.ServiceRegistries), &serviceRegistries); err == nil {
+			logging.Debug("Using ServiceRegistries from service",
+				"serviceName", serviceName,
+				"serviceRegistries", service.ServiceRegistries)
+		}
+	}
+
+	// If still no service registries, try legacy ServiceRegistryMetadata
+	if len(serviceRegistries) == 0 && service.ServiceRegistryMetadata != nil {
+		logging.Debug("Falling back to ServiceRegistryMetadata",
+			"serviceName", serviceName)
+		// Register each service discovery service using legacy metadata
+		for serviceID, metadataJSON := range service.ServiceRegistryMetadata {
+			// Parse metadata
+			var metadata struct {
+				ContainerName string `json:"containerName"`
+				ContainerPort int32  `json:"containerPort"`
+			}
+			if err := json.Unmarshal([]byte(metadataJSON), &metadata); err != nil {
+				logging.Warn("Failed to parse service registry metadata", "serviceID", serviceID, "error", err)
+				continue
+			}
+
+			tm.registerInstance(ctx, task, pod, serviceID, metadata.ContainerName, metadata.ContainerPort, service.ServiceName, clusterName)
+		}
+		return
+	}
+
+	// Register using ServiceRegistries
+	for _, registry := range serviceRegistries {
+		registryArn, _ := registry["registryArn"].(string)
+		containerName, _ := registry["containerName"].(string)
+		containerPort := int32(0)
+		if cp, ok := registry["containerPort"].(float64); ok {
+			containerPort = int32(cp)
+		}
+
+		// Extract service ID from registry ARN
+		// Format: arn:aws:servicediscovery:region:account:service/srv-xxx
+		serviceID := ""
+		if registryArn != "" {
+			parts := strings.Split(registryArn, "/")
+			if len(parts) > 0 {
+				serviceID = parts[len(parts)-1]
+			}
+		}
+
+		if serviceID == "" {
+			logging.Warn("Invalid registry ARN", "registryArn", registryArn)
 			continue
 		}
 
-		// Map ECS health status to Service Discovery health status
-		var sdHealthStatus string
-		switch task.HealthStatus {
-		case "HEALTHY":
-			sdHealthStatus = "HEALTHY"
-		case "UNHEALTHY":
-			sdHealthStatus = "UNHEALTHY"
-		case "UNKNOWN":
-			sdHealthStatus = "UNKNOWN"
-		default:
-			sdHealthStatus = "UNKNOWN"
-		}
+		tm.registerInstance(ctx, task, pod, serviceID, containerName, containerPort, service.ServiceName, clusterName)
+	}
+}
 
-		// Create instance
-		instance := &servicediscovery.Instance{
-			ID:           pod.Name,
-			ServiceID:    serviceID,
-			HealthStatus: sdHealthStatus,
-			Attributes: map[string]string{
-				"AWS_INSTANCE_IPV4": pod.Status.PodIP,
-				"AWS_INSTANCE_ID":   pod.Name,
-				"ECS_SERVICE_NAME":  service.ServiceName,
-				"ECS_TASK_ARN":      task.ARN,
-				"ECS_CLUSTER":       clusterName,
-				"K8S_NAMESPACE":     pod.Namespace,
-			},
-		}
+// registerInstance registers a single instance with Service Discovery
+func (tm *TaskManager) registerInstance(ctx context.Context, task *storage.Task, pod *corev1.Pod,
+	serviceID, containerName string, containerPort int32, serviceName, clusterName string) {
 
-		// If container port is specified, add it to attributes
-		if metadata.ContainerPort > 0 {
-			instance.Attributes["AWS_INSTANCE_PORT"] = fmt.Sprintf("%d", metadata.ContainerPort)
-			instance.Attributes["PORT"] = fmt.Sprintf("%d", metadata.ContainerPort)
-		}
+	// Map ECS health status to Service Discovery health status
+	var sdHealthStatus string
+	switch task.HealthStatus {
+	case "HEALTHY":
+		sdHealthStatus = "HEALTHY"
+	case "UNHEALTHY":
+		sdHealthStatus = "UNHEALTHY"
+	case "UNKNOWN":
+		sdHealthStatus = "UNKNOWN"
+	default:
+		sdHealthStatus = "UNKNOWN"
+	}
 
-		// Register the instance
-		if err := tm.serviceDiscoveryManager.RegisterInstance(ctx, instance); err != nil {
-			logging.Warn("Failed to register task with service discovery",
-				"task", task.ARN,
-				"serviceID", serviceID,
-				"instanceID", pod.Name,
-				"error", err)
-		} else {
-			logging.Info("Task registered with service discovery",
-				"task", task.ARN,
-				"serviceID", serviceID,
-				"instanceID", pod.Name,
-				"ip", pod.Status.PodIP)
-		}
+	// Create instance
+	instance := &servicediscovery.Instance{
+		ID:           pod.Name,
+		ServiceID:    serviceID,
+		HealthStatus: sdHealthStatus,
+		Attributes: map[string]string{
+			"AWS_INSTANCE_IPV4": pod.Status.PodIP,
+			"AWS_INSTANCE_ID":   pod.Name,
+			"ECS_SERVICE_NAME":  serviceName,
+			"ECS_TASK_ARN":      task.ARN,
+			"ECS_CLUSTER":       clusterName,
+			"K8S_NAMESPACE":     pod.Namespace,
+		},
+	}
+
+	// Add container name if specified
+	if containerName != "" {
+		instance.Attributes["CONTAINER_NAME"] = containerName
+	}
+
+	// If container port is specified, add it to attributes
+	if containerPort > 0 {
+		instance.Attributes["AWS_INSTANCE_PORT"] = fmt.Sprintf("%d", containerPort)
+		instance.Attributes["PORT"] = fmt.Sprintf("%d", containerPort)
+	}
+
+	// Register the instance
+	if err := tm.serviceDiscoveryManager.RegisterInstance(ctx, instance); err != nil {
+		logging.Warn("Failed to register task with service discovery",
+			"task", task.ARN,
+			"serviceID", serviceID,
+			"instanceID", pod.Name,
+			"error", err)
+	} else {
+		logging.Info("Task registered with service discovery",
+			"task", task.ARN,
+			"serviceID", serviceID,
+			"instanceID", pod.Name,
+			"ip", pod.Status.PodIP)
 	}
 }
 
@@ -711,24 +794,97 @@ func (tm *TaskManager) deregisterFromServiceDiscovery(ctx context.Context, task 
 
 	// Get the service from storage to check for ServiceRegistry metadata
 	service, err := tm.storage.ServiceStore().Get(ctx, clusterName, serviceName)
-	if err != nil || service == nil || service.ServiceRegistryMetadata == nil {
+	if err != nil || service == nil {
 		return
 	}
 
-	// Deregister from each service discovery service
-	for serviceID := range service.ServiceRegistryMetadata {
-		// Deregister the instance (use pod name as instance ID)
-		if err := tm.serviceDiscoveryManager.DeregisterInstance(ctx, serviceID, task.PodName); err != nil {
-			logging.Warn("Failed to deregister task from service discovery",
-				"task", task.ARN,
-				"serviceID", serviceID,
-				"instanceID", task.PodName,
-				"error", err)
-		} else {
-			logging.Info("Task deregistered from service discovery",
-				"task", task.ARN,
-				"serviceID", serviceID,
-				"instanceID", task.PodName)
+	// Try to get ServiceRegistries from task first
+	var serviceRegistries []map[string]interface{}
+	if task.ServiceRegistries != "" {
+		if err := json.Unmarshal([]byte(task.ServiceRegistries), &serviceRegistries); err == nil {
+			// Deregister using ServiceRegistries
+			for _, registry := range serviceRegistries {
+				registryArn, _ := registry["registryArn"].(string)
+
+				// Extract service ID from registry ARN
+				serviceID := ""
+				if registryArn != "" {
+					parts := strings.Split(registryArn, "/")
+					if len(parts) > 0 {
+						serviceID = parts[len(parts)-1]
+					}
+				}
+
+				if serviceID != "" {
+					if err := tm.serviceDiscoveryManager.DeregisterInstance(ctx, serviceID, task.PodName); err != nil {
+						logging.Warn("Failed to deregister task from service discovery",
+							"task", task.ARN,
+							"serviceID", serviceID,
+							"instanceID", task.PodName,
+							"error", err)
+					} else {
+						logging.Info("Task deregistered from service discovery",
+							"task", task.ARN,
+							"serviceID", serviceID,
+							"instanceID", task.PodName)
+					}
+				}
+			}
+			return
+		}
+	}
+
+	// Fallback to service.ServiceRegistries
+	if service.ServiceRegistries != "" {
+		if err := json.Unmarshal([]byte(service.ServiceRegistries), &serviceRegistries); err == nil {
+			for _, registry := range serviceRegistries {
+				registryArn, _ := registry["registryArn"].(string)
+
+				// Extract service ID from registry ARN
+				serviceID := ""
+				if registryArn != "" {
+					parts := strings.Split(registryArn, "/")
+					if len(parts) > 0 {
+						serviceID = parts[len(parts)-1]
+					}
+				}
+
+				if serviceID != "" {
+					if err := tm.serviceDiscoveryManager.DeregisterInstance(ctx, serviceID, task.PodName); err != nil {
+						logging.Warn("Failed to deregister task from service discovery",
+							"task", task.ARN,
+							"serviceID", serviceID,
+							"instanceID", task.PodName,
+							"error", err)
+					} else {
+						logging.Info("Task deregistered from service discovery",
+							"task", task.ARN,
+							"serviceID", serviceID,
+							"instanceID", task.PodName)
+					}
+				}
+			}
+			return
+		}
+	}
+
+	// Fallback to legacy ServiceRegistryMetadata
+	if service.ServiceRegistryMetadata != nil {
+		// Deregister from each service discovery service
+		for serviceID := range service.ServiceRegistryMetadata {
+			// Deregister the instance (use pod name as instance ID)
+			if err := tm.serviceDiscoveryManager.DeregisterInstance(ctx, serviceID, task.PodName); err != nil {
+				logging.Warn("Failed to deregister task from service discovery",
+					"task", task.ARN,
+					"serviceID", serviceID,
+					"instanceID", task.PodName,
+					"error", err)
+			} else {
+				logging.Info("Task deregistered from service discovery",
+					"task", task.ARN,
+					"serviceID", serviceID,
+					"instanceID", task.PodName)
+			}
 		}
 	}
 }

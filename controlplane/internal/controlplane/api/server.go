@@ -42,6 +42,7 @@ type Server struct {
 	ecsAPI                    generated.ECSAPIInterface
 	storage                   storage.Storage
 	clusterManager            kubernetes.ClusterManager
+	serviceManager            *kubernetes.ServiceManager
 	taskManager               *kubernetes.TaskManager
 	region                    string
 	accountID                 string
@@ -102,7 +103,11 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		clusterManager: clusterManager,
 	}
 
-	// Initialize task manager
+	// Initialize service manager
+	serviceManager := kubernetes.NewServiceManager(storage, clusterManager)
+	s.serviceManager = serviceManager
+
+	// Initialize task manager (will be re-initialized with Service Discovery later)
 	taskManager, err := kubernetes.NewTaskManager(storage)
 	if err != nil {
 		if apiconfig.GetBool("features.testMode") || apiconfig.GetBool("features.containerMode") {
@@ -393,6 +398,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		ecsAPI = NewDefaultECSAPI(storage)
 	}
 	if defaultAPI, ok := ecsAPI.(*DefaultECSAPI); ok {
+		if s.serviceManager != nil {
+			defaultAPI.SetServiceManager(s.serviceManager)
+		}
 		if s.iamIntegration != nil {
 			defaultAPI.SetIAMIntegration(s.iamIntegration)
 		}
@@ -465,6 +473,26 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 
 			// Create Service Discovery API handler
 			s.serviceDiscoveryAPI = NewServiceDiscoveryAPI(serviceDiscoveryManager, storage, s.region, s.accountID)
+
+			// Re-initialize TaskManager with Service Discovery
+			if s.taskManager != nil {
+				logging.Info("Re-initializing TaskManager with Service Discovery integration")
+				taskManagerWithSD, err := kubernetes.NewTaskManagerWithServiceDiscovery(storage, serviceDiscoveryManager)
+				if err != nil {
+					logging.Warn("Failed to re-initialize TaskManager with Service Discovery",
+						"error", err)
+				} else {
+					s.taskManager = taskManagerWithSD
+					
+					// Update ServiceManager's TaskManager if it exists
+					if s.serviceManager != nil {
+						s.serviceManager.SetTaskManager(taskManagerWithSD)
+						logging.Info("ServiceManager's TaskManager updated with Service Discovery support")
+					}
+					
+					logging.Info("TaskManager re-initialized with Service Discovery support")
+				}
+			}
 
 			logging.Info("Service Discovery integration initialized successfully")
 		} else {

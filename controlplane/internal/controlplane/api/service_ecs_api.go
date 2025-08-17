@@ -20,6 +20,11 @@ import (
 
 // getServiceManager returns a ServiceManager using the appropriate cluster manager
 func (api *DefaultECSAPI) getServiceManager() (*kubernetes.ServiceManager, error) {
+	// Use the shared service manager if available
+	if api.serviceManager != nil {
+		return api.serviceManager, nil
+	}
+	
 	// In test mode, we can return a ServiceManager with nil cluster manager
 	// as the ServiceManager handles test mode internally
 	if config.GetBool("features.testMode") {
@@ -223,10 +228,11 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 
 	// Convert ECS service to Kubernetes Deployment
 	storageServiceTemp := &storage.Service{
-		ServiceName:   req.ServiceName,
-		DesiredCount:  int(desiredCount),
-		LaunchType:    string(launchType),
-		LoadBalancers: string(loadBalancersJSON),
+		ServiceName:       req.ServiceName,
+		DesiredCount:      int(desiredCount),
+		LaunchType:        string(launchType),
+		LoadBalancers:     string(loadBalancersJSON),
+		ServiceRegistries: string(serviceRegistriesJSON),
 	}
 	deployment, kubeService, err := serviceConverter.ConvertServiceToDeploymentWithNetworkConfig(
 		storageServiceTemp,

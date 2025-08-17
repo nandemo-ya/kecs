@@ -18,6 +18,7 @@ import (
 type DefaultECSAPI struct {
 	storage                   storage.Storage
 	clusterManager            kubernetes.ClusterManager
+	serviceManager            *kubernetes.ServiceManager
 	taskManagerInstance       *kubernetes.TaskManager
 	region                    string
 	accountID                 string
@@ -76,6 +77,11 @@ func (api *DefaultECSAPI) SetELBv2Integration(elbv2Integration elbv2.Integration
 // SetServiceDiscoveryManager sets the service discovery manager for the ECS API
 func (api *DefaultECSAPI) SetServiceDiscoveryManager(serviceDiscoveryManager servicediscovery.Manager) {
 	api.serviceDiscoveryManager = serviceDiscoveryManager
+}
+
+// SetServiceManager sets the service manager for the ECS API
+func (api *DefaultECSAPI) SetServiceManager(serviceManager *kubernetes.ServiceManager) {
+	api.serviceManager = serviceManager
 }
 
 // SetLocalStackManager sets the LocalStack manager for the ECS API

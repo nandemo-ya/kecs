@@ -389,12 +389,33 @@ func (m *manager) RegisterInstance(ctx context.Context, instance *Instance) erro
 
 	service, exists := m.services[instance.ServiceID]
 	if !exists {
+		logging.Debug("Service not found during instance registration",
+			"serviceID", instance.ServiceID,
+			"instanceID", instance.ID,
+			"availableServices", len(m.services))
 		return fmt.Errorf("service not found: %s", instance.ServiceID)
+	}
+
+	// Initialize instance map for service if needed
+	if m.instances[instance.ServiceID] == nil {
+		m.instances[instance.ServiceID] = make(map[string]*Instance)
 	}
 
 	// Check if instance already exists
 	if _, exists := m.instances[instance.ServiceID][instance.ID]; exists {
-		return fmt.Errorf("instance %s already registered", instance.ID)
+		logging.Debug("Instance already registered, updating",
+			"instanceID", instance.ID,
+			"serviceID", instance.ServiceID)
+		// Update existing instance instead of failing
+		existingInstance := m.instances[instance.ServiceID][instance.ID]
+		existingInstance.UpdatedAt = time.Now()
+		existingInstance.HealthStatus = instance.HealthStatus
+		if instance.Attributes != nil {
+			for k, v := range instance.Attributes {
+				existingInstance.Attributes[k] = v
+			}
+		}
+		return nil
 	}
 
 	// Set creation time if not set
@@ -419,7 +440,11 @@ func (m *manager) RegisterInstance(ctx context.Context, instance *Instance) erro
 	m.instances[instance.ServiceID][instance.ID] = instance
 	service.InstanceCount++
 
-	logging.Info("Registered instance with service", "instanceID", instance.ID, "serviceID", instance.ServiceID)
+	logging.Info("Registered instance with service",
+		"instanceID", instance.ID,
+		"serviceID", instance.ServiceID,
+		"ip", instance.Attributes["AWS_INSTANCE_IPV4"],
+		"port", instance.Attributes["AWS_INSTANCE_PORT"])
 
 	// Create/update Kubernetes Endpoints
 	if err := m.updateKubernetesEndpoints(ctx, service, m.instances[instance.ServiceID]); err != nil {
