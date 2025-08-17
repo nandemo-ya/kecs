@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	"k8s.io/client-go/kubernetes"
+	k8sclient "k8s.io/client-go/kubernetes"
 	appslistersv1 "k8s.io/client-go/listers/apps/v1"
 	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -25,8 +25,9 @@ import (
 
 // SyncController manages the synchronization of Kubernetes resources to ECS state
 type SyncController struct {
-	kubeClient       kubernetes.Interface
+	kubeClient       k8sclient.Interface
 	storage          storage.Storage
+	taskUpdater      TaskUpdater
 	deploymentLister appslistersv1.DeploymentLister
 	replicaSetLister appslistersv1.ReplicaSetLister
 	podLister        corelistersv1.PodLister
@@ -54,7 +55,7 @@ type SyncController struct {
 
 // NewSyncController creates a new synchronization controller
 func NewSyncController(
-	kubeClient kubernetes.Interface,
+	kubeClient k8sclient.Interface,
 	storage storage.Storage,
 	deploymentInformer appsinformers.DeploymentInformer,
 	replicaSetInformer appsinformers.ReplicaSetInformer,
@@ -118,6 +119,14 @@ func NewSyncController(
 	})
 
 	return controller
+}
+
+// SetTaskUpdater sets the task updater for the controller
+func (c *SyncController) SetTaskUpdater(taskUpdater TaskUpdater, kubeClient k8sclient.Interface) {
+	c.taskUpdater = taskUpdater
+	if c.batchUpdater != nil && taskUpdater != nil {
+		c.batchUpdater.SetTaskUpdater(taskUpdater, kubeClient)
+	}
 }
 
 // Run starts the controller

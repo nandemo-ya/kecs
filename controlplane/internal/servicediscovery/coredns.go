@@ -62,6 +62,19 @@ func (m *manager) updateCoreDNSConfig(ctx context.Context, namespace *Namespace)
 	if customCM.Data == nil {
 		customCM.Data = make(map[string]string)
 	}
+
+	// Check for duplicate domain configurations
+	// Remove any existing entries for the same domain to prevent CoreDNS conflicts
+	for key, existingConfig := range customCM.Data {
+		if strings.Contains(existingConfig, fmt.Sprintf("%s:53", namespace.Name)) {
+			logging.Warn("Removing duplicate CoreDNS configuration for domain",
+				"domain", namespace.Name,
+				"existingKey", key,
+				"newKey", fmt.Sprintf("kecs-%s.server", namespace.ID))
+			delete(customCM.Data, key)
+		}
+	}
+
 	customCM.Data[fmt.Sprintf("kecs-%s.server", namespace.ID)] = corefile
 
 	// Update ConfigMap
