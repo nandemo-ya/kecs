@@ -9,7 +9,7 @@
   "containerDefinitions": [
     {
       "name": "frontend",
-      "image": "k3d-kecs-registry:5000/frontend-web:latest",
+      "image": "registry.kecs.local:5000/frontend-web:latest",
       "essential": true,
       "portMappings": [
         {

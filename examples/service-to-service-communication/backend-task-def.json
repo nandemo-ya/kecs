@@ -9,7 +9,7 @@
   "containerDefinitions": [
     {
       "name": "backend",
-      "image": "k3d-kecs-registry:5000/backend-api:latest",
+      "image": "registry.kecs.local:5000/backend-api:latest",
       "essential": true,
       "portMappings": [
         {

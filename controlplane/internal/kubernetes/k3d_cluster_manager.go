@@ -1606,15 +1606,15 @@ func (k *K3dClusterManager) configureRegistryForCluster(ctx context.Context, clu
 	logging.Info("Configuring k3s to use registry with HTTP", "cluster", clusterName)
 
 	// Create registry configuration for k3s
-	// Support both old and new registry names for compatibility
+	// Support multiple registry access patterns:
+	// - localhost:5000 (from host machine)
+	// - registry.kecs.local:5000 (from within cluster - preferred)
+	// All patterns redirect to the actual k3d-kecs-registry container
 	registryConfig := `mirrors:
-  "k3d-kecs-registry.localhost:5000":
-    endpoint:
-      - "http://k3d-kecs-registry:5000"
   "localhost:5000":
     endpoint:
       - "http://k3d-kecs-registry:5000"
-  "k3d-kecs-registry:5000":
+  "registry.kecs.local:5000":
     endpoint:
       - "http://k3d-kecs-registry:5000"
 `
@@ -1733,9 +1733,12 @@ func (k *K3dClusterManager) addRegistryToCoreDNS(ctx context.Context, clusterNam
 	// Check if registry entries already exist
 	// Use the actual registry node name, ensuring it doesn't have k3d- prefix
 	registryHostname := strings.TrimPrefix(registryNode.Name, "k3d-")
-	if !strings.Contains(nodeHosts, registryHostname) {
-		// Add registry entries
-		registryEntries := fmt.Sprintf("\n%s %s %s.localhost", registryIP, registryHostname, registryHostname)
+	if !strings.Contains(nodeHosts, "registry.kecs.local") {
+		// Add registry entries with multiple aliases
+		// - k3d-kecs-registry (actual container name)
+		// - kecs-registry (without k3d prefix)
+		// - registry.kecs.local (preferred cluster-internal name)
+		registryEntries := fmt.Sprintf("\n%s k3d-%s %s registry.kecs.local", registryIP, registryHostname, registryHostname)
 		nodeHosts += registryEntries
 
 		// Update ConfigMap
@@ -1828,7 +1831,11 @@ func (k *K3dClusterManager) addRegistryToNodeHosts(ctx context.Context, clusterN
 	// Add registry to each node's /etc/hosts
 	// Use the actual registry node name, ensuring it doesn't have k3d- prefix
 	registryHostname := strings.TrimPrefix(registryNode.Name, "k3d-")
-	hostsEntry := fmt.Sprintf("%s %s", registryIP, registryHostname)
+	// Add multiple aliases for the registry
+	// - k3d-kecs-registry (actual container name)
+	// - kecs-registry (without k3d prefix)
+	// - registry.kecs.local (preferred cluster-internal name)
+	hostsEntry := fmt.Sprintf("%s k3d-%s %s registry.kecs.local", registryIP, registryHostname, registryHostname)
 
 	for _, node := range nodes {
 		// Skip non-cluster nodes

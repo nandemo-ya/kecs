@@ -72,7 +72,7 @@ func init() {
 }
 
 func startRegistry(ctx context.Context) error {
-	registryName := "k3d-kecs-registry.localhost"
+	registryName := "kecs-registry" // k3d will add the prefix automatically
 
 	// Initialize runtime
 	runtime, err := runtimes.GetRuntime("docker")
@@ -143,7 +143,7 @@ func startRegistry(ctx context.Context) error {
 }
 
 func stopRegistry(ctx context.Context) error {
-	registryName := "k3d-kecs-registry.localhost"
+	registryName := "kecs-registry" // k3d will add the prefix automatically
 
 	// Initialize runtime
 	runtime, err := runtimes.GetRuntime("docker")
@@ -174,7 +174,7 @@ func stopRegistry(ctx context.Context) error {
 }
 
 func showRegistryStatus(ctx context.Context) error {
-	registryName := "k3d-kecs-registry.localhost"
+	registryName := "kecs-registry" // k3d will add the prefix automatically
 
 	// Initialize runtime
 	runtime, err := runtimes.GetRuntime("docker")
@@ -228,10 +228,11 @@ func showRegistryStatus(ctx context.Context) error {
 func printRegistryInfo() {
 	fmt.Println("\n✅ Registry is ready!")
 	fmt.Println("\nNext steps:")
-	fmt.Println("1. Ensure /etc/hosts contains:")
-	fmt.Printf("   127.0.0.1 k3d-kecs-registry.localhost\n")
-	fmt.Println("\n2. Build and push images:")
+	fmt.Println("1. Build and push images:")
+	fmt.Println("   docker tag myimage:latest localhost:5000/myimage:latest")
+	fmt.Println("   docker push localhost:5000/myimage:latest")
+	fmt.Println("\n2. Or use the dev workflow:")
 	fmt.Println("   make docker-push-dev")
-	fmt.Println("\n3. Start KECS in dev mode:")
-	fmt.Println("   kecs start --dev")
+	fmt.Println("\n3. Start KECS (registry is always enabled):")
+	fmt.Println("   kecs start")
 }
