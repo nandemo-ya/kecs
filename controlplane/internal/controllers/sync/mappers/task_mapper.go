@@ -177,6 +177,11 @@ func (m *TaskStateMapper) MapPodToTask(pod *corev1.Pod) *storage.Task {
 	// Extract CPU and memory from pod spec
 	task.CPU, task.Memory = m.extractResourceLimits(pod)
 
+	// Extract Service Registries from pod annotations
+	if serviceRegistries, exists := pod.Annotations["kecs.dev/service-registries"]; exists {
+		task.ServiceRegistries = serviceRegistries
+	}
+
 	return task
 }
 

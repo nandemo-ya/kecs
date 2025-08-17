@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -57,7 +58,97 @@ func NewServiceManager(storage storage.Storage, clusterManager ClusterManager) *
 		// Don't fail creation - client will be initialized on first use
 	}
 
+	// Process existing pods after initialization
+	go sm.processExistingPods()
+
 	return sm
+}
+
+// processExistingPods processes existing pods to ensure they are tracked
+func (sm *ServiceManager) processExistingPods() {
+	// Wait a bit for initialization to complete
+	time.Sleep(5 * time.Second)
+
+	if sm.clientset == nil {
+		logging.Debug("Kubernetes client not initialized, skipping existing pods processing")
+		return
+	}
+
+	ctx := context.Background()
+
+	// List all namespaces
+	namespaces, err := sm.clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		logging.Warn("Failed to list namespaces for existing pods processing", "error", err)
+		return
+	}
+
+	processedCount := 0
+	for _, ns := range namespaces.Items {
+		// Skip system namespaces
+		if ns.Name == "kube-system" || ns.Name == "kube-public" || ns.Name == "kube-node-lease" || ns.Name == "kecs-system" {
+			continue
+		}
+
+		// List pods in namespace
+		pods, err := sm.clientset.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			logging.Warn("Failed to list pods in namespace", "namespace", ns.Name, "error", err)
+			continue
+		}
+
+		for _, pod := range pods.Items {
+			// Check if pod is managed by ECS
+			if _, exists := pod.Labels["ecs.amazonaws.com/task-arn"]; !exists {
+				continue
+			}
+
+			// Check if pod is running
+			if pod.Status.Phase != corev1.PodRunning {
+				continue
+			}
+
+			// Get service name from labels
+			serviceName := pod.Labels["ecs.amazonaws.com/service-name"]
+			if serviceName == "" {
+				serviceName = pod.Labels["kecs.dev/service"]
+			}
+			if serviceName == "" {
+				continue
+			}
+
+			// Extract cluster name from namespace
+			clusterName := "default"
+			if strings.Contains(ns.Name, "-") {
+				parts := strings.Split(ns.Name, "-")
+				if len(parts) > 0 {
+					clusterName = parts[0]
+				}
+			}
+
+			// Get cluster and service from storage
+			cluster, err := sm.storage.ClusterStore().Get(ctx, clusterName)
+			if err != nil || cluster == nil {
+				logging.Debug("Cluster not found for existing pod", "cluster", clusterName, "pod", pod.Name)
+				continue
+			}
+
+			service, err := sm.storage.ServiceStore().Get(ctx, clusterName, serviceName)
+			if err != nil || service == nil {
+				logging.Debug("Service not found for existing pod", "service", serviceName, "pod", pod.Name)
+				continue
+			}
+
+			// Process the pod
+			logging.Info("Processing existing pod", "pod", pod.Name, "namespace", ns.Name, "service", serviceName)
+			sm.registerPodAsTask(ctx, &pod, cluster, service)
+			processedCount++
+		}
+	}
+
+	if processedCount > 0 {
+		logging.Info("Processed existing pods", "count", processedCount)
+	}
 }
 
 // initializeClient initializes the kubernetes client
@@ -763,6 +854,19 @@ func (sm *ServiceManager) registerPodAsTask(ctx context.Context, pod *corev1.Pod
 
 	// Store the task
 	if err := sm.storage.TaskStore().Create(ctx, task); err != nil {
+		// Check if it's a duplicate key error
+		if strings.Contains(err.Error(), "Duplicate key") {
+			logging.Info("Task already exists, updating status", "pod", pod.Name, "task", taskARN)
+			// Task already exists, update its status instead
+			if sm.taskManager != nil {
+				if err := sm.taskManager.UpdateTaskStatus(ctx, taskARN, pod); err != nil {
+					logging.Error("Failed to update existing task status", "task", taskARN, "error", err)
+				}
+				// Still start watching for future updates
+				go sm.taskManager.watchPodStatus(context.Background(), taskARN, pod.Namespace, pod.Name)
+			}
+			return
+		}
 		logging.Error("Failed to create task for pod", "pod", pod.Name, "error", err)
 		return
 	}
