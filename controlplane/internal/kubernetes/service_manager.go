@@ -26,6 +26,12 @@ type ServiceManager struct {
 	taskManager    *TaskManager
 }
 
+// SetTaskManager sets or updates the task manager
+func (sm *ServiceManager) SetTaskManager(taskManager *TaskManager) {
+	sm.taskManager = taskManager
+	logging.Info("ServiceManager TaskManager updated")
+}
+
 // NewServiceManager creates a new ServiceManager
 func NewServiceManager(storage storage.Storage, clusterManager ClusterManager) *ServiceManager {
 	// Create TaskManager if storage is available

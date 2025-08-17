@@ -167,6 +167,10 @@ func (c *ServiceConverter) createDeployment(
 	c.addCloudWatchLogsAnnotations(podAnnotations, containerDefs)
 
 	// Add Service Registry annotations to pod template
+	logging.Info("Checking ServiceRegistries for pod template",
+		"serviceName", service.ServiceName,
+		"hasServiceRegistries", service.ServiceRegistries != "",
+		"serviceRegistries", service.ServiceRegistries)
 	if service.ServiceRegistries != "" {
 		podAnnotations["kecs.dev/service-registries"] = service.ServiceRegistries
 		logging.Info("Added Service Registry annotations to pod template",
