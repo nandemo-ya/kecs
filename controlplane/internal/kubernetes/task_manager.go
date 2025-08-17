@@ -316,6 +316,16 @@ func (tm *TaskManager) UpdateTaskStatus(ctx context.Context, taskARN string, pod
 
 // watchPodStatus watches a pod for status changes
 func (tm *TaskManager) watchPodStatus(ctx context.Context, taskARN, namespace, podName string) {
+	// First, get the current pod status and update immediately
+	pod, err := tm.Clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+	if err == nil && pod != nil {
+		// Update task status with current pod state
+		logging.Debug("Updating task status for existing pod", "pod", podName, "phase", pod.Status.Phase)
+		if err := tm.UpdateTaskStatus(ctx, taskARN, pod); err != nil {
+			logging.Error("Failed to update task status for existing pod", "task", taskARN, "namespace", namespace, "pod", podName, "error", err)
+		}
+	}
+
 	// Use a field selector to watch only this specific pod
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", podName).String()
 
