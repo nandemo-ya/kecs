@@ -345,7 +345,8 @@ func (s *DuckDBStorage) createTasksTable(ctx context.Context) error {
 		region VARCHAR NOT NULL,
 		account_id VARCHAR NOT NULL,
 		pod_name VARCHAR,
-		namespace VARCHAR
+		namespace VARCHAR,
+		service_registries VARCHAR
 	)`
 
 	if _, err := s.db.ExecContext(ctx, query); err != nil {
