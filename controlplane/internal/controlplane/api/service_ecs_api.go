@@ -1477,6 +1477,9 @@ func (api *DefaultECSAPI) createTasksForService(ctx context.Context, service *st
 			ContainerInstanceARN: "", // Empty in test mode
 			Group:                fmt.Sprintf("service:%s", service.ServiceName),
 			Containers:           string(containersJSON),
+			Region:               api.region,
+			AccountID:            api.accountID,
+			ServiceRegistries:    service.ServiceRegistries, // Propagate service registries
 		}
 
 		// Save task to storage

@@ -29,10 +29,10 @@ func (s *taskStore) Create(ctx context.Context, task *storage.Task) error {
 			launch_type, platform_version, platform_family, task_group,
 			attachments, health_status, tags, attributes, enable_execute_command,
 			capacity_provider_name, ephemeral_storage, region, account_id,
-			pod_name, namespace
+			pod_name, namespace, service_registries
 		) VALUES (
 			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 		)`
 
 	_, err := s.db.ExecContext(ctx, query,
@@ -52,7 +52,7 @@ func (s *taskStore) Create(ctx context.Context, task *storage.Task) error {
 		nullString(task.Attributes), task.EnableExecuteCommand,
 		nullString(task.CapacityProviderName), nullString(task.EphemeralStorage),
 		task.Region, task.AccountID, nullString(task.PodName),
-		nullString(task.Namespace),
+		nullString(task.Namespace), nullString(task.ServiceRegistries),
 	)
 
 	return err
@@ -80,7 +80,7 @@ func (s *taskStore) Get(ctx context.Context, cluster, taskID string) (*storage.T
 	var stopCode, stoppedReason, connectivity, platformVersion sql.NullString
 	var platformFamily, group, attachments, healthStatus, tags sql.NullString
 	var attributes, capacityProviderName, ephemeralStorage sql.NullString
-	var podName, namespace sql.NullString
+	var podName, namespace, serviceRegistries sql.NullString
 
 	err := s.db.QueryRowContext(ctx, query, args...).Scan(
 		&task.ID, &task.ARN, &task.ClusterARN, &task.TaskDefinitionARN,
@@ -93,7 +93,7 @@ func (s *taskStore) Get(ctx context.Context, cluster, taskID string) (*storage.T
 		&platformVersion, &platformFamily, &group, &attachments,
 		&healthStatus, &tags, &attributes, &task.EnableExecuteCommand,
 		&capacityProviderName, &ephemeralStorage, &task.Region,
-		&task.AccountID, &podName, &namespace,
+		&task.AccountID, &podName, &namespace, &serviceRegistries,
 	)
 
 	if err != nil {
@@ -123,6 +123,7 @@ func (s *taskStore) Get(ctx context.Context, cluster, taskID string) (*storage.T
 	task.EphemeralStorage = ephemeralStorage.String
 	task.PodName = podName.String
 	task.Namespace = namespace.String
+	task.ServiceRegistries = serviceRegistries.String
 
 	if stoppingAt.Valid {
 		task.StoppingAt = &stoppingAt.Time
@@ -222,7 +223,7 @@ func (s *taskStore) Update(ctx context.Context, task *storage.Task) error {
 			stopping_at = ?, stopped_at = ?, connectivity = ?,
 			connectivity_at = ?, pull_started_at = ?, pull_stopped_at = ?,
 			execution_stopped_at = ?, started_at = ?, health_status = ?,
-			pod_name = ?, namespace = ?
+			pod_name = ?, namespace = ?, service_registries = ?
 		WHERE arn = ?`
 
 	_, err := s.db.ExecContext(ctx, query,
@@ -233,7 +234,7 @@ func (s *taskStore) Update(ctx context.Context, task *storage.Task) error {
 		nullTime(task.PullStartedAt), nullTime(task.PullStoppedAt),
 		nullTime(task.ExecutionStoppedAt), nullTime(task.StartedAt),
 		nullString(task.HealthStatus), nullString(task.PodName),
-		nullString(task.Namespace), task.ARN,
+		nullString(task.Namespace), nullString(task.ServiceRegistries), task.ARN,
 	)
 
 	return err
@@ -299,7 +300,7 @@ func scanTask(rows *sql.Rows) (*storage.Task, error) {
 	var stopCode, stoppedReason, connectivity, platformVersion sql.NullString
 	var platformFamily, group, attachments, healthStatus, tags sql.NullString
 	var attributes, capacityProviderName, ephemeralStorage sql.NullString
-	var podName, namespace sql.NullString
+	var podName, namespace, serviceRegistries sql.NullString
 
 	err := rows.Scan(
 		&task.ID, &task.ARN, &task.ClusterARN, &task.TaskDefinitionARN,
@@ -312,7 +313,7 @@ func scanTask(rows *sql.Rows) (*storage.Task, error) {
 		&platformVersion, &platformFamily, &group, &attachments,
 		&healthStatus, &tags, &attributes, &task.EnableExecuteCommand,
 		&capacityProviderName, &ephemeralStorage, &task.Region,
-		&task.AccountID, &podName, &namespace,
+		&task.AccountID, &podName, &namespace, &serviceRegistries,
 	)
 
 	if err != nil {
@@ -339,6 +340,7 @@ func scanTask(rows *sql.Rows) (*storage.Task, error) {
 	task.EphemeralStorage = ephemeralStorage.String
 	task.PodName = podName.String
 	task.Namespace = namespace.String
+	task.ServiceRegistries = serviceRegistries.String
 
 	if stoppingAt.Valid {
 		task.StoppingAt = &stoppingAt.Time
@@ -392,10 +394,10 @@ func (s *taskStore) CreateOrUpdate(ctx context.Context, task *storage.Task) erro
 			launch_type, platform_version, platform_family, task_group,
 			attachments, health_status, tags, attributes, enable_execute_command,
 			capacity_provider_name, ephemeral_storage, region, account_id,
-			pod_name, namespace
+			pod_name, namespace, service_registries
 		) VALUES (
 			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 		) ON CONFLICT (arn) DO UPDATE SET
 			last_status = EXCLUDED.last_status,
 			desired_status = EXCLUDED.desired_status,
@@ -413,7 +415,8 @@ func (s *taskStore) CreateOrUpdate(ctx context.Context, task *storage.Task) erro
 			started_at = EXCLUDED.started_at,
 			health_status = EXCLUDED.health_status,
 			pod_name = EXCLUDED.pod_name,
-			namespace = EXCLUDED.namespace`
+			namespace = EXCLUDED.namespace,
+			service_registries = EXCLUDED.service_registries`
 
 	_, err := s.db.ExecContext(ctx, query,
 		task.ID, task.ARN, task.ClusterARN, task.TaskDefinitionARN,
@@ -432,7 +435,7 @@ func (s *taskStore) CreateOrUpdate(ctx context.Context, task *storage.Task) erro
 		nullString(task.Attributes), task.EnableExecuteCommand,
 		nullString(task.CapacityProviderName), nullString(task.EphemeralStorage),
 		task.Region, task.AccountID, nullString(task.PodName),
-		nullString(task.Namespace),
+		nullString(task.Namespace), nullString(task.ServiceRegistries),
 	)
 
 	return err
