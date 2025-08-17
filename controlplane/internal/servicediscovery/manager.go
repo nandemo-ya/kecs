@@ -136,6 +136,14 @@ func (m *manager) CreateNamespace(ctx context.Context, namespace *Namespace) err
 	// Store namespace
 	m.namespaces[namespace.ID] = namespace
 
+	// Update CoreDNS configuration for DNS namespaces
+	if namespace.Type == NamespaceTypeDNSPrivate || namespace.Type == NamespaceTypeDNSPublic {
+		if err := m.updateCoreDNSConfig(ctx, namespace); err != nil {
+			logging.Warn("Failed to update CoreDNS configuration", "namespace", namespace.Name, "error", err)
+			// Don't fail namespace creation for CoreDNS update issues
+		}
+	}
+
 	logging.Info("Created namespace", "namespaceID", namespace.ID, "name", namespace.Name, "type", namespace.Type)
 
 	return nil
@@ -246,6 +254,13 @@ func (m *manager) DeleteNamespace(ctx context.Context, namespaceID string) error
 	delete(m.namespaces, namespaceID)
 	delete(m.dnsToK8sNamespace, namespace.Name)
 
+	// Remove CoreDNS configuration
+	if namespace.Type == NamespaceTypeDNSPrivate || namespace.Type == NamespaceTypeDNSPublic {
+		if err := m.removeCoreDNSConfig(ctx, namespaceID); err != nil {
+			logging.Warn("Failed to remove CoreDNS configuration", "namespace", namespace.Name, "error", err)
+		}
+	}
+
 	// Delete Route53 hosted zone if integration is enabled
 	if m.route53Manager != nil {
 		err := m.route53Manager.DeleteNamespaceZone(ctx, namespace.Name)
@@ -293,6 +308,12 @@ func (m *manager) CreateService(ctx context.Context, service *Service) error {
 
 	// Update namespace service count
 	namespace.ServiceCount++
+
+	// Create DNS alias for the service
+	if err := m.createServiceDNSAlias(ctx, namespace, service); err != nil {
+		logging.Warn("Failed to create DNS alias for service", "service", service.Name, "error", err)
+		// Don't fail service creation for DNS alias issues
+	}
 
 	logging.Info("Created service in namespace", "name", service.Name, "namespaceID", service.NamespaceID, "serviceID", service.ID)
 
@@ -343,8 +364,14 @@ func (m *manager) DeleteService(ctx context.Context, serviceID string) error {
 	}
 
 	// Update namespace service count
-	if namespace, exists := m.namespaces[service.NamespaceID]; exists {
+	namespace, exists := m.namespaces[service.NamespaceID]
+	if exists {
 		namespace.ServiceCount--
+
+		// Remove DNS alias for the service
+		if err := m.removeServiceDNSAlias(ctx, namespace, service); err != nil {
+			logging.Warn("Failed to remove DNS alias for service", "service", service.Name, "error", err)
+		}
 	}
 
 	delete(m.services, serviceID)
