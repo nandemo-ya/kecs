@@ -5,6 +5,10 @@ import (
 	stdsync "sync"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
@@ -13,9 +17,16 @@ import (
 type StorageService = storage.Service
 type StorageTask = storage.Task
 
+// TaskUpdater interface for updating task status
+type TaskUpdater interface {
+	UpdateTaskStatus(ctx context.Context, taskARN string, pod *corev1.Pod) error
+}
+
 // BatchUpdater efficiently batches updates to the storage layer
 type BatchUpdater struct {
 	storage      storage.Storage
+	taskUpdater  TaskUpdater
+	kubeClient   kubernetes.Interface
 	serviceCache map[string]*StorageService // key is service ARN
 	taskCache    map[string]*StorageTask    // key is task ARN
 	mu           stdsync.Mutex
@@ -37,6 +48,12 @@ func NewBatchUpdater(storage storage.Storage, batchSize int, maxDelay time.Durat
 		stopCh:       make(chan struct{}),
 		flushCh:      make(chan struct{}, 1),
 	}
+}
+
+// SetTaskUpdater sets the task updater and kubernetes client for the batch updater
+func (b *BatchUpdater) SetTaskUpdater(taskUpdater TaskUpdater, kubeClient kubernetes.Interface) {
+	b.taskUpdater = taskUpdater
+	b.kubeClient = kubeClient
 }
 
 // Start begins the batch update process
@@ -199,6 +216,28 @@ func (b *BatchUpdater) updateTask(ctx context.Context, task *StorageTask) error 
 	}
 
 	logging.Debug("Successfully created or updated task", "taskARN", task.ARN, "lastStatus", task.LastStatus)
+
+	// If TaskUpdater is available and task is RUNNING, get the pod and call UpdateTaskStatus
+	// This will trigger Service Discovery registration
+	if b.taskUpdater != nil && b.kubeClient != nil {
+		if task.LastStatus == "RUNNING" && task.PodName != "" && task.Namespace != "" {
+			// Get the pod from Kubernetes
+			pod, err := b.kubeClient.CoreV1().Pods(task.Namespace).Get(ctx, task.PodName, metav1.GetOptions{})
+			if err == nil && pod != nil {
+				// Call UpdateTaskStatus which will trigger Service Discovery registration
+				logging.Info("Triggering UpdateTaskStatus for Service Discovery registration",
+					"task", task.ARN,
+					"pod", task.PodName,
+					"status", task.LastStatus)
+				if err := b.taskUpdater.UpdateTaskStatus(ctx, task.ARN, pod); err != nil {
+					logging.Warn("Failed to update task status via TaskUpdater",
+						"task", task.ARN,
+						"error", err)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

@@ -173,6 +173,13 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 			// Store informer factory to start it later with proper context
 			s.informerFactory = informerFactory
 			s.syncController = syncController
+
+			// Set TaskManager if available
+			if s.taskManager != nil && s.taskManager.Clientset != nil {
+				s.syncController.SetTaskUpdater(s.taskManager, s.taskManager.Clientset)
+				logging.Info("TaskManager set for sync controller")
+			}
+
 			logging.Info("Sync controller initialized successfully")
 		} else {
 			logging.Info("Kubernetes client not available, sync controller will not be initialized")
@@ -483,13 +490,19 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 						"error", err)
 				} else {
 					s.taskManager = taskManagerWithSD
-					
+
 					// Update ServiceManager's TaskManager if it exists
 					if s.serviceManager != nil {
 						s.serviceManager.SetTaskManager(taskManagerWithSD)
 						logging.Info("ServiceManager's TaskManager updated with Service Discovery support")
 					}
-					
+
+					// Update SyncController's TaskManager if it exists
+					if s.syncController != nil && taskManagerWithSD.Clientset != nil {
+						s.syncController.SetTaskUpdater(taskManagerWithSD, taskManagerWithSD.Clientset)
+						logging.Info("SyncController's TaskManager updated with Service Discovery support")
+					}
+
 					logging.Info("TaskManager re-initialized with Service Discovery support")
 				}
 			}
@@ -1075,7 +1088,6 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 	if err != nil {
 		return fmt.Errorf("failed to get Kubernetes client: %w", err)
 	}
-
 
 	// Get kube config
 	kubeConfig, err := s.clusterManager.GetKubeConfig(ctx, cluster.K8sClusterName)

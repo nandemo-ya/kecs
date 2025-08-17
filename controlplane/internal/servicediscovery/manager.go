@@ -100,7 +100,17 @@ func (m *manager) CreateNamespace(ctx context.Context, namespace *Namespace) err
 	// Check if namespace already exists
 	for _, ns := range m.namespaces {
 		if ns.Name == namespace.Name {
-			return fmt.Errorf("namespace with name %s already exists", namespace.Name)
+			logging.Info("Namespace already exists, updating existing namespace",
+				"name", namespace.Name,
+				"existingID", ns.ID,
+				"newID", namespace.ID)
+			// Update the existing namespace's ID in our records if needed
+			// This handles the case where controlplane restarts and tries to recreate
+			namespace.ID = ns.ID
+			namespace.ARN = ns.ARN
+			namespace.CreatedAt = ns.CreatedAt
+			m.namespaces[ns.ID] = namespace
+			return nil
 		}
 	}
 
@@ -157,7 +167,10 @@ func (m *manager) CreatePrivateDnsNamespace(ctx context.Context, name, vpc strin
 	// Check if namespace already exists
 	for _, ns := range m.namespaces {
 		if ns.Name == name {
-			return nil, fmt.Errorf("namespace with name %s already exists", name)
+			logging.Info("Namespace already exists, returning existing namespace",
+				"name", name,
+				"id", ns.ID)
+			return ns, nil
 		}
 	}
 
