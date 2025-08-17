@@ -543,10 +543,14 @@ func (m *manager) DiscoverInstances(ctx context.Context, namespaceName, serviceN
 		return nil, fmt.Errorf("service not found: %s in namespace %s", serviceName, namespaceName)
 	}
 
-	// Get instances
+	// Get only healthy instances for DNS resolution
 	var instances []*Instance
 	for _, instance := range m.instances[serviceID] {
-		instances = append(instances, instance)
+		// Only include healthy instances in DNS responses
+		// This implements ECS behavior where unhealthy containers are excluded from Service Discovery
+		if instance.HealthStatus == "HEALTHY" || instance.HealthStatus == "" {
+			instances = append(instances, instance)
+		}
 	}
 
 	return instances, nil
@@ -557,7 +561,8 @@ func (m *manager) UpdateInstanceHealthStatus(ctx context.Context, serviceID, ins
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if _, exists := m.services[serviceID]; !exists {
+	service, exists := m.services[serviceID]
+	if !exists {
 		return fmt.Errorf("service not found: %s", serviceID)
 	}
 
@@ -566,10 +571,51 @@ func (m *manager) UpdateInstanceHealthStatus(ctx context.Context, serviceID, ins
 		return fmt.Errorf("instance %s not found", instanceID)
 	}
 
+	// Only update if status actually changed
+	if instance.HealthStatus == status {
+		return nil
+	}
+
+	previousStatus := instance.HealthStatus
 	instance.HealthStatus = status
 	instance.UpdatedAt = time.Now()
 
-	logging.Debug("Updated health status for instance", "instanceID", instanceID, "status", status)
+	logging.Info("Updated health status for instance",
+		"instanceID", instanceID,
+		"previousStatus", previousStatus,
+		"newStatus", status)
+
+	// Update Kubernetes Endpoints to reflect health status change
+	// This ensures DNS responses are updated immediately
+	if err := m.updateKubernetesEndpoints(ctx, service, m.instances[serviceID]); err != nil {
+		logging.Error("Failed to update Kubernetes endpoints after health status change",
+			"serviceID", serviceID,
+			"instanceID", instanceID,
+			"error", err)
+		// Don't fail the health status update, just log the error
+	}
+
+	// Update Route53 records if integration is enabled
+	if m.route53Manager != nil {
+		namespace := m.namespaces[service.NamespaceID]
+		if namespace != nil {
+			// Collect only healthy instance IPs
+			var ips []string
+			for _, inst := range m.instances[serviceID] {
+				if inst.HealthStatus == "HEALTHY" || inst.HealthStatus == "" {
+					if ip := inst.Attributes["AWS_INSTANCE_IPV4"]; ip != "" {
+						ips = append(ips, ip)
+					}
+				}
+			}
+
+			if err := m.route53Manager.RegisterService(ctx, namespace.Name, service.Name, ips); err != nil {
+				logging.Warn("Failed to update Route53 records after health status change",
+					"service", service.Name,
+					"error", err)
+			}
+		}
+	}
 
 	return nil
 }

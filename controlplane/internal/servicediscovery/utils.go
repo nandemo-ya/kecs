@@ -45,8 +45,9 @@ func extractK8sNamespace(dnsNamespace string) string {
 func (m *manager) collectInstanceIPs(instances map[string]*Instance) []string {
 	ips := make([]string, 0)
 	for _, instance := range instances {
-		// Only include healthy instances
-		if instance.HealthStatus == "HEALTHY" || instance.HealthStatus == "UNKNOWN" {
+		// Only include healthy instances or instances with no health status set (initial state)
+		// This implements ECS behavior where unhealthy containers are excluded from DNS
+		if instance.HealthStatus == "HEALTHY" || instance.HealthStatus == "" {
 			if ip, ok := instance.Attributes["AWS_INSTANCE_IPV4"]; ok && ip != "" {
 				ips = append(ips, ip)
 			} else if ip, ok := instance.Attributes["IPV4"]; ok && ip != "" {

@@ -182,7 +182,8 @@ func (m *manager) buildEndpointSubsets(instances map[string]*Instance, service *
 		}
 
 		// Categorize by health status
-		if instance.HealthStatus == "HEALTHY" {
+		// Consider instances with HEALTHY or empty status (initial state) as ready
+		if instance.HealthStatus == "HEALTHY" || instance.HealthStatus == "" {
 			addresses = append(addresses, endpointAddress)
 		} else {
 			notReadyAddresses = append(notReadyAddresses, endpointAddress)
