@@ -278,6 +278,7 @@ func (tm *TaskManager) UpdateTaskStatus(ctx context.Context, taskARN string, pod
 	}
 
 	// Update health status
+	previousHealthStatus := task.HealthStatus
 	task.HealthStatus = tm.getHealthStatus(pod)
 
 	// Register/deregister with Service Discovery
@@ -289,6 +290,11 @@ func (tm *TaskManager) UpdateTaskStatus(ctx context.Context, taskARN string, pod
 			// Task is stopping - deregister from Service Discovery
 			go tm.deregisterFromServiceDiscovery(context.Background(), task)
 		}
+	}
+
+	// Update health status in Service Discovery if changed
+	if task.LastStatus == "RUNNING" && previousHealthStatus != task.HealthStatus {
+		go tm.updateServiceDiscoveryHealth(context.Background(), task)
 	}
 
 	return tm.storage.TaskStore().Update(ctx, task)
@@ -628,10 +634,24 @@ func (tm *TaskManager) registerWithServiceDiscovery(ctx context.Context, task *s
 			continue
 		}
 
+		// Map ECS health status to Service Discovery health status
+		var sdHealthStatus string
+		switch task.HealthStatus {
+		case "HEALTHY":
+			sdHealthStatus = "HEALTHY"
+		case "UNHEALTHY":
+			sdHealthStatus = "UNHEALTHY"
+		case "UNKNOWN":
+			sdHealthStatus = "UNKNOWN"
+		default:
+			sdHealthStatus = "UNKNOWN"
+		}
+
 		// Create instance
 		instance := &servicediscovery.Instance{
-			ID:        pod.Name,
-			ServiceID: serviceID,
+			ID:           pod.Name,
+			ServiceID:    serviceID,
+			HealthStatus: sdHealthStatus,
 			Attributes: map[string]string{
 				"AWS_INSTANCE_IPV4": pod.Status.PodIP,
 				"AWS_INSTANCE_ID":   pod.Name,
@@ -709,6 +729,69 @@ func (tm *TaskManager) deregisterFromServiceDiscovery(ctx context.Context, task 
 				"task", task.ARN,
 				"serviceID", serviceID,
 				"instanceID", task.PodName)
+		}
+	}
+}
+
+// updateServiceDiscoveryHealth updates the health status of a task in Service Discovery
+func (tm *TaskManager) updateServiceDiscoveryHealth(ctx context.Context, task *storage.Task) {
+	// Check if Service Discovery manager is available
+	if tm.serviceDiscoveryManager == nil {
+		return
+	}
+
+	// Check if the task was started by a service
+	if !strings.HasPrefix(task.StartedBy, "ecs-svc/") {
+		return
+	}
+
+	// Extract service name from StartedBy field
+	serviceName := strings.TrimPrefix(task.StartedBy, "ecs-svc/")
+
+	// Extract cluster name from ClusterARN
+	clusterName := "default"
+	if task.ClusterARN != "" {
+		parts := strings.Split(task.ClusterARN, "/")
+		if len(parts) > 0 {
+			clusterName = parts[len(parts)-1]
+		}
+	}
+
+	// Get the service from storage to check for ServiceRegistry metadata
+	service, err := tm.storage.ServiceStore().Get(ctx, clusterName, serviceName)
+	if err != nil || service == nil || service.ServiceRegistryMetadata == nil {
+		return
+	}
+
+	// Update health status for each service discovery service
+	for serviceID := range service.ServiceRegistryMetadata {
+		// Map ECS health status to Service Discovery health status
+		var sdHealthStatus string
+		switch task.HealthStatus {
+		case "HEALTHY":
+			sdHealthStatus = "HEALTHY"
+		case "UNHEALTHY":
+			sdHealthStatus = "UNHEALTHY"
+		case "UNKNOWN":
+			sdHealthStatus = "UNKNOWN"
+		default:
+			sdHealthStatus = "UNKNOWN"
+		}
+
+		// Update the instance health status (use pod name as instance ID)
+		if err := tm.serviceDiscoveryManager.UpdateInstanceHealthStatus(ctx, serviceID, task.PodName, sdHealthStatus); err != nil {
+			logging.Warn("Failed to update task health status in service discovery",
+				"task", task.ARN,
+				"serviceID", serviceID,
+				"instanceID", task.PodName,
+				"healthStatus", sdHealthStatus,
+				"error", err)
+		} else {
+			logging.Info("Task health status updated in service discovery",
+				"task", task.ARN,
+				"serviceID", serviceID,
+				"instanceID", task.PodName,
+				"healthStatus", sdHealthStatus)
 		}
 	}
 }
