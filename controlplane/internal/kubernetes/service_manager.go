@@ -703,6 +703,24 @@ func (sm *ServiceManager) registerPodAsTask(ctx context.Context, pod *corev1.Pod
 		return
 	}
 
+	// Get Service Registry metadata from pod annotations (if available)
+	serviceRegistries := ""
+	if pod.Annotations != nil {
+		if sr, exists := pod.Annotations["kecs.dev/service-registries"]; exists {
+			serviceRegistries = sr
+			logging.Debug("Found Service Registry metadata in pod annotations",
+				"pod", pod.Name,
+				"serviceRegistries", serviceRegistries)
+		}
+	}
+	// Fallback to service's ServiceRegistries if not in pod annotations
+	if serviceRegistries == "" && service.ServiceRegistries != "" {
+		serviceRegistries = service.ServiceRegistries
+		logging.Debug("Using Service Registry metadata from service",
+			"service", service.ServiceName,
+			"serviceRegistries", serviceRegistries)
+	}
+
 	// Create new task
 	now := time.Now()
 	task := &storage.Task{
@@ -723,8 +741,9 @@ func (sm *ServiceManager) registerPodAsTask(ctx context.Context, pod *corev1.Pod
 		Version:           1,
 		Connectivity:      "CONNECTED",
 		ConnectivityAt:    &now,
-		CPU:               "", // Will be set from task definition
-		Memory:            "", // Will be set from task definition,
+		CPU:               "",                // Will be set from task definition
+		Memory:            "",                // Will be set from task definition
+		ServiceRegistries: serviceRegistries, // Use Service Registry metadata from pod or service
 	}
 
 	// Create containers info from pod

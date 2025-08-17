@@ -129,11 +129,12 @@ func (m *manager) buildCoreDNSConfig(namespace *Namespace) string {
 	sb.WriteString("    }\n")
 	sb.WriteString("    ready\n")
 
-	// Use Kubernetes plugin to resolve services in this namespace
+	// Use Kubernetes plugin to resolve services
+	// Note: The kubernetes plugin doesn't support restricting to specific namespaces via directive
+	// We'll use a broader configuration and rely on service naming conventions
 	sb.WriteString(fmt.Sprintf("    kubernetes %s in-addr.arpa ip6.arpa {\n", namespace.Name))
 	sb.WriteString("        pods insecure\n")
-	sb.WriteString(fmt.Sprintf("        fallthrough in-addr.arpa ip6.arpa\n"))
-	sb.WriteString(fmt.Sprintf("        namespace %s\n", k8sNamespace))
+	sb.WriteString("        fallthrough in-addr.arpa ip6.arpa\n")
 	sb.WriteString("    }\n")
 
 	// If Route53 integration is available, forward to Route53

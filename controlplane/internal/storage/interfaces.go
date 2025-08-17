@@ -524,6 +524,9 @@ type Task struct {
 
 	// Kubernetes namespace
 	Namespace string `json:"namespace,omitempty"`
+
+	// Service registries (JSON)
+	ServiceRegistries string `json:"serviceRegistries,omitempty"`
 }
 
 // AccountSettingStore defines account setting-specific storage operations

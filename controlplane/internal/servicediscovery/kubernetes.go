@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -18,14 +19,42 @@ func (m *manager) updateKubernetesEndpoints(ctx context.Context, service *Servic
 		return fmt.Errorf("namespace not found: %s", service.NamespaceID)
 	}
 
-	// Get Kubernetes namespace
-	k8sNamespace := m.dnsToK8sNamespace[namespace.Name]
-	if k8sNamespace == "" {
-		k8sNamespace = "default"
+	// Get Kubernetes namespace - use namespace name directly for better DNS resolution
+	// This allows service.production.local to work directly
+	k8sNamespace := sanitizeDNSLabel(namespace.Name)
+
+	// Ensure namespace exists (simple inline implementation)
+	if m.kubeClient != nil {
+		_, err := m.kubeClient.CoreV1().Namespaces().Get(ctx, k8sNamespace, metav1.GetOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) {
+				// Create namespace
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: k8sNamespace,
+						Labels: map[string]string{
+							"kecs.io/managed":           "true",
+							"kecs.io/service-discovery": "true",
+						},
+					},
+				}
+
+				if _, err := m.kubeClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{}); err != nil {
+					if !errors.IsAlreadyExists(err) {
+						return fmt.Errorf("failed to create namespace: %w", err)
+					}
+				}
+
+				logging.Info("Created Kubernetes namespace for Service Discovery", "namespace", k8sNamespace)
+			} else {
+				return fmt.Errorf("failed to check namespace: %w", err)
+			}
+		}
 	}
 
-	// Service name for Kubernetes
-	k8sServiceName := fmt.Sprintf("sd-%s", service.Name)
+	// Use service name directly (not prefixed with sd-)
+	// This allows backend-api.production.local to resolve correctly
+	k8sServiceName := service.Name
 
 	// Check if Kubernetes Service exists, create if not
 	k8sService, err := m.kubeClient.CoreV1().Services(k8sNamespace).Get(ctx, k8sServiceName, metav1.GetOptions{})
