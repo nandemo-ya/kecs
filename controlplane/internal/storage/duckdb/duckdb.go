@@ -39,15 +39,23 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 		}
 	}
 
-	// Create connection pool with optimized settings
-	// maxConns: 25 - Allow up to 25 concurrent connections
-	// maxIdleConns: 5 - Keep 5 idle connections ready
-	pool, err := NewConnectionPool(dbPath, 25, 5)
+	// DuckDB's MVCC means each connection has its own transaction view.
+	// For immediate visibility of writes across operations, we use a single shared connection
+	// instead of a connection pool to ensure all operations see the same data.
+	// This is appropriate for KECS as it's not designed for high-concurrency transactional workloads.
+	db, err := sql.Open("duckdb", dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create connection pool: %w", err)
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	db := pool.DB()
+	// Configure connection for optimal performance
+	// DuckDB is single-threaded per connection, so we limit to 1 connection
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(0) // Keep connection alive indefinitely
+
+	// Note: pool is set to nil as we're using a single shared connection
+	var pool *ConnectionPool
 
 	s := &DuckDBStorage{
 		db:     db,
@@ -123,10 +131,13 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 		return fmt.Errorf("failed to create ELBv2 tables: %w", err)
 	}
 
-	// Initialize prepared statements for common queries
-	if err := s.pool.InitializeCommonStatements(ctx); err != nil {
-		logging.Warn("Failed to initialize prepared statements", "error", err)
-		// Non-fatal error - continue initialization
+	// Skip prepared statements initialization for single connection mode
+	// Prepared statements are handled differently without connection pool
+	if s.pool != nil {
+		if err := s.pool.InitializeCommonStatements(ctx); err != nil {
+			logging.Warn("Failed to initialize prepared statements", "error", err)
+			// Non-fatal error - continue initialization
+		}
 	}
 
 	logging.Info("DuckDB storage initialized successfully")

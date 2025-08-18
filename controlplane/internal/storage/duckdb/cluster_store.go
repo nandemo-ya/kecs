@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -76,6 +77,8 @@ func (s *clusterStore) Create(ctx context.Context, cluster *storage.Cluster) err
 		return fmt.Errorf("failed to create cluster: %w", err)
 	}
 
+	// With a single shared connection, data is immediately visible
+	// No need for explicit CHECKPOINT as we're not using multiple connections
 	return nil
 }
 
@@ -224,20 +227,22 @@ func (s *clusterStore) ListWithPagination(ctx context.Context, limit int, nextTo
 
 	// Add token-based pagination
 	if nextToken != "" {
-		// Validate that the token exists
-		var exists bool
-		err := s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM clusters WHERE id = ?)", nextToken).Scan(&exists)
-		if err != nil || !exists {
-			// Invalid token, start from beginning
-			nextToken = ""
-		} else {
-			baseQuery += " WHERE id > ?"
-			args = append(args, nextToken)
+		// Token format: created_at|id for stable pagination
+		parts := strings.Split(nextToken, "|")
+		if len(parts) == 2 {
+			// Parse the timestamp and ID from the token
+			createdAtStr := parts[0]
+			lastID := parts[1]
+
+			// Add WHERE clause for pagination - get items older than the last seen item
+			baseQuery += " WHERE (created_at < ? OR (created_at = ? AND id < ?))"
+			args = append(args, createdAtStr, createdAtStr, lastID)
 		}
+		// If token is invalid, ignore it and start from beginning
 	}
 
-	// Add ordering and limit
-	baseQuery += " ORDER BY id"
+	// Add ordering and limit - order by created_at DESC to show newest first, with id for stable sort
+	baseQuery += " ORDER BY created_at DESC, id DESC"
 	if limit > 0 {
 		baseQuery += " LIMIT ?"
 		args = append(args, limit+1) // Get one extra to determine if there are more results
@@ -301,9 +306,11 @@ func (s *clusterStore) ListWithPagination(ctx context.Context, limit int, nextTo
 	if limit > 0 && len(clusters) > limit {
 		// Remove the extra item
 		clusters = clusters[:limit]
-		// Use the last item's ID as the next token
+		// Use the last item's created_at and ID as the next token for stable pagination
 		if len(clusters) > 0 {
-			newNextToken = clusters[len(clusters)-1].ID
+			lastCluster := clusters[len(clusters)-1]
+			// Format: created_at|id
+			newNextToken = fmt.Sprintf("%s|%s", lastCluster.CreatedAt.Format(time.RFC3339Nano), lastCluster.ID)
 		}
 	}
 
