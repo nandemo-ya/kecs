@@ -1,0 +1,375 @@
+name: KECS on Actions
+
+on:
+  workflow_dispatch:
+    inputs:
+      kecs_image_tag:
+        description: 'KECS Docker image tag'
+        required: false
+        default: 'latest'
+        type: string
+      debug:
+        description: 'Enable debug logging'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  KECS_IMAGE: ghcr.io/nandemo-ya/kecs
+  CLUSTER_NAME: kecs-e2e-test
+
+jobs:
+  e2e-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install kubectl
+      run: |
+        # Detect architecture
+        ARCH=$(uname -m)
+        case $ARCH in
+          x86_64)
+            KUBECTL_ARCH="amd64"
+            ;;
+          aarch64|arm64)
+            KUBECTL_ARCH="arm64"
+            ;;
+          *)
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+            ;;
+        esac
+        
+        # Download kubectl for the detected architecture
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${KUBECTL_ARCH}/kubectl"
+        chmod +x kubectl
+        sudo mv kubectl /usr/local/bin/
+        kubectl version --client
+    
+    - name: Install k3d
+      run: |
+        # Detect architecture and install k3d binary
+        ARCH=$(uname -m)
+        case $ARCH in
+          x86_64)
+            K3D_ARCH="amd64"
+            ;;
+          aarch64|arm64)
+            K3D_ARCH="arm64"
+            ;;
+          *)
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+            ;;
+        esac
+        
+        # Download k3d for the detected architecture
+        curl -s -L https://github.com/k3d-io/k3d/releases/download/v5.4.6/k3d-linux-${K3D_ARCH} -o /tmp/k3d
+        chmod +x /tmp/k3d
+        sudo mv /tmp/k3d /usr/local/bin/k3d
+        k3d version
+    
+    - name: Setup k3d cluster
+      run: |
+        # Create k3d cluster with registry (without port mapping since KECS will use host ports)
+        k3d cluster create ${{ env.CLUSTER_NAME }} \
+          --servers 1 \
+          --agents 0 \
+          --k3s-arg "--disable=traefik@server:0" \
+          --registry-create kecs-registry:5000
+        
+        # Wait for cluster to be ready
+        kubectl wait --for=condition=Ready nodes --all --timeout=300s
+    
+    - name: Verify cluster is ready
+      run: |
+        # Verify k3d cluster is accessible
+        kubectl get nodes
+    
+    - name: Configure AWS CLI
+      run: |
+        # Set dummy AWS credentials for KECS testing
+        # KECS doesn't require real AWS credentials
+        mkdir -p ~/.aws
+        cat > ~/.aws/credentials <<EOF
+        [default]
+        aws_access_key_id = test
+        aws_secret_access_key = test
+        EOF
+        cat > ~/.aws/config <<EOF
+        [default]
+        region = us-east-1
+        output = json
+        EOF
+    
+    - name: Install AWS CLI v2
+      run: |
+        # Detect architecture and install AWS CLI v2
+        ARCH=$(uname -m)
+        case $ARCH in
+          x86_64)
+            AWS_ARCH="x86_64"
+            ;;
+          aarch64|arm64)
+            AWS_ARCH="aarch64"
+            ;;
+          *)
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+            ;;
+        esac
+        
+        # Download AWS CLI for the detected architecture
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-${AWS_ARCH}.zip" -o "awscliv2.zip"
+        unzip -q awscliv2.zip
+        sudo ./aws/install
+        aws --version
+    
+    - name: Setup Go for local build
+      if: inputs.kecs_image_tag == 'local' || inputs.kecs_image_tag == ''
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    
+    - name: Build KECS locally for testing
+      if: inputs.kecs_image_tag == 'local' || inputs.kecs_image_tag == ''
+      run: |
+        # Detect architecture for Go build
+        ARCH=$(uname -m)
+        case $ARCH in
+          x86_64)
+            GOARCH="amd64"
+            ;;
+          aarch64|arm64)
+            GOARCH="arm64"
+            ;;
+          *)
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+            ;;
+        esac
+        
+        # Build KECS binary for the detected architecture
+        cd controlplane
+        GOARCH=${GOARCH} go build -o ../bin/kecs ./cmd/controlplane
+        cd ..
+        
+        # Create a simple Dockerfile for testing
+        cat > Dockerfile.test <<EOF
+        FROM alpine:latest
+        RUN apk add --no-cache ca-certificates
+        COPY bin/kecs /usr/local/bin/kecs
+        ENTRYPOINT ["/usr/local/bin/kecs"]
+        EOF
+        
+        # Build Docker image
+        docker build -f Dockerfile.test -t ghcr.io/nandemo-ya/kecs:local .
+    
+    - name: Deploy KECS to k3d cluster
+      run: |
+        # Use local image if not specified
+        IMAGE_TAG="${{ inputs.kecs_image_tag }}"
+        if [ -z "$IMAGE_TAG" ] || [ "$IMAGE_TAG" = "local" ]; then
+          IMAGE_TAG="local"
+        fi
+        
+        # Create namespace
+        kubectl create namespace kecs-system || true
+        
+        # Get kubeconfig path and verify it exists
+        KUBECONFIG_PATH="$HOME/.kube/config"
+        if [ ! -f "${KUBECONFIG_PATH}" ]; then
+          echo "ERROR: kubeconfig not found at ${KUBECONFIG_PATH}"
+          exit 1
+        fi
+        echo "Found kubeconfig at: ${KUBECONFIG_PATH}"
+        ls -la "${KUBECONFIG_PATH}"
+        
+        # Check if image exists
+        docker image inspect ${{ env.KECS_IMAGE }}:$IMAGE_TAG > /dev/null 2>&1 || {
+          echo "Image ${{ env.KECS_IMAGE }}:$IMAGE_TAG not found, trying to pull..."
+          docker pull ${{ env.KECS_IMAGE }}:$IMAGE_TAG || {
+            echo "Failed to pull image, using local build"
+            IMAGE_TAG="local"
+          }
+        }
+        
+        # Copy kubeconfig with proper permissions
+        cp ${KUBECONFIG_PATH} /tmp/kubeconfig
+        chmod 644 /tmp/kubeconfig
+        
+        # Deploy KECS as a container with proper kubeconfig and Docker socket access
+        docker run -d \
+          --name kecs-server \
+          --network host \
+          --privileged \
+          --user root \
+          -e KUBECONFIG=/tmp/kubeconfig \
+          -e DOCKER_HOST=unix:///var/run/docker.sock \
+          -v /tmp/kubeconfig:/tmp/kubeconfig:ro \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          ${{ env.KECS_IMAGE }}:${IMAGE_TAG} \
+          server --port 8080 --admin-port 8081 --kubeconfig /tmp/kubeconfig
+        
+        # Check if container started
+        sleep 5
+        docker ps -a | grep kecs-server
+        
+        # Check initial container logs for LocalStack startup
+        echo "=== Initial KECS Container Logs ==="
+        docker logs kecs-server || true
+        
+        # Check permissions and availability
+        echo "=== Kubeconfig Permissions ==="
+        docker exec kecs-server ls -la /tmp/kubeconfig || true
+        docker exec kecs-server cat /tmp/kubeconfig | head -5 || true
+        echo "=== Docker Socket Permissions ==="
+        docker exec kecs-server ls -la /var/run/docker.sock || true
+        echo "=== Check for Docker client in container ==="
+        docker exec kecs-server which docker || echo "Docker client not found in container"
+        docker exec kecs-server printenv PATH || true
+        
+        # Wait for LocalStack to be created and ready
+        echo "Waiting for LocalStack container..."
+        for i in {1..15}; do
+          if docker ps | grep -q localstack; then
+            echo "LocalStack container found"
+            docker ps | grep localstack
+            break
+          fi
+          echo "Waiting for LocalStack... ($i/15)"
+          # Check KECS logs for LocalStack creation attempts
+          docker logs --tail 20 kecs-server 2>&1 | grep -i localstack || true
+          sleep 3
+        done
+        
+        # Show all running containers
+        echo "=== All Docker Containers ==="
+        docker ps -a
+        
+        # Wait for KECS to be ready
+        echo "Waiting for KECS server to be ready..."
+        for i in {1..30}; do
+          if curl -s http://localhost:8081/health > /dev/null 2>&1; then
+            echo "KECS server is ready"
+            curl -s http://localhost:8081/health | jq . || true
+            break
+          fi
+          echo "Waiting for KECS server... ($i/30)"
+          docker logs --tail 10 kecs-server || true
+          sleep 2
+        done
+        
+        # Final health check
+        curl -s http://localhost:8081/health || {
+          echo "Health check failed, showing container logs:"
+          docker logs kecs-server
+          exit 1
+        }
+    
+    - name: Create ECS Cluster
+      run: |
+        export AWS_ENDPOINT_URL=http://localhost:8080
+        
+        # Create cluster
+        aws ecs create-cluster --cluster-name default
+        
+        # List clusters
+        aws ecs list-clusters
+    
+    - name: Register Task Definition
+      run: |
+        export AWS_ENDPOINT_URL=http://localhost:8080
+        
+        # Register nginx task definition
+        aws ecs register-task-definition \
+          --cli-input-json file://examples/single-task-nginx/task_def.json
+        
+        # List task definitions
+        aws ecs list-task-definitions
+    
+    - name: Run Task
+      run: |
+        export AWS_ENDPOINT_URL=http://localhost:8080
+        
+        # Run the task
+        aws ecs run-task \
+          --cluster default \
+          --task-definition single-task-nginx:1 \
+          --launch-type FARGATE \
+          --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],securityGroups=[sg-12345],assignPublicIp=ENABLED}"
+        
+        # Wait for task to start
+        sleep 15
+        
+        # List running tasks
+        aws ecs list-tasks --cluster default
+        
+        # Describe tasks to check status
+        TASK_ARNS=$(aws ecs list-tasks --cluster default --query 'taskArns' --output text)
+        if [ ! -z "$TASK_ARNS" ]; then
+          aws ecs describe-tasks --cluster default --tasks $TASK_ARNS
+        fi
+    
+    - name: Create Service
+      run: |
+        export AWS_ENDPOINT_URL=http://localhost:8080
+        
+        # Create service with correct task definition reference
+        cat > /tmp/service_def.json <<EOF
+        {
+          "serviceName": "single-task-nginx",
+          "cluster": "default",
+          "taskDefinition": "single-task-nginx:1",
+          "desiredCount": 1,
+          "launchType": "FARGATE",
+          "networkConfiguration": {
+            "awsvpcConfiguration": {
+              "subnets": ["subnet-12345"],
+              "securityGroups": ["sg-12345"],
+              "assignPublicIp": "ENABLED"
+            }
+          }
+        }
+        EOF
+        
+        aws ecs create-service --cli-input-json file:///tmp/service_def.json
+        
+        # List services
+        aws ecs list-services --cluster default
+        
+        # Describe service
+        aws ecs describe-services --cluster default --services single-task-nginx
+    
+    - name: Collect Logs on Failure
+      if: failure()
+      run: |
+        echo "=== KECS Container Logs ==="
+        docker logs kecs-server || true
+        
+        echo "=== LocalStack Container Logs ==="
+        docker logs localstack 2>/dev/null || true
+        
+        echo "=== Kubernetes Pods ==="
+        kubectl get pods -n default 2>/dev/null || true
+        kubectl get pods -n kecs-system 2>/dev/null || true
+        
+        echo "=== Docker Containers ==="
+        docker ps -a
+        
+        echo "=== k3d Clusters ==="
+        k3d cluster list || true
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        # Stop KECS container
+        docker stop kecs-server || true
+        docker rm kecs-server || true
+        
+        # Clean up k3d cluster
+        k3d cluster delete ${{ env.CLUSTER_NAME }} || true
