@@ -213,7 +213,7 @@ func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterNa
 		}
 
 		// Configure k3s to use the registry with HTTP
-		if err := k.configureRegistryForCluster(ctx, normalizedName); err != nil {
+		if err := k.configureRegistryForCluster(ctx, normalizedName, registryNode); err != nil {
 			logging.Warn("Failed to configure registry for cluster", "error", err)
 			// Continue anyway as the registry might still work
 		}
@@ -406,7 +406,7 @@ func (k *K3dClusterManager) createClusterStandardWithPorts(ctx context.Context, 
 		}
 
 		// Configure k3s to use the registry with HTTP
-		if err := k.configureRegistryForCluster(ctx, normalizedName); err != nil {
+		if err := k.configureRegistryForCluster(ctx, normalizedName, registryNode); err != nil {
 			logging.Warn("Failed to configure registry for cluster", "error", err)
 			// Continue anyway as the registry might still work
 		}
@@ -1426,7 +1426,7 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		}
 
 		// Configure k3s to use the registry with HTTP
-		if err := k.configureRegistryForCluster(ctx, normalizedName); err != nil {
+		if err := k.configureRegistryForCluster(ctx, normalizedName, registryNode); err != nil {
 			logging.Warn("Failed to configure registry for cluster", "error", err)
 			// Continue anyway as the registry might still work
 		}
@@ -1523,7 +1523,7 @@ func (k *K3dClusterManager) ensureRegistry(ctx context.Context) (*k3d.Node, erro
 
 	// Create registry configuration
 	reg := &k3d.Registry{
-		Host:  fmt.Sprintf("%s.localhost", registryName),
+		Host:  registryName, // Use simple name without .localhost suffix
 		Image: "docker.io/library/registry:2",
 		ExposureOpts: k3d.ExposureOpts{
 			Host: "0.0.0.0",
@@ -1602,22 +1602,33 @@ func (k *K3dClusterManager) ensureRegistry(ctx context.Context) (*k3d.Node, erro
 }
 
 // configureRegistryForCluster configures k3s to use the registry with HTTP
-func (k *K3dClusterManager) configureRegistryForCluster(ctx context.Context, clusterName string) error {
+func (k *K3dClusterManager) configureRegistryForCluster(ctx context.Context, clusterName string, registryNode *k3d.Node) error {
 	logging.Info("Configuring k3s to use registry with HTTP", "cluster", clusterName)
 
+	// Get registry IP address in the cluster network
+	registryIP, err := k.getRegistryIPInClusterNetwork(ctx, clusterName, registryNode)
+	if err != nil {
+		logging.Warn("Failed to get registry IP, using hostname fallback", "error", err)
+		registryIP = "k3d-kecs-registry"
+	}
+
 	// Create registry configuration for k3s
-	// Support both old and new registry names for compatibility
-	registryConfig := `mirrors:
-  "k3d-kecs-registry.localhost:5000":
-    endpoint:
-      - "http://k3d-kecs-registry:5000"
+	// Support multiple registry access patterns:
+	// - localhost:5000 (from host machine)
+	// - registry.kecs.local:5000 (from within cluster - preferred)
+	// Use direct IP address for reliability
+	registryConfig := fmt.Sprintf(`mirrors:
   "localhost:5000":
     endpoint:
-      - "http://k3d-kecs-registry:5000"
-  "k3d-kecs-registry:5000":
+      - "http://%s:5000"
+  "registry.kecs.local:5000":
     endpoint:
-      - "http://k3d-kecs-registry:5000"
-`
+      - "http://%s:5000"
+configs:
+  "%s:5000":
+    tls:
+      insecure_skip_verify: true
+`, registryIP, registryIP, registryIP)
 
 	// Get the server node name
 	serverNodeName := fmt.Sprintf("k3d-%s-server-0", clusterName)
@@ -1696,10 +1707,8 @@ func (k *K3dClusterManager) addRegistryToCoreDNS(ctx context.Context, clusterNam
 	}
 
 	// Inspect the registry container
+	// The registry container might have different naming patterns
 	registryContainerName := registryNode.Name
-	if !strings.HasPrefix(registryContainerName, "k3d-") {
-		registryContainerName = "k3d-" + registryContainerName
-	}
 
 	containerJSON, err := dockerClient.ContainerInspect(ctx, registryContainerName)
 	if err != nil {
@@ -1733,9 +1742,12 @@ func (k *K3dClusterManager) addRegistryToCoreDNS(ctx context.Context, clusterNam
 	// Check if registry entries already exist
 	// Use the actual registry node name, ensuring it doesn't have k3d- prefix
 	registryHostname := strings.TrimPrefix(registryNode.Name, "k3d-")
-	if !strings.Contains(nodeHosts, registryHostname) {
-		// Add registry entries
-		registryEntries := fmt.Sprintf("\n%s %s %s.localhost", registryIP, registryHostname, registryHostname)
+	if !strings.Contains(nodeHosts, "registry.kecs.local") {
+		// Add registry entries with multiple aliases
+		// - k3d-kecs-registry (actual container name)
+		// - kecs-registry (without k3d prefix)
+		// - registry.kecs.local (preferred cluster-internal name)
+		registryEntries := fmt.Sprintf("\n%s k3d-%s %s registry.kecs.local", registryIP, registryHostname, registryHostname)
 		nodeHosts += registryEntries
 
 		// Update ConfigMap
@@ -1798,10 +1810,8 @@ func (k *K3dClusterManager) addRegistryToNodeHosts(ctx context.Context, clusterN
 	}
 
 	// Inspect the registry container
+	// The registry container might have different naming patterns
 	registryContainerName := registryNode.Name
-	if !strings.HasPrefix(registryContainerName, "k3d-") {
-		registryContainerName = "k3d-" + registryContainerName
-	}
 
 	containerJSON, err := dockerClient.ContainerInspect(ctx, registryContainerName)
 	if err != nil {
@@ -1828,7 +1838,11 @@ func (k *K3dClusterManager) addRegistryToNodeHosts(ctx context.Context, clusterN
 	// Add registry to each node's /etc/hosts
 	// Use the actual registry node name, ensuring it doesn't have k3d- prefix
 	registryHostname := strings.TrimPrefix(registryNode.Name, "k3d-")
-	hostsEntry := fmt.Sprintf("%s %s", registryIP, registryHostname)
+	// Add multiple aliases for the registry
+	// - k3d-kecs-registry (actual container name)
+	// - kecs-registry (without k3d prefix)
+	// - registry.kecs.local (preferred cluster-internal name)
+	hostsEntry := fmt.Sprintf("%s k3d-%s %s registry.kecs.local", registryIP, registryHostname, registryHostname)
 
 	for _, node := range nodes {
 		// Skip non-cluster nodes
@@ -1867,4 +1881,37 @@ func (k *K3dClusterManager) addRegistryToNodeHosts(ctx context.Context, clusterN
 	}
 
 	return nil
+}
+
+// getRegistryIPInClusterNetwork gets the registry container's IP address in the cluster network
+func (k *K3dClusterManager) getRegistryIPInClusterNetwork(ctx context.Context, clusterName string, registryNode *k3d.Node) (string, error) {
+	if registryNode == nil {
+		return "", fmt.Errorf("registry node is nil")
+	}
+
+	// Get Docker client
+	dockerClient, err := docker.GetDockerClient()
+	if err != nil {
+		return "", fmt.Errorf("failed to get docker client: %w", err)
+	}
+
+	// Get the registry container name
+	// The registry container might have different naming patterns
+	registryContainerName := registryNode.Name
+
+	// Inspect the registry container
+	containerJSON, err := dockerClient.ContainerInspect(ctx, registryContainerName)
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect registry container: %w", err)
+	}
+
+	// Find the IP address in the cluster network
+	clusterNetworkName := fmt.Sprintf("k3d-%s", clusterName)
+	if network, ok := containerJSON.NetworkSettings.Networks[clusterNetworkName]; ok && network != nil {
+		if network.IPAddress != "" {
+			return network.IPAddress, nil
+		}
+	}
+
+	return "", fmt.Errorf("failed to get registry IP address in cluster network %s", clusterNetworkName)
 }

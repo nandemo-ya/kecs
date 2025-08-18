@@ -131,18 +131,15 @@ docker-build:
 .PHONY: docker-build-dev
 docker-build-dev:
 	@echo "Building Docker image for local k3d registry..."
-	$(DOCKER) build -t k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) $(CONTROLPLANE_DIR)
-	$(DOCKER) tag k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:latest
-	# Also tag for cluster-internal access
-	$(DOCKER) tag k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) k3d-kecs-registry:5000/nandemo-ya/kecs-controlplane:$(VERSION)
-	$(DOCKER) tag k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) k3d-kecs-registry:5000/nandemo-ya/kecs-controlplane:latest
+	$(DOCKER) build -t localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) $(CONTROLPLANE_DIR)
+	$(DOCKER) tag localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION) localhost:5000/nandemo-ya/kecs-controlplane:latest
 
 # Push Docker image to local k3d registry (dev mode)
 .PHONY: docker-push-dev
 docker-push-dev: docker-build-dev
 	@echo "Pushing to k3d registry..."
-	$(DOCKER) push k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION)
-	$(DOCKER) push k3d-kecs-registry.localhost:5000/nandemo-ya/kecs-controlplane:latest
+	$(DOCKER) push localhost:5000/nandemo-ya/kecs-controlplane:$(VERSION)
+	$(DOCKER) push localhost:5000/nandemo-ya/kecs-controlplane:latest
 
 # Hot reload: Build and replace controlplane in running KECS instance
 .PHONY: hot-reload
@@ -171,7 +168,7 @@ hot-reload: docker-push-dev
 	fi; \
 	echo "Updating controlplane in cluster: $$CLUSTER_NAME"; \
 	kubectl config use-context "k3d-$$CLUSTER_NAME" && \
-	kubectl set image deployment/kecs-controlplane controlplane=k3d-kecs-registry:5000/nandemo-ya/kecs-controlplane:$(VERSION) -n kecs-system && \
+	kubectl set image deployment/kecs-controlplane controlplane=registry.kecs.local:5000/nandemo-ya/kecs-controlplane:$(VERSION) -n kecs-system && \
 	kubectl rollout status deployment/kecs-controlplane -n kecs-system && \
 	echo "✅ Controlplane updated successfully!"
 
