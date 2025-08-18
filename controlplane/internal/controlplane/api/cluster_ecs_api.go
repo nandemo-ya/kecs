@@ -142,8 +142,11 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 		return nil, fmt.Errorf("failed to create cluster: %w", err)
 	}
 
-	// Create k8s cluster and namespace asynchronously
-	go api.createK8sClusterAndNamespace(cluster)
+	// Create k8s namespace synchronously to ensure it exists before returning
+	api.createNamespaceForCluster(cluster)
+	
+	// Deploy LocalStack asynchronously (not critical for cluster creation)
+	go api.deployLocalStackIfEnabled(cluster)
 
 	// Build response
 	response := &generated.CreateClusterResponse{
@@ -685,32 +688,9 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 	}, nil
 }
 
-// createK8sClusterAndNamespace creates a namespace for the ECS cluster in the existing KECS instance
-func (api *DefaultECSAPI) createK8sClusterAndNamespace(cluster *storage.Cluster) {
-	// In the new design, we use the existing KECS instance's k3d cluster
-	// ECS clusters are represented as Kubernetes namespaces
-	logging.Info("Creating namespace for ECS cluster", "cluster", cluster.Name, "k8sCluster", cluster.K8sClusterName)
-
-	// In the new architecture, the KECS instance (k3d cluster) should already exist
-	// We only need to create namespaces for ECS clusters
-	// The k3d cluster name in storage is just for reference to the KECS instance
-
-	// Create namespace
-	api.createNamespaceForCluster(cluster)
-
-	// Deploy LocalStack if enabled
-	api.deployLocalStackIfEnabled(cluster)
-}
-
 // createNamespaceForCluster creates a namespace in the k3d cluster
 func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 	ctx := context.Background()
-
-	// Skip actual namespace creation in CI/test mode
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
-		logging.Info("CI/TEST MODE: Skipping namespace creation", "cluster", cluster.Name)
-		return
-	}
 
 	// Try to create Kubernetes client
 	// First, try in-cluster config (when running inside Kubernetes)
