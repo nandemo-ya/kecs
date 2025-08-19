@@ -155,10 +155,8 @@ var _ = Describe("TaskSetEcsApi", func() {
 			Expect(*resp.TaskSet.Status).To(Equal("DRAINING"))
 			Expect(*resp.TaskSet.Id).To(Equal(taskSetID))
 
-			// Verify status was updated to DRAINING
-			taskSet, err := mockTaskSetStore.Get(ctx, serviceARN, taskSetID)
-			Expect(err).To(BeNil())
-			Expect(taskSet.Status).To(Equal("DRAINING"))
+			// Note: TaskSet is deleted from storage after setting status to DRAINING
+			// so we cannot verify it exists in storage anymore
 		})
 
 		It("should return error when service or taskSet is missing", func() {
@@ -307,8 +305,17 @@ var _ = Describe("TaskSetEcsApi", func() {
 				},
 			}
 
+			// Mock service exists
+			err := mockServiceStore.Create(ctx, &storage.Service{
+				ARN:          serviceARN,
+				ServiceName:  serviceName,
+				ClusterARN:   clusterARN,
+				DesiredCount: 10,
+			})
+			Expect(err).To(BeNil())
+
 			// Mock task set exists
-			err := mockTaskSetStore.Create(ctx, &storage.TaskSet{
+			err = mockTaskSetStore.Create(ctx, &storage.TaskSet{
 				ID:                   taskSetID,
 				ARN:                  fmt.Sprintf("arn:aws:ecs:%s:%s:task-set/%s/%s/%s", region, accountID, clusterName, serviceName, taskSetID),
 				ServiceARN:           serviceARN,

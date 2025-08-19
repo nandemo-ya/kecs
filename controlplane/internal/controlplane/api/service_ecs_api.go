@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
@@ -41,6 +43,11 @@ func (api *DefaultECSAPI) getServiceManager() (*kubernetes.ServiceManager, error
 
 // CreateService implements the CreateService operation
 func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.CreateServiceRequest) (*generated.CreateServiceResponse, error) {
+	logging.Info("CreateService called", 
+		"serviceName", req.ServiceName,
+		"hasTaskDefinition", req.TaskDefinition != nil,
+		"hasDeploymentController", req.DeploymentController != nil)
+	
 	// Default cluster if not specified
 	clusterName := "default"
 	if req.Cluster != nil && *req.Cluster != "" {
@@ -57,60 +64,75 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	if req.ServiceName == "" {
 		return nil, fmt.Errorf("serviceName is required")
 	}
-	if req.TaskDefinition == nil {
-		return nil, fmt.Errorf("taskDefinition is required")
+	
+	// Check deployment controller type
+	isExternalDeployment := false
+	if req.DeploymentController != nil {
+		deploymentType := string(req.DeploymentController.Type)
+		isExternalDeployment = (deploymentType == "EXTERNAL")
+		logging.Info("DeploymentController detected", 
+			"type", deploymentType,
+			"isExternal", isExternalDeployment)
+	}
+	
+	// TaskDefinition is not required for EXTERNAL deployment controller
+	if !isExternalDeployment && req.TaskDefinition == nil {
+		return nil, fmt.Errorf("taskDefinition is required for non-EXTERNAL deployment controller")
 	}
 
-	// Get task definition
+	// Get task definition (only for non-EXTERNAL deployment)
 	var taskDef *storage.TaskDefinition
-	taskDefArn := *req.TaskDefinition
+	var taskDefArn string
+	
+	if !isExternalDeployment && req.TaskDefinition != nil {
+		taskDefArn = *req.TaskDefinition
+		logging.Debug("Looking for task definition", "taskDefinition", taskDefArn)
 
-	logging.Debug("Looking for task definition", "taskDefinition", taskDefArn)
+		if !strings.HasPrefix(taskDefArn, "arn:aws:ecs:") {
+			// Check if it's family:revision, family:latest, or just family
+			if strings.Contains(taskDefArn, ":") {
+				parts := strings.SplitN(taskDefArn, ":", 2)
+				family := parts[0]
+				revision := parts[1]
 
-	if !strings.HasPrefix(taskDefArn, "arn:aws:ecs:") {
-		// Check if it's family:revision, family:latest, or just family
-		if strings.Contains(taskDefArn, ":") {
-			parts := strings.SplitN(taskDefArn, ":", 2)
-			family := parts[0]
-			revision := parts[1]
-
-			if revision == "latest" {
-				// KECS extension: support for family:latest
-				logging.Debug("Resolving 'latest' tag for task definition family", "family", family)
-				taskDef, err = api.storage.TaskDefinitionStore().GetLatest(ctx, family)
-				if taskDef != nil {
-					taskDefArn = taskDef.ARN
-					logging.Debug("Resolved 'latest' to task definition", "arn", taskDefArn, "revision", taskDef.Revision)
+				if revision == "latest" {
+					// KECS extension: support for family:latest
+					logging.Debug("Resolving 'latest' tag for task definition family", "family", family)
+					taskDef, err = api.storage.TaskDefinitionStore().GetLatest(ctx, family)
+					if taskDef != nil {
+						taskDefArn = taskDef.ARN
+						logging.Debug("Resolved 'latest' to task definition", "arn", taskDefArn, "revision", taskDef.Revision)
+					}
+				} else {
+					// family:revision format
+					taskDefArn = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", api.region, api.accountID, taskDefArn)
+					logging.Debug("Trying to get task definition by ARN", "arn", taskDefArn)
+					taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefArn)
 				}
 			} else {
-				// family:revision format
-				taskDefArn = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s", api.region, api.accountID, taskDefArn)
-				logging.Debug("Trying to get task definition by ARN", "arn", taskDefArn)
-				taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefArn)
+				// Just family - get latest
+				logging.Debug("Trying to get latest task definition for family", "family", taskDefArn)
+				taskDef, err = api.storage.TaskDefinitionStore().GetLatest(ctx, taskDefArn)
+				if taskDef != nil {
+					taskDefArn = taskDef.ARN
+					logging.Debug("Found latest task definition", "arn", taskDefArn)
+				}
 			}
 		} else {
-			// Just family - get latest
-			logging.Debug("Trying to get latest task definition for family", "family", taskDefArn)
-			taskDef, err = api.storage.TaskDefinitionStore().GetLatest(ctx, taskDefArn)
-			if taskDef != nil {
-				taskDefArn = taskDef.ARN
-				logging.Debug("Found latest task definition", "arn", taskDefArn)
-			}
+			// Full ARN provided
+			logging.Debug("Full ARN provided", "arn", taskDefArn)
+			taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefArn)
 		}
-	} else {
-		// Full ARN provided
-		logging.Debug("Full ARN provided", "arn", taskDefArn)
-		taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefArn)
-	}
 
-	if err != nil {
-		logging.Debug("Error getting task definition", "error", err)
-		return nil, fmt.Errorf("task definition not found: %s", *req.TaskDefinition)
-	}
+		if err != nil {
+			logging.Debug("Error getting task definition", "error", err)
+			return nil, fmt.Errorf("task definition not found: %s", *req.TaskDefinition)
+		}
 
-	if taskDef == nil {
-		logging.Debug("Task definition is nil")
-		return nil, fmt.Errorf("task definition not found: %s", *req.TaskDefinition)
+		if taskDef == nil {
+			logging.Debug("Task definition is nil")
+			return nil, fmt.Errorf("task definition not found: %s", *req.TaskDefinition)
+		}
 	}
 
 	// Generate ARNs
@@ -178,6 +200,11 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		return nil, fmt.Errorf("failed to marshal deployment configuration: %w", err)
 	}
 
+	deploymentControllerJSON, err := json.Marshal(req.DeploymentController)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal deployment controller: %w", err)
+	}
+
 	placementConstraintsJSON, err := json.Marshal(req.PlacementConstraints)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal placement constraints: %w", err)
@@ -208,45 +235,55 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	// So we don't need to check for individual k3d clusters per ECS cluster
 	logging.Info("Creating service in namespace for ECS cluster", "cluster", cluster.Name)
 
-	// Create service converter and manager
-	// Use ServiceConverterWithLB if ELBv2 integration is available
-	var serviceConverter converters.ServiceConverterInterface
-	if api.elbv2Integration != nil {
-		logging.Info("Using ServiceConverterWithLB for ELBv2 integration",
-			"serviceName", req.ServiceName)
-		serviceConverter = converters.NewServiceConverterWithLB(api.region, api.accountID, api.elbv2Integration)
+	// Variables for Kubernetes resources (will be nil for EXTERNAL deployment)
+	var deployment *appsv1.Deployment
+	var kubeService *corev1.Service
+	var deploymentName string
+	var namespace string
+
+	// Only create Kubernetes resources for non-EXTERNAL deployment controller
+	if !isExternalDeployment {
+		// Create service converter and manager
+		// Use ServiceConverterWithLB if ELBv2 integration is available
+		var serviceConverter converters.ServiceConverterInterface
+		if api.elbv2Integration != nil {
+			logging.Info("Using ServiceConverterWithLB for ELBv2 integration",
+				"serviceName", req.ServiceName)
+			serviceConverter = converters.NewServiceConverterWithLB(api.region, api.accountID, api.elbv2Integration)
+		} else {
+			logging.Info("Using standard ServiceConverter",
+				"serviceName", req.ServiceName)
+			serviceConverter = converters.NewServiceConverter(api.region, api.accountID)
+		}
+
+		// Convert ECS service to Kubernetes Deployment
+		storageServiceTemp := &storage.Service{
+			ServiceName:       req.ServiceName,
+			DesiredCount:      int(desiredCount),
+			LaunchType:        string(launchType),
+			LoadBalancers:     string(loadBalancersJSON),
+			ServiceRegistries: string(serviceRegistriesJSON),
+		}
+		deployment, kubeService, err = serviceConverter.ConvertServiceToDeploymentWithNetworkConfig(
+			storageServiceTemp,
+			taskDef,
+			cluster,
+			req.NetworkConfiguration,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert service to deployment: %w", err)
+		}
+
+		deploymentName = req.ServiceName
+		namespace = fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
 	} else {
-		logging.Info("Using standard ServiceConverter",
+		// For EXTERNAL deployment, we don't create Kubernetes resources
+		// TaskSets will handle the actual workload deployment
+		logging.Info("Service has EXTERNAL deployment controller, skipping Kubernetes resource creation",
 			"serviceName", req.ServiceName)
-		serviceConverter = converters.NewServiceConverter(api.region, api.accountID)
+		namespace = fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
+		deploymentName = "" // No deployment for EXTERNAL
 	}
-
-	serviceManager, err := api.getServiceManager()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create service manager: %w", err)
-	}
-
-	// Convert ECS service to Kubernetes Deployment
-	storageServiceTemp := &storage.Service{
-		ServiceName:       req.ServiceName,
-		DesiredCount:      int(desiredCount),
-		LaunchType:        string(launchType),
-		LoadBalancers:     string(loadBalancersJSON),
-		ServiceRegistries: string(serviceRegistriesJSON),
-	}
-	deployment, kubeService, err := serviceConverter.ConvertServiceToDeploymentWithNetworkConfig(
-		storageServiceTemp,
-		taskDef,
-		cluster,
-		req.NetworkConfiguration,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert service to deployment: %w", err)
-	}
-
-	// Create storage service with deployment information
-	namespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
-	deploymentName := req.ServiceName
 
 	// Extract optional string values
 	var platformVersion, roleARN, propagateTags string
@@ -273,11 +310,17 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		enableExecuteCommand = *req.EnableExecuteCommand
 	}
 
+	// TaskDefinitionARN is only set for non-EXTERNAL deployments
+	var taskDefinitionARN string
+	if !isExternalDeployment {
+		taskDefinitionARN = taskDefArn
+	}
+
 	storageService := &storage.Service{
 		ARN:                           serviceARN,
 		ServiceName:                   req.ServiceName,
 		ClusterARN:                    clusterARN,
-		TaskDefinitionARN:             taskDefArn,
+		TaskDefinitionARN:             taskDefinitionARN,
 		DesiredCount:                  int(desiredCount),
 		RunningCount:                  0,
 		PendingCount:                  int(desiredCount),
@@ -289,6 +332,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		ServiceRegistries:             string(serviceRegistriesJSON),
 		NetworkConfiguration:          string(networkConfigJSON),
 		DeploymentConfiguration:       string(deploymentConfigJSON),
+		DeploymentController:          string(deploymentControllerJSON),
 		PlacementConstraints:          string(placementConstraintsJSON),
 		PlacementStrategy:             string(placementStrategyJSON),
 		CapacityProviderStrategy:      string(capacityProviderStrategyJSON),
@@ -322,19 +366,33 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		logging.Warn("Failed to update cluster service count", "error", err)
 	}
 
-	// Create Kubernetes Deployment and Service
-	logging.Info("Calling ServiceManager.CreateService",
-		"service", storageService.ServiceName,
-		"deployment", deployment.Name,
-		"namespace", deployment.Namespace)
-	if err := serviceManager.CreateService(ctx, deployment, kubeService, cluster, storageService); err != nil {
-		// Service was created in storage but Kubernetes deployment failed
-		// Update status to indicate failure - get fresh service data first
-		if freshService, getErr := api.storage.ServiceStore().Get(ctx, cluster.ARN, storageService.ServiceName); getErr == nil {
-			freshService.Status = "FAILED"
-			api.storage.ServiceStore().Update(ctx, freshService)
+	// Create Kubernetes Deployment and Service (only for non-EXTERNAL deployment)
+	if !isExternalDeployment {
+		serviceManager, err := api.getServiceManager()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create service manager: %w", err)
 		}
-		return nil, fmt.Errorf("failed to create kubernetes deployment: %w", err)
+
+		logging.Info("Calling ServiceManager.CreateService",
+			"service", storageService.ServiceName,
+			"deployment", deployment.Name,
+			"namespace", deployment.Namespace)
+		if err := serviceManager.CreateService(ctx, deployment, kubeService, cluster, storageService); err != nil {
+			// Service was created in storage but Kubernetes deployment failed
+			// Update status to indicate failure - get fresh service data first
+			if freshService, getErr := api.storage.ServiceStore().Get(ctx, cluster.ARN, storageService.ServiceName); getErr == nil {
+				freshService.Status = "FAILED"
+				api.storage.ServiceStore().Update(ctx, freshService)
+			}
+			return nil, fmt.Errorf("failed to create kubernetes deployment: %w", err)
+		}
+	} else {
+		// For EXTERNAL deployment, service is managed by TaskSets
+		// Update status to ACTIVE since there's no deployment to wait for
+		storageService.Status = "ACTIVE"
+		if err := api.storage.ServiceStore().Update(ctx, storageService); err != nil {
+			logging.Warn("Failed to update service status", "error", err)
+		}
 	}
 
 	// Handle Service Discovery registration if ServiceRegistries are specified

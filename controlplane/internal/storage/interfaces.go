@@ -307,6 +307,9 @@ type Service struct {
 	// Deployment configuration as JSON
 	DeploymentConfiguration string `json:"deploymentConfiguration,omitempty"`
 
+	// Deployment controller as JSON (type: ECS|CODE_DEPLOY|EXTERNAL)
+	DeploymentController string `json:"deploymentController,omitempty"`
+
 	// Placement constraints as JSON
 	PlacementConstraints string `json:"placementConstraints,omitempty"`
 

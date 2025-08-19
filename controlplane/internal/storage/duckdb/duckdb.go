@@ -272,6 +272,7 @@ func (s *DuckDBStorage) createServicesTable(ctx context.Context) error {
 		service_registries VARCHAR,
 		network_configuration VARCHAR,
 		deployment_configuration VARCHAR,
+		deployment_controller VARCHAR,
 		placement_constraints VARCHAR,
 		placement_strategy VARCHAR,
 		capacity_provider_strategy VARCHAR,

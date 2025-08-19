@@ -20,6 +20,7 @@ type DefaultECSAPI struct {
 	clusterManager            kubernetes.ClusterManager
 	serviceManager            *kubernetes.ServiceManager
 	taskManagerInstance       *kubernetes.TaskManager
+	taskSetManager            *kubernetes.TaskSetManager
 	region                    string
 	accountID                 string
 	iamIntegration            iam.Integration
@@ -82,6 +83,11 @@ func (api *DefaultECSAPI) SetServiceDiscoveryManager(serviceDiscoveryManager ser
 // SetServiceManager sets the service manager for the ECS API
 func (api *DefaultECSAPI) SetServiceManager(serviceManager *kubernetes.ServiceManager) {
 	api.serviceManager = serviceManager
+}
+
+// SetTaskSetManager sets the TaskSet manager for the ECS API
+func (api *DefaultECSAPI) SetTaskSetManager(taskSetManager *kubernetes.TaskSetManager) {
+	api.taskSetManager = taskSetManager
 }
 
 // SetLocalStackManager sets the LocalStack manager for the ECS API

@@ -44,6 +44,7 @@ type Server struct {
 	clusterManager            kubernetes.ClusterManager
 	serviceManager            *kubernetes.ServiceManager
 	taskManager               *kubernetes.TaskManager
+	taskSetManager            *kubernetes.TaskSetManager
 	region                    string
 	accountID                 string
 	testModeWorker            *TestModeTaskWorker
@@ -129,6 +130,26 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 	} else {
 		s.taskManager = taskManager
+	}
+
+	// Initialize TaskSet manager
+	if s.taskManager != nil && !apiconfig.GetBool("features.testMode") {
+		// Try to get kubernetes client for TaskSetManager
+		kubeConfig, err := kubernetes.GetKubeConfig()
+		if err != nil {
+			logging.Warn("Failed to get kubernetes config for TaskSet manager",
+				"error", err)
+		} else {
+			kubeClient, err := k8s.NewForConfig(kubeConfig)
+			if err != nil {
+				logging.Warn("Failed to create kubernetes client for TaskSet manager",
+					"error", err)
+			} else {
+				taskSetManager := kubernetes.NewTaskSetManager(kubeClient, s.taskManager)
+				s.taskSetManager = taskSetManager
+				logging.Info("TaskSet manager initialized successfully")
+			}
+		}
 	}
 
 	// Initialize sync controller
@@ -408,6 +429,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		if s.serviceManager != nil {
 			defaultAPI.SetServiceManager(s.serviceManager)
 		}
+		if s.taskSetManager != nil {
+			defaultAPI.SetTaskSetManager(s.taskSetManager)
+		}
 		if s.iamIntegration != nil {
 			defaultAPI.SetIAMIntegration(s.iamIntegration)
 		}
@@ -490,6 +514,14 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 						"error", err)
 				} else {
 					s.taskManager = taskManagerWithSD
+
+					// Re-initialize TaskSetManager with the updated TaskManager
+					if s.taskSetManager != nil {
+						taskSetManager := kubernetes.NewTaskSetManager(kubeClient, taskManagerWithSD)
+						s.taskSetManager = taskSetManager
+						defaultAPI.SetTaskSetManager(s.taskSetManager)
+						logging.Info("TaskSetManager re-initialized with updated TaskManager")
+					}
 
 					// Update ServiceManager's TaskManager if it exists
 					if s.serviceManager != nil {
