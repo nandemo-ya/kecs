@@ -1,0 +1,36 @@
+{
+  "serviceName": "webapp-service",
+  "cluster": "default",
+  "desiredCount": 3,
+  "deploymentController": {
+    "type": "EXTERNAL"
+  },
+  "schedulingStrategy": "REPLICA",
+  "placementConstraints": [],
+  "placementStrategy": [
+    {
+      "type": "spread",
+      "field": "attribute:ecs.availability-zone"
+    }
+  ],
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": ["subnet-12345", "subnet-67890"],
+      "securityGroups": ["sg-webapp"],
+      "assignPublicIp": "ENABLED"
+    }
+  },
+  "healthCheckGracePeriodSeconds": 60,
+  "enableECSManagedTags": true,
+  "propagateTags": "SERVICE",
+  "tags": [
+    {
+      "key": "Environment",
+      "value": "production"
+    },
+    {
+      "key": "Application",
+      "value": "webapp"
+    }
+  ]
+}

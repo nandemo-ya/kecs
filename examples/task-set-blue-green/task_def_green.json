@@ -1,0 +1,52 @@
+{
+  "family": "webapp",
+  "taskRoleArn": "arn:aws:iam::000000000000:role/ecsTaskRole",
+  "executionRoleArn": "arn:aws:iam::000000000000:role/ecsTaskExecutionRole",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "webapp",
+      "image": "nginx:1.25-alpine",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "VERSION",
+          "value": "green"
+        },
+        {
+          "name": "APP_COLOR",
+          "value": "#00FF00"
+        }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/ || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/kecs/webapp",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "green"
+        }
+      },
+      "command": [
+        "sh",
+        "-c",
+        "echo '<html><body style=\"background-color: #00FF00;\"><h1>Green Version</h1><p>TaskSet: Green</p><p>Version: 2.0.0</p></body></html>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"
+      ]
+    }
+  ]
+}
