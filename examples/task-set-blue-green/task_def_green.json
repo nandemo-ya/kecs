@@ -1,7 +1,7 @@
 {
   "family": "webapp",
-  "taskRoleArn": "arn:aws:iam::123456789012:role/ecsTaskRole",
-  "executionRoleArn": "arn:aws:iam::123456789012:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::000000000000:role/ecsTaskRole",
+  "executionRoleArn": "arn:aws:iam::000000000000:role/ecsTaskExecutionRole",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
