@@ -1,0 +1,29 @@
+{
+  "serviceName": "webapp-service",
+  "cluster": "default",
+  "desiredCount": 2,
+  "deploymentController": {
+    "type": "EXTERNAL"
+  },
+  "schedulingStrategy": "REPLICA",
+  "launchType": "FARGATE",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": ["subnet-12345"],
+      "securityGroups": ["sg-12345"],
+      "assignPublicIp": "ENABLED"
+    }
+  },
+  "healthCheckGracePeriodSeconds": 60,
+  "enableECSManagedTags": true,
+  "tags": [
+    {
+      "key": "Environment",
+      "value": "test"
+    },
+    {
+      "key": "Application",
+      "value": "webapp"
+    }
+  ]
+}

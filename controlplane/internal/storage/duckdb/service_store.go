@@ -35,7 +35,7 @@ func (s *serviceStore) Create(ctx context.Context, service *storage.Service) err
 		id, arn, service_name, cluster_arn, task_definition_arn,
 		desired_count, running_count, pending_count, launch_type, platform_version,
 		status, role_arn, load_balancers, service_registries, network_configuration,
-		deployment_configuration, placement_constraints, placement_strategy,
+		deployment_configuration, deployment_controller, placement_constraints, placement_strategy,
 		capacity_provider_strategy, tags, scheduling_strategy, service_connect_configuration,
 		enable_ecs_managed_tags, propagate_tags, enable_execute_command,
 		health_check_grace_period_seconds, region, account_id, deployment_name, namespace,
@@ -47,14 +47,14 @@ func (s *serviceStore) Create(ctx context.Context, service *storage.Service) err
 		?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?,
-		?, ?
+		?, ?, ?
 	)`
 
 	_, err := s.db.ExecContext(ctx, query,
 		service.ID, service.ARN, service.ServiceName, service.ClusterARN, service.TaskDefinitionARN,
 		service.DesiredCount, service.RunningCount, service.PendingCount, service.LaunchType, service.PlatformVersion,
 		service.Status, service.RoleARN, service.LoadBalancers, service.ServiceRegistries, service.NetworkConfiguration,
-		service.DeploymentConfiguration, service.PlacementConstraints, service.PlacementStrategy,
+		service.DeploymentConfiguration, service.DeploymentController, service.PlacementConstraints, service.PlacementStrategy,
 		service.CapacityProviderStrategy, service.Tags, service.SchedulingStrategy, service.ServiceConnectConfiguration,
 		service.EnableECSManagedTags, service.PropagateTags, service.EnableExecuteCommand,
 		service.HealthCheckGracePeriodSeconds, service.Region, service.AccountID, service.DeploymentName, service.Namespace,
@@ -75,7 +75,7 @@ func (s *serviceStore) Get(ctx context.Context, cluster, serviceName string) (*s
 		id, arn, service_name, cluster_arn, task_definition_arn,
 		desired_count, running_count, pending_count, launch_type, platform_version,
 		status, role_arn, load_balancers, service_registries, network_configuration,
-		deployment_configuration, placement_constraints, placement_strategy,
+		deployment_configuration, deployment_controller, placement_constraints, placement_strategy,
 		capacity_provider_strategy, tags, scheduling_strategy, service_connect_configuration,
 		enable_ecs_managed_tags, propagate_tags, enable_execute_command,
 		health_check_grace_period_seconds, region, account_id, deployment_name, namespace,
@@ -85,7 +85,7 @@ func (s *serviceStore) Get(ctx context.Context, cluster, serviceName string) (*s
 
 	service := &storage.Service{}
 	var platformVersion, roleARN, loadBalancers, serviceRegistries, networkConfiguration sql.NullString
-	var deploymentConfiguration, placementConstraints, placementStrategy sql.NullString
+	var deploymentConfiguration, deploymentController, placementConstraints, placementStrategy sql.NullString
 	var capacityProviderStrategy, tags, serviceConnectConfiguration sql.NullString
 	var propagateTags, deploymentName, namespace sql.NullString
 	var healthCheckGracePeriodSeconds sql.NullInt32
@@ -94,7 +94,7 @@ func (s *serviceStore) Get(ctx context.Context, cluster, serviceName string) (*s
 		&service.ID, &service.ARN, &service.ServiceName, &service.ClusterARN, &service.TaskDefinitionARN,
 		&service.DesiredCount, &service.RunningCount, &service.PendingCount, &service.LaunchType, &platformVersion,
 		&service.Status, &roleARN, &loadBalancers, &serviceRegistries, &networkConfiguration,
-		&deploymentConfiguration, &placementConstraints, &placementStrategy,
+		&deploymentConfiguration, &deploymentController, &placementConstraints, &placementStrategy,
 		&capacityProviderStrategy, &tags, &service.SchedulingStrategy, &serviceConnectConfiguration,
 		&service.EnableECSManagedTags, &propagateTags, &service.EnableExecuteCommand,
 		&healthCheckGracePeriodSeconds, &service.Region, &service.AccountID, &deploymentName, &namespace,
@@ -126,6 +126,9 @@ func (s *serviceStore) Get(ctx context.Context, cluster, serviceName string) (*s
 	}
 	if deploymentConfiguration.Valid {
 		service.DeploymentConfiguration = deploymentConfiguration.String
+	}
+	if deploymentController.Valid {
+		service.DeploymentController = deploymentController.String
 	}
 	if placementConstraints.Valid {
 		service.PlacementConstraints = placementConstraints.String
@@ -168,7 +171,7 @@ func (s *serviceStore) List(ctx context.Context, cluster string, serviceName str
 		id, arn, service_name, cluster_arn, task_definition_arn,
 		desired_count, running_count, pending_count, launch_type, platform_version,
 		status, role_arn, load_balancers, service_registries, network_configuration,
-		deployment_configuration, placement_constraints, placement_strategy,
+		deployment_configuration, deployment_controller, placement_constraints, placement_strategy,
 		capacity_provider_strategy, tags, scheduling_strategy, service_connect_configuration,
 		enable_ecs_managed_tags, propagate_tags, enable_execute_command,
 		health_check_grace_period_seconds, region, account_id, created_at, updated_at
@@ -215,7 +218,7 @@ func (s *serviceStore) List(ctx context.Context, cluster string, serviceName str
 	for rows.Next() {
 		service := &storage.Service{}
 		var platformVersion, roleARN, loadBalancers, serviceRegistries, networkConfiguration sql.NullString
-		var deploymentConfiguration, placementConstraints, placementStrategy sql.NullString
+		var deploymentConfiguration, deploymentController, placementConstraints, placementStrategy sql.NullString
 		var capacityProviderStrategy, tags, serviceConnectConfiguration sql.NullString
 		var propagateTags sql.NullString
 		var healthCheckGracePeriodSeconds sql.NullInt32
@@ -224,7 +227,7 @@ func (s *serviceStore) List(ctx context.Context, cluster string, serviceName str
 			&service.ID, &service.ARN, &service.ServiceName, &service.ClusterARN, &service.TaskDefinitionARN,
 			&service.DesiredCount, &service.RunningCount, &service.PendingCount, &service.LaunchType, &platformVersion,
 			&service.Status, &roleARN, &loadBalancers, &serviceRegistries, &networkConfiguration,
-			&deploymentConfiguration, &placementConstraints, &placementStrategy,
+			&deploymentConfiguration, &deploymentController, &placementConstraints, &placementStrategy,
 			&capacityProviderStrategy, &tags, &service.SchedulingStrategy, &serviceConnectConfiguration,
 			&service.EnableECSManagedTags, &propagateTags, &service.EnableExecuteCommand,
 			&healthCheckGracePeriodSeconds, &service.Region, &service.AccountID, &service.CreatedAt, &service.UpdatedAt,
@@ -322,6 +325,7 @@ func (s *serviceStore) Update(ctx context.Context, service *storage.Service) err
 		service_registries = ?,
 		network_configuration = ?,
 		deployment_configuration = ?,
+		deployment_controller = ?,
 		placement_constraints = ?,
 		placement_strategy = ?,
 		capacity_provider_strategy = ?,
@@ -345,6 +349,7 @@ func (s *serviceStore) Update(ctx context.Context, service *storage.Service) err
 		nullString(service.ServiceRegistries),
 		nullString(service.NetworkConfiguration),
 		nullString(service.DeploymentConfiguration),
+		nullString(service.DeploymentController),
 		nullString(service.PlacementConstraints),
 		nullString(service.PlacementStrategy),
 		nullString(service.CapacityProviderStrategy),
@@ -403,7 +408,7 @@ func (s *serviceStore) GetByARN(ctx context.Context, arn string) (*storage.Servi
 		id, arn, service_name, cluster_arn, task_definition_arn,
 		desired_count, running_count, pending_count, launch_type, platform_version,
 		status, role_arn, load_balancers, service_registries, network_configuration,
-		deployment_configuration, placement_constraints, placement_strategy,
+		deployment_configuration, deployment_controller, placement_constraints, placement_strategy,
 		capacity_provider_strategy, tags, scheduling_strategy, service_connect_configuration,
 		enable_ecs_managed_tags, propagate_tags, enable_execute_command,
 		health_check_grace_period_seconds, region, account_id, deployment_name, namespace,
@@ -413,7 +418,7 @@ func (s *serviceStore) GetByARN(ctx context.Context, arn string) (*storage.Servi
 
 	service := &storage.Service{}
 	var platformVersion, roleARN, loadBalancers, serviceRegistries, networkConfiguration sql.NullString
-	var deploymentConfiguration, placementConstraints, placementStrategy sql.NullString
+	var deploymentConfiguration, deploymentController, placementConstraints, placementStrategy sql.NullString
 	var capacityProviderStrategy, tags, serviceConnectConfiguration sql.NullString
 	var propagateTags, deploymentName, namespace sql.NullString
 	var healthCheckGracePeriodSeconds sql.NullInt32
@@ -422,7 +427,7 @@ func (s *serviceStore) GetByARN(ctx context.Context, arn string) (*storage.Servi
 		&service.ID, &service.ARN, &service.ServiceName, &service.ClusterARN, &service.TaskDefinitionARN,
 		&service.DesiredCount, &service.RunningCount, &service.PendingCount, &service.LaunchType, &platformVersion,
 		&service.Status, &roleARN, &loadBalancers, &serviceRegistries, &networkConfiguration,
-		&deploymentConfiguration, &placementConstraints, &placementStrategy,
+		&deploymentConfiguration, &deploymentController, &placementConstraints, &placementStrategy,
 		&capacityProviderStrategy, &tags, &service.SchedulingStrategy, &serviceConnectConfiguration,
 		&service.EnableECSManagedTags, &propagateTags, &service.EnableExecuteCommand,
 		&healthCheckGracePeriodSeconds, &service.Region, &service.AccountID, &deploymentName, &namespace,
@@ -454,6 +459,9 @@ func (s *serviceStore) GetByARN(ctx context.Context, arn string) (*storage.Servi
 	}
 	if deploymentConfiguration.Valid {
 		service.DeploymentConfiguration = deploymentConfiguration.String
+	}
+	if deploymentController.Valid {
+		service.DeploymentController = deploymentController.String
 	}
 	if placementConstraints.Valid {
 		service.PlacementConstraints = placementConstraints.String
