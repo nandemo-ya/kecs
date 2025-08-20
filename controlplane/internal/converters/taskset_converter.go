@@ -190,9 +190,20 @@ func (c *TaskSetConverter) ConvertTaskSetToService(
 		}
 	}
 
-	// If no ports, don't create a service
-	if len(ports) == 0 {
+	// If no ports, don't create a service unless load balancer is configured
+	if len(ports) == 0 && taskSet.LoadBalancers == "" {
 		return nil, nil
+	}
+
+	// Determine service type based on load balancer configuration
+	serviceType := corev1.ServiceTypeClusterIP
+	if taskSet.LoadBalancers != "" {
+		// Parse load balancers to check if external load balancer is needed
+		var loadBalancers []generated.LoadBalancer
+		if err := json.Unmarshal([]byte(taskSet.LoadBalancers), &loadBalancers); err == nil && len(loadBalancers) > 0 {
+			// If load balancer is configured, create LoadBalancer type service
+			serviceType = corev1.ServiceTypeLoadBalancer
+		}
 	}
 
 	// Create service
@@ -219,13 +230,23 @@ func (c *TaskSetConverter) ConvertTaskSetToService(
 				"kecs.io/taskset": taskSet.ID,
 			},
 			Ports: ports,
-			Type:  corev1.ServiceTypeClusterIP,
+			Type:  serviceType,
 		},
 	}
 
 	// If this is the primary TaskSet, also update the main service selector
 	if isPrimary {
 		k8sService.Labels["kecs.io/primary"] = "true"
+	}
+
+	// Add load balancer annotations if configured
+	if taskSet.LoadBalancers != "" {
+		k8sService.Annotations["kecs.io/load-balancers"] = taskSet.LoadBalancers
+		// Add annotations for common cloud providers
+		if serviceType == corev1.ServiceTypeLoadBalancer {
+			// For k3d/Traefik, we can use annotations
+			k8sService.Annotations["metallb.universe.tf/loadBalancerIPs"] = "172.18.255.200" // Example IP for local testing
+		}
 	}
 
 	return k8sService, nil

@@ -18,9 +18,10 @@ import (
 
 // TaskSetManager manages TaskSet resources in Kubernetes
 type TaskSetManager struct {
-	kubeClient       kubernetes.Interface
-	taskSetConverter *converters.TaskSetConverter
-	taskManager      *TaskManager
+	kubeClient         kubernetes.Interface
+	taskSetConverter   *converters.TaskSetConverter
+	taskSetConverterLB *converters.TaskSetConverterWithLB
+	taskManager        *TaskManager
 }
 
 // NewTaskSetManager creates a new TaskSet manager
@@ -34,6 +35,29 @@ func NewTaskSetManager(kubeClient kubernetes.Interface, taskManager *TaskManager
 		kubeClient:       kubeClient,
 		taskSetConverter: taskSetConverter,
 		taskManager:      taskManager,
+	}
+}
+
+// NewTaskSetManagerWithLB creates a new TaskSet manager with load balancer support
+func NewTaskSetManagerWithLB(kubeClient kubernetes.Interface, taskManager *TaskManager, elbv2Integration interface{}) *TaskSetManager {
+	// Use default region and account ID for converter
+	// These will be overridden by actual values in the TaskSet/Service objects
+	taskConverter := converters.NewTaskConverter("us-east-1", "000000000000")
+	taskSetConverter := converters.NewTaskSetConverter(taskConverter)
+
+	// Create LB converter if integration is provided
+	var taskSetConverterLB *converters.TaskSetConverterWithLB
+	if elbv2Integration != nil {
+		// Note: We'd need to properly type-assert the elbv2Integration here
+		// For now, we'll leave it as nil since we don't have the integration yet
+		taskSetConverterLB = nil
+	}
+
+	return &TaskSetManager{
+		kubeClient:         kubeClient,
+		taskSetConverter:   taskSetConverter,
+		taskSetConverterLB: taskSetConverterLB,
+		taskManager:        taskManager,
 	}
 }
 
@@ -85,7 +109,15 @@ func (m *TaskSetManager) CreateTaskSet(
 		"replicas", *createdDeployment.Spec.Replicas)
 
 	// Create service if needed
-	k8sService, err := m.taskSetConverter.ConvertTaskSetToService(taskSet, service, taskDef, clusterName, false)
+	var k8sService *corev1.Service
+	if m.taskSetConverterLB != nil {
+		// Use load balancer-aware converter if available
+		k8sService, err = m.taskSetConverterLB.ConvertTaskSetToServiceWithLB(ctx, taskSet, service, taskDef, clusterName, false)
+	} else {
+		// Use standard converter
+		k8sService, err = m.taskSetConverter.ConvertTaskSetToService(taskSet, service, taskDef, clusterName, false)
+	}
+
 	if err != nil {
 		logging.Warn("Failed to convert TaskSet to service",
 			"error", err)
@@ -95,6 +127,11 @@ func (m *TaskSetManager) CreateTaskSet(
 			logging.Warn("Failed to create service for TaskSet",
 				"service", k8sService.Name,
 				"error", err)
+		} else if err == nil {
+			logging.Info("Created service for TaskSet",
+				"service", k8sService.Name,
+				"type", k8sService.Spec.Type,
+				"namespace", namespace)
 		}
 	}
 
