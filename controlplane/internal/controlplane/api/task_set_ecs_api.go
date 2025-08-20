@@ -122,7 +122,7 @@ func (api *DefaultECSAPI) CreateTaskSet(ctx context.Context, req *generated.Crea
 		// Get task definition from storage
 		taskDefIdentifier := req.TaskDefinition
 		var taskDef *storage.TaskDefinition
-		
+
 		// Try to get by ARN first
 		if strings.HasPrefix(taskDefIdentifier, "arn:") {
 			taskDef, err = api.storage.TaskDefinitionStore().GetByARN(ctx, taskDefIdentifier)
@@ -139,13 +139,13 @@ func (api *DefaultECSAPI) CreateTaskSet(ctx context.Context, req *generated.Crea
 				taskDef, err = api.storage.TaskDefinitionStore().GetLatest(ctx, taskDefIdentifier)
 			}
 		}
-		
+
 		if err != nil {
 			// If not found, log warning
 			// TaskSet will be created in storage but not in Kubernetes
 			fmt.Printf("Warning: Task definition not found: %s\n", taskDefIdentifier)
 		}
-		
+
 		if err == nil && taskDef != nil {
 			// Create TaskSet in Kubernetes
 			if err := api.taskSetManager.CreateTaskSet(ctx, storageTaskSet, serviceObj, taskDef, cluster); err != nil {
@@ -282,7 +282,7 @@ func (api *DefaultECSAPI) DescribeTaskSets(ctx context.Context, req *generated.D
 		runningCount := ts.RunningCount
 		pendingCount := ts.PendingCount
 		stabilityStatus := ts.StabilityStatus
-		
+
 		if api.taskSetManager != nil {
 			// Get service from storage
 			serviceObj, err := api.storage.ServiceStore().GetByARN(ctx, serviceARN)
@@ -298,7 +298,7 @@ func (api *DefaultECSAPI) DescribeTaskSets(ctx context.Context, req *generated.D
 				}
 			}
 		}
-		
+
 		apiTaskSet := generated.TaskSet{
 			Id:                   ptr.String(ts.ID),
 			TaskSetArn:           ptr.String(ts.ARN),
@@ -434,7 +434,7 @@ func (api *DefaultECSAPI) UpdateTaskSet(ctx context.Context, req *generated.Upda
 	if data, err := json.Marshal(req.Scale); err == nil {
 		storageTaskSet.Scale = string(data)
 	}
-	
+
 	// Calculate new computed desired count
 	if req.Scale.Value != nil && req.Scale.Unit != nil {
 		switch *req.Scale.Unit {
@@ -444,7 +444,7 @@ func (api *DefaultECSAPI) UpdateTaskSet(ctx context.Context, req *generated.Upda
 			storageTaskSet.ComputedDesiredCount = int32(*req.Scale.Value)
 		}
 	}
-	
+
 	storageTaskSet.StabilityStatus = "STABILIZING"
 	if err := api.storage.TaskSetStore().Update(ctx, storageTaskSet); err != nil {
 		return nil, fmt.Errorf("failed to update task set: %w", err)

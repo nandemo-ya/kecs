@@ -144,7 +144,7 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 
 	// Create k8s namespace synchronously to ensure it exists before returning
 	api.createNamespaceForCluster(cluster)
-	
+
 	// Deploy LocalStack asynchronously (not critical for cluster creation)
 	go api.deployLocalStackIfEnabled(cluster)
 
@@ -834,7 +834,6 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		logging.Debug("LocalStack is not enabled in configuration")
 		return
 	}
-
 
 	// Set lazy loading for faster startup in container mode
 	if config.ContainerMode {

@@ -88,7 +88,7 @@ func isAWSAPIRequest(r *http.Request) bool {
 	auth := r.Header.Get("Authorization")
 	if strings.Contains(auth, "AWS4-HMAC-SHA256") {
 		// Check if it's NOT for ECS or Service Discovery service
-		if !strings.Contains(auth, "/ecs/") && 
+		if !strings.Contains(auth, "/ecs/") &&
 			!strings.Contains(auth, "/servicediscovery/") &&
 			!strings.Contains(auth, "/route53autonaming/") {
 			return true

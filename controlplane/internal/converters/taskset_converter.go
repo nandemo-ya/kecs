@@ -118,7 +118,13 @@ func (c *TaskSetConverter) ConvertTaskSetToDeployment(
 					},
 					Annotations: pod.Annotations,
 				},
-				Spec: pod.Spec,
+				Spec: func() corev1.PodSpec {
+					// Copy pod spec and adjust for deployment
+					podSpec := pod.Spec
+					// Deployments require RestartPolicy to be Always
+					podSpec.RestartPolicy = corev1.RestartPolicyAlways
+					return podSpec
+				}(),
 			},
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
@@ -312,4 +318,3 @@ func intOrStringPtr(s string) *intstr.IntOrString {
 	val := intstr.FromString(s)
 	return &val
 }
-

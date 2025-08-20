@@ -557,6 +557,20 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				return
 			}
 		}
+
+		// Handle TaskSet operations (not in generated code yet)
+		target := r.Header.Get("X-Amz-Target")
+		if target == "AmazonEC2ContainerServiceV20141113.CreateTaskSet" ||
+			target == "AmazonEC2ContainerServiceV20141113.DeleteTaskSet" ||
+			target == "AmazonEC2ContainerServiceV20141113.DescribeTaskSets" ||
+			target == "AmazonEC2ContainerServiceV20141113.UpdateTaskSet" ||
+			target == "AmazonEC2ContainerServiceV20141113.UpdateServicePrimaryTaskSet" {
+			if defaultAPI, ok := s.ecsAPI.(*DefaultECSAPI); ok {
+				defaultAPI.HandleTaskSetRequest(w, r)
+				return
+			}
+		}
+
 		// Otherwise handle as ECS request
 		router := generated.NewRouter(s.ecsAPI)
 		router.Route(w, r)

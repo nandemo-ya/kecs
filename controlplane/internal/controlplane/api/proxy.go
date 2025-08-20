@@ -32,7 +32,7 @@ func NewProxyHandler(localStackURL string, ecsHandler, elbv2Handler, sdHandler h
 
 	// Create reverse proxy for LocalStack
 	proxy := httputil.NewSingleHostReverseProxy(parsedURL)
-	
+
 	// Customize the director to preserve headers
 	originalDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
@@ -176,7 +176,7 @@ func (h *ProxyHandler) isECSRequest(r *http.Request) bool {
 
 	// Check for ECS-specific content
 	bodyStr := string(bodyBytes)
-	
+
 	// Check for common ECS action parameters
 	ecsActions := []string{
 		"CreateCluster",
