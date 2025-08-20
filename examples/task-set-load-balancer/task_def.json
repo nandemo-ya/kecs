@@ -1,0 +1,37 @@
+{
+  "family": "webapp-lb",
+  "taskRoleArn": "",
+  "executionRoleArn": "",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "webapp",
+      "image": "nginx:alpine",
+      "cpu": 256,
+      "memory": 512,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1/ || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      },
+      "environment": [
+        {
+          "name": "SERVICE_NAME",
+          "value": "webapp-lb"
+        }
+      ]
+    }
+  ],
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512"
+}
