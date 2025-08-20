@@ -26,7 +26,7 @@ func (api *DefaultECSAPI) getServiceManager() (*kubernetes.ServiceManager, error
 	if api.serviceManager != nil {
 		return api.serviceManager, nil
 	}
-	
+
 	// In test mode, we can return a ServiceManager with nil cluster manager
 	// as the ServiceManager handles test mode internally
 	if config.GetBool("features.testMode") {
@@ -43,11 +43,11 @@ func (api *DefaultECSAPI) getServiceManager() (*kubernetes.ServiceManager, error
 
 // CreateService implements the CreateService operation
 func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.CreateServiceRequest) (*generated.CreateServiceResponse, error) {
-	logging.Info("CreateService called", 
+	logging.Info("CreateService called",
 		"serviceName", req.ServiceName,
 		"hasTaskDefinition", req.TaskDefinition != nil,
 		"hasDeploymentController", req.DeploymentController != nil)
-	
+
 	// Default cluster if not specified
 	clusterName := "default"
 	if req.Cluster != nil && *req.Cluster != "" {
@@ -64,17 +64,17 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	if req.ServiceName == "" {
 		return nil, fmt.Errorf("serviceName is required")
 	}
-	
+
 	// Check deployment controller type
 	isExternalDeployment := false
 	if req.DeploymentController != nil {
 		deploymentType := string(req.DeploymentController.Type)
 		isExternalDeployment = (deploymentType == "EXTERNAL")
-		logging.Info("DeploymentController detected", 
+		logging.Info("DeploymentController detected",
 			"type", deploymentType,
 			"isExternal", isExternalDeployment)
 	}
-	
+
 	// TaskDefinition is not required for EXTERNAL deployment controller
 	if !isExternalDeployment && req.TaskDefinition == nil {
 		return nil, fmt.Errorf("taskDefinition is required for non-EXTERNAL deployment controller")
@@ -83,7 +83,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 	// Get task definition (only for non-EXTERNAL deployment)
 	var taskDef *storage.TaskDefinition
 	var taskDefArn string
-	
+
 	if !isExternalDeployment && req.TaskDefinition != nil {
 		taskDefArn = *req.TaskDefinition
 		logging.Debug("Looking for task definition", "taskDefinition", taskDefArn)
@@ -883,6 +883,15 @@ func (api *DefaultECSAPI) UpdateServicePrimaryTaskSet(ctx context.Context, req *
 	taskSet, err := api.storage.TaskSetStore().Get(ctx, service.ARN, req.PrimaryTaskSet)
 	if err != nil {
 		return nil, fmt.Errorf("task set not found: %s", req.PrimaryTaskSet)
+	}
+
+	// Update Kubernetes resources if manager is available
+	if api.taskSetManager != nil {
+		// Update labels/annotations to mark this as primary
+		if err := api.taskSetManager.UpdatePrimaryTaskSet(ctx, taskSet, service, clusterName); err != nil {
+			// Log error but don't fail the API call
+			fmt.Printf("Warning: Failed to update primary TaskSet in Kubernetes: %v\n", err)
+		}
 	}
 
 	// Build response

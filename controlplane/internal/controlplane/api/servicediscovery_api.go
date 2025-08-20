@@ -23,10 +23,10 @@ func NewServiceDiscoveryAPI(manager servicediscovery.Manager, store storage.Stor
 	// Create handler
 	logger := logrus.New()
 	handler := servicediscovery.NewHandler(logger, store, manager)
-	
+
 	// Create router with handler
 	router := generated.NewRouter(handler)
-	
+
 	return &ServiceDiscoveryAPI{
 		manager:   manager,
 		region:    region,

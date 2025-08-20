@@ -405,3 +405,60 @@ type TaskSetInfo struct {
 	StabilityStatus string
 }
 
+// UpdatePrimaryTaskSet updates the primary TaskSet labels and annotations
+func (m *TaskSetManager) UpdatePrimaryTaskSet(
+	ctx context.Context,
+	primaryTaskSet *storage.TaskSet,
+	service *storage.Service,
+	clusterName string,
+) error {
+	logging.Info("Updating primary TaskSet in Kubernetes",
+		"taskSetId", primaryTaskSet.ID,
+		"service", service.ServiceName,
+		"cluster", clusterName)
+
+	namespace := m.taskSetConverter.GetNamespace(clusterName, primaryTaskSet.Region)
+
+	// List all deployments for this service
+	labelSelector := fmt.Sprintf("kecs.io/service=%s", service.ServiceName)
+	deployments, err := m.kubeClient.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list deployments: %w", err)
+	}
+
+	// Update all deployments to mark which one is primary
+	for _, deployment := range deployments.Items {
+		taskSetID := deployment.Labels["kecs.io/taskset"]
+		isPrimary := taskSetID == primaryTaskSet.ID
+
+		// Update labels to indicate primary status
+		if deployment.Labels == nil {
+			deployment.Labels = make(map[string]string)
+		}
+		if deployment.Annotations == nil {
+			deployment.Annotations = make(map[string]string)
+		}
+
+		if isPrimary {
+			deployment.Labels["kecs.io/primary"] = "true"
+			deployment.Annotations["kecs.io/primary-taskset"] = "true"
+		} else {
+			delete(deployment.Labels, "kecs.io/primary")
+			delete(deployment.Annotations, "kecs.io/primary-taskset")
+		}
+
+		// Update the deployment
+		_, err := m.kubeClient.AppsV1().Deployments(namespace).Update(ctx, &deployment, metav1.UpdateOptions{})
+		if err != nil {
+			logging.Warn("Failed to update deployment primary status",
+				"deployment", deployment.Name,
+				"error", err)
+			// Continue with other deployments
+		}
+	}
+
+	// Also call SetPrimaryTaskSet to update service selectors if needed
+	return m.SetPrimaryTaskSet(ctx, primaryTaskSet, service, clusterName)
+}
