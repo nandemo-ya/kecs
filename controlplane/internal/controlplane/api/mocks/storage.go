@@ -26,7 +26,9 @@ type MockStorage struct {
 }
 
 func NewMockStorage() *MockStorage {
-	return &MockStorage{}
+	return &MockStorage{
+		taskLogStore: NewMockTaskLogStore(),
+	}
 }
 
 func (m *MockStorage) Initialize(ctx context.Context) error {
@@ -124,6 +126,11 @@ func (m *MockStorage) SetAttributeStore(store storage.AttributeStore) {
 // SetELBv2Store sets the ELBv2 store
 func (m *MockStorage) SetELBv2Store(store storage.ELBv2Store) {
 	m.elbv2Store = store
+}
+
+// SetTaskLogStore sets the task log store
+func (m *MockStorage) SetTaskLogStore(store storage.TaskLogStore) {
+	m.taskLogStore = store
 }
 
 // MockClusterStore implements storage.ClusterStore for testing
@@ -854,4 +861,116 @@ func (m *MockAttributeStore) ListWithPagination(ctx context.Context, targetType,
 	}
 
 	return result, newNextToken, nil
+}
+
+// MockTaskLogStore implements storage.TaskLogStore for testing
+type MockTaskLogStore struct {
+	logs []storage.TaskLog
+}
+
+// NewMockTaskLogStore creates a new mock task log store
+func NewMockTaskLogStore() *MockTaskLogStore {
+	return &MockTaskLogStore{
+		logs: []storage.TaskLog{},
+	}
+}
+
+// SaveLogs implements TaskLogStore
+func (m *MockTaskLogStore) SaveLogs(ctx context.Context, logs []storage.TaskLog) error {
+	m.logs = append(m.logs, logs...)
+	return nil
+}
+
+// GetLogs implements TaskLogStore
+func (m *MockTaskLogStore) GetLogs(ctx context.Context, filter storage.TaskLogFilter) ([]storage.TaskLog, error) {
+	var result []storage.TaskLog
+
+	for _, log := range m.logs {
+		// Filter by task ARN
+		if filter.TaskArn != "" && log.TaskArn != filter.TaskArn {
+			continue
+		}
+
+		// Filter by container name
+		if filter.ContainerName != "" && log.ContainerName != filter.ContainerName {
+			continue
+		}
+
+		// Filter by log level
+		if filter.LogLevel != "" && log.LogLevel != filter.LogLevel {
+			continue
+		}
+
+		// Filter by time range
+		if filter.From != nil && log.Timestamp.Before(*filter.From) {
+			continue
+		}
+		if filter.To != nil && log.Timestamp.After(*filter.To) {
+			continue
+		}
+
+		// Filter by search text (simple substring search)
+		if filter.SearchText != "" {
+			if !strings.Contains(log.LogLine, filter.SearchText) {
+				continue
+			}
+		}
+
+		result = append(result, log)
+	}
+
+	// Apply pagination
+	start := filter.Offset
+	end := filter.Offset + filter.Limit
+	if end > len(result) {
+		end = len(result)
+	}
+	if start > len(result) {
+		start = len(result)
+	}
+
+	return result[start:end], nil
+}
+
+// GetLogCount implements TaskLogStore
+func (m *MockTaskLogStore) GetLogCount(ctx context.Context, filter storage.TaskLogFilter) (int64, error) {
+	// For simplicity, we'll reuse GetLogs without pagination
+	filter.Offset = 0
+	filter.Limit = len(m.logs) + 1
+	logs, err := m.GetLogs(ctx, filter)
+	if err != nil {
+		return 0, err
+	}
+	return int64(len(logs)), nil
+}
+
+// DeleteOldLogs implements TaskLogStore
+func (m *MockTaskLogStore) DeleteOldLogs(ctx context.Context, olderThan time.Time) (int64, error) {
+	var kept []storage.TaskLog
+	var deletedCount int64
+
+	for _, log := range m.logs {
+		if log.CreatedAt.Before(olderThan) {
+			deletedCount++
+		} else {
+			kept = append(kept, log)
+		}
+	}
+
+	m.logs = kept
+	return deletedCount, nil
+}
+
+// DeleteTaskLogs implements TaskLogStore
+func (m *MockTaskLogStore) DeleteTaskLogs(ctx context.Context, taskArn string) error {
+	var kept []storage.TaskLog
+
+	for _, log := range m.logs {
+		if log.TaskArn != taskArn {
+			kept = append(kept, log)
+		}
+	}
+
+	m.logs = kept
+	return nil
 }
