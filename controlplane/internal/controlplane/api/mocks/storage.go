@@ -22,6 +22,7 @@ type MockStorage struct {
 	containerInstanceStore storage.ContainerInstanceStore
 	attributeStore         storage.AttributeStore
 	elbv2Store             storage.ELBv2Store
+	taskLogStore           storage.TaskLogStore
 }
 
 func NewMockStorage() *MockStorage {
@@ -70,6 +71,10 @@ func (m *MockStorage) AttributeStore() storage.AttributeStore {
 
 func (m *MockStorage) ELBv2Store() storage.ELBv2Store {
 	return m.elbv2Store
+}
+
+func (m *MockStorage) TaskLogStore() storage.TaskLogStore {
+	return m.taskLogStore
 }
 
 func (m *MockStorage) BeginTx(ctx context.Context) (storage.Transaction, error) {

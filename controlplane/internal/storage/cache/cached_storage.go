@@ -89,6 +89,11 @@ func (s *CachedStorage) ELBv2Store() storage.ELBv2Store {
 	return s.backend.ELBv2Store()
 }
 
+// TaskLogStore returns the task log store (no caching for logs)
+func (s *CachedStorage) TaskLogStore() storage.TaskLogStore {
+	return s.backend.TaskLogStore()
+}
+
 // BeginTx starts a new transaction
 func (s *CachedStorage) BeginTx(ctx context.Context) (storage.Transaction, error) {
 	return s.backend.BeginTx(ctx)

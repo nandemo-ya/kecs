@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS task_logs (
     timestamp TIMESTAMP NOT NULL,
     log_line TEXT NOT NULL,
     log_level TEXT,  -- INFO, WARN, ERROR, DEBUG, etc. (when parseable)
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (task_arn) REFERENCES tasks(arn) ON DELETE CASCADE
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    -- Note: DuckDB doesn't support CASCADE on foreign keys
 );
 
 -- Indexes

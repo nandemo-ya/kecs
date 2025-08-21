@@ -27,6 +27,7 @@ type DuckDBStorage struct {
 	containerInstanceStore *containerInstanceStore
 	attributeStore         *attributeStore
 	elbv2Store             *elbv2Store
+	taskLogStore           *TaskLogStore
 }
 
 // NewDuckDBStorage creates a new DuckDB storage instance
@@ -73,6 +74,7 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 	s.containerInstanceStore = &containerInstanceStore{db: db}
 	s.attributeStore = &attributeStore{db: db}
 	s.elbv2Store = &elbv2Store{db: db}
+	s.taskLogStore = NewTaskLogStore(db)
 
 	return s, nil
 }
@@ -129,6 +131,11 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 	// Create ELBv2 tables
 	if err := s.createELBv2Tables(ctx); err != nil {
 		return fmt.Errorf("failed to create ELBv2 tables: %w", err)
+	}
+
+	// Create task logs table
+	if err := s.createTaskLogsTable(ctx); err != nil {
+		return fmt.Errorf("failed to create task logs table: %w", err)
 	}
 
 	// Skip prepared statements initialization for single connection mode
@@ -195,6 +202,11 @@ func (s *DuckDBStorage) AttributeStore() storage.AttributeStore {
 // ELBv2Store returns the ELBv2 store
 func (s *DuckDBStorage) ELBv2Store() storage.ELBv2Store {
 	return s.elbv2Store
+}
+
+// TaskLogStore returns the task log store
+func (s *DuckDBStorage) TaskLogStore() storage.TaskLogStore {
+	return s.taskLogStore
 }
 
 // BeginTx starts a new transaction
@@ -866,6 +878,39 @@ func (s *DuckDBStorage) createELBv2Tables(ctx context.Context) error {
 	for _, idx := range indexes {
 		if _, err := s.db.ExecContext(ctx, idx); err != nil {
 			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// createTaskLogsTable creates the task_logs table for storing container logs
+func (s *DuckDBStorage) createTaskLogsTable(ctx context.Context) error {
+	query := `
+	CREATE TABLE IF NOT EXISTS task_logs (
+		id TEXT PRIMARY KEY DEFAULT (gen_random_uuid()::TEXT),
+		task_arn TEXT NOT NULL,
+		container_name TEXT NOT NULL,
+		timestamp TIMESTAMP NOT NULL,
+		log_line TEXT NOT NULL,
+		log_level TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`
+
+	if _, err := s.db.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("failed to create task_logs table: %w", err)
+	}
+
+	// Create indexes for efficient querying
+	logIndexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_task_logs_task_arn ON task_logs(task_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_task_logs_timestamp ON task_logs(task_arn, timestamp)",
+		"CREATE INDEX IF NOT EXISTS idx_task_logs_container ON task_logs(task_arn, container_name)",
+	}
+
+	for _, idx := range logIndexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create task logs index: %w", err)
 		}
 	}
 
