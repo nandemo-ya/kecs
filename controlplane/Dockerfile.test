@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Build stage
-FROM --platform=$BUILDPLATFORM golang:1.24.3 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25.0 AS builder
 WORKDIR /app
 
 ARG TARGETOS=linux
