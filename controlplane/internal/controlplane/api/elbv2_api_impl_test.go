@@ -369,6 +369,10 @@ func (m *mockStorage) ELBv2Store() storage.ELBv2Store {
 	return m.elbv2Store
 }
 
+func (m *mockStorage) TaskLogStore() storage.TaskLogStore {
+	return nil
+}
+
 func (m *mockStorage) BeginTx(ctx context.Context) (storage.Transaction, error) {
 	return nil, nil
 }

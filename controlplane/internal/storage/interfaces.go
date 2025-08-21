@@ -40,6 +40,9 @@ type Storage interface {
 	// ELBv2 operations
 	ELBv2Store() ELBv2Store
 
+	// Task log operations
+	TaskLogStore() TaskLogStore
+
 	// Transaction support
 	BeginTx(ctx context.Context) (Transaction, error)
 }
