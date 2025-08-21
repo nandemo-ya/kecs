@@ -223,4 +223,3 @@ func taskSetInt32Ptr(i int32) *int32 {
 func taskSetFloat64Ptr(f float64) *float64 {
 	return &f
 }
-
