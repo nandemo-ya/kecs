@@ -19,8 +19,8 @@ import (
 var _ = Describe("LogsAPI Demo", func() {
 	Context("Integration test with DuckDB", func() {
 		It("demonstrates log storage and retrieval", func() {
-			// Create temporary DuckDB storage
-			dbPath := "/tmp/test-logs.db"
+			// Create temporary DuckDB storage with unique path
+			dbPath := "/tmp/test-logs-" + time.Now().Format("20060102150405") + ".db"
 			store, err := duckdb.NewDuckDBStorage(dbPath)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -106,7 +106,7 @@ var _ = Describe("LogsAPI Demo", func() {
 
 			// Verify response
 			Expect(result["saved"]).To(Equal(float64(2)))
-			Expect(result["retrieved"]).To(Equal(float64(10))) // The API returns 10 demo logs regardless of how many were saved
+			Expect(result["retrieved"]).To(Equal(float64(2))) // Should retrieve the same number that were saved
 
 			// Clean up
 			err = store.Close()
