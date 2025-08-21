@@ -48,14 +48,16 @@ type ServiceData struct {
 
 // TaskData holds mock task data
 type TaskData struct {
-	ID      string
-	Service string
-	Status  string
-	Health  string
-	CPU     float64
-	Memory  string
-	IP      string
-	Age     time.Duration
+	ID         string
+	ARN        string
+	Service    string
+	Status     string
+	Health     string
+	CPU        float64
+	Memory     string
+	IP         string
+	Age        time.Duration
+	Containers []string
 }
 
 // LogData holds mock log data
@@ -278,15 +280,18 @@ func GetTasks(instanceName, clusterName, serviceName string) []TaskData {
 			health = "UNKNOWN"
 		}
 
+		taskID := fmt.Sprintf("%08x-%04x-%04x", rand.Uint32(), rand.Intn(65536), rand.Intn(65536))
 		tasks = append(tasks, TaskData{
-			ID:      fmt.Sprintf("%08x-%04x-%04x", rand.Uint32(), rand.Intn(65536), rand.Intn(65536)),
-			Service: serviceName,
-			Status:  status,
-			Health:  health,
-			CPU:     cpu,
-			Memory:  memory,
-			IP:      ip,
-			Age:     time.Duration(rand.Intn(48)) * time.Hour,
+			ID:         taskID,
+			ARN:        fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:task/%s/%s", clusterName, taskID),
+			Service:    serviceName,
+			Status:     status,
+			Health:     health,
+			CPU:        cpu,
+			Memory:     memory,
+			IP:         ip,
+			Age:        time.Duration(rand.Intn(48)) * time.Hour,
+			Containers: []string{"app", "sidecar"},
 		})
 	}
 

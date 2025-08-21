@@ -630,3 +630,42 @@ func (m Model) loadTaskDefinitionJSONCmd(taskDefArn string) tea.Cmd {
 		}
 	}
 }
+
+// viewTaskLogsCmd opens the log viewer for a specific task
+func (m Model) viewTaskLogsCmd(taskArn string, containerName string) tea.Cmd {
+	return func() tea.Msg {
+		// Create log API client
+		var apiClient LogAPIClient
+		if m.useMockData {
+			apiClient = NewMockLogAPIClient()
+		} else {
+			// Use real API client with the correct endpoint
+			// Find the selected instance to get the port
+			var port int = 8080 // default port
+			for _, inst := range m.instances {
+				if inst.Name == m.selectedInstance {
+					port = inst.APIPort
+					break
+				}
+			}
+			baseURL := fmt.Sprintf("http://localhost:%d", port)
+			apiClient = NewLogAPIClient(baseURL)
+		}
+
+		// Create log viewer
+		logViewer := NewLogViewer(taskArn, containerName, apiClient)
+		
+		return logViewerCreatedMsg{
+			viewer:    logViewer,
+			taskArn:   taskArn,
+			container: containerName,
+		}
+	}
+}
+
+// logViewerCreatedMsg is sent when a log viewer is created
+type logViewerCreatedMsg struct {
+	viewer    LogViewerModel
+	taskArn   string
+	container string
+}

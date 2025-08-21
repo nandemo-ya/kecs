@@ -68,14 +68,16 @@ type Service struct {
 
 // Task represents an ECS task
 type Task struct {
-	ID      string
-	Service string
-	Status  string
-	Health  string
-	CPU     float64
-	Memory  string
-	IP      string
-	Age     time.Duration
+	ID         string
+	ARN        string
+	Service    string
+	Status     string
+	Health     string
+	CPU        float64
+	Memory     string
+	IP         string
+	Age        time.Duration
+	Containers []string
 }
 
 // LogEntry represents a log line
@@ -204,6 +206,11 @@ type Model struct {
 	// Clipboard notification
 	clipboardMsg     string
 	clipboardMsgTime time.Time
+
+	// Log viewer
+	logViewer        *LogViewerModel
+	logViewerTaskArn string
+	logViewerContainer string
 }
 
 // NewModel creates a new application model
