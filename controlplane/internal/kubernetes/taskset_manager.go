@@ -21,6 +21,7 @@ type TaskSetManager struct {
 	kubeClient         kubernetes.Interface
 	taskSetConverter   *converters.TaskSetConverter
 	taskSetConverterLB *converters.TaskSetConverterWithLB
+	taskSetConverterSD *converters.TaskSetConverterWithSD
 	taskManager        *TaskManager
 }
 
@@ -30,11 +31,13 @@ func NewTaskSetManager(kubeClient kubernetes.Interface, taskManager *TaskManager
 	// These will be overridden by actual values in the TaskSet/Service objects
 	taskConverter := converters.NewTaskConverter("us-east-1", "000000000000")
 	taskSetConverter := converters.NewTaskSetConverter(taskConverter)
+	taskSetConverterSD := converters.NewTaskSetConverterWithSD(taskConverter)
 
 	return &TaskSetManager{
-		kubeClient:       kubeClient,
-		taskSetConverter: taskSetConverter,
-		taskManager:      taskManager,
+		kubeClient:         kubeClient,
+		taskSetConverter:   taskSetConverter,
+		taskSetConverterSD: taskSetConverterSD,
+		taskManager:        taskManager,
 	}
 }
 
@@ -116,6 +119,26 @@ func (m *TaskSetManager) CreateTaskSet(
 	} else {
 		// Use standard converter
 		k8sService, err = m.taskSetConverter.ConvertTaskSetToService(taskSet, service, taskDef, clusterName, false)
+	}
+
+	// Create Service Discovery endpoints if configured
+	if m.taskSetConverterSD != nil && taskSet.ServiceRegistries != "" {
+		endpoints, err := m.taskSetConverterSD.ConvertTaskSetToServiceDiscoveryEndpoint(ctx, taskSet, service, taskDef, clusterName)
+		if err != nil {
+			logging.Warn("Failed to convert TaskSet to Service Discovery endpoint",
+				"error", err)
+		} else if endpoints != nil {
+			_, err = m.kubeClient.CoreV1().Endpoints(namespace).Create(ctx, endpoints, metav1.CreateOptions{})
+			if err != nil && !errors.IsAlreadyExists(err) {
+				logging.Warn("Failed to create Service Discovery endpoints",
+					"endpoints", endpoints.Name,
+					"error", err)
+			} else if err == nil {
+				logging.Info("Created Service Discovery endpoints for TaskSet",
+					"endpoints", endpoints.Name,
+					"namespace", namespace)
+			}
+		}
 	}
 
 	if err != nil {

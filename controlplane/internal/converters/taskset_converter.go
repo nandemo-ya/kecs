@@ -142,9 +142,25 @@ func (c *TaskSetConverter) ConvertTaskSetToDeployment(
 		deployment.Spec.Template.Labels["kecs.io/load-balancer-enabled"] = "true"
 	}
 
-	// Add service registry labels if configured
+	// Add service registry labels and annotations if configured
 	if taskSet.ServiceRegistries != "" {
 		deployment.Spec.Template.Labels["kecs.io/service-discovery-enabled"] = "true"
+
+		// Add Service Discovery annotations
+		if deployment.Annotations == nil {
+			deployment.Annotations = make(map[string]string)
+		}
+		deployment.Annotations["kecs.io/service-registries"] = taskSet.ServiceRegistries
+
+		// Parse and add individual registry annotations
+		var serviceRegistries []generated.ServiceRegistry
+		if err := json.Unmarshal([]byte(taskSet.ServiceRegistries), &serviceRegistries); err == nil {
+			for i, registry := range serviceRegistries {
+				if registry.RegistryArn != nil {
+					deployment.Spec.Template.Annotations[fmt.Sprintf("kecs.io/sd-registry-%d", i)] = *registry.RegistryArn
+				}
+			}
+		}
 	}
 
 	return deployment, nil
