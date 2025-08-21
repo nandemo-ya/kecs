@@ -229,6 +229,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update task definition revisions
 		m.taskDefRevisions = msg.revisions
 
+	case logViewerCreatedMsg:
+		// Set log viewer
+		m.logViewer = &msg.viewer
+		m.logViewerTaskArn = msg.taskArn
+		m.logViewerContainer = msg.container
+		m.currentView = ViewLogs
+
+		// Initialize the log viewer
+		return m, m.logViewer.Init()
+
 	case taskDefJSONLoadedMsg:
 		// Cache loaded JSON
 		m.taskDefJSONCache[msg.revision] = msg.json
@@ -886,11 +896,19 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 	case "l":
 		// View logs for selected task
-		if len(m.tasks) > 0 {
-			m.selectedTask = m.tasks[m.taskCursor].ID
+		if len(m.tasks) > 0 && m.taskCursor < len(m.tasks) {
+			task := m.tasks[m.taskCursor]
+			m.selectedTask = task.ID
 			m.previousView = m.currentView
-			m.currentView = ViewLogs
-			return m, m.loadTaskLogsCmd()
+
+			// Use first container name if available
+			containerName := ""
+			if len(task.Containers) > 0 {
+				containerName = task.Containers[0]
+			}
+
+			// Open log viewer
+			return m, m.viewTaskLogsCmd(task.ARN, containerName)
 		}
 	case "backspace":
 		m.goBack()
@@ -938,6 +956,22 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	// If we have an active log viewer, delegate to it
+	if m.logViewer != nil {
+		updatedViewer, cmd := m.logViewer.Update(msg)
+		m.logViewer = &updatedViewer
+
+		// Check if user wants to quit log viewer
+		if msg.String() == "q" || msg.String() == "esc" {
+			m.logViewer = nil
+			m.currentView = m.previousView
+			return m, m.loadDataFromAPI()
+		}
+
+		return m, cmd
+	}
+
+	// Otherwise handle log list view
 	switch msg.String() {
 	case "up", "k":
 		m.moveCursorUp()
@@ -946,10 +980,17 @@ func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "esc", "backspace":
 		m.currentView = m.previousView
 		return m, m.loadDataFromAPI()
-	case "f":
-		// Toggle follow mode (mock)
-	case "s":
-		// Save logs (mock)
+	case "enter":
+		// Open log viewer for selected task
+		if m.selectedTask != "" && len(m.tasks) > m.taskCursor {
+			task := m.tasks[m.taskCursor]
+			// Use first container name if available
+			containerName := ""
+			if len(task.Containers) > 0 {
+				containerName = task.Containers[0]
+			}
+			return m, m.viewTaskLogsCmd(task.ARN, containerName)
+		}
 	case "/":
 		m.searchMode = true
 		m.searchQuery = ""

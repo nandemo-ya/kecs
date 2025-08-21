@@ -433,6 +433,10 @@ func (m Model) renderResourcePanel() string {
 	case ViewTaskDescribe:
 		content = m.renderTaskDescribe()
 	case ViewLogs:
+		if m.logViewer != nil {
+			// If log viewer is active, use its render
+			return m.logViewer.View()
+		}
 		content = m.renderLogsContent(resourceHeight - 4)
 	case ViewHelp:
 		content = m.renderHelpContent(resourceHeight - 4)
