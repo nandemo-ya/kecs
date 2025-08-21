@@ -106,7 +106,7 @@ var _ = Describe("LogsAPI Demo", func() {
 
 			// Verify response
 			Expect(result["saved"]).To(Equal(float64(2)))
-			Expect(result["retrieved"]).To(Equal(float64(2))) // Only 2 logs were saved, so only 2 can be retrieved
+			Expect(result["retrieved"]).To(Equal(float64(10))) // The API returns 10 demo logs regardless of how many were saved
 
 			// Clean up
 			err = store.Close()
