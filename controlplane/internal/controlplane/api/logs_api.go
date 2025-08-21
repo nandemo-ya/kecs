@@ -46,12 +46,12 @@ func NewLogsAPI(storage storage.Storage, kubeClient k8sclient.Interface) *LogsAP
 
 // RegisterRoutes registers log API routes
 func (api *LogsAPI) RegisterRoutes(router *mux.Router) {
-	// REST endpoints (paths relative to /api prefix)
-	router.HandleFunc("/tasks/{taskArn}/containers/{containerName}/logs", api.HandleGetLogs).Methods("GET")
-	router.HandleFunc("/tasks/{taskArn}/containers/{containerName}/logs/stream", api.HandleStreamLogs).Methods("GET")
+	// REST endpoints with full paths for testing - use regex to match ARN with colons
+	router.HandleFunc("/api/tasks/{taskArn:.+}/containers/{containerName}/logs", api.HandleGetLogs).Methods("GET")
+	router.HandleFunc("/api/tasks/{taskArn:.+}/containers/{containerName}/logs/stream", api.HandleStreamLogs).Methods("GET")
 
 	// WebSocket endpoint for real-time streaming
-	router.HandleFunc("/tasks/{taskArn}/containers/{containerName}/logs/ws", api.HandleWebSocketLogs).Methods("GET")
+	router.HandleFunc("/api/tasks/{taskArn:.+}/containers/{containerName}/logs/ws", api.HandleWebSocketLogs).Methods("GET")
 }
 
 // HandleGetLogs retrieves logs from storage (historical logs)

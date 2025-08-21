@@ -86,9 +86,9 @@ var _ = Describe("LogsAPI", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// Make request
-				url := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs?limit=10",
+				reqUrl := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs?limit=10",
 					server.URL, taskArn, containerName)
-				resp, err := http.Get(url)
+				resp, err := http.Get(reqUrl)
 				Expect(err).NotTo(HaveOccurred())
 				defer resp.Body.Close()
 
@@ -154,9 +154,9 @@ var _ = Describe("LogsAPI", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// Make request filtering by ERROR level
-				url := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs?level=ERROR",
+				reqUrl := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs?level=ERROR",
 					server.URL, taskArn, containerName)
-				resp, err := http.Get(url)
+				resp, err := http.Get(reqUrl)
 				Expect(err).NotTo(HaveOccurred())
 				defer resp.Body.Close()
 
@@ -207,9 +207,9 @@ var _ = Describe("LogsAPI", func() {
 				containerName := "test-container"
 
 				// Make request with follow=false for one-time fetch
-				url := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs/stream?follow=false&tail=10",
+				reqUrl := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs/stream?follow=false&tail=10",
 					server.URL, taskArn, containerName)
-				resp, err := http.Get(url)
+				resp, err := http.Get(reqUrl)
 				Expect(err).NotTo(HaveOccurred())
 				defer resp.Body.Close()
 
@@ -236,9 +236,9 @@ var _ = Describe("LogsAPI", func() {
 				containerName := "ws-container"
 
 				// Make regular HTTP request (not WebSocket)
-				url := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs/ws",
+				reqUrl := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs/ws",
 					server.URL, taskArn, containerName)
-				resp, err := http.Get(url)
+				resp, err := http.Get(reqUrl)
 				Expect(err).NotTo(HaveOccurred())
 				defer resp.Body.Close()
 
