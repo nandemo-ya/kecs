@@ -1,0 +1,201 @@
+# GoReleaser configuration for KECS
+# Documentation: https://goreleaser.com
+
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+
+builds:
+  - id: kecs
+    main: ./controlplane/cmd/controlplane
+    binary: kecs
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin
+      - linux
+      # - windows  # Windows support can be added later
+    goarch:
+      - amd64
+      - arm64
+    # macOS specific build settings
+    overrides:
+      - goos: darwin
+        goarch: amd64
+        env:
+          - CGO_ENABLED=1
+          - CC=o64-clang
+          - CXX=o64-clang++
+      - goos: darwin
+        goarch: arm64
+        env:
+          - CGO_ENABLED=1
+          - CC=oa64-clang
+          - CXX=oa64-clang++
+      # Linux specific build settings
+      - goos: linux
+        goarch: amd64
+        env:
+          - CGO_ENABLED=1
+          - CC=x86_64-linux-gnu-gcc
+          - CXX=x86_64-linux-gnu-g++
+      - goos: linux
+        goarch: arm64
+        env:
+          - CGO_ENABLED=1
+          - CC=aarch64-linux-gnu-gcc
+          - CXX=aarch64-linux-gnu-g++
+    ldflags:
+      - -s -w
+      - -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version={{.Version}}
+      - -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Commit={{.Commit}}
+      - -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.BuildDate={{.Date}}
+
+archives:
+  - id: kecs
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- if eq .Os "darwin" }}Darwin
+      {{- else if eq .Os "linux" }}Linux
+      {{- else if eq .Os "windows" }}Windows
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - docs/getting-started.md
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^ci:'
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+  groups:
+    - title: 'Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Performance improvements'
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: 'Refactors'
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: 'Other changes'
+      order: 999
+
+release:
+  github:
+    owner: nandemo-ya
+    name: kecs
+  
+  # Release notes configuration
+  header: |
+    ## KECS (Kubernetes-based ECS Compatible Service) {{.Version}}
+    
+    ### Installation
+    
+    #### Homebrew (macOS/Linux)
+    ```bash
+    brew tap nandemo-ya/kecs
+    brew install kecs
+    ```
+    
+    #### Direct Download
+    Download the appropriate binary for your platform from the assets below.
+    
+    #### Docker
+    ```bash
+    docker pull ghcr.io/nandemo-ya/kecs:{{.Version}}
+    ```
+    
+  footer: |
+    ## Full Changelog
+    **Full Changelog**: https://github.com/nandemo-ya/kecs/compare/{{.PreviousTag}}...{{.Tag}}
+    
+    ## Documentation
+    - [Getting Started](https://github.com/nandemo-ya/kecs/blob/main/docs/getting-started.md)
+    - [API Reference](https://github.com/nandemo-ya/kecs/blob/main/docs/api-reference.md)
+    
+  draft: false
+  prerelease: auto
+  mode: keep-existing
+  
+brews:
+  - name: kecs
+    repository:
+      owner: nandemo-ya
+      name: homebrew-kecs
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    
+    # Formula template
+    commit_author:
+      name: kecs-bot
+      email: kecs-bot@nandemo-ya.github.io
+    
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    
+    homepage: "https://github.com/nandemo-ya/kecs"
+    description: "Kubernetes-based ECS Compatible Service - Run ECS workloads on Kubernetes"
+    license: "Apache-2.0"
+    
+    # Dependencies
+    dependencies:
+      - name: docker
+        type: optional
+      - name: kubectl
+        type: optional
+    
+    # Installation test
+    test: |
+      system "#{bin}/kecs", "version"
+    
+    # Caveats for users
+    caveats: |
+      KECS requires a Kubernetes cluster to run workloads.
+      For local development, you can use:
+        - Docker Desktop with Kubernetes enabled
+        - k3d: brew install k3d
+        - kind: brew install kind
+      
+      Quick start:
+        kecs start  # Start KECS in a container
+        kecs status # Check status
+      
+      For more information:
+        https://github.com/nandemo-ya/kecs
+
+# Announce releases
+announce:
+  slack:
+    enabled: false
+  twitter:
+    enabled: false
+  discord:
+    enabled: false
