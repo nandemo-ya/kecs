@@ -208,8 +208,8 @@ type Model struct {
 	clipboardMsgTime time.Time
 
 	// Log viewer
-	logViewer        *LogViewerModel
-	logViewerTaskArn string
+	logViewer          *LogViewerModel
+	logViewerTaskArn   string
 	logViewerContainer string
 }
 

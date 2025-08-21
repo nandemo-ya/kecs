@@ -33,40 +33,45 @@ func NewLogAPIClient(baseURL string) *DefaultLogAPIClient {
 func (c *DefaultLogAPIClient) GetLogs(ctx context.Context, taskArn, container string, follow bool) ([]storage.TaskLog, error) {
 	// Build URL with query parameters
 	params := url.Values{}
-	params.Set("taskArn", taskArn)
-	if container != "" {
-		params.Set("containerName", container)
-	}
 	params.Set("limit", "1000")
-	
-	endpoint := fmt.Sprintf("%s/v1/logs?%s", c.baseURL, params.Encode())
-	
+	if follow {
+		params.Set("follow", "true")
+	}
+
+	// Use the correct API endpoint path
+	// Format: /api/tasks/{taskArn}/containers/{containerName}/logs
+	endpoint := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs?%s",
+		c.baseURL,
+		url.PathEscape(taskArn),
+		url.PathEscape(container),
+		params.Encode())
+
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	// Execute request
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
-	
+
 	// Parse response
 	var result struct {
 		Logs []storage.TaskLog `json:"logs"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
-	
+
 	return result.Logs, nil
 }
 
@@ -74,50 +79,52 @@ func (c *DefaultLogAPIClient) GetLogs(ctx context.Context, taskArn, container st
 func (c *DefaultLogAPIClient) StreamLogs(ctx context.Context, taskArn, container string) (<-chan storage.TaskLog, error) {
 	// Build URL with query parameters
 	params := url.Values{}
-	params.Set("taskArn", taskArn)
-	if container != "" {
-		params.Set("containerName", container)
-	}
 	params.Set("follow", "true")
-	
-	endpoint := fmt.Sprintf("%s/v1/logs/stream?%s", c.baseURL, params.Encode())
-	
+
+	// Use the correct API endpoint path
+	// Format: /api/tasks/{taskArn}/containers/{containerName}/logs
+	endpoint := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs?%s",
+		c.baseURL,
+		url.PathEscape(taskArn),
+		url.PathEscape(container),
+		params.Encode())
+
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	// Set SSE headers
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Cache-Control", "no-cache")
-	
+
 	// Execute request without timeout for streaming
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	
+
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
-	
+
 	// Create channel for logs
 	logChan := make(chan storage.TaskLog, 100)
-	
+
 	// Start goroutine to read SSE stream
 	go func() {
 		defer resp.Body.Close()
 		defer close(logChan)
-		
+
 		scanner := bufio.NewScanner(resp.Body)
 		var eventData strings.Builder
-		
+
 		for scanner.Scan() {
 			line := scanner.Text()
-			
+
 			// SSE format: "data: {json}"
 			if strings.HasPrefix(line, "data: ") {
 				data := strings.TrimPrefix(line, "data: ")
@@ -136,7 +143,7 @@ func (c *DefaultLogAPIClient) StreamLogs(ctx context.Context, taskArn, container
 			}
 		}
 	}()
-	
+
 	return logChan, nil
 }
 
@@ -150,7 +157,7 @@ func NewMockLogAPIClient() *MockLogAPIClient {
 	// Generate some sample logs
 	logs := []storage.TaskLog{}
 	baseTime := time.Now().Add(-1 * time.Hour)
-	
+
 	logLines := []struct {
 		level string
 		line  string
@@ -177,7 +184,7 @@ func NewMockLogAPIClient() *MockLogAPIClient {
 		{"INFO", "Shutting down server..."},
 		{"INFO", "Server shutdown complete"},
 	}
-	
+
 	for i, entry := range logLines {
 		logs = append(logs, storage.TaskLog{
 			TaskArn:       "arn:aws:ecs:us-east-1:123456789012:task/test/task-abc123",
@@ -188,7 +195,7 @@ func NewMockLogAPIClient() *MockLogAPIClient {
 			CreatedAt:     baseTime.Add(time.Duration(i) * time.Second),
 		})
 	}
-	
+
 	return &MockLogAPIClient{
 		logs: logs,
 	}
@@ -202,10 +209,10 @@ func (m *MockLogAPIClient) GetLogs(ctx context.Context, taskArn, container strin
 // StreamLogs streams mock logs
 func (m *MockLogAPIClient) StreamLogs(ctx context.Context, taskArn, container string) (<-chan storage.TaskLog, error) {
 	logChan := make(chan storage.TaskLog, 100)
-	
+
 	go func() {
 		defer close(logChan)
-		
+
 		// Send existing logs
 		for _, log := range m.logs {
 			select {
@@ -214,11 +221,11 @@ func (m *MockLogAPIClient) StreamLogs(ctx context.Context, taskArn, container st
 				return
 			}
 		}
-		
+
 		// Simulate streaming new logs
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
-		
+
 		counter := 0
 		for {
 			select {
@@ -232,18 +239,18 @@ func (m *MockLogAPIClient) StreamLogs(ctx context.Context, taskArn, container st
 					LogLevel:      "INFO",
 					CreatedAt:     time.Now(),
 				}
-				
+
 				select {
 				case logChan <- log:
 				case <-ctx.Done():
 					return
 				}
-				
+
 			case <-ctx.Done():
 				return
 			}
 		}
 	}()
-	
+
 	return logChan, nil
 }

@@ -116,10 +116,10 @@ var _ = Describe("LogCollector", func() {
 			It("should skip log collection gracefully", func() {
 				// Create collector with nil client
 				nilClientCollector := kubernetes.NewLogCollector(nil, mockStorage)
-				
+
 				taskArn := "arn:aws:ecs:us-east-1:123456789012:task/test-cluster/test-task-789"
 				err := nilClientCollector.CollectTaskLogs(ctx, taskArn, "test-namespace", "test-pod")
-				
+
 				// Should not return error
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -129,10 +129,10 @@ var _ = Describe("LogCollector", func() {
 			It("should skip log collection gracefully", func() {
 				// Create collector with nil storage
 				nilStorageCollector := kubernetes.NewLogCollector(kubeClient, nil)
-				
+
 				taskArn := "arn:aws:ecs:us-east-1:123456789012:task/test-cluster/test-task-999"
 				err := nilStorageCollector.CollectTaskLogs(ctx, taskArn, "test-namespace", "test-pod")
-				
+
 				// Should not return error
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -162,13 +162,13 @@ var _ = Describe("LogCollector", func() {
 			// Note: fake.Clientset doesn't support streaming pod logs
 
 			taskArn := "arn:aws:ecs:us-east-1:123456789012:task/test-cluster/test-task-async"
-			
+
 			// This should not block
 			logCollector.CollectLogsBeforeDeletion(ctx, taskArn, "test-namespace", "test-pod-async")
-			
+
 			// Give it some time to complete
 			time.Sleep(200 * time.Millisecond)
-			
+
 			// Since fake client doesn't support streaming, no logs will be collected
 			// But the method should not block
 		})

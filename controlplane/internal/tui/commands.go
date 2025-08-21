@@ -640,21 +640,21 @@ func (m Model) viewTaskLogsCmd(taskArn string, containerName string) tea.Cmd {
 			apiClient = NewMockLogAPIClient()
 		} else {
 			// Use real API client with the correct endpoint
-			// Find the selected instance to get the port
-			var port int = 8080 // default port
+			// Find the selected instance to get the API port (where the logs API is hosted)
+			var apiPort int = 8080 // default API port
 			for _, inst := range m.instances {
 				if inst.Name == m.selectedInstance {
-					port = inst.APIPort
+					apiPort = inst.APIPort
 					break
 				}
 			}
-			baseURL := fmt.Sprintf("http://localhost:%d", port)
+			baseURL := fmt.Sprintf("http://localhost:%d", apiPort)
 			apiClient = NewLogAPIClient(baseURL)
 		}
 
 		// Create log viewer
 		logViewer := NewLogViewer(taskArn, containerName, apiClient)
-		
+
 		return logViewerCreatedMsg{
 			viewer:    logViewer,
 			taskArn:   taskArn,
