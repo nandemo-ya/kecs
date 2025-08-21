@@ -1,0 +1,139 @@
+name: GoReleaser
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      # Install cross-compilation tools
+      - name: Install cross-compilation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-x86-64-linux-gnu g++-x86-64-linux-gnu \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          
+          # Install osxcross for macOS cross-compilation
+          # This is complex and typically done in a Docker container
+          # For now, we'll build on macOS runners for macOS binaries
+      
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Token for updating homebrew-kecs repository
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+  # Build macOS binaries on macOS runner
+  goreleaser-darwin:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build macOS binaries
+        run: |
+          # Build for macOS amd64
+          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build \
+            -ldflags "-s -w -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version=${{ github.ref_name }}" \
+            -o kecs-darwin-amd64 \
+            ./controlplane/cmd/controlplane
+          
+          # Build for macOS arm64
+          CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build \
+            -ldflags "-s -w -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version=${{ github.ref_name }}" \
+            -o kecs-darwin-arm64 \
+            ./controlplane/cmd/controlplane
+          
+          # Create archives
+          tar czf kecs_${{ github.ref_name }}_Darwin_x86_64.tar.gz kecs-darwin-amd64 README.md LICENSE
+          tar czf kecs_${{ github.ref_name }}_Darwin_arm64.tar.gz kecs-darwin-arm64 README.md LICENSE
+          
+          # Generate checksums
+          shasum -a 256 kecs_*.tar.gz > checksums-darwin.txt
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: darwin-binaries
+          path: |
+            kecs_*.tar.gz
+            checksums-darwin.txt
+
+  # Combine all artifacts and create release
+  create-release:
+    needs: [goreleaser, goreleaser-darwin]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Merge checksums
+        run: |
+          cat ./artifacts/*/checksums*.txt > checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./artifacts/**/*.tar.gz
+            ./artifacts/**/*.zip
+            checksums.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          generate_release_notes: true
+          body: |
+            ## Installation
+            
+            ### Homebrew (macOS/Linux)
+            ```bash
+            brew tap nandemo-ya/kecs
+            brew install kecs
+            ```
+            
+            ### Direct Download
+            Download the appropriate binary for your platform from the assets below.
+            
+            ### Docker
+            ```bash
+            docker pull ghcr.io/nandemo-ya/kecs:${{ github.ref_name }}
+            ```
+            
+            ## What's Changed
+            
+            Auto-generated release notes are below.
