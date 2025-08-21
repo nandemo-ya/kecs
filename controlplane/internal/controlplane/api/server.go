@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	gorillamux "github.com/gorilla/mux"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8s "k8s.io/client-go/kubernetes"
@@ -64,6 +65,7 @@ type Server struct {
 	secretsCancelFunc         context.CancelFunc
 	informerFactory           informers.SharedInformerFactory
 	proxyHandler              *ProxyHandler // New unified proxy handler
+	logsAPI                   *LogsAPI      // Logs API handler
 }
 
 // NewServer creates a new API server instance
@@ -210,6 +212,24 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	// Initialize test mode worker if in test mode
 	if apiconfig.GetBool("features.testMode") {
 		s.testModeWorker = NewTestModeTaskWorker(storage)
+	}
+
+	// Initialize Logs API if Kubernetes client is available
+	if !apiconfig.GetBool("features.testMode") {
+		kubeConfig, err := kubernetes.GetKubeConfig()
+		if err != nil {
+			logging.Warn("Failed to get kubernetes config for Logs API",
+				"error", err)
+		} else {
+			kubeClient, err := k8s.NewForConfig(kubeConfig)
+			if err != nil {
+				logging.Warn("Failed to create kubernetes client for Logs API",
+					"error", err)
+			} else {
+				s.logsAPI = NewLogsAPI(storage, kubeClient)
+				logging.Info("Logs API initialized successfully")
+			}
+		}
 	}
 
 	// Initialize LocalStack manager (always required for KECS)
@@ -1233,6 +1253,20 @@ func (s *Server) SetupRoutes() http.Handler {
 	// LocalStack endpoints
 	mux.HandleFunc("/api/localstack/status", s.GetLocalStackStatus)
 	mux.HandleFunc("/localstack/dashboard", s.GetLocalStackDashboard)
+
+	// Register Logs API routes if available
+	if s.logsAPI != nil {
+		// Create gorilla/mux router for path parameters
+		gorillaRouter := gorillamux.NewRouter()
+
+		// Register routes with the /api prefix
+		gorillaRouter.HandleFunc("/api/tasks/{taskArn}/containers/{containerName}/logs", s.logsAPI.HandleGetLogs).Methods("GET")
+		gorillaRouter.HandleFunc("/api/tasks/{taskArn}/containers/{containerName}/logs/stream", s.logsAPI.HandleStreamLogs).Methods("GET")
+		gorillaRouter.HandleFunc("/api/tasks/{taskArn}/containers/{containerName}/logs/ws", s.logsAPI.HandleWebSocketLogs).Methods("GET")
+
+		// Mount the Logs API routes
+		mux.Handle("/api/tasks/", gorillaRouter)
+	}
 
 	// Apply middleware
 	handler := http.Handler(mux)
