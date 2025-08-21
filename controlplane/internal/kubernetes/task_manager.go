@@ -29,6 +29,7 @@ type TaskManager struct {
 	Clientset               kubernetes.Interface
 	storage                 storage.Storage
 	serviceDiscoveryManager servicediscovery.Manager
+	logCollector            *LogCollector
 }
 
 // NewTaskManager creates a new task manager
@@ -51,6 +52,7 @@ func NewTaskManagerWithServiceDiscovery(storage storage.Storage, sdManager servi
 			Clientset:               nil, // Will be initialized later
 			storage:                 storage,
 			serviceDiscoveryManager: sdManager,
+			logCollector:            nil, // Will be initialized when clientset is available
 		}, nil
 	}
 
@@ -69,11 +71,21 @@ func NewTaskManagerWithServiceDiscovery(storage storage.Storage, sdManager servi
 		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
-	return &TaskManager{
+	tm := &TaskManager{
 		Clientset:               clientset,
 		storage:                 storage,
 		serviceDiscoveryManager: sdManager,
-	}, nil
+	}
+	
+	// Initialize log collector if storage supports it
+	if storage != nil && storage.TaskLogStore() != nil {
+		tm.logCollector = NewLogCollector(clientset, storage)
+		logging.Info("Task log collection enabled")
+	} else {
+		logging.Debug("Task log collection disabled - no TaskLogStore available")
+	}
+	
+	return tm, nil
 }
 
 // InitializeClient initializes the kubernetes client if not already initialized
@@ -104,6 +116,13 @@ func (tm *TaskManager) InitializeClient() error {
 	}
 
 	tm.Clientset = clientset
+	
+	// Initialize log collector if not already initialized
+	if tm.logCollector == nil && tm.storage != nil && tm.storage.TaskLogStore() != nil {
+		tm.logCollector = NewLogCollector(clientset, tm.storage)
+		logging.Info("Task log collection enabled (late initialization)")
+	}
+	
 	logging.Debug("TaskManager kubernetes client initialized")
 	return nil
 }
@@ -202,6 +221,12 @@ func (tm *TaskManager) StopTask(ctx context.Context, cluster, taskID, reason str
 
 	if err := tm.storage.TaskStore().Update(ctx, task); err != nil {
 		return fmt.Errorf("failed to update task: %w", err)
+	}
+
+	// Collect logs before deleting the pod
+	if tm.logCollector != nil && tm.Clientset != nil && task.PodName != "" && task.Namespace != "" {
+		// Collect logs asynchronously to avoid blocking the stop operation
+		tm.logCollector.CollectLogsBeforeDeletion(ctx, task.ARN, task.Namespace, task.PodName)
 	}
 
 	// Delete the pod (skip if no kubernetes client)
@@ -353,6 +378,11 @@ func (tm *TaskManager) watchPodStatus(ctx context.Context, taskARN, namespace, p
 
 		// Stop watching if pod is terminated
 		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+			// Collect logs before pod is garbage collected
+			if tm.logCollector != nil {
+				logging.Info("Pod terminated, collecting logs", "taskARN", taskARN, "pod", pod.Name, "phase", pod.Status.Phase)
+				tm.logCollector.CollectLogsBeforeDeletion(ctx, taskARN, namespace, podName)
+			}
 			return
 		}
 	}
