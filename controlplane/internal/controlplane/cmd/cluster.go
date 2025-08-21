@@ -87,7 +87,6 @@ func runClusterCreate(cmd *cobra.Command, args []string) error {
 		clusterName = args[0]
 	}
 
-
 	// Set up data directory
 	if clusterDataDir == "" {
 		home, _ := os.UserHomeDir()
@@ -145,7 +144,6 @@ func runClusterCreate(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Nodes: %d\n", info.NodeCount)
 		fmt.Printf("  Version: %s\n", info.Version)
 	}
-
 
 	fmt.Printf("\nNext steps:\n")
 	fmt.Printf("1. Deploy KECS control plane: kecs deploy control-plane --cluster %s\n", clusterName)
@@ -275,7 +273,6 @@ func runClusterInfo(cmd *cobra.Command, args []string) error {
 
 	// Get kubeconfig path
 	fmt.Printf("\nKubeconfig: %s\n", manager.GetKubeconfigPath(clusterName))
-
 
 	return nil
 }
