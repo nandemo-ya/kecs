@@ -182,11 +182,20 @@ func testMockAPI() {
 }
 
 func runInteractiveTUI() {
-	fmt.Println("Starting interactive TUI with mock data...")
+	// Get API endpoint from environment
+	endpoint := os.Getenv("KECS_API_ENDPOINT")
+	useMock := endpoint == ""
 
-	// Import the TUI package and create a new model
-	// This will use the existing TUI implementation
-	model := tui.NewModel()
+	var model tui.Model
+	if useMock {
+		fmt.Println("Starting interactive TUI with mock data...")
+		model = tui.NewModel()
+	} else {
+		fmt.Printf("Starting interactive TUI connected to: %s\n", endpoint)
+		// Create HTTP client for real API
+		client := api.NewHTTPClient(endpoint)
+		model = tui.NewModelWithClient(client)
+	}
 
 	// Create and run the Bubble Tea program
 	p := tea.NewProgram(model, tea.WithAltScreen())

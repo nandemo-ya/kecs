@@ -1260,9 +1260,10 @@ func (s *Server) SetupRoutes() http.Handler {
 		gorillaRouter := gorillamux.NewRouter()
 
 		// Register routes with the /api prefix
-		gorillaRouter.HandleFunc("/api/tasks/{taskArn}/containers/{containerName}/logs", s.logsAPI.HandleGetLogs).Methods("GET")
-		gorillaRouter.HandleFunc("/api/tasks/{taskArn}/containers/{containerName}/logs/stream", s.logsAPI.HandleStreamLogs).Methods("GET")
-		gorillaRouter.HandleFunc("/api/tasks/{taskArn}/containers/{containerName}/logs/ws", s.logsAPI.HandleWebSocketLogs).Methods("GET")
+		// Use {taskArn:.+} to match ARNs with colons
+		gorillaRouter.HandleFunc("/api/tasks/{taskArn:.+}/containers/{containerName}/logs", s.logsAPI.HandleGetLogs).Methods("GET")
+		gorillaRouter.HandleFunc("/api/tasks/{taskArn:.+}/containers/{containerName}/logs/stream", s.logsAPI.HandleStreamLogs).Methods("GET")
+		gorillaRouter.HandleFunc("/api/tasks/{taskArn:.+}/containers/{containerName}/logs/ws", s.logsAPI.HandleWebSocketLogs).Methods("GET")
 
 		// Mount the Logs API routes
 		mux.Handle("/api/tasks/", gorillaRouter)

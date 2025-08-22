@@ -76,7 +76,7 @@ func NewTaskManagerWithServiceDiscovery(storage storage.Storage, sdManager servi
 		storage:                 storage,
 		serviceDiscoveryManager: sdManager,
 	}
-	
+
 	// Initialize log collector if storage supports it
 	if storage != nil && storage.TaskLogStore() != nil {
 		tm.logCollector = NewLogCollector(clientset, storage)
@@ -84,7 +84,7 @@ func NewTaskManagerWithServiceDiscovery(storage storage.Storage, sdManager servi
 	} else {
 		logging.Debug("Task log collection disabled - no TaskLogStore available")
 	}
-	
+
 	return tm, nil
 }
 
@@ -116,13 +116,13 @@ func (tm *TaskManager) InitializeClient() error {
 	}
 
 	tm.Clientset = clientset
-	
+
 	// Initialize log collector if not already initialized
 	if tm.logCollector == nil && tm.storage != nil && tm.storage.TaskLogStore() != nil {
 		tm.logCollector = NewLogCollector(clientset, tm.storage)
 		logging.Info("Task log collection enabled (late initialization)")
 	}
-	
+
 	logging.Debug("TaskManager kubernetes client initialized")
 	return nil
 }

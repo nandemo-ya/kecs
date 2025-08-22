@@ -58,8 +58,8 @@ func (lc *LogCollector) CollectTaskLogs(ctx context.Context, taskArn, namespace,
 	for _, container := range pod.Spec.Containers {
 		logs, err := lc.collectContainerLogs(ctx, taskArn, namespace, podName, container.Name)
 		if err != nil {
-			logging.Warn("Failed to collect logs from container", 
-				"container", container.Name, 
+			logging.Warn("Failed to collect logs from container",
+				"container", container.Name,
 				"error", err)
 			continue
 		}
@@ -70,8 +70,8 @@ func (lc *LogCollector) CollectTaskLogs(ctx context.Context, taskArn, namespace,
 	for _, container := range pod.Spec.InitContainers {
 		logs, err := lc.collectContainerLogs(ctx, taskArn, namespace, podName, container.Name)
 		if err != nil {
-			logging.Warn("Failed to collect logs from init container", 
-				"container", container.Name, 
+			logging.Warn("Failed to collect logs from init container",
+				"container", container.Name,
 				"error", err)
 			continue
 		}
@@ -84,8 +84,8 @@ func (lc *LogCollector) CollectTaskLogs(ctx context.Context, taskArn, namespace,
 			logging.Error("Failed to save collected logs", "error", err, "count", len(allLogs))
 			return fmt.Errorf("failed to save logs: %w", err)
 		}
-		logging.Info("Successfully collected and saved task logs", 
-			"taskArn", taskArn, 
+		logging.Info("Successfully collected and saved task logs",
+			"taskArn", taskArn,
 			"logCount", len(allLogs))
 	} else {
 		logging.Info("No logs collected for task", "taskArn", taskArn)
@@ -114,11 +114,11 @@ func (lc *LogCollector) collectContainerLogs(ctx context.Context, taskArn, names
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		// Parse timestamp and log line
 		// Format: 2024-01-20T10:30:45.123456789Z Log message here
 		timestamp, logLine := parseTimestampedLogLine(line)
-		
+
 		// Determine log level from content
 		logLevel := detectLogLevel(logLine)
 
@@ -156,7 +156,7 @@ func parseTimestampedLogLine(line string) (time.Time, string) {
 // detectLogLevel attempts to detect the log level from the log content
 func detectLogLevel(logLine string) string {
 	logLineUpper := strings.ToUpper(logLine)
-	
+
 	// Check for common log level patterns
 	switch {
 	case strings.Contains(logLineUpper, "ERROR") || strings.Contains(logLineUpper, "FATAL"):
@@ -178,15 +178,15 @@ func (lc *LogCollector) CollectLogsBeforeDeletion(ctx context.Context, taskArn, 
 	go func() {
 		collectCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		
+
 		if err := lc.CollectTaskLogs(collectCtx, taskArn, namespace, podName); err != nil {
-			logging.Error("Failed to collect logs before deletion", 
-				"error", err, 
+			logging.Error("Failed to collect logs before deletion",
+				"error", err,
 				"taskArn", taskArn,
 				"pod", podName)
 		}
 	}()
-	
+
 	// Give log collection a small head start before deletion proceeds
 	time.Sleep(100 * time.Millisecond)
 }
