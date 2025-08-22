@@ -313,7 +313,8 @@ func (m Model) renderFooter() string {
 		status := "Unknown"
 		for _, inst := range m.instances {
 			if inst.Name == m.selectedInstance {
-				if inst.Status == "ACTIVE" {
+				// Check for various active states
+				if inst.Status == "ACTIVE" || inst.Status == "Running" || inst.Status == "running" {
 					status = statusActiveStyle.Render("● Active")
 				} else {
 					status = statusInactiveStyle.Render("○ Inactive")
@@ -466,7 +467,8 @@ func (m Model) renderSummary() string {
 		active := 0
 		total := len(m.instances)
 		for _, inst := range m.instances {
-			if inst.Status == "ACTIVE" {
+			// Check for various active states
+			if inst.Status == "ACTIVE" || inst.Status == "Running" || inst.Status == "running" {
 				active++
 			}
 		}
@@ -791,14 +793,18 @@ func formatDuration(d time.Duration) string {
 // formatInstanceStatus formats instance status with icons
 func formatInstanceStatus(status string) string {
 	switch status {
-	case "running", "ACTIVE":
+	case "running", "Running", "ACTIVE":
 		return "● Running"
-	case "stopped", "STOPPED":
+	case "stopped", "Stopped", "STOPPED":
 		return "○ Stopped"
-	case "pending":
+	case "pending", "Pending":
 		return "◐ Pending"
-	case "unhealthy":
+	case "unhealthy", "Unhealthy":
 		return "▲ Unhealthy"
+	case "starting", "Starting":
+		return "◉ Starting"
+	case "stopping", "Stopping":
+		return "◉ Stopping"
 	default:
 		return status
 	}
