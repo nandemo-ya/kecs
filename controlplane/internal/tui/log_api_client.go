@@ -31,19 +31,27 @@ func NewLogAPIClient(baseURL string) *DefaultLogAPIClient {
 
 // GetLogs retrieves logs from the API
 func (c *DefaultLogAPIClient) GetLogs(ctx context.Context, taskArn, container string, follow bool) ([]storage.TaskLog, error) {
+	// Extract task ID from ARN
+	// ARN format: arn:aws:ecs:region:account:task/cluster/task-id
+	taskId := extractTaskIdFromArn(taskArn)
+	cluster := extractClusterFromArn(taskArn)
+	
 	// Build URL with query parameters
 	params := url.Values{}
 	params.Set("limit", "1000")
 	if follow {
 		params.Set("follow", "true")
 	}
+	if cluster != "" && cluster != "default" {
+		params.Set("cluster", cluster)
+	}
 
-	// Use the correct API endpoint path
-	// Format: /api/tasks/{taskArn}/containers/{containerName}/logs
+	// Use the correct API endpoint path with task ID instead of full ARN
+	// Format: /api/tasks/{taskId}/containers/{containerName}/logs
 	endpoint := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs?%s",
 		c.baseURL,
-		url.PathEscape(taskArn),
-		url.PathEscape(container),
+		taskId,
+		container,
 		params.Encode())
 
 	// Create request
@@ -77,16 +85,23 @@ func (c *DefaultLogAPIClient) GetLogs(ctx context.Context, taskArn, container st
 
 // StreamLogs streams logs from the API using SSE
 func (c *DefaultLogAPIClient) StreamLogs(ctx context.Context, taskArn, container string) (<-chan storage.TaskLog, error) {
+	// Extract task ID from ARN
+	taskId := extractTaskIdFromArn(taskArn)
+	cluster := extractClusterFromArn(taskArn)
+	
 	// Build URL with query parameters
 	params := url.Values{}
 	params.Set("follow", "true")
+	if cluster != "" && cluster != "default" {
+		params.Set("cluster", cluster)
+	}
 
-	// Use the correct API endpoint path
-	// Format: /api/tasks/{taskArn}/containers/{containerName}/logs
-	endpoint := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs?%s",
+	// Use the correct API endpoint path with task ID instead of full ARN
+	// Format: /api/tasks/{taskId}/containers/{containerName}/logs/stream
+	endpoint := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs/stream?%s",
 		c.baseURL,
-		url.PathEscape(taskArn),
-		url.PathEscape(container),
+		taskId,
+		container,
 		params.Encode())
 
 	// Create request
@@ -145,6 +160,36 @@ func (c *DefaultLogAPIClient) StreamLogs(ctx context.Context, taskArn, container
 	}()
 
 	return logChan, nil
+}
+
+// extractTaskIdFromArn extracts task ID from a task ARN
+// ARN format: arn:aws:ecs:region:account:task/cluster/task-id
+func extractTaskIdFromArn(taskArn string) string {
+	// If it's already just a task ID, return it as is
+	if !strings.Contains(taskArn, ":") {
+		return taskArn
+	}
+	
+	parts := strings.Split(taskArn, "/")
+	if len(parts) >= 1 {
+		return parts[len(parts)-1]
+	}
+	return taskArn
+}
+
+// extractClusterFromArn extracts cluster name from a task ARN
+// ARN format: arn:aws:ecs:region:account:task/cluster/task-id
+func extractClusterFromArn(taskArn string) string {
+	// If it's not an ARN, return empty
+	if !strings.Contains(taskArn, ":") {
+		return ""
+	}
+	
+	parts := strings.Split(taskArn, "/")
+	if len(parts) >= 3 {
+		return parts[len(parts)-2]
+	}
+	return "default"
 }
 
 // MockLogAPIClient provides a mock implementation for testing
