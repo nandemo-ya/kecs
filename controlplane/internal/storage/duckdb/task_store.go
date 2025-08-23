@@ -440,3 +440,25 @@ func (s *taskStore) CreateOrUpdate(ctx context.Context, task *storage.Task) erro
 
 	return err
 }
+
+// DeleteOlderThan deletes tasks older than the specified time with the given status
+func (s *taskStore) DeleteOlderThan(ctx context.Context, clusterARN string, before time.Time, status string) (int, error) {
+	query := `
+		DELETE FROM tasks 
+		WHERE cluster_arn = ? 
+		AND last_status = ? 
+		AND (stopped_at IS NOT NULL AND stopped_at < ?)
+	`
+
+	result, err := s.db.ExecContext(ctx, query, clusterARN, status, before)
+	if err != nil {
+		return 0, err
+	}
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}

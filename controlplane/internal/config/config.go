@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -109,6 +110,15 @@ func InitConfig() error {
 		v.SetDefault("features.autoRecoverState", true)
 		v.SetDefault("features.iamIntegration", false) // Disable IAM integration by default
 		v.SetDefault("features.tuiMock", true)         // Enable TUI mock mode by default
+
+		// Cleanup worker defaults
+		v.SetDefault("cleanup.enabled", true)
+		v.SetDefault("cleanup.interval", "5m")
+		v.SetDefault("cleanup.task.retention", "1h")
+		v.SetDefault("cleanup.service.retention", "24h")
+		v.SetDefault("cleanup.containerInstance.retention", "1h")
+		v.SetDefault("cleanup.taskSet.retention", "24h")
+		v.SetDefault("cleanup.log.retention", "168h") // 7 days
 
 		// AWS defaults
 		v.SetDefault("aws.defaultRegion", "us-east-1")
@@ -296,6 +306,20 @@ func GetStringSlice(key string) []string {
 	mu.RLock()
 	defer mu.RUnlock()
 	return v.GetStringSlice(key)
+}
+
+// GetDuration returns a duration value from the config with a default fallback
+func GetDuration(key string, defaultValue time.Duration) time.Duration {
+	ensureInitialized()
+	mu.RLock()
+	defer mu.RUnlock()
+
+	// Try to get as duration first
+	if v.IsSet(key) {
+		return v.GetDuration(key)
+	}
+
+	return defaultValue
 }
 
 // Set sets a configuration value

@@ -535,3 +535,19 @@ type paginatedClustersResult struct {
 	Clusters  []*storage.Cluster
 	NextToken string
 }
+
+// DeleteOlderThan deletes tasks older than the specified time with the given status
+func (s *cachedTaskStore) DeleteOlderThan(ctx context.Context, clusterARN string, before time.Time, status string) (int, error) {
+	// Clear cache for the cluster
+	s.cache.Delete(ctx, clusterARN)
+	// Pass through to underlying store
+	return s.backend.DeleteOlderThan(ctx, clusterARN, before, status)
+}
+
+// DeleteMarkedForDeletion deletes services marked for deletion before the specified time
+func (s *cachedServiceStore) DeleteMarkedForDeletion(ctx context.Context, clusterARN string, before time.Time) (int, error) {
+	// Clear cache for the cluster
+	s.cache.Delete(ctx, clusterARN)
+	// Pass through to underlying store
+	return s.backend.DeleteMarkedForDeletion(ctx, clusterARN, before)
+}

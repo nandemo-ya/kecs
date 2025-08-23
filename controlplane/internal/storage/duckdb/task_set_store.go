@@ -295,3 +295,27 @@ func (s *taskSetStore) UpdatePrimary(ctx context.Context, serviceARN, taskSetID 
 	// and potentially adjust the scale of other task sets
 	return nil
 }
+
+// DeleteOrphaned deletes task sets that no longer have an associated service
+func (s *taskSetStore) DeleteOrphaned(ctx context.Context, clusterARN string) (int, error) {
+	// Delete task sets where the associated service no longer exists
+	query := `
+		DELETE FROM task_sets 
+		WHERE cluster_arn = ? 
+		AND service_arn NOT IN (
+			SELECT arn FROM services WHERE cluster_arn = ?
+		)
+	`
+
+	result, err := s.db.ExecContext(ctx, query, clusterARN, clusterARN)
+	if err != nil {
+		return 0, err
+	}
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}

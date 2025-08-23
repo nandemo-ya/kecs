@@ -434,6 +434,11 @@ func (m *MockServiceStore) GetByARN(ctx context.Context, arn string) (*storage.S
 	return nil, errors.New("service not found")
 }
 
+func (m *MockServiceStore) DeleteMarkedForDeletion(ctx context.Context, clusterARN string, before time.Time) (int, error) {
+	// Mock implementation - just return 0 for tests
+	return 0, nil
+}
+
 // MockTaskStore implements storage.TaskStore for testing
 type MockTaskStore struct {
 	tasks map[string]*storage.Task
@@ -554,6 +559,21 @@ func (m *MockTaskStore) CreateOrUpdate(ctx context.Context, task *storage.Task) 
 	return nil
 }
 
+func (m *MockTaskStore) DeleteOlderThan(ctx context.Context, clusterARN string, before time.Time, status string) (int, error) {
+	count := 0
+	toDelete := []string{}
+	for key, task := range m.tasks {
+		if task.ClusterARN == clusterARN && task.LastStatus == status && task.StoppedAt != nil && task.StoppedAt.Before(before) {
+			toDelete = append(toDelete, key)
+			count++
+		}
+	}
+	for _, key := range toDelete {
+		delete(m.tasks, key)
+	}
+	return count, nil
+}
+
 // MockTaskSetStore implements storage.TaskSetStore for testing
 type MockTaskSetStore struct {
 	taskSets map[string]*storage.TaskSet
@@ -656,6 +676,11 @@ func (m *MockTaskSetStore) UpdatePrimary(ctx context.Context, serviceARN, taskSe
 }
 
 // GetTaskSets returns the internal task sets map for testing
+func (m *MockTaskSetStore) DeleteOrphaned(ctx context.Context, clusterARN string) (int, error) {
+	// For mock, we'll just return 0 deleted since we don't track service associations
+	return 0, nil
+}
+
 func (m *MockTaskSetStore) GetTaskSets() map[string]*storage.TaskSet {
 	return m.taskSets
 }
@@ -781,6 +806,21 @@ func (m *MockContainerInstanceStore) GetByARNs(ctx context.Context, arns []strin
 		}
 	}
 	return results, nil
+}
+
+func (m *MockContainerInstanceStore) DeleteStale(ctx context.Context, clusterARN string, before time.Time) (int, error) {
+	count := 0
+	toDelete := []string{}
+	for arn, instance := range m.instances {
+		if instance.ClusterARN == clusterARN && instance.Status == "INACTIVE" && instance.UpdatedAt.Before(before) {
+			toDelete = append(toDelete, arn)
+			count++
+		}
+	}
+	for _, arn := range toDelete {
+		delete(m.instances, arn)
+	}
+	return count, nil
 }
 
 // MockAttributeStore implements storage.AttributeStore for testing
