@@ -17,6 +17,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 )
 
 // ServiceManager manages Kubernetes Deployments and Services for ECS services
@@ -785,9 +786,13 @@ func (sm *ServiceManager) registerPodAsTask(ctx context.Context, pod *corev1.Pod
 		return
 	}
 
+	// Generate deterministic task ID from pod name
+	// This ensures the same pod always gets the same ECS-compatible task ID
+	taskID := utils.GenerateTaskIDFromString(pod.Name)
+
 	// Check if task already exists for this pod
 	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s",
-		service.Region, service.AccountID, cluster.Name, pod.Name)
+		service.Region, service.AccountID, cluster.Name, taskID)
 
 	existingTask, err := sm.storage.TaskStore().Get(ctx, cluster.ARN, taskARN)
 	if err == nil && existingTask != nil {
@@ -821,7 +826,7 @@ func (sm *ServiceManager) registerPodAsTask(ctx context.Context, pod *corev1.Pod
 	// Create new task
 	now := time.Now()
 	task := &storage.Task{
-		ID:                pod.Name,
+		ID:                taskID,
 		ARN:               taskARN,
 		ClusterARN:        cluster.ARN,
 		TaskDefinitionARN: service.TaskDefinitionARN,
@@ -881,8 +886,10 @@ func (sm *ServiceManager) registerPodAsTask(ctx context.Context, pod *corev1.Pod
 
 // handlePodDeletion handles when a pod is deleted
 func (sm *ServiceManager) handlePodDeletion(ctx context.Context, pod *corev1.Pod, cluster *storage.Cluster, service *storage.Service) {
+	// Generate deterministic task ID from pod name
+	taskID := utils.GenerateTaskIDFromString(pod.Name)
 	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s",
-		service.Region, service.AccountID, cluster.Name, pod.Name)
+		service.Region, service.AccountID, cluster.Name, taskID)
 
 	task, err := sm.storage.TaskStore().Get(ctx, cluster.ARN, taskARN)
 	if err != nil || task == nil {
