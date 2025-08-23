@@ -162,7 +162,7 @@ func runServer(cmd *cobra.Command) {
 		log.Fatalf("Failed to initialize API server: %v", err)
 	}
 	adminServer := admin.NewServer(cfg.Server.AdminPort, storage)
-	
+
 	// Set Kubernetes client for admin server if available
 	if apiServer != nil && apiServer.GetKubeClient() != nil {
 		adminServer.SetKubeClient(apiServer.GetKubeClient())
