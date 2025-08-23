@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Format Go files that are staged for commit
+echo "Running gofmt and goimports on staged Go files..."
+
+# Get list of staged Go files
+STAGED_GO_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$')
+
+if [ -z "$STAGED_GO_FILES" ]; then
+    exit 0
+fi
+
+# Format each file
+for FILE in $STAGED_GO_FILES; do
+    if [ -f "$FILE" ]; then
+        echo "Formatting: $FILE"
+        
+        # Run gofmt
+        gofmt -w "$FILE"
+        
+        # Run goimports if available
+        if command -v goimports &> /dev/null; then
+            goimports -w "$FILE"
+        fi
+        
+        # Re-add the file to staging
+        git add "$FILE"
+    fi
+done
+
+echo "Go formatting complete."
+exit 0
