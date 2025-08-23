@@ -28,7 +28,8 @@ const (
 	ControlPlaneConfigMap      = "kecs-config"
 	ControlPlanePVC            = "kecs-data"
 	ControlPlaneAPIService     = "kecs-api"
-	ControlPlaneService        = "kecs-controlplane"
+	ControlPlaneAdminService   = "kecs-admin"
+	ControlPlaneService        = "kecs-controlplane" // Deprecated, kept for backward compatibility
 
 	// Labels
 	LabelManagedBy = "kecs.dev/managed"
@@ -326,7 +327,34 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 				Type: corev1.ServiceTypeNodePort,
 			},
 		},
-		// Admin Service
+		// Admin Service (NodePort for external access)
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ControlPlaneAdminService,
+				Namespace: ControlPlaneNamespace,
+				Labels: map[string]string{
+					LabelManagedBy: "true",
+					LabelComponent: "controlplane",
+					LabelType:      "admin",
+				},
+			},
+			Spec: corev1.ServiceSpec{
+				Selector: map[string]string{
+					LabelApp: ControlPlaneName,
+				},
+				Ports: []corev1.ServicePort{
+					{
+						Name:       "admin",
+						Port:       config.AdminPort,
+						TargetPort: intstr.FromInt(int(config.AdminPort)),
+						Protocol:   corev1.ProtocolTCP,
+						NodePort:   30081, // Fixed NodePort for admin API
+					},
+				},
+				Type: corev1.ServiceTypeNodePort,
+			},
+		},
+		// Legacy Admin Service (ClusterIP for backward compatibility)
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ControlPlaneService,
@@ -334,7 +362,7 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 				Labels: map[string]string{
 					LabelManagedBy: "true",
 					LabelComponent: "controlplane",
-					LabelType:      "admin",
+					LabelType:      "admin-legacy",
 				},
 			},
 			Spec: corev1.ServiceSpec{

@@ -49,9 +49,19 @@ func (m *Manager) createCluster(ctx context.Context, instanceName string, cfg *c
 		apiNodePort = 30080 // fallback to default
 	}
 
+	// Calculate NodePort for Admin access
+	adminNodePort := int32(opts.AdminPort)
+	if adminNodePort < 30000 {
+		adminNodePort = adminNodePort + 22000
+	}
+	if adminNodePort < 30000 || adminNodePort > 32767 {
+		adminNodePort = 30081 // fallback to default
+	}
+
 	// Create port mappings for k3d cluster
 	portMappings := map[int32]int32{
-		int32(opts.ApiPort): apiNodePort, // Map host API port to NodePort for ECS API
+		int32(opts.ApiPort):   apiNodePort,   // Map host API port to NodePort for ECS API
+		int32(opts.AdminPort): adminNodePort, // Map host Admin port to NodePort for Admin API
 	}
 
 	// If LocalStack is enabled, add its port mapping

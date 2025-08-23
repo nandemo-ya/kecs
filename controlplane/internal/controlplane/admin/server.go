@@ -12,6 +12,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
+	k8sclient "k8s.io/client-go/kubernetes"
 )
 
 // Server represents the HTTP admin server for KECS Control Plane
@@ -23,6 +24,7 @@ type Server struct {
 	config           *config.Config
 	instanceAPI      *InstanceAPI
 	ecsProxy         *ECSProxy
+	logsAPI          *LogsAPI
 }
 
 // NewServer creates a new admin server instance
@@ -57,7 +59,30 @@ func NewServer(port int, storage storage.Storage) *Server {
 		s.ecsProxy = NewECSProxy(cfg, s.instanceAPI.manager)
 	}
 
+	// Initialize Logs API with storage (Kubernetes client will be set later)
+	s.logsAPI = NewLogsAPI(storage, nil)
+
 	return s
+}
+
+// SetKubeClient sets the Kubernetes client for admin APIs
+func (s *Server) SetKubeClient(kubeClient k8sclient.Interface) {
+	// Initialize Logs API with Kubernetes client
+	if s.logsAPI == nil {
+		s.logsAPI = NewLogsAPI(nil, kubeClient)
+	} else {
+		s.logsAPI.SetKubeClient(kubeClient)
+	}
+}
+
+// SetStorage sets the storage for admin APIs
+func (s *Server) SetStorage(storage storage.Storage) {
+	// Update Logs API with storage
+	if s.logsAPI == nil {
+		s.logsAPI = NewLogsAPI(storage, nil)
+	} else {
+		s.logsAPI = NewLogsAPI(storage, s.logsAPI.kubeClient)
+	}
 }
 
 // Start starts the HTTP admin server
@@ -106,6 +131,14 @@ func (s *Server) setupRoutes() http.Handler {
 	}
 	if s.ecsProxy != nil {
 		s.ecsProxy.RegisterRoutes(router)
+	}
+
+	// Register Logs API endpoints
+	if s.logsAPI != nil {
+		logging.Info("Registering Logs API routes")
+		s.logsAPI.RegisterRoutes(router)
+	} else {
+		logging.Warn("Logs API is nil, not registering routes")
 	}
 
 	// Add middleware

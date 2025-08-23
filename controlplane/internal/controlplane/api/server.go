@@ -65,7 +65,7 @@ type Server struct {
 	secretsCancelFunc         context.CancelFunc
 	informerFactory           informers.SharedInformerFactory
 	proxyHandler              *ProxyHandler // New unified proxy handler
-	logsAPI                   *LogsAPI      // Logs API handler
+	kubeClient                k8s.Interface // Kubernetes client
 }
 
 // NewServer creates a new API server instance
@@ -147,6 +147,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 				logging.Warn("Failed to create kubernetes client for TaskSet manager",
 					"error", err)
 			} else {
+				s.kubeClient = kubeClient
 				taskSetManager := kubernetes.NewTaskSetManager(kubeClient, s.taskManager)
 				s.taskSetManager = taskSetManager
 				logging.Info("TaskSet manager initialized successfully")
@@ -214,23 +215,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		s.testModeWorker = NewTestModeTaskWorker(storage)
 	}
 
-	// Initialize Logs API if Kubernetes client is available
-	if !apiconfig.GetBool("features.testMode") {
-		kubeConfig, err := kubernetes.GetKubeConfig()
-		if err != nil {
-			logging.Warn("Failed to get kubernetes config for Logs API",
-				"error", err)
-		} else {
-			kubeClient, err := k8s.NewForConfig(kubeConfig)
-			if err != nil {
-				logging.Warn("Failed to create kubernetes client for Logs API",
-					"error", err)
-			} else {
-				s.logsAPI = NewLogsAPI(storage, kubeClient)
-				logging.Info("Logs API initialized successfully")
-			}
-		}
-	}
+	// Logs API has been moved to admin server (port 8081)
 
 	// Initialize LocalStack manager (always required for KECS)
 	if localStackConfig != nil {
@@ -1242,35 +1227,24 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 
 // SetupRoutes configures all the API routes
 func (s *Server) SetupRoutes() http.Handler {
-	mux := http.NewServeMux()
-
-	// Main handler - use the proxy handler for all API requests
-	mux.Handle("/", s.proxyHandler)
+	// Use gorilla/mux for all non-AWS API routes
+	router := gorillamux.NewRouter()
 
 	// Health check endpoint
-	mux.HandleFunc("/health", s.handleHealthCheck)
+	router.HandleFunc("/health", s.handleHealthCheck).Methods("GET")
 
 	// LocalStack endpoints
-	mux.HandleFunc("/api/localstack/status", s.GetLocalStackStatus)
-	mux.HandleFunc("/localstack/dashboard", s.GetLocalStackDashboard)
+	router.HandleFunc("/api/localstack/status", s.GetLocalStackStatus).Methods("GET")
+	router.HandleFunc("/localstack/dashboard", s.GetLocalStackDashboard).Methods("GET")
 
-	// Register Logs API routes if available
-	if s.logsAPI != nil {
-		// Create gorilla/mux router for path parameters
-		gorillaRouter := gorillamux.NewRouter()
+	// Logs API moved to admin server (port 8081)
 
-		// Register routes with the /api prefix
-		// Use {taskArn:.+} to match ARNs with colons
-		gorillaRouter.HandleFunc("/api/tasks/{taskArn:.+}/containers/{containerName}/logs", s.logsAPI.HandleGetLogs).Methods("GET")
-		gorillaRouter.HandleFunc("/api/tasks/{taskArn:.+}/containers/{containerName}/logs/stream", s.logsAPI.HandleStreamLogs).Methods("GET")
-		gorillaRouter.HandleFunc("/api/tasks/{taskArn:.+}/containers/{containerName}/logs/ws", s.logsAPI.HandleWebSocketLogs).Methods("GET")
-
-		// Mount the Logs API routes
-		mux.Handle("/api/tasks/", gorillaRouter)
-	}
+	// AWS API endpoints (generated) - handle everything else
+	// This should be last as it's a catch-all for AWS API requests
+	router.PathPrefix("/").Handler(s.proxyHandler)
 
 	// Apply middleware
-	handler := http.Handler(mux)
+	handler := http.Handler(router)
 	handler = SecurityHeadersMiddleware(handler)
 	handler = CORSMiddleware(handler)
 	handler = LoggingMiddleware(handler)
@@ -1282,4 +1256,9 @@ func (s *Server) SetupRoutes() http.Handler {
 func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
+}
+
+// GetKubeClient returns the Kubernetes client
+func (s *Server) GetKubeClient() k8s.Interface {
+	return s.kubeClient
 }
