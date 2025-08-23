@@ -113,10 +113,8 @@ func (s *Server) setupRoutes() http.Handler {
 
 	// Health check endpoints
 	router.HandleFunc("/health", s.handleHealth).Methods("GET")
-	router.HandleFunc("/healthz", s.handleHealthCheck).Methods("GET") // Legacy endpoint
 	router.HandleFunc("/live", s.handleLiveness).Methods("GET")
 	router.HandleFunc("/ready", s.handleReadiness(s.healthChecker)).Methods("GET")
-	router.HandleFunc("/health/detailed", s.handleHealthDetailed(s.healthChecker)).Methods("GET")
 
 	// Metrics endpoints
 	router.HandleFunc("/metrics", s.handleMetrics(s.metricsCollector)).Methods("GET")
@@ -156,26 +154,6 @@ func (s *Server) setupRoutes() http.Handler {
 	// }
 
 	return handler
-}
-
-// HealthResponse represents the health check response
-type HealthResponse struct {
-	Status    string    `json:"status"`
-	Timestamp time.Time `json:"timestamp"`
-	Version   string    `json:"version"`
-}
-
-// handleHealthCheck handles the legacy health check endpoint
-func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
-	response := HealthResponse{
-		Status:    "OK",
-		Timestamp: time.Now(),
-		Version:   getVersion(),
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
 }
 
 // ConfigResponse represents the configuration response

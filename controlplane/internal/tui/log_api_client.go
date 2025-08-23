@@ -35,7 +35,7 @@ func (c *DefaultLogAPIClient) GetLogs(ctx context.Context, taskArn, container st
 	// ARN format: arn:aws:ecs:region:account:task/cluster/task-id
 	taskId := extractTaskIdFromArn(taskArn)
 	cluster := extractClusterFromArn(taskArn)
-	
+
 	// Build URL with query parameters
 	params := url.Values{}
 	params.Set("limit", "1000")
@@ -88,7 +88,7 @@ func (c *DefaultLogAPIClient) StreamLogs(ctx context.Context, taskArn, container
 	// Extract task ID from ARN
 	taskId := extractTaskIdFromArn(taskArn)
 	cluster := extractClusterFromArn(taskArn)
-	
+
 	// Build URL with query parameters
 	params := url.Values{}
 	params.Set("follow", "true")
@@ -169,7 +169,7 @@ func extractTaskIdFromArn(taskArn string) string {
 	if !strings.Contains(taskArn, ":") {
 		return taskArn
 	}
-	
+
 	parts := strings.Split(taskArn, "/")
 	if len(parts) >= 1 {
 		return parts[len(parts)-1]
@@ -184,7 +184,7 @@ func extractClusterFromArn(taskArn string) string {
 	if !strings.Contains(taskArn, ":") {
 		return ""
 	}
-	
+
 	parts := strings.Split(taskArn, "/")
 	if len(parts) >= 3 {
 		return parts[len(parts)-2]

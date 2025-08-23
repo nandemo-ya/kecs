@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"runtime"
 	"sync"
 	"time"
 
@@ -30,25 +29,7 @@ type CheckResult struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// DetailedHealthResponse represents a detailed health check response
-type DetailedHealthResponse struct {
-	Status    string                 `json:"status"`
-	Timestamp time.Time              `json:"timestamp"`
-	Version   string                 `json:"version"`
-	Uptime    string                 `json:"uptime"`
-	Checks    map[string]CheckResult `json:"checks"`
-	System    SystemInfo             `json:"system"`
-}
-
-// SystemInfo contains system information
-type SystemInfo struct {
-	GoVersion    string      `json:"go_version"`
-	NumCPU       int         `json:"num_cpu"`
-	NumGoroutine int         `json:"num_goroutine"`
-	MemoryUsage  MemoryStats `json:"memory_usage"`
-}
-
-// MemoryStats contains memory usage statistics
+// MemoryStats contains memory usage statistics (used by metrics.go as well)
 type MemoryStats struct {
 	Alloc      uint64 `json:"alloc"`
 	TotalAlloc uint64 `json:"total_alloc"`
@@ -122,43 +103,6 @@ func (hc *HealthChecker) RunChecks(ctx context.Context) map[string]CheckResult {
 	return results
 }
 
-// GetDetailedHealth returns detailed health information
-func (hc *HealthChecker) GetDetailedHealth(ctx context.Context) DetailedHealthResponse {
-	checks := hc.RunChecks(ctx)
-
-	// Determine overall status
-	status := "healthy"
-	for _, check := range checks {
-		if check.Status != "healthy" {
-			status = "unhealthy"
-			break
-		}
-	}
-
-	// Get system info
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-
-	return DetailedHealthResponse{
-		Status:    status,
-		Timestamp: time.Now(),
-		Version:   getVersion(),
-		Uptime:    time.Since(hc.startTime).String(),
-		Checks:    checks,
-		System: SystemInfo{
-			GoVersion:    runtime.Version(),
-			NumCPU:       runtime.NumCPU(),
-			NumGoroutine: runtime.NumGoroutine(),
-			MemoryUsage: MemoryStats{
-				Alloc:      m.Alloc,
-				TotalAlloc: m.TotalAlloc,
-				Sys:        m.Sys,
-				NumGC:      m.NumGC,
-			},
-		},
-	}
-}
-
 // Health check implementations
 
 func (hc *HealthChecker) checkStorage(ctx context.Context) error {
@@ -185,25 +129,6 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "ok",
 	})
-}
-
-// handleHealthDetailed handles the detailed health check endpoint
-func (s *Server) handleHealthDetailed(checker *HealthChecker) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		health := checker.GetDetailedHealth(ctx)
-
-		w.Header().Set("Content-Type", "application/json")
-
-		// Set appropriate status code
-		if health.Status != "healthy" {
-			w.WriteHeader(http.StatusServiceUnavailable)
-		} else {
-			w.WriteHeader(http.StatusOK)
-		}
-
-		json.NewEncoder(w).Encode(health)
-	}
 }
 
 // handleReadiness handles the readiness probe endpoint
