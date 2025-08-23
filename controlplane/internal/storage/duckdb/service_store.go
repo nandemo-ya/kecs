@@ -493,3 +493,27 @@ func (s *serviceStore) GetByARN(ctx context.Context, arn string) (*storage.Servi
 
 	return service, nil
 }
+
+// DeleteMarkedForDeletion deletes services marked for deletion before the specified time
+func (s *serviceStore) DeleteMarkedForDeletion(ctx context.Context, clusterARN string, before time.Time) (int, error) {
+	// For now, we delete services that have a desired_count of 0 and were updated before the cutoff
+	// In the future, we might add a specific "marked_for_deletion" field
+	query := `
+		DELETE FROM services 
+		WHERE cluster_arn = ? 
+		AND desired_count = 0 
+		AND updated_at < ?
+	`
+
+	result, err := s.db.ExecContext(ctx, query, clusterARN, before)
+	if err != nil {
+		return 0, err
+	}
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}

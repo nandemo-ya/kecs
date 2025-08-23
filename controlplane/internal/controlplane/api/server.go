@@ -49,6 +49,7 @@ type Server struct {
 	region                    string
 	accountID                 string
 	testModeWorker            *TestModeTaskWorker
+	resourceCleanupWorker     *ResourceCleanupWorker
 	localStackManager         localstack.Manager
 	awsProxyRouter            *AWSProxyRouter
 	iamIntegration            iam.Integration
@@ -214,6 +215,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	if apiconfig.GetBool("features.testMode") {
 		s.testModeWorker = NewTestModeTaskWorker(storage)
 	}
+
+	// Initialize resource cleanup worker
+	s.resourceCleanupWorker = NewResourceCleanupWorker(storage)
 
 	// Logs API has been moved to admin server (port 8081)
 
@@ -639,6 +643,11 @@ func (s *Server) Start() error {
 		s.testModeWorker.Start(ctx)
 	}
 
+	// Start resource cleanup worker if available
+	if s.resourceCleanupWorker != nil {
+		s.resourceCleanupWorker.Start(ctx)
+	}
+
 	// Start sync controller if available
 	if s.syncController != nil && s.informerFactory != nil {
 		logging.Info("Starting sync controller...")
@@ -723,6 +732,11 @@ func (s *Server) Stop(ctx context.Context) error {
 	// Stop test mode worker if running
 	if s.testModeWorker != nil {
 		s.testModeWorker.Stop()
+	}
+
+	// Stop resource cleanup worker if running
+	if s.resourceCleanupWorker != nil {
+		s.resourceCleanupWorker.Stop()
 	}
 
 	// Stop sync controller if running

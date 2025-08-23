@@ -358,3 +358,22 @@ func (s *containerInstanceStore) GetByARNs(ctx context.Context, arns []string) (
 
 	return instances, nil
 }
+
+// DeleteStale deletes container instances that have been inactive before the specified time
+func (s *containerInstanceStore) DeleteStale(ctx context.Context, clusterARN string, before time.Time) (int, error) {
+	// Delete container instances that have been in INACTIVE status for too long
+	// Use parameterized query to avoid any quote issues
+	query := "DELETE FROM container_instances WHERE cluster_arn = ? AND status = ? AND updated_at < ?"
+
+	result, err := s.db.ExecContext(ctx, query, clusterARN, "INACTIVE", before)
+	if err != nil {
+		return 0, err
+	}
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}

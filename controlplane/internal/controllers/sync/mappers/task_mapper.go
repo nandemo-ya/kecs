@@ -31,6 +31,9 @@ func NewTaskStateMapper(accountID, region string) *TaskStateMapper {
 func (m *TaskStateMapper) MapPodPhaseToTaskStatus(pod *corev1.Pod) (desiredStatus, lastStatus string) {
 	// Check if pod is being deleted
 	if pod.DeletionTimestamp != nil {
+		// When pod is being terminated, lastStatus should be DEPROVISIONING
+		// and desiredStatus should be STOPPED
+		// Note: The actual transition to STOPPED happens when the pod is fully deleted
 		return "STOPPED", "DEPROVISIONING"
 	}
 

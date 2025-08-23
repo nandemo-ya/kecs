@@ -258,6 +258,9 @@ type ServiceStore interface {
 
 	// Get service by ARN
 	GetByARN(ctx context.Context, arn string) (*Service, error)
+
+	// DeleteMarkedForDeletion deletes services marked for deletion before the specified time
+	DeleteMarkedForDeletion(ctx context.Context, clusterARN string, before time.Time) (int, error)
 }
 
 // Service represents an ECS service in storage
@@ -383,6 +386,9 @@ type TaskStore interface {
 
 	// CreateOrUpdate creates a new task or updates if it already exists
 	CreateOrUpdate(ctx context.Context, task *Task) error
+
+	// DeleteOlderThan deletes tasks older than the specified time with the given status
+	DeleteOlderThan(ctx context.Context, clusterARN string, before time.Time, status string) (int, error)
 }
 
 // TaskFilters defines filters for listing tasks
@@ -627,6 +633,9 @@ type TaskSetStore interface {
 
 	// Update primary task set
 	UpdatePrimary(ctx context.Context, serviceARN, taskSetID string) error
+
+	// DeleteOrphaned deletes task sets that no longer have an associated service
+	DeleteOrphaned(ctx context.Context, clusterARN string) (int, error)
 }
 
 // TaskSet represents an ECS task set in storage
@@ -730,6 +739,9 @@ type ContainerInstanceStore interface {
 
 	// Get container instances by ARNs
 	GetByARNs(ctx context.Context, arns []string) ([]*ContainerInstance, error)
+
+	// DeleteStale deletes container instances that have been inactive before the specified time
+	DeleteStale(ctx context.Context, clusterARN string, before time.Time) (int, error)
 }
 
 // ContainerInstance represents an ECS container instance in storage
