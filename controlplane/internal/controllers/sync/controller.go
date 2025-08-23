@@ -412,7 +412,15 @@ func (c *SyncController) handlePodDelete(obj interface{}) {
 		runtime.HandleError(err)
 		return
 	}
-	logging.Debug("Pod deleted", "name", pod.Name)
+
+	// Log pod deletion with task ID for debugging
+	taskID := pod.Labels["kecs.dev/task-id"]
+	logging.Info("Pod deletion event detected",
+		"pod", pod.Name,
+		"namespace", pod.Namespace,
+		"taskID", taskID,
+		"labels", pod.Labels)
+
 	c.podQueue.Add(key)
 }
 
