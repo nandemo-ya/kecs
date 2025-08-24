@@ -102,6 +102,30 @@ type LogEntry struct {
 
 // ECS API Request/Response types
 
+// CreateClusterRequest represents the request for CreateCluster
+type CreateClusterRequest struct {
+	ClusterName string           `json:"clusterName"`
+	Tags        []Tag            `json:"tags,omitempty"`
+	Settings    []ClusterSetting `json:"settings,omitempty"`
+}
+
+// CreateClusterResponse represents the response from CreateCluster
+type CreateClusterResponse struct {
+	Cluster *Cluster `json:"cluster,omitempty"`
+}
+
+// Tag represents a resource tag
+type Tag struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// ClusterSetting represents a cluster setting
+type ClusterSetting struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 // ListClustersRequest represents the request for ListClusters
 type ListClustersRequest struct {
 	NextToken  *string `json:"nextToken,omitempty"`

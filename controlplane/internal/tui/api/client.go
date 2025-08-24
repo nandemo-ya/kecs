@@ -274,14 +274,46 @@ func (c *HTTPClient) DescribeClusters(ctx context.Context, instanceName string, 
 }
 
 func (c *HTTPClient) CreateCluster(ctx context.Context, instanceName, clusterName string) (*Cluster, error) {
+	// Get instance info to find API port
+	if c.k3dProvider != nil {
+		inst, err := c.k3dProvider.GetInstance(ctx, instanceName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get instance: %w", err)
+		}
+
+		// Call the instance's API directly
+		url := fmt.Sprintf("http://localhost:%d/v1/CreateCluster", inst.APIPort)
+		client := &http.Client{Timeout: 30 * time.Second}
+
+		reqBody, _ := json.Marshal(CreateClusterRequest{ClusterName: clusterName})
+		resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
+		if err != nil {
+			return nil, fmt.Errorf("failed to call CreateCluster: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return nil, fmt.Errorf("CreateCluster returned status %d: %s", resp.StatusCode, string(body))
+		}
+
+		var result CreateClusterResponse
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return nil, fmt.Errorf("failed to decode response: %w", err)
+		}
+
+		return result.Cluster, nil
+	}
+
+	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/clusters", url.PathEscape(instanceName))
-	req := map[string]string{"clusterName": clusterName}
-	var cluster Cluster
-	err := c.doRequest(ctx, "POST", path, req, &cluster)
+	req := CreateClusterRequest{ClusterName: clusterName}
+	var resp CreateClusterResponse
+	err := c.doRequest(ctx, "POST", path, req, &resp)
 	if err != nil {
 		return nil, err
 	}
-	return &cluster, nil
+	return resp.Cluster, nil
 }
 
 func (c *HTTPClient) DeleteCluster(ctx context.Context, instanceName, clusterName string) error {

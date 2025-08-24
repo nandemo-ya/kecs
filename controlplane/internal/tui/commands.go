@@ -697,3 +697,29 @@ func (m Model) performInstanceDeletionCmd(instanceName string) tea.Cmd {
 		return instanceDeletedMsg{name: instanceName, err: err}
 	}
 }
+
+// createClusterCmd creates an ECS cluster via API
+func (m Model) createClusterCmd(clusterName, region string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+
+		// Note: Region is specified in the form but not yet used by the API
+		// In the future, this could be used to configure region-specific settings
+		cluster, err := m.apiClient.CreateCluster(ctx, m.selectedInstance, clusterName)
+
+		if err != nil {
+			return clusterCreatedMsg{
+				clusterName: clusterName,
+				region:      region,
+				err:         err,
+			}
+		}
+
+		// Success
+		return clusterCreatedMsg{
+			clusterName: cluster.ClusterName,
+			region:      region,
+			err:         nil,
+		}
+	}
+}
