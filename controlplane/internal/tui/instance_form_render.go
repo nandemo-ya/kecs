@@ -19,7 +19,7 @@ var (
 			Background(lipgloss.Color("#1a1a1a")).
 			Foreground(lipgloss.Color("#ffffff")).
 			Padding(1, 2).
-			Width(55)
+			Width(65)
 
 	formTitleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00ff00")).
@@ -33,13 +33,13 @@ var (
 			Background(lipgloss.Color("#2a2a2a")).
 			Foreground(lipgloss.Color("#ffffff")).
 			Padding(0, 1).
-			Width(30)
+			Width(35)
 
 	formInputFocusedStyle = lipgloss.NewStyle().
 				Background(lipgloss.Color("#3a3a5a")).
 				Foreground(lipgloss.Color("#ffffff")).
 				Padding(0, 1).
-				Width(30)
+				Width(35)
 
 	formCheckboxStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#00ff00"))
@@ -147,7 +147,7 @@ func (m Model) renderInstanceForm() string {
 	buttons := lipgloss.JoinHorizontal(lipgloss.Top, createBtn, cancelBtn)
 	// Center the buttons
 	buttonsWidth := lipgloss.Width(buttons)
-	formWidth := 51 // Width of form content area (55 - 2*2 padding)
+	formWidth := 61 // Width of form content area (65 - 2*2 padding)
 	if buttonsWidth < formWidth {
 		padding := (formWidth - buttonsWidth) / 2
 		buttons = strings.Repeat(" ", padding) + buttons
