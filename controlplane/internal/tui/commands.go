@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -75,9 +76,12 @@ func (m Model) loadDataFromAPI() tea.Cmd {
 				if err == nil {
 					tuiClusters = make([]Cluster, len(clusters))
 					for i, cluster := range clusters {
+						// Extract region from ClusterArn (format: arn:aws:ecs:region:account:cluster/name)
+						region := extractRegionFromArn(cluster.ClusterArn)
 						tuiClusters[i] = Cluster{
 							Name:     cluster.ClusterName,
 							Status:   cluster.Status,
+							Region:   region,
 							Services: cluster.ActiveServicesCount,
 							Tasks:    cluster.RunningTasksCount,
 							Age:      24 * time.Hour, // Mock age for now
@@ -403,6 +407,17 @@ func parseCPU(cpuStr string) float64 {
 	var cpu float64
 	fmt.Sscanf(cpuStr, "%f", &cpu)
 	return cpu
+}
+
+func extractRegionFromArn(arn string) string {
+	// Extract region from ARN
+	// Example: arn:aws:ecs:us-east-1:123456789012:cluster/default
+	// Returns: us-east-1
+	parts := strings.Split(arn, ":")
+	if len(parts) >= 4 {
+		return parts[3]
+	}
+	return "unknown"
 }
 
 func extractTaskID(taskArn string) string {

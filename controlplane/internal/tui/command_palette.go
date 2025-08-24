@@ -252,6 +252,7 @@ func (cp *CommandPalette) initCommands() {
 				newCluster := Cluster{
 					Name:     fmt.Sprintf("cluster-%d", time.Now().Unix()),
 					Status:   "ACTIVE",
+					Region:   "us-east-1",
 					Services: 0,
 					Tasks:    0,
 					Age:      0,
