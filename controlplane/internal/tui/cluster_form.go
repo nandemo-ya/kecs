@@ -76,26 +76,32 @@ func (f *ClusterForm) Update(msg tea.Msg) (*ClusterForm, tea.Cmd) {
 	case tea.KeyMsg:
 		if f.isCreating {
 			// Only allow ESC during creation
-			if msg.String() == "esc" {
+			if msg.Type == tea.KeyEsc {
 				return nil, nil // Close form
 			}
 			return f, nil
 		}
 
-		switch msg.String() {
-		case "esc":
+		// Check for ESC key first using Type
+		if msg.Type == tea.KeyEsc {
 			// Close form without creating
 			return nil, nil // Close form
+		}
+
+		// Handle other special keys
+		switch msg.String() {
 
 		case "tab":
 			// Navigate forward
 			f.focusedField = (f.focusedField + 1) % 4
 			f.updateFocus()
+			return f, nil
 
 		case "shift+tab":
 			// Navigate backward
 			f.focusedField = (f.focusedField - 1 + 4) % 4
 			f.updateFocus()
+			return f, nil
 
 		case "up", "down":
 			// Handle region selection
@@ -106,6 +112,7 @@ func (f *ClusterForm) Update(msg tea.Msg) (*ClusterForm, tea.Cmd) {
 					f.regionIndex++
 				}
 			}
+			return f, nil
 
 		case "enter":
 			switch f.focusedField {
@@ -119,13 +126,14 @@ func (f *ClusterForm) Update(msg tea.Msg) (*ClusterForm, tea.Cmd) {
 			case FieldCancelButton:
 				return nil, nil // Close form
 			}
+			return f, tea.Batch(cmds...)
 
 		default:
 			// Pass other keys to text input if focused
 			if f.focusedField == FieldClusterName {
 				var cmd tea.Cmd
 				f.clusterName, cmd = f.clusterName.Update(msg)
-				cmds = append(cmds, cmd)
+				return f, cmd
 			}
 		}
 
