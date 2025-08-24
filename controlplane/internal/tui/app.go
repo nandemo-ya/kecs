@@ -146,6 +146,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m, cmd = m.handleTaskDefinitionRevisionsKeys(msg)
 		case ViewTaskDefinitionEditor:
 			m, cmd = m.handleTaskDefinitionEditorKeys(msg)
+		case ViewClusterCreate:
+			m, cmd = m.handleClusterCreateKeys(msg)
 		}
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -416,6 +418,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.currentView = m.previousView
 		}
 
+	case clusterCreatingMsg:
+		// Handle cluster creation in progress
+		if m.clusterForm != nil {
+			// Update the form with the message
+			m.clusterForm, cmd = m.clusterForm.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			// Perform the actual API call
+			cmds = append(cmds, m.createClusterCmd(msg.clusterName, msg.region))
+		}
+
+	case clusterCreatedMsg:
+		// Handle cluster creation completed
+		if m.clusterForm != nil {
+			m.clusterForm, cmd = m.clusterForm.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+
+	case clusterFormCloseMsg:
+		// Close the cluster form
+		m.clusterForm = nil
+		m.currentView = m.previousView
+		// Reload clusters
+		cmds = append(cmds, m.loadDataFromAPI())
+
 	case errMsg:
 		// Handle API errors
 		m.err = msg.err
@@ -512,6 +542,11 @@ func (m Model) View() string {
 	// For instance create, use overlay
 	if m.currentView == ViewInstanceCreate {
 		return m.renderInstanceCreateOverlay()
+	}
+
+	// For cluster create, use overlay
+	if m.currentView == ViewClusterCreate {
+		return m.renderClusterCreateOverlay()
 	}
 
 	// For task describe, use full screen
@@ -739,6 +774,25 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleClusterCreateKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	if m.clusterForm == nil {
+		return m, nil
+	}
+
+	// Let the form handle the key event
+	updatedForm, cmd := m.clusterForm.Update(msg)
+
+	if updatedForm == nil {
+		// Form closed
+		m.clusterForm = nil
+		m.currentView = m.previousView
+		return m, m.loadDataFromAPI() // Reload clusters after creation
+	}
+
+	m.clusterForm = updatedForm
+	return m, cmd
+}
+
 func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
@@ -758,6 +812,13 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "s":
 		if m.selectedCluster != "" {
 			m.currentView = ViewServices
+		}
+	case "n":
+		// Create new cluster
+		if m.selectedInstance != "" {
+			m.clusterForm = NewClusterForm()
+			m.previousView = m.currentView
+			m.currentView = ViewClusterCreate
 		}
 	case "d":
 		// Go to task definitions view

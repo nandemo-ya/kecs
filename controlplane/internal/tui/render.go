@@ -107,6 +107,7 @@ func (m Model) getHeaderShortcuts() string {
 	case ViewClusters:
 		shortcuts = []string{
 			keyStyle.Render("<↵>") + sepStyle.Render(" Select"),
+			keyStyle.Render("<N>") + sepStyle.Render(" Create"),
 			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
 			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
 			keyStyle.Render("<?>") + sepStyle.Render(" Help"),

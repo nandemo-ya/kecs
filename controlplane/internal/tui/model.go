@@ -30,6 +30,7 @@ const (
 	ViewTaskDefinitionRevisions
 	ViewTaskDefinitionEditor
 	ViewTaskDefinitionDiff
+	ViewClusterCreate
 )
 
 // Instance represents a KECS instance
@@ -218,6 +219,9 @@ type Model struct {
 	spinner         spinner.Model
 	isDeleting      bool
 	deletingMessage string
+
+	// Cluster creation form
+	clusterForm *ClusterForm
 }
 
 // NewModel creates a new application model
