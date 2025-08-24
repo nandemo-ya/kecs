@@ -114,15 +114,14 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 	}
 
 	// Check if instance already exists and is stopped
-	clusterName := fmt.Sprintf("kecs-%s", opts.InstanceName)
-	exists, err := m.k3dManager.ClusterExists(ctx, clusterName)
+	exists, err := m.k3dManager.ClusterExists(ctx, opts.InstanceName)
 	if err != nil {
 		return fmt.Errorf("failed to check cluster existence: %w", err)
 	}
 
 	if exists {
 		// Check if it's running
-		running, err := m.k3dManager.IsClusterRunning(ctx, clusterName)
+		running, err := m.k3dManager.IsClusterRunning(ctx, opts.InstanceName)
 		if err != nil {
 			return fmt.Errorf("failed to check cluster status: %w", err)
 		}
@@ -417,7 +416,6 @@ func (m *Manager) Restart(ctx context.Context, instanceName string) error {
 
 // restartInstance restarts a stopped instance and redeploys all components
 func (m *Manager) restartInstance(ctx context.Context, opts StartOptions) error {
-	clusterName := fmt.Sprintf("kecs-%s", opts.InstanceName)
 
 	// Load configuration
 	cfg, err := config.LoadConfig(opts.ConfigFile)
@@ -453,7 +451,7 @@ func (m *Manager) restartInstance(ctx context.Context, opts StartOptions) error 
 
 	// Step 1: Start the k3d cluster
 	m.updateStatus(opts.InstanceName, "Starting k3d cluster", "running")
-	if err := m.k3dManager.StartCluster(ctx, clusterName); err != nil {
+	if err := m.k3dManager.StartCluster(ctx, opts.InstanceName); err != nil {
 		m.updateStatus(opts.InstanceName, "Starting k3d cluster", "failed", err.Error())
 		return fmt.Errorf("failed to start k3d cluster: %w", err)
 	}
@@ -461,7 +459,7 @@ func (m *Manager) restartInstance(ctx context.Context, opts StartOptions) error 
 
 	// Step 2: Wait for cluster to be ready
 	m.updateStatus(opts.InstanceName, "Waiting for cluster", "running")
-	if err := m.k3dManager.WaitForClusterReady(ctx, clusterName); err != nil {
+	if err := m.k3dManager.WaitForClusterReady(ctx, opts.InstanceName); err != nil {
 		m.updateStatus(opts.InstanceName, "Waiting for cluster", "failed", err.Error())
 		return fmt.Errorf("cluster did not become ready: %w", err)
 	}
