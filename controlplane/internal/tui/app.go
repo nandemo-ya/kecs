@@ -779,8 +779,8 @@ func (m Model) handleClusterCreateKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Let the form handle the key event
-	updatedForm, cmd := m.clusterForm.Update(msg)
+	// Let the form handle the key event (convert tea.KeyMsg to tea.Msg)
+	updatedForm, cmd := m.clusterForm.Update(tea.Msg(msg))
 
 	if updatedForm == nil {
 		// Form closed
@@ -1317,6 +1317,11 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "enter":
 		// Handle action based on focused field
 		switch m.instanceForm.focusedField {
+		case FieldInstanceCloseButton:
+			// Close form
+			m.currentView = m.previousView
+			m.instanceForm.Reset()
+			return m, nil
 		case FieldInstanceName:
 			// If on name field and pressed enter, generate new name
 			m.instanceForm.GenerateNewName()

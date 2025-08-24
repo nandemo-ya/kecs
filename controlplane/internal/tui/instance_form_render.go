@@ -98,9 +98,9 @@ func (m Model) renderInstanceForm() string {
 	f := m.instanceForm
 	var content []string
 
-	// Title
-	title := formTitleStyle.Render("Create New Instance")
-	content = append(content, title)
+	// Title with close button
+	titleLine := renderDialogTitle("Create New Instance", true, f.focusedField == FieldInstanceCloseButton, 61)
+	content = append(content, titleLine)
 	content = append(content, "")
 
 	// Instance name field
@@ -201,7 +201,7 @@ func (m Model) renderInstanceForm() string {
 	}
 
 	// Help text (shortened to fit in one line)
-	help := formHelpStyle.Render("[Tab] Navigate  [Space] Toggle  [Enter] Select  [Esc] Cancel")
+	help := formHelpStyle.Render("[Tab] Navigate  [Space] On/Off  [Esc] Cancel")
 	content = append(content, "")
 	content = append(content, help)
 

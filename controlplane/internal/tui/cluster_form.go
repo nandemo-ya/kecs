@@ -12,7 +12,8 @@ import (
 type ClusterFormField int
 
 const (
-	FieldClusterName ClusterFormField = iota
+	FieldCloseButton ClusterFormField = iota // × button at top-right
+	FieldClusterName
 	FieldRegion
 	FieldCreateButton
 	FieldCancelButton
@@ -63,8 +64,8 @@ func NewClusterForm() *ClusterForm {
 
 	return &ClusterForm{
 		clusterName:  clusterNameInput,
-		regionIndex:  0, // Default to us-east-1
-		focusedField: FieldClusterName,
+		regionIndex:  0,                // Default to us-east-1
+		focusedField: FieldClusterName, // Start with cluster name field, not close button
 	}
 }
 
@@ -76,22 +77,32 @@ func (f *ClusterForm) Update(msg tea.Msg) (*ClusterForm, tea.Cmd) {
 	case tea.KeyMsg:
 		if f.isCreating {
 			// Only allow ESC during creation
-			if msg.String() == "esc" {
+			if msg.Type == tea.KeyEsc {
 				return nil, nil // Close form
 			}
 			return f, nil
 		}
 
+		// Check for ESC key first using Type
+		if msg.Type == tea.KeyEsc {
+			// Close form without creating
+			return nil, nil // Close form
+		}
+
+		// Handle other special keys
 		switch msg.String() {
+
 		case "tab":
 			// Navigate forward
-			f.focusedField = (f.focusedField + 1) % 4
+			f.focusedField = (f.focusedField + 1) % 5
 			f.updateFocus()
+			return f, nil
 
 		case "shift+tab":
 			// Navigate backward
-			f.focusedField = (f.focusedField - 1 + 4) % 4
+			f.focusedField = (f.focusedField - 1 + 5) % 5
 			f.updateFocus()
+			return f, nil
 
 		case "up", "down":
 			// Handle region selection
@@ -102,9 +113,12 @@ func (f *ClusterForm) Update(msg tea.Msg) (*ClusterForm, tea.Cmd) {
 					f.regionIndex++
 				}
 			}
+			return f, nil
 
 		case "enter":
 			switch f.focusedField {
+			case FieldCloseButton:
+				return nil, nil // Close form
 			case FieldCreateButton:
 				// Validate and create
 				if f.validate() {
@@ -115,9 +129,15 @@ func (f *ClusterForm) Update(msg tea.Msg) (*ClusterForm, tea.Cmd) {
 			case FieldCancelButton:
 				return nil, nil // Close form
 			}
+			return f, tea.Batch(cmds...)
 
-		case "esc":
-			return nil, nil // Close form
+		default:
+			// Pass other keys to text input if focused
+			if f.focusedField == FieldClusterName {
+				var cmd tea.Cmd
+				f.clusterName, cmd = f.clusterName.Update(msg)
+				return f, cmd
+			}
 		}
 
 	case clusterCreatingMsg:
@@ -151,13 +171,6 @@ func (f *ClusterForm) Update(msg tea.Msg) (*ClusterForm, tea.Cmd) {
 
 	case clusterFormCloseMsg:
 		return nil, nil
-	}
-
-	// Update text input if focused
-	if f.focusedField == FieldClusterName && !f.isCreating {
-		var cmd tea.Cmd
-		f.clusterName, cmd = f.clusterName.Update(msg)
-		cmds = append(cmds, cmd)
 	}
 
 	return f, tea.Batch(cmds...)

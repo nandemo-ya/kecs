@@ -32,9 +32,9 @@ func (m Model) renderClusterForm() string {
 	f := m.clusterForm
 	var content []string
 
-	// Title
-	title := formTitleStyle.Render("Create ECS Cluster")
-	content = append(content, title)
+	// Title with close button
+	titleLine := renderDialogTitle("Create ECS Cluster", true, f.focusedField == FieldCloseButton, 61)
+	content = append(content, titleLine)
 	content = append(content, "")
 
 	// Instance info
@@ -112,7 +112,7 @@ func (m Model) renderClusterForm() string {
 	}
 
 	// Help text
-	help := formHelpStyle.Render("[Tab] Navigate  [↑/↓] Select Region  [Enter] Select  [Esc] Cancel")
+	help := formHelpStyle.Render("[Tab] Navigate  [↑/↓] Select Region  [Esc] Cancel")
 	content = append(content, "")
 	content = append(content, help)
 
@@ -151,13 +151,13 @@ func (m Model) renderRegionSelector(f *ClusterForm) string {
 				line = lipgloss.NewStyle().
 					Background(lipgloss.Color("#3a3a5a")).
 					Foreground(lipgloss.Color("#ffffff")).
-					Width(width - 2). // Account for border
+					Width(width - 4). // Account for border and padding
 					Render("▸ " + awsRegions[i])
 			} else {
 				// Other options
 				line = lipgloss.NewStyle().
 					Foreground(lipgloss.Color("#808080")).
-					Width(width - 2). // Account for border
+					Width(width - 4). // Account for border and padding
 					Render("  " + awsRegions[i])
 			}
 			lines = append(lines, line)
@@ -168,6 +168,7 @@ func (m Model) renderRegionSelector(f *ClusterForm) string {
 		return lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("#3a3a5a")).
+			Width(width).
 			Padding(0, 1). // Add horizontal padding
 			Render(content)
 	} else {

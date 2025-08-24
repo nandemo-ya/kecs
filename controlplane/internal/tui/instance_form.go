@@ -13,7 +13,8 @@ import (
 type FormField int
 
 const (
-	FieldInstanceName FormField = iota
+	FieldInstanceCloseButton FormField = iota // × button at top-right
+	FieldInstanceName
 	FieldAPIPort
 	FieldAdminPort
 	FieldLocalStack
@@ -70,7 +71,7 @@ func NewInstanceForm() *InstanceForm {
 		localStack:   true,
 		traefik:      true,
 		devMode:      false,
-		focusedField: FieldInstanceName,
+		focusedField: FieldInstanceName, // Start with instance name field, not close button
 	}
 }
 
@@ -89,7 +90,7 @@ func NewInstanceFormWithSuggestions(instances []Instance) *InstanceForm {
 		localStack:   true,
 		traefik:      true,
 		devMode:      false,
-		focusedField: FieldInstanceName,
+		focusedField: FieldInstanceName, // Start with instance name field, not close button
 	}
 }
 
@@ -117,7 +118,7 @@ func (f *InstanceForm) GenerateNewName() {
 
 // MoveFocusUp moves focus to the previous field
 func (f *InstanceForm) MoveFocusUp() {
-	if f.focusedField > FieldInstanceName {
+	if f.focusedField > FieldInstanceCloseButton {
 		f.focusedField--
 	} else {
 		f.focusedField = FieldCancel
@@ -129,7 +130,7 @@ func (f *InstanceForm) MoveFocusDown() {
 	if f.focusedField < FieldCancel {
 		f.focusedField++
 	} else {
-		f.focusedField = FieldInstanceName
+		f.focusedField = FieldInstanceCloseButton
 	}
 }
 
