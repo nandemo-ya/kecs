@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/version"
 )
 
 var (
@@ -169,9 +171,9 @@ func (m Model) renderHeader() string {
 	maxContentWidth := leftColumnWidth - 2 // Account for header padding
 
 	// Build the header content
-	headerText := "KECS v0.0.1-alpha"
+	headerText := fmt.Sprintf("KECS %s", version.GetVersion())
 	if m.selectedInstance != "" {
-		headerText = fmt.Sprintf("KECS v0.0.1-alpha | Instance: %s", m.selectedInstance)
+		headerText = fmt.Sprintf("KECS %s | Instance: %s", version.GetVersion(), m.selectedInstance)
 	}
 
 	// Check if we need to truncate
@@ -179,7 +181,7 @@ func (m Model) renderHeader() string {
 		if m.selectedInstance != "" {
 			// Shorten instance name
 			instanceName := m.selectedInstance
-			prefix := "KECS v0.0.1-alpha | "
+			prefix := fmt.Sprintf("KECS %s | ", version.GetVersion())
 			maxInstanceWidth := maxContentWidth - len(prefix) - 3 // -3 for "..."
 			if maxInstanceWidth > 0 && len(instanceName) > maxInstanceWidth {
 				instanceName = instanceName[:maxInstanceWidth] + "..."

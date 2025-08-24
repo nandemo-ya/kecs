@@ -9,8 +9,20 @@ GOIMPORTS=goimports
 GOLANGCI_LINT=golangci-lint
 DOCKER=docker
 DOCKER_IMAGE=ghcr.io/nandemo-ya/kecs
-VERSION=$(shell git describe --tags --always --dirty)
-LDFLAGS=-ldflags "-X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version=$(VERSION)"
+
+# Version information
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
+GO_VERSION := $(shell go version | cut -d' ' -f3)
+
+# Build flags
+LDFLAGS := -ldflags "\
+  -X github.com/nandemo-ya/kecs/controlplane/internal/version.Version=$(VERSION) \
+  -X github.com/nandemo-ya/kecs/controlplane/internal/version.GitCommit=$(GIT_COMMIT) \
+  -X github.com/nandemo-ya/kecs/controlplane/internal/version.BuildDate=$(BUILD_DATE) \
+  -X github.com/nandemo-ya/kecs/controlplane/internal/version.GoVersion=$(GO_VERSION)"
+
 GOTEST=$(GO) test
 GOVET=$(GO) vet
 PLATFORMS=linux/amd64 linux/arm64

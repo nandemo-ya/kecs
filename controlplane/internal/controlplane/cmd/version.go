@@ -1,16 +1,16 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/version"
 )
 
-// Version information
 var (
-	Version   = "0.1.0"
-	GitCommit = "unknown"
-	BuildDate = "unknown"
+	jsonOutput bool
 
 	// versionCmd represents the version command
 	versionCmd = &cobra.Command{
@@ -18,10 +18,22 @@ var (
 		Short: "Print the version information",
 		Long:  `Print the version, git commit, and build date of the KECS Control Plane.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("KECS Control Plane\n")
-			fmt.Printf("Version:    %s\n", Version)
-			fmt.Printf("Git commit: %s\n", GitCommit)
-			fmt.Printf("Built:      %s\n", BuildDate)
+			info := version.GetInfo()
+
+			if jsonOutput {
+				output, _ := json.MarshalIndent(info, "", "  ")
+				fmt.Println(string(output))
+			} else {
+				fmt.Printf("KECS Control Plane\n")
+				fmt.Printf("Version:    %s\n", info.Version)
+				fmt.Printf("Git commit: %s\n", info.GitCommit)
+				fmt.Printf("Built:      %s\n", info.BuildDate)
+				fmt.Printf("Go version: %s\n", info.GoVersion)
+			}
 		},
 	}
 )
+
+func init() {
+	versionCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output version information in JSON format")
+}
