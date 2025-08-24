@@ -779,8 +779,8 @@ func (m Model) handleClusterCreateKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Let the form handle the key event
-	updatedForm, cmd := m.clusterForm.Update(msg)
+	// Let the form handle the key event (convert tea.KeyMsg to tea.Msg)
+	updatedForm, cmd := m.clusterForm.Update(tea.Msg(msg))
 
 	if updatedForm == nil {
 		// Form closed
