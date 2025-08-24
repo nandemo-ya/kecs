@@ -32,9 +32,31 @@ func (m Model) renderClusterForm() string {
 	f := m.clusterForm
 	var content []string
 
-	// Title
-	title := formTitleStyle.Render("Create ECS Cluster")
-	content = append(content, title)
+	// Title with close button
+	title := "Create ECS Cluster"
+	closeBtn := "[×]"
+	if f.focusedField == FieldCloseButton {
+		closeBtn = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#ff6b6b")).
+			Bold(true).
+			Render("[×]")
+	} else {
+		closeBtn = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#808080")).
+			Render("[×]")
+	}
+
+	// Calculate spacing for right-aligned close button
+	titleWidth := lipgloss.Width(title)
+	closeBtnWidth := 3 // [×]
+	totalWidth := 61   // Form width
+	spaces := totalWidth - titleWidth - closeBtnWidth
+	if spaces < 1 {
+		spaces = 1
+	}
+
+	titleLine := formTitleStyle.Render(title) + strings.Repeat(" ", spaces) + closeBtn
+	content = append(content, titleLine)
 	content = append(content, "")
 
 	// Instance info

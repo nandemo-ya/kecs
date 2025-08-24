@@ -12,7 +12,8 @@ import (
 type ClusterFormField int
 
 const (
-	FieldClusterName ClusterFormField = iota
+	FieldCloseButton ClusterFormField = iota // × button at top-right
+	FieldClusterName
 	FieldRegion
 	FieldCreateButton
 	FieldCancelButton
@@ -63,8 +64,8 @@ func NewClusterForm() *ClusterForm {
 
 	return &ClusterForm{
 		clusterName:  clusterNameInput,
-		regionIndex:  0, // Default to us-east-1
-		focusedField: FieldClusterName,
+		regionIndex:  0,                // Default to us-east-1
+		focusedField: FieldClusterName, // Start with cluster name field, not close button
 	}
 }
 
@@ -93,13 +94,13 @@ func (f *ClusterForm) Update(msg tea.Msg) (*ClusterForm, tea.Cmd) {
 
 		case "tab":
 			// Navigate forward
-			f.focusedField = (f.focusedField + 1) % 4
+			f.focusedField = (f.focusedField + 1) % 5
 			f.updateFocus()
 			return f, nil
 
 		case "shift+tab":
 			// Navigate backward
-			f.focusedField = (f.focusedField - 1 + 4) % 4
+			f.focusedField = (f.focusedField - 1 + 5) % 5
 			f.updateFocus()
 			return f, nil
 
@@ -116,6 +117,8 @@ func (f *ClusterForm) Update(msg tea.Msg) (*ClusterForm, tea.Cmd) {
 
 		case "enter":
 			switch f.focusedField {
+			case FieldCloseButton:
+				return nil, nil // Close form
 			case FieldCreateButton:
 				// Validate and create
 				if f.validate() {
