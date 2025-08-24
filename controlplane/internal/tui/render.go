@@ -834,17 +834,19 @@ func (m Model) renderClustersList(maxHeight int) string {
 
 	// Calculate column widths based on available width
 	availableWidth := m.width - 8
-	nameWidth := int(float64(availableWidth) * 0.40)
-	statusWidth := int(float64(availableWidth) * 0.15)
-	servicesWidth := int(float64(availableWidth) * 0.15)
-	tasksWidth := int(float64(availableWidth) * 0.15)
-	ageWidth := int(float64(availableWidth) * 0.15)
+	nameWidth := int(float64(availableWidth) * 0.30)
+	statusWidth := int(float64(availableWidth) * 0.12)
+	regionWidth := int(float64(availableWidth) * 0.15)
+	servicesWidth := int(float64(availableWidth) * 0.13)
+	tasksWidth := int(float64(availableWidth) * 0.13)
+	ageWidth := int(float64(availableWidth) * 0.17)
 
 	// Header
 	header := fmt.Sprintf(
-		"%-*s %-*s %-*s %-*s %-*s",
+		"%-*s %-*s %-*s %-*s %-*s %-*s",
 		nameWidth, "NAME",
 		statusWidth, "STATUS",
+		regionWidth, "REGION",
 		servicesWidth, "SERVICES",
 		tasksWidth, "TASKS",
 		ageWidth, "AGE",
@@ -882,6 +884,7 @@ func (m Model) renderClustersList(maxHeight int) string {
 		// Format values
 		name := cluster.Name
 		status := cluster.Status
+		region := cluster.Region
 		services := fmt.Sprintf("%d", cluster.Services)
 		tasks := fmt.Sprintf("%d", cluster.Tasks)
 		age := formatDuration(cluster.Age)
@@ -890,12 +893,16 @@ func (m Model) renderClustersList(maxHeight int) string {
 		if len(name) > nameWidth {
 			name = name[:nameWidth-3] + "..."
 		}
+		if len(region) > regionWidth {
+			region = region[:regionWidth-3] + "..."
+		}
 
 		// Create row
 		row := fmt.Sprintf(
-			"%-*s %-*s %-*s %-*s %-*s",
+			"%-*s %-*s %-*s %-*s %-*s %-*s",
 			nameWidth, name,
 			statusWidth, status,
+			regionWidth, region,
 			servicesWidth, services,
 			tasksWidth, tasks,
 			ageWidth, age,

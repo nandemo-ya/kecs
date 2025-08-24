@@ -476,6 +476,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.clusters[i] = Cluster{
 				Name:     cl.Name,
 				Status:   cl.Status,
+				Region:   cl.Region,
 				Services: cl.Services,
 				Tasks:    cl.Tasks,
 				Age:      cl.Age,

@@ -53,6 +53,7 @@ type Instance struct {
 type Cluster struct {
 	Name     string
 	Status   string
+	Region   string
 	Services int
 	Tasks    int
 	Age      time.Duration

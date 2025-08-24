@@ -34,6 +34,7 @@ type InstanceMsg struct {
 type ClusterMsg struct {
 	Name        string
 	Status      string
+	Region      string
 	Services    int
 	Tasks       int
 	CPUUsed     float64
@@ -106,6 +107,7 @@ func LoadAllData(selectedInstance, selectedCluster, selectedService, selectedTas
 				result.Clusters[i] = ClusterMsg{
 					Name:        data.Name,
 					Status:      data.Status,
+					Region:      data.Region,
 					Services:    data.Services,
 					Tasks:       data.Tasks,
 					CPUUsed:     data.CPUUsed,

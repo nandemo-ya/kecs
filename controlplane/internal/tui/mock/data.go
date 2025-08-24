@@ -25,6 +25,7 @@ type InstanceData struct {
 type ClusterData struct {
 	Name        string
 	Status      string
+	Region      string
 	Services    int
 	Tasks       int
 	CPUUsed     float64
@@ -79,23 +80,23 @@ var (
 
 	mockClusters = map[string][]ClusterData{
 		"development": {
-			{Name: "default", Status: "ACTIVE", Services: 5, Tasks: 12, CPUUsed: 2.4, CPUTotal: 8.0, MemoryUsed: "3.2G", MemoryTotal: "16G", Namespace: "default.us-east-1", Age: 2 * 24 * time.Hour},
-			{Name: "staging", Status: "ACTIVE", Services: 4, Tasks: 10, CPUUsed: 1.8, CPUTotal: 6.0, MemoryUsed: "2.8G", MemoryTotal: "12G", Namespace: "staging.us-east-1", Age: 24 * time.Hour},
-			{Name: "development", Status: "ACTIVE", Services: 3, Tasks: 6, CPUUsed: 0.6, CPUTotal: 4.0, MemoryUsed: "1.5G", MemoryTotal: "8G", Namespace: "development.us-east-1", Age: 5 * time.Hour},
+			{Name: "default", Status: "ACTIVE", Region: "us-east-1", Services: 5, Tasks: 12, CPUUsed: 2.4, CPUTotal: 8.0, MemoryUsed: "3.2G", MemoryTotal: "16G", Namespace: "default.us-east-1", Age: 2 * 24 * time.Hour},
+			{Name: "staging", Status: "ACTIVE", Region: "us-east-1", Services: 4, Tasks: 10, CPUUsed: 1.8, CPUTotal: 6.0, MemoryUsed: "2.8G", MemoryTotal: "12G", Namespace: "staging.us-east-1", Age: 24 * time.Hour},
+			{Name: "development", Status: "ACTIVE", Region: "us-east-1", Services: 3, Tasks: 6, CPUUsed: 0.6, CPUTotal: 4.0, MemoryUsed: "1.5G", MemoryTotal: "8G", Namespace: "development.us-east-1", Age: 5 * time.Hour},
 		},
 		"staging": {
-			{Name: "default", Status: "ACTIVE", Services: 5, Tasks: 10, CPUUsed: 3.2, CPUTotal: 8.0, MemoryUsed: "4.1G", MemoryTotal: "16G", Namespace: "default.us-west-2", Age: 24 * time.Hour},
-			{Name: "api", Status: "ACTIVE", Services: 3, Tasks: 8, CPUUsed: 2.1, CPUTotal: 6.0, MemoryUsed: "3.5G", MemoryTotal: "12G", Namespace: "api.us-west-2", Age: 12 * time.Hour},
+			{Name: "default", Status: "ACTIVE", Region: "us-west-2", Services: 5, Tasks: 10, CPUUsed: 3.2, CPUTotal: 8.0, MemoryUsed: "4.1G", MemoryTotal: "16G", Namespace: "default.us-west-2", Age: 24 * time.Hour},
+			{Name: "api", Status: "ACTIVE", Region: "us-west-2", Services: 3, Tasks: 8, CPUUsed: 2.1, CPUTotal: 6.0, MemoryUsed: "3.5G", MemoryTotal: "12G", Namespace: "api.us-west-2", Age: 12 * time.Hour},
 		},
 		"production": {
-			{Name: "default", Status: "ACTIVE", Services: 8, Tasks: 20, CPUUsed: 6.5, CPUTotal: 16.0, MemoryUsed: "12.3G", MemoryTotal: "32G", Namespace: "default.us-east-1", Age: 10 * 24 * time.Hour},
-			{Name: "api", Status: "ACTIVE", Services: 6, Tasks: 15, CPUUsed: 4.2, CPUTotal: 12.0, MemoryUsed: "8.7G", MemoryTotal: "24G", Namespace: "api.us-east-1", Age: 7 * 24 * time.Hour},
-			{Name: "worker", Status: "ACTIVE", Services: 4, Tasks: 12, CPUUsed: 3.8, CPUTotal: 8.0, MemoryUsed: "6.2G", MemoryTotal: "16G", Namespace: "worker.us-east-1", Age: 5 * 24 * time.Hour},
-			{Name: "batch", Status: "ACTIVE", Services: 3, Tasks: 8, CPUUsed: 2.1, CPUTotal: 6.0, MemoryUsed: "4.5G", MemoryTotal: "12G", Namespace: "batch.us-east-1", Age: 3 * 24 * time.Hour},
-			{Name: "analytics", Status: "ACTIVE", Services: 4, Tasks: 7, CPUUsed: 3.2, CPUTotal: 8.0, MemoryUsed: "5.8G", MemoryTotal: "16G", Namespace: "analytics.us-east-1", Age: 2 * 24 * time.Hour},
+			{Name: "default", Status: "ACTIVE", Region: "us-east-1", Services: 8, Tasks: 20, CPUUsed: 6.5, CPUTotal: 16.0, MemoryUsed: "12.3G", MemoryTotal: "32G", Namespace: "default.us-east-1", Age: 10 * 24 * time.Hour},
+			{Name: "api", Status: "ACTIVE", Region: "us-east-1", Services: 6, Tasks: 15, CPUUsed: 4.2, CPUTotal: 12.0, MemoryUsed: "8.7G", MemoryTotal: "24G", Namespace: "api.us-east-1", Age: 7 * 24 * time.Hour},
+			{Name: "worker", Status: "ACTIVE", Region: "us-east-1", Services: 4, Tasks: 12, CPUUsed: 3.8, CPUTotal: 8.0, MemoryUsed: "6.2G", MemoryTotal: "16G", Namespace: "worker.us-east-1", Age: 5 * 24 * time.Hour},
+			{Name: "batch", Status: "ACTIVE", Region: "us-east-1", Services: 3, Tasks: 8, CPUUsed: 2.1, CPUTotal: 6.0, MemoryUsed: "4.5G", MemoryTotal: "12G", Namespace: "batch.us-east-1", Age: 3 * 24 * time.Hour},
+			{Name: "analytics", Status: "ACTIVE", Region: "us-east-1", Services: 4, Tasks: 7, CPUUsed: 3.2, CPUTotal: 8.0, MemoryUsed: "5.8G", MemoryTotal: "16G", Namespace: "analytics.us-east-1", Age: 2 * 24 * time.Hour},
 		},
 		"local": {
-			{Name: "default", Status: "ACTIVE", Services: 3, Tasks: 5, CPUUsed: 0.8, CPUTotal: 4.0, MemoryUsed: "1.2G", MemoryTotal: "8G", Namespace: "default.local", Age: 2 * time.Hour},
+			{Name: "default", Status: "ACTIVE", Region: "local", Services: 3, Tasks: 5, CPUUsed: 0.8, CPUTotal: 4.0, MemoryUsed: "1.2G", MemoryTotal: "8G", Namespace: "default.local", Age: 2 * time.Hour},
 		},
 	}
 
