@@ -107,7 +107,7 @@ func (m Model) getHeaderShortcuts() string {
 	case ViewClusters:
 		shortcuts = []string{
 			keyStyle.Render("<↵>") + sepStyle.Render(" Select"),
-			keyStyle.Render("<←>") + sepStyle.Render(" Back"),
+			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
 			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
 			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
 		}
@@ -122,7 +122,7 @@ func (m Model) getHeaderShortcuts() string {
 		shortcuts = []string{
 			keyStyle.Render("<↵>") + sepStyle.Render(" Describe"),
 			keyStyle.Render("<l>") + sepStyle.Render(" Logs"),
-			keyStyle.Render("<←>") + sepStyle.Render(" Back"),
+			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
 			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
 		}
 	case ViewLogs:
@@ -135,14 +135,14 @@ func (m Model) getHeaderShortcuts() string {
 		shortcuts = []string{
 			keyStyle.Render("<↵>") + sepStyle.Render(" Select"),
 			keyStyle.Render("<N>") + sepStyle.Render(" New"),
-			keyStyle.Render("<←>") + sepStyle.Render(" Back"),
+			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
 			keyStyle.Render("</>") + sepStyle.Render(" Search"),
 		}
 	case ViewTaskDefinitionRevisions:
 		shortcuts = []string{
 			keyStyle.Render("<↵>") + sepStyle.Render(" JSON"),
 			keyStyle.Render("<e>") + sepStyle.Render(" Edit"),
-			keyStyle.Render("<←>") + sepStyle.Render(" Back"),
+			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
 		}
 		if m.showTaskDefJSON {
 			shortcuts = append(shortcuts,
@@ -1296,7 +1296,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 	case ViewClusters:
 		shortcuts = append(shortcuts,
 			keyStyle.Render("↵")+" "+descStyle.Render("Select"),
-			keyStyle.Render("←")+" "+descStyle.Render("Back"),
+			keyStyle.Render("ESC")+" "+descStyle.Render("Back"),
 			keyStyle.Render("i")+" "+descStyle.Render("Instances"),
 			keyStyle.Render("s")+" "+descStyle.Render("Services"),
 			keyStyle.Render("T")+" "+descStyle.Render("Task defs"),
@@ -1315,14 +1315,14 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		shortcuts = append(shortcuts,
 			keyStyle.Render("↵")+" "+descStyle.Render("Describe"),
 			keyStyle.Render("l")+" "+descStyle.Render("Logs"),
-			keyStyle.Render("←")+" "+descStyle.Render("Back"),
+			keyStyle.Render("ESC")+" "+descStyle.Render("Back"),
 			keyStyle.Render("T")+" "+descStyle.Render("Task defs"),
 		)
 	case ViewLogs:
 		shortcuts = append(shortcuts,
 			keyStyle.Render("f")+" "+descStyle.Render("Follow"),
 			keyStyle.Render("s")+" "+descStyle.Render("Save"),
-			keyStyle.Render("←")+" "+descStyle.Render("Back"),
+			keyStyle.Render("ESC")+" "+descStyle.Render("Back"),
 		)
 	case ViewTaskDescribe:
 		shortcuts = append(shortcuts,
@@ -1336,7 +1336,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 			keyStyle.Render("↵")+" "+descStyle.Render("Select"),
 			keyStyle.Render("N")+" "+descStyle.Render("New"),
 			keyStyle.Render("C")+" "+descStyle.Render("Copy latest"),
-			keyStyle.Render("←")+" "+descStyle.Render("Back"),
+			keyStyle.Render("ESC")+" "+descStyle.Render("Back"),
 		)
 	case ViewTaskDefinitionRevisions:
 		shortcuts = append(shortcuts,
@@ -1344,7 +1344,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 			keyStyle.Render("e")+" "+descStyle.Render("Edit"),
 			keyStyle.Render("c")+" "+descStyle.Render("Copy"),
 			keyStyle.Render("d")+" "+descStyle.Render("Deregister"),
-			keyStyle.Render("←")+" "+descStyle.Render("Back"),
+			keyStyle.Render("ESC")+" "+descStyle.Render("Back"),
 		)
 		if m.showTaskDefJSON {
 			shortcuts = append(shortcuts,
@@ -1627,7 +1627,7 @@ Global Navigation:
   ↑, k        Move up
   ↓, j        Move down
   Enter       Select/Drill down
-  Backspace   Go back to parent view
+  ESC         Go back to parent view
 
 Clipboard Operations:
   y           Copy selected item name/ID to clipboard
