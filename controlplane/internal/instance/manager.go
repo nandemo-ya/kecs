@@ -113,6 +113,27 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 		opts.InstanceName = generateInstanceName()
 	}
 
+	// Check if instance already exists and is stopped
+	exists, err := m.k3dManager.ClusterExists(ctx, opts.InstanceName)
+	if err != nil {
+		return fmt.Errorf("failed to check cluster existence: %w", err)
+	}
+
+	if exists {
+		// Check if it's running
+		running, err := m.k3dManager.IsClusterRunning(ctx, opts.InstanceName)
+		if err != nil {
+			return fmt.Errorf("failed to check cluster status: %w", err)
+		}
+
+		if running {
+			return fmt.Errorf("instance '%s' is already running", opts.InstanceName)
+		}
+
+		// Instance exists but is stopped - restart it
+		return m.restartInstance(ctx, opts)
+	}
+
 	// Load configuration
 	cfg, err := config.LoadConfig(opts.ConfigFile)
 	if err != nil {
@@ -364,7 +385,7 @@ func (m *Manager) IsRunning(ctx context.Context, instanceName string) (bool, err
 	return m.k3dManager.IsClusterRunning(ctx, instanceName)
 }
 
-// Restart restarts a stopped instance
+// Restart restarts a stopped instance (deprecated - use Start instead)
 func (m *Manager) Restart(ctx context.Context, instanceName string) error {
 	// Check if instance exists
 	exists, err := m.k3dManager.ClusterExists(ctx, instanceName)
@@ -386,14 +407,164 @@ func (m *Manager) Restart(ctx context.Context, instanceName string) error {
 		return fmt.Errorf("instance '%s' is already running", instanceName)
 	}
 
-	// Start the k3d cluster
-	if err := m.k3dManager.StartCluster(ctx, instanceName); err != nil {
-		return fmt.Errorf("failed to start instance: %w", err)
+	// Load saved instance configuration
+	savedConfig, err := LoadInstanceConfig(instanceName)
+	if err != nil {
+		// If no saved config, use defaults
+		savedConfig = &InstanceConfig{
+			APIPort:    4566,
+			AdminPort:  8081,
+			LocalStack: true,
+			Traefik:    false,
+			DevMode:    false,
+		}
 	}
 
-	// Wait for cluster to be ready
-	if err := m.k3dManager.WaitForClusterReady(ctx, instanceName); err != nil {
-		return fmt.Errorf("instance did not become ready: %w", err)
+	// Convert to StartOptions
+	opts := StartOptions{
+		InstanceName: instanceName,
+		ApiPort:      savedConfig.APIPort,
+		AdminPort:    savedConfig.AdminPort,
+		NoLocalStack: !savedConfig.LocalStack,
+		NoTraefik:    !savedConfig.Traefik,
+		DevMode:      savedConfig.DevMode,
+	}
+
+	// Use restartInstance to handle the restart
+	return m.restartInstance(ctx, opts)
+}
+
+// restartInstance restarts a stopped instance and redeploys all components
+func (m *Manager) restartInstance(ctx context.Context, opts StartOptions) error {
+
+	// Load configuration
+	cfg, err := config.LoadConfig(opts.ConfigFile)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Override with options
+	if opts.NoLocalStack {
+		cfg.LocalStack.Enabled = false
+	}
+
+	// Load saved instance config if available
+	savedConfig, err := LoadInstanceConfig(opts.InstanceName)
+	if err == nil {
+		// Use saved config values if not overridden by command line
+		if opts.ApiPort == 0 {
+			opts.ApiPort = savedConfig.APIPort
+		}
+		if opts.AdminPort == 0 {
+			opts.AdminPort = savedConfig.AdminPort
+		}
+		if opts.DataDir == "" {
+			opts.DataDir = savedConfig.DataDir
+		}
+	}
+
+	// Set up data directory
+	if opts.DataDir == "" {
+		home, _ := os.UserHomeDir()
+		opts.DataDir = filepath.Join(home, ".kecs", "instances", opts.InstanceName, "data")
+	}
+
+	// Step 1: Start the k3d cluster
+	m.updateStatus(opts.InstanceName, "Starting k3d cluster", "running")
+	if err := m.k3dManager.StartCluster(ctx, opts.InstanceName); err != nil {
+		m.updateStatus(opts.InstanceName, "Starting k3d cluster", "failed", err.Error())
+		return fmt.Errorf("failed to start k3d cluster: %w", err)
+	}
+	m.updateStatus(opts.InstanceName, "Starting k3d cluster", "done")
+
+	// Step 2: Wait for cluster to be ready
+	m.updateStatus(opts.InstanceName, "Waiting for cluster", "running")
+	if err := m.k3dManager.WaitForClusterReady(ctx, opts.InstanceName); err != nil {
+		m.updateStatus(opts.InstanceName, "Waiting for cluster", "failed", err.Error())
+		return fmt.Errorf("cluster did not become ready: %w", err)
+	}
+	m.updateStatus(opts.InstanceName, "Waiting for cluster", "done")
+
+	// Step 3: Recreate namespace (in case it was deleted)
+	m.updateStatus(opts.InstanceName, "Creating namespace", "running")
+	if err := m.createOrUpdateNamespace(ctx, opts.InstanceName); err != nil {
+		m.updateStatus(opts.InstanceName, "Creating namespace", "failed", err.Error())
+		return fmt.Errorf("failed to create namespace: %w", err)
+	}
+	m.updateStatus(opts.InstanceName, "Creating namespace", "done")
+
+	// Step 4: Deploy components in parallel
+	var wg sync.WaitGroup
+	errChan := make(chan error, 4)
+
+	// Deploy Control Plane
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		m.updateStatus(opts.InstanceName, "Deploying control plane", "running")
+		if err := m.deployControlPlane(ctx, opts.InstanceName, cfg, opts); err != nil {
+			m.updateStatus(opts.InstanceName, "Deploying control plane", "failed", err.Error())
+			errChan <- fmt.Errorf("failed to deploy control plane: %w", err)
+			return
+		}
+		m.updateStatus(opts.InstanceName, "Deploying control plane", "done")
+	}()
+
+	// Deploy LocalStack if enabled
+	if cfg.LocalStack.Enabled {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			m.updateStatus(opts.InstanceName, "Starting LocalStack", "running")
+			if err := m.deployLocalStack(ctx, opts.InstanceName, cfg); err != nil {
+				m.updateStatus(opts.InstanceName, "Starting LocalStack", "failed", err.Error())
+				errChan <- fmt.Errorf("failed to deploy LocalStack: %w", err)
+				return
+			}
+			m.updateStatus(opts.InstanceName, "Starting LocalStack", "done")
+		}()
+	}
+
+	// Deploy Vector for log aggregation
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		m.updateStatus(opts.InstanceName, "Deploying Vector", "running")
+		if err := m.deployVector(ctx, opts.InstanceName, cfg); err != nil {
+			m.updateStatus(opts.InstanceName, "Deploying Vector", "failed", err.Error())
+			// Vector deployment failure is not critical, just log warning
+			logging.Warn("Failed to deploy Vector DaemonSet", "error", err)
+		} else {
+			m.updateStatus(opts.InstanceName, "Deploying Vector", "done")
+		}
+	}()
+
+	// Wait for deployments
+	wg.Wait()
+	close(errChan)
+
+	// Check for errors
+	for err := range errChan {
+		return err
+	}
+
+	// Step 5: Wait for readiness
+	m.updateStatus(opts.InstanceName, "Finalizing", "running")
+	if err := m.waitForReady(ctx, opts.InstanceName, cfg); err != nil {
+		m.updateStatus(opts.InstanceName, "Finalizing", "failed", err.Error())
+		return fmt.Errorf("components failed to become ready: %w", err)
+	}
+	m.updateStatus(opts.InstanceName, "Finalizing", "done")
+
+	// Clear status after successful restart
+	m.statusMu.Lock()
+	delete(m.creationStatus, opts.InstanceName)
+	m.statusMu.Unlock()
+
+	// Save updated instance configuration
+	if err := SaveInstanceConfig(opts.InstanceName, opts); err != nil {
+		// Log warning but don't fail - config saving is not critical
+		// TODO: Add proper logging here
 	}
 
 	return nil
