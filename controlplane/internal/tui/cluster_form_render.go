@@ -112,7 +112,7 @@ func (m Model) renderClusterForm() string {
 	}
 
 	// Help text
-	help := formHelpStyle.Render("[Tab] Navigate  [↑/↓] Select Region  [Enter] Select  [Esc] Cancel")
+	help := formHelpStyle.Render("[Tab] Navigate  [↑/↓] Select Region  [Esc] Cancel")
 	content = append(content, "")
 	content = append(content, help)
 

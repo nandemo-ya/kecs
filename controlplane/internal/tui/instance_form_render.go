@@ -201,7 +201,7 @@ func (m Model) renderInstanceForm() string {
 	}
 
 	// Help text (shortened to fit in one line)
-	help := formHelpStyle.Render("[Tab] Navigate  [Space] Toggle  [Enter] Select  [Esc] Cancel")
+	help := formHelpStyle.Render("[Tab] Navigate  [Space] Toggle  [Esc] Cancel")
 	content = append(content, "")
 	content = append(content, help)
 
