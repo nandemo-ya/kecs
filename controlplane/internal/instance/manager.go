@@ -387,6 +387,26 @@ func (m *Manager) IsRunning(ctx context.Context, instanceName string) (bool, err
 
 // Restart restarts a stopped instance (deprecated - use Start instead)
 func (m *Manager) Restart(ctx context.Context, instanceName string) error {
+	// Check if instance exists
+	exists, err := m.k3dManager.ClusterExists(ctx, instanceName)
+	if err != nil {
+		return fmt.Errorf("failed to check instance existence: %w", err)
+	}
+
+	if !exists {
+		return fmt.Errorf("instance '%s' does not exist", instanceName)
+	}
+
+	// Check if instance is running
+	running, err := m.k3dManager.IsClusterRunning(ctx, instanceName)
+	if err != nil {
+		return fmt.Errorf("failed to check instance status: %w", err)
+	}
+
+	if running {
+		return fmt.Errorf("instance '%s' is already running", instanceName)
+	}
+
 	// Load saved instance configuration
 	savedConfig, err := LoadInstanceConfig(instanceName)
 	if err != nil {
