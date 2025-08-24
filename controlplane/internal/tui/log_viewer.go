@@ -332,7 +332,7 @@ func (m LogViewerModel) View() string {
 		"[f] Follow",
 		"[r] Reload",
 		"[g/G] Top/Bottom",
-		"[q] Quit",
+		"[Esc] Back",
 	}
 
 	footer := footerStyle.Render(strings.Join(shortcuts, "  "))
