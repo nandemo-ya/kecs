@@ -19,7 +19,7 @@ var (
 			Background(lipgloss.Color("#1a1a1a")).
 			Foreground(lipgloss.Color("#ffffff")).
 			Padding(1, 2).
-			Width(55)
+			Width(65)
 
 	formTitleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00ff00")).
@@ -33,13 +33,13 @@ var (
 			Background(lipgloss.Color("#2a2a2a")).
 			Foreground(lipgloss.Color("#ffffff")).
 			Padding(0, 1).
-			Width(30)
+			Width(35)
 
 	formInputFocusedStyle = lipgloss.NewStyle().
 				Background(lipgloss.Color("#3a3a5a")).
 				Foreground(lipgloss.Color("#ffffff")).
 				Padding(0, 1).
-				Width(30)
+				Width(35)
 
 	formCheckboxStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#00ff00"))
@@ -137,14 +137,21 @@ func (m Model) renderInstanceForm() string {
 	content = append(content, m.renderCheckbox("Developer Mode", f.devMode, f.focusedField == FieldDevMode))
 	content = append(content, "")
 
-	// Buttons
+	// Buttons (centered)
 	createBtnLabel := "Create"
 	if f.isCreating {
 		createBtnLabel = "Creating..."
 	}
 	createBtn := m.renderFormButton(createBtnLabel, f.focusedField == FieldSubmit && !f.isCreating)
 	cancelBtn := m.renderFormButton("Cancel", f.focusedField == FieldCancel)
-	buttons := fmt.Sprintf("%s%s", createBtn, cancelBtn)
+	buttons := lipgloss.JoinHorizontal(lipgloss.Top, createBtn, cancelBtn)
+	// Center the buttons
+	buttonsWidth := lipgloss.Width(buttons)
+	formWidth := 61 // Width of form content area (65 - 2*2 padding)
+	if buttonsWidth < formWidth {
+		padding := (formWidth - buttonsWidth) / 2
+		buttons = strings.Repeat(" ", padding) + buttons
+	}
 	content = append(content, buttons)
 
 	// Show creation status with checkmarks
@@ -193,8 +200,8 @@ func (m Model) renderInstanceForm() string {
 		content = append(content, formSuccessStyle.Render("✓ "+f.successMsg))
 	}
 
-	// Help text
-	help := formHelpStyle.Render("[Tab/Shift+Tab] Navigate  [Space] Toggle  [Enter] Select")
+	// Help text (shortened to fit in one line)
+	help := formHelpStyle.Render("[Tab] Navigate  [Space] Toggle  [Enter] Select  [Esc] Cancel")
 	content = append(content, "")
 	content = append(content, help)
 
