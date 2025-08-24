@@ -1733,6 +1733,35 @@ func (m Model) renderInstanceSwitcherOverlay() string {
 	return m.instanceSwitcher.Render(m.width, m.height)
 }
 
+// renderDeletingOverlay renders the deletion progress overlay
+func (m Model) renderDeletingOverlay() string {
+	// Create overlay style
+	overlayStyle := lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Align(lipgloss.Center, lipgloss.Center)
+
+	// Create dialog box
+	dialogStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#585b70")).
+		Padding(2, 4).
+		Background(lipgloss.Color("#1e1e2e"))
+
+	// Create spinner with message
+	content := lipgloss.JoinVertical(
+		lipgloss.Center,
+		m.spinner.View()+" "+m.deletingMessage,
+		"",
+		lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Render("Please wait..."),
+	)
+
+	dialog := dialogStyle.Render(content)
+	return overlayStyle.Render(dialog)
+}
+
 // renderTaskDefFamiliesList renders the list of task definition families
 func (m Model) renderTaskDefFamiliesList(maxHeight int) string {
 	if len(m.taskDefFamilies) == 0 {
