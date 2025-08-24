@@ -151,13 +151,13 @@ func (m Model) renderRegionSelector(f *ClusterForm) string {
 				line = lipgloss.NewStyle().
 					Background(lipgloss.Color("#3a3a5a")).
 					Foreground(lipgloss.Color("#ffffff")).
-					Width(width - 2). // Account for border
+					Width(width - 4). // Account for border and padding
 					Render("▸ " + awsRegions[i])
 			} else {
 				// Other options
 				line = lipgloss.NewStyle().
 					Foreground(lipgloss.Color("#808080")).
-					Width(width - 2). // Account for border
+					Width(width - 4). // Account for border and padding
 					Render("  " + awsRegions[i])
 			}
 			lines = append(lines, line)
@@ -168,6 +168,7 @@ func (m Model) renderRegionSelector(f *ClusterForm) string {
 		return lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("#3a3a5a")).
+			Width(width).
 			Padding(0, 1). // Add horizontal padding
 			Render(content)
 	} else {

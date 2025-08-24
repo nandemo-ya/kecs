@@ -152,13 +152,14 @@ func (f *ClusterForm) Update(msg tea.Msg) (*ClusterForm, tea.Cmd) {
 
 	case clusterFormCloseMsg:
 		return nil, nil
-	}
 
-	// Update text input if focused
-	if f.focusedField == FieldClusterName && !f.isCreating {
-		var cmd tea.Cmd
-		f.clusterName, cmd = f.clusterName.Update(msg)
-		cmds = append(cmds, cmd)
+	default:
+		// Update text input if focused (only for non-KeyMsg messages or unhandled keys)
+		if f.focusedField == FieldClusterName && !f.isCreating {
+			var cmd tea.Cmd
+			f.clusterName, cmd = f.clusterName.Update(msg)
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	return f, tea.Batch(cmds...)
