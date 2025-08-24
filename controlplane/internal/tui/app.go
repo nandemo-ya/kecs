@@ -1317,6 +1317,11 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "enter":
 		// Handle action based on focused field
 		switch m.instanceForm.focusedField {
+		case FieldInstanceCloseButton:
+			// Close form
+			m.currentView = m.previousView
+			m.instanceForm.Reset()
+			return m, nil
 		case FieldInstanceName:
 			// If on name field and pressed enter, generate new name
 			m.instanceForm.GenerateNewName()

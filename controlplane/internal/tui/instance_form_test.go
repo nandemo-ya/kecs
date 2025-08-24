@@ -38,8 +38,9 @@ var _ = Describe("InstanceForm", func() {
 			form.MoveFocusDown() // Dev mode
 			form.MoveFocusDown() // Submit
 			form.MoveFocusDown() // Cancel
-			form.MoveFocusDown() // Back to instance name
-			// Should wrap around
+			form.MoveFocusDown() // Back to close button
+			// Should wrap around to close button (not a text field, so value is empty)
+			form.MoveFocusDown() // Now at instance name
 			Expect(form.GetCurrentFieldValue()).NotTo(BeEmpty())
 		})
 
