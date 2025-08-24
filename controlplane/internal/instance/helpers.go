@@ -107,6 +107,38 @@ func (m *Manager) createNamespace(ctx context.Context, instanceName string) erro
 	return nil
 }
 
+// createOrUpdateNamespace creates the kecs-system namespace or ensures it exists
+func (m *Manager) createOrUpdateNamespace(ctx context.Context, instanceName string) error {
+	clusterName := fmt.Sprintf("kecs-%s", instanceName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(context.Background(), clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	client, err := kubernetes.NewForConfig(kubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kecs-system",
+		},
+	}
+
+	// Try to get the namespace first
+	_, err = client.CoreV1().Namespaces().Get(ctx, "kecs-system", metav1.GetOptions{})
+	if err != nil {
+		// Namespace doesn't exist, create it
+		if _, err := client.CoreV1().Namespaces().Create(ctx, namespace, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create namespace: %w", err)
+		}
+	}
+	// Namespace already exists, nothing to do
+
+	return nil
+}
+
 // deployControlPlane deploys the KECS control plane
 func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, cfg *config.Config, opts StartOptions) error {
 
