@@ -83,6 +83,10 @@ func (f *ClusterForm) Update(msg tea.Msg) (*ClusterForm, tea.Cmd) {
 		}
 
 		switch msg.String() {
+		case "esc":
+			// Close form without creating
+			return nil, nil // Close form
+
 		case "tab":
 			// Navigate forward
 			f.focusedField = (f.focusedField + 1) % 4
@@ -115,9 +119,6 @@ func (f *ClusterForm) Update(msg tea.Msg) (*ClusterForm, tea.Cmd) {
 			case FieldCancelButton:
 				return nil, nil // Close form
 			}
-
-		case "esc":
-			return nil, nil // Close form
 		}
 
 	case clusterCreatingMsg:
