@@ -3,7 +3,9 @@ package tui
 import (
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/mock"
@@ -211,10 +213,19 @@ type Model struct {
 	logViewer          *LogViewerModel
 	logViewerTaskArn   string
 	logViewerContainer string
+
+	// Spinner for long-running operations
+	spinner         spinner.Model
+	isDeleting      bool
+	deletingMessage string
 }
 
 // NewModel creates a new application model
 func NewModel() Model {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+
 	return Model{
 		currentView:      ViewInstances,
 		refreshInterval:  5 * time.Second,
@@ -223,11 +234,16 @@ func NewModel() Model {
 		useMockData:      true, // Default to mock data for now
 		apiClient:        api.NewMockClient(),
 		taskDefJSONCache: make(map[int]string),
+		spinner:          s,
 	}
 }
 
 // NewModelWithClient creates a new application model with a specific API client
 func NewModelWithClient(client api.Client) Model {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+
 	return Model{
 		currentView:      ViewInstances,
 		refreshInterval:  5 * time.Second,
@@ -236,6 +252,7 @@ func NewModelWithClient(client api.Client) Model {
 		useMockData:      false,
 		apiClient:        client,
 		taskDefJSONCache: make(map[int]string),
+		spinner:          s,
 	}
 }
 

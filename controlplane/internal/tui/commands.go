@@ -385,6 +385,17 @@ type instanceStatusUpdateMsg struct {
 	instances []Instance
 }
 
+// instanceDeletingMsg indicates that an instance deletion is in progress
+type instanceDeletingMsg struct {
+	name string
+}
+
+// instanceDeletedMsg indicates that an instance deletion has completed
+type instanceDeletedMsg struct {
+	name string
+	err  error
+}
+
 // Helper functions
 func parseCPU(cpuStr string) float64 {
 	// Parse CPU string to float64
@@ -668,4 +679,21 @@ type logViewerCreatedMsg struct {
 	viewer    LogViewerModel
 	taskArn   string
 	container string
+}
+
+// deleteInstanceCmd initiates instance deletion
+func (m Model) deleteInstanceCmd(instanceName string) tea.Cmd {
+	return func() tea.Msg {
+		// Start deleting
+		return instanceDeletingMsg{name: instanceName}
+	}
+}
+
+// performInstanceDeletionCmd performs the actual deletion
+func (m Model) performInstanceDeletionCmd(instanceName string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		err := m.apiClient.DeleteInstance(ctx, instanceName)
+		return instanceDeletedMsg{name: instanceName, err: err}
+	}
 }

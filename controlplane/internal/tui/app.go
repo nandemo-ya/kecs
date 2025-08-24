@@ -1,12 +1,12 @@
 package tui
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -149,6 +149,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
+
+	case spinner.TickMsg:
+		// Update spinner if deleting
+		if m.isDeleting {
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			cmds = append(cmds, cmd)
+		}
 
 	case tickMsg:
 		// Update data periodically
@@ -373,6 +381,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case instanceDeletingMsg:
+		// Start deletion process with spinner
+		m.isDeleting = true
+		m.deletingMessage = fmt.Sprintf("Deleting instance '%s'...", msg.name)
+		// Start spinner
+		cmds = append(cmds, m.spinner.Tick)
+		// Perform the actual deletion
+		cmds = append(cmds, m.performInstanceDeletionCmd(msg.name))
+
+	case instanceDeletedMsg:
+		// Deletion completed
+		m.isDeleting = false
+		m.deletingMessage = ""
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			// If the deleted instance was selected, clear selection
+			if m.selectedInstance == msg.name {
+				m.selectedInstance = ""
+			}
+			// Reload instances
+			cmds = append(cmds, m.loadDataFromAPI())
+		}
+		// Go back to previous view if we were in confirm dialog
+		if m.currentView == ViewConfirmDialog {
+			m.confirmDialog = nil
+			m.currentView = m.previousView
+		}
+
 	case errMsg:
 		// Handle API errors
 		m.err = msg.err
@@ -493,6 +530,11 @@ func (m Model) View() string {
 		}
 		// Fallback if editor is nil
 		return m.View()
+	}
+
+	// If deleting, show spinner overlay
+	if m.isDeleting {
+		return m.renderDeletingOverlay()
 	}
 
 	// Calculate exact heights for panels
@@ -642,23 +684,16 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 				return m, nil
 			}
 
+			// Don't allow delete if already deleting
+			if m.isDeleting {
+				return m, nil
+			}
+
 			// Create confirmation dialog
 			m.confirmDialog = DeleteInstanceDialog(
 				instanceName,
 				func() error {
-					// Delete instance via API
-					ctx := context.Background()
-					err := m.apiClient.DeleteInstance(ctx, instanceName)
-					if err != nil {
-						return err
-					}
-
-					// If the deleted instance was selected, clear selection
-					if m.selectedInstance == instanceName {
-						m.selectedInstance = ""
-					}
-
-					// Reload instances
+					// Just return nil here, actual deletion will be handled via message
 					return nil
 				},
 				func() {
@@ -666,6 +701,8 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 				},
 			)
 
+			// Store the pending deletion command
+			m.pendingCommand = m.deleteInstanceCmd(instanceName)
 			m.previousView = m.currentView
 			m.currentView = ViewConfirmDialog
 			return m, nil
