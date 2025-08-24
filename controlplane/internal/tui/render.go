@@ -1360,7 +1360,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		keyStyle.Render(":")+" "+descStyle.Render("Command"),
 		keyStyle.Render("/")+" "+descStyle.Render("Search"),
 		keyStyle.Render("?")+" "+descStyle.Render("Help"),
-		keyStyle.Render("q")+" "+descStyle.Render("Quit"),
+		keyStyle.Render("Ctrl+C")+" "+descStyle.Render("Quit"),
 	)
 
 	// Join shortcuts vertically
@@ -1621,9 +1621,9 @@ func (m Model) renderHelpContent(maxHeight int) string {
 
 Global Navigation:
   ?           Show/hide this help
-  q, Ctrl-C   Quit
+  Ctrl-C      Quit application
+  Esc         Go back / Cancel
   /           Search in current view
-  Esc         Cancel/Back
   ↑, k        Move up
   ↓, j        Move down
   Enter       Select/Drill down

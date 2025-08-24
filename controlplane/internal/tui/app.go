@@ -66,11 +66,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		// Global navigation
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
+			// Exit application (k9s style - only Ctrl+C exits)
 			if !m.searchMode && !m.commandMode && m.currentView != ViewTaskDefinitionEditor {
 				return m, tea.Quit
 			}
 		case "esc":
+			// Go back to previous view or cancel current mode (k9s style)
 			if m.searchMode {
 				m.searchMode = false
 				m.searchQuery = ""
@@ -84,6 +86,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commandPalette.Reset()
 			} else if m.currentView == ViewTaskDescribe {
 				m.currentView = m.previousView
+			} else if m.currentView != ViewInstances {
+				// Go back to previous view if not at root
+				m.goBack()
+				return m, m.loadDataFromAPI()
 			}
 			return m, nil
 		case "?":
@@ -746,9 +752,6 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.serviceCursor = 0
 			return m, m.loadDataFromAPI()
 		}
-	case "backspace":
-		m.goBack()
-		return m, m.loadDataFromAPI()
 	case "i":
 		m.currentView = ViewInstances
 		m.selectedInstance = ""
@@ -800,9 +803,6 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.taskCursor = 0
 			return m, m.loadDataFromAPI()
 		}
-	case "backspace":
-		m.goBack()
-		return m, m.loadDataFromAPI()
 	case "i":
 		m.currentView = ViewInstances
 		m.selectedInstance = ""
@@ -947,9 +947,6 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			// Open log viewer
 			return m, m.viewTaskLogsCmd(task.ARN, containerName)
 		}
-	case "backspace":
-		m.goBack()
-		return m, m.loadDataFromAPI()
 	case "i":
 		m.currentView = ViewInstances
 		m.selectedInstance = ""
@@ -998,8 +995,8 @@ func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		updatedViewer, cmd := m.logViewer.Update(msg)
 		m.logViewer = &updatedViewer
 
-		// Check if user wants to quit log viewer
-		if msg.String() == "q" || msg.String() == "esc" {
+		// Check if user wants to exit log viewer (k9s style - only ESC)
+		if msg.String() == "esc" {
 			m.logViewer = nil
 			m.currentView = m.previousView
 			return m, m.loadDataFromAPI()
@@ -1014,7 +1011,7 @@ func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.moveCursorUp()
 	case "down", "j":
 		m.moveCursorDown()
-	case "esc", "backspace":
+	case "esc":
 		m.currentView = m.previousView
 		return m, m.loadDataFromAPI()
 	case "enter":
@@ -1037,7 +1034,8 @@ func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 func (m Model) handleHelpKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "?", "q":
+	case "esc", "?":
+		// Close help (k9s style - ESC or ?)
 		m.showHelp = false
 		m.currentView = m.previousView
 	}
@@ -1172,8 +1170,8 @@ func (m Model) handleConfirmDialogKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 		// Reload data after potential deletion
 		return m, m.loadDataFromAPI()
-	case "esc", "q":
-		// Cancel and go back
+	case "esc":
+		// Cancel and go back (k9s style - only ESC cancels)
 		if m.confirmDialog.onNo != nil {
 			m.confirmDialog.onNo()
 		}
@@ -1463,11 +1461,6 @@ func (m Model) handleTaskDefinitionFamiliesKeys(msg tea.KeyMsg) (Model, tea.Cmd)
 			m.showTaskDefJSON = false
 			return m, m.loadTaskDefinitionRevisionsCmd()
 		}
-	case "backspace":
-		// Go back to instances
-		m.currentView = ViewInstances
-		m.selectedFamily = ""
-		m.taskDefFamilies = []TaskDefinitionFamily{}
 	case "c":
 		// Switch to clusters view
 		m.currentView = ViewClusters
@@ -1554,12 +1547,6 @@ func (m Model) handleTaskDefinitionRevisionsKeys(msg tea.KeyMsg) (Model, tea.Cmd
 				return m, m.loadTaskDefinitionJSONCmd(taskDefArn)
 			}
 		}
-	case "backspace":
-		// Go back to families
-		m.currentView = ViewTaskDefinitionFamilies
-		m.selectedFamily = ""
-		m.taskDefRevisions = []TaskDefinitionRevision{}
-		m.showTaskDefJSON = false
 		// Clear JSON cache to save memory
 		m.taskDefJSONCache = make(map[int]string)
 	case "e":
