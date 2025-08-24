@@ -131,9 +131,6 @@ func (m Model) renderRegionSelector(f *ClusterForm) string {
 	// Build the selector display
 	selectedRegion := awsRegions[f.regionIndex]
 
-	// Show 3 regions: previous, current (selected), next
-	var display strings.Builder
-
 	if focused {
 		// Show dropdown-like view when focused
 		startIdx := f.regionIndex - 1
@@ -145,29 +142,34 @@ func (m Model) renderRegionSelector(f *ClusterForm) string {
 			endIdx = len(awsRegions)
 		}
 
+		// Build lines for the dropdown
+		var lines []string
 		for i := startIdx; i < endIdx && i < len(awsRegions); i++ {
+			var line string
 			if i == f.regionIndex {
 				// Highlighted selection
-				style := lipgloss.NewStyle().
+				line = lipgloss.NewStyle().
 					Background(lipgloss.Color("#3a3a5a")).
 					Foreground(lipgloss.Color("#ffffff")).
-					Width(width)
-				display.WriteString(style.Render("▸ " + awsRegions[i]))
+					Width(width - 2). // Account for border
+					Render("▸ " + awsRegions[i])
 			} else {
 				// Other options
-				style := lipgloss.NewStyle().
+				line = lipgloss.NewStyle().
 					Foreground(lipgloss.Color("#808080")).
-					Width(width)
-				display.WriteString("\n")
-				display.WriteString(style.Render("  " + awsRegions[i]))
+					Width(width - 2). // Account for border
+					Render("  " + awsRegions[i])
 			}
+			lines = append(lines, line)
 		}
 
+		// Join lines and apply border
+		content := strings.Join(lines, "\n")
 		return lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("#3a3a5a")).
-			Width(width).
-			Render(display.String())
+			Padding(0, 1). // Add horizontal padding
+			Render(content)
 	} else {
 		// Show only selected region when not focused
 		return formInputStyle.Render(selectedRegion)
