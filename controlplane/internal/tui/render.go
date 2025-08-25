@@ -1286,98 +1286,115 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		PaddingLeft(1).
 		Width(width)
 
-	shortcuts := []string{}
+	// Split width into two columns
+	halfWidth := (width - 3) / 2 // -3 for border and padding
+
+	// Left column: Screen-specific shortcuts
+	var leftShortcuts []string
 
 	// Add view-specific shortcuts
 	switch m.currentView {
 	case ViewInstances:
-		shortcuts = append(shortcuts,
-			keyStyle.Render("N")+" "+descStyle.Render("New instance"),
-			keyStyle.Render("↵")+" "+descStyle.Render("Select"),
-			keyStyle.Render("S")+" "+descStyle.Render("Start/Stop"),
-			keyStyle.Render("D")+" "+descStyle.Render("Delete"),
+		leftShortcuts = append(leftShortcuts,
+			keyStyle.Render("<N>")+" "+descStyle.Render("New instance"),
+			keyStyle.Render("<enter>")+" "+descStyle.Render("Select"),
+			keyStyle.Render("<S>")+" "+descStyle.Render("Start/Stop"),
+			keyStyle.Render("<D>")+" "+descStyle.Render("Delete"),
 		)
 		// Only show Task defs shortcut if an instance is selected
 		if m.selectedInstance != "" {
-			shortcuts = append(shortcuts,
-				keyStyle.Render("T")+" "+descStyle.Render("Task defs"),
+			leftShortcuts = append(leftShortcuts,
+				keyStyle.Render("<T>")+" "+descStyle.Render("Task defs"),
 			)
 		}
 	case ViewClusters:
-		shortcuts = append(shortcuts,
-			keyStyle.Render("↵")+" "+descStyle.Render("Select"),
-			keyStyle.Render("n")+" "+descStyle.Render("Create cluster"),
-			keyStyle.Render("ESC")+" "+descStyle.Render("Back"),
-			keyStyle.Render("i")+" "+descStyle.Render("Instances"),
-			keyStyle.Render("s")+" "+descStyle.Render("Services"),
-			keyStyle.Render("T")+" "+descStyle.Render("Task defs"),
+		leftShortcuts = append(leftShortcuts,
+			keyStyle.Render("<enter>")+" "+descStyle.Render("Select"),
+			keyStyle.Render("<n>")+" "+descStyle.Render("Create cluster"),
+			keyStyle.Render("<i>")+" "+descStyle.Render("Instances"),
+			keyStyle.Render("<s>")+" "+descStyle.Render("Services"),
+			keyStyle.Render("<T>")+" "+descStyle.Render("Task defs"),
 		)
 	case ViewServices:
-		shortcuts = append(shortcuts,
-			keyStyle.Render("↵")+" "+descStyle.Render("Select"),
-			keyStyle.Render("S")+" "+descStyle.Render("Scale"),
-			keyStyle.Render("r")+" "+descStyle.Render("Restart"),
-			keyStyle.Render("u")+" "+descStyle.Render("Update"),
-			keyStyle.Render("x")+" "+descStyle.Render("Stop"),
-			keyStyle.Render("l")+" "+descStyle.Render("Logs"),
-			keyStyle.Render("T")+" "+descStyle.Render("Task defs"),
+		leftShortcuts = append(leftShortcuts,
+			keyStyle.Render("<enter>")+" "+descStyle.Render("Select"),
+			keyStyle.Render("<S>")+" "+descStyle.Render("Scale"),
+			keyStyle.Render("<r>")+" "+descStyle.Render("Restart"),
+			keyStyle.Render("<u>")+" "+descStyle.Render("Update"),
+			keyStyle.Render("<x>")+" "+descStyle.Render("Stop"),
+			keyStyle.Render("<l>")+" "+descStyle.Render("Logs"),
+			keyStyle.Render("<T>")+" "+descStyle.Render("Task defs"),
 		)
 	case ViewTasks:
-		shortcuts = append(shortcuts,
-			keyStyle.Render("↵")+" "+descStyle.Render("Describe"),
-			keyStyle.Render("l")+" "+descStyle.Render("Logs"),
-			keyStyle.Render("ESC")+" "+descStyle.Render("Back"),
-			keyStyle.Render("T")+" "+descStyle.Render("Task defs"),
+		leftShortcuts = append(leftShortcuts,
+			keyStyle.Render("<enter>")+" "+descStyle.Render("Describe"),
+			keyStyle.Render("<l>")+" "+descStyle.Render("Logs"),
+			keyStyle.Render("<T>")+" "+descStyle.Render("Task defs"),
 		)
 	case ViewLogs:
-		shortcuts = append(shortcuts,
-			keyStyle.Render("f")+" "+descStyle.Render("Follow"),
-			keyStyle.Render("s")+" "+descStyle.Render("Save"),
-			keyStyle.Render("ESC")+" "+descStyle.Render("Back"),
+		leftShortcuts = append(leftShortcuts,
+			keyStyle.Render("<f>")+" "+descStyle.Render("Follow"),
+			keyStyle.Render("<s>")+" "+descStyle.Render("Save"),
 		)
 	case ViewTaskDescribe:
-		shortcuts = append(shortcuts,
-			keyStyle.Render("ESC")+" "+descStyle.Render("Back"),
-			keyStyle.Render("l")+" "+descStyle.Render("View Logs"),
-			keyStyle.Render("r")+" "+descStyle.Render("Restart"),
-			keyStyle.Render("s")+" "+descStyle.Render("Stop"),
+		leftShortcuts = append(leftShortcuts,
+			keyStyle.Render("<l>")+" "+descStyle.Render("View Logs"),
+			keyStyle.Render("<r>")+" "+descStyle.Render("Restart"),
+			keyStyle.Render("<s>")+" "+descStyle.Render("Stop"),
 		)
 	case ViewTaskDefinitionFamilies:
-		shortcuts = append(shortcuts,
-			keyStyle.Render("↵")+" "+descStyle.Render("Select"),
-			keyStyle.Render("N")+" "+descStyle.Render("New"),
-			keyStyle.Render("C")+" "+descStyle.Render("Copy latest"),
-			keyStyle.Render("ESC")+" "+descStyle.Render("Back"),
+		leftShortcuts = append(leftShortcuts,
+			keyStyle.Render("<enter>")+" "+descStyle.Render("Select"),
+			keyStyle.Render("<N>")+" "+descStyle.Render("New"),
+			keyStyle.Render("<C>")+" "+descStyle.Render("Copy latest"),
 		)
 	case ViewTaskDefinitionRevisions:
-		shortcuts = append(shortcuts,
-			keyStyle.Render("↵")+" "+descStyle.Render("Toggle JSON"),
-			keyStyle.Render("e")+" "+descStyle.Render("Edit"),
-			keyStyle.Render("c")+" "+descStyle.Render("Copy"),
-			keyStyle.Render("d")+" "+descStyle.Render("Deregister"),
-			keyStyle.Render("ESC")+" "+descStyle.Render("Back"),
+		leftShortcuts = append(leftShortcuts,
+			keyStyle.Render("<enter>")+" "+descStyle.Render("Toggle JSON"),
+			keyStyle.Render("<e>")+" "+descStyle.Render("Edit"),
+			keyStyle.Render("<c>")+" "+descStyle.Render("Copy"),
+			keyStyle.Render("<d>")+" "+descStyle.Render("Deregister"),
 		)
 		if m.showTaskDefJSON {
-			shortcuts = append(shortcuts,
-				keyStyle.Render("^U")+" "+descStyle.Render("Scroll up"),
-				keyStyle.Render("^D")+" "+descStyle.Render("Scroll down"),
+			leftShortcuts = append(leftShortcuts,
+				keyStyle.Render("<ctrl-u>")+" "+descStyle.Render("Scroll up"),
+				keyStyle.Render("<ctrl-d>")+" "+descStyle.Render("Scroll down"),
 			)
 		}
 	}
 
-	// Add common shortcuts
-	shortcuts = append(shortcuts,
-		"", // Empty line for separation
-		keyStyle.Render(":")+" "+descStyle.Render("Command"),
-		keyStyle.Render("/")+" "+descStyle.Render("Search"),
-		keyStyle.Render("?")+" "+descStyle.Render("Help"),
-		keyStyle.Render("Ctrl+C")+" "+descStyle.Render("Quit"),
+	// Right column: Global shortcuts
+	rightShortcuts := []string{
+		keyStyle.Render("<↑>/<k>") + " " + descStyle.Render("Move up"),
+		keyStyle.Render("<↓>/<j>") + " " + descStyle.Render("Move down"),
+		keyStyle.Render("<esc>") + " " + descStyle.Render("Back"),
+		keyStyle.Render("<:>") + " " + descStyle.Render("Command"),
+		keyStyle.Render("</>") + " " + descStyle.Render("Search"),
+		keyStyle.Render("<?>") + " " + descStyle.Render("Help"),
+		keyStyle.Render("<ctrl-c>") + " " + descStyle.Render("Quit"),
+	}
+
+	// Create left column with screen-specific shortcuts
+	leftColumn := lipgloss.NewStyle().
+		Width(halfWidth).
+		Align(lipgloss.Left).
+		Render(strings.Join(leftShortcuts, "\n"))
+
+	// Create right column with global shortcuts
+	rightColumn := lipgloss.NewStyle().
+		Width(halfWidth).
+		Align(lipgloss.Left).
+		PaddingLeft(1).
+		Render(strings.Join(rightShortcuts, "\n"))
+
+	// Join columns horizontally
+	columnsContent := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		leftColumn,
+		rightColumn,
 	)
 
-	// Join shortcuts vertically
-	shortcutsContent := strings.Join(shortcuts, "\n")
-
-	return columnStyle.Height(height).Render(shortcutsContent)
+	return columnStyle.Height(height).Render(columnsContent)
 }
 
 // renderLogsContent renders the logs content with the given height constraint
@@ -1628,69 +1645,137 @@ func (m Model) renderTaskDescribeView() string {
 
 // renderHelpContent renders the help content with the given height constraint
 func (m Model) renderHelpContent(maxHeight int) string {
-	helpText := `KECS TUI Help
+	// Style definitions
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#cdd6f4")).
+		MarginBottom(1)
 
-Global Navigation:
-  ?           Show/hide this help
-  Ctrl-C      Quit application
-  Esc         Go back / Cancel
-  /           Search in current view
-  ↑, k        Move up
-  ↓, j        Move down
-  Enter       Select/Drill down
-  ESC         Go back to parent view
+	sectionStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#89b4fa")).
+		MarginTop(1).
+		MarginBottom(1)
 
-Clipboard Operations:
-  y           Copy selected item name/ID to clipboard
-  Y           Copy full details to clipboard
+	keyStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6e3a1")).
+		Bold(true)
 
-Resource Navigation:
-  i           Go to instances
-  c           Go to clusters
-  s           Go to services
-  t           Go to tasks
-  T           Go to task definitions (from any view with instance selected)
+	descStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#9399b2"))
 
-Instance Operations:
-  N           Create new instance (Instances view)
-  S           Stop/Start instance (Instance selected)
-  D           Delete instance (Instance selected)
-  Ctrl+I      Quick switch instance (Any view)
+	// Calculate column widths
+	totalWidth := m.width - 8 // Account for padding
+	columnWidth := totalWidth/2 - 2
 
-Service Operations:
-  r           Restart service (Service selected)
-  S           Scale service (Service selected)  
-  u           Update service (Service selected)
-  x           Stop service (Service selected)
+	// Left column: View-specific operations
+	leftContent := []string{
+		sectionStyle.Render("View-Specific Operations"),
+		"",
+		lipgloss.NewStyle().Bold(true).Underline(true).Render("Instance Operations:"),
+		keyStyle.Render("<N>") + "           " + descStyle.Render("Create new instance"),
+		keyStyle.Render("<S>") + "           " + descStyle.Render("Stop/Start instance"),
+		keyStyle.Render("<D>") + "           " + descStyle.Render("Delete instance"),
+		keyStyle.Render("<ctrl-i>") + "     " + descStyle.Render("Quick switch instance"),
+		"",
+		lipgloss.NewStyle().Bold(true).Underline(true).Render("Cluster Operations:"),
+		keyStyle.Render("<n>") + "           " + descStyle.Render("Create new cluster"),
+		"",
+		lipgloss.NewStyle().Bold(true).Underline(true).Render("Service Operations:"),
+		keyStyle.Render("<r>") + "           " + descStyle.Render("Restart service"),
+		keyStyle.Render("<S>") + "           " + descStyle.Render("Scale service"),
+		keyStyle.Render("<u>") + "           " + descStyle.Render("Update service"),
+		keyStyle.Render("<x>") + "           " + descStyle.Render("Stop service"),
+		"",
+		lipgloss.NewStyle().Bold(true).Underline(true).Render("Task Definition Operations:"),
+		keyStyle.Render("<N>") + "           " + descStyle.Render("Create new task def"),
+		keyStyle.Render("<C>") + "           " + descStyle.Render("Copy family's latest"),
+		keyStyle.Render("<e>") + "           " + descStyle.Render("Edit as new revision"),
+		keyStyle.Render("<c>") + "           " + descStyle.Render("Copy to clipboard"),
+		keyStyle.Render("<d>") + "           " + descStyle.Render("Deregister revision"),
+		keyStyle.Render("<a>") + "           " + descStyle.Render("Activate revision"),
+		keyStyle.Render("<D>") + "           " + descStyle.Render("Diff mode"),
+		"",
+		lipgloss.NewStyle().Bold(true).Underline(true).Render("Common Operations:"),
+		keyStyle.Render("<l>") + "           " + descStyle.Render("View logs"),
+		keyStyle.Render("<D>") + "           " + descStyle.Render("Describe resource"),
+		keyStyle.Render("<R>") + "           " + descStyle.Render("Refresh view"),
+		keyStyle.Render("<M>") + "           " + descStyle.Render("Multi-instance overview"),
+	}
 
-Task Definition Operations:
-  N           Create new task definition (Families view)
-  C           Copy family's latest revision (Families view)
-  Enter       Toggle JSON view (Revisions view)
-  e           Edit as new revision (Revisions view)
-  c           Copy to clipboard (Revisions view)
-  d           Deregister revision (Revisions view)
-  a           Activate revision (Revisions view)
-  D           Diff mode (Revisions view)
-  Ctrl+U      Scroll JSON up (JSON view)
-  Ctrl+D      Scroll JSON down (JSON view)
+	// Right column: Global navigation
+	rightContent := []string{
+		sectionStyle.Render("Global Navigation"),
+		"",
+		lipgloss.NewStyle().Bold(true).Underline(true).Render("Navigation:"),
+		keyStyle.Render("<↑>/<k>") + "      " + descStyle.Render("Move up"),
+		keyStyle.Render("<↓>/<j>") + "      " + descStyle.Render("Move down"),
+		keyStyle.Render("<enter>") + "      " + descStyle.Render("Select/Drill down"),
+		keyStyle.Render("<esc>") + "        " + descStyle.Render("Go back to parent"),
+		"",
+		lipgloss.NewStyle().Bold(true).Underline(true).Render("Quick Navigation:"),
+		keyStyle.Render("<i>") + "           " + descStyle.Render("Go to instances"),
+		keyStyle.Render("<c>") + "           " + descStyle.Render("Go to clusters"),
+		keyStyle.Render("<s>") + "           " + descStyle.Render("Go to services"),
+		keyStyle.Render("<t>") + "           " + descStyle.Render("Go to tasks"),
+		keyStyle.Render("<T>") + "           " + descStyle.Render("Go to task definitions"),
+		"",
+		lipgloss.NewStyle().Bold(true).Underline(true).Render("Search & Commands:"),
+		keyStyle.Render("</>") + "           " + descStyle.Render("Search in current view"),
+		keyStyle.Render("<:>") + "           " + descStyle.Render("Enter command mode"),
+		keyStyle.Render("<?>") + "           " + descStyle.Render("Show/hide this help"),
+		"",
+		lipgloss.NewStyle().Bold(true).Underline(true).Render("Clipboard:"),
+		keyStyle.Render("<y>") + "           " + descStyle.Render("Copy item name/ID"),
+		keyStyle.Render("<Y>") + "           " + descStyle.Render("Copy full details"),
+		"",
+		lipgloss.NewStyle().Bold(true).Underline(true).Render("Application:"),
+		keyStyle.Render("<ctrl-c>") + "     " + descStyle.Render("Quit application"),
+		"",
+		lipgloss.NewStyle().Bold(true).Underline(true).Render("JSON View (Task Defs):"),
+		keyStyle.Render("<ctrl-u>") + "     " + descStyle.Render("Scroll JSON up"),
+		keyStyle.Render("<ctrl-d>") + "     " + descStyle.Render("Scroll JSON down"),
+	}
 
-Common Operations:
-  l           View logs (Task/Service selected)
-  D           Describe resource (Any resource)
-  R           Refresh view (Any view)
-  M           Multi-instance overview (Any view)
+	// Create styled columns
+	leftColumn := lipgloss.NewStyle().
+		Width(columnWidth).
+		Padding(0, 2).
+		Render(strings.Join(leftContent, "\n"))
 
-Command Mode:
-  :           Enter command mode
-  Enter       Execute command
-  Esc         Cancel command
+	rightColumn := lipgloss.NewStyle().
+		Width(columnWidth).
+		Padding(0, 2).
+		BorderLeft(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("#45475a")).
+		Render(strings.Join(rightContent, "\n"))
 
-Press any key to close help...`
+	// Join columns
+	content := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		leftColumn,
+		rightColumn,
+	)
+
+	// Add title and footer
+	title := titleStyle.Render("KECS TUI Help")
+	footer := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#6c7086")).
+		MarginTop(2).
+		Render("Press any key to close help...")
+
+	// Combine all parts
+	helpView := lipgloss.JoinVertical(
+		lipgloss.Top,
+		title,
+		content,
+		footer,
+	)
 
 	return lipgloss.NewStyle().
 		Padding(1, 2).
-		Render(helpText)
+		Render(helpView)
 }
 
 func (m Model) renderHelpView() string {
