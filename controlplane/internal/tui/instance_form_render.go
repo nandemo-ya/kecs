@@ -131,11 +131,6 @@ func (m Model) renderInstanceForm() string {
 	}
 	content = append(content, "")
 
-	// Checkboxes
-	content = append(content, m.renderCheckbox("Enable LocalStack", f.localStack, f.focusedField == FieldLocalStack))
-	content = append(content, m.renderCheckbox("Enable Traefik Gateway", f.traefik, f.focusedField == FieldTraefik))
-	content = append(content, "")
-
 	// Buttons (centered)
 	createBtnLabel := "Create"
 	if f.isCreating {

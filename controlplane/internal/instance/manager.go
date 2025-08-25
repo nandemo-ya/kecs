@@ -32,7 +32,6 @@ type StartOptions struct {
 	DataDir      string
 	ConfigFile   string
 	NoLocalStack bool
-	NoTraefik    bool
 	ApiPort      int
 	AdminPort    int
 }
@@ -350,7 +349,6 @@ func (m *Manager) List(ctx context.Context) ([]InstanceInfo, error) {
 			AdminPort:  cfg.AdminPort,
 			HasData:    hasData,
 			LocalStack: cfg.LocalStack,
-			Traefik:    cfg.Traefik,
 		})
 	}
 
@@ -365,7 +363,6 @@ type InstanceInfo struct {
 	AdminPort  int
 	HasData    bool
 	LocalStack bool
-	Traefik    bool
 }
 
 // IsRunning checks if an instance is running
@@ -412,7 +409,6 @@ func (m *Manager) Restart(ctx context.Context, instanceName string) error {
 			APIPort:    4566,
 			AdminPort:  8081,
 			LocalStack: true,
-			Traefik:    false,
 		}
 	}
 
@@ -422,7 +418,6 @@ func (m *Manager) Restart(ctx context.Context, instanceName string) error {
 		ApiPort:      savedConfig.APIPort,
 		AdminPort:    savedConfig.AdminPort,
 		NoLocalStack: !savedConfig.LocalStack,
-		NoTraefik:    !savedConfig.Traefik,
 	}
 
 	// Use restartInstance to handle the restart

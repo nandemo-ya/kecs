@@ -22,8 +22,7 @@ var _ = Describe("InstanceForm", func() {
 			Expect(data["instanceName"]).NotTo(BeEmpty())
 			Expect(data["apiPort"]).To(Equal(8080))
 			Expect(data["adminPort"]).To(Equal(8081))
-			Expect(data["localStack"]).To(BeTrue())
-			Expect(data["traefik"]).To(BeTrue())
+			Expect(data["localStack"]).To(BeTrue()) // Always true
 		})
 	})
 
@@ -32,9 +31,6 @@ var _ = Describe("InstanceForm", func() {
 			// Start at instance name
 			form.MoveFocusDown() // API port
 			form.MoveFocusDown() // Admin port
-			form.MoveFocusDown() // LocalStack
-			form.MoveFocusDown() // Traefik
-			form.MoveFocusDown() // Dev mode
 			form.MoveFocusDown() // Submit
 			form.MoveFocusDown() // Cancel
 			form.MoveFocusDown() // Back to close button
@@ -46,7 +42,7 @@ var _ = Describe("InstanceForm", func() {
 		It("should move focus up through fields", func() {
 			form.MoveFocusUp() // From instance name to cancel
 			form.MoveFocusUp() // Submit
-			form.MoveFocusUp() // Dev mode
+			form.MoveFocusUp() // Admin port
 			// Continue cycling
 		})
 	})
@@ -66,24 +62,7 @@ var _ = Describe("InstanceForm", func() {
 		})
 	})
 
-	Describe("Checkbox Toggle", func() {
-		It("should toggle LocalStack checkbox", func() {
-			// Move to LocalStack field
-			form.MoveFocusDown() // API port
-			form.MoveFocusDown() // Admin port
-			form.MoveFocusDown() // LocalStack
-
-			// Toggle
-			form.ToggleCheckbox()
-			data := form.GetFormData()
-			Expect(data["localStack"]).To(BeFalse())
-
-			// Toggle back
-			form.ToggleCheckbox()
-			data = form.GetFormData()
-			Expect(data["localStack"]).To(BeTrue())
-		})
-	})
+	// Checkbox tests removed - LocalStack is always enabled, no checkboxes in form
 
 	Describe("Validation", func() {
 		It("should validate empty instance name", func() {

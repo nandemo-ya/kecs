@@ -44,9 +44,9 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	// Display instances in a table format
 	fmt.Println("KECS Instances:")
-	fmt.Println("==================================================================")
-	fmt.Printf("%-20s %-10s %-10s %-10s %-10s %-8s\n", "NAME", "STATUS", "API PORT", "ADMIN PORT", "LOCALSTACK", "TRAEFIK")
-	fmt.Println("------------------------------------------------------------------")
+	fmt.Println("=========================================================")
+	fmt.Printf("%-20s %-10s %-10s %-10s %-10s\n", "NAME", "STATUS", "API PORT", "ADMIN PORT", "LOCALSTACK")
+	fmt.Println("---------------------------------------------------------")
 
 	for _, inst := range instances {
 		status := strings.ToLower(inst.Status)
@@ -54,21 +54,16 @@ func runList(cmd *cobra.Command, args []string) error {
 		if inst.LocalStack {
 			localStack = "yes"
 		}
-		traefik := "no"
-		if inst.Traefik {
-			traefik = "yes"
-		}
 
-		fmt.Printf("%-20s %-10s %-10d %-10d %-10s %-8s\n",
+		fmt.Printf("%-20s %-10s %-10d %-10d %-10s\n",
 			inst.Name,
 			status,
 			inst.ApiPort,
 			inst.AdminPort,
 			localStack,
-			traefik,
 		)
 	}
-	fmt.Println("==================================================================")
+	fmt.Println("=========================================================")
 
 	// Show helpful commands
 	fmt.Println("\nCommands:")

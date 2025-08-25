@@ -44,7 +44,6 @@ var (
 	startAdminPort    int
 	startConfigFile   string
 	startNoLocalStack bool
-	startNoTraefik    bool
 	startTimeout      time.Duration
 )
 
@@ -65,7 +64,6 @@ func init() {
 	startCmd.Flags().IntVar(&startAdminPort, "admin-port", 8081, "Admin API port")
 	startCmd.Flags().StringVar(&startConfigFile, "config", "", "Configuration file path")
 	startCmd.Flags().BoolVar(&startNoLocalStack, "no-localstack", false, "Disable LocalStack deployment")
-	startCmd.Flags().BoolVar(&startNoTraefik, "no-traefik", false, "Disable Traefik deployment")
 	startCmd.Flags().DurationVar(&startTimeout, "timeout", 10*time.Minute, "Timeout for cluster creation")
 }
 
@@ -102,7 +100,6 @@ func runStart(cmd *cobra.Command, args []string) error {
 		DataDir:      startDataDir,
 		ConfigFile:   startConfigFile,
 		NoLocalStack: startNoLocalStack,
-		NoTraefik:    startNoTraefik,
 		ApiPort:      startApiPort,
 		AdminPort:    startAdminPort,
 	}

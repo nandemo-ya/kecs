@@ -38,7 +38,6 @@ type CreateInstanceOptions struct {
 	APIPort    int    `json:"apiPort"`
 	AdminPort  int    `json:"adminPort"`
 	LocalStack bool   `json:"localStack"`
-	Traefik    bool   `json:"traefik"`
 }
 
 // Cluster represents an ECS cluster
