@@ -37,7 +37,7 @@ var (
 				PaddingLeft(2)
 
 	selectedCommandStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("#2a2a4a")).
+				Background(lipgloss.Color("#005577")).
 				Foreground(lipgloss.Color("#ffffff")).
 				Bold(true).
 				PaddingLeft(1).

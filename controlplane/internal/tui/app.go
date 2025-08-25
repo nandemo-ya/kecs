@@ -132,6 +132,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleServiceScaleDialogKeys(msg)
 		}
 
+		// Handle service update dialog
+		if m.serviceUpdateDialog != nil {
+			return m.handleServiceUpdateDialogKeys(msg)
+		}
+
 		// View-specific key handling
 		switch m.currentView {
 		case ViewInstances:
@@ -186,6 +191,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Check if command result should be cleared
 		if m.commandPalette != nil {
 			m.commandPalette.ShouldShowResult() // This will clear expired results
+		}
+
+	case TaskDefinitionsFetchedMsg:
+		// Handle fetched task definitions and open dialog
+		if msg.Error != nil {
+			// Still show dialog with fallback data if there was an error
+			if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
+				if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+					logger := log.New(f, "", log.LstdFlags)
+					logger.Printf("Error fetching task definitions: %v\n", msg.Error)
+					f.Close()
+				}
+			}
+		}
+		m.serviceUpdateDialog = NewServiceUpdateDialog(msg.ServiceName, msg.CurrentTaskDef, msg.TaskDefs)
+		return m, nil
+	case ServiceUpdatedMsg:
+		// Handle service update completion
+		m.updatingInProgress = false
+
+		// Log the result for debugging
+		if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
+			if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				logger := log.New(f, "", log.LstdFlags)
+				if msg.Success {
+					logger.Printf("Service updated successfully: %s to %s\n", msg.ServiceName, msg.TaskDef)
+				} else {
+					logger.Printf("Service update failed: %v\n", msg.Error)
+				}
+				f.Close()
+			}
+		}
+
+		if msg.Success {
+			// Refresh services to show updated task definition
+			cmds = append(cmds, m.loadDataFromAPI())
+		} else {
+			// Show error (could add error dialog here)
+			m.err = msg.Error
 		}
 
 	case ServiceScaledMsg:
@@ -619,9 +663,19 @@ func (m Model) View() string {
 		return m.renderServiceScaleDialog()
 	}
 
+	// Service update dialog
+	if m.serviceUpdateDialog != nil {
+		return m.renderServiceUpdateDialog()
+	}
+
 	// Scaling progress overlay
 	if m.scalingInProgress {
 		return m.renderScalingProgress()
+	}
+
+	// Updating progress overlay
+	if m.updatingInProgress {
+		return m.renderUpdatingProgress()
 	}
 
 	// Calculate exact heights for panels
@@ -910,9 +964,12 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.serviceScaleDialog = NewServiceScaleDialog(service.Name, service.Desired)
 		}
 	case "u":
-		// Update service (mock)
-	case "x":
-		// Stop service (mock)
+		// Update service - fetch available task definitions
+		if len(m.services) > 0 && m.serviceCursor < len(m.services) {
+			service := m.services[m.serviceCursor]
+			// Start fetching task definitions
+			return m, m.fetchTaskDefinitionsForUpdate(service.Name, service.TaskDef)
+		}
 	case "l":
 		// View logs
 		if len(m.services) > 0 {

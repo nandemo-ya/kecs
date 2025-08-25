@@ -33,7 +33,7 @@ func (m Model) renderClusterForm() string {
 	var content []string
 
 	// Title with close button
-	titleLine := renderDialogTitle("Create ECS Cluster", true, f.focusedField == FieldCloseButton, 61)
+	titleLine := renderDialogTitle("Create ECS Cluster", true, f.focusedField == FieldCloseButton, 71)
 	content = append(content, titleLine)
 	content = append(content, "")
 
@@ -68,7 +68,7 @@ func (m Model) renderClusterForm() string {
 
 	// Center the buttons
 	buttonsWidth := lipgloss.Width(buttons)
-	formWidth := 61 // Width of form content area (65 - 2*2 padding)
+	formWidth := 71 // Width of form content area (75 - 2*2 padding)
 	if buttonsWidth < formWidth {
 		padding := (formWidth - buttonsWidth) / 2
 		buttons = strings.Repeat(" ", padding) + buttons
@@ -125,7 +125,7 @@ func (m Model) renderClusterForm() string {
 
 // renderRegionSelector renders the region selector dropdown
 func (m Model) renderRegionSelector(f *ClusterForm) string {
-	width := 35
+	width := 45
 	focused := f.focusedField == FieldRegion
 
 	// Build the selector display
@@ -149,7 +149,7 @@ func (m Model) renderRegionSelector(f *ClusterForm) string {
 			if i == f.regionIndex {
 				// Highlighted selection
 				line = lipgloss.NewStyle().
-					Background(lipgloss.Color("#3a3a5a")).
+					Background(lipgloss.Color("#005577")).
 					Foreground(lipgloss.Color("#ffffff")).
 					Width(width - 4). // Account for border and padding
 					Render("▸ " + awsRegions[i])

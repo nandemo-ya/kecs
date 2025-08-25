@@ -13,6 +13,12 @@ func renderDialogTitle(title string, showCloseButton bool, closeButtonFocused bo
 		return formTitleStyle.Render(title)
 	}
 
+	// Style the title without margin
+	styledTitle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00ff00")).
+		Bold(true).
+		Render(title)
+
 	// Close button styling
 	closeBtn := "[×]"
 	if closeButtonFocused {
@@ -27,12 +33,18 @@ func renderDialogTitle(title string, showCloseButton bool, closeButtonFocused bo
 	}
 
 	// Calculate spacing for right-aligned close button
-	titleWidth := lipgloss.Width(title)
+	titleWidth := lipgloss.Width(styledTitle)
 	closeBtnWidth := 3 // [×]
 	spaces := width - titleWidth - closeBtnWidth
 	if spaces < 1 {
 		spaces = 1
 	}
 
-	return formTitleStyle.Render(title) + strings.Repeat(" ", spaces) + closeBtn
+	// Create the complete line without margin
+	completeLine := styledTitle + strings.Repeat(" ", spaces) + closeBtn
+
+	// Apply margin to the whole line
+	return lipgloss.NewStyle().
+		MarginBottom(1).
+		Render(completeLine)
 }

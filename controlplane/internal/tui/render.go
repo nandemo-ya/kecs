@@ -62,7 +62,7 @@ var (
 
 	// Row highlight style for selected items
 	selectedRowStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("#2a2a4a")).
+				Background(lipgloss.Color("#005577")).
 				Foreground(lipgloss.Color("#ffffff")).
 				Bold(true)
 
@@ -117,7 +117,8 @@ func (m Model) getHeaderShortcuts() string {
 	case ViewServices:
 		shortcuts = []string{
 			keyStyle.Render("<s>") + sepStyle.Render(" Scale"),
-			keyStyle.Render("<r>") + sepStyle.Render(" Restart"),
+			keyStyle.Render("<u>") + sepStyle.Render(" Update"),
+			keyStyle.Render("<r>") + sepStyle.Render(" Refresh"),
 			keyStyle.Render("<l>") + sepStyle.Render(" Logs"),
 			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
 		}
@@ -1281,9 +1282,8 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		leftShortcuts = append(leftShortcuts,
 			keyStyle.Render("<enter>")+" "+descStyle.Render("Select"),
 			keyStyle.Render("<s>")+" "+descStyle.Render("Scale"),
-			keyStyle.Render("<r>")+" "+descStyle.Render("Restart"),
 			keyStyle.Render("<u>")+" "+descStyle.Render("Update"),
-			keyStyle.Render("<x>")+" "+descStyle.Render("Stop"),
+			keyStyle.Render("<r>")+" "+descStyle.Render("Refresh"),
 			keyStyle.Render("<l>")+" "+descStyle.Render("Logs"),
 			keyStyle.Render("<t>")+" "+descStyle.Render("Task defs"),
 		)
@@ -1644,10 +1644,9 @@ func (m Model) renderHelpContent(maxHeight int) string {
 		keyStyle.Render("<n>") + "           " + descStyle.Render("Create new cluster"),
 		"",
 		lipgloss.NewStyle().Bold(true).Underline(true).Render("Service Operations:"),
-		keyStyle.Render("<r>") + "           " + descStyle.Render("Restart service"),
 		keyStyle.Render("<s>") + "           " + descStyle.Render("Scale service"),
-		keyStyle.Render("<u>") + "           " + descStyle.Render("Update service"),
-		keyStyle.Render("<x>") + "           " + descStyle.Render("Stop service"),
+		keyStyle.Render("<u>") + "           " + descStyle.Render("Update task definition"),
+		keyStyle.Render("<r>") + "           " + descStyle.Render("Refresh services"),
 		"",
 		lipgloss.NewStyle().Bold(true).Underline(true).Render("Task Definition Operations:"),
 		keyStyle.Render("<n>") + "           " + descStyle.Render("Create new task def"),
@@ -1846,7 +1845,7 @@ func (m Model) renderTaskDefFamiliesList(maxHeight int) string {
 
 	// Styles
 	selectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#2a2a4a")).
+		Background(lipgloss.Color("#005577")).
 		Foreground(lipgloss.Color("#ffffff")).
 		Bold(true)
 
@@ -1947,7 +1946,7 @@ func (m Model) renderTaskDefRevisionsList(maxHeight int, width int) string {
 
 	// Styles
 	selectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#2a2a4a")).
+		Background(lipgloss.Color("#005577")).
 		Foreground(lipgloss.Color("#ffffff")).
 		Bold(true).
 		Width(width)
