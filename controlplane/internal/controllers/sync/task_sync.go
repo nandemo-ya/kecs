@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -50,9 +51,29 @@ func (c *SyncController) syncTask(ctx context.Context, key string) error {
 
 	logging.Debug("Mapped pod to task", "taskArn", task.ARN, "status", task.LastStatus)
 
+	// Check if task exists in storage
+	existingTask, err := c.storage.TaskStore().Get(ctx, task.ClusterARN, task.ARN)
+	if err != nil && !errors.IsNotFound(err) {
+		logging.Warn("Failed to check existing task", "error", err)
+	}
+
+	// Track state transitions for cluster count updates
+	var wasRunning, isRunning bool
+	if existingTask != nil {
+		wasRunning = existingTask.LastStatus == "RUNNING"
+	}
+	isRunning = task.LastStatus == "RUNNING"
+
 	// Add to batch updater for efficient storage update
 	c.batchUpdater.AddTaskUpdate(task)
 	logging.Debug("Queued task update", "namespace", namespace, "name", name)
+
+	// Update cluster counts if task state changed
+	if wasRunning != isRunning {
+		if err := c.updateClusterTaskCount(ctx, task.ClusterARN); err != nil {
+			logging.Warn("Failed to update cluster task count", "error", err)
+		}
+	}
 
 	// Log the sync result
 	logging.Debug("Successfully synced task",
@@ -160,6 +181,11 @@ func (c *SyncController) handleDeletedPod(ctx context.Context, namespace, podNam
 	// Add to batch updater
 	c.batchUpdater.AddTaskUpdate(task)
 
+	// Update cluster task count after marking task as stopped
+	if err := c.updateClusterTaskCount(ctx, clusterARN); err != nil {
+		logging.Warn("Failed to update cluster task count after pod deletion", "error", err)
+	}
+
 	logging.Info("Marked task as STOPPED due to pod deletion",
 		"taskArn", task.ARN,
 		"podName", podName,
@@ -171,6 +197,58 @@ func (c *SyncController) handleDeletedPod(ctx context.Context, namespace, podNam
 func (c *SyncController) syncPod(ctx context.Context, key string) error {
 	logging.Debug("Syncing pod", "key", key)
 	return c.syncTask(ctx, key)
+}
+
+// updateClusterTaskCount updates the cluster's running and pending task counts
+func (c *SyncController) updateClusterTaskCount(ctx context.Context, clusterARN string) error {
+	// Extract cluster name from ARN
+	parts := strings.Split(clusterARN, "/")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid cluster ARN: %s", clusterARN)
+	}
+	clusterName := parts[len(parts)-1]
+
+	// Get cluster from storage
+	cluster, err := c.storage.ClusterStore().Get(ctx, clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get cluster: %w", err)
+	}
+	if cluster == nil {
+		return fmt.Errorf("cluster not found: %s", clusterName)
+	}
+
+	// Count running and pending tasks
+	filters := storage.TaskFilters{}
+	tasks, err := c.storage.TaskStore().List(ctx, clusterARN, filters)
+	if err != nil {
+		return fmt.Errorf("failed to list tasks: %w", err)
+	}
+
+	var runningCount, pendingCount int
+	for _, task := range tasks {
+		switch task.LastStatus {
+		case "RUNNING":
+			runningCount++
+		case "PENDING":
+			pendingCount++
+		}
+	}
+
+	// Update cluster counts
+	cluster.RunningTasksCount = runningCount
+	cluster.PendingTasksCount = pendingCount
+
+	// Save updated cluster
+	if err := c.storage.ClusterStore().Update(ctx, cluster); err != nil {
+		return fmt.Errorf("failed to update cluster: %w", err)
+	}
+
+	logging.Info("Updated cluster task counts",
+		"cluster", clusterName,
+		"running", runningCount,
+		"pending", pendingCount)
+
+	return nil
 }
 
 // stringPtr returns a pointer to the string
