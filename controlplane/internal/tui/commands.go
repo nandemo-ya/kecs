@@ -277,7 +277,7 @@ func (m Model) createInstanceCmd(opts api.CreateInstanceOptions) tea.Cmd {
 }
 
 // monitorInstanceCreation monitors the creation progress and sends status updates
-func (m Model) monitorInstanceCreation(instanceName string, hasLocalStack, hasTraefik bool) tea.Cmd {
+func (m Model) monitorInstanceCreation(instanceName string, hasLocalStack bool) tea.Cmd {
 	return func() tea.Msg {
 		// Start a background monitoring goroutine
 		startTime := time.Now()
@@ -290,9 +290,6 @@ func (m Model) monitorInstanceCreation(instanceName string, hasLocalStack, hasTr
 
 		if hasLocalStack {
 			steps = append(steps, CreationStep{Name: "Starting LocalStack", Status: "pending"})
-		}
-		if hasTraefik {
-			steps = append(steps, CreationStep{Name: "Configuring Traefik", Status: "pending"})
 		}
 		steps = append(steps, CreationStep{Name: "Finalizing", Status: "pending"})
 

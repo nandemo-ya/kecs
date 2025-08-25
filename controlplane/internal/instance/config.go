@@ -35,7 +35,6 @@ type InstanceConfig struct {
 
 	// Feature toggles
 	LocalStack bool `yaml:"localStack"`
-	Traefik    bool `yaml:"traefik"`
 
 	// Data directory
 	DataDir string `yaml:"dataDir"`
@@ -61,7 +60,6 @@ func SaveInstanceConfig(instanceName string, opts StartOptions) error {
 		APIPort:    opts.ApiPort,
 		AdminPort:  opts.AdminPort,
 		LocalStack: !opts.NoLocalStack,
-		Traefik:    !opts.NoTraefik,
 		DataDir:    opts.DataDir,
 	}
 

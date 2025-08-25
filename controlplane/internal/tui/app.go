@@ -1343,7 +1343,6 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				APIPort:    formData["apiPort"].(int),
 				AdminPort:  formData["adminPort"].(int),
 				LocalStack: formData["localStack"].(bool),
-				Traefik:    formData["traefik"].(bool),
 			}
 
 			// Initialize creation steps
@@ -1353,9 +1352,6 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 			}
 			if opts.LocalStack {
 				steps = append(steps, CreationStep{Name: "Starting LocalStack", Status: "pending"})
-			}
-			if opts.Traefik {
-				steps = append(steps, CreationStep{Name: "Configuring Traefik", Status: "pending"})
 			}
 			steps = append(steps, CreationStep{Name: "Finalizing", Status: "pending"})
 
@@ -1369,7 +1365,7 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 			// Start creation and monitoring
 			return m, tea.Batch(
 				m.createInstanceCmd(opts),
-				m.monitorInstanceCreation(opts.Name, opts.LocalStack, opts.Traefik),
+				m.monitorInstanceCreation(opts.Name, opts.LocalStack),
 			)
 		case FieldCancel:
 			// Cancel and close
@@ -1381,8 +1377,7 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case " ", "space":
 		// Toggle checkbox or press button
 		switch m.instanceForm.focusedField {
-		case FieldLocalStack, FieldTraefik:
-			m.instanceForm.ToggleCheckbox()
+		// No checkboxes anymore, LocalStack is always enabled
 		case FieldSubmit:
 			// Same as enter on submit
 			if !m.instanceForm.Validate() {
@@ -1399,7 +1394,6 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				APIPort:    formData["apiPort"].(int),
 				AdminPort:  formData["adminPort"].(int),
 				LocalStack: formData["localStack"].(bool),
-				Traefik:    formData["traefik"].(bool),
 			}
 
 			// Initialize creation steps
@@ -1409,9 +1403,6 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 			}
 			if opts.LocalStack {
 				steps = append(steps, CreationStep{Name: "Starting LocalStack", Status: "pending"})
-			}
-			if opts.Traefik {
-				steps = append(steps, CreationStep{Name: "Configuring Traefik", Status: "pending"})
 			}
 			steps = append(steps, CreationStep{Name: "Finalizing", Status: "pending"})
 
@@ -1425,7 +1416,7 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 			// Start creation and monitoring
 			return m, tea.Batch(
 				m.createInstanceCmd(opts),
-				m.monitorInstanceCreation(opts.Name, opts.LocalStack, opts.Traefik),
+				m.monitorInstanceCreation(opts.Name, opts.LocalStack),
 			)
 		case FieldCancel:
 			m.currentView = m.previousView

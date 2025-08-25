@@ -17,8 +17,6 @@ const (
 	FieldInstanceName
 	FieldAPIPort
 	FieldAdminPort
-	FieldLocalStack
-	FieldTraefik
 	FieldSubmit
 	FieldCancel
 )
@@ -35,8 +33,6 @@ type InstanceForm struct {
 	instanceName string
 	apiPort      string
 	adminPort    string
-	localStack   bool
-	traefik      bool
 
 	// UI state
 	focusedField FormField
@@ -66,8 +62,6 @@ func NewInstanceForm() *InstanceForm {
 		instanceName: defaultName,
 		apiPort:      "8080",
 		adminPort:    "8081",
-		localStack:   true,
-		traefik:      true,
 		focusedField: FieldInstanceName, // Start with instance name field, not close button
 	}
 }
@@ -84,8 +78,6 @@ func NewInstanceFormWithSuggestions(instances []Instance) *InstanceForm {
 		instanceName: defaultName,
 		apiPort:      fmt.Sprintf("%d", apiPort),
 		adminPort:    fmt.Sprintf("%d", adminPort),
-		localStack:   true,
-		traefik:      true,
 		focusedField: FieldInstanceName, // Start with instance name field, not close button
 	}
 }
@@ -96,8 +88,6 @@ func (f *InstanceForm) Reset() {
 	f.instanceName = defaultName
 	f.apiPort = "8080"
 	f.adminPort = "8081"
-	f.localStack = true
-	f.traefik = true
 	f.focusedField = FieldInstanceName
 	f.errorMsg = ""
 	f.successMsg = ""
@@ -131,12 +121,7 @@ func (f *InstanceForm) MoveFocusDown() {
 
 // ToggleCheckbox toggles the checkbox at the current focus
 func (f *InstanceForm) ToggleCheckbox() {
-	switch f.focusedField {
-	case FieldLocalStack:
-		f.localStack = !f.localStack
-	case FieldTraefik:
-		f.traefik = !f.traefik
-	}
+	// No checkboxes anymore
 }
 
 // UpdateField updates the text field at the current focus
@@ -215,8 +200,7 @@ func (f *InstanceForm) GetFormData() map[string]interface{} {
 		"instanceName": f.instanceName,
 		"apiPort":      apiPort,
 		"adminPort":    adminPort,
-		"localStack":   f.localStack,
-		"traefik":      f.traefik,
+		"localStack":   true, // Always enabled
 	}
 }
 

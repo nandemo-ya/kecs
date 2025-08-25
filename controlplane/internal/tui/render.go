@@ -488,18 +488,11 @@ func (m Model) renderSummary() string {
 			}
 
 			// Find instance configuration
-			var features []string
 			var apiPort, adminPort int
 			for _, inst := range m.instances {
 				if inst.Name == m.selectedInstance {
 					apiPort = inst.APIPort
 					adminPort = inst.AdminPort
-					if inst.LocalStack {
-						features = append(features, "LocalStack")
-					}
-					if inst.Traefik {
-						features = append(features, "Traefik")
-					}
 					break
 				}
 			}
@@ -508,11 +501,6 @@ func (m Model) renderSummary() string {
 			line1 := fmt.Sprintf("Clusters: %-4d  API:   %d", len(m.clusters), apiPort)
 			line2 := fmt.Sprintf("Services: %-4d  Admin: %d", totalServices, adminPort)
 			line3 := fmt.Sprintf("Tasks:    %-4d", totalTasks)
-
-			// Add features on the same line if they exist
-			if len(features) > 0 {
-				line3 += "  " + strings.Join(features, ", ")
-			}
 
 			// Create multi-line summary with consistent styling
 			summary = summaryStyle.Render(line1) + "\n" +
@@ -529,28 +517,8 @@ func (m Model) renderSummary() string {
 				totalRunning += svc.Running
 			}
 
-			// Add instance configuration info
-			var instanceInfo string
-			if m.selectedInstance != "" {
-				var features []string
-				for _, inst := range m.instances {
-					if inst.Name == m.selectedInstance {
-						if inst.LocalStack {
-							features = append(features, "LocalStack")
-						}
-						if inst.Traefik {
-							features = append(features, "Traefik")
-						}
-						break
-					}
-				}
-				if len(features) > 0 {
-					instanceInfo = " | " + strings.Join(features, ", ")
-				}
-			}
-
-			summary = fmt.Sprintf("Cluster: %s | Services: %d | Desired Tasks: %d | Running Tasks: %d%s",
-				m.selectedCluster, len(m.services), totalDesired, totalRunning, instanceInfo)
+			summary = fmt.Sprintf("Cluster: %s | Services: %d | Desired Tasks: %d | Running Tasks: %d",
+				m.selectedCluster, len(m.services), totalDesired, totalRunning)
 		}
 
 	case ViewTasks:
