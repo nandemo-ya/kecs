@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"io"
+	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -125,6 +127,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleInstanceSwitcherInput(msg)
 		}
 
+		// Handle service scale dialog
+		if m.serviceScaleDialog != nil {
+			return m.handleServiceScaleDialogKeys(msg)
+		}
+
 		// View-specific key handling
 		switch m.currentView {
 		case ViewInstances:
@@ -179,6 +186,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Check if command result should be cleared
 		if m.commandPalette != nil {
 			m.commandPalette.ShouldShowResult() // This will clear expired results
+		}
+
+	case ServiceScaledMsg:
+		// Handle service scaling completion
+		m.scalingInProgress = false
+
+		// Log the result for debugging
+		if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
+			if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				logger := log.New(f, "", log.LstdFlags)
+				if msg.Success {
+					logger.Printf("Service scaled successfully: %s to %d\n", msg.ServiceName, msg.DesiredCount)
+				} else {
+					logger.Printf("Service scaling failed: %v\n", msg.Error)
+				}
+				f.Close()
+			}
+		}
+
+		if msg.Success {
+			// Refresh services to show updated count
+			cmds = append(cmds, m.loadDataFromAPI())
+		} else {
+			// Show error (could add error dialog here)
+			m.err = msg.Error
 		}
 
 	case statusTickMsg:
@@ -582,6 +614,16 @@ func (m Model) View() string {
 		return m.renderDeletingOverlay()
 	}
 
+	// Service scale dialog has priority
+	if m.serviceScaleDialog != nil {
+		return m.renderServiceScaleDialog()
+	}
+
+	// Scaling progress overlay
+	if m.scalingInProgress {
+		return m.renderScalingProgress()
+	}
+
 	// Calculate exact heights for panels
 	footerHeight := 1
 	availableHeight := m.height - footerHeight
@@ -862,9 +904,11 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		// Restart service or refresh (context-dependent)
 		return m, m.loadDataFromAPI()
 	case "s":
-		// Scale service (mock)
-		m.commandMode = true
-		m.commandInput = fmt.Sprintf("scale service %s ", m.services[m.serviceCursor].Name)
+		// Scale service
+		if len(m.services) > 0 && m.serviceCursor < len(m.services) {
+			service := m.services[m.serviceCursor]
+			m.serviceScaleDialog = NewServiceScaleDialog(service.Name, service.Desired)
+		}
 	case "u":
 		// Update service (mock)
 	case "x":

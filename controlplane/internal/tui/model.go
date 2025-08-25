@@ -222,6 +222,12 @@ type Model struct {
 
 	// Cluster creation form
 	clusterForm *ClusterForm
+
+	// Service scaling
+	serviceScaleDialog *ServiceScaleDialog
+	scalingInProgress  bool
+	scalingServiceName string
+	scalingTargetCount int
 }
 
 // NewModel creates a new application model
