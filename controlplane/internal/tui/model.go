@@ -328,6 +328,20 @@ func (m *Model) goBack() {
 		m.selectedService = ""
 	case ViewLogs:
 		m.currentView = m.previousView
+	case ViewTaskDefinitionFamilies:
+		m.currentView = ViewClusters
+		m.selectedFamily = ""
+	case ViewTaskDefinitionRevisions:
+		// Special handling for JSON view
+		if m.showTaskDefJSON {
+			// Just hide the JSON view
+			m.showTaskDefJSON = false
+		} else {
+			// Go back to families view
+			m.currentView = ViewTaskDefinitionFamilies
+			m.selectedFamily = ""
+			m.taskDefRevisionCursor = 0
+		}
 	}
 }
 

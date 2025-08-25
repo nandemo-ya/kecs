@@ -86,6 +86,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commandPalette.Reset()
 			} else if m.currentView == ViewTaskDescribe {
 				m.currentView = m.previousView
+			} else if m.currentView == ViewTaskDefinitionRevisions && m.showTaskDefJSON {
+				// Special case: just hide JSON view without navigating
+				m.showTaskDefJSON = false
 			} else if m.currentView != ViewInstances {
 				// Go back to previous view if not at root
 				m.goBack()
