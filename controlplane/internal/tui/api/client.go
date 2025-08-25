@@ -437,6 +437,55 @@ func (c *HTTPClient) UpdateService(ctx context.Context, instanceName, clusterNam
 	return &updatedService, nil
 }
 
+func (c *HTTPClient) UpdateServiceDesiredCount(instanceName, clusterName, serviceArn string, desiredCount int) error {
+	// Get instance info to find API port
+	if c.k3dProvider != nil {
+		inst, err := c.k3dProvider.GetInstance(context.Background(), instanceName)
+		if err != nil {
+			return fmt.Errorf("failed to get instance: %w", err)
+		}
+
+		// Call the instance's API directly using UpdateService
+		url := fmt.Sprintf("http://localhost:%d/v1/UpdateService", inst.APIPort)
+		client := &http.Client{Timeout: 10 * time.Second}
+
+		// Create UpdateService request with only desired count change
+		reqBody := map[string]interface{}{
+			"service":      serviceArn,
+			"cluster":      clusterName,
+			"desiredCount": desiredCount,
+		}
+
+		jsonData, err := json.Marshal(reqBody)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request: %w", err)
+		}
+
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+		req.Header.Set("X-Amz-Target", "AmazonEC2ContainerServiceV20141113.UpdateService")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to call UpdateService: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("UpdateService failed: %s", string(body))
+		}
+
+		return nil
+	}
+
+	// Fallback to regular API call
+	return fmt.Errorf("UpdateServiceDesiredCount not implemented for this client type")
+}
+
 func (c *HTTPClient) DeleteService(ctx context.Context, instanceName, clusterName, serviceName string) error {
 	path := fmt.Sprintf("/api/instances/%s/services/%s", url.PathEscape(instanceName), url.PathEscape(serviceName))
 	req := map[string]string{"cluster": clusterName}

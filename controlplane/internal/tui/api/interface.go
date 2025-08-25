@@ -41,6 +41,7 @@ type Client interface {
 	DescribeServices(ctx context.Context, instanceName, clusterName string, serviceNames []string) ([]Service, error)
 	CreateService(ctx context.Context, instanceName, clusterName string, service Service) (*Service, error)
 	UpdateService(ctx context.Context, instanceName, clusterName string, service Service) (*Service, error)
+	UpdateServiceDesiredCount(instanceName, clusterName, serviceArn string, desiredCount int) error
 	DeleteService(ctx context.Context, instanceName, clusterName, serviceName string) error
 
 	// ECS Task operations
