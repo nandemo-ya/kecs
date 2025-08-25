@@ -6,7 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/tui"
 )
 
 var (
@@ -19,11 +20,19 @@ var (
 		Use:   "controlplane",
 		Short: "KECS Control Plane - Kubernetes-based ECS Compatible Service",
 		Long: `KECS Control Plane provides Amazon ECS compatible APIs running on Kubernetes.
-It allows you to run ECS workloads locally or in any Kubernetes cluster without AWS dependencies.`,
+It allows you to run ECS workloads locally or in any Kubernetes cluster without AWS dependencies.
+
+When run without arguments, launches the interactive terminal user interface (TUI).`,
 		// The default command when no subcommands are specified
-		Run: func(cmd *cobra.Command, args []string) {
-			// This will start the server by default
-			startServer()
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Launch TUI by default when no subcommands are provided
+			// Initialize config if not already done
+			if err := config.InitConfig(); err != nil {
+				return err
+			}
+
+			// Run the TUI
+			return tui.Run()
 		},
 	}
 )
@@ -46,12 +55,4 @@ func init() {
 	RootCmd.AddCommand(serverCmd)
 	RootCmd.AddCommand(versionCmd)
 	RootCmd.AddCommand(localstackCmd)
-}
-
-// startServer is the default action when no subcommands are specified
-func startServer() {
-	logging.Info("Starting KECS Control Plane",
-		"port", port,
-		"logLevel", logLevel)
-	// TODO: Implement actual control plane server startup logic
 }
