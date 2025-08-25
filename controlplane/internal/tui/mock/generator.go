@@ -26,7 +26,6 @@ type InstanceMsg struct {
 	AdminPort  int
 	LocalStack bool
 	Traefik    bool
-	DevMode    bool
 	Age        time.Duration
 }
 
@@ -94,7 +93,6 @@ func LoadAllData(selectedInstance, selectedCluster, selectedService, selectedTas
 				AdminPort:  data.AdminPort,
 				LocalStack: data.LocalStack,
 				Traefik:    data.Traefik,
-				DevMode:    data.DevMode,
 				Age:        data.Age,
 			}
 		}

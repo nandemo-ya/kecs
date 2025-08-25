@@ -17,7 +17,6 @@ type InstanceData struct {
 	AdminPort  int
 	LocalStack bool
 	Traefik    bool
-	DevMode    bool
 	Age        time.Duration
 }
 
@@ -71,11 +70,11 @@ type LogData struct {
 // Predefined mock data
 var (
 	mockInstances = []InstanceData{
-		{Name: "development", Status: "ACTIVE", Clusters: 3, Services: 12, Tasks: 28, APIPort: 8080, AdminPort: 8081, LocalStack: true, Traefik: true, DevMode: true, Age: 5 * 24 * time.Hour},
-		{Name: "staging", Status: "ACTIVE", Clusters: 2, Services: 8, Tasks: 18, APIPort: 8090, AdminPort: 8091, LocalStack: true, Traefik: true, DevMode: false, Age: 3 * 24 * time.Hour},
-		{Name: "testing", Status: "STOPPED", Clusters: 1, Services: 0, Tasks: 0, APIPort: 8100, AdminPort: 8101, LocalStack: false, Traefik: false, DevMode: false, Age: 7 * 24 * time.Hour},
-		{Name: "production", Status: "ACTIVE", Clusters: 5, Services: 25, Tasks: 62, APIPort: 8110, AdminPort: 8111, LocalStack: false, Traefik: true, DevMode: false, Age: 24 * time.Hour},
-		{Name: "local", Status: "ACTIVE", Clusters: 1, Services: 3, Tasks: 5, APIPort: 8120, AdminPort: 8121, LocalStack: true, Traefik: false, DevMode: true, Age: 2 * time.Hour},
+		{Name: "development", Status: "ACTIVE", Clusters: 3, Services: 12, Tasks: 28, APIPort: 8080, AdminPort: 8081, LocalStack: true, Traefik: true, Age: 5 * 24 * time.Hour},
+		{Name: "staging", Status: "ACTIVE", Clusters: 2, Services: 8, Tasks: 18, APIPort: 8090, AdminPort: 8091, LocalStack: true, Traefik: true, Age: 3 * 24 * time.Hour},
+		{Name: "testing", Status: "STOPPED", Clusters: 1, Services: 0, Tasks: 0, APIPort: 8100, AdminPort: 8101, LocalStack: false, Traefik: false, Age: 7 * 24 * time.Hour},
+		{Name: "production", Status: "ACTIVE", Clusters: 5, Services: 25, Tasks: 62, APIPort: 8110, AdminPort: 8111, LocalStack: false, Traefik: true, Age: 24 * time.Hour},
+		{Name: "local", Status: "ACTIVE", Clusters: 1, Services: 3, Tasks: 5, APIPort: 8120, AdminPort: 8121, LocalStack: true, Traefik: false, Age: 2 * time.Hour},
 	}
 
 	mockClusters = map[string][]ClusterData{

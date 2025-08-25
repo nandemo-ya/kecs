@@ -44,7 +44,6 @@ type Instance struct {
 	AdminPort  int
 	LocalStack bool
 	Traefik    bool
-	DevMode    bool
 	Age        time.Duration
 	Selected   bool
 }

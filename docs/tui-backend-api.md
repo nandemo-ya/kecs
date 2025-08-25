@@ -79,8 +79,7 @@ Creates a new KECS instance (currently returns 501 Not Implemented).
   "apiPort": 8090,
   "adminPort": 8091,
   "localStack": true,
-  "traefik": true,
-  "devMode": false
+  "traefik": true
 }
 ```
 

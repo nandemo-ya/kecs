@@ -47,7 +47,6 @@ type FeaturesConfig struct {
 	TestMode         bool `yaml:"testMode" mapstructure:"testMode"`
 	ContainerMode    bool `yaml:"containerMode" mapstructure:"containerMode"`
 	AutoRecoverState bool `yaml:"autoRecoverState" mapstructure:"autoRecoverState"`
-	DevMode          bool `yaml:"devMode" mapstructure:"devMode"`
 	IAMIntegration   bool `yaml:"iamIntegration" mapstructure:"iamIntegration"`
 	TUIMock          bool `yaml:"tuiMock" mapstructure:"tuiMock"`
 }
@@ -161,7 +160,6 @@ func bindLegacyEnvVars() {
 	v.BindEnv("kubernetes.keepClustersOnShutdown", "KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
 	v.BindEnv("features.autoRecoverState", "KECS_AUTO_RECOVER_STATE")
 	v.BindEnv("aws.proxyImage", "KECS_AWS_PROXY_IMAGE")
-	v.BindEnv("features.devMode", "KECS_DEV_MODE")
 	v.BindEnv("features.iamIntegration", "KECS_IAM_INTEGRATION")
 	v.BindEnv("localstack.enabled", "KECS_LOCALSTACK_ENABLED")
 	v.BindEnv("localstack.useTraefik", "KECS_LOCALSTACK_USE_TRAEFIK")

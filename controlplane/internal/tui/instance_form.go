@@ -19,7 +19,6 @@ const (
 	FieldAdminPort
 	FieldLocalStack
 	FieldTraefik
-	FieldDevMode
 	FieldSubmit
 	FieldCancel
 )
@@ -38,7 +37,6 @@ type InstanceForm struct {
 	adminPort    string
 	localStack   bool
 	traefik      bool
-	devMode      bool
 
 	// UI state
 	focusedField FormField
@@ -70,7 +68,6 @@ func NewInstanceForm() *InstanceForm {
 		adminPort:    "8081",
 		localStack:   true,
 		traefik:      true,
-		devMode:      false,
 		focusedField: FieldInstanceName, // Start with instance name field, not close button
 	}
 }
@@ -89,7 +86,6 @@ func NewInstanceFormWithSuggestions(instances []Instance) *InstanceForm {
 		adminPort:    fmt.Sprintf("%d", adminPort),
 		localStack:   true,
 		traefik:      true,
-		devMode:      false,
 		focusedField: FieldInstanceName, // Start with instance name field, not close button
 	}
 }
@@ -102,7 +98,6 @@ func (f *InstanceForm) Reset() {
 	f.adminPort = "8081"
 	f.localStack = true
 	f.traefik = true
-	f.devMode = false
 	f.focusedField = FieldInstanceName
 	f.errorMsg = ""
 	f.successMsg = ""
@@ -141,8 +136,6 @@ func (f *InstanceForm) ToggleCheckbox() {
 		f.localStack = !f.localStack
 	case FieldTraefik:
 		f.traefik = !f.traefik
-	case FieldDevMode:
-		f.devMode = !f.devMode
 	}
 }
 
@@ -224,7 +217,6 @@ func (f *InstanceForm) GetFormData() map[string]interface{} {
 		"adminPort":    adminPort,
 		"localStack":   f.localStack,
 		"traefik":      f.traefik,
-		"devMode":      f.devMode,
 	}
 }
 

@@ -62,7 +62,6 @@ func (m Model) loadDataFromAPI() tea.Cmd {
 				AdminPort:  inst.AdminPort,
 				LocalStack: inst.LocalStack,
 				Traefik:    inst.Traefik,
-				DevMode:    inst.DevMode,
 				Age:        time.Since(inst.CreatedAt),
 			}
 		}
@@ -271,7 +270,6 @@ func (m Model) createInstanceCmd(opts api.CreateInstanceOptions) tea.Cmd {
 				AdminPort:  instance.AdminPort,
 				LocalStack: instance.LocalStack,
 				Traefik:    instance.Traefik,
-				DevMode:    instance.DevMode,
 				Age:        time.Since(instance.CreatedAt),
 			},
 		}
@@ -487,7 +485,6 @@ func (m Model) updateInstanceStatusCmd() tea.Cmd {
 				AdminPort:  inst.AdminPort,
 				LocalStack: inst.LocalStack,
 				Traefik:    inst.Traefik,
-				DevMode:    inst.DevMode,
 				Age:        time.Since(inst.CreatedAt),
 			}
 		}

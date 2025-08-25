@@ -29,7 +29,6 @@ type Instance struct {
 	AdminPort  int       `json:"adminPort"`
 	LocalStack bool      `json:"localStack"`
 	Traefik    bool      `json:"traefik"`
-	DevMode    bool      `json:"devMode"`
 	CreatedAt  time.Time `json:"createdAt"`
 }
 
@@ -40,7 +39,6 @@ type CreateInstanceOptions struct {
 	AdminPort  int    `json:"adminPort"`
 	LocalStack bool   `json:"localStack"`
 	Traefik    bool   `json:"traefik"`
-	DevMode    bool   `json:"devMode"`
 }
 
 // Cluster represents an ECS cluster
