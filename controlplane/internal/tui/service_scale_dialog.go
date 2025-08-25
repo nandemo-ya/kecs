@@ -13,7 +13,7 @@ type ServiceScaleDialog struct {
 	desiredCount  string
 	errorMsg      string
 	confirmMode   bool
-	focusedButton int // 0: OK, 1: Cancel
+	focusedButton int // -1: Input field, 0: OK, 1: Cancel, 2: Close
 }
 
 // NewServiceScaleDialog creates a new service scale dialog
@@ -23,7 +23,7 @@ func NewServiceScaleDialog(serviceName string, currentCount int) *ServiceScaleDi
 		currentCount:  currentCount,
 		desiredCount:  strconv.Itoa(currentCount),
 		confirmMode:   false,
-		focusedButton: 0,
+		focusedButton: -1, // Start with input field focused
 	}
 }
 
@@ -44,9 +44,19 @@ func (d *ServiceScaleDialog) RemoveLastChar() {
 	}
 }
 
-// MoveFocus moves focus between buttons
+// MoveFocus moves focus between input field and buttons
 func (d *ServiceScaleDialog) MoveFocus() {
-	d.focusedButton = (d.focusedButton + 1) % 2
+	if d.confirmMode {
+		// In confirm mode, cycle through OK, Cancel, Close
+		if d.focusedButton < 0 {
+			d.focusedButton = 0
+		} else {
+			d.focusedButton = (d.focusedButton + 1) % 3
+		}
+	} else {
+		// In input mode, cycle through input field, OK, Cancel, Close
+		d.focusedButton = (d.focusedButton+2)%4 - 1 // -1, 0, 1, 2
+	}
 }
 
 // Validate validates the input
@@ -91,9 +101,19 @@ func (d *ServiceScaleDialog) IsOKFocused() bool {
 	return d.focusedButton == 0
 }
 
+// IsInputFocused returns true if input field is focused
+func (d *ServiceScaleDialog) IsInputFocused() bool {
+	return d.focusedButton == -1
+}
+
 // IsCancelFocused returns true if Cancel button is focused
 func (d *ServiceScaleDialog) IsCancelFocused() bool {
 	return d.focusedButton == 1
+}
+
+// IsCloseFocused returns true if Close button is focused
+func (d *ServiceScaleDialog) IsCloseFocused() bool {
+	return d.focusedButton == 2
 }
 
 // GetMessage returns the dialog message

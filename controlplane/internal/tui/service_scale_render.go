@@ -17,7 +17,7 @@ func (m Model) renderServiceScaleDialog() string {
 	var content []string
 
 	// Title with close button
-	titleLine := renderDialogTitle("Scale Service", true, false, 50)
+	titleLine := renderDialogTitle("Scale Service", true, d.IsCloseFocused(), 50)
 	content = append(content, titleLine)
 	content = append(content, "")
 
@@ -31,11 +31,11 @@ func (m Model) renderServiceScaleDialog() string {
 
 		// Input field
 		inputStyle := formInputStyle
-		if !d.IsOKFocused() && !d.IsCancelFocused() {
+		if d.IsInputFocused() {
 			inputStyle = formInputFocusedStyle
 		}
 		inputValue := d.desiredCount
-		if !d.IsOKFocused() && !d.IsCancelFocused() {
+		if d.IsInputFocused() {
 			inputValue += "_"
 		}
 		content = append(content, inputStyle.Width(20).Render(inputValue))

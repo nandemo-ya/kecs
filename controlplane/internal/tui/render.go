@@ -116,7 +116,7 @@ func (m Model) getHeaderShortcuts() string {
 		}
 	case ViewServices:
 		shortcuts = []string{
-			keyStyle.Render("<S>") + sepStyle.Render(" Scale"),
+			keyStyle.Render("<s>") + sepStyle.Render(" Scale"),
 			keyStyle.Render("<r>") + sepStyle.Render(" Restart"),
 			keyStyle.Render("<l>") + sepStyle.Render(" Logs"),
 			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
@@ -1280,7 +1280,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 	case ViewServices:
 		leftShortcuts = append(leftShortcuts,
 			keyStyle.Render("<enter>")+" "+descStyle.Render("Select"),
-			keyStyle.Render("<S>")+" "+descStyle.Render("Scale"),
+			keyStyle.Render("<s>")+" "+descStyle.Render("Scale"),
 			keyStyle.Render("<r>")+" "+descStyle.Render("Restart"),
 			keyStyle.Render("<u>")+" "+descStyle.Render("Update"),
 			keyStyle.Render("<x>")+" "+descStyle.Render("Stop"),

@@ -437,7 +437,7 @@ func (c *HTTPClient) UpdateService(ctx context.Context, instanceName, clusterNam
 	return &updatedService, nil
 }
 
-func (c *HTTPClient) UpdateServiceDesiredCount(instanceName, clusterName, serviceArn string, desiredCount int) error {
+func (c *HTTPClient) UpdateServiceDesiredCount(instanceName, clusterName, serviceNameOrArn string, desiredCount int) error {
 	// Get instance info to find API port
 	if c.k3dProvider != nil {
 		inst, err := c.k3dProvider.GetInstance(context.Background(), instanceName)
@@ -450,8 +450,9 @@ func (c *HTTPClient) UpdateServiceDesiredCount(instanceName, clusterName, servic
 		client := &http.Client{Timeout: 10 * time.Second}
 
 		// Create UpdateService request with only desired count change
+		// ECS API accepts either service name or ARN
 		reqBody := map[string]interface{}{
-			"service":      serviceArn,
+			"service":      serviceNameOrArn,
 			"cluster":      clusterName,
 			"desiredCount": desiredCount,
 		}

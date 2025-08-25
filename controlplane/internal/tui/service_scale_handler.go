@@ -1,7 +1,8 @@
 package tui
 
 import (
-	"fmt"
+	"log"
+	"os"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -22,11 +23,11 @@ func (m Model) handleServiceScaleDialogKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 
 	case "tab":
-		// Move focus between buttons
+		// Move focus between input field and buttons
 		d.MoveFocus()
 
 	case "enter":
-		if !d.IsOKFocused() && !d.IsCancelFocused() {
+		if d.IsInputFocused() {
 			// In input field, move to OK button
 			d.focusedButton = 0
 		} else if d.IsOKFocused() {
@@ -39,20 +40,20 @@ func (m Model) handleServiceScaleDialogKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 				// Execute scaling
 				return m.executeServiceScale()
 			}
-		} else if d.IsCancelFocused() {
+		} else if d.IsCancelFocused() || d.IsCloseFocused() {
 			// Cancel dialog
 			m.serviceScaleDialog = nil
 			return m, nil
 		}
 
 	case "backspace":
-		if !d.IsOKFocused() && !d.IsCancelFocused() && !d.confirmMode {
+		if d.IsInputFocused() && !d.confirmMode {
 			d.RemoveLastChar()
 		}
 
 	default:
 		// Handle text input
-		if !d.IsOKFocused() && !d.IsCancelFocused() && !d.confirmMode {
+		if d.IsInputFocused() && !d.confirmMode {
 			if len(msg.String()) == 1 {
 				d.UpdateInput(d.desiredCount + msg.String())
 			}
@@ -72,43 +73,57 @@ func (m Model) executeServiceScale() (Model, tea.Cmd) {
 	desiredCount := d.GetDesiredCount()
 	serviceName := d.serviceName
 
+	// Log to file for debugging (optional)
+	if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
+		if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			logger := log.New(f, "", log.LstdFlags)
+			logger.Printf("Scaling service: %s to %d\n", serviceName, desiredCount)
+			f.Close()
+		}
+	}
+
 	// Close dialog and show progress
 	m.serviceScaleDialog = nil
 	m.scalingInProgress = true
 	m.scalingServiceName = serviceName
 	m.scalingTargetCount = desiredCount
 
-	// Find the service to update
-	var serviceArn string
+	// Verify service exists
+	serviceFound := false
 	for _, svc := range m.services {
 		if svc.Name == serviceName {
-			// Construct service ARN
-			serviceArn = fmt.Sprintf("arn:aws:ecs:%s:%s:service/%s/%s",
-				"us-east-1",    // Use default region
-				"000000000000", // Use default account
-				m.selectedCluster,
-				serviceName)
+			serviceFound = true
 			break
 		}
 	}
 
-	if serviceArn == "" {
+	if !serviceFound {
 		m.scalingInProgress = false
 		return m, nil
 	}
 
-	// Create the scale command
-	return m, m.scaleService(serviceArn, desiredCount)
+	// Create the scale command (pass service name, not ARN)
+	return m, m.scaleService(serviceName, serviceName, desiredCount)
 }
 
 // scaleService creates a command to scale the service
-func (m Model) scaleService(serviceArn string, desiredCount int) tea.Cmd {
+func (m Model) scaleService(serviceNameOrArn string, serviceName string, desiredCount int) tea.Cmd {
 	return func() tea.Msg {
+		// Log to file for debugging (optional)
+		if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
+			if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				logger := log.New(f, "", log.LstdFlags)
+				logger.Printf("API Call: UpdateServiceDesiredCount - instance: %s, cluster: %s, service: %s, desired: %d\n",
+					m.selectedInstance, m.selectedCluster, serviceName, desiredCount)
+				f.Close()
+			}
+		}
+
 		// Call UpdateService API
 		err := m.apiClient.UpdateServiceDesiredCount(
 			m.selectedInstance,
 			m.selectedCluster,
-			serviceArn,
+			serviceNameOrArn, // Pass service name, not full ARN
 			desiredCount,
 		)
 
@@ -124,7 +139,7 @@ func (m Model) scaleService(serviceArn string, desiredCount int) tea.Cmd {
 
 		return ServiceScaledMsg{
 			Success:      true,
-			ServiceName:  m.scalingServiceName,
+			ServiceName:  serviceName,
 			DesiredCount: desiredCount,
 		}
 	}

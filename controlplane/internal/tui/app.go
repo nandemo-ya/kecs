@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"io"
+	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -189,6 +191,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ServiceScaledMsg:
 		// Handle service scaling completion
 		m.scalingInProgress = false
+
+		// Log the result for debugging
+		if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
+			if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				logger := log.New(f, "", log.LstdFlags)
+				if msg.Success {
+					logger.Printf("Service scaled successfully: %s to %d\n", msg.ServiceName, msg.DesiredCount)
+				} else {
+					logger.Printf("Service scaling failed: %v\n", msg.Error)
+				}
+				f.Close()
+			}
+		}
+
 		if msg.Success {
 			// Refresh services to show updated count
 			cmds = append(cmds, m.loadDataFromAPI())
