@@ -99,7 +99,7 @@ func (m Model) getHeaderShortcuts() string {
 			keyStyle.Render("<N>") + sepStyle.Render(" New"),
 		}
 		if m.selectedInstance != "" {
-			shortcuts = append(shortcuts, keyStyle.Render("<T>")+sepStyle.Render(" TaskDefs"))
+			shortcuts = append(shortcuts, keyStyle.Render("<t>")+sepStyle.Render(" TaskDefs"))
 		}
 		shortcuts = append(shortcuts,
 			keyStyle.Render("<:>")+sepStyle.Render(" Cmd"),
@@ -1258,15 +1258,15 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 	switch m.currentView {
 	case ViewInstances:
 		leftShortcuts = append(leftShortcuts,
-			keyStyle.Render("<N>")+" "+descStyle.Render("New instance"),
+			keyStyle.Render("<n>")+" "+descStyle.Render("New instance"),
 			keyStyle.Render("<enter>")+" "+descStyle.Render("Select"),
-			keyStyle.Render("<S>")+" "+descStyle.Render("Start/Stop"),
-			keyStyle.Render("<D>")+" "+descStyle.Render("Delete"),
+			keyStyle.Render("<s>")+" "+descStyle.Render("Start/Stop"),
+			keyStyle.Render("<d>")+" "+descStyle.Render("Delete"),
 		)
 		// Only show Task defs shortcut if an instance is selected
 		if m.selectedInstance != "" {
 			leftShortcuts = append(leftShortcuts,
-				keyStyle.Render("<T>")+" "+descStyle.Render("Task defs"),
+				keyStyle.Render("<t>")+" "+descStyle.Render("Task defs"),
 			)
 		}
 	case ViewClusters:
@@ -1275,7 +1275,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 			keyStyle.Render("<n>")+" "+descStyle.Render("Create cluster"),
 			keyStyle.Render("<i>")+" "+descStyle.Render("Instances"),
 			keyStyle.Render("<s>")+" "+descStyle.Render("Services"),
-			keyStyle.Render("<T>")+" "+descStyle.Render("Task defs"),
+			keyStyle.Render("<t>")+" "+descStyle.Render("Task defs"),
 		)
 	case ViewServices:
 		leftShortcuts = append(leftShortcuts,
@@ -1285,13 +1285,13 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 			keyStyle.Render("<u>")+" "+descStyle.Render("Update"),
 			keyStyle.Render("<x>")+" "+descStyle.Render("Stop"),
 			keyStyle.Render("<l>")+" "+descStyle.Render("Logs"),
-			keyStyle.Render("<T>")+" "+descStyle.Render("Task defs"),
+			keyStyle.Render("<t>")+" "+descStyle.Render("Task defs"),
 		)
 	case ViewTasks:
 		leftShortcuts = append(leftShortcuts,
 			keyStyle.Render("<enter>")+" "+descStyle.Render("Describe"),
 			keyStyle.Render("<l>")+" "+descStyle.Render("Logs"),
-			keyStyle.Render("<T>")+" "+descStyle.Render("Task defs"),
+			keyStyle.Render("<t>")+" "+descStyle.Render("Task defs"),
 		)
 	case ViewLogs:
 		leftShortcuts = append(leftShortcuts,
@@ -1635,9 +1635,9 @@ func (m Model) renderHelpContent(maxHeight int) string {
 		sectionStyle.Render("View-Specific Operations"),
 		"",
 		lipgloss.NewStyle().Bold(true).Underline(true).Render("Instance Operations:"),
-		keyStyle.Render("<N>") + "           " + descStyle.Render("Create new instance"),
-		keyStyle.Render("<S>") + "           " + descStyle.Render("Stop/Start instance"),
-		keyStyle.Render("<D>") + "           " + descStyle.Render("Delete instance"),
+		keyStyle.Render("<n>") + "           " + descStyle.Render("Create new instance"),
+		keyStyle.Render("<s>") + "           " + descStyle.Render("Stop/Start instance"),
+		keyStyle.Render("<d>") + "           " + descStyle.Render("Delete instance"),
 		keyStyle.Render("<ctrl-i>") + "     " + descStyle.Render("Quick switch instance"),
 		"",
 		lipgloss.NewStyle().Bold(true).Underline(true).Render("Cluster Operations:"),
@@ -1645,24 +1645,20 @@ func (m Model) renderHelpContent(maxHeight int) string {
 		"",
 		lipgloss.NewStyle().Bold(true).Underline(true).Render("Service Operations:"),
 		keyStyle.Render("<r>") + "           " + descStyle.Render("Restart service"),
-		keyStyle.Render("<S>") + "           " + descStyle.Render("Scale service"),
+		keyStyle.Render("<s>") + "           " + descStyle.Render("Scale service"),
 		keyStyle.Render("<u>") + "           " + descStyle.Render("Update service"),
 		keyStyle.Render("<x>") + "           " + descStyle.Render("Stop service"),
 		"",
 		lipgloss.NewStyle().Bold(true).Underline(true).Render("Task Definition Operations:"),
-		keyStyle.Render("<N>") + "           " + descStyle.Render("Create new task def"),
-		keyStyle.Render("<C>") + "           " + descStyle.Render("Copy family's latest"),
+		keyStyle.Render("<n>") + "           " + descStyle.Render("Create new task def"),
 		keyStyle.Render("<e>") + "           " + descStyle.Render("Edit as new revision"),
-		keyStyle.Render("<c>") + "           " + descStyle.Render("Copy to clipboard"),
-		keyStyle.Render("<d>") + "           " + descStyle.Render("Deregister revision"),
 		keyStyle.Render("<a>") + "           " + descStyle.Render("Activate revision"),
-		keyStyle.Render("<D>") + "           " + descStyle.Render("Diff mode"),
+		keyStyle.Render("<d>") + "           " + descStyle.Render("Diff/Deregister"),
 		"",
 		lipgloss.NewStyle().Bold(true).Underline(true).Render("Common Operations:"),
 		keyStyle.Render("<l>") + "           " + descStyle.Render("View logs"),
-		keyStyle.Render("<D>") + "           " + descStyle.Render("Describe resource"),
-		keyStyle.Render("<R>") + "           " + descStyle.Render("Refresh view"),
-		keyStyle.Render("<M>") + "           " + descStyle.Render("Multi-instance overview"),
+		keyStyle.Render("<d>") + "           " + descStyle.Render("Describe resource"),
+		keyStyle.Render("<r>") + "           " + descStyle.Render("Refresh view"),
 	}
 
 	// Right column: Global navigation
@@ -1680,7 +1676,7 @@ func (m Model) renderHelpContent(maxHeight int) string {
 		keyStyle.Render("<c>") + "           " + descStyle.Render("Go to clusters"),
 		keyStyle.Render("<s>") + "           " + descStyle.Render("Go to services"),
 		keyStyle.Render("<t>") + "           " + descStyle.Render("Go to tasks"),
-		keyStyle.Render("<T>") + "           " + descStyle.Render("Go to task definitions"),
+		keyStyle.Render("<t>") + "           " + descStyle.Render("Go to task definitions"),
 		"",
 		lipgloss.NewStyle().Bold(true).Underline(true).Render("Search & Commands:"),
 		keyStyle.Render("</>") + "           " + descStyle.Render("Search in current view"),
@@ -1689,7 +1685,7 @@ func (m Model) renderHelpContent(maxHeight int) string {
 		"",
 		lipgloss.NewStyle().Bold(true).Underline(true).Render("Clipboard:"),
 		keyStyle.Render("<y>") + "           " + descStyle.Render("Copy item name/ID"),
-		keyStyle.Render("<Y>") + "           " + descStyle.Render("Copy full details"),
+		keyStyle.Render("<y>") + "           " + descStyle.Render("Copy full details"),
 		"",
 		lipgloss.NewStyle().Bold(true).Underline(true).Render("Application:"),
 		keyStyle.Render("<ctrl-c>") + "     " + descStyle.Render("Quit application"),

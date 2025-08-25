@@ -640,20 +640,7 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 				m.clipboardMsgTime = time.Now()
 			}
 		}
-	case "Y":
-		// Copy full instance info to clipboard
-		if len(m.instances) > 0 && m.instanceCursor < len(m.instances) {
-			inst := m.instances[m.instanceCursor]
-			err := copyToClipboard(copyInstanceInfo(inst))
-			if err == nil {
-				m.clipboardMsg = "Copied instance details to clipboard"
-				m.clipboardMsgTime = time.Now()
-			} else {
-				m.clipboardMsg = fmt.Sprintf("Copy failed: %v", err)
-				m.clipboardMsgTime = time.Now()
-			}
-		}
-	case "N":
+	case "n":
 		// Open instance creation form
 		if m.instanceForm == nil {
 			m.instanceForm = NewInstanceFormWithSuggestions(m.instances)
@@ -664,7 +651,7 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.previousView = m.currentView
 		m.currentView = ViewInstanceCreate
 		return m, nil
-	case "S":
+	case "s":
 		// Start/Stop instance
 		if len(m.instances) > 0 && m.instanceCursor < len(m.instances) {
 			instanceName := m.instances[m.instanceCursor].Name
@@ -715,7 +702,7 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 				return m, nil
 			}
 		}
-	case "D":
+	case "d":
 		// Delete instance
 		if len(m.instances) > 0 && m.instanceCursor < len(m.instances) {
 			instanceName := m.instances[m.instanceCursor].Name
@@ -756,7 +743,7 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
 		}
-	case "T":
+	case "t":
 		// Navigate to task definitions
 		if m.selectedInstance != "" {
 			m.currentView = ViewTaskDefinitionFamilies
@@ -769,7 +756,7 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case ":":
 		m.commandMode = true
 		m.commandInput = ""
-	case "R":
+	case "r":
 		return m, m.loadDataFromAPI()
 	}
 	return m, nil
@@ -821,18 +808,14 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.previousView = m.currentView
 			m.currentView = ViewClusterCreate
 		}
-	case "d":
-		// Go to task definitions view
-		m.currentView = ViewTaskDefinitionFamilies
-		m.taskDefFamilyCursor = 0
-		return m, m.loadTaskDefinitionFamiliesCmd()
+	// Removed 'd' binding as it conflicts with 'D' for delete cluster
 	case "/":
 		m.searchMode = true
 		m.searchQuery = ""
 	case ":":
 		m.commandMode = true
 		m.commandInput = ""
-	case "R":
+	case "r":
 		return m, m.loadDataFromAPI()
 	case "ctrl+i":
 		// Quick switch instance
@@ -841,7 +824,7 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
 		}
-	case "T":
+	case "t":
 		// Navigate to task definitions
 		if m.selectedInstance != "" {
 			m.currentView = ViewTaskDefinitionFamilies
@@ -871,13 +854,11 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "c":
 		m.currentView = ViewClusters
 		m.selectedCluster = ""
-	case "t":
-		if m.selectedService != "" {
-			m.currentView = ViewTasks
-		}
+	// Removed 't' binding as it conflicts with 'T' for task definitions
 	case "r":
-		// Restart service (mock)
-	case "S":
+		// Restart service or refresh (context-dependent)
+		return m, m.loadDataFromAPI()
+	case "s":
 		// Scale service (mock)
 		m.commandMode = true
 		m.commandInput = fmt.Sprintf("scale service %s ", m.services[m.serviceCursor].Name)
@@ -898,8 +879,6 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case ":":
 		m.commandMode = true
 		m.commandInput = ""
-	case "R":
-		return m, m.loadDataFromAPI()
 	case "ctrl+i":
 		// Quick switch instance
 		if len(m.instances) > 1 {
@@ -907,7 +886,7 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
 		}
-	case "T":
+	case "t":
 		// Navigate to task definitions
 		if m.selectedInstance != "" {
 			m.currentView = ViewTaskDefinitionFamilies
@@ -1018,7 +997,7 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "s":
 		m.currentView = ViewServices
 		m.selectedService = ""
-	case "D":
+	case "d":
 		// Describe task
 		if len(m.tasks) > 0 {
 			m.selectedTask = m.tasks[m.taskCursor].ID
@@ -1031,7 +1010,7 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case ":":
 		m.commandMode = true
 		m.commandInput = ""
-	case "R":
+	case "r":
 		return m, m.loadDataFromAPI()
 	case "ctrl+i":
 		// Quick switch instance
@@ -1040,7 +1019,7 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
 		}
-	case "T":
+	case "t":
 		// Navigate to task definitions
 		if m.selectedInstance != "" {
 			m.currentView = ViewTaskDefinitionFamilies
@@ -1522,7 +1501,7 @@ func (m Model) handleTaskDefinitionFamiliesKeys(msg tea.KeyMsg) (Model, tea.Cmd)
 		m.currentView = ViewClusters
 		m.clusterCursor = 0
 		return m, m.loadDataFromAPI()
-	case "N":
+	case "n":
 		// Create new task definition
 		m.taskDefEditor = NewTaskDefinitionEditor("new-task-definition", nil)
 		m.previousView = m.currentView
@@ -1565,7 +1544,7 @@ func (m Model) handleTaskDefinitionFamiliesKeys(msg tea.KeyMsg) (Model, tea.Cmd)
 	case ":":
 		m.commandMode = true
 		m.commandInput = ""
-	case "R":
+	case "r":
 		return m, m.loadTaskDefinitionFamiliesCmd()
 	case "ctrl+i":
 		// Quick switch instance
@@ -1633,13 +1612,11 @@ func (m Model) handleTaskDefinitionRevisionsKeys(msg tea.KeyMsg) (Model, tea.Cmd
 	case "c":
 		// Copy to clipboard
 		// TODO: Implement clipboard copy
-	case "d":
-		// Deregister revision
-		// TODO: Implement deregister
+	// Removed lowercase 'd' - use uppercase 'D' for deregister to avoid conflicts
 	case "a":
 		// Activate revision
 		// TODO: Implement activate
-	case "D":
+	case "d":
 		// Enter diff mode
 		// TODO: Implement diff mode
 	case "ctrl+u", "pgup":
@@ -1685,7 +1662,7 @@ func (m Model) handleTaskDefinitionRevisionsKeys(msg tea.KeyMsg) (Model, tea.Cmd
 	case ":":
 		m.commandMode = true
 		m.commandInput = ""
-	case "R":
+	case "r":
 		return m, m.loadTaskDefinitionRevisionsCmd()
 	case "ctrl+i":
 		// Quick switch instance
