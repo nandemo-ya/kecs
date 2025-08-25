@@ -46,7 +46,6 @@ var (
 	startNoLocalStack bool
 	startNoTraefik    bool
 	startTimeout      time.Duration
-	startDevMode      bool
 )
 
 var startCmd = &cobra.Command{
@@ -68,7 +67,6 @@ func init() {
 	startCmd.Flags().BoolVar(&startNoLocalStack, "no-localstack", false, "Disable LocalStack deployment")
 	startCmd.Flags().BoolVar(&startNoTraefik, "no-traefik", false, "Disable Traefik deployment")
 	startCmd.Flags().DurationVar(&startTimeout, "timeout", 10*time.Minute, "Timeout for cluster creation")
-	startCmd.Flags().BoolVar(&startDevMode, "dev", false, "Enable dev mode (deprecated, registry is always enabled)")
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
@@ -107,7 +105,6 @@ func runStart(cmd *cobra.Command, args []string) error {
 		NoTraefik:    startNoTraefik,
 		ApiPort:      startApiPort,
 		AdminPort:    startAdminPort,
-		DevMode:      startDevMode,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), startTimeout)

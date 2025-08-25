@@ -103,7 +103,6 @@ func (p *K3dInstanceProvider) getInstanceInfo(ctx context.Context, name string) 
 		inst.AdminPort = config.AdminPort
 		inst.LocalStack = config.LocalStack
 		inst.Traefik = config.Traefik
-		inst.DevMode = config.DevMode
 		inst.CreatedAt = config.CreatedAt
 	}
 
@@ -188,7 +187,6 @@ func (p *K3dInstanceProvider) CreateInstance(ctx context.Context, opts CreateIns
 		AdminPort:    opts.AdminPort,
 		NoLocalStack: !opts.LocalStack,
 		NoTraefik:    !opts.Traefik,
-		DevMode:      opts.DevMode,
 	}
 
 	// Use the instance manager to start the instance

@@ -134,7 +134,6 @@ func (m Model) renderInstanceForm() string {
 	// Checkboxes
 	content = append(content, m.renderCheckbox("Enable LocalStack", f.localStack, f.focusedField == FieldLocalStack))
 	content = append(content, m.renderCheckbox("Enable Traefik Gateway", f.traefik, f.focusedField == FieldTraefik))
-	content = append(content, m.renderCheckbox("Developer Mode", f.devMode, f.focusedField == FieldDevMode))
 	content = append(content, "")
 
 	// Buttons (centered)

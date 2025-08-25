@@ -500,9 +500,6 @@ func (m Model) renderSummary() string {
 					if inst.Traefik {
 						features = append(features, "Traefik")
 					}
-					if inst.DevMode {
-						features = append(features, "DevMode")
-					}
 					break
 				}
 			}
@@ -543,9 +540,6 @@ func (m Model) renderSummary() string {
 						}
 						if inst.Traefik {
 							features = append(features, "Traefik")
-						}
-						if inst.DevMode {
-							features = append(features, "DevMode")
 						}
 						break
 					}

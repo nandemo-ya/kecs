@@ -35,7 +35,6 @@ type StartOptions struct {
 	NoTraefik    bool
 	ApiPort      int
 	AdminPort    int
-	DevMode      bool
 }
 
 // CreationStatus represents the status of instance creation
@@ -56,10 +55,10 @@ type Manager struct {
 
 // NewManager creates a new instance manager
 func NewManager() (*Manager, error) {
-	// Default configuration - registry will be enabled per-instance based on DevMode flag
+	// Default configuration - registry is always enabled for all instances
 	k3dConfig := &kecs.ClusterManagerConfig{
 		Provider:       "k3d",
-		EnableRegistry: false, // Will be overridden per-instance based on DevMode
+		EnableRegistry: true,  // Always enabled for local development
 		ContainerMode:  false, // TUI mode is not container mode
 	}
 	k3dManager, err := kecs.NewK3dClusterManager(k3dConfig)
@@ -350,7 +349,6 @@ func (m *Manager) List(ctx context.Context) ([]InstanceInfo, error) {
 			ApiPort:    cfg.APIPort,
 			AdminPort:  cfg.AdminPort,
 			HasData:    hasData,
-			DevMode:    cfg.DevMode,
 			LocalStack: cfg.LocalStack,
 			Traefik:    cfg.Traefik,
 		})
@@ -366,7 +364,6 @@ type InstanceInfo struct {
 	ApiPort    int
 	AdminPort  int
 	HasData    bool
-	DevMode    bool
 	LocalStack bool
 	Traefik    bool
 }
@@ -416,7 +413,6 @@ func (m *Manager) Restart(ctx context.Context, instanceName string) error {
 			AdminPort:  8081,
 			LocalStack: true,
 			Traefik:    false,
-			DevMode:    false,
 		}
 	}
 
@@ -427,7 +423,6 @@ func (m *Manager) Restart(ctx context.Context, instanceName string) error {
 		AdminPort:    savedConfig.AdminPort,
 		NoLocalStack: !savedConfig.LocalStack,
 		NoTraefik:    !savedConfig.Traefik,
-		DevMode:      savedConfig.DevMode,
 	}
 
 	// Use restartInstance to handle the restart

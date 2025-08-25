@@ -37,9 +37,6 @@ type InstanceConfig struct {
 	LocalStack bool `yaml:"localStack"`
 	Traefik    bool `yaml:"traefik"`
 
-	// Development settings
-	DevMode bool `yaml:"devMode"`
-
 	// Data directory
 	DataDir string `yaml:"dataDir"`
 }
@@ -65,7 +62,6 @@ func SaveInstanceConfig(instanceName string, opts StartOptions) error {
 		AdminPort:  opts.AdminPort,
 		LocalStack: !opts.NoLocalStack,
 		Traefik:    !opts.NoTraefik,
-		DevMode:    opts.DevMode,
 		DataDir:    opts.DataDir,
 	}
 

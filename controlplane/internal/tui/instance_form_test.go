@@ -24,7 +24,6 @@ var _ = Describe("InstanceForm", func() {
 			Expect(data["adminPort"]).To(Equal(8081))
 			Expect(data["localStack"]).To(BeTrue())
 			Expect(data["traefik"]).To(BeTrue())
-			Expect(data["devMode"]).To(BeFalse())
 		})
 	})
 

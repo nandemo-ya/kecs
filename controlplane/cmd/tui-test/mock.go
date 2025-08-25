@@ -55,7 +55,6 @@ func testMockClientBasic() {
 		AdminPort:  8091,
 		LocalStack: true,
 		Traefik:    false,
-		DevMode:    false,
 	})
 	if err != nil {
 		log.Printf("Error creating instance: %v", err)

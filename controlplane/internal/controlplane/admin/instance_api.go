@@ -66,7 +66,6 @@ type Instance struct {
 	AdminPort  int       `json:"adminPort"`
 	LocalStack bool      `json:"localStack"`
 	Traefik    bool      `json:"traefik"`
-	DevMode    bool      `json:"devMode"`
 	CreatedAt  time.Time `json:"createdAt"`
 }
 
@@ -77,7 +76,6 @@ type CreateInstanceRequest struct {
 	AdminPort  int    `json:"adminPort"`
 	LocalStack bool   `json:"localStack"`
 	Traefik    bool   `json:"traefik"`
-	DevMode    bool   `json:"devMode"`
 }
 
 // ErrorResponse represents an API error response
@@ -135,7 +133,6 @@ func (api *InstanceAPI) handleListInstances(w http.ResponseWriter, r *http.Reque
 			AdminPort  int       `yaml:"adminPort"`
 			LocalStack bool      `yaml:"localStack"`
 			Traefik    bool      `yaml:"traefik"`
-			DevMode    bool      `yaml:"devMode"`
 		}
 		if err := yaml.Unmarshal(configData, &config); err != nil {
 			logging.Error("Failed to parse instance config", "instance", entry.Name(), "error", err)
@@ -155,7 +152,6 @@ func (api *InstanceAPI) handleListInstances(w http.ResponseWriter, r *http.Reque
 			AdminPort:  config.AdminPort,
 			LocalStack: config.LocalStack,
 			Traefik:    config.Traefik,
-			DevMode:    config.DevMode,
 			CreatedAt:  config.CreatedAt,
 		})
 	}

@@ -1344,7 +1344,6 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				AdminPort:  formData["adminPort"].(int),
 				LocalStack: formData["localStack"].(bool),
 				Traefik:    formData["traefik"].(bool),
-				DevMode:    formData["devMode"].(bool),
 			}
 
 			// Initialize creation steps
@@ -1382,7 +1381,7 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case " ", "space":
 		// Toggle checkbox or press button
 		switch m.instanceForm.focusedField {
-		case FieldLocalStack, FieldTraefik, FieldDevMode:
+		case FieldLocalStack, FieldTraefik:
 			m.instanceForm.ToggleCheckbox()
 		case FieldSubmit:
 			// Same as enter on submit
@@ -1401,7 +1400,6 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 				AdminPort:  formData["adminPort"].(int),
 				LocalStack: formData["localStack"].(bool),
 				Traefik:    formData["traefik"].(bool),
-				DevMode:    formData["devMode"].(bool),
 			}
 
 			// Initialize creation steps
