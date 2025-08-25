@@ -1553,6 +1553,11 @@ func (m Model) handleTaskDefinitionFamiliesKeys(msg tea.KeyMsg) (Model, tea.Cmd)
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
 		}
+	case "esc":
+		// Go back to clusters view
+		m.currentView = ViewClusters
+		m.selectedFamily = ""
+		return m, m.loadDataFromAPI()
 	}
 	return m, nil
 }
@@ -1670,6 +1675,17 @@ func (m Model) handleTaskDefinitionRevisionsKeys(msg tea.KeyMsg) (Model, tea.Cmd
 			m.instanceSwitcher = NewInstanceSwitcher(m.instances)
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
+		}
+	case "esc":
+		// Go back to task definition families view
+		if m.showTaskDefJSON {
+			// If JSON is shown, just hide it
+			m.showTaskDefJSON = false
+		} else {
+			// Otherwise go back to families view
+			m.currentView = ViewTaskDefinitionFamilies
+			m.selectedFamily = ""
+			m.taskDefRevisionCursor = 0
 		}
 	}
 	return m, nil
