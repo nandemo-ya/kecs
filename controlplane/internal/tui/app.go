@@ -86,6 +86,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commandPalette.Reset()
 			} else if m.currentView == ViewTaskDescribe {
 				m.currentView = m.previousView
+			} else if m.currentView == ViewTaskDefinitionRevisions && m.showTaskDefJSON {
+				// Special case: just hide JSON view without navigating
+				m.showTaskDefJSON = false
 			} else if m.currentView != ViewInstances {
 				// Go back to previous view if not at root
 				m.goBack()
@@ -1553,11 +1556,6 @@ func (m Model) handleTaskDefinitionFamiliesKeys(msg tea.KeyMsg) (Model, tea.Cmd)
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
 		}
-	case "esc":
-		// Go back to clusters view
-		m.currentView = ViewClusters
-		m.selectedFamily = ""
-		return m, m.loadDataFromAPI()
 	}
 	return m, nil
 }
@@ -1675,17 +1673,6 @@ func (m Model) handleTaskDefinitionRevisionsKeys(msg tea.KeyMsg) (Model, tea.Cmd
 			m.instanceSwitcher = NewInstanceSwitcher(m.instances)
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
-		}
-	case "esc":
-		// Go back to task definition families view
-		if m.showTaskDefJSON {
-			// If JSON is shown, just hide it
-			m.showTaskDefJSON = false
-		} else {
-			// Otherwise go back to families view
-			m.currentView = ViewTaskDefinitionFamilies
-			m.selectedFamily = ""
-			m.taskDefRevisionCursor = 0
 		}
 	}
 	return m, nil
