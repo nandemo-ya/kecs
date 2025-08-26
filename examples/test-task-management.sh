@@ -2,7 +2,7 @@
 
 # Test script for ECS Task Management APIs (RunTask, StartTask, ListTasks)
 
-ENDPOINT="http://localhost:8080"
+ENDPOINT="http://localhost:5373"
 
 echo "=== Prerequisites: Register a task definition ==="
 aws ecs register-task-definition \

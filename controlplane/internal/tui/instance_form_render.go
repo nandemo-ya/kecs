@@ -114,21 +114,10 @@ func (m Model) renderInstanceForm() string {
 	}
 	content = append(content, "")
 
-	// API Port field
-	apiLabel := formLabelStyle.Width(14).Render("API Port:")
-	apiInput := m.renderFormInput(f.apiPort, f.focusedField == FieldAPIPort)
-	content = append(content, fmt.Sprintf("%s %s", apiLabel, apiInput))
-	if f.apiPortError != "" {
-		content = append(content, "  "+formErrorStyle.Render(f.apiPortError))
-	}
-
-	// Admin Port field
-	adminLabel := formLabelStyle.Width(14).Render("Admin Port:")
-	adminInput := m.renderFormInput(f.adminPort, f.focusedField == FieldAdminPort)
-	content = append(content, fmt.Sprintf("%s %s", adminLabel, adminInput))
-	if f.adminPortError != "" {
-		content = append(content, "  "+formErrorStyle.Render(f.adminPortError))
-	}
+	// Ports are automatically allocated
+	content = append(content, formLabelStyle.Render("Ports will be automatically allocated"))
+	content = append(content, formHelpStyle.Render("API Port: 5373 (or next available)"))
+	content = append(content, formHelpStyle.Render("Admin Port: 5374 (or next available)"))
 	content = append(content, "")
 
 	// Buttons (centered)

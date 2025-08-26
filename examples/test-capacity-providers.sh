@@ -2,7 +2,7 @@
 
 # Test script for ECS Capacity Provider APIs
 
-ENDPOINT="http://localhost:8080"
+ENDPOINT="http://localhost:5373"
 
 echo "=== Testing DescribeCapacityProviders API (list default providers) ==="
 aws ecs describe-capacity-providers \

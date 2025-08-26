@@ -57,7 +57,7 @@ kecs start
 
 ```bash
 aws ecs create-cluster --cluster-name default \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 3. Create CloudWatch Log Group
@@ -65,7 +65,7 @@ aws ecs create-cluster --cluster-name default \
 ```bash
 aws logs create-log-group \
   --log-group-name /ecs/multi-container-webapp \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts LocalStack. No need to create it manually.
@@ -78,12 +78,12 @@ Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts
 # Register task definition
 aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Create service
 aws ecs create-service \
   --cli-input-json file://service_def.json \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ## Verification
@@ -95,21 +95,21 @@ aws ecs create-service \
 aws ecs describe-services \
   --cluster default \
   --services multi-container-webapp \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'services[0].{Status:status,Desired:desiredCount,Running:runningCount}'
 
 # List tasks
 TASK_ARNS=$(aws ecs list-tasks \
   --cluster default \
   --service-name multi-container-webapp \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'taskArns' --output json)
 
 # Describe tasks
 aws ecs describe-tasks \
   --cluster default \
   --tasks $TASK_ARNS \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'tasks[*].{TaskArn:taskArn,Status:lastStatus,Containers:containers[*].{Name:name,Status:lastStatus}}'
 ```
 
@@ -192,14 +192,14 @@ kubectl logs -n default $POD_NAME -c sidecar-logger
 
 # View CloudWatch logs
 aws logs tail /ecs/multi-container-webapp \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --follow
 
 # Filter logs by container
 aws logs filter-log-events \
   --log-group-name /ecs/multi-container-webapp \
   --log-stream-name-prefix "frontend-nginx" \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### Verify Container Health
@@ -224,23 +224,23 @@ aws ecs delete-service \
   --cluster default \
   --service multi-container-webapp \
   --force \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Wait for service deletion
 aws ecs wait services-inactive \
   --cluster default \
   --services multi-container-webapp \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Deregister task definition
 aws ecs deregister-task-definition \
   --task-definition multi-container-webapp:1 \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Delete log group
 aws logs delete-log-group \
   --log-group-name /ecs/multi-container-webapp \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Delete IAM roles (if created for this example)
 # Note: ecsTaskExecutionRole is managed by KECS, no need to delete it
@@ -256,7 +256,7 @@ aws ecs update-service \
   --cluster default \
   --service multi-container-webapp \
   --desired-count 3 \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Verify all pods are running
 kubectl get pods -n default -l app=multi-container-webapp

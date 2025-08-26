@@ -42,7 +42,7 @@ kecs start
 
 2. AWS CLI configured to use KECS:
 ```bash
-export AWS_ENDPOINT_URL=http://localhost:8080
+export AWS_ENDPOINT_URL=http://localhost:5373
 export AWS_REGION=us-east-1
 ```
 

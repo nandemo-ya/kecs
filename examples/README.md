@@ -89,10 +89,10 @@ Each example is self-contained with:
 3. **Configure AWS CLI**
    ```bash
    # Point AWS CLI to KECS endpoint
-   export AWS_ENDPOINT_URL=http://localhost:8080
+   export AWS_ENDPOINT_URL=http://localhost:5373
    
    # Or use --endpoint-url flag with each command
-   aws ecs list-clusters --endpoint-url http://localhost:8080
+   aws ecs list-clusters --endpoint-url http://localhost:5373
    ```
 
 4. **Install ecspresso** (optional but recommended)
@@ -117,8 +117,8 @@ Each example is self-contained with:
 
 4. Or deploy using AWS CLI:
    ```bash
-   aws ecs register-task-definition --cli-input-json file://task_def.json --endpoint-url http://localhost:8080
-   aws ecs create-service --cli-input-json file://service_def.json --endpoint-url http://localhost:8080
+   aws ecs register-task-definition --cli-input-json file://task_def.json --endpoint-url http://localhost:5373
+   aws ecs create-service --cli-input-json file://service_def.json --endpoint-url http://localhost:5373
    ```
 
 ## Common Patterns
@@ -183,7 +183,7 @@ docker run -d \
   localstack/localstack
 
 # Use different endpoints for different services
-aws ecs create-cluster --endpoint-url http://localhost:8080      # KECS for ECS
+aws ecs create-cluster --endpoint-url http://localhost:5373      # KECS for ECS
 aws secretsmanager create-secret --endpoint-url http://localhost:4566  # LocalStack for Secrets
 ```
 
@@ -242,9 +242,9 @@ kecs status
 kecs logs -f
 
 # List all resources
-aws ecs list-clusters --endpoint-url http://localhost:8080
-aws ecs list-services --cluster default --endpoint-url http://localhost:8080
-aws ecs list-tasks --cluster default --endpoint-url http://localhost:8080
+aws ecs list-clusters --endpoint-url http://localhost:5373
+aws ecs list-services --cluster default --endpoint-url http://localhost:5373
+aws ecs list-tasks --cluster default --endpoint-url http://localhost:5373
 
 # Check Kubernetes resources
 kubectl get all -n default

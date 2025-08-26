@@ -2,7 +2,7 @@
 
 # Test script for ECS Task Set APIs
 
-ENDPOINT="http://localhost:8080"
+ENDPOINT="http://localhost:5373"
 
 echo "=== Prerequisites: Create a service ==="
 aws ecs create-service \

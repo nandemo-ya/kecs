@@ -48,7 +48,7 @@ func Execute() {
 
 func init() {
 	// Define persistent flags that will be inherited by all subcommands
-	RootCmd.PersistentFlags().IntVarP(&port, "port", "p", 8080, "Port to run the control plane server on")
+	RootCmd.PersistentFlags().IntVarP(&port, "port", "p", 5373, "Port to run the control plane server on")
 	RootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "l", "info", "Log level (debug, info, warn, error)")
 
 	// Add subcommands

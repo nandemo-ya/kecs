@@ -29,8 +29,8 @@ var _ = Describe("Config", func() {
 		It("should return valid default configuration", func() {
 			cfg := config.DefaultConfig()
 			Expect(cfg).NotTo(BeNil())
-			Expect(cfg.Server.Port).To(Equal(8080))
-			Expect(cfg.Server.AdminPort).To(Equal(8081))
+			Expect(cfg.Server.Port).To(Equal(5373))
+			Expect(cfg.Server.AdminPort).To(Equal(5374))
 			// LocalStack is enabled by default
 			Expect(cfg.LocalStack.Enabled).To(BeTrue())
 		})
@@ -94,7 +94,7 @@ var _ = Describe("Config", func() {
 				cfg, err := config.LoadConfig("")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(cfg).NotTo(BeNil())
-				Expect(cfg.Server.Port).To(Equal(8080))
+				Expect(cfg.Server.Port).To(Equal(5373))
 			})
 		})
 

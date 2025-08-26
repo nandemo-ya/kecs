@@ -17,6 +17,7 @@ package instance
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"sync"
@@ -109,6 +110,20 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 	// Generate instance name if not provided
 	if opts.InstanceName == "" {
 		opts.InstanceName = generateInstanceName()
+	}
+
+	// Handle automatic port allocation
+	if opts.ApiPort == 0 || opts.AdminPort == 0 {
+		allocatedApiPort, allocatedAdminPort, err := m.allocatePorts(ctx, opts.ApiPort, opts.AdminPort)
+		if err != nil {
+			return fmt.Errorf("failed to allocate ports: %w", err)
+		}
+		if opts.ApiPort == 0 {
+			opts.ApiPort = allocatedApiPort
+		}
+		if opts.AdminPort == 0 {
+			opts.AdminPort = allocatedAdminPort
+		}
 	}
 
 	// Check if instance already exists and is stopped
@@ -407,7 +422,7 @@ func (m *Manager) Restart(ctx context.Context, instanceName string) error {
 		// If no saved config, use defaults
 		savedConfig = &InstanceConfig{
 			APIPort:    4566,
-			AdminPort:  8081,
+			AdminPort:  5374,
 			LocalStack: true,
 		}
 	}
@@ -558,6 +573,91 @@ func (m *Manager) restartInstance(ctx context.Context, opts StartOptions) error 
 	}
 
 	return nil
+}
+
+// allocatePorts allocates available ports for API and Admin services
+// If a port is already specified (non-zero), it will be used as-is
+// Returns (apiPort, adminPort, error)
+func (m *Manager) allocatePorts(ctx context.Context, requestedApiPort, requestedAdminPort int) (int, int, error) {
+	// Default ports
+	defaultApiPort := 5373
+	defaultAdminPort := 5374
+
+	// If both ports are specified, return them
+	if requestedApiPort != 0 && requestedAdminPort != 0 {
+		return requestedApiPort, requestedAdminPort, nil
+	}
+
+	// Get list of existing instances to check port usage
+	clusters, err := m.k3dManager.ListClusters(ctx)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to list clusters: %w", err)
+	}
+
+	// Build a map of used ports from existing instances
+	usedPorts := make(map[int]bool)
+	for _, cluster := range clusters {
+		// Try to load the saved config for each instance
+		if config, err := LoadInstanceConfig(cluster.Name); err == nil {
+			usedPorts[config.APIPort] = true
+			usedPorts[config.AdminPort] = true
+		}
+	}
+
+	// Determine API port
+	apiPort := requestedApiPort
+	if apiPort == 0 {
+		// Check if default is available
+		if !usedPorts[defaultApiPort] && isPortAvailable(defaultApiPort) {
+			apiPort = defaultApiPort
+		} else {
+			// Find an available port starting from default + 10
+			apiPort = findAvailablePort(defaultApiPort+10, usedPorts)
+		}
+	}
+
+	// Determine Admin port
+	adminPort := requestedAdminPort
+	if adminPort == 0 {
+		// Check if default is available
+		if !usedPorts[defaultAdminPort] && adminPort != apiPort && isPortAvailable(defaultAdminPort) {
+			adminPort = defaultAdminPort
+		} else {
+			// Find an available port starting from default + 10
+			adminPort = findAvailablePort(defaultAdminPort+10, usedPorts)
+			// Make sure it's different from API port
+			if adminPort == apiPort {
+				adminPort = findAvailablePort(adminPort+1, usedPorts)
+			}
+		}
+	}
+
+	// Mark these ports as used for this allocation
+	usedPorts[apiPort] = true
+	usedPorts[adminPort] = true
+
+	return apiPort, adminPort, nil
+}
+
+// isPortAvailable checks if a port is available on the local system
+func isPortAvailable(port int) bool {
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return false
+	}
+	ln.Close()
+	return true
+}
+
+// findAvailablePort finds an available port starting from the given port
+func findAvailablePort(startPort int, usedPorts map[int]bool) int {
+	for port := startPort; port < 65535; port++ {
+		if !usedPorts[port] && isPortAvailable(port) {
+			return port
+		}
+	}
+	// Fallback - this should rarely happen
+	return startPort
 }
 
 // Helper functions will be implemented below...

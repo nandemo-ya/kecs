@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,8 +14,6 @@ type FormField int
 const (
 	FieldInstanceCloseButton FormField = iota // × button at top-right
 	FieldInstanceName
-	FieldAPIPort
-	FieldAdminPort
 	FieldSubmit
 	FieldCancel
 )
@@ -31,8 +28,6 @@ type CreationStep struct {
 type InstanceForm struct {
 	// Form fields
 	instanceName string
-	apiPort      string
-	adminPort    string
 
 	// UI state
 	focusedField FormField
@@ -48,9 +43,7 @@ type InstanceForm struct {
 	elapsedTime       string    // Time elapsed as string
 
 	// Validation state
-	nameError      string
-	apiPortError   string
-	adminPortError string
+	nameError string
 }
 
 // NewInstanceForm creates a new instance form with defaults
@@ -60,24 +53,17 @@ func NewInstanceForm() *InstanceForm {
 
 	return &InstanceForm{
 		instanceName: defaultName,
-		apiPort:      "8080",
-		adminPort:    "8081",
 		focusedField: FieldInstanceName, // Start with instance name field, not close button
 	}
 }
 
-// NewInstanceFormWithSuggestions creates a new instance form with suggested ports
+// NewInstanceFormWithSuggestions creates a new instance form
 func NewInstanceFormWithSuggestions(instances []Instance) *InstanceForm {
 	// Generate a default name
 	defaultName, _ := utils.GenerateRandomName()
 
-	// Suggest available ports
-	apiPort, adminPort := SuggestAvailablePorts(instances, 8080, 8081)
-
 	return &InstanceForm{
 		instanceName: defaultName,
-		apiPort:      fmt.Sprintf("%d", apiPort),
-		adminPort:    fmt.Sprintf("%d", adminPort),
 		focusedField: FieldInstanceName, // Start with instance name field, not close button
 	}
 }
@@ -86,8 +72,6 @@ func NewInstanceFormWithSuggestions(instances []Instance) *InstanceForm {
 func (f *InstanceForm) Reset() {
 	defaultName, _ := utils.GenerateRandomName()
 	f.instanceName = defaultName
-	f.apiPort = "8080"
-	f.adminPort = "8081"
 	f.focusedField = FieldInstanceName
 	f.errorMsg = ""
 	f.successMsg = ""
@@ -130,12 +114,6 @@ func (f *InstanceForm) UpdateField(value string) {
 	case FieldInstanceName:
 		f.instanceName = value
 		f.nameError = ""
-	case FieldAPIPort:
-		f.apiPort = value
-		f.apiPortError = ""
-	case FieldAdminPort:
-		f.adminPort = value
-		f.adminPortError = ""
 	}
 }
 
@@ -145,14 +123,6 @@ func (f *InstanceForm) RemoveLastChar() {
 	case FieldInstanceName:
 		if len(f.instanceName) > 0 {
 			f.instanceName = f.instanceName[:len(f.instanceName)-1]
-		}
-	case FieldAPIPort:
-		if len(f.apiPort) > 0 {
-			f.apiPort = f.apiPort[:len(f.apiPort)-1]
-		}
-	case FieldAdminPort:
-		if len(f.adminPort) > 0 {
-			f.adminPort = f.adminPort[:len(f.adminPort)-1]
 		}
 	}
 }
@@ -171,35 +141,18 @@ func (f *InstanceForm) Validate() bool {
 		valid = false
 	}
 
-	// Validate API port
-	apiPort, err := strconv.Atoi(f.apiPort)
-	if err != nil || apiPort < 1 || apiPort > 65535 {
-		f.apiPortError = "API port must be between 1 and 65535"
-		valid = false
-	}
-
-	// Validate Admin port
-	adminPort, err := strconv.Atoi(f.adminPort)
-	if err != nil || adminPort < 1 || adminPort > 65535 {
-		f.adminPortError = "Admin port must be between 1 and 65535"
-		valid = false
-	} else if adminPort == apiPort {
-		f.adminPortError = "Admin port must be different from API port"
-		valid = false
-	}
+	// Ports are now automatically allocated, no validation needed
 
 	return valid
 }
 
 // GetFormData returns the form data for instance creation
 func (f *InstanceForm) GetFormData() map[string]interface{} {
-	apiPort, _ := strconv.Atoi(f.apiPort)
-	adminPort, _ := strconv.Atoi(f.adminPort)
-
+	// Ports will be automatically allocated
 	return map[string]interface{}{
 		"instanceName": f.instanceName,
-		"apiPort":      apiPort,
-		"adminPort":    adminPort,
+		"apiPort":      0,    // 0 means auto-allocate
+		"adminPort":    0,    // 0 means auto-allocate
 		"localStack":   true, // Always enabled
 	}
 }
@@ -219,7 +172,7 @@ func (f *InstanceForm) CreateMockInstance() (*Instance, error) {
 		Clusters: 0,
 		Services: 0,
 		Tasks:    0,
-		APIPort:  data["apiPort"].(int),
+		APIPort:  5373, // Default port for mock
 		Age:      0,
 	}
 
@@ -230,8 +183,6 @@ func (f *InstanceForm) CreateMockInstance() (*Instance, error) {
 // clearValidationErrors clears all validation errors
 func (f *InstanceForm) clearValidationErrors() {
 	f.nameError = ""
-	f.apiPortError = ""
-	f.adminPortError = ""
 }
 
 // GetCurrentFieldValue returns the value of the currently focused field
@@ -239,10 +190,6 @@ func (f *InstanceForm) GetCurrentFieldValue() string {
 	switch f.focusedField {
 	case FieldInstanceName:
 		return f.instanceName
-	case FieldAPIPort:
-		return f.apiPort
-	case FieldAdminPort:
-		return f.adminPort
 	default:
 		return ""
 	}

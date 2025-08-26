@@ -52,7 +52,7 @@ func getDefaultDataDir() string {
 func init() {
 	// Add server-specific flags
 	serverCmd.Flags().StringVar(&kubeconfig, "kubeconfig", "", "Path to the kubeconfig file (default is $HOME/.kube/config)")
-	serverCmd.Flags().IntVar(&adminPort, "admin-port", 8081, "Port for the admin server")
+	serverCmd.Flags().IntVar(&adminPort, "admin-port", 5374, "Port for the admin server")
 	serverCmd.Flags().StringVar(&dataDir, "data-dir", getDefaultDataDir(), "Directory for storing persistent data")
 	serverCmd.Flags().BoolVar(&localstackEnabled, "localstack-enabled", false, "Enable LocalStack integration for AWS service emulation")
 	serverCmd.Flags().StringVar(&configFile, "config", "", "Path to configuration file")

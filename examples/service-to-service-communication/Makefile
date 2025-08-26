@@ -3,7 +3,7 @@
 .PHONY: build deploy test clean help
 
 # Configuration
-KECS_ENDPOINT ?= http://localhost:8080
+KECS_ENDPOINT ?= http://localhost:5373
 CLUSTER_NAME ?= default
 
 help: ## Show this help message
