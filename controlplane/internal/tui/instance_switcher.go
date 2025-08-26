@@ -107,7 +107,7 @@ func (s *InstanceSwitcher) Render(width, height int) string {
 		PaddingLeft(2)
 
 	selectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#2a2a4a")).
+		Background(lipgloss.Color("#005577")).
 		Foreground(lipgloss.Color("#ffffff")).
 		Bold(true).
 		Width(46)

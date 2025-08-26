@@ -105,7 +105,7 @@ func (m Model) loadDataFromAPI() tea.Cmd {
 							Desired: service.DesiredCount,
 							Running: service.RunningCount,
 							Pending: service.PendingCount,
-							TaskDef: service.TaskDefinition,
+							TaskDef: formatTaskDefinition(service.TaskDefinition),
 							Age:     time.Since(service.CreatedAt),
 						}
 					}
@@ -412,7 +412,20 @@ func extractRegionFromArn(arn string) string {
 	if len(parts) >= 4 {
 		return parts[3]
 	}
-	return "unknown"
+	return ""
+}
+
+func formatTaskDefinition(taskDefArn string) string {
+	// Extract family:revision from task definition ARN
+	// Example: arn:aws:ecs:us-east-1:123456789012:task-definition/nginx:1
+	// Returns: nginx:1
+	if strings.Contains(taskDefArn, "task-definition/") {
+		parts := strings.Split(taskDefArn, "/")
+		if len(parts) > 1 {
+			return parts[len(parts)-1]
+		}
+	}
+	return taskDefArn // Return as-is if not an ARN
 }
 
 func extractTaskID(taskArn string) string {

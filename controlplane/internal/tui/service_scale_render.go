@@ -17,7 +17,7 @@ func (m Model) renderServiceScaleDialog() string {
 	var content []string
 
 	// Title with close button
-	titleLine := renderDialogTitle("Scale Service", true, d.IsCloseFocused(), 50)
+	titleLine := renderDialogTitle("Scale Service", true, d.IsCloseFocused(), 66)
 	content = append(content, titleLine)
 	content = append(content, "")
 
@@ -38,7 +38,7 @@ func (m Model) renderServiceScaleDialog() string {
 		if d.IsInputFocused() {
 			inputValue += "_"
 		}
-		content = append(content, inputStyle.Width(20).Render(inputValue))
+		content = append(content, inputStyle.Width(30).Render(inputValue))
 
 		// Error message
 		if d.errorMsg != "" {
@@ -53,7 +53,7 @@ func (m Model) renderServiceScaleDialog() string {
 
 		// Center the buttons
 		buttonsWidth := lipgloss.Width(buttons)
-		formWidth := 46 // Width of form content area (50 - 2*2 padding)
+		formWidth := 66 // Width of form content area (70 - 2*2 padding)
 		if buttonsWidth < formWidth {
 			padding := (formWidth - buttonsWidth) / 2
 			buttons = strings.Repeat(" ", padding) + buttons
@@ -70,7 +70,7 @@ func (m Model) renderServiceScaleDialog() string {
 
 		// Center the buttons
 		buttonsWidth := lipgloss.Width(buttons)
-		formWidth := 46
+		formWidth := 66
 		if buttonsWidth < formWidth {
 			padding := (formWidth - buttonsWidth) / 2
 			buttons = strings.Repeat(" ", padding) + buttons
@@ -93,7 +93,7 @@ func (m Model) renderServiceScaleDialog() string {
 		Background(lipgloss.Color("#1a1a1a")).
 		Foreground(lipgloss.Color("#ffffff")).
 		Padding(1, 2).
-		Width(50).
+		Width(70).
 		Render(dialogContent)
 
 	// Center the dialog
@@ -133,7 +133,7 @@ func (m Model) renderScalingProgress() string {
 		Background(lipgloss.Color("#1a1a1a")).
 		Foreground(lipgloss.Color("#ffffff")).
 		Padding(1, 2).
-		Width(40).
+		Width(50).
 		Render(progressContent)
 
 	// Center the dialog

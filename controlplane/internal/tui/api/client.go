@@ -487,6 +487,55 @@ func (c *HTTPClient) UpdateServiceDesiredCount(instanceName, clusterName, servic
 	return fmt.Errorf("UpdateServiceDesiredCount not implemented for this client type")
 }
 
+func (c *HTTPClient) UpdateServiceTaskDefinition(instanceName, clusterName, serviceName, taskDefinition string) error {
+	// Get instance info to find API port
+	if c.k3dProvider != nil {
+		inst, err := c.k3dProvider.GetInstance(context.Background(), instanceName)
+		if err != nil {
+			return fmt.Errorf("failed to get instance: %w", err)
+		}
+
+		// Call the instance's API directly using UpdateService
+		url := fmt.Sprintf("http://localhost:%d/v1/UpdateService", inst.APIPort)
+		client := &http.Client{Timeout: 10 * time.Second}
+
+		// Create UpdateService request with task definition change
+		reqBody := map[string]interface{}{
+			"service":        serviceName,
+			"cluster":        clusterName,
+			"taskDefinition": taskDefinition,
+		}
+
+		jsonData, err := json.Marshal(reqBody)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request: %w", err)
+		}
+
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+		req.Header.Set("X-Amz-Target", "AmazonEC2ContainerServiceV20141113.UpdateService")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to call UpdateService: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("UpdateService failed: %s", string(body))
+		}
+
+		return nil
+	}
+
+	// Fallback to regular API call
+	return fmt.Errorf("UpdateServiceTaskDefinition not implemented for this client type")
+}
+
 func (c *HTTPClient) DeleteService(ctx context.Context, instanceName, clusterName, serviceName string) error {
 	path := fmt.Sprintf("/api/instances/%s/services/%s", url.PathEscape(instanceName), url.PathEscape(serviceName))
 	req := map[string]string{"cluster": clusterName}
@@ -614,6 +663,38 @@ func (c *HTTPClient) StopTask(ctx context.Context, instanceName, clusterName, ta
 // Task Definition operations
 
 func (c *HTTPClient) ListTaskDefinitions(ctx context.Context, instanceName string) ([]string, error) {
+	// Get instance info to find API port
+	if c.k3dProvider != nil {
+		inst, err := c.k3dProvider.GetInstance(ctx, instanceName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get instance: %w", err)
+		}
+
+		// Call the instance's API directly
+		url := fmt.Sprintf("http://localhost:%d/v1/ListTaskDefinitions", inst.APIPort)
+		client := &http.Client{Timeout: 5 * time.Second}
+
+		reqBody, _ := json.Marshal(map[string]interface{}{})
+		resp, err := client.Post(url, "application/json", bytes.NewReader(reqBody))
+		if err != nil {
+			return nil, fmt.Errorf("failed to call ListTaskDefinitions: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return nil, fmt.Errorf("ListTaskDefinitions returned status %d: %s", resp.StatusCode, string(body))
+		}
+
+		var result map[string][]string
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return nil, fmt.Errorf("failed to decode response: %w", err)
+		}
+
+		return result["taskDefinitionArns"], nil
+	}
+
+	// Fallback to admin API path (which doesn't exist yet)
 	path := fmt.Sprintf("/api/instances/%s/task-definitions", url.PathEscape(instanceName))
 	var taskDefs []string
 	err := c.doRequest(ctx, "GET", path, nil, &taskDefs)

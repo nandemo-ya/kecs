@@ -228,6 +228,12 @@ type Model struct {
 	scalingInProgress  bool
 	scalingServiceName string
 	scalingTargetCount int
+
+	// Service updating
+	serviceUpdateDialog *ServiceUpdateDialog
+	updatingInProgress  bool
+	updatingServiceName string
+	updatingTaskDef     string
 }
 
 // NewModel creates a new application model

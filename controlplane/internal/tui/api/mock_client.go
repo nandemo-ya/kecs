@@ -402,6 +402,19 @@ func (c *MockClient) UpdateService(ctx context.Context, instanceName, clusterNam
 	return nil, fmt.Errorf("service not found: %s", service.ServiceName)
 }
 
+func (c *MockClient) UpdateServiceTaskDefinition(instanceName, clusterName, serviceName, taskDefinition string) error {
+	key := fmt.Sprintf("%s/%s", instanceName, clusterName)
+	services := c.services[key]
+	for i, s := range services {
+		if s.ServiceName == serviceName {
+			services[i].TaskDefinition = taskDefinition
+			c.services[key] = services
+			return nil
+		}
+	}
+	return fmt.Errorf("service not found: %s", serviceName)
+}
+
 func (c *MockClient) UpdateServiceDesiredCount(instanceName, clusterName, serviceNameOrArn string, desiredCount int) error {
 	// Extract service name from ARN if it's an ARN, otherwise use as-is
 	serviceName := serviceNameOrArn

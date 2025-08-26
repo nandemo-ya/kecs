@@ -19,7 +19,7 @@ var (
 			Background(lipgloss.Color("#1a1a1a")).
 			Foreground(lipgloss.Color("#ffffff")).
 			Padding(1, 2).
-			Width(65)
+			Width(75)
 
 	formTitleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00ff00")).
@@ -33,13 +33,13 @@ var (
 			Background(lipgloss.Color("#2a2a2a")).
 			Foreground(lipgloss.Color("#ffffff")).
 			Padding(0, 1).
-			Width(35)
+			Width(45)
 
 	formInputFocusedStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("#3a3a5a")).
+				Background(lipgloss.Color("#005577")).
 				Foreground(lipgloss.Color("#ffffff")).
 				Padding(0, 1).
-				Width(35)
+				Width(45)
 
 	formCheckboxStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#00ff00"))
@@ -99,7 +99,7 @@ func (m Model) renderInstanceForm() string {
 	var content []string
 
 	// Title with close button
-	titleLine := renderDialogTitle("Create New Instance", true, f.focusedField == FieldInstanceCloseButton, 61)
+	titleLine := renderDialogTitle("Create New Instance", true, f.focusedField == FieldInstanceCloseButton, 71)
 	content = append(content, titleLine)
 	content = append(content, "")
 
@@ -141,7 +141,7 @@ func (m Model) renderInstanceForm() string {
 	buttons := lipgloss.JoinHorizontal(lipgloss.Top, createBtn, cancelBtn)
 	// Center the buttons
 	buttonsWidth := lipgloss.Width(buttons)
-	formWidth := 61 // Width of form content area (65 - 2*2 padding)
+	formWidth := 71 // Width of form content area (75 - 2*2 padding)
 	if buttonsWidth < formWidth {
 		padding := (formWidth - buttonsWidth) / 2
 		buttons = strings.Repeat(" ", padding) + buttons
