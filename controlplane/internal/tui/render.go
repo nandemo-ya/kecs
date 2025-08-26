@@ -1313,8 +1313,9 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 	case ViewTaskDefinitionRevisions:
 		leftShortcuts = append(leftShortcuts,
 			keyStyle.Render("<enter>")+" "+descStyle.Render("Toggle JSON"),
+			keyStyle.Render("<y>")+" "+descStyle.Render("Yank name"),
 			keyStyle.Render("<e>")+" "+descStyle.Render("Edit"),
-			keyStyle.Render("<c>")+" "+descStyle.Render("Copy"),
+			keyStyle.Render("<c>")+" "+descStyle.Render("Copy JSON"),
 			keyStyle.Render("<d>")+" "+descStyle.Render("Deregister"),
 		)
 		if m.showTaskDefJSON {
@@ -1941,8 +1942,17 @@ func (m Model) renderTaskDefRevisionsList(maxHeight int, width int) string {
 		BorderBottom(true).
 		BorderStyle(lipgloss.NormalBorder())
 
-	headers := fmt.Sprintf("%-4s %-10s %-10s %-12s",
-		"REV", "STATUS", "CPU/MEM", "CREATED")
+	// Adjust column widths to include family
+	var headers string
+	if width > 60 {
+		// Wide view with family column
+		headers = fmt.Sprintf("%-30s %-4s %-8s %-10s %-10s",
+			"FAMILY", "REV", "STATUS", "CPU/MEM", "CREATED")
+	} else {
+		// Narrow view without family (for two-column mode)
+		headers = fmt.Sprintf("%-4s %-10s %-10s %-12s",
+			"REV", "STATUS", "CPU/MEM", "CREATED")
+	}
 
 	// Styles
 	selectedStyle := lipgloss.NewStyle().
@@ -1979,12 +1989,29 @@ func (m Model) renderTaskDefRevisionsList(maxHeight int, width int) string {
 
 		// Format row
 		cpuMem := fmt.Sprintf("%s/%s", rev.CPU, rev.Memory)
-		row := fmt.Sprintf("%-4d %-10s %-10s %-12s",
-			rev.Revision,
-			rev.Status,
-			cpuMem,
-			formatDuration(time.Since(rev.CreatedAt)),
-		)
+		var row string
+		if width > 60 {
+			// Wide view with family column
+			familyName := rev.Family
+			if len(familyName) > 28 {
+				familyName = familyName[:25] + "..."
+			}
+			row = fmt.Sprintf("%-30s %-4d %-8s %-10s %-10s",
+				familyName,
+				rev.Revision,
+				rev.Status,
+				cpuMem,
+				formatDuration(time.Since(rev.CreatedAt)),
+			)
+		} else {
+			// Narrow view without family (for two-column mode)
+			row = fmt.Sprintf("%-4d %-10s %-10s %-12s",
+				rev.Revision,
+				rev.Status,
+				cpuMem,
+				formatDuration(time.Since(rev.CreatedAt)),
+			)
+		}
 
 		// Apply style
 		if i == m.taskDefRevisionCursor {

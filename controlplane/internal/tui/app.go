@@ -1713,9 +1713,23 @@ func (m Model) handleTaskDefinitionRevisionsKeys(msg tea.KeyMsg) (Model, tea.Cmd
 				return m, m.loadTaskDefinitionJSONCmd(taskDefArn)
 			}
 		}
+	case "y":
+		// Yank (copy) family:revision to clipboard
+		if len(m.taskDefRevisions) > 0 && m.taskDefRevisionCursor < len(m.taskDefRevisions) {
+			rev := m.taskDefRevisions[m.taskDefRevisionCursor]
+			taskDefName := fmt.Sprintf("%s:%d", rev.Family, rev.Revision)
+			err := copyToClipboard(taskDefName)
+			if err == nil {
+				m.clipboardMsg = fmt.Sprintf("Copied: %s", taskDefName)
+				m.clipboardMsgTime = time.Now()
+			} else {
+				m.clipboardMsg = fmt.Sprintf("Copy failed: %v", err)
+				m.clipboardMsgTime = time.Now()
+			}
+		}
 	case "c":
-		// Copy to clipboard
-		// TODO: Implement clipboard copy
+		// Copy full task definition JSON to clipboard
+		// TODO: Implement full JSON copy
 	// Removed lowercase 'd' - use uppercase 'D' for deregister to avoid conflicts
 	case "a":
 		// Activate revision
