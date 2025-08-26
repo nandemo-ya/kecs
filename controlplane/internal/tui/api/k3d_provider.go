@@ -93,7 +93,7 @@ func (p *K3dInstanceProvider) getInstanceInfo(ctx context.Context, name string) 
 		Clusters:  0,
 		Services:  0,
 		Tasks:     0,
-		APIPort:   8080,
+		APIPort:   5373,
 		CreatedAt: time.Now(), // Default value
 	}
 
@@ -124,7 +124,7 @@ func (p *K3dInstanceProvider) getInstanceInfo(ctx context.Context, name string) 
 	if err == nil && containerInfo != nil {
 		// Extract port mapping
 		for _, port := range containerInfo.Ports {
-			if port.PrivatePort == 8080 {
+			if port.PrivatePort == 5373 {
 				inst.APIPort = int(port.PublicPort)
 				break
 			}

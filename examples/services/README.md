@@ -59,7 +59,7 @@ An advanced microservices configuration featuring:
 ```bash
 # Using AWS CLI with KECS endpoint
 aws ecs create-service \
-  --endpoint-url http://localhost:8080 \
+  --endpoint-url http://localhost:5373 \
   --cli-input-json file://examples/services/simple-service.json
 
 # Or using curl
@@ -73,7 +73,7 @@ curl -X POST http://localhost:8080/v1/createservice \
 
 ```bash
 aws ecs list-services \
-  --endpoint-url http://localhost:8080 \
+  --endpoint-url http://localhost:5373 \
   --cluster default
 ```
 
@@ -81,7 +81,7 @@ aws ecs list-services \
 
 ```bash
 aws ecs describe-services \
-  --endpoint-url http://localhost:8080 \
+  --endpoint-url http://localhost:5373 \
   --cluster default \
   --services simple-service
 ```
@@ -90,7 +90,7 @@ aws ecs describe-services \
 
 ```bash
 aws ecs update-service \
-  --endpoint-url http://localhost:8080 \
+  --endpoint-url http://localhost:5373 \
   --cluster default \
   --service simple-service \
   --desired-count 3
@@ -100,7 +100,7 @@ aws ecs update-service \
 
 ```bash
 aws ecs delete-service \
-  --endpoint-url http://localhost:8080 \
+  --endpoint-url http://localhost:5373 \
   --cluster default \
   --service simple-service \
   --force
@@ -113,14 +113,14 @@ Before using these service examples:
 1. **Register Task Definitions**: Ensure the referenced task definitions exist
    ```bash
    aws ecs register-task-definition \
-     --endpoint-url http://localhost:8080 \
+     --endpoint-url http://localhost:5373 \
      --cli-input-json file://examples/task-definitions/nginx-fargate.json
    ```
 
 2. **Create Clusters**: Ensure the target clusters exist
    ```bash
    aws ecs create-cluster \
-     --endpoint-url http://localhost:8080 \
+     --endpoint-url http://localhost:5373 \
      --cluster-name default
    ```
 

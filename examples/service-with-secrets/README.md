@@ -319,13 +319,13 @@ aws ecs update-service \
   --cluster default \
   --service service-with-secrets \
   --force-new-deployment \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Wait for deployment to complete
 aws ecs wait services-stable \
   --cluster default \
   --services service-with-secrets \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ## Key Points to Verify

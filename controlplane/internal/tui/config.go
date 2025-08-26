@@ -39,7 +39,7 @@ func LoadConfig() Config {
 	}
 
 	// If endpoint is explicitly set, prefer real API
-	if cfg.APIEndpoint != "" && cfg.APIEndpoint != "http://localhost:8080" {
+	if cfg.APIEndpoint != "" && cfg.APIEndpoint != "http://localhost:5373" {
 		// Unless mock mode is explicitly enabled
 		if !kecsConfig.Features.TUIMock {
 			cfg.UseMockData = false
@@ -48,7 +48,7 @@ func LoadConfig() Config {
 
 	// Default endpoint if not set
 	if cfg.APIEndpoint == "" {
-		cfg.APIEndpoint = "http://localhost:8080"
+		cfg.APIEndpoint = "http://localhost:5373"
 	}
 
 	return cfg

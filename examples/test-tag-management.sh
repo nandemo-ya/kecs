@@ -2,7 +2,7 @@
 
 # Test script for ECS Tag Management APIs
 
-ENDPOINT="http://localhost:8080"
+ENDPOINT="http://localhost:5373"
 
 echo "=== Create a sample cluster for testing ==="
 aws ecs create-cluster \

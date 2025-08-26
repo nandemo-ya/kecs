@@ -88,8 +88,8 @@ func InitConfig() error {
 		defaultDataDir := filepath.Join(homeDir, ".kecs", "data")
 
 		// Server defaults
-		v.SetDefault("server.port", 8080)
-		v.SetDefault("server.adminPort", 8081)
+		v.SetDefault("server.port", 5373)
+		v.SetDefault("server.adminPort", 5374)
 		v.SetDefault("server.dataDir", defaultDataDir)
 		v.SetDefault("server.logLevel", "info")
 		v.SetDefault("server.allowedOrigins", []string{})
@@ -177,8 +177,8 @@ func DefaultConfig() *Config {
 
 			return &Config{
 				Server: ServerConfig{
-					Port:      8080,
-					AdminPort: 8081,
+					Port:      5373,
+					AdminPort: 5374,
 					DataDir:   defaultDataDir,
 					LogLevel:  "info",
 				},
@@ -196,8 +196,8 @@ func DefaultConfig() *Config {
 
 			return &Config{
 				Server: ServerConfig{
-					Port:      8080,
-					AdminPort: 8081,
+					Port:      5373,
+					AdminPort: 5374,
 					DataDir:   defaultDataDir,
 					LogLevel:  "info",
 				},

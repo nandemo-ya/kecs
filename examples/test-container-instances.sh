@@ -2,7 +2,7 @@
 
 # Test script for ECS Container Instance APIs
 
-ENDPOINT="http://localhost:8080"
+ENDPOINT="http://localhost:5373"
 
 echo "=== Testing RegisterContainerInstance API ==="
 aws ecs register-container-instance \

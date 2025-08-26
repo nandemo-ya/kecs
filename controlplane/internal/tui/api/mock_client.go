@@ -51,8 +51,8 @@ func (c *MockClient) initMockData() {
 			Clusters:  2,
 			Services:  5,
 			Tasks:     12,
-			APIPort:   8080,
-			AdminPort: 8081,
+			APIPort:   5373,
+			AdminPort: 5374,
 			CreatedAt: time.Now().Add(-24 * time.Hour),
 		},
 		{

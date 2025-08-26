@@ -67,7 +67,7 @@ This demo demonstrates service-to-service communication where:
 kecs start --name service-demo
 
 # Set environment variable
-export KECS_ENDPOINT=http://localhost:8080
+export KECS_ENDPOINT=http://localhost:5373
 ```
 
 ### 2. Build Docker Images

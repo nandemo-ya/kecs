@@ -20,30 +20,33 @@ var _ = Describe("InstanceForm", func() {
 			// Default values should be set
 			data := form.GetFormData()
 			Expect(data["instanceName"]).NotTo(BeEmpty())
-			Expect(data["apiPort"]).To(Equal(8080))
-			Expect(data["adminPort"]).To(Equal(8081))
+			Expect(data["apiPort"]).To(Equal(0))    // Auto-allocate
+			Expect(data["adminPort"]).To(Equal(0))  // Auto-allocate
 			Expect(data["localStack"]).To(BeTrue()) // Always true
 		})
 	})
 
 	Describe("Field Navigation", func() {
 		It("should move focus down through fields", func() {
-			// Start at instance name
-			form.MoveFocusDown() // API port
-			form.MoveFocusDown() // Admin port
-			form.MoveFocusDown() // Submit
-			form.MoveFocusDown() // Cancel
-			form.MoveFocusDown() // Back to close button
-			// Should wrap around to close button (not a text field, so value is empty)
-			form.MoveFocusDown() // Now at instance name
-			Expect(form.GetCurrentFieldValue()).NotTo(BeEmpty())
+			// Start at instance name and capture value
+			initialValue := form.GetCurrentFieldValue()
+			Expect(initialValue).NotTo(BeEmpty()) // Should have random name
+
+			// Navigate down
+			form.MoveFocusDown() // Should move to Submit
+
+			// Navigate back up
+			form.MoveFocusUp() // Should return to instance name
+
+			// Verify we're back at instance name
+			currentValue := form.GetCurrentFieldValue()
+			Expect(currentValue).To(Equal(initialValue))
 		})
 
 		It("should move focus up through fields", func() {
-			form.MoveFocusUp() // From instance name to cancel
-			form.MoveFocusUp() // Submit
-			form.MoveFocusUp() // Admin port
-			// Continue cycling
+			// Start at instance name field
+			form.MoveFocusUp() // Moves to close button (wraps to Cancel)
+			// Since we removed API/Admin port fields, navigation should be simpler
 		})
 	})
 
@@ -71,23 +74,20 @@ var _ = Describe("InstanceForm", func() {
 			Expect(valid).To(BeFalse())
 		})
 
-		It("should validate invalid port numbers", func() {
-			// Move to API port
-			form.MoveFocusDown()
-			form.UpdateField("invalid")
+		It("should validate instance name", func() {
+			// Clear instance name by repeatedly calling RemoveLastChar
+			for i := 0; i < 50; i++ {
+				form.RemoveLastChar()
+			}
 			valid := form.Validate()
 			Expect(valid).To(BeFalse())
+
+			form.UpdateField("test-instance")
+			valid = form.Validate()
+			Expect(valid).To(BeTrue())
 		})
 
-		It("should validate port conflicts", func() {
-			// Set same port for both
-			form.MoveFocusDown() // API port
-			form.UpdateField("8080")
-			form.MoveFocusDown() // Admin port
-			form.UpdateField("8080")
-			valid := form.Validate()
-			Expect(valid).To(BeFalse())
-		})
+		// Port validation is no longer needed as ports are auto-allocated
 
 		It("should pass validation with valid data", func() {
 			valid := form.Validate()
@@ -101,7 +101,7 @@ var _ = Describe("InstanceForm", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(instance).NotTo(BeNil())
 			Expect(instance.Status).To(Equal("ACTIVE"))
-			Expect(instance.APIPort).To(Equal(8080))
+			Expect(instance.APIPort).To(Equal(5373)) // Default mock port
 		})
 
 		It("should fail with invalid data", func() {
@@ -116,8 +116,6 @@ var _ = Describe("InstanceForm", func() {
 		It("should reset form to defaults", func() {
 			// Modify form
 			form.UpdateField("custom-name")
-			form.MoveFocusDown()
-			form.UpdateField("9999")
 
 			// Reset
 			form.Reset()
@@ -125,7 +123,7 @@ var _ = Describe("InstanceForm", func() {
 			// Check defaults restored
 			data := form.GetFormData()
 			Expect(data["instanceName"]).NotTo(Equal("custom-name"))
-			Expect(data["apiPort"]).To(Equal(8080))
+			Expect(data["apiPort"]).To(Equal(0)) // Auto-allocate
 		})
 	})
 })

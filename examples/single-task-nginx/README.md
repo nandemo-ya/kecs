@@ -28,7 +28,7 @@ kecs start
 
 ```bash
 aws ecs create-cluster --cluster-name default \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 3. Create CloudWatch Log Group
@@ -36,7 +36,7 @@ aws ecs create-cluster --cluster-name default \
 ```bash
 aws logs create-log-group \
   --log-group-name /ecs/single-task-nginx \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts LocalStack. No need to create it manually.
@@ -49,12 +49,12 @@ Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts
 # Register task definition
 aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Create service
 aws ecs create-service \
   --cli-input-json file://service_def.json \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ## Verification
@@ -65,7 +65,7 @@ aws ecs create-service \
 aws ecs describe-services \
   --cluster default \
   --services single-task-nginx \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 2. List Running Tasks
@@ -74,7 +74,7 @@ aws ecs describe-services \
 aws ecs list-tasks \
   --cluster default \
   --service-name single-task-nginx \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 3. Get Task Details
@@ -84,14 +84,14 @@ aws ecs list-tasks \
 TASK_ARN=$(aws ecs list-tasks \
   --cluster default \
   --service-name single-task-nginx \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'taskArns[0]' --output text)
 
 # Describe task to get IP address
 TASK_IP=$(aws ecs describe-tasks \
   --cluster default \
   --tasks $TASK_ARN \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'tasks[0].containers[0].networkInterfaces[0].privateIpv4Address' \
   --output text)
 ```
@@ -126,7 +126,7 @@ curl http://localhost:8888/
 
 ```bash
 aws logs tail /ecs/single-task-nginx \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --follow
 ```
 
@@ -145,15 +145,15 @@ aws ecs delete-service \
   --cluster default \
   --service single-task-nginx \
   --force \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Deregister task definition
 aws ecs deregister-task-definition \
   --task-definition single-task-nginx:1 \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Delete log group
 aws logs delete-log-group \
   --log-group-name /ecs/single-task-nginx \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```

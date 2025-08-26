@@ -75,7 +75,7 @@ func init() {
 	clusterCreateCmd.Flags().StringVar(&clusterK3dImage, "k3d-image", "rancher/k3s:v1.31.4-k3s1", "K3s image to use")
 	clusterCreateCmd.Flags().StringVar(&clusterDataDir, "data-dir", "", "Data directory for persistence (default: ~/.kecs/clusters/<name>/data)")
 	clusterCreateCmd.Flags().IntVar(&clusterPort, "api-port", 4566, "Port to expose for AWS API access")
-	clusterCreateCmd.Flags().IntVar(&clusterAdminPort, "admin-port", 8081, "Port to expose for admin API access")
+	clusterCreateCmd.Flags().IntVar(&clusterAdminPort, "admin-port", 5374, "Port to expose for admin API access")
 	clusterCreateCmd.Flags().StringVar(&clusterConfigFile, "config", "", "Path to KECS configuration file")
 	clusterCreateCmd.Flags().DurationVar(&clusterWaitTimeout, "wait-timeout", 5*time.Minute, "Timeout for waiting cluster to be ready")
 }

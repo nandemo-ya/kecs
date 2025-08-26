@@ -673,8 +673,8 @@ func (m Model) viewTaskLogsCmd(taskArn string, containerName string) tea.Cmd {
 			apiClient = NewMockLogAPIClient()
 		} else {
 			// Use real API client with the correct endpoint
-			// Logs API is now on admin port (8081)
-			var adminPort int = 8081 // default admin port
+			// Logs API is now on admin port (5374)
+			var adminPort int = 5374 // default admin port
 			for _, inst := range m.instances {
 				if inst.Name == m.selectedInstance {
 					adminPort = inst.AdminPort

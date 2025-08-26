@@ -2,7 +2,7 @@
 
 # Test script for ECS Attribute management APIs
 
-ENDPOINT="http://localhost:8080"
+ENDPOINT="http://localhost:5373"
 
 echo "=== Testing PutAttributes API ==="
 aws ecs put-attributes \

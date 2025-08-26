@@ -74,7 +74,7 @@ docker run -d \
 
 ```bash
 aws ecs create-cluster --cluster-name default \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 3. Create CloudWatch Log Group
@@ -179,19 +179,19 @@ sed -i.bak "s|arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/mi
 # Register task definition
 aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Create service
 aws ecs create-service \
   --cli-input-json file://service_def.json \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Scale the service
 aws ecs update-service \
   --cluster default \
   --service microservice-api \
   --desired-count 5 \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ## Verification
@@ -272,7 +272,7 @@ done
 aws ecs describe-services \
   --cluster default \
   --services microservice-api \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'services[0].{Service:serviceName,Desired:desiredCount,Running:runningCount,Pending:pendingCount}'
 
 # Monitor target group health
@@ -313,20 +313,20 @@ kubectl top pods -n default -l app=microservice-api
 TASK_ARN=$(aws ecs list-tasks \
   --cluster default \
   --service-name microservice-api \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'taskArns[0]' --output text)
 
 aws ecs stop-task \
   --cluster default \
   --task $TASK_ARN \
   --reason "Chaos testing" \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Verify service recovers
 watch "aws ecs describe-services \
   --cluster default \
   --services microservice-api \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'services[0].runningCount'"
 ```
 
@@ -398,12 +398,12 @@ aws ecs delete-service \
   --cluster default \
   --service microservice-api \
   --force \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Deregister task definition
 aws ecs deregister-task-definition \
   --task-definition microservice-api:1 \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Delete log group
 aws logs delete-log-group \

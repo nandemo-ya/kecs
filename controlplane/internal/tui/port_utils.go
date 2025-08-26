@@ -53,7 +53,7 @@ func SuggestAvailablePorts(instances []Instance, preferredAPIPort, preferredAdmi
 	apiPort = preferredAPIPort
 	if usedPorts[apiPort] || !IsPortAvailable(apiPort) {
 		// Try common alternatives
-		alternatives := []int{8080, 8090, 8100, 8110, 8120, 8130, 8140, 8150}
+		alternatives := []int{5373, 5383, 5393, 5403, 5413, 5423, 5433, 5443}
 		for _, port := range alternatives {
 			if !usedPorts[port] && IsPortAvailable(port) {
 				apiPort = port
@@ -61,9 +61,9 @@ func SuggestAvailablePorts(instances []Instance, preferredAPIPort, preferredAdmi
 			}
 		}
 
-		// If still not found, scan from 8080
+		// If still not found, scan from 5373
 		if usedPorts[apiPort] || !IsPortAvailable(apiPort) {
-			apiPort = FindAvailablePort(8080)
+			apiPort = FindAvailablePort(5373)
 		}
 	}
 

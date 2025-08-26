@@ -19,13 +19,13 @@ import (
 const (
 	// DefaultImage is the default KECS Docker image
 	DefaultImage = "kecs:test"
-	
+
 	// DefaultAPIPort is the default port for the ECS API
-	DefaultAPIPort = "8080"
-	
+	DefaultAPIPort = "5373"
+
 	// DefaultAdminPort is the default port for the admin API (health checks)
-	DefaultAdminPort = "8081"
-	
+	DefaultAdminPort = "5374"
+
 	// DefaultRegion is the default AWS region
 	DefaultRegion = "us-east-1"
 )
@@ -33,23 +33,23 @@ const (
 // Container represents a running KECS container
 type Container struct {
 	testcontainers.Container
-	endpoint   string
+	endpoint      string
 	adminEndpoint string
-	region     string
+	region        string
 }
 
 // Option is a functional option for configuring KECS container
 type Option func(*containerOptions)
 
 type containerOptions struct {
-	image         string
-	region        string
-	apiPort       string
-	adminPort     string
-	env           map[string]string
-	testMode      bool
-	waitTimeout   time.Duration
-	logConsumer   testcontainers.LogConsumer
+	image       string
+	region      string
+	apiPort     string
+	adminPort   string
+	env         map[string]string
+	testMode    bool
+	waitTimeout time.Duration
+	logConsumer testcontainers.LogConsumer
 }
 
 // WithImage sets a custom Docker image
@@ -130,10 +130,10 @@ func StartContainer(ctx context.Context, opts ...Option) (*Container, error) {
 
 	// Set default environment variables
 	env := map[string]string{
-		"AWS_REGION":        options.region,
+		"AWS_REGION":         options.region,
 		"AWS_DEFAULT_REGION": options.region,
 	}
-	
+
 	// Merge with user-provided environment variables
 	for k, v := range options.env {
 		env[k] = v
@@ -146,7 +146,7 @@ func StartContainer(ctx context.Context, opts ...Option) (*Container, error) {
 		Env:          env,
 		WaitingFor: wait.ForAll(
 			wait.ForHTTP("/health").
-				WithPort(nat.Port(options.adminPort+"/tcp")).
+				WithPort(nat.Port(options.adminPort + "/tcp")).
 				WithStartupTimeout(options.waitTimeout),
 		),
 	}

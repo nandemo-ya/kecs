@@ -88,7 +88,7 @@ func DefaultControlPlaneConfig() *ControlPlaneConfig {
 		MemoryLimit:     "1Gi",
 		StorageSize:     "10Gi",
 		APIPort:         80,
-		AdminPort:       8081,
+		AdminPort:       5374,
 		LogLevel:        "info",
 	}
 }
@@ -236,7 +236,7 @@ func createConfigMap(config *ControlPlaneConfig) *corev1.ConfigMap {
 		},
 		Data: map[string]string{
 			"config.yaml": fmt.Sprintf(`server:
-  port: 8080
+  port: 5373
   adminPort: %d
   logLevel: %s
 
@@ -319,7 +319,7 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 					{
 						Name:       "http",
 						Port:       config.APIPort,
-						TargetPort: intstr.FromInt(8080),
+						TargetPort: intstr.FromInt(5373),
 						Protocol:   corev1.ProtocolTCP,
 						NodePort:   30080, // Fixed NodePort for external access
 					},
@@ -483,7 +483,7 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "api",
-									ContainerPort: 8080,
+									ContainerPort: 5373,
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{

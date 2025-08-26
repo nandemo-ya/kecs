@@ -53,7 +53,7 @@ kecs start
 
 ```bash
 aws ecs create-cluster --cluster-name default \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 3. Create CloudWatch Log Group
@@ -61,7 +61,7 @@ aws ecs create-cluster --cluster-name default \
 ```bash
 aws logs create-log-group \
   --log-group-name /ecs/batch-job-simple \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts LocalStack. No need to create it manually.
@@ -74,7 +74,7 @@ Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts
 # Register task definition
 aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Run a single task
 aws ecs run-task \
@@ -82,7 +82,7 @@ aws ecs run-task \
   --task-definition batch-job-simple \
   --launch-type FARGATE \
   --network-configuration "awsvpcConfiguration={subnets=[subnet-12345678],securityGroups=[sg-batch-job],assignPublicIp=ENABLED}" \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Run task with overrides
 aws ecs run-task \
@@ -99,7 +99,7 @@ aws ecs run-task \
       ]
     }]
   }' \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ## Monitoring and Verification
@@ -110,19 +110,19 @@ aws ecs run-task \
 # List all tasks in the cluster
 aws ecs list-tasks \
   --cluster default \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # List only running tasks
 aws ecs list-tasks \
   --cluster default \
   --desired-status RUNNING \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # List stopped tasks
 aws ecs list-tasks \
   --cluster default \
   --desired-status STOPPED \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 2. Monitor Task Execution
@@ -132,14 +132,14 @@ aws ecs list-tasks \
 TASK_ARN=$(aws ecs list-tasks \
   --cluster default \
   --desired-status RUNNING \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'taskArns[0]' --output text)
 
 # Watch task status
 watch -n 2 "aws ecs describe-tasks \
   --cluster default \
   --tasks $TASK_ARN \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'tasks[0].{Status:lastStatus,Started:startedAt,Stopped:stoppedAt,Exit:containers[0].exitCode}'"
 ```
 
@@ -149,13 +149,13 @@ watch -n 2 "aws ecs describe-tasks \
 # Stream logs in real-time
 aws logs tail /ecs/batch-job-simple \
   --follow \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Get logs for a specific task
 aws logs filter-log-events \
   --log-group-name /ecs/batch-job-simple \
   --filter-pattern "Batch job" \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 4. Check Task Output in Kubernetes
@@ -187,7 +187,7 @@ kubectl get pods -n default -l app=batch-job-simple --field-selector=status.phas
   --launch-type FARGATE \
   --network-configuration "awsvpcConfiguration={subnets=[subnet-12345678],securityGroups=[sg-batch-job],assignPublicIp=ENABLED}" \
   --overrides '{"containerOverrides":[{"name":"batch-processor","environment":[{"name":"JOB_TYPE","value":"hourly-report"}]}]}' \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 2. Parallel Processing
@@ -217,7 +217,7 @@ for i in $(seq 0 $((TASKS-1))); do
         ]
       }]
     }" \
-    --endpoint-url http://localhost:4566 &
+    --endpoint-url http://localhost:5373 &
 done
 
 wait
@@ -234,20 +234,20 @@ TASK1=$(aws ecs run-task \
   --launch-type FARGATE \
   --network-configuration "awsvpcConfiguration={subnets=[subnet-12345678],securityGroups=[sg-batch-job],assignPublicIp=ENABLED}" \
   --overrides '{"containerOverrides":[{"name":"batch-processor","environment":[{"name":"JOB_TYPE","value":"stage-1"}]}]}' \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'tasks[0].taskArn' --output text)
 
 # Wait for job 1 to complete
 aws ecs wait tasks-stopped \
   --cluster default \
   --tasks $TASK1 \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Check exit code
 EXIT_CODE=$(aws ecs describe-tasks \
   --cluster default \
   --tasks $TASK1 \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'tasks[0].containers[0].exitCode' --output text)
 
 if [ "$EXIT_CODE" -eq "0" ]; then
@@ -258,7 +258,7 @@ if [ "$EXIT_CODE" -eq "0" ]; then
     --launch-type FARGATE \
     --network-configuration "awsvpcConfiguration={subnets=[subnet-12345678],securityGroups=[sg-batch-job],assignPublicIp=ENABLED}" \
     --overrides '{"containerOverrides":[{"name":"batch-processor","environment":[{"name":"JOB_TYPE","value":"stage-2"}]}]}' \
-    --endpoint-url http://localhost:4566
+    --endpoint-url http://localhost:5373
 else
   echo "Stage 1 failed with exit code $EXIT_CODE"
 fi
@@ -281,7 +281,7 @@ fi
 aws ecs describe-tasks \
   --cluster default \
   --tasks $TASK_ARN \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'tasks[0].{StoppedReason:stoppedReason,StopCode:stopCode}'
 
 # Check container status
@@ -296,7 +296,7 @@ aws ecs stop-task \
   --cluster default \
   --task $TASK_ARN \
   --reason "Task timeout" \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### Debug Task Environment
@@ -314,7 +314,7 @@ aws ecs run-task \
       "command": ["sh", "-c", "sleep 3600"]
     }]
   }' \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Then exec into the container
 kubectl exec -it -n default $POD_NAME -- sh
@@ -327,22 +327,22 @@ kubectl exec -it -n default $POD_NAME -- sh
 aws ecs list-tasks \
   --cluster default \
   --desired-status RUNNING \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'taskArns[]' --output text | \
 xargs -n1 aws ecs stop-task \
   --cluster default \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --task
 
 # Deregister task definition
 aws ecs deregister-task-definition \
   --task-definition batch-job-simple:1 \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Delete log group
 aws logs delete-log-group \
   --log-group-name /ecs/batch-job-simple \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Clean up completed pods in Kubernetes
 kubectl delete pods -n default -l app=batch-job-simple --field-selector=status.phase=Succeeded

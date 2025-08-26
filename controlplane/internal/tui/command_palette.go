@@ -231,7 +231,7 @@ func (cp *CommandPalette) initCommands() {
 					Clusters: 0,
 					Services: 0,
 					Tasks:    0,
-					APIPort:  8080 + len(m.instances),
+					APIPort:  5373 + len(m.instances),
 					Age:      0,
 				}
 				m.instances = append(m.instances, newInstance)

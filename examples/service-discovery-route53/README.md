@@ -39,7 +39,7 @@ kecs start --name discovery-demo
 aws servicediscovery create-private-dns-namespace \
   --name production.local \
   --vpc vpc-default \
-  --endpoint-url http://localhost:8080
+  --endpoint-url http://localhost:5373
 ```
 
 ### 4. Create Service with Service Discovery
@@ -50,7 +50,7 @@ aws servicediscovery create-service \
   --name backend \
   --namespace-id <namespace-id> \
   --dns-config "NamespaceId=<namespace-id>,DnsRecords=[{Type=A,TTL=60}]" \
-  --endpoint-url http://localhost:8080
+  --endpoint-url http://localhost:5373
 
 # Create ECS service with service registry
 aws ecs create-service \
@@ -58,7 +58,7 @@ aws ecs create-service \
   --service-name backend-service \
   --task-definition backend:1 \
   --service-registries "registryArn=arn:aws:servicediscovery:us-east-1:000000000000:service/<service-id>" \
-  --endpoint-url http://localhost:8080
+  --endpoint-url http://localhost:5373
 ```
 
 ### 5. Discover Services
@@ -68,17 +68,17 @@ aws ecs create-service \
 aws servicediscovery discover-instances \
   --namespace-name production.local \
   --service-name backend \
-  --endpoint-url http://localhost:8080
+  --endpoint-url http://localhost:5373
 ```
 
 ## Cross-Cluster Communication
 
 With Route53 integration, services in different KECS instances can discover each other:
 
-### Instance 1 (Port 8080)
+### Instance 1 (Port 5373)
 ```bash
-kecs start --name cluster1 --api-port 8080
-export AWS_ENDPOINT_URL=http://localhost:8080
+kecs start --name cluster1 --api-port 5373
+export AWS_ENDPOINT_URL=http://localhost:5373
 
 # Create namespace and service
 aws servicediscovery create-private-dns-namespace --name shared.local --vpc vpc-default
@@ -130,7 +130,7 @@ dig SRV _http._tcp.backend.production.local
     │                                  │
 ┌───▼──────────────┐     ┌────────────▼─────────┐
 │   KECS Cluster 1 │     │   KECS Cluster 2     │
-│   Port: 8080     │     │   Port: 8090         │
+│   Port: 5373     │     │   Port: 8090         │
 │                  │     │                      │
 │  ┌─────────────┐ │     │  ┌─────────────┐    │
 │  │  Service A  │ │     │  │  Service B  │    │
