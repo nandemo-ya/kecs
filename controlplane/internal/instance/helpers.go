@@ -64,11 +64,8 @@ func (m *Manager) createCluster(ctx context.Context, instanceName string, cfg *c
 		int32(opts.AdminPort): adminNodePort, // Map host Admin port to NodePort for Admin API
 	}
 
-	// If LocalStack is enabled, add its port mapping
-	if cfg.LocalStack.Enabled {
-		// LocalStack always uses fixed NodePort 30566
-		portMappings[4566] = 30566
-	}
+	// LocalStack port mapping is no longer needed as it's accessed only internally
+	// This prevents port conflicts when running multiple instances
 
 	// Enable k3d registry
 	m.k3dManager.SetEnableRegistry(true)
