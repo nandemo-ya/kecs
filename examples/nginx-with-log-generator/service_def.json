@@ -1,0 +1,31 @@
+{
+  "serviceName": "nginx-with-log-generator",
+  "cluster": "default",
+  "taskDefinition": "nginx-with-log-generator:1",
+  "desiredCount": 1,
+  "launchType": "FARGATE",
+  "platformVersion": "LATEST",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": ["subnet-12345678", "subnet-87654321"],
+      "securityGroups": ["sg-nginx-web"],
+      "assignPublicIp": "ENABLED"
+    }
+  },
+  "deploymentConfiguration": {
+    "maximumPercent": 200,
+    "minimumHealthyPercent": 100
+  },
+  "tags": [
+    {
+      "key": "Environment",
+      "value": "development"
+    },
+    {
+      "key": "Application",
+      "value": "nginx-log-test"
+    }
+  ],
+  "enableECSManagedTags": true,
+  "propagateTags": "SERVICE"
+}

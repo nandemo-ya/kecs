@@ -1,0 +1,51 @@
+{
+  "family": "nginx-with-log-generator",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::000000000000:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "nginx",
+      "image": "nginx:latest",
+      "cpu": 128,
+      "memory": 256,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/nginx-with-log-generator",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "nginx"
+        }
+      }
+    },
+    {
+      "name": "log-generator",
+      "image": "curlimages/curl:latest",
+      "cpu": 128,
+      "memory": 256,
+      "essential": false,
+      "command": [
+        "/bin/sh",
+        "-c",
+        "while true; do echo 'Sending request to nginx...'; curl -s http://localhost:80/ > /dev/null && echo 'Request successful' || echo 'Request failed'; sleep 5; done"
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/nginx-with-log-generator",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "log-generator"
+        }
+      }
+    }
+  ]
+}
