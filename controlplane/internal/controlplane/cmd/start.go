@@ -60,7 +60,7 @@ func init() {
 
 	startCmd.Flags().StringVar(&startInstanceName, "instance", "", "KECS instance name (auto-generated if not specified)")
 	startCmd.Flags().StringVar(&startDataDir, "data-dir", "", "Data directory (default: ~/.kecs/data)")
-	startCmd.Flags().IntVar(&startApiPort, "api-port", 4566, "AWS API port (Traefik gateway)")
+	startCmd.Flags().IntVar(&startApiPort, "api-port", 5373, "AWS API port")
 	startCmd.Flags().IntVar(&startAdminPort, "admin-port", 5374, "Admin API port")
 	startCmd.Flags().StringVar(&startConfigFile, "config", "", "Configuration file path")
 	startCmd.Flags().BoolVar(&startNoLocalStack, "no-localstack", false, "Disable LocalStack deployment")
