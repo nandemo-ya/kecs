@@ -65,6 +65,29 @@ func (api *LogsAPI) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 	taskId := vars["taskId"]
 	containerName := vars["containerName"]
 
+	// Try to get the actual pod name and namespace from task storage
+	var namespace, podName string
+	if api.storage != nil && api.storage.TaskStore() != nil {
+		// Get cluster from query params or default
+		cluster := r.URL.Query().Get("cluster")
+		if cluster == "" {
+			cluster = "default"
+		}
+		clusterArn := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:cluster/%s", cluster)
+
+		// First try to find the task by ID
+		task, err := api.storage.TaskStore().Get(r.Context(), clusterArn, taskId)
+		if err == nil && task != nil && task.PodName != "" {
+			// Use the stored pod name and namespace
+			namespace = task.Namespace
+			podName = task.PodName
+			logging.Debug("Found task with pod mapping",
+				"taskId", taskId,
+				"podName", podName,
+				"namespace", namespace)
+		}
+	}
+
 	// Convert task ID to full ARN for storage lookup
 	// Assume default cluster and region for now
 	taskArn := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:task/default/%s", taskId)
@@ -130,9 +153,18 @@ func (api *LogsAPI) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 
 	// If no logs in storage, try to get from Kubernetes directly
 	if len(logs) == 0 && api.kubeClient != nil && api.podLogService != nil {
-		// Parse task ARN to get namespace and pod name
-		namespace, podName, err := parseTaskArn(taskArn)
-		if err == nil {
+		// If we didn't get pod info from storage, parse task ARN
+		if namespace == "" || podName == "" {
+			var err error
+			namespace, podName, err = parseTaskArn(taskArn)
+			if err != nil {
+				logging.Warn("Failed to parse task ARN",
+					"taskArn", taskArn,
+					"error", err)
+			}
+		}
+
+		if namespace != "" && podName != "" {
 			// Try to get logs from Kubernetes
 			options := &kubernetes.LogOptions{
 				Follow:    false,
@@ -150,6 +182,9 @@ func (api *LogsAPI) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 					"pod", podName,
 					"container", containerName)
 			}
+		} else {
+			logging.Warn("Cannot fetch logs: missing namespace or pod name",
+				"taskId", taskId)
 		}
 	}
 
@@ -183,19 +218,41 @@ func (api *LogsAPI) HandleStreamLogs(w http.ResponseWriter, r *http.Request) {
 	taskId := vars["taskId"]
 	containerName := vars["containerName"]
 
-	// For streaming, task ID is the pod name directly
-	// Parse cluster from query param if provided
-	cluster := r.URL.Query().Get("cluster")
-	if cluster == "" {
-		cluster = "default"
-	}
-	taskArn := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:task/%s/%s", cluster, taskId)
+	// Try to get the actual pod name and namespace from task storage
+	var namespace, podName string
+	if api.storage != nil && api.storage.TaskStore() != nil {
+		// Get cluster from query params or default
+		cluster := r.URL.Query().Get("cluster")
+		if cluster == "" {
+			cluster = "default"
+		}
+		clusterArn := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:cluster/%s", cluster)
 
-	// Parse task ARN to get namespace and pod name
-	namespace, podName, err := parseTaskArn(taskArn)
-	if err != nil {
-		http.Error(w, "Invalid task ARN", http.StatusBadRequest)
-		return
+		// First try to find the task by ID
+		task, err := api.storage.TaskStore().Get(r.Context(), clusterArn, taskId)
+		if err == nil && task != nil && task.PodName != "" {
+			// Use the stored pod name and namespace
+			namespace = task.Namespace
+			podName = task.PodName
+			logging.Debug("Found task with pod mapping for streaming",
+				"taskId", taskId,
+				"podName", podName,
+				"namespace", namespace)
+		}
+	}
+
+	// Fall back to parsing if not found in storage
+	if namespace == "" || podName == "" {
+		// Already have cluster from above
+		taskArn := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:task/default/%s", taskId)
+
+		// Parse task ARN to get namespace and pod name
+		var err error
+		namespace, podName, err = parseTaskArn(taskArn)
+		if err != nil {
+			http.Error(w, "Invalid task ARN", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Set SSE headers
@@ -271,19 +328,41 @@ func (api *LogsAPI) HandleWebSocketLogs(w http.ResponseWriter, r *http.Request) 
 	taskId := vars["taskId"]
 	containerName := vars["containerName"]
 
-	// For WebSocket, task ID is the pod name directly
-	// Parse cluster from query param if provided
-	cluster := r.URL.Query().Get("cluster")
-	if cluster == "" {
-		cluster = "default"
-	}
-	taskArn := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:task/%s/%s", cluster, taskId)
+	// Try to get the actual pod name and namespace from task storage
+	var namespace, podName string
+	if api.storage != nil && api.storage.TaskStore() != nil {
+		// Get cluster from query params or default
+		cluster := r.URL.Query().Get("cluster")
+		if cluster == "" {
+			cluster = "default"
+		}
+		clusterArn := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:cluster/%s", cluster)
 
-	// Parse task ARN to get namespace and pod name
-	namespace, podName, err := parseTaskArn(taskArn)
-	if err != nil {
-		http.Error(w, "Invalid task ARN", http.StatusBadRequest)
-		return
+		// First try to find the task by ID
+		task, err := api.storage.TaskStore().Get(r.Context(), clusterArn, taskId)
+		if err == nil && task != nil && task.PodName != "" {
+			// Use the stored pod name and namespace
+			namespace = task.Namespace
+			podName = task.PodName
+			logging.Debug("Found task with pod mapping for WebSocket",
+				"taskId", taskId,
+				"podName", podName,
+				"namespace", namespace)
+		}
+	}
+
+	// Fall back to parsing if not found in storage
+	if namespace == "" || podName == "" {
+		// Already have cluster from above
+		taskArn := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:task/default/%s", taskId)
+
+		// Parse task ARN to get namespace and pod name
+		var err error
+		namespace, podName, err = parseTaskArn(taskArn)
+		if err != nil {
+			http.Error(w, "Invalid task ARN", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Upgrade to WebSocket
