@@ -733,6 +733,23 @@ func (k *K3dClusterManager) GetKubeClient(ctx context.Context, clusterName strin
 		return fake.NewSimpleClientset(), nil
 	}
 
+	// When running inside Kubernetes (control plane in pod), use in-cluster config
+	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		config, err := rest.InClusterConfig()
+		if err == nil {
+			// Adjust config for better performance
+			config.QPS = 100
+			config.Burst = 200
+
+			client, err := kubernetes.NewForConfig(config)
+			if err == nil {
+				logging.Debug("Using in-cluster config for Kubernetes client")
+				return client, nil
+			}
+			logging.Warn("Failed to create client from in-cluster config, falling back to k3d kubeconfig", "error", err)
+		}
+	}
+
 	return k.getKubeClientInternal(clusterName)
 }
 
