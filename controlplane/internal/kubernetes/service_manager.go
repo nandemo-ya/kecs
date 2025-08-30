@@ -169,37 +169,18 @@ func (sm *ServiceManager) initializeClient() error {
 		return nil
 	}
 
-	// Always prioritize in-cluster config when running inside Kubernetes
+	// Control Plane always runs inside Kubernetes, use in-cluster config
 	logging.Info("Initializing Kubernetes client for ServiceManager")
 
-	// Check if we're running inside Kubernetes
-	if config.IsRunningInKubernetes() {
-		logging.Info("Detected Kubernetes environment, using in-cluster config")
-		cfg, err := rest.InClusterConfig()
-		if err != nil {
-			return fmt.Errorf("failed to get in-cluster config despite being in Kubernetes: %w", err)
-		}
-		// Adjust config for better performance
-		cfg.QPS = 100
-		cfg.Burst = 200
-		logging.Info("Successfully obtained in-cluster config for ServiceManager", "host", cfg.Host)
-
-		clientset, err := kubernetes.NewForConfig(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to create kubernetes client: %w", err)
-		}
-		sm.clientset = clientset
-		logging.Info("ServiceManager kubernetes client initialized with in-cluster config")
-		return nil
-	}
-
-	// Not in Kubernetes, try kubeconfig
-	logging.Info("Not running in Kubernetes, attempting kubeconfig")
-	cfg, err := GetKubeConfig()
+	cfg, err := rest.InClusterConfig()
 	if err != nil {
-		return fmt.Errorf("failed to get kubernetes config: %w", err)
+		return fmt.Errorf("failed to get in-cluster config: %w", err)
 	}
-	logging.Info("Using kubeconfig", "host", cfg.Host)
+
+	// Adjust config for better performance
+	cfg.QPS = 100
+	cfg.Burst = 200
+	logging.Info("Successfully obtained in-cluster config", "host", cfg.Host)
 
 	clientset, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
@@ -207,7 +188,7 @@ func (sm *ServiceManager) initializeClient() error {
 	}
 
 	sm.clientset = clientset
-	logging.Debug("ServiceManager kubernetes client initialized")
+	logging.Info("ServiceManager kubernetes client initialized with in-cluster config")
 	return nil
 }
 

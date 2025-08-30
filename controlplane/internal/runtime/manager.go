@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-
-	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 )
 
 var (
@@ -154,11 +152,6 @@ func GetPreferredRuntime() string {
 		return "containerd"
 	}
 
-	// Check if running in Kubernetes (prefer containerd)
-	if config.IsRunningInKubernetes() {
-		return "containerd"
-	}
-
-	// Default to Docker for backward compatibility
-	return "docker"
+	// Control Plane always runs inside Kubernetes, prefer containerd
+	return "containerd"
 }
