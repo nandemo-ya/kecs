@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -174,9 +173,8 @@ func (sm *ServiceManager) initializeClient() error {
 	logging.Info("Initializing Kubernetes client for ServiceManager")
 
 	// Check if we're running inside Kubernetes
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
-		logging.Info("Detected Kubernetes environment, using in-cluster config",
-			"KUBERNETES_SERVICE_HOST", os.Getenv("KUBERNETES_SERVICE_HOST"))
+	if config.IsRunningInKubernetes() {
+		logging.Info("Detected Kubernetes environment, using in-cluster config")
 		cfg, err := rest.InClusterConfig()
 		if err != nil {
 			return fmt.Errorf("failed to get in-cluster config despite being in Kubernetes: %w", err)

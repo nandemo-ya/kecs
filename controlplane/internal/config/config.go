@@ -165,6 +165,10 @@ func bindLegacyEnvVars() {
 	v.BindEnv("localstack.useTraefik", "KECS_LOCALSTACK_USE_TRAEFIK")
 	v.BindEnv("server.controlPlaneImage", "KECS_CONTROLPLANE_IMAGE")
 	v.BindEnv("features.tuiMock", "KECS_TUI_MOCK")
+
+	// Bind Kubernetes service discovery environment variables (for in-cluster detection)
+	v.BindEnv("kubernetes.serviceHost", "KUBERNETES_SERVICE_HOST")
+	v.BindEnv("kubernetes.servicePort", "KUBERNETES_SERVICE_PORT")
 }
 
 // DefaultConfig returns the default configuration
@@ -382,4 +386,11 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// IsRunningInKubernetes checks if the control plane is running inside a Kubernetes pod
+func IsRunningInKubernetes() bool {
+	ensureInitialized()
+	// Check if KUBERNETES_SERVICE_HOST is set (standard Kubernetes environment variable)
+	return v.GetString("kubernetes.serviceHost") != ""
 }

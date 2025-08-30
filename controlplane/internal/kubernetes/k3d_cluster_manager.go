@@ -735,10 +735,8 @@ func (k *K3dClusterManager) GetKubeClient(ctx context.Context, clusterName strin
 	}
 
 	// When running inside Kubernetes (control plane in pod), use in-cluster config
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
-		logging.Info("Kubernetes environment detected, attempting in-cluster config",
-			"KUBERNETES_SERVICE_HOST", os.Getenv("KUBERNETES_SERVICE_HOST"),
-			"KUBERNETES_SERVICE_PORT", os.Getenv("KUBERNETES_SERVICE_PORT"))
+	if config.IsRunningInKubernetes() {
+		logging.Info("Kubernetes environment detected, attempting in-cluster config")
 
 		config, err := rest.InClusterConfig()
 		if err == nil {

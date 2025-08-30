@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"sync"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 )
 
 var (
@@ -152,8 +154,8 @@ func GetPreferredRuntime() string {
 		return "containerd"
 	}
 
-	// Check if running in Kind (prefer containerd)
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+	// Check if running in Kubernetes (prefer containerd)
+	if config.IsRunningInKubernetes() {
 		return "containerd"
 	}
 

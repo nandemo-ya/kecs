@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gorilla/mux"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
@@ -126,9 +124,6 @@ func (s *Server) setupRoutes() http.Handler {
 
 	// Configuration endpoint
 	router.HandleFunc("/config", s.handleConfig).Methods("GET")
-
-	// Kubernetes connectivity check endpoint
-	router.HandleFunc("/k8s/check", s.handleK8sCheck).Methods("GET")
 
 	// Register TUI API endpoints
 	if s.instanceAPI != nil {
@@ -256,66 +251,6 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			DefaultRegion: cfg.AWS.DefaultRegion,
 			AccountID:     cfg.AWS.AccountID,
 		},
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
-}
-
-// K8sCheckResponse represents the Kubernetes connectivity check response
-type K8sCheckResponse struct {
-	Connected     bool   `json:"connected"`
-	ServerVersion string `json:"serverVersion,omitempty"`
-	Error         string `json:"error,omitempty"`
-	ConfigSource  string `json:"configSource"`
-	Endpoint      string `json:"endpoint,omitempty"`
-	Namespaces    int    `json:"namespaces,omitempty"`
-}
-
-// handleK8sCheck handles the Kubernetes connectivity check endpoint
-func (s *Server) handleK8sCheck(w http.ResponseWriter, r *http.Request) {
-	response := K8sCheckResponse{
-		Connected:    false,
-		ConfigSource: "unknown",
-	}
-
-	// Check if we have a Kubernetes client
-	if s.kubeClient == nil {
-		response.Error = "No Kubernetes client configured"
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	// Try to get server version to test connectivity
-	versionInfo, err := s.kubeClient.Discovery().ServerVersion()
-	if err != nil {
-		response.Error = fmt.Sprintf("Failed to connect to Kubernetes API: %v", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	response.Connected = true
-	response.ServerVersion = versionInfo.String()
-
-	// Determine config source
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
-		response.ConfigSource = "in-cluster"
-		response.Endpoint = fmt.Sprintf("https://%s:%s",
-			os.Getenv("KUBERNETES_SERVICE_HOST"),
-			os.Getenv("KUBERNETES_SERVICE_PORT"))
-	} else {
-		response.ConfigSource = "kubeconfig"
-	}
-
-	// Try to list namespaces as additional connectivity test
-	namespaces, err := s.kubeClient.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
-	if err == nil {
-		response.Namespaces = len(namespaces.Items)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
