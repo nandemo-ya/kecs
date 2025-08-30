@@ -159,8 +159,8 @@ func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, c
 		CPULimit:        "1000m",
 		MemoryLimit:     "1Gi",
 		StorageSize:     "10Gi",
-		APIPort:         resources.ControlPlaneInternalAPIPort,
-		AdminPort:       resources.ControlPlaneInternalAdminPort,
+		APIPort:         80,                                      // Service port (external facing)
+		AdminPort:       resources.ControlPlaneInternalAdminPort, // Admin service port
 		LogLevel:        cfg.Server.LogLevel,
 	}
 
