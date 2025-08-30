@@ -282,15 +282,20 @@ func (m Model) monitorInstanceCreation(instanceName string, hasLocalStack bool) 
 		// Start a background monitoring goroutine
 		startTime := time.Now()
 
-		// Define initial steps
+		// Define initial steps (must match backend status messages exactly)
 		steps := []CreationStep{
 			{Name: "Creating k3d cluster", Status: "running"},
+			{Name: "Creating namespace", Status: "pending"},
 			{Name: "Deploying control plane", Status: "pending"},
 		}
 
 		if hasLocalStack {
 			steps = append(steps, CreationStep{Name: "Starting LocalStack", Status: "pending"})
 		}
+
+		// Add Vector deployment step
+		steps = append(steps, CreationStep{Name: "Deploying Vector", Status: "pending"})
+
 		steps = append(steps, CreationStep{Name: "Finalizing", Status: "pending"})
 
 		// Return initial status immediately
