@@ -36,6 +36,10 @@ const (
 	LabelComponent = "kecs.dev/component"
 	LabelType      = "kecs.dev/type"
 	LabelApp       = "app"
+
+	// Internal ports - Control plane always listens on these ports inside the container
+	ControlPlaneInternalAPIPort   = 5373
+	ControlPlaneInternalAdminPort = 5374
 )
 
 // ControlPlaneResources contains all resources needed for the control plane
@@ -87,8 +91,8 @@ func DefaultControlPlaneConfig() *ControlPlaneConfig {
 		CPULimit:        "1000m",
 		MemoryLimit:     "1Gi",
 		StorageSize:     "10Gi",
-		APIPort:         80,
-		AdminPort:       5374,
+		APIPort:         ControlPlaneInternalAPIPort,
+		AdminPort:       ControlPlaneInternalAdminPort,
 		LogLevel:        "info",
 	}
 }
@@ -319,7 +323,7 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 					{
 						Name:       "http",
 						Port:       config.APIPort,
-						TargetPort: intstr.FromInt(5373),
+						TargetPort: intstr.FromInt(ControlPlaneInternalAPIPort),
 						Protocol:   corev1.ProtocolTCP,
 						NodePort:   30080, // Fixed NodePort for external access
 					},
@@ -346,7 +350,7 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 					{
 						Name:       "admin",
 						Port:       config.AdminPort,
-						TargetPort: intstr.FromInt(int(config.AdminPort)),
+						TargetPort: intstr.FromInt(ControlPlaneInternalAdminPort),
 						Protocol:   corev1.ProtocolTCP,
 						NodePort:   30081, // Fixed NodePort for admin API
 					},
@@ -373,7 +377,7 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 					{
 						Name:       "admin",
 						Port:       config.AdminPort,
-						TargetPort: intstr.FromInt(int(config.AdminPort)),
+						TargetPort: intstr.FromInt(ControlPlaneInternalAdminPort),
 						Protocol:   corev1.ProtocolTCP,
 					},
 				},
@@ -483,12 +487,12 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "api",
-									ContainerPort: 5373,
+									ContainerPort: ControlPlaneInternalAPIPort,
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
 									Name:          "admin",
-									ContainerPort: int32(config.AdminPort),
+									ContainerPort: ControlPlaneInternalAdminPort,
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},
