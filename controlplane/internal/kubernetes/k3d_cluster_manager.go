@@ -730,11 +730,16 @@ func (k *K3dClusterManager) IsClusterRunning(ctx context.Context, clusterName st
 func (k *K3dClusterManager) GetKubeClient(ctx context.Context, clusterName string) (kubernetes.Interface, error) {
 	// In CI/test mode, return a fake client
 	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+		logging.Debug("CI/test mode detected, using fake client")
 		return fake.NewSimpleClientset(), nil
 	}
 
 	// When running inside Kubernetes (control plane in pod), use in-cluster config
 	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		logging.Info("Kubernetes environment detected, attempting in-cluster config",
+			"KUBERNETES_SERVICE_HOST", os.Getenv("KUBERNETES_SERVICE_HOST"),
+			"KUBERNETES_SERVICE_PORT", os.Getenv("KUBERNETES_SERVICE_PORT"))
+
 		config, err := rest.InClusterConfig()
 		if err == nil {
 			// Adjust config for better performance
@@ -743,11 +748,16 @@ func (k *K3dClusterManager) GetKubeClient(ctx context.Context, clusterName strin
 
 			client, err := kubernetes.NewForConfig(config)
 			if err == nil {
-				logging.Debug("Using in-cluster config for Kubernetes client")
+				logging.Info("Successfully using in-cluster config for Kubernetes client",
+					"endpoint", config.Host)
 				return client, nil
 			}
 			logging.Warn("Failed to create client from in-cluster config, falling back to k3d kubeconfig", "error", err)
+		} else {
+			logging.Warn("Failed to get in-cluster config", "error", err)
 		}
+	} else {
+		logging.Debug("Not running in Kubernetes, using k3d kubeconfig", "clusterName", clusterName)
 	}
 
 	return k.getKubeClientInternal(clusterName)
