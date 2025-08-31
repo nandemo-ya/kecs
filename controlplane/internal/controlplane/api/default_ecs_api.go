@@ -17,7 +17,6 @@ import (
 // DefaultECSAPI provides the default implementation of ECS API operations
 type DefaultECSAPI struct {
 	storage                   storage.Storage
-	clusterManager            kubernetes.ClusterManager
 	serviceManager            *kubernetes.ServiceManager
 	taskManagerInstance       *kubernetes.TaskManager
 	taskSetManager            *kubernetes.TaskSetManager
@@ -36,7 +35,6 @@ type DefaultECSAPI struct {
 }
 
 // NewDefaultECSAPI creates a new default ECS API implementation with storage
-// Deprecated: Use NewDefaultECSAPIWithClusterManager instead
 func NewDefaultECSAPI(storage storage.Storage) generated.ECSAPIInterface {
 	return &DefaultECSAPI{
 		storage:   storage,
@@ -113,21 +111,6 @@ func NewDefaultECSAPIWithConfig(storage storage.Storage, region, accountID strin
 		region:    region,
 		accountID: accountID,
 	}
-}
-
-// NewDefaultECSAPIWithClusterManager creates a new default ECS API implementation with ClusterManager
-func NewDefaultECSAPIWithClusterManager(storage storage.Storage, clusterManager kubernetes.ClusterManager, region, accountID string) generated.ECSAPIInterface {
-	return &DefaultECSAPI{
-		storage:        storage,
-		clusterManager: clusterManager,
-		region:         region,
-		accountID:      accountID,
-	}
-}
-
-// getClusterManager returns the cluster manager
-func (api *DefaultECSAPI) getClusterManager() kubernetes.ClusterManager {
-	return api.clusterManager
 }
 
 // taskManager returns the task manager, creating it if necessary

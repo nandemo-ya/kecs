@@ -2,183 +2,41 @@ package api
 
 import (
 	"context"
-	"net/http"
-	"os"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/memory"
 )
 
-var _ = Describe("Server State Recovery", func() {
+var _ = Describe("Server Recovery", func() {
 	var (
-		server         *Server
-		mockStorage    storage.Storage
-		mockClusterMgr *MockClusterManager
-		ctx            context.Context
+		server  *Server
+		ctx     context.Context
+		storage *memory.MemoryStorage
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		mockStorage = memory.NewMemoryStorage()
-		mockClusterMgr = NewMockClusterManager()
+		storage = memory.NewMemoryStorage()
 
 		// Initialize storage
-		err := mockStorage.Initialize(ctx)
+		err := storage.Initialize(ctx)
 		Expect(err).To(BeNil())
 
-		// Create test data in storage
-		cluster1 := &storage.Cluster{
-			ID:             "1",
-			Name:           "test-cluster-1",
-			K8sClusterName: "kecs-test-cluster-1",
-			ARN:            "arn:aws:ecs:us-east-1:000000000000:cluster/test-cluster-1",
-			Status:         "ACTIVE",
-			Region:         "us-east-1",
-			AccountID:      "000000000000",
-			CreatedAt:      time.Now(),
-			UpdatedAt:      time.Now(),
-		}
-		err = mockStorage.ClusterStore().Create(ctx, cluster1)
-		Expect(err).To(BeNil())
-
-		cluster2 := &storage.Cluster{
-			ID:             "2",
-			Name:           "test-cluster-2",
-			K8sClusterName: "", // No k8s cluster name, should be skipped
-			ARN:            "arn:aws:ecs:us-east-1:000000000000:cluster/test-cluster-2",
-			Status:         "ACTIVE",
-			Region:         "us-east-1",
-			AccountID:      "000000000000",
-			CreatedAt:      time.Now(),
-			UpdatedAt:      time.Now(),
-		}
-		err = mockStorage.ClusterStore().Create(ctx, cluster2)
-		Expect(err).To(BeNil())
-
-		// Create server with mocks
+		// Create server without ClusterManager
 		server = &Server{
-			storage:        mockStorage,
-			clusterManager: mockClusterMgr,
-			httpServer: &http.Server{
-				Addr: ":8080",
-			},
+			storage: storage,
 		}
 	})
 
-	AfterEach(func() {
-		// Clean up environment variables
-		os.Unsetenv("KECS_TEST_MODE")
-		os.Unsetenv("KECS_AUTO_RECOVER_STATE")
-	})
-
-	Describe("RecoverState", func() {
-		Context("when clusters need recovery", func() {
-			It("should not recreate k3d clusters (new architecture)", func() {
-				// Ensure clusters don't exist
-				mockClusterMgr.ClusterMap = make(map[string]bool)
-
-				err := server.RecoverState(ctx)
-				Expect(err).To(BeNil())
-
-				// In the new architecture, k3d clusters are not created by the API server
-				// They are managed by the CLI
-				Expect(mockClusterMgr.ClusterMap).To(BeEmpty())
-			})
-
-			It("should recover services and reschedule tasks", func() {
-				Skip("Skipping task rescheduling test - memory storage doesn't implement required stores")
-			})
-
-			It("should skip clusters that already exist", func() {
-				// Mark cluster as existing
-				mockClusterMgr.ClusterMap["kecs-test-cluster-1"] = true
-
-				err := server.RecoverState(ctx)
-				Expect(err).To(BeNil())
-
-				// Verify no new clusters were created
-				Expect(len(mockClusterMgr.ClusterMap)).To(Equal(1))
-			})
-
-			It("should skip clusters without k8s cluster name", func() {
-				err := server.RecoverState(ctx)
-				Expect(err).To(BeNil())
-
-				// In the new architecture, no k3d clusters are created
-				Expect(len(mockClusterMgr.ClusterMap)).To(Equal(0))
-			})
-		})
-
-		Context("when storage is empty", func() {
-			It("should return without error", func() {
-				// Create empty storage
-				emptyStorage := memory.NewMemoryStorage()
-				err := emptyStorage.Initialize(ctx)
-				Expect(err).To(BeNil())
-
-				server.storage = emptyStorage
-
-				err = server.RecoverState(ctx)
-				Expect(err).To(BeNil())
-
-				// No clusters should be created
-				Expect(len(mockClusterMgr.ClusterMap)).To(Equal(0))
-			})
-		})
-
-		Context("when storage or cluster manager is nil", func() {
-			It("should skip recovery when storage is nil", func() {
-				server.storage = nil
-
-				err := server.RecoverState(ctx)
-				Expect(err).To(BeNil())
-			})
-
-			It("should skip recovery when cluster manager is nil", func() {
-				server.clusterManager = nil
-
-				err := server.RecoverState(ctx)
-				Expect(err).To(BeNil())
-			})
+	Context("when recovering state", func() {
+		It("should skip recovery when kube client is not available", func() {
+			// Server has no kube client, so recovery should be skipped
+			err := server.RecoverState(ctx)
+			Expect(err).To(BeNil())
 		})
 	})
 
-	Describe("Server Start with Recovery", func() {
-		It("should skip recovery when KECS_TEST_MODE is true", func() {
-			os.Setenv("KECS_TEST_MODE", "true")
-
-			// We can't easily test the full Start method, but we can verify
-			// that RecoverState would be skipped based on environment
-			testMode := os.Getenv("KECS_TEST_MODE")
-			autoRecover := os.Getenv("KECS_AUTO_RECOVER_STATE")
-
-			shouldRecover := testMode != "true" && autoRecover != "false"
-			Expect(shouldRecover).To(BeFalse())
-		})
-
-		It("should skip recovery when KECS_AUTO_RECOVER_STATE is false", func() {
-			os.Setenv("KECS_AUTO_RECOVER_STATE", "false")
-
-			testMode := os.Getenv("KECS_TEST_MODE")
-			autoRecover := os.Getenv("KECS_AUTO_RECOVER_STATE")
-
-			shouldRecover := testMode != "true" && autoRecover != "false"
-			Expect(shouldRecover).To(BeFalse())
-		})
-
-		It("should enable recovery by default", func() {
-			os.Unsetenv("KECS_TEST_MODE")
-			os.Unsetenv("KECS_AUTO_RECOVER_STATE")
-
-			testMode := os.Getenv("KECS_TEST_MODE")
-			autoRecover := os.Getenv("KECS_AUTO_RECOVER_STATE")
-
-			shouldRecover := testMode != "true" && autoRecover != "false"
-			Expect(shouldRecover).To(BeTrue())
-		})
-	})
+	// ClusterManager-related recovery tests have been removed as ClusterManager is deprecated
 })

@@ -9,14 +9,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	k8s "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 
-	apiconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
-	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
@@ -72,15 +68,11 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 	// We need to determine the KECS instance name
 	var k8sClusterName string
 
-	// Try to get the KECS instance name from the existing k3d clusters
-	if api.clusterManager != nil {
-		// For now, we'll use a simple approach - look for a k3d cluster
-		// In a real implementation, this should be passed from the server configuration
-		instanceName := api.getKecsInstanceName()
-		if instanceName != "" {
-			// The k3d cluster name has "kecs-" prefix
-			k8sClusterName = fmt.Sprintf("kecs-%s", instanceName)
-		}
+	// Get the KECS instance name from environment or configuration
+	instanceName := api.getKecsInstanceName()
+	if instanceName != "" {
+		// The k3d cluster name has "kecs-" prefix
+		k8sClusterName = fmt.Sprintf("kecs-%s", instanceName)
 	}
 
 	if k8sClusterName == "" {
@@ -692,25 +684,11 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 func (api *DefaultECSAPI) createNamespaceForCluster(cluster *storage.Cluster) {
 	ctx := context.Background()
 
-	// Try to create Kubernetes client
-	// First, try in-cluster config (when running inside Kubernetes)
+	// Try to create Kubernetes client using in-cluster config
 	kubeClient, err := kubernetes.GetInClusterClient()
 	if err != nil {
-		// If in-cluster fails, try using cluster manager (for local development)
-		logging.Debug("In-cluster config failed (expected in local development)", "error", err)
-		clusterManager := api.getClusterManager()
-		if clusterManager == nil {
-			logging.Error("Cannot create namespace: no Kubernetes client available (neither in-cluster nor cluster manager)")
-			return
-		}
-
-		// Get Kubernetes client for the KECS instance
-		client, err := clusterManager.GetKubeClient(context.Background(), cluster.K8sClusterName)
-		if err != nil {
-			logging.Error("Failed to get kubernetes client", "error", err)
-			return
-		}
-		kubeClient = client.(*k8s.Clientset)
+		logging.Error("Failed to get in-cluster kubernetes client", "error", err)
+		return
 	}
 
 	// Create namespace
@@ -742,24 +720,11 @@ func (api *DefaultECSAPI) deleteK8sClusterAndNamespace(cluster *storage.Cluster)
 	logging.Info("Deleting namespace", "namespace", cluster.Name, "ecsCluster", cluster.Name, "kecsInstance", cluster.K8sClusterName)
 
 	// Try to create Kubernetes client
-	// First, try in-cluster config (when running inside Kubernetes)
+	// Get in-cluster kubernetes client
 	kubeClient, err := kubernetes.GetInClusterClient()
 	if err != nil {
-		// If in-cluster fails, try using cluster manager (for local development)
-		logging.Debug("In-cluster config failed (expected in local development)", "error", err)
-		clusterManager := api.getClusterManager()
-		if clusterManager == nil {
-			logging.Error("Cannot delete namespace: no Kubernetes client available (neither in-cluster nor cluster manager)")
-			return
-		}
-
-		// Get Kubernetes client for the KECS instance
-		client, err := clusterManager.GetKubeClient(context.Background(), cluster.K8sClusterName)
-		if err != nil {
-			logging.Error("Failed to get kubernetes client", "error", err)
-			return
-		}
-		kubeClient = client.(*k8s.Clientset)
+		logging.Error("Failed to get in-cluster kubernetes client", "error", err)
+		return
 	}
 
 	// Delete namespace
@@ -794,154 +759,140 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		return
 	}
 
-	// Skip if cluster manager is not available
-	if api.clusterManager == nil {
-		logging.Warn("Cluster manager not available, cannot deploy LocalStack", "cluster", cluster.Name)
-		return
-	}
+	// LocalStack deployment is only supported when running with a cluster manager (deprecated)
+	// This functionality will be moved to a separate deployment mechanism
+	logging.Warn("LocalStack deployment skipped - cluster manager no longer available", "cluster", cluster.Name)
+	// TODO: Implement LocalStack deployment using in-cluster operations
 
-	ctx := context.Background()
+	// The rest of this function is temporarily disabled until we implement a new deployment mechanism
+	_ = cluster // silence unused variable warning
+	return
 
-	// Get the LocalStack configuration
-	var config *localstack.Config
-	if api.localStackConfig != nil {
-		// Create a copy of the config to avoid modifying the shared instance
-		configCopy := *api.localStackConfig
-		config = &configCopy
-		// Ensure container mode is set if running in container
-		if apiconfig.GetBool("features.containerMode") {
-			config.ContainerMode = true
+	/*
+		ctx := context.Background()
+
+		// Get the LocalStack configuration
+		var config *localstack.Config
+		if api.localStackConfig != nil {
+			// Create a copy of the config to avoid modifying the shared instance
+			configCopy := *api.localStackConfig
+			config = &configCopy
+			// Ensure container mode is set if running in container
+			if apiconfig.GetBool("features.containerMode") {
+				config.ContainerMode = true
+			}
+			logging.Debug("Using LocalStack config from API", "enabled", config.Enabled, "containerMode", config.ContainerMode)
+		} else if api.localStackManager != nil {
+			config = api.localStackManager.GetConfig()
+		} else {
+			// Use default config and check if enabled via environment
+			config = localstack.DefaultConfig()
+			// Use Viper config which handles environment variables
+			appConfig := apiconfig.GetConfig()
+			if appConfig.LocalStack.Enabled {
+				config.Enabled = true
+			}
+			// Set container mode
+			if appConfig.Features.ContainerMode {
+				config.ContainerMode = true
+				logging.Debug("Container mode is enabled for LocalStack")
+			}
 		}
-		logging.Debug("Using LocalStack config from API", "enabled", config.Enabled, "containerMode", config.ContainerMode)
-	} else if api.localStackManager != nil {
-		config = api.localStackManager.GetConfig()
-	} else {
-		// Use default config and check if enabled via environment
-		config = localstack.DefaultConfig()
-		// Use Viper config which handles environment variables
-		appConfig := apiconfig.GetConfig()
-		if appConfig.LocalStack.Enabled {
-			config.Enabled = true
+
+		if config == nil || !config.Enabled {
+			logging.Debug("LocalStack is not enabled in configuration")
+			return
 		}
-		// Set container mode
-		if appConfig.Features.ContainerMode {
-			config.ContainerMode = true
-			logging.Debug("Container mode is enabled for LocalStack")
+
+		// Set lazy loading for faster startup in container mode
+		if config.ContainerMode {
+			// Use lazy loading to avoid timeout issues
+			if config.Environment == nil {
+				config.Environment = make(map[string]string)
+			}
+			config.Environment["EAGER_SERVICE_LOADING"] = "0"
+			logging.Debug("Container mode: Disabled eager service loading for faster LocalStack startup")
 		}
-	}
 
-	if config == nil || !config.Enabled {
-		logging.Debug("LocalStack is not enabled in configuration")
-		return
-	}
+		// Try to create Kubernetes client
+		// First, try in-cluster config (when running inside Kubernetes)
+		var kubeClient k8s.Interface
+		var kubeConfig *rest.Config
 
-	// Set lazy loading for faster startup in container mode
-	if config.ContainerMode {
-		// Use lazy loading to avoid timeout issues
-		if config.Environment == nil {
-			config.Environment = make(map[string]string)
+		// Try in-cluster config first
+		inClusterClient, err := kubernetes.GetInClusterClient()
+		if err == nil {
+			kubeClient = inClusterClient
+			// For in-cluster config, we need to get the config separately
+			kubeConfig, err = rest.InClusterConfig()
+			if err != nil {
+				logging.Debug("Failed to get in-cluster config", "error", err)
+				return
+			}
+		} else {
+			// If in-cluster fails, try using cluster manager (for local development)
+			logging.Error("Failed to get in-cluster config", "error", err)
+				return
+			}
 		}
-		config.Environment["EAGER_SERVICE_LOADING"] = "0"
-		logging.Debug("Container mode: Disabled eager service loading for faster LocalStack startup")
-	}
 
-	// Try to create Kubernetes client
-	// First, try in-cluster config (when running inside Kubernetes)
-	var kubeClient k8s.Interface
-	var kubeConfig *rest.Config
-
-	// Try in-cluster config first
-	inClusterClient, err := kubernetes.GetInClusterClient()
-	if err == nil {
-		kubeClient = inClusterClient
-		// For in-cluster config, we need to get the config separately
-		kubeConfig, err = rest.InClusterConfig()
+		// Create a new LocalStack manager with the cluster-specific client
+		clusterLocalStackManager, err := localstack.NewManager(config, kubeClient.(*k8s.Clientset), kubeConfig)
 		if err != nil {
-			logging.Debug("Failed to get in-cluster config", "error", err)
-			return
-		}
-	} else {
-		// If in-cluster fails, try using cluster manager (for local development)
-		logging.Debug("In-cluster config failed (expected in local development)", "error", err)
-
-		// Check if cluster manager is available
-		if api.clusterManager == nil {
-			logging.Error("Neither in-cluster config nor cluster manager available")
+			logging.Error("Failed to create LocalStack manager", "cluster", cluster.Name, "error", err)
 			return
 		}
 
-		// Get Kubernetes client for the specific k3d cluster
-		client, err := api.clusterManager.GetKubeClient(ctx, cluster.K8sClusterName)
+		// Check if LocalStack is already running in this cluster
+		if clusterLocalStackManager.IsRunning() {
+			logging.Info("LocalStack is already running", "cluster", cluster.Name)
+			return
+		}
+
+		// Start LocalStack in the cluster
+		logging.Info("Starting LocalStack", "cluster", cluster.Name)
+		// Update LocalStack state to deploying
+		api.updateLocalStackState(cluster, "deploying", "")
+
+		if err := clusterLocalStackManager.Start(ctx); err != nil {
+			logging.Error("Failed to start LocalStack", "cluster", cluster.Name, "error", err)
+			// Update LocalStack state to failed
+			api.updateLocalStackState(cluster, "failed", err.Error())
+			return
+		}
+
+		// Wait for LocalStack to be ready (monitoring logs for "Ready." message)
+		logging.Info("Waiting for LocalStack to be ready (monitoring logs)", "cluster", cluster.Name)
+
+		// Check LocalStack status - the manager now monitors logs for "Ready."
+		status, err := clusterLocalStackManager.GetStatus()
 		if err != nil {
-			logging.Error("Failed to get Kubernetes client", "error", err)
+			logging.Error("Failed to get LocalStack status", "cluster", cluster.Name, "error", err)
+			api.updateLocalStackState(cluster, "failed", err.Error())
 			return
 		}
-		kubeClient = client
 
-		// Get kube config
-		kubeConfig, err = api.clusterManager.GetKubeConfig(context.Background(), cluster.K8sClusterName)
-		if err != nil {
-			logging.Error("Failed to get kube config", "error", err)
-			return
+		if status.Running && status.Healthy {
+			logging.Info("LocalStack successfully deployed and ready", "cluster", cluster.Name)
+			api.updateLocalStackState(cluster, "running", "")
+		} else if status.Running && !status.Healthy {
+			logging.Info("LocalStack is running but not yet fully ready", "cluster", cluster.Name)
+			// Still mark as running since it can handle requests
+			api.updateLocalStackState(cluster, "running", "Services still initializing")
+		} else {
+			logging.Error("LocalStack failed to start", "cluster", cluster.Name)
+			api.updateLocalStackState(cluster, "failed", "Failed to start")
 		}
-	}
 
-	// Create a new LocalStack manager with the cluster-specific client
-	clusterLocalStackManager, err := localstack.NewManager(config, kubeClient.(*k8s.Clientset), kubeConfig)
-	if err != nil {
-		logging.Error("Failed to create LocalStack manager", "cluster", cluster.Name, "error", err)
-		return
-	}
+		// Update the global LocalStack manager reference and notify server to re-initialize AWS proxy router
+		api.localStackManager = clusterLocalStackManager
 
-	// Check if LocalStack is already running in this cluster
-	if clusterLocalStackManager.IsRunning() {
-		logging.Info("LocalStack is already running", "cluster", cluster.Name)
-		return
-	}
-
-	// Start LocalStack in the cluster
-	logging.Info("Starting LocalStack", "cluster", cluster.Name)
-	// Update LocalStack state to deploying
-	api.updateLocalStackState(cluster, "deploying", "")
-
-	if err := clusterLocalStackManager.Start(ctx); err != nil {
-		logging.Error("Failed to start LocalStack", "cluster", cluster.Name, "error", err)
-		// Update LocalStack state to failed
-		api.updateLocalStackState(cluster, "failed", err.Error())
-		return
-	}
-
-	// Wait for LocalStack to be ready (monitoring logs for "Ready." message)
-	logging.Info("Waiting for LocalStack to be ready (monitoring logs)", "cluster", cluster.Name)
-
-	// Check LocalStack status - the manager now monitors logs for "Ready."
-	status, err := clusterLocalStackManager.GetStatus()
-	if err != nil {
-		logging.Error("Failed to get LocalStack status", "cluster", cluster.Name, "error", err)
-		api.updateLocalStackState(cluster, "failed", err.Error())
-		return
-	}
-
-	if status.Running && status.Healthy {
-		logging.Info("LocalStack successfully deployed and ready", "cluster", cluster.Name)
-		api.updateLocalStackState(cluster, "running", "")
-	} else if status.Running && !status.Healthy {
-		logging.Info("LocalStack is running but not yet fully ready", "cluster", cluster.Name)
-		// Still mark as running since it can handle requests
-		api.updateLocalStackState(cluster, "running", "Services still initializing")
-	} else {
-		logging.Error("LocalStack failed to start", "cluster", cluster.Name)
-		api.updateLocalStackState(cluster, "failed", "Failed to start")
-	}
-
-	// Update the global LocalStack manager reference and notify server to re-initialize AWS proxy router
-	api.localStackManager = clusterLocalStackManager
-
-	// Call the update callback if set
-	if api.localStackUpdateCallback != nil {
-		logging.Debug("Notifying server about LocalStack manager update")
-		api.localStackUpdateCallback(clusterLocalStackManager)
-	}
+		// Call the update callback if set
+		if api.localStackUpdateCallback != nil {
+			logging.Debug("Notifying server about LocalStack manager update")
+			api.localStackUpdateCallback(clusterLocalStackManager)
+		}
+	*/
 }
 
 // updateLocalStackState updates the LocalStack deployment state in storage

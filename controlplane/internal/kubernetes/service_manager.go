@@ -22,10 +22,9 @@ import (
 
 // ServiceManager manages Kubernetes Deployments and Services for ECS services
 type ServiceManager struct {
-	storage        storage.Storage
-	clusterManager ClusterManager
-	clientset      kubernetes.Interface
-	taskManager    *TaskManager
+	storage     storage.Storage
+	clientset   kubernetes.Interface
+	taskManager *TaskManager
 }
 
 // SetTaskManager sets or updates the task manager
@@ -35,7 +34,7 @@ func (sm *ServiceManager) SetTaskManager(taskManager *TaskManager) {
 }
 
 // NewServiceManager creates a new ServiceManager
-func NewServiceManager(storage storage.Storage, clusterManager ClusterManager) *ServiceManager {
+func NewServiceManager(storage storage.Storage) *ServiceManager {
 	// Create TaskManager if storage is available
 	var taskManager *TaskManager
 	if storage != nil {
@@ -48,9 +47,8 @@ func NewServiceManager(storage storage.Storage, clusterManager ClusterManager) *
 	}
 
 	sm := &ServiceManager{
-		storage:        storage,
-		clusterManager: clusterManager,
-		taskManager:    taskManager,
+		storage:     storage,
+		taskManager: taskManager,
 	}
 
 	// Don't initialize kubernetes client here - it will be initialized on first use
@@ -565,11 +563,13 @@ func (sm *ServiceManager) GetServiceStatus(
 		}, nil
 	}
 
-	// Get Kubernetes client for the cluster
-	kubeClient, err := sm.clusterManager.GetKubeClient(ctx, cluster.K8sClusterName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get kubernetes client: %w", err)
+	// Ensure kubernetes client is initialized
+	if sm.clientset == nil {
+		if err := sm.initializeClient(); err != nil {
+			return nil, fmt.Errorf("failed to initialize kubernetes client: %w", err)
+		}
 	}
+	kubeClient := sm.clientset
 
 	namespace := storageService.Namespace
 	if namespace == "" {
