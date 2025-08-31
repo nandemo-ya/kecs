@@ -2,13 +2,9 @@ package kubernetes
 
 import (
 	"context"
-	"os"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-
-	appconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // ClusterManager defines the interface for managing local Kubernetes clusters
@@ -108,35 +104,12 @@ type VolumeMount struct {
 	ContainerPath string `json:"containerPath"`
 }
 
-// NewClusterManager creates a new cluster manager based on the configuration
+// NewClusterManager is deprecated and should not be used.
+// K3d cluster manager has been moved to host/k3d package.
+// For host-side operations (TUI, CLI), use host/k3d.NewK3dClusterManager.
+// For cluster-internal operations (control plane), use in-cluster config directly.
+//
+// Deprecated: This function will panic if called. Use host/k3d package instead.
 func NewClusterManager(config *ClusterManagerConfig) (ClusterManager, error) {
-	if config == nil {
-		config = &ClusterManagerConfig{}
-	}
-
-	// Detect CI environment and enable test mode
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
-		config.TestMode = true
-		logging.Info("CI environment detected, enabling test mode")
-	}
-
-	// k3d is the only supported provider now
-	config.Provider = "k3d"
-
-	// Use Viper config which handles environment variables
-	viperConfig := appconfig.GetConfig()
-
-	// Set container mode from app config if not explicitly set
-	if !config.ContainerMode && viperConfig.Features.ContainerMode {
-		config.ContainerMode = true
-	}
-
-	// Set kubeconfig path from app config if not specified
-	if config.KubeconfigPath == "" {
-		config.KubeconfigPath = viperConfig.Kubernetes.KubeconfigPath
-	}
-
-	// K3d cluster manager has been moved to host/k3d package
-	// This should not be used from within the cluster
-	panic("ClusterManager should not be used from within Kubernetes cluster. Use host/k3d package for host-side operations.")
+	panic("NewClusterManager is deprecated. Use host/k3d.NewK3dClusterManager for host-side operations.")
 }

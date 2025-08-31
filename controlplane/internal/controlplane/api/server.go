@@ -73,24 +73,15 @@ type Server struct {
 func NewServer(port int, kubeconfig string, storage storage.Storage, localStackConfig *localstack.Config) (*Server, error) {
 
 	// Initialize cluster manager first
+	// Note: ClusterManager is not needed when running inside a cluster
+	// It's only used for host-side operations (TUI, CLI commands)
 	var clusterManager kubernetes.ClusterManager
 	if apiconfig.GetBool("features.testMode") {
 		logging.Info("Running in test mode - Kubernetes operations will be simulated")
 	} else {
-		// Create cluster manager (k3d only)
-		clusterConfig := &kubernetes.ClusterManagerConfig{
-			ContainerMode:  apiconfig.GetBool("features.containerMode"),
-			KubeconfigPath: kubeconfig,
-		}
-
-		cm, err := kubernetes.NewClusterManager(clusterConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create cluster manager: %w", err)
-		}
-		clusterManager = cm
-
-		logging.Info("Initialized k3d cluster manager",
-			"containerMode", clusterConfig.ContainerMode)
+		// Don't create cluster manager when running inside cluster
+		// The control plane runs inside Kubernetes and uses in-cluster config
+		logging.Info("Running inside Kubernetes cluster - ClusterManager not needed")
 	}
 
 	// Get region and accountID from configuration
@@ -881,7 +872,7 @@ func (s *Server) recoverServicesForCluster(ctx context.Context, cluster *storage
 		"cluster", cluster.Name)
 
 	// Get Kubernetes client for the cluster
-	kubeClient, err := s.clusterManager.GetKubeClient(ctx, cluster.K8sClusterName)
+	kubeClient, err := s.getKubeClient(cluster.K8sClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client for cluster %s: %w", cluster.K8sClusterName, err)
 	}
@@ -1045,7 +1036,7 @@ func (s *Server) scheduleServiceTasks(ctx context.Context, cluster *storage.Clus
 // createPodForTask creates a Kubernetes pod for an ECS task
 func (s *Server) createPodForTask(ctx context.Context, cluster *storage.Cluster, service *storage.Service, taskDef *storage.TaskDefinition, task *storage.Task) (*corev1.Pod, error) {
 	// Get Kubernetes client
-	kubeClient, err := s.clusterManager.GetKubeClient(ctx, cluster.K8sClusterName)
+	kubeClient, err := s.getKubeClient(cluster.K8sClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes client: %w", err)
 	}
@@ -1150,13 +1141,13 @@ func (s *Server) recoverLocalStackForCluster(ctx context.Context, cluster *stora
 	}
 
 	// Get Kubernetes client for the specific k3d cluster
-	kubeClient, err := s.clusterManager.GetKubeClient(ctx, cluster.K8sClusterName)
+	kubeClient, err := s.getKubeClient(cluster.K8sClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get Kubernetes client: %w", err)
 	}
 
 	// Get kube config
-	kubeConfig, err := s.clusterManager.GetKubeConfig(ctx, cluster.K8sClusterName)
+	kubeConfig, err := s.getKubeConfig(cluster.K8sClusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kube config: %w", err)
 	}
