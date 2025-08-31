@@ -30,20 +30,16 @@ func (api *DefaultECSAPI) getServiceManager() (*kubernetes.ServiceManager, error
 
 	logging.Warn("ServiceManager not set on DefaultECSAPI, this may cause issues with Kubernetes client initialization")
 
-	// In test mode, we can return a ServiceManager with nil cluster manager
+	// In test mode, we can return a ServiceManager
 	// as the ServiceManager handles test mode internally
 	if config.GetBool("features.testMode") {
-		return kubernetes.NewServiceManager(api.storage, nil), nil
+		return kubernetes.NewServiceManager(api.storage), nil
 	}
 
-	// Get cluster manager - but note this creates a new ServiceManager instance
-	// which may not have the proper in-cluster configuration
-	if clusterManager := api.getClusterManager(); clusterManager != nil {
-		logging.Warn("Creating new ServiceManager instance - this should be avoided in production")
-		return kubernetes.NewServiceManager(api.storage, clusterManager), nil
-	} else {
-		return nil, fmt.Errorf("no cluster manager available")
-	}
+	// Create a new ServiceManager instance
+	// Note: This creates a new instance which may not have the proper in-cluster configuration
+	logging.Warn("Creating new ServiceManager instance - this should be avoided in production")
+	return kubernetes.NewServiceManager(api.storage), nil
 }
 
 // CreateService implements the CreateService operation

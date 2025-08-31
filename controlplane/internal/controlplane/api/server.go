@@ -42,7 +42,6 @@ type Server struct {
 	kubeconfig                string
 	ecsAPI                    generated.ECSAPIInterface
 	storage                   storage.Storage
-	clusterManager            kubernetes.ClusterManager
 	serviceManager            *kubernetes.ServiceManager
 	taskManager               *kubernetes.TaskManager
 	taskSetManager            *kubernetes.TaskSetManager
@@ -72,16 +71,12 @@ type Server struct {
 // NewServer creates a new API server instance
 func NewServer(port int, kubeconfig string, storage storage.Storage, localStackConfig *localstack.Config) (*Server, error) {
 
-	// Initialize cluster manager first
-	// Note: ClusterManager is not needed when running inside a cluster
-	// It's only used for host-side operations (TUI, CLI commands)
-	var clusterManager kubernetes.ClusterManager
+	// Log the runtime mode
 	if apiconfig.GetBool("features.testMode") {
 		logging.Info("Running in test mode - Kubernetes operations will be simulated")
 	} else {
-		// Don't create cluster manager when running inside cluster
 		// The control plane runs inside Kubernetes and uses in-cluster config
-		logging.Info("Running inside Kubernetes cluster - ClusterManager not needed")
+		logging.Info("Running inside Kubernetes cluster - using in-cluster config")
 	}
 
 	// Get region and accountID from configuration
@@ -89,17 +84,16 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	accountID := apiconfig.GetString("aws.accountID")
 
 	s := &Server{
-		port:           port,
-		kubeconfig:     kubeconfig,
-		region:         region,
-		accountID:      accountID,
-		ecsAPI:         nil, // Will be set after IAM integration
-		storage:        storage,
-		clusterManager: clusterManager,
+		port:       port,
+		kubeconfig: kubeconfig,
+		region:     region,
+		accountID:  accountID,
+		ecsAPI:     nil, // Will be set after IAM integration
+		storage:    storage,
 	}
 
 	// Initialize service manager
-	serviceManager := kubernetes.NewServiceManager(storage, clusterManager)
+	serviceManager := kubernetes.NewServiceManager(storage)
 	s.serviceManager = serviceManager
 	logging.Info("ServiceManager initialized", "nil", serviceManager == nil)
 
@@ -404,8 +398,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		logging.Warn("Kubernetes client not available for SecretsController")
 	}
 
-	// Initialize ELBv2 integration (independent of LocalStack)
-	if clusterManager != nil {
+	// Initialize ELBv2 integration
+	// This requires Kubernetes client for load balancer operations
+	if kubeClient != nil {
 		elbv2Integration := elbv2.NewK8sIntegration(s.region, s.accountID)
 		s.elbv2Integration = elbv2Integration
 
@@ -415,17 +410,11 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 
 		logging.Info("ELBv2 integration and API initialized successfully")
 	} else {
-		logging.Info("ClusterManager is nil, cannot initialize ELBv2 integration")
+		logging.Info("Kubernetes client not available, ELBv2 integration disabled")
 	}
 
 	// Create ECS API with integrations
-	var ecsAPI generated.ECSAPIInterface
-	if clusterManager != nil {
-		ecsAPI = NewDefaultECSAPIWithClusterManager(storage, clusterManager, s.region, s.accountID)
-	} else {
-		// Fallback for test mode or when no cluster manager is available
-		ecsAPI = NewDefaultECSAPI(storage)
-	}
+	ecsAPI := NewDefaultECSAPIWithConfig(storage, s.region, s.accountID)
 	if defaultAPI, ok := ecsAPI.(*DefaultECSAPI); ok {
 		if s.serviceManager != nil {
 			defaultAPI.SetServiceManager(s.serviceManager)
@@ -777,8 +766,8 @@ func (s *Server) Stop(ctx context.Context) error {
 
 // RecoverState recovers k3d clusters and Kubernetes resources from storage
 func (s *Server) RecoverState(ctx context.Context) error {
-	if s.storage == nil || s.clusterManager == nil {
-		logging.Info("Skipping state recovery: storage or cluster manager not available")
+	if s.storage == nil || s.kubeClient == nil {
+		logging.Info("Skipping state recovery: storage or kube client not available")
 		return nil
 	}
 
