@@ -136,5 +136,7 @@ func NewClusterManager(config *ClusterManagerConfig) (ClusterManager, error) {
 		config.KubeconfigPath = viperConfig.Kubernetes.KubeconfigPath
 	}
 
-	return NewK3dClusterManager(config)
+	// K3d cluster manager has been moved to host/k3d package
+	// This should not be used from within the cluster
+	panic("ClusterManager should not be used from within Kubernetes cluster. Use host/k3d package for host-side operations.")
 }

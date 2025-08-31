@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
+	"github.com/nandemo-ya/kecs/controlplane/internal/host/instance"
 )
 
 func TestManager(t *testing.T) {

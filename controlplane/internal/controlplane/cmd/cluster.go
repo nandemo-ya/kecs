@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/host/k3d"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
@@ -104,13 +104,13 @@ func runClusterCreate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Admin port: %d\n", clusterAdminPort)
 
 	// Create k3d cluster manager configuration
-	clusterConfig := &kubernetes.ClusterManagerConfig{
+	clusterConfig := &k3d.ClusterManagerConfig{
 		Provider:      "k3d",
 		ContainerMode: false, // Running on host
 	}
 
 	// Create k3d cluster manager
-	manager, err := kubernetes.NewK3dClusterManager(clusterConfig)
+	manager, err := k3d.NewK3dClusterManager(clusterConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create cluster manager: %w", err)
 	}
@@ -163,7 +163,7 @@ func runClusterDelete(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Deleting KECS k3d cluster '%s'...\n", clusterName)
 
 	// Create k3d cluster manager
-	manager, err := kubernetes.NewK3dClusterManager(nil)
+	manager, err := k3d.NewK3dClusterManager(nil)
 	if err != nil {
 		return fmt.Errorf("failed to create cluster manager: %w", err)
 	}
@@ -193,7 +193,7 @@ func runClusterDelete(cmd *cobra.Command, args []string) error {
 
 func runClusterList(cmd *cobra.Command, args []string) error {
 	// Create k3d cluster manager
-	manager, err := kubernetes.NewK3dClusterManager(nil)
+	manager, err := k3d.NewK3dClusterManager(nil)
 	if err != nil {
 		return fmt.Errorf("failed to create cluster manager: %w", err)
 	}
@@ -238,7 +238,7 @@ func runClusterInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create k3d cluster manager
-	manager, err := kubernetes.NewK3dClusterManager(nil)
+	manager, err := k3d.NewK3dClusterManager(nil)
 	if err != nil {
 		return fmt.Errorf("failed to create cluster manager: %w", err)
 	}

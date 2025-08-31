@@ -1,4 +1,4 @@
-package kubernetes
+package k3d
 
 import (
 	"testing"

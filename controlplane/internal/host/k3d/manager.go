@@ -1,4 +1,4 @@
-package kubernetes
+package k3d
 
 import (
 	"context"
@@ -28,6 +28,46 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
+
+// ClusterInfo contains information about a cluster
+type ClusterInfo struct {
+	Name           string            `json:"name"`
+	Status         string            `json:"status"`
+	Provider       string            `json:"provider"`
+	NodeCount      int               `json:"nodeCount"`
+	Version        string            `json:"version,omitempty"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
+	KubeconfigPath string            `json:"kubeconfigPath,omitempty"`
+	APIPort        int               `json:"apiPort,omitempty"`
+	TraefikPort    int               `json:"traefikPort,omitempty"`
+	Running        bool              `json:"running"`
+}
+
+// ClusterManagerConfig contains configuration for cluster managers
+type ClusterManagerConfig struct {
+	Provider          string                 `json:"provider"`
+	ContainerMode     bool                   `json:"containerMode"`
+	KubeconfigPath    string                 `json:"kubeconfigPath,omitempty"`
+	HostAddress       string                 `json:"hostAddress,omitempty"`
+	AdditionalOptions map[string]interface{} `json:"additionalOptions,omitempty"`
+	VolumeMounts      []VolumeMount          `json:"volumeMounts,omitempty"`
+	APIPort           int                    `json:"apiPort,omitempty"`
+	K3dImage          string                 `json:"k3dImage,omitempty"`
+	EnableRegistry    bool                   `json:"enableRegistry,omitempty"`
+	RegistryPort      int                    `json:"registryPort,omitempty"`
+	TestMode          bool                   `json:"testMode,omitempty"`
+}
+
+// VolumeMount represents a volume mount configuration
+type VolumeMount struct {
+	HostPath      string `json:"hostPath"`
+	ContainerPath string `json:"containerPath"`
+}
+
+// PortForwarder manages port forwarding for k3d clusters
+type PortForwarder struct {
+	// Add fields as needed
+}
 
 // K3dClusterManager implements ClusterManager interface using k3d
 type K3dClusterManager struct {
@@ -727,6 +767,7 @@ func (k *K3dClusterManager) IsClusterRunning(ctx context.Context, clusterName st
 }
 
 // GetKubeClient returns a Kubernetes client for the specified cluster
+// This method is used by host-side operations (TUI, kecs start command)
 func (k *K3dClusterManager) GetKubeClient(ctx context.Context, clusterName string) (kubernetes.Interface, error) {
 	// In CI/test mode, return a fake client
 	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
@@ -734,29 +775,13 @@ func (k *K3dClusterManager) GetKubeClient(ctx context.Context, clusterName strin
 		return fake.NewSimpleClientset(), nil
 	}
 
-	// Control Plane always runs inside Kubernetes, use in-cluster config
-	logging.Info("Initializing Kubernetes client for K3dClusterManager")
-
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
-	}
-
-	// Adjust config for better performance
-	config.QPS = 100
-	config.Burst = 200
-
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
-	}
-
-	logging.Info("Successfully created Kubernetes client using in-cluster config",
-		"endpoint", config.Host)
-	return client, nil
+	// K3dClusterManager is used by host operations (TUI, kecs start)
+	// Always use k3d kubeconfig from the host
+	return k.getKubeClientInternal(clusterName)
 }
 
 // GetKubeConfig returns the REST config for the specified cluster
+// This method is used by host-side operations (TUI, kecs start command)
 func (k *K3dClusterManager) GetKubeConfig(ctx context.Context, clusterName string) (*rest.Config, error) {
 	// In CI/test mode, return a minimal config
 	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
@@ -765,17 +790,9 @@ func (k *K3dClusterManager) GetKubeConfig(ctx context.Context, clusterName strin
 		}, nil
 	}
 
-	// Control Plane always runs inside Kubernetes, use in-cluster config
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
-	}
-
-	// Adjust config for better performance
-	config.QPS = 100
-	config.Burst = 200
-
-	return config, nil
+	// K3dClusterManager is used by host operations (TUI, kecs start)
+	// Always use k3d kubeconfig from the host
+	return k.getRESTConfig(clusterName)
 }
 
 // WaitForClusterReady waits for a k3d cluster to be ready
@@ -1112,87 +1129,6 @@ func (k *K3dClusterManager) getLoadBalancerAPIPort(ctx context.Context, containe
 }
 
 // deployTraefik method has been removed - Traefik deployment is now handled by ResourceDeployer
-
-// getRESTConfig returns the REST config for a cluster
-func (k *K3dClusterManager) getRESTConfig(clusterName string) (*rest.Config, error) {
-	normalizedName := k.normalizeClusterName(clusterName)
-	ctx := context.Background()
-
-	// Get cluster
-	cluster, err := client.ClusterGet(ctx, k.runtime, &k3d.Cluster{Name: normalizedName})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get cluster: %w", err)
-	}
-
-	// Get all nodes including the loadbalancer
-	nodes, err := k.runtime.GetNodesByLabel(ctx, map[string]string{k3d.LabelClusterName: normalizedName})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get cluster nodes: %w", err)
-	}
-
-	// Find the loadbalancer node
-	var loadbalancerNode *k3d.Node
-	for i := range nodes {
-		if nodes[i].Role == k3d.LoadBalancerRole {
-			loadbalancerNode = nodes[i]
-			cluster.ServerLoadBalancer = &k3d.Loadbalancer{
-				Node: loadbalancerNode,
-			}
-			break
-		}
-	}
-
-	// Get kubeconfig
-	kubeconfigObj, err := client.KubeconfigGet(ctx, k.runtime, cluster)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get kubeconfig: %w", err)
-	}
-
-	// Fix the server URL by getting the actual port from Docker inspect
-	if loadbalancerNode != nil {
-		// Get the actual port mapping from Docker
-		apiPort, err := k.getLoadBalancerAPIPort(ctx, loadbalancerNode.Name)
-		if err != nil {
-			logging.Warn("Failed to get loadbalancer port", "error", err)
-		} else if apiPort != "" {
-			// Update the server URL with the correct port
-			for clusterName, clusterConfig := range kubeconfigObj.Clusters {
-				// When running in container mode, we need to connect to k3d containers directly
-				host := "127.0.0.1"
-				if k.config.ContainerMode {
-					// In container mode, connect directly to the k3d server container
-					// using its container name within the same Docker network
-					k3dServerName := fmt.Sprintf("k3d-%s-server-0", normalizedName)
-					host = k3dServerName
-					logging.Debug("Container mode: using direct container connection", "server", k3dServerName)
-				}
-
-				// In container mode with direct connection, use the internal port 6443
-				port := apiPort
-				if k.config.ContainerMode {
-					port = "6443" // k3d server internal port
-				}
-				newServer := fmt.Sprintf("https://%s:%s", host, port)
-				logging.Debug("Updating server URL",
-					"oldServer", clusterConfig.Server,
-					"newServer", newServer)
-				clusterConfig.Server = newServer
-				kubeconfigObj.Clusters[clusterName] = clusterConfig
-			}
-		}
-	}
-
-	// Convert to REST config
-	config, err := clientcmd.NewDefaultClientConfig(
-		*kubeconfigObj,
-		&clientcmd.ConfigOverrides{},
-	).ClientConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get client config: %w", err)
-	}
-
-	return config, nil
-}
 
 // CreateClusterOptimized creates a new k3d cluster with optimizations for faster startup
 func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterName string) error {
@@ -1835,4 +1771,194 @@ func (k *K3dClusterManager) getRegistryIPInClusterNetwork(ctx context.Context, c
 	}
 
 	return "", fmt.Errorf("failed to get registry IP address in cluster network %s", clusterNetworkName)
+}
+
+// getKubeClientInternal returns a Kubernetes client using k3d kubeconfig
+func (k *K3dClusterManager) getKubeClientInternal(clusterName string) (kubernetes.Interface, error) {
+	normalizedName := k.normalizeClusterName(clusterName)
+	ctx := context.Background()
+
+	// Get the k3d cluster to retrieve kubeconfig
+	cluster, err := client.ClusterGet(ctx, k.runtime, &k3d.Cluster{Name: normalizedName})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster: %w", err)
+	}
+
+	// Get all nodes including the loadbalancer
+	nodes, err := k.runtime.GetNodesByLabel(ctx, map[string]string{k3d.LabelClusterName: normalizedName})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster nodes: %w", err)
+	}
+
+	// Find the loadbalancer node
+	var loadbalancerNode *k3d.Node
+	for i := range nodes {
+		if nodes[i].Role == k3d.LoadBalancerRole {
+			loadbalancerNode = nodes[i]
+			cluster.ServerLoadBalancer = &k3d.Loadbalancer{
+				Node: loadbalancerNode,
+			}
+			break
+		}
+	}
+
+	// Get kubeconfig from k3d
+	kubeconfigObj, err := client.KubeconfigGet(ctx, k.runtime, cluster)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	// Fix the server URL by getting the actual port from Docker inspect
+	if loadbalancerNode != nil {
+		// Get the actual port mapping from Docker
+		apiPort, err := k.getLoadBalancerAPIPort(ctx, loadbalancerNode.Name)
+		if err != nil {
+			logging.Warn("Failed to get loadbalancer port", "error", err)
+		} else if apiPort != "" {
+			// Update the server URL with the correct port
+			for clusterName, clusterConfig := range kubeconfigObj.Clusters {
+				// When running in container mode, we need to connect to k3d containers directly
+				host := "127.0.0.1"
+				if k.config.ContainerMode {
+					// In container mode, connect directly to the k3d server container
+					// using its container name within the same Docker network
+					k3dServerName := fmt.Sprintf("k3d-%s-server-0", normalizedName)
+					host = k3dServerName
+					logging.Debug("Container mode: using direct container connection", "server", k3dServerName)
+				}
+
+				// In container mode with direct connection, use the internal port 6443
+				port := apiPort
+				if k.config.ContainerMode {
+					port = "6443" // k3d server internal port
+				}
+				newServer := fmt.Sprintf("https://%s:%s", host, port)
+				logging.Debug("Updating server URL",
+					"oldServer", clusterConfig.Server,
+					"newServer", newServer)
+				clusterConfig.Server = newServer
+				kubeconfigObj.Clusters[clusterName] = clusterConfig
+			}
+		}
+	}
+
+	// In container mode, write kubeconfig to file for compatibility
+	if k.config.ContainerMode {
+		kubeconfigPath := k.GetKubeconfigPath(clusterName)
+		logging.Debug("Writing kubeconfig", "path", kubeconfigPath)
+
+		// Ensure directory exists
+		kubeconfigDir := filepath.Dir(kubeconfigPath)
+		if err := os.MkdirAll(kubeconfigDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create kubeconfig directory: %w", err)
+		}
+
+		// Write kubeconfig to file
+		kubeconfigBytes, err := clientcmd.Write(*kubeconfigObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize kubeconfig: %w", err)
+		}
+
+		if err := os.WriteFile(kubeconfigPath, kubeconfigBytes, 0600); err != nil {
+			return nil, fmt.Errorf("failed to write kubeconfig file: %w", err)
+		}
+	}
+
+	// Convert the kubeconfig object to REST config
+	config, err := clientcmd.NewDefaultClientConfig(
+		*kubeconfigObj,
+		&clientcmd.ConfigOverrides{},
+	).ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	// Create clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	return clientset, nil
+}
+
+// getRESTConfig returns the REST config using k3d kubeconfig
+func (k *K3dClusterManager) getRESTConfig(clusterName string) (*rest.Config, error) {
+	normalizedName := k.normalizeClusterName(clusterName)
+	ctx := context.Background()
+
+	// Get cluster
+	cluster, err := client.ClusterGet(ctx, k.runtime, &k3d.Cluster{Name: normalizedName})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster: %w", err)
+	}
+
+	// Get all nodes including the loadbalancer
+	nodes, err := k.runtime.GetNodesByLabel(ctx, map[string]string{k3d.LabelClusterName: normalizedName})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster nodes: %w", err)
+	}
+
+	// Find the loadbalancer node
+	var loadbalancerNode *k3d.Node
+	for i := range nodes {
+		if nodes[i].Role == k3d.LoadBalancerRole {
+			loadbalancerNode = nodes[i]
+			cluster.ServerLoadBalancer = &k3d.Loadbalancer{
+				Node: loadbalancerNode,
+			}
+			break
+		}
+	}
+
+	// Get kubeconfig
+	kubeconfigObj, err := client.KubeconfigGet(ctx, k.runtime, cluster)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	// Fix the server URL by getting the actual port from Docker inspect
+	if loadbalancerNode != nil {
+		// Get the actual port mapping from Docker
+		apiPort, err := k.getLoadBalancerAPIPort(ctx, loadbalancerNode.Name)
+		if err != nil {
+			logging.Warn("Failed to get loadbalancer port", "error", err)
+		} else if apiPort != "" {
+			// Update the server URL with the correct port
+			for clusterName, clusterConfig := range kubeconfigObj.Clusters {
+				// When running in container mode, we need to connect to k3d containers directly
+				host := "127.0.0.1"
+				if k.config.ContainerMode {
+					// In container mode, connect directly to the k3d server container
+					// using its container name within the same Docker network
+					k3dServerName := fmt.Sprintf("k3d-%s-server-0", normalizedName)
+					host = k3dServerName
+					logging.Debug("Container mode: using direct container connection", "server", k3dServerName)
+				}
+
+				// In container mode with direct connection, use the internal port 6443
+				port := apiPort
+				if k.config.ContainerMode {
+					port = "6443" // k3d server internal port
+				}
+				newServer := fmt.Sprintf("https://%s:%s", host, port)
+				logging.Debug("Updating server URL",
+					"oldServer", clusterConfig.Server,
+					"newServer", newServer)
+				clusterConfig.Server = newServer
+				kubeconfigObj.Clusters[clusterName] = clusterConfig
+			}
+		}
+	}
+
+	// Convert the kubeconfig object to REST config
+	config, err := clientcmd.NewDefaultClientConfig(
+		*kubeconfigObj,
+		&clientcmd.ConfigOverrides{},
+	).ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client config: %w", err)
+	}
+
+	return config, nil
 }
