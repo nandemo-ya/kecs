@@ -864,6 +864,12 @@ func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
 		// If in-cluster fails, try using cluster manager (for local development)
 		logging.Debug("In-cluster config failed (expected in local development)", "error", err)
 
+		// Check if cluster manager is available
+		if api.clusterManager == nil {
+			logging.Error("Neither in-cluster config nor cluster manager available")
+			return
+		}
+
 		// Get Kubernetes client for the specific k3d cluster
 		client, err := api.clusterManager.GetKubeClient(ctx, cluster.K8sClusterName)
 		if err != nil {

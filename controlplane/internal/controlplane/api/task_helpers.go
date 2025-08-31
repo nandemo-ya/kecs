@@ -9,7 +9,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
+	k8sutils "github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
@@ -87,9 +89,23 @@ func (s *Server) createBasicPod(taskDef *storage.TaskDefinition, cluster *storag
 
 // getKubeClient gets a Kubernetes client for the specified k3d cluster
 func (s *Server) getKubeClient(k8sClusterName string) (kubernetes.Interface, error) {
+	// When running inside cluster, use the pre-initialized kube client
 	if s.clusterManager == nil {
-		return nil, fmt.Errorf("cluster manager not available")
+		if s.kubeClient != nil {
+			return s.kubeClient, nil
+		}
+		return nil, fmt.Errorf("kubernetes client not available")
 	}
 
 	return s.clusterManager.GetKubeClient(context.Background(), k8sClusterName)
+}
+
+// getKubeConfig gets the Kubernetes config for the specified k3d cluster
+func (s *Server) getKubeConfig(k8sClusterName string) (*rest.Config, error) {
+	// When running inside cluster, use in-cluster config
+	if s.clusterManager == nil {
+		return k8sutils.GetKubeConfig()
+	}
+
+	return s.clusterManager.GetKubeConfig(context.Background(), k8sClusterName)
 }
