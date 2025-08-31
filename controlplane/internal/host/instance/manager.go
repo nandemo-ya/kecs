@@ -23,7 +23,7 @@ import (
 	"sync"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
-	kecs "github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/host/k3d"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
@@ -46,7 +46,7 @@ type CreationStatus struct {
 
 // Manager handles KECS instance lifecycle
 type Manager struct {
-	k3dManager *kecs.K3dClusterManager
+	k3dManager *k3d.K3dClusterManager
 
 	// Creation status tracking
 	statusMu       sync.RWMutex
@@ -56,12 +56,12 @@ type Manager struct {
 // NewManager creates a new instance manager
 func NewManager() (*Manager, error) {
 	// Default configuration - registry is always enabled for all instances
-	k3dConfig := &kecs.ClusterManagerConfig{
+	k3dConfig := &k3d.ClusterManagerConfig{
 		Provider:       "k3d",
 		EnableRegistry: true,  // Always enabled for local development
 		ContainerMode:  false, // TUI mode is not container mode
 	}
-	k3dManager, err := kecs.NewK3dClusterManager(k3dConfig)
+	k3dManager, err := k3d.NewK3dClusterManager(k3dConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create k3d manager: %w", err)
 	}

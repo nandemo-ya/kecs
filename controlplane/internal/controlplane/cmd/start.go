@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
-	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/host/instance"
+	"github.com/nandemo-ya/kecs/controlplane/internal/host/k3d"
 	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 )
 
@@ -69,7 +69,7 @@ func init() {
 
 func runStart(cmd *cobra.Command, args []string) error {
 	// Create k3d cluster manager to check existing instances
-	manager, err := kubernetes.NewK3dClusterManager(nil)
+	manager, err := k3d.NewK3dClusterManager(nil)
 	if err != nil {
 		return fmt.Errorf(errCreateClusterManager, err)
 	}
@@ -120,7 +120,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 // determineInstanceToStart handles instance selection and status checking
 // Returns: (instanceName, shouldStart, error)
-func determineInstanceToStart(manager *kubernetes.K3dClusterManager) (string, bool, error) {
+func determineInstanceToStart(manager *k3d.K3dClusterManager) (string, bool, error) {
 	var instanceName string
 	var isNew bool
 
@@ -172,7 +172,7 @@ func showStartCompletionMessage(opts instance.StartOptions) {
 }
 
 // selectOrCreateInstance shows an interactive selection for existing instances or creates a new one
-func selectOrCreateInstance(manager *kubernetes.K3dClusterManager) (string, bool, error) {
+func selectOrCreateInstance(manager *k3d.K3dClusterManager) (string, bool, error) {
 	ctx := context.Background()
 
 	fmt.Println(msgFetchingInstances)
@@ -206,7 +206,7 @@ func createNewInstance() (string, bool, error) {
 }
 
 // displayExistingInstances shows the list of existing KECS instances
-func displayExistingInstances(manager *kubernetes.K3dClusterManager, clusters []kubernetes.ClusterInfo) {
+func displayExistingInstances(manager *k3d.K3dClusterManager, clusters []k3d.ClusterInfo) {
 	fmt.Println(msgExistingInstances)
 	for i, cluster := range clusters {
 		status := getInstanceStatus(manager, cluster.Name)
@@ -219,7 +219,7 @@ func displayExistingInstances(manager *kubernetes.K3dClusterManager, clusters []
 }
 
 // getInstanceStatus returns the status string for an instance
-func getInstanceStatus(manager *kubernetes.K3dClusterManager, instanceName string) string {
+func getInstanceStatus(manager *k3d.K3dClusterManager, instanceName string) string {
 	running, _ := checkInstanceRunning(manager, instanceName)
 	if running {
 		return "running"
@@ -238,7 +238,7 @@ func getInstanceDataInfo(instanceName string) string {
 }
 
 // checkInstanceRunning checks if a KECS instance is currently running
-func checkInstanceRunning(manager *kubernetes.K3dClusterManager, instanceName string) (bool, error) {
+func checkInstanceRunning(manager *k3d.K3dClusterManager, instanceName string) (bool, error) {
 	ctx := context.Background()
 
 	// Use the new IsClusterRunning method to check status without triggering warnings

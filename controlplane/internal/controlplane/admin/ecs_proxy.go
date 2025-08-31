@@ -27,7 +27,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
-	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
+	"github.com/nandemo-ya/kecs/controlplane/internal/host/instance"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
+	"github.com/nandemo-ya/kecs/controlplane/internal/host/instance"
 )
 
 var listCmd = &cobra.Command{

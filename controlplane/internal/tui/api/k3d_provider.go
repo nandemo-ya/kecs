@@ -26,13 +26,13 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/instance"
-	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
+	"github.com/nandemo-ya/kecs/controlplane/internal/host/instance"
+	"github.com/nandemo-ya/kecs/controlplane/internal/host/k3d"
 )
 
 // K3dInstanceProvider provides instance information directly from k3d clusters
 type K3dInstanceProvider struct {
-	k3dManager      *kubernetes.K3dClusterManager
+	k3dManager      *k3d.K3dClusterManager
 	dockerClient    *client.Client
 	instanceManager *instance.Manager
 }
@@ -40,7 +40,7 @@ type K3dInstanceProvider struct {
 // NewK3dInstanceProvider creates a new k3d-based instance provider
 func NewK3dInstanceProvider() (*K3dInstanceProvider, error) {
 	// Create k3d manager
-	k3dManager, err := kubernetes.NewK3dClusterManager(nil)
+	k3dManager, err := k3d.NewK3dClusterManager(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create k3d manager: %w", err)
 	}
