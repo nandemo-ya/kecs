@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	k8sclient "k8s.io/client-go/kubernetes"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	k8sclient "k8s.io/client-go/kubernetes"
 )
 
 // Server represents the HTTP admin server for KECS Control Plane
@@ -25,6 +25,7 @@ type Server struct {
 	instanceAPI      *InstanceAPI
 	ecsProxy         *ECSProxy
 	logsAPI          *LogsAPI
+	kubeClient       k8sclient.Interface
 }
 
 // NewServer creates a new admin server instance
@@ -67,6 +68,7 @@ func NewServer(port int, storage storage.Storage) *Server {
 
 // SetKubeClient sets the Kubernetes client for admin APIs
 func (s *Server) SetKubeClient(kubeClient k8sclient.Interface) {
+	s.kubeClient = kubeClient
 	// Initialize Logs API with Kubernetes client
 	if s.logsAPI == nil {
 		s.logsAPI = NewLogsAPI(nil, kubeClient)

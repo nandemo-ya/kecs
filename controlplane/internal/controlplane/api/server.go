@@ -110,6 +110,7 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	// Initialize service manager
 	serviceManager := kubernetes.NewServiceManager(storage, clusterManager)
 	s.serviceManager = serviceManager
+	logging.Info("ServiceManager initialized", "nil", serviceManager == nil)
 
 	// Initialize task manager (will be re-initialized with Service Discovery later)
 	taskManager, err := kubernetes.NewTaskManager(storage)

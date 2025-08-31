@@ -91,8 +91,8 @@ func DefaultControlPlaneConfig() *ControlPlaneConfig {
 		CPULimit:        "1000m",
 		MemoryLimit:     "1Gi",
 		StorageSize:     "10Gi",
-		APIPort:         ControlPlaneInternalAPIPort,
-		AdminPort:       ControlPlaneInternalAdminPort,
+		APIPort:         80,                            // Service port (external facing)
+		AdminPort:       ControlPlaneInternalAdminPort, // Keep admin port as internal
 		LogLevel:        "info",
 	}
 }

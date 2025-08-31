@@ -24,8 +24,11 @@ import (
 func (api *DefaultECSAPI) getServiceManager() (*kubernetes.ServiceManager, error) {
 	// Use the shared service manager if available
 	if api.serviceManager != nil {
+		logging.Info("Using shared ServiceManager instance")
 		return api.serviceManager, nil
 	}
+
+	logging.Warn("ServiceManager not set on DefaultECSAPI, this may cause issues with Kubernetes client initialization")
 
 	// In test mode, we can return a ServiceManager with nil cluster manager
 	// as the ServiceManager handles test mode internally
@@ -33,8 +36,10 @@ func (api *DefaultECSAPI) getServiceManager() (*kubernetes.ServiceManager, error
 		return kubernetes.NewServiceManager(api.storage, nil), nil
 	}
 
-	// Get cluster manager
+	// Get cluster manager - but note this creates a new ServiceManager instance
+	// which may not have the proper in-cluster configuration
 	if clusterManager := api.getClusterManager(); clusterManager != nil {
+		logging.Warn("Creating new ServiceManager instance - this should be avoided in production")
 		return kubernetes.NewServiceManager(api.storage, clusterManager), nil
 	} else {
 		return nil, fmt.Errorf("no cluster manager available")

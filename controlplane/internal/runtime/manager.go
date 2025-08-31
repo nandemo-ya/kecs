@@ -152,11 +152,6 @@ func GetPreferredRuntime() string {
 		return "containerd"
 	}
 
-	// Check if running in Kind (prefer containerd)
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
-		return "containerd"
-	}
-
-	// Default to Docker for backward compatibility
-	return "docker"
+	// Control Plane always runs inside Kubernetes, prefer containerd
+	return "containerd"
 }

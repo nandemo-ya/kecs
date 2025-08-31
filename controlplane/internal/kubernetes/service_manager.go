@@ -53,14 +53,15 @@ func NewServiceManager(storage storage.Storage, clusterManager ClusterManager) *
 		taskManager:    taskManager,
 	}
 
-	// Initialize kubernetes client
-	if err := sm.initializeClient(); err != nil {
-		logging.Warn("Failed to initialize kubernetes client", "error", err)
-		// Don't fail creation - client will be initialized on first use
-	}
+	// Don't initialize kubernetes client here - it will be initialized on first use
+	// This ensures we get the correct in-cluster config when running inside Kubernetes
+	logging.Debug("ServiceManager created, kubernetes client will be initialized on first use")
 
-	// Process existing pods after initialization
-	go sm.processExistingPods()
+	// Process existing pods after a delay to allow proper initialization
+	go func() {
+		time.Sleep(10 * time.Second) // Wait for server to be fully initialized
+		sm.processExistingPods()
+	}()
 
 	return sm
 }
@@ -70,9 +71,12 @@ func (sm *ServiceManager) processExistingPods() {
 	// Wait a bit for initialization to complete
 	time.Sleep(5 * time.Second)
 
+	// Initialize client if needed
 	if sm.clientset == nil {
-		logging.Debug("Kubernetes client not initialized, skipping existing pods processing")
-		return
+		if err := sm.initializeClient(); err != nil {
+			logging.Warn("Failed to initialize client for existing pods processing", "error", err)
+			return
+		}
 	}
 
 	ctx := context.Background()
@@ -155,6 +159,7 @@ func (sm *ServiceManager) processExistingPods() {
 // initializeClient initializes the kubernetes client
 func (sm *ServiceManager) initializeClient() error {
 	if sm.clientset != nil {
+		logging.Debug("ServiceManager client already initialized")
 		return nil // Already initialized
 	}
 
@@ -164,15 +169,18 @@ func (sm *ServiceManager) initializeClient() error {
 		return nil
 	}
 
-	// Try in-cluster config first
+	// Control Plane always runs inside Kubernetes, use in-cluster config
+	logging.Info("Initializing Kubernetes client for ServiceManager")
+
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
-		// Fall back to kubeconfig
-		cfg, err = GetKubeConfig()
-		if err != nil {
-			return fmt.Errorf("failed to get kubernetes config: %w", err)
-		}
+		return fmt.Errorf("failed to get in-cluster config: %w", err)
 	}
+
+	// Adjust config for better performance
+	cfg.QPS = 100
+	cfg.Burst = 200
+	logging.Info("Successfully obtained in-cluster config", "host", cfg.Host)
 
 	clientset, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
@@ -180,7 +188,7 @@ func (sm *ServiceManager) initializeClient() error {
 	}
 
 	sm.clientset = clientset
-	logging.Debug("ServiceManager kubernetes client initialized")
+	logging.Info("ServiceManager kubernetes client initialized with in-cluster config")
 	return nil
 }
 
@@ -252,9 +260,17 @@ func (sm *ServiceManager) CreateService(
 	// Use the service manager's client
 	kubeClient := sm.clientset
 
+	// Get the client config to log the endpoint
+	var endpoint string
+	if kubeClient != nil {
+		// Try to get the endpoint from the client - this is for debugging
+		endpoint = "client initialized"
+	}
+
 	logging.Info("Kubernetes client initialized, proceeding with deployment creation",
 		"service", storageService.ServiceName,
-		"clientNil", kubeClient == nil)
+		"clientNil", kubeClient == nil,
+		"endpoint", endpoint)
 
 	// Ensure namespace exists
 	if err := sm.ensureNamespace(ctx, kubeClient, deployment.Namespace); err != nil {
@@ -602,6 +618,17 @@ func (sm *ServiceManager) GetServiceStatus(
 
 // ensureNamespace creates a namespace if it doesn't exist
 func (sm *ServiceManager) ensureNamespace(ctx context.Context, kubeClient kubernetes.Interface, namespace string) error {
+	logging.Info("ensureNamespace called",
+		"namespace", namespace,
+		"clientNil", kubeClient == nil,
+		"smClientNil", sm.clientset == nil,
+		"sameClient", kubeClient == sm.clientset)
+
+	// Double-check we're using the right client
+	if kubeClient != sm.clientset {
+		logging.Warn("ensureNamespace received different client than sm.clientset!")
+	}
+
 	_, err := kubeClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {

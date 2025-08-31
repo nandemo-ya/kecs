@@ -7,14 +7,25 @@ import (
 )
 
 // GetKubeConfig returns the Kubernetes client configuration
-// It tries to use the default kubeconfig paths and settings
+// It first tries in-cluster config, then falls back to kubeconfig file
 func GetKubeConfig() (*rest.Config, error) {
-	// Try to use the default kubeconfig loading rules
+	// First, try in-cluster configuration
+	// This is used when running inside a Kubernetes pod
+	config, err := rest.InClusterConfig()
+	if err == nil {
+		// Adjust config for better performance
+		config.QPS = 100
+		config.Burst = 200
+		return config, nil
+	}
+
+	// Fall back to kubeconfig file
+	// This is used when running outside of Kubernetes (e.g., local development)
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	configOverrides := &clientcmd.ConfigOverrides{}
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
 
-	config, err := kubeConfig.ClientConfig()
+	config, err = kubeConfig.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
