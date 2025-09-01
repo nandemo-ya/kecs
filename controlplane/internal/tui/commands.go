@@ -133,12 +133,36 @@ func (m Model) loadDataFromAPI() tea.Cmd {
 				if err == nil {
 					tuiTasks = make([]Task, len(tasks))
 					for i, task := range tasks {
+						// Extract service name from task if available
+						serviceName := ""
+						if task.ServiceName != "" {
+							serviceName = task.ServiceName
+						} else if m.selectedService != "" {
+							serviceName = m.selectedService
+						}
+
+						// Determine health status
+						health := "UNKNOWN"
+						if task.HealthStatus != "" {
+							health = task.HealthStatus
+						} else if task.LastStatus == "RUNNING" {
+							health = "HEALTHY" // Assume healthy if running
+						}
+
+						// Extract IP if available
+						ip := ""
+						// For now, we don't have IP information in the API response
+						// This would need to be added to the API response
+
 						tuiTasks[i] = Task{
-							ID:     extractTaskID(task.TaskArn),
-							Status: task.LastStatus,
-							CPU:    parseCPU(task.Cpu),
-							Memory: task.Memory,
-							Age:    time.Since(task.CreatedAt),
+							ID:      extractTaskID(task.TaskArn),
+							Service: serviceName,
+							Status:  task.LastStatus,
+							Health:  health,
+							CPU:     parseCPU(task.Cpu),
+							Memory:  task.Memory,
+							IP:      ip,
+							Age:     time.Since(task.CreatedAt),
 						}
 					}
 				}

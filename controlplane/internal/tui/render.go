@@ -1082,11 +1082,11 @@ func (m Model) renderServicesList(maxHeight int) string {
 
 // renderTasksList renders the tasks list with the given height constraint
 func (m Model) renderTasksList(maxHeight int) string {
-	if m.selectedInstance == "" || m.selectedCluster == "" || m.selectedService == "" {
+	if m.selectedInstance == "" || m.selectedCluster == "" {
 		return lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#666666")).
 			Italic(true).
-			Render("No service selected. Press 's' to go to services.")
+			Render("No cluster selected.")
 	}
 
 	// Colors for tasks
@@ -1144,6 +1144,21 @@ func (m Model) renderTasksList(maxHeight int) string {
 
 	// Get filtered tasks
 	filteredTasks := m.filterTasks(m.tasks)
+
+	// If no tasks, show appropriate message
+	if len(filteredTasks) == 0 {
+		emptyMsg := ""
+		if m.selectedService == "" {
+			emptyMsg = "No tasks in this cluster. Press 'r' to refresh."
+		} else {
+			emptyMsg = "No tasks for this service. Press 'r' to refresh."
+		}
+		rows = append(rows, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Italic(true).
+			Render(emptyMsg))
+		return strings.Join(rows, "\n")
+	}
 
 	// Calculate visible range with scrolling
 	visibleRows := maxHeight - 2
