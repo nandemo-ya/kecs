@@ -851,13 +851,8 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 	case "T":
 		// Navigate to all tasks in cluster (uppercase T)
-		if m.selectedInstance != "" && m.selectedCluster != "" {
-			m.currentView = ViewTasks
-			m.taskCursor = 0
-			// Clear service selection to show all cluster tasks
-			m.selectedService = ""
-			return m, m.loadDataFromAPI()
-		}
+		// This key is not valid from instances view since no cluster is selected
+		// User must first navigate to a cluster
 	case "/":
 		m.searchMode = true
 		m.searchQuery = ""
@@ -941,12 +936,18 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 	case "T":
 		// Navigate to all tasks in selected cluster (uppercase T)
-		if m.selectedInstance != "" && m.selectedCluster != "" {
-			m.currentView = ViewTasks
-			m.taskCursor = 0
-			// Clear service selection to show all cluster tasks
-			m.selectedService = ""
-			return m, m.loadDataFromAPI()
+		if m.selectedInstance != "" && len(m.clusters) > 0 {
+			// Select current cluster if not already selected
+			if m.selectedCluster == "" && m.clusterCursor < len(m.clusters) {
+				m.selectedCluster = m.clusters[m.clusterCursor].Name
+			}
+			if m.selectedCluster != "" {
+				m.currentView = ViewTasks
+				m.taskCursor = 0
+				// Clear service selection to show all cluster tasks
+				m.selectedService = ""
+				return m, m.loadDataFromAPI()
+			}
 		}
 	}
 	return m, nil
