@@ -364,6 +364,32 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 				Type: corev1.ServiceTypeNodePort,
 			},
 		},
+		// Webhook Service
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "kecs-webhook",
+				Namespace: ControlPlaneNamespace,
+				Labels: map[string]string{
+					LabelManagedBy: "true",
+					LabelComponent: "controlplane",
+					LabelType:      "webhook",
+				},
+			},
+			Spec: corev1.ServiceSpec{
+				Selector: map[string]string{
+					LabelApp: ControlPlaneName,
+				},
+				Ports: []corev1.ServicePort{
+					{
+						Name:       "webhook",
+						Port:       443,
+						TargetPort: intstr.FromInt(9443),
+						Protocol:   corev1.ProtocolTCP,
+					},
+				},
+				Type: corev1.ServiceTypeClusterIP,
+			},
+		},
 		// Legacy Admin Service (ClusterIP for backward compatibility)
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -499,6 +525,11 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 								{
 									Name:          "admin",
 									ContainerPort: ControlPlaneInternalAdminPort,
+									Protocol:      corev1.ProtocolTCP,
+								},
+								{
+									Name:          "webhook",
+									ContainerPort: 9443,
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},
