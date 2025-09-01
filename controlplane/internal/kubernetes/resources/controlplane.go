@@ -198,6 +198,12 @@ func createClusterRole() *rbacv1.ClusterRole {
 				Resources: []string{"pods", "nodes"},
 				Verbs:     []string{"get", "list"},
 			},
+			// Admission webhooks
+			{
+				APIGroups: []string{"admissionregistration.k8s.io"},
+				Resources: []string{"mutatingwebhookconfigurations", "validatingwebhookconfigurations"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			},
 		},
 	}
 }
