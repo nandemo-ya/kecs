@@ -65,6 +65,11 @@ func (api *LogsAPI) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 	taskId := vars["taskId"]
 	containerName := vars["containerName"]
 
+	logging.Debug("HandleGetLogs called",
+		"taskId", taskId,
+		"containerName", containerName,
+		"url", r.URL.String())
+
 	// Try to get the actual pod name and namespace from task storage
 	var namespace, podName string
 	if api.storage != nil && api.storage.TaskStore() != nil {
@@ -153,19 +158,34 @@ func (api *LogsAPI) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 
 	// If no logs in storage, try to get from Kubernetes directly
 	if len(logs) == 0 && api.kubeClient != nil && api.podLogService != nil {
-		// If we didn't get pod info from storage, parse task ARN
+		// If we didn't get pod info from storage, parse task ARN or use taskId as pod name
 		if namespace == "" || podName == "" {
+			// First, try to parse as task ARN
 			var err error
 			namespace, podName, err = parseTaskArn(taskArn)
 			if err != nil {
-				logging.Warn("Failed to parse task ARN",
-					"taskArn", taskArn,
+				// If ARN parsing fails, assume taskId is already a pod name
+				// For default cluster, use default-us-east-1 namespace
+				logging.Debug("Task ARN parsing failed, using taskId as pod name",
+					"taskId", taskId,
 					"error", err)
+				podName = taskId
+				namespace = "default-us-east-1" // Default namespace for KECS
+
+				// Check if cluster was specified in query params
+				if cluster := r.URL.Query().Get("cluster"); cluster != "" && cluster != "default" {
+					namespace = cluster + "-us-east-1"
+				}
 			}
 		}
 
 		if namespace != "" && podName != "" {
 			// Try to get logs from Kubernetes
+			logging.Debug("Attempting to fetch logs from Kubernetes",
+				"namespace", namespace,
+				"podName", podName,
+				"container", containerName)
+
 			options := &kubernetes.LogOptions{
 				Follow:    false,
 				TailLines: filter.Limit,
@@ -175,6 +195,11 @@ func (api *LogsAPI) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 			if err == nil && len(podLogs) > 0 {
 				// The logs are already in TaskLog format
 				logs = podLogs
+				logging.Info("Successfully retrieved logs from Kubernetes",
+					"count", len(podLogs),
+					"namespace", namespace,
+					"pod", podName,
+					"container", containerName)
 			} else if err != nil {
 				logging.Warn("Failed to get logs from Kubernetes",
 					"error", err,
@@ -444,9 +469,14 @@ func parseTaskArn(taskArn string) (namespace, podName string, err error) {
 	// Format: arn:aws:ecs:region:account:task/cluster/task-id
 	// Example: arn:aws:ecs:us-east-1:000000000000:task/default/multi-container-webapp-66dcddbdd8-x7tqc
 
+	// Check if this is actually an ARN format
+	if !strings.HasPrefix(taskArn, "arn:aws:ecs:") {
+		return "", "", fmt.Errorf("not a valid task ARN format: %s", taskArn)
+	}
+
 	parts := strings.Split(taskArn, "/")
 	if len(parts) < 3 {
-		return "", "", fmt.Errorf("invalid task ARN format")
+		return "", "", fmt.Errorf("invalid task ARN format: %s", taskArn)
 	}
 
 	cluster := parts[len(parts)-2]
