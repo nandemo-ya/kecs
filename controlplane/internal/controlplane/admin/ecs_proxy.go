@@ -184,6 +184,40 @@ func (p *ECSProxy) handleDeleteService(w http.ResponseWriter, r *http.Request) {
 	p.proxySimpleAction(w, r, "DeleteService")
 }
 
+// handleListTasks handles listing tasks
+func (p *ECSProxy) handleListTasks(w http.ResponseWriter, r *http.Request) {
+	logging.Info("handleListTasks called", "method", r.Method, "url", r.URL.String())
+
+	// Get cluster from query params, default to "default"
+	cluster := r.URL.Query().Get("cluster")
+	if cluster == "" {
+		cluster = "default"
+	}
+
+	// Build ECS ListTasks request
+	body := map[string]interface{}{
+		"cluster": cluster,
+	}
+
+	// Add optional filters from query params
+	if family := r.URL.Query().Get("family"); family != "" {
+		body["family"] = family
+	}
+	if serviceName := r.URL.Query().Get("serviceName"); serviceName != "" {
+		body["serviceName"] = serviceName
+	}
+	if desiredStatus := r.URL.Query().Get("desiredStatus"); desiredStatus != "" {
+		body["desiredStatus"] = desiredStatus
+	}
+
+	p.proxyWithBody(w, r, "ListTasks", body)
+}
+
+// handleDescribeTasks handles describing tasks
+func (p *ECSProxy) handleDescribeTasks(w http.ResponseWriter, r *http.Request) {
+	p.proxySimpleAction(w, r, "DescribeTasks")
+}
+
 // handleStopTask handles task stopping
 func (p *ECSProxy) handleStopTask(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -313,12 +347,14 @@ func (p *ECSProxy) getInstanceAPIPort(instanceName string) (int, error) {
 
 // RegisterRoutes registers ECS proxy routes
 func (p *ECSProxy) RegisterRoutes(router *mux.Router) {
-	// Generic ECS proxy endpoints
-	router.HandleFunc("/api/instances/{name}/{endpoint:.*}", p.handleECSProxy).Methods("POST")
-
-	// Specific endpoints that need custom handling
+	// Specific endpoints that need custom handling (must be registered first)
+	router.HandleFunc("/api/instances/{name}/tasks", p.handleListTasks).Methods("GET")
+	router.HandleFunc("/api/instances/{name}/tasks/describe", p.handleDescribeTasks).Methods("POST")
+	router.HandleFunc("/api/instances/{name}/tasks/{task}", p.handleStopTask).Methods("DELETE")
 	router.HandleFunc("/api/instances/{name}/clusters", p.handleCreateCluster).Methods("POST")
 	router.HandleFunc("/api/instances/{name}/clusters/{cluster}", p.handleDeleteCluster).Methods("DELETE")
 	router.HandleFunc("/api/instances/{name}/services/{service}", p.handleDeleteService).Methods("DELETE")
-	router.HandleFunc("/api/instances/{name}/tasks/{task}", p.handleStopTask).Methods("DELETE")
+
+	// Generic ECS proxy endpoints (must be last to avoid catching specific routes)
+	router.HandleFunc("/api/instances/{name}/{endpoint:.*}", p.handleECSProxy).Methods("POST")
 }
