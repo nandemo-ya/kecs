@@ -388,7 +388,9 @@ func (s *DuckDBStorage) createTasksTable(ctx context.Context) error {
 		"CREATE INDEX IF NOT EXISTS idx_tasks_desired_status ON tasks(desired_status)",
 		"CREATE INDEX IF NOT EXISTS idx_tasks_launch_type ON tasks(launch_type)",
 		"CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at)",
-		"CREATE INDEX IF NOT EXISTS idx_tasks_pod ON tasks(pod_name, namespace)",
+		// Create unique index on pod_name and namespace combination
+		// This will prevent duplicate tasks for the same pod
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_pod_unique ON tasks(pod_name, namespace)",
 	}
 
 	for _, idx := range indexes {

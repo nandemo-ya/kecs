@@ -1,13 +1,10 @@
 package webhook
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
@@ -146,42 +143,12 @@ func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.Admi
 			Value: taskID,
 		})
 
-		// Get cluster name from label or namespace
-		clusterName := "default"
-		if cluster, ok := pod.Labels["kecs.dev/cluster"]; ok {
-			clusterName = cluster
-		}
-
-		// Create task record in storage
-		if m.storage != nil && m.storage.TaskStore() != nil {
-			task := &storage.Task{
-				ID:                generateTaskIDForStorage(taskID),
-				ARN:               fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s", m.region, m.accountID, clusterName, taskID),
-				ClusterARN:        fmt.Sprintf("arn:aws:ecs:%s:%s:cluster/%s", m.region, m.accountID, clusterName),
-				TaskDefinitionARN: "", // Will be updated by task sync
-				LaunchType:        "FARGATE",
-				LastStatus:        "PENDING",
-				DesiredStatus:     "RUNNING",
-				StartedBy:         fmt.Sprintf("ecs-svc/%s", serviceName),
-				CreatedAt:         time.Now(),
-				Version:           1,
-				Namespace:         pod.Namespace,
-				// PodName will be set after pod is created
-			}
-
-			ctx := context.Background()
-			if err := m.storage.TaskStore().Create(ctx, task); err != nil {
-				logging.Warn("Failed to create task record for service pod",
-					"taskId", taskID,
-					"service", serviceName,
-					"error", err)
-				// Don't fail the pod creation, just log the error
-			} else {
-				logging.Debug("Created task record for service pod",
-					"taskId", taskID,
-					"service", serviceName)
-			}
-		}
+		// Don't create task here - let ServiceManager handle it to avoid duplicates
+		// The webhook only adds the task ID label, and ServiceManager will create
+		// the actual task record when it processes the pod
+		logging.Debug("Added task ID label to pod, task will be created by ServiceManager",
+			"taskId", taskID,
+			"service", serviceName)
 	}
 
 	// If no patches needed, allow without mutation
@@ -223,10 +190,4 @@ func generateTaskID() string {
 	// Generate a UUID and remove hyphens to match ECS task ID format
 	id := uuid.New().String()
 	return strings.ReplaceAll(id, "-", "")
-}
-
-// generateTaskIDForStorage generates a storage-friendly task ID
-func generateTaskIDForStorage(taskID string) string {
-	// For storage, we can use the same ID
-	return taskID
 }

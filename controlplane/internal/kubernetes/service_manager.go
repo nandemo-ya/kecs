@@ -813,9 +813,16 @@ func (sm *ServiceManager) registerPodAsTask(ctx context.Context, pod *corev1.Pod
 		return
 	}
 
-	// Generate deterministic task ID from pod name
-	// This ensures the same pod always gets the same ECS-compatible task ID
-	taskID := utils.GenerateTaskIDFromString(pod.Name)
+	// Use task ID from webhook label if available, otherwise generate from pod name
+	var taskID string
+	if tid, exists := pod.Labels["kecs.dev/task-id"]; exists && tid != "" {
+		taskID = tid
+		logging.Debug("Using task ID from webhook label", "taskId", taskID, "pod", pod.Name)
+	} else {
+		// Fallback to generating from pod name for backward compatibility
+		taskID = utils.GenerateTaskIDFromString(pod.Name)
+		logging.Debug("Generated task ID from pod name", "taskId", taskID, "pod", pod.Name)
+	}
 
 	// Check if task already exists for this pod
 	taskARN := fmt.Sprintf("arn:aws:ecs:%s:%s:task/%s/%s",
