@@ -138,6 +138,11 @@ func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *st
 		task.Connectivity = "CONNECTED"
 		task.ConnectivityAt = &task.CreatedAt
 
+		// Add pod name and namespace to task attributes for easy lookup
+		if err := tm.addPodInfoToTaskAttributes(task, task.PodName, task.Namespace); err != nil {
+			logging.Warn("Failed to add pod info to task attributes", "task", task.ARN, "error", err)
+		}
+
 		// Simulate container and network information for test mode
 		if p := pod; p != nil {
 			containers := tm.createTestContainers(p, task)
@@ -187,6 +192,11 @@ func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *st
 	task.LastStatus = "PENDING"
 	task.Connectivity = "CONNECTED"
 	task.ConnectivityAt = &task.CreatedAt
+
+	// Add pod name and namespace to task attributes for easy lookup
+	if err := tm.addPodInfoToTaskAttributes(task, createdPod.Name, createdPod.Namespace); err != nil {
+		logging.Warn("Failed to add pod info to task attributes", "task", task.ARN, "error", err)
+	}
 
 	// Store task in database
 	if err := tm.storage.TaskStore().Create(ctx, task); err != nil {
@@ -990,4 +1000,40 @@ func (tm *TaskManager) updateServiceDiscoveryHealth(ctx context.Context, task *s
 				"healthStatus", sdHealthStatus)
 		}
 	}
+}
+
+// addPodInfoToTaskAttributes adds the pod name and namespace to the task's Attributes field
+func (tm *TaskManager) addPodInfoToTaskAttributes(task *storage.Task, podName, namespace string) error {
+	// Parse existing attributes or create new slice
+	var attributes []map[string]interface{}
+	if task.Attributes != "" && task.Attributes != "[]" {
+		if err := json.Unmarshal([]byte(task.Attributes), &attributes); err != nil {
+			logging.Warn("Failed to unmarshal existing task attributes", "task", task.ARN, "error", err)
+			// Initialize empty slice if unmarshal fails
+			attributes = []map[string]interface{}{}
+		}
+	}
+
+	// Add pod name attribute
+	podNameAttr := map[string]interface{}{
+		"name":  "kecs.dev/pod-name",
+		"value": podName,
+	}
+	attributes = append(attributes, podNameAttr)
+
+	// Add namespace attribute
+	namespaceAttr := map[string]interface{}{
+		"name":  "kecs.dev/pod-namespace",
+		"value": namespace,
+	}
+	attributes = append(attributes, namespaceAttr)
+
+	// Serialize updated attributes back to JSON
+	attributesJSON, err := json.Marshal(attributes)
+	if err != nil {
+		return fmt.Errorf("failed to marshal task attributes: %w", err)
+	}
+
+	task.Attributes = string(attributesJSON)
+	return nil
 }

@@ -281,6 +281,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case logsLoadedMsg:
 		// Handle loaded logs
 		m.logs = msg.logs
+		// If we have an active log viewer, pass the message to it
+		if m.logViewer != nil {
+			updatedViewer, cmd := m.logViewer.Update(msg)
+			m.logViewer = &updatedViewer
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
 
 	case taskDetailLoadedMsg:
 		// Handle loaded task details
@@ -331,7 +339,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logViewerContainer = msg.container
 		m.currentView = ViewLogs
 
-		// Initialize the log viewer
+		// If we already have logs from previous load, pass them to the viewer
+		if len(m.logs) > 0 {
+			updatedViewer, cmd := m.logViewer.Update(logsLoadedMsg{logs: m.logs})
+			m.logViewer = &updatedViewer
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+
+		// Initialize the log viewer to load fresh logs
 		return m, m.logViewer.Init()
 
 	case taskDefJSONLoadedMsg:
@@ -651,6 +668,11 @@ func (m Model) View() string {
 		}
 		// Fallback if editor is nil
 		return m.View()
+	}
+
+	// For logs view with active log viewer, use full screen
+	if m.currentView == ViewLogs && m.logViewer != nil {
+		return m.logViewer.View()
 	}
 
 	// If deleting, show spinner overlay

@@ -19,6 +19,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/cache"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
+	"github.com/nandemo-ya/kecs/controlplane/internal/webhook"
 )
 
 var (
@@ -166,6 +167,84 @@ func runServer(cmd *cobra.Command) {
 	// Set Kubernetes client for admin server if available
 	if apiServer != nil && apiServer.GetKubeClient() != nil {
 		adminServer.SetKubeClient(apiServer.GetKubeClient())
+		logging.Info("Kubernetes client is available for admin server")
+	} else {
+		logging.Info("Kubernetes client is not available",
+			"apiServerNil", apiServer == nil,
+			"kubeClientNil", apiServer != nil && apiServer.GetKubeClient() == nil)
+	}
+
+	// Start webhook server if Kubernetes client is available
+	var webhookServer *webhook.Server
+	if apiServer != nil && apiServer.GetKubeClient() != nil {
+		logging.Info("Starting webhook server for pod mutation")
+
+		// Create webhook configuration
+		webhookConfig := webhook.Config{
+			Port:      9443, // Standard webhook port
+			Storage:   storage,
+			Region:    cfg.AWS.DefaultRegion,
+			AccountID: cfg.AWS.AccountID,
+		}
+
+		// Generate self-signed certificates for the webhook
+		// In production, proper certificate management would be needed
+		certPath := "/tmp/webhook-cert.pem"
+		keyPath := "/tmp/webhook-key.pem"
+		if err := webhook.GenerateSelfSignedCert(certPath, keyPath, "kecs-webhook.kecs-system.svc"); err != nil {
+			logging.Warn("Failed to generate webhook certificates", "error", err)
+			// Continue without TLS for development
+			webhookConfig.CertFile = ""
+			webhookConfig.KeyFile = ""
+		} else {
+			webhookConfig.CertFile = certPath
+			webhookConfig.KeyFile = keyPath
+			logging.Info("Generated self-signed certificates for webhook")
+		}
+
+		// Create webhook server
+		var err error
+		webhookServer, err = webhook.NewServer(webhookConfig)
+		if err != nil {
+			logging.Error("Failed to create webhook server", "error", err)
+			// Don't fail startup, just log the error
+		} else {
+			// Start webhook server in goroutine
+			go func() {
+				webhookCtx := context.Background()
+				if err := webhookServer.Start(webhookCtx); err != nil {
+					logging.Error("Webhook server error", "error", err)
+				}
+			}()
+
+			logging.Info("Webhook server started successfully on port", "port", webhookConfig.Port)
+
+			// Register the webhook with Kubernetes
+			if webhookConfig.CertFile != "" {
+				// Read the certificate for CA bundle
+				certData, err := os.ReadFile(webhookConfig.CertFile)
+				if err != nil {
+					logging.Error("Failed to read webhook certificate", "error", err)
+				} else {
+					// Create webhook registrar
+					// Note: Service port is 443, which maps to targetPort 9443
+					registrar := webhook.NewWebhookRegistrar(
+						apiServer.GetKubeClient(),
+						"kecs-system",
+						"kecs-webhook",
+						443, // Service port, not the actual webhook port
+					)
+
+					// Register the webhook configuration
+					webhookCtx := context.Background()
+					if err := registrar.Register(webhookCtx, certData); err != nil {
+						logging.Error("Failed to register webhook configuration", "error", err)
+					} else {
+						logging.Info("Webhook configuration registered successfully")
+					}
+				}
+			}
+		}
 	}
 
 	// Set up graceful shutdown
@@ -205,7 +284,7 @@ func runServer(cmd *cobra.Command) {
 			// Storage should handle its own graceful shutdown
 		}
 
-		// Stop both servers
+		// Stop all servers
 		if err := apiServer.Stop(shutdownCtx); err != nil {
 			logging.Error("Error during API server shutdown",
 				"error", err)
@@ -214,6 +293,14 @@ func runServer(cmd *cobra.Command) {
 		if err := adminServer.Stop(shutdownCtx); err != nil {
 			logging.Error("Error during Admin server shutdown",
 				"error", err)
+		}
+
+		// Stop webhook server if running
+		if webhookServer != nil {
+			if err := webhookServer.Shutdown(); err != nil {
+				logging.Error("Error during webhook server shutdown",
+					"error", err)
+			}
 		}
 
 		// LocalStack will be stopped by the API server during shutdown

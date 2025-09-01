@@ -42,10 +42,7 @@ type LogStreamMsg struct {
 	Log storage.TaskLog
 }
 
-// LogsLoadedMsg represents logs loaded from API
-type LogsLoadedMsg struct {
-	Logs []storage.TaskLog
-}
+// Note: logsLoadedMsg is defined in commands.go and used by main TUI
 
 // LogErrorMsg represents an error loading logs
 type LogErrorMsg struct {
@@ -90,7 +87,16 @@ func (m LogViewerModel) loadLogs() tea.Cmd {
 			return LogErrorMsg{Error: err}
 		}
 
-		return LogsLoadedMsg{Logs: logs}
+		// Convert storage.TaskLog to LogEntry for consistency with main TUI
+		logEntries := make([]LogEntry, len(logs))
+		for i, taskLog := range logs {
+			logEntries[i] = LogEntry{
+				Timestamp: taskLog.Timestamp,
+				Level:     taskLog.LogLevel,
+				Message:   taskLog.LogLine,
+			}
+		}
+		return logsLoadedMsg{logs: logEntries}
 	}
 }
 
@@ -136,8 +142,16 @@ func (m LogViewerModel) Update(msg tea.Msg) (LogViewerModel, tea.Cmd) {
 		// Update search bar width
 		m.searchBar.Width = msg.Width - 4
 
-	case LogsLoadedMsg:
-		m.logs = msg.Logs
+	case logsLoadedMsg:
+		// Convert LogEntry to storage.TaskLog
+		m.logs = make([]storage.TaskLog, len(msg.logs))
+		for i, logEntry := range msg.logs {
+			m.logs[i] = storage.TaskLog{
+				Timestamp: logEntry.Timestamp,
+				LogLevel:  logEntry.Level,
+				LogLine:   logEntry.Message,
+			}
+		}
 		m.loading = false
 		m.filterLogs()
 		m.updateViewport()
