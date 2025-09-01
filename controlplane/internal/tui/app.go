@@ -849,6 +849,15 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.taskDefFamilyCursor = 0
 			return m, m.loadTaskDefinitionFamiliesCmd()
 		}
+	case "T":
+		// Navigate to all tasks in cluster (uppercase T)
+		if m.selectedInstance != "" && m.selectedCluster != "" {
+			m.currentView = ViewTasks
+			m.taskCursor = 0
+			// Clear service selection to show all cluster tasks
+			m.selectedService = ""
+			return m, m.loadDataFromAPI()
+		}
 	case "/":
 		m.searchMode = true
 		m.searchQuery = ""
@@ -929,6 +938,15 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.currentView = ViewTaskDefinitionFamilies
 			m.taskDefFamilyCursor = 0
 			return m, m.loadTaskDefinitionFamiliesCmd()
+		}
+	case "T":
+		// Navigate to all tasks in selected cluster (uppercase T)
+		if m.selectedInstance != "" && m.selectedCluster != "" {
+			m.currentView = ViewTasks
+			m.taskCursor = 0
+			// Clear service selection to show all cluster tasks
+			m.selectedService = ""
+			return m, m.loadDataFromAPI()
 		}
 	}
 	return m, nil
@@ -1098,6 +1116,16 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "c":
 		m.currentView = ViewClusters
 		m.selectedCluster = ""
+	case "esc", "b":
+		// Go back to previous view
+		if m.selectedService != "" {
+			// If we came from services view, go back to services
+			m.currentView = ViewServices
+		} else {
+			// If we came from clusters view (showing all tasks), go back to clusters
+			m.currentView = ViewClusters
+		}
+		m.selectedTask = ""
 	case "s":
 		m.currentView = ViewServices
 		m.selectedService = ""

@@ -110,6 +110,7 @@ func (m Model) getHeaderShortcuts() string {
 		shortcuts = []string{
 			keyStyle.Render("<↵>") + sepStyle.Render(" Select"),
 			keyStyle.Render("<n>") + sepStyle.Render(" Create"),
+			keyStyle.Render("<T>") + sepStyle.Render(" Tasks"),
 			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
 			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
 			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
@@ -229,8 +230,15 @@ func (m Model) renderBreadcrumb() string {
 
 	if m.selectedService != "" {
 		parts = append(parts, ">", m.selectedService)
+	}
 
-		if m.currentView == ViewTasks {
+	// Show Tasks breadcrumb whether service is selected or not
+	if m.currentView == ViewTasks {
+		if m.selectedService == "" {
+			// Showing all tasks in cluster
+			parts = append(parts, ">", "[All Tasks]")
+		} else {
+			// Showing tasks for specific service
 			parts = append(parts, ">", "[Tasks]")
 		}
 	}
@@ -523,19 +531,25 @@ func (m Model) renderSummary() string {
 		}
 
 	case ViewTasks:
-		if m.selectedService != "" {
-			running := 0
-			healthy := 0
-			for _, task := range m.tasks {
-				if task.Status == "RUNNING" {
-					running++
-					if task.Health == "HEALTHY" {
-						healthy++
-					}
+		running := 0
+		healthy := 0
+		for _, task := range m.tasks {
+			if task.Status == "RUNNING" {
+				running++
+				if task.Health == "HEALTHY" {
+					healthy++
 				}
 			}
+		}
+
+		if m.selectedService != "" {
+			// Tasks for specific service
 			summary = fmt.Sprintf("Service: %s | Tasks: %d | Running: %d | Healthy: %d",
 				m.selectedService, len(m.tasks), running, healthy)
+		} else {
+			// All tasks in cluster
+			summary = fmt.Sprintf("Cluster: %s | All Tasks: %d | Running: %d | Healthy: %d",
+				m.selectedCluster, len(m.tasks), running, healthy)
 		}
 
 	case ViewLogs:
@@ -1277,6 +1291,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 			keyStyle.Render("<i>")+" "+descStyle.Render("Instances"),
 			keyStyle.Render("<s>")+" "+descStyle.Render("Services"),
 			keyStyle.Render("<t>")+" "+descStyle.Render("Task defs"),
+			keyStyle.Render("<T>")+" "+descStyle.Render("All tasks"),
 		)
 	case ViewServices:
 		leftShortcuts = append(leftShortcuts,
@@ -1291,6 +1306,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		leftShortcuts = append(leftShortcuts,
 			keyStyle.Render("<enter>")+" "+descStyle.Render("Describe"),
 			keyStyle.Render("<l>")+" "+descStyle.Render("Logs"),
+			keyStyle.Render("<esc>")+" "+descStyle.Render("Back"),
 			keyStyle.Render("<t>")+" "+descStyle.Render("Task defs"),
 		)
 	case ViewLogs:
