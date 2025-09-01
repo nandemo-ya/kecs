@@ -121,25 +121,35 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		s.taskManager = taskManager
 	}
 
-	// Initialize TaskSet manager
-	if s.taskManager != nil && !apiconfig.GetBool("features.testMode") {
-		// Try to get kubernetes client for TaskSetManager
+	// Initialize Kubernetes client first (needed for multiple components)
+	logging.Info("Checking test mode for kubernetes client initialization",
+		"testMode", apiconfig.GetBool("features.testMode"))
+	if !apiconfig.GetBool("features.testMode") {
+		logging.Info("Attempting to get kubernetes config...")
 		kubeConfig, err := kubernetes.GetKubeConfig()
 		if err != nil {
-			logging.Warn("Failed to get kubernetes config for TaskSet manager",
+			logging.Warn("Failed to get kubernetes config",
 				"error", err)
 		} else {
+			logging.Info("Got kubernetes config, creating client...")
 			kubeClient, err := k8s.NewForConfig(kubeConfig)
 			if err != nil {
-				logging.Warn("Failed to create kubernetes client for TaskSet manager",
+				logging.Warn("Failed to create kubernetes client",
 					"error", err)
 			} else {
 				s.kubeClient = kubeClient
-				taskSetManager := kubernetes.NewTaskSetManager(kubeClient, s.taskManager)
-				s.taskSetManager = taskSetManager
-				logging.Info("TaskSet manager initialized successfully")
+				logging.Info("Kubernetes client initialized successfully for webhook and other components")
 			}
 		}
+	} else {
+		logging.Info("Skipping kubernetes client initialization due to test mode")
+	}
+
+	// Initialize TaskSet manager
+	if s.taskManager != nil && s.kubeClient != nil && !apiconfig.GetBool("features.testMode") {
+		taskSetManager := kubernetes.NewTaskSetManager(s.kubeClient, s.taskManager)
+		s.taskSetManager = taskSetManager
+		logging.Info("TaskSet manager initialized successfully")
 	}
 
 	// Initialize sync controller
