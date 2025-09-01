@@ -65,7 +65,7 @@ func (api *LogsAPI) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 	taskId := vars["taskId"]
 	containerName := vars["containerName"]
 
-	logging.Debug("HandleGetLogs called",
+	logging.Info("HandleGetLogs called",
 		"taskId", taskId,
 		"containerName", containerName,
 		"url", r.URL.String())
@@ -157,6 +157,10 @@ func (api *LogsAPI) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If no logs in storage, try to get from Kubernetes directly
+	logging.Info("Checking Kubernetes for logs",
+		"storageLogsCount", len(logs),
+		"hasKubeClient", api.kubeClient != nil,
+		"hasPodLogService", api.podLogService != nil)
 	if len(logs) == 0 && api.kubeClient != nil && api.podLogService != nil {
 		// If we didn't get pod info from storage, parse task ARN or use taskId as pod name
 		if namespace == "" || podName == "" {

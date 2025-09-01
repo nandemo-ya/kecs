@@ -113,10 +113,21 @@ func (m Model) loadDataFromAPI() tea.Cmd {
 			}
 		}
 
-		// Load tasks if service is selected
+		// Load tasks - either for selected service or all tasks in cluster
 		var tuiTasks []Task
-		if m.selectedInstance != "" && m.selectedCluster != "" && m.selectedService != "" {
-			taskArns, err := m.apiClient.ListTasks(ctx, m.selectedInstance, m.selectedCluster, m.selectedService)
+		if m.selectedInstance != "" && m.selectedCluster != "" {
+			var taskArns []string
+			var err error
+
+			// If service is selected, get tasks for that service
+			// Otherwise, get all tasks in the cluster
+			if m.selectedService != "" {
+				taskArns, err = m.apiClient.ListTasks(ctx, m.selectedInstance, m.selectedCluster, m.selectedService)
+			} else {
+				// Get all tasks in cluster by passing empty service name
+				taskArns, err = m.apiClient.ListTasks(ctx, m.selectedInstance, m.selectedCluster, "")
+			}
+
 			if err == nil && len(taskArns) > 0 {
 				tasks, err := m.apiClient.DescribeTasks(ctx, m.selectedInstance, m.selectedCluster, taskArns)
 				if err == nil {

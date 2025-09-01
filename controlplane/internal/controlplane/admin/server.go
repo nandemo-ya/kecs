@@ -126,11 +126,13 @@ func (s *Server) setupRoutes() http.Handler {
 	router.HandleFunc("/config", s.handleConfig).Methods("GET")
 
 	// Register TUI API endpoints
-	if s.instanceAPI != nil {
-		s.instanceAPI.RegisterRoutes(router)
-	}
+	// IMPORTANT: ECS Proxy must be registered before instance API
+	// to ensure specific routes are matched before generic ones
 	if s.ecsProxy != nil {
 		s.ecsProxy.RegisterRoutes(router)
+	}
+	if s.instanceAPI != nil {
+		s.instanceAPI.RegisterRoutes(router)
 	}
 
 	// Register Logs API endpoints
