@@ -176,12 +176,21 @@ func (api *LogsAPI) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 	if len(logs) == 0 && api.kubeClient != nil && api.podLogService != nil {
 		// If we didn't get pod info from storage, try to find pod by task ID label
 		if namespace == "" || podName == "" {
-			// Determine namespace from cluster
+			// Get cluster and region from query parameters
 			cluster := r.URL.Query().Get("cluster")
-			if cluster == "" {
-				cluster = "default"
+			region := r.URL.Query().Get("region")
+
+			// Both cluster and region are required
+			if cluster == "" || region == "" {
+				logging.Warn("Missing required query parameters",
+					"cluster", cluster,
+					"region", region)
+				http.Error(w, "Both 'cluster' and 'region' query parameters are required", http.StatusBadRequest)
+				return
 			}
-			namespace = cluster + "-us-east-1"
+
+			// Construct namespace from cluster and region
+			namespace = fmt.Sprintf("%s-%s", cluster, region)
 
 			// Try to find pod by task ID label
 			logging.Debug("Looking for pod by task ID label",
@@ -274,15 +283,18 @@ func (api *LogsAPI) HandleStreamLogs(w http.ResponseWriter, r *http.Request) {
 	taskId := vars["taskId"]
 	containerName := vars["containerName"]
 
+	// Get cluster and region from query params
+	cluster := r.URL.Query().Get("cluster")
+	region := r.URL.Query().Get("region")
+	if cluster == "" || region == "" {
+		http.Error(w, "Both 'cluster' and 'region' query parameters are required", http.StatusBadRequest)
+		return
+	}
+
 	// Try to get the actual pod name and namespace from task storage
 	var namespace, podName string
 	if api.storage != nil && api.storage.TaskStore() != nil {
-		// Get cluster from query params or default
-		cluster := r.URL.Query().Get("cluster")
-		if cluster == "" {
-			cluster = "default"
-		}
-		clusterArn := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:cluster/%s", cluster)
+		clusterArn := fmt.Sprintf("arn:aws:ecs:%s:000000000000:cluster/%s", region, cluster)
 
 		// First try to find the task by ID
 		task, err := api.storage.TaskStore().Get(r.Context(), clusterArn, taskId)
@@ -310,12 +322,12 @@ func (api *LogsAPI) HandleStreamLogs(w http.ResponseWriter, r *http.Request) {
 
 	// Fall back to parsing if not found in storage
 	if namespace == "" || podName == "" {
-		// Already have cluster from above
-		taskArn := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:task/default/%s", taskId)
+		// Use cluster and region from query params
+		taskArn := fmt.Sprintf("arn:aws:ecs:%s:000000000000:task/%s/%s", region, cluster, taskId)
 
 		// Parse task ARN to get namespace and pod name
 		var err error
-		namespace, podName, err = parseTaskArn(taskArn)
+		namespace, podName, err = parseTaskArn(taskArn, region)
 		if err != nil {
 			http.Error(w, "Invalid task ARN", http.StatusBadRequest)
 			return
@@ -395,15 +407,18 @@ func (api *LogsAPI) HandleWebSocketLogs(w http.ResponseWriter, r *http.Request) 
 	taskId := vars["taskId"]
 	containerName := vars["containerName"]
 
+	// Get cluster and region from query params
+	cluster := r.URL.Query().Get("cluster")
+	region := r.URL.Query().Get("region")
+	if cluster == "" || region == "" {
+		http.Error(w, "Both 'cluster' and 'region' query parameters are required", http.StatusBadRequest)
+		return
+	}
+
 	// Try to get the actual pod name and namespace from task storage
 	var namespace, podName string
 	if api.storage != nil && api.storage.TaskStore() != nil {
-		// Get cluster from query params or default
-		cluster := r.URL.Query().Get("cluster")
-		if cluster == "" {
-			cluster = "default"
-		}
-		clusterArn := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:cluster/%s", cluster)
+		clusterArn := fmt.Sprintf("arn:aws:ecs:%s:000000000000:cluster/%s", region, cluster)
 
 		// First try to find the task by ID
 		task, err := api.storage.TaskStore().Get(r.Context(), clusterArn, taskId)
@@ -431,12 +446,12 @@ func (api *LogsAPI) HandleWebSocketLogs(w http.ResponseWriter, r *http.Request) 
 
 	// Fall back to parsing if not found in storage
 	if namespace == "" || podName == "" {
-		// Already have cluster from above
-		taskArn := fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:task/default/%s", taskId)
+		// Use cluster and region from query params
+		taskArn := fmt.Sprintf("arn:aws:ecs:%s:000000000000:task/%s/%s", region, cluster, taskId)
 
 		// Parse task ARN to get namespace and pod name
 		var err error
-		namespace, podName, err = parseTaskArn(taskArn)
+		namespace, podName, err = parseTaskArn(taskArn, region)
 		if err != nil {
 			http.Error(w, "Invalid task ARN", http.StatusBadRequest)
 			return
@@ -518,7 +533,7 @@ func (api *LogsAPI) HandleWebSocketLogs(w http.ResponseWriter, r *http.Request) 
 }
 
 // parseTaskArn parses a task ARN to extract namespace and pod name
-func parseTaskArn(taskArn string) (namespace, podName string, err error) {
+func parseTaskArn(taskArn string, region string) (namespace, podName string, err error) {
 	// Format: arn:aws:ecs:region:account:task/cluster/task-id
 	// Example: arn:aws:ecs:us-east-1:000000000000:task/default/multi-container-webapp-66dcddbdd8-x7tqc
 
@@ -535,13 +550,9 @@ func parseTaskArn(taskArn string) (namespace, podName string, err error) {
 	cluster := parts[len(parts)-2]
 	taskID := parts[len(parts)-1]
 
-	// Namespace is derived from cluster name
-	// In KECS, we use default-us-east-1 for the default cluster
-	if cluster == "default" {
-		namespace = "default-us-east-1"
-	} else {
-		namespace = cluster + "-us-east-1"
-	}
+	// Namespace is derived from cluster name and region
+	// In KECS, we use cluster-region format for namespaces
+	namespace = fmt.Sprintf("%s-%s", cluster, region)
 
 	return namespace, taskID, nil
 }
