@@ -339,17 +339,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logViewerContainer = msg.container
 		m.currentView = ViewLogs
 
-		// If we already have logs from previous load, pass them to the viewer
-		if len(m.logs) > 0 {
-			updatedViewer, cmd := m.logViewer.Update(logsLoadedMsg{logs: m.logs})
-			m.logViewer = &updatedViewer
-			if cmd != nil {
-				cmds = append(cmds, cmd)
-			}
+		// Initialize the log viewer to start loading logs
+		cmd := m.logViewer.Init()
+		if cmd != nil {
+			cmds = append(cmds, cmd)
 		}
-
-		// Initialize the log viewer to load fresh logs
-		return m, m.logViewer.Init()
 
 	case taskDefJSONLoadedMsg:
 		// Cache loaded JSON
@@ -1082,10 +1076,17 @@ func (m Model) handleTaskDescribeKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		// Go to bottom (will be adjusted in render)
 		m.taskDescribeScroll = maxScroll
 	case "l":
-		// View logs
-		m.previousView = m.currentView
-		m.currentView = ViewLogs
-		return m, m.loadTaskLogsCmd()
+		// View logs for the detailed task
+		if m.selectedTaskDetail != nil {
+			m.previousView = m.currentView
+			// Use first container name if available
+			containerName := ""
+			if len(m.selectedTaskDetail.Containers) > 0 {
+				containerName = m.selectedTaskDetail.Containers[0].Name
+			}
+			// Open log viewer with the task ARN
+			return m, m.viewTaskLogsCmd(m.selectedTaskDetail.TaskARN, containerName)
+		}
 	case "esc", "backspace":
 		// Go back to tasks list
 		m.currentView = m.previousView

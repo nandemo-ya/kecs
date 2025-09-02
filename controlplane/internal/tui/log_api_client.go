@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -31,34 +32,43 @@ func NewLogAPIClient(baseURL string) *DefaultLogAPIClient {
 
 // GetLogs retrieves logs from the API
 func (c *DefaultLogAPIClient) GetLogs(ctx context.Context, taskArn, container string, follow bool) ([]storage.TaskLog, error) {
-	// Extract task ID from ARN
-	// ARN format: arn:aws:ecs:region:account:task/cluster/task-id
-	taskId := extractTaskIdFromArn(taskArn)
+	// Extract cluster from ARN
 	cluster := extractClusterFromArn(taskArn)
-
-	// Build URL with query parameters
-	params := url.Values{}
-	params.Set("limit", "1000")
-	if follow {
-		params.Set("follow", "true")
-	}
-	if cluster != "" && cluster != "default" {
-		params.Set("cluster", cluster)
+	if cluster == "" {
+		cluster = "default"
 	}
 
-	// Use the correct API endpoint path with task ID instead of full ARN
-	// Format: /api/tasks/{taskId}/containers/{containerName}/logs
-	endpoint := fmt.Sprintf("%s/api/tasks/%s/containers/%s/logs?%s",
-		c.baseURL,
-		taskId,
-		container,
-		params.Encode())
+	// Build request body for /v1/GetTaskLogs endpoint
+	reqBody := struct {
+		Cluster    string `json:"cluster"`
+		TaskArn    string `json:"taskArn"`
+		Timestamps bool   `json:"timestamps"`
+		Tail       *int64 `json:"tail,omitempty"`
+	}{
+		Cluster:    cluster,
+		TaskArn:    taskArn,
+		Timestamps: true,
+	}
 
-	// Create request
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	// Set tail limit
+	tailLimit := int64(1000)
+	reqBody.Tail = &tailLimit
+
+	// Marshal request body
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Use the correct API endpoint /v1/GetTaskLogs
+	endpoint := fmt.Sprintf("%s/v1/GetTaskLogs", c.baseURL)
+
+	// Create POST request
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	// Execute request
 	resp, err := c.client.Do(req)
@@ -73,14 +83,32 @@ func (c *DefaultLogAPIClient) GetLogs(ctx context.Context, taskArn, container st
 
 	// Parse response
 	var result struct {
-		Logs []storage.TaskLog `json:"logs"`
+		Logs []struct {
+			Timestamp time.Time `json:"timestamp"`
+			Level     string    `json:"level"`
+			Message   string    `json:"message"`
+			Container string    `json:"container,omitempty"`
+		} `json:"logs"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return result.Logs, nil
+	// Convert to storage.TaskLog format
+	logs := make([]storage.TaskLog, 0, len(result.Logs))
+	for _, log := range result.Logs {
+		logs = append(logs, storage.TaskLog{
+			TaskArn:       taskArn,
+			ContainerName: log.Container,
+			Timestamp:     log.Timestamp,
+			LogLine:       log.Message,
+			LogLevel:      log.Level,
+			CreatedAt:     log.Timestamp,
+		})
+	}
+
+	return logs, nil
 }
 
 // StreamLogs streams logs from the API using SSE

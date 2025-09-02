@@ -154,15 +154,23 @@ func (m Model) loadDataFromAPI() tea.Cmd {
 						// For now, we don't have IP information in the API response
 						// This would need to be added to the API response
 
+						// Extract container names
+						var containerNames []string
+						for _, container := range task.Containers {
+							containerNames = append(containerNames, container.Name)
+						}
+
 						tuiTasks[i] = Task{
-							ID:      extractTaskID(task.TaskArn),
-							Service: serviceName,
-							Status:  task.LastStatus,
-							Health:  health,
-							CPU:     parseCPU(task.Cpu),
-							Memory:  task.Memory,
-							IP:      ip,
-							Age:     time.Since(task.CreatedAt),
+							ID:         extractTaskID(task.TaskArn),
+							ARN:        task.TaskArn,
+							Service:    serviceName,
+							Status:     task.LastStatus,
+							Health:     health,
+							CPU:        parseCPU(task.Cpu),
+							Memory:     task.Memory,
+							IP:         ip,
+							Age:        time.Since(task.CreatedAt),
+							Containers: containerNames,
 						}
 					}
 				}
@@ -713,7 +721,7 @@ func (m Model) viewTaskLogsCmd(taskArn string, containerName string) tea.Cmd {
 			apiClient = NewMockLogAPIClient()
 		} else {
 			// Use real API client with the correct endpoint
-			// Logs API is now on admin port (5374)
+			// Logs API is on the admin port
 			var adminPort int = 5374 // default admin port
 			for _, inst := range m.instances {
 				if inst.Name == m.selectedInstance {
