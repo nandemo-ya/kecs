@@ -194,7 +194,7 @@ func getPodLogs(ctx context.Context, clientset kubernetes.Interface, namespace, 
 		opts.Container = container.Name
 
 		// Get log stream
-		logReq := clientset.CoreV1().Pods(namespace).GetLogs(podName, opts)
+		logReq := clientset.CoreV1().Pods(namespace).GetLogs(pod.Name, opts)
 		stream, err := logReq.Stream(ctx)
 		if err != nil {
 			logging.Warn("Failed to get logs for container", "container", container.Name, "error", err)
@@ -313,14 +313,15 @@ func sortLogsByTimestamp(logs []LogEntry) {
 
 // getKubernetesClient returns a Kubernetes client
 func (api *DefaultECSAPI) getKubernetesClient() (kubernetes.Interface, error) {
-	// Get the Kubernetes client from task manager
-	if api.taskManagerInstance == nil {
-		return nil, fmt.Errorf("task manager not initialized")
+	// Get or create the task manager
+	tm, err := api.taskManager()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get task manager: %w", err)
 	}
 
-	if api.taskManagerInstance.Clientset == nil {
+	if tm.Clientset == nil {
 		return nil, fmt.Errorf("kubernetes client not initialized")
 	}
 
-	return api.taskManagerInstance.Clientset, nil
+	return tm.Clientset, nil
 }
