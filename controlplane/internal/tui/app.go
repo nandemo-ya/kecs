@@ -345,6 +345,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 
+		// Send window size update to log viewer
+		windowMsg := tea.WindowSizeMsg{
+			Width:  m.width,
+			Height: m.height,
+		}
+		updatedViewer, sizeCmd := m.logViewer.Update(windowMsg)
+		m.logViewer = &updatedViewer
+		if sizeCmd != nil {
+			cmds = append(cmds, sizeCmd)
+		}
+
 	case taskDefJSONLoadedMsg:
 		// Cache loaded JSON
 		m.taskDefJSONCache[msg.revision] = msg.json

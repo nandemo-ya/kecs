@@ -131,13 +131,21 @@ func (m LogViewerModel) Update(msg tea.Msg) (LogViewerModel, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		// Adjust viewport size
-		headerHeight := 3
-		footerHeight := 3
-		searchHeight := 3
+		// Adjust viewport size - count actual UI elements:
+		// header (1 line) + status (1 line) + search bar (1 line) + footer (1 line) = 4 lines total
+		headerHeight := 1
+		statusHeight := 1
+		searchHeight := 1
+		footerHeight := 1
+		totalUIHeight := headerHeight + statusHeight + searchHeight + footerHeight
 
 		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height - headerHeight - footerHeight - searchHeight
+		m.viewport.Height = msg.Height - totalUIHeight
+
+		// Ensure minimum height
+		if m.viewport.Height < 5 {
+			m.viewport.Height = 5
+		}
 
 		// Update search bar width
 		m.searchBar.Width = msg.Width - 4
