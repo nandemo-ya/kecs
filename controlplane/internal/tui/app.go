@@ -614,6 +614,120 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+// renderSplitViewWithLogs renders the split view with main content on top and logs at bottom
+func (m Model) renderSplitViewWithLogs() string {
+	// Calculate heights for split view (60/40 or 50/50 ratio)
+	// Use full height - no footer in split view as the log viewer has its own footer
+	availableHeight := m.height
+
+	// Use 60/40 split ratio - upper 60% for main view, lower 40% for logs
+	mainViewHeight := int(float64(availableHeight) * 0.6)
+	logViewHeight := availableHeight - mainViewHeight
+
+	// Ensure minimum heights
+	if mainViewHeight < 8 {
+		mainViewHeight = 8
+		logViewHeight = availableHeight - mainViewHeight
+	}
+	if logViewHeight < 6 {
+		logViewHeight = 6
+		mainViewHeight = availableHeight - logViewHeight
+	}
+
+	// Render the main view (what we were viewing before logs)
+	var mainView string
+	switch m.previousView {
+	case ViewTasks:
+		// Calculate exact heights for panels in the main view
+		navPanelHeight := int(float64(mainViewHeight-1) * 0.3)
+		resourcePanelHeight := mainViewHeight - navPanelHeight - 1 // -1 for potential separator
+
+		// Ensure minimum heights
+		if navPanelHeight < 6 {
+			navPanelHeight = 6
+		}
+		if resourcePanelHeight < 6 {
+			resourcePanelHeight = 6
+		}
+
+		navigationPanel := m.renderNavigationPanel()
+		resourcePanel := m.renderResourcePanel()
+
+		// Resize panels to fit in split view
+		navigationPanel = lipgloss.NewStyle().
+			Height(navPanelHeight - 4). // Account for borders
+			Render(navigationPanel)
+
+		resourcePanel = lipgloss.NewStyle().
+			Height(resourcePanelHeight - 4). // Account for borders
+			Render(resourcePanel)
+
+		mainView = lipgloss.JoinVertical(
+			lipgloss.Top,
+			navigationPanel,
+			resourcePanel,
+		)
+
+	case ViewServices:
+		// Similar layout for services view
+		navPanelHeight := int(float64(mainViewHeight-1) * 0.3)
+		resourcePanelHeight := mainViewHeight - navPanelHeight - 1
+
+		if navPanelHeight < 6 {
+			navPanelHeight = 6
+		}
+		if resourcePanelHeight < 6 {
+			resourcePanelHeight = 6
+		}
+
+		navigationPanel := m.renderNavigationPanel()
+		resourcePanel := m.renderResourcePanel()
+
+		navigationPanel = lipgloss.NewStyle().
+			Height(navPanelHeight - 4).
+			Render(navigationPanel)
+
+		resourcePanel = lipgloss.NewStyle().
+			Height(resourcePanelHeight - 4).
+			Render(resourcePanel)
+
+		mainView = lipgloss.JoinVertical(
+			lipgloss.Top,
+			navigationPanel,
+			resourcePanel,
+		)
+
+	case ViewTaskDescribe:
+		// Task description view
+		mainView = m.renderTaskDescribe()
+		// Truncate to fit available height
+		lines := strings.Split(mainView, "\n")
+		if len(lines) > mainViewHeight-2 {
+			lines = lines[:mainViewHeight-2]
+		}
+		mainView = strings.Join(lines, "\n")
+
+	default:
+		// Fallback: show a simple message
+		mainView = lipgloss.NewStyle().
+			Width(m.width).
+			Height(mainViewHeight).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render("Split View - Previous: " + m.previousView.String())
+	}
+
+	// Render the log viewer for the bottom portion
+	// Create a new log viewer with adjusted dimensions
+	logView := m.renderLogViewForSplit(logViewHeight)
+
+	// Combine all components (no separate footer - log viewer has its own)
+	return lipgloss.JoinVertical(
+		lipgloss.Top,
+		mainView,
+		logView,
+	)
+}
+
 // View renders the current view
 func (m Model) View() string {
 	if !m.ready {
@@ -664,9 +778,15 @@ func (m Model) View() string {
 		return m.View()
 	}
 
-	// For logs view with active log viewer, use full screen
+	// For logs view with active log viewer, use full screen or split view
 	if m.currentView == ViewLogs && m.logViewer != nil {
-		return m.logViewer.View()
+		if m.logSplitView {
+			// Split-view mode: show main view in upper portion and logs in lower portion
+			return m.renderSplitViewWithLogs()
+		} else {
+			// Fullscreen mode
+			return m.logViewer.View()
+		}
 	}
 
 	// If deleting, show spinner overlay
@@ -1187,8 +1307,31 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	// Handle split-view toggle first (available in both split and fullscreen modes)
+	if msg.String() == "f" {
+		// Toggle between split-view and fullscreen
+		m.logSplitView = !m.logSplitView
+		return m, nil
+	}
+
 	// If we have an active log viewer, delegate to it
 	if m.logViewer != nil {
+		// In split-view mode, we might want to handle some keys differently
+		if m.logSplitView {
+			// Handle keys specific to split-view mode
+			switch msg.String() {
+			case "esc":
+				// Exit log viewer (k9s style - only ESC)
+				m.logViewer = nil
+				m.currentView = m.previousView
+				m.logSplitView = false // Reset to fullscreen for next time
+				return m, m.loadDataFromAPI()
+			case "tab":
+				// Switch focus between main view and log view (future enhancement)
+				// For now, just delegate to log viewer
+			}
+		}
+
 		updatedViewer, cmd := m.logViewer.Update(msg)
 		m.logViewer = &updatedViewer
 
@@ -1196,6 +1339,7 @@ func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if msg.String() == "esc" {
 			m.logViewer = nil
 			m.currentView = m.previousView
+			m.logSplitView = false // Reset to fullscreen for next time
 			return m, m.loadDataFromAPI()
 		}
 
@@ -1870,4 +2014,66 @@ func (m Model) handleTaskDefinitionEditorKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// renderLogViewForSplit renders the log viewer adjusted for split view mode
+func (m Model) renderLogViewForSplit(height int) string {
+	if m.logViewer == nil {
+		return lipgloss.NewStyle().
+			Width(m.width).
+			Height(height).
+			Align(lipgloss.Center, lipgloss.Center).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#585b70")).
+			Render("No log viewer available")
+	}
+
+	// Create a copy of the log viewer with adjusted dimensions
+	adjustedViewer := *m.logViewer
+	adjustedViewer.width = m.width
+	adjustedViewer.height = height
+
+	// Update the viewport dimensions in the adjusted viewer
+	// Account for header (2 lines), footer (1 line), and search bar (2 lines) space
+	// Plus borders (2 lines)
+	headerHeight := 2
+	footerHeight := 1
+	searchHeight := 2
+	borderHeight := 2
+	viewportHeight := height - headerHeight - footerHeight - searchHeight - borderHeight
+	if viewportHeight < 3 {
+		viewportHeight = 3
+	}
+
+	adjustedViewer.viewport.Width = m.width - 4 // Account for borders
+	adjustedViewer.viewport.Height = viewportHeight
+
+	// Update search bar width
+	adjustedViewer.searchBar.Width = m.width - 4
+
+	// Add split-view indicator to the view
+	splitViewStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#cba6f7")). // Purple border to indicate split mode
+		Width(m.width).
+		Height(height)
+
+	logContent := adjustedViewer.View()
+
+	// Add split-view mode indicator
+	splitHeader := lipgloss.NewStyle().
+		Background(lipgloss.Color("#6c7086")).
+		Foreground(lipgloss.Color("#cdd6f4")).
+		Padding(0, 1).
+		Width(m.width - 4).
+		Render("Split View - Logs | Press 'f' to toggle fullscreen")
+
+	// Combine header with log content
+	contentWithHeader := lipgloss.JoinVertical(
+		lipgloss.Top,
+		splitHeader,
+		logContent,
+	)
+
+	return splitViewStyle.Render(contentWithHeader)
 }

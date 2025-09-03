@@ -132,7 +132,7 @@ func (m Model) getHeaderShortcuts() string {
 		}
 	case ViewLogs:
 		shortcuts = []string{
-			keyStyle.Render("<f>") + sepStyle.Render(" Follow"),
+			keyStyle.Render("<f>") + sepStyle.Render(" Toggle View"),
 			keyStyle.Render("<s>") + sepStyle.Render(" Save"),
 			keyStyle.Render("<Esc>") + sepStyle.Render(" Back"),
 		}
@@ -1326,7 +1326,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		)
 	case ViewLogs:
 		leftShortcuts = append(leftShortcuts,
-			keyStyle.Render("<f>")+" "+descStyle.Render("Follow"),
+			keyStyle.Render("<f>")+" "+descStyle.Render("Toggle split-view"),
 			keyStyle.Render("<s>")+" "+descStyle.Render("Save"),
 		)
 	case ViewTaskDescribe:

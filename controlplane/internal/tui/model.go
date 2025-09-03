@@ -33,6 +33,46 @@ const (
 	ViewClusterCreate
 )
 
+// String returns the string representation of ViewType
+func (v ViewType) String() string {
+	switch v {
+	case ViewInstances:
+		return "Instances"
+	case ViewClusters:
+		return "Clusters"
+	case ViewServices:
+		return "Services"
+	case ViewTasks:
+		return "Tasks"
+	case ViewLogs:
+		return "Logs"
+	case ViewHelp:
+		return "Help"
+	case ViewCommandPalette:
+		return "Command Palette"
+	case ViewInstanceCreate:
+		return "Instance Create"
+	case ViewTaskDescribe:
+		return "Task Describe"
+	case ViewConfirmDialog:
+		return "Confirm Dialog"
+	case ViewInstanceSwitcher:
+		return "Instance Switcher"
+	case ViewTaskDefinitionFamilies:
+		return "Task Definition Families"
+	case ViewTaskDefinitionRevisions:
+		return "Task Definition Revisions"
+	case ViewTaskDefinitionEditor:
+		return "Task Definition Editor"
+	case ViewTaskDefinitionDiff:
+		return "Task Definition Diff"
+	case ViewClusterCreate:
+		return "Cluster Create"
+	default:
+		return "Unknown"
+	}
+}
+
 // Instance represents a KECS instance
 type Instance struct {
 	Name       string
@@ -214,6 +254,7 @@ type Model struct {
 	logViewer          *LogViewerModel
 	logViewerTaskArn   string
 	logViewerContainer string
+	logSplitView       bool // true for split-view, false for fullscreen
 
 	// Spinner for long-running operations
 	spinner         spinner.Model

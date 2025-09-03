@@ -188,8 +188,8 @@ func (m LogViewerModel) Update(msg tea.Msg) (LogViewerModel, tea.Cmd) {
 			m.filterLogs()
 			m.updateViewport()
 
-		case "f":
-			// Toggle follow mode
+		case "F":
+			// Toggle follow mode (uppercase F to avoid conflict with split-view toggle)
 			m.follow = !m.follow
 			if m.follow {
 				m.viewport.GotoBottom()
@@ -343,9 +343,10 @@ func (m LogViewerModel) View() string {
 
 	shortcuts := []string{
 		"[/] Search",
-		"[f] Follow",
+		"[F] Follow",
 		"[r] Reload",
 		"[g/G] Top/Bottom",
+		"[f] Toggle View",
 		"[Esc] Back",
 	}
 
