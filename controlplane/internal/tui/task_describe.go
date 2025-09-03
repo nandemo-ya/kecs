@@ -646,44 +646,51 @@ func (m Model) loadTaskDetailsCmd() tea.Cmd {
 		var containerResources map[string]struct{ CPU, Memory string }
 		if task.TaskDefinitionArn != "" {
 			taskDef, err := m.apiClient.DescribeTaskDefinition(ctx, m.selectedInstance, task.TaskDefinitionArn)
-			if err == nil && taskDef != nil && taskDef.ContainerDefinitions != nil {
-				containerDependencies = make(map[string][]ContainerDependency)
-				containerEssential = make(map[string]bool)
-				containerImages = make(map[string]string)
-				containerResources = make(map[string]struct{ CPU, Memory string })
+			if err == nil && taskDef != nil {
+				// Update task definition display to family:revision format
+				if taskDef.Family != "" && taskDef.Revision > 0 {
+					detail.TaskDefinition = fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision)
+				}
 
-				for _, containerDef := range taskDef.ContainerDefinitions {
-					// Store essential flag
-					containerEssential[containerDef.Name] = containerDef.Essential
+				if taskDef.ContainerDefinitions != nil {
+					containerDependencies = make(map[string][]ContainerDependency)
+					containerEssential = make(map[string]bool)
+					containerImages = make(map[string]string)
+					containerResources = make(map[string]struct{ CPU, Memory string })
 
-					// Store image
-					if containerDef.Image != "" {
-						containerImages[containerDef.Name] = containerDef.Image
-					}
+					for _, containerDef := range taskDef.ContainerDefinitions {
+						// Store essential flag
+						containerEssential[containerDef.Name] = containerDef.Essential
 
-					// Store resource limits
-					cpu := "-"
-					memory := "-"
-					if containerDef.Cpu > 0 {
-						cpu = fmt.Sprintf("%d", containerDef.Cpu)
-					}
-					if containerDef.Memory > 0 {
-						memory = fmt.Sprintf("%d", containerDef.Memory)
-					} else if containerDef.MemoryReservation > 0 {
-						memory = fmt.Sprintf("%d", containerDef.MemoryReservation)
-					}
-					containerResources[containerDef.Name] = struct{ CPU, Memory string }{cpu, memory}
-
-					// Store dependencies
-					if len(containerDef.DependsOn) > 0 {
-						var deps []ContainerDependency
-						for _, dep := range containerDef.DependsOn {
-							deps = append(deps, ContainerDependency{
-								ContainerName: dep.ContainerName,
-								Condition:     dep.Condition,
-							})
+						// Store image
+						if containerDef.Image != "" {
+							containerImages[containerDef.Name] = containerDef.Image
 						}
-						containerDependencies[containerDef.Name] = deps
+
+						// Store resource limits
+						cpu := "-"
+						memory := "-"
+						if containerDef.Cpu > 0 {
+							cpu = fmt.Sprintf("%d", containerDef.Cpu)
+						}
+						if containerDef.Memory > 0 {
+							memory = fmt.Sprintf("%d", containerDef.Memory)
+						} else if containerDef.MemoryReservation > 0 {
+							memory = fmt.Sprintf("%d", containerDef.MemoryReservation)
+						}
+						containerResources[containerDef.Name] = struct{ CPU, Memory string }{cpu, memory}
+
+						// Store dependencies
+						if len(containerDef.DependsOn) > 0 {
+							var deps []ContainerDependency
+							for _, dep := range containerDef.DependsOn {
+								deps = append(deps, ContainerDependency{
+									ContainerName: dep.ContainerName,
+									Condition:     dep.Condition,
+								})
+							}
+							containerDependencies[containerDef.Name] = deps
+						}
 					}
 				}
 			}
