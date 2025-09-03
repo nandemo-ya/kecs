@@ -131,13 +131,21 @@ func (m LogViewerModel) Update(msg tea.Msg) (LogViewerModel, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		// Adjust viewport size
-		headerHeight := 3
-		footerHeight := 3
-		searchHeight := 3
+		// Adjust viewport size - count actual UI elements:
+		// header (1 line) + status (1 line) + search bar (1 line) + footer (1 line) = 4 lines total
+		headerHeight := 1
+		statusHeight := 1
+		searchHeight := 1
+		footerHeight := 1
+		totalUIHeight := headerHeight + statusHeight + searchHeight + footerHeight
 
 		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height - headerHeight - footerHeight - searchHeight
+		m.viewport.Height = msg.Height - totalUIHeight
+
+		// Ensure minimum height
+		if m.viewport.Height < 5 {
+			m.viewport.Height = 5
+		}
 
 		// Update search bar width
 		m.searchBar.Width = msg.Width - 4
@@ -188,8 +196,8 @@ func (m LogViewerModel) Update(msg tea.Msg) (LogViewerModel, tea.Cmd) {
 			m.filterLogs()
 			m.updateViewport()
 
-		case "f":
-			// Toggle follow mode
+		case "F":
+			// Toggle follow mode (uppercase F to avoid conflict with split-view toggle)
 			m.follow = !m.follow
 			if m.follow {
 				m.viewport.GotoBottom()
@@ -317,10 +325,23 @@ func (m LogViewerModel) View() string {
 
 	header := headerStyle.Render(fmt.Sprintf("Logs: %s/%s", m.taskArn, m.container))
 
-	// Status line
+	// Status line with scroll position
 	statusItems := []string{
 		fmt.Sprintf("Lines: %d", len(m.filteredLogs)),
 	}
+
+	// Add scroll position indicator
+	scrollPercent := 0
+	if m.viewport.TotalLineCount() > 0 {
+		scrollPercent = int(float64(m.viewport.YOffset) / float64(max(1, m.viewport.TotalLineCount()-m.viewport.Height)) * 100)
+		if scrollPercent > 100 {
+			scrollPercent = 100
+		}
+		if scrollPercent < 0 {
+			scrollPercent = 0
+		}
+	}
+	statusItems = append(statusItems, fmt.Sprintf("Scroll: %d%%", scrollPercent))
 
 	if m.follow {
 		statusItems = append(statusItems, "Following")
@@ -343,9 +364,10 @@ func (m LogViewerModel) View() string {
 
 	shortcuts := []string{
 		"[/] Search",
-		"[f] Follow",
+		"[F] Follow",
 		"[r] Reload",
 		"[g/G] Top/Bottom",
+		"[f] Toggle View",
 		"[Esc] Back",
 	}
 
