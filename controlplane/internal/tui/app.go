@@ -290,6 +290,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case pollLogsTick:
+		// Forward polling tick to log viewer for follow mode
+		if m.logViewer != nil {
+			updatedViewer, cmd := m.logViewer.Update(msg)
+			m.logViewer = &updatedViewer
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+
 	case taskDetailLoadedMsg:
 		// Handle loaded task details
 		m.selectedTaskDetail = msg.detail
@@ -1376,7 +1386,7 @@ func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			// Handle keys specific to split-view mode
 			switch msg.String() {
 			case "esc":
-				// Exit log viewer (k9s style - only ESC)
+				// Exit log viewer (ESC only)
 				m.logViewer = nil
 				m.currentView = m.previousView
 				m.logSplitView = false // Reset to fullscreen for next time
@@ -1390,7 +1400,7 @@ func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		updatedViewer, cmd := m.logViewer.Update(msg)
 		m.logViewer = &updatedViewer
 
-		// Check if user wants to exit log viewer (k9s style - only ESC)
+		// Check if user wants to exit log viewer (ESC only)
 		if msg.String() == "esc" {
 			m.logViewer = nil
 			m.currentView = m.previousView
