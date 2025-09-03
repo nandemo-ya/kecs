@@ -68,12 +68,18 @@ func NewLogViewer(taskArn, container string, apiClient LogAPIClient) LogViewerMo
 		logs:         []storage.TaskLog{},
 		filteredLogs: []storage.TaskLog{},
 		loading:      true,
+		follow:       true, // Auto-enable follow mode
+		streaming:    true, // Auto-enable streaming
 	}
 }
 
 // Init initializes the log viewer
 func (m LogViewerModel) Init() tea.Cmd {
-	return m.loadLogs()
+	// Start with loading logs and polling
+	return tea.Batch(
+		m.loadLogs(),
+		m.pollLogsCmd(),
+	)
 }
 
 // loadLogs loads logs from the API
@@ -100,27 +106,15 @@ func (m LogViewerModel) loadLogs() tea.Cmd {
 	}
 }
 
-// startStreaming starts streaming logs
-func (m LogViewerModel) startStreaming() tea.Cmd {
-	return func() tea.Msg {
-		ctx := context.Background()
-		stream, err := m.apiClient.StreamLogs(ctx, m.taskArn, m.container)
-		if err != nil {
-			return LogErrorMsg{Error: err}
-		}
-
-		// Start listening to stream in a goroutine
-		go func() {
-			for log := range stream {
-				// Send log message through tea.Program
-				// This would need to be handled properly with the program instance
-				_ = log
-			}
-		}()
-
-		return nil
-	}
+// pollLogsCmd polls for new logs periodically
+func (m LogViewerModel) pollLogsCmd() tea.Cmd {
+	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+		return pollLogsTick{}
+	})
 }
+
+// pollLogsTick is sent periodically to fetch new logs when in follow mode
+type pollLogsTick struct{}
 
 // Update handles messages
 func (m LogViewerModel) Update(msg tea.Msg) (LogViewerModel, tea.Cmd) {
@@ -152,14 +146,41 @@ func (m LogViewerModel) Update(msg tea.Msg) (LogViewerModel, tea.Cmd) {
 
 	case logsLoadedMsg:
 		// Convert LogEntry to storage.TaskLog
-		m.logs = make([]storage.TaskLog, len(msg.logs))
+		newLogs := make([]storage.TaskLog, len(msg.logs))
 		for i, logEntry := range msg.logs {
-			m.logs[i] = storage.TaskLog{
+			newLogs[i] = storage.TaskLog{
 				Timestamp: logEntry.Timestamp,
 				LogLevel:  logEntry.Level,
 				LogLine:   logEntry.Message,
 			}
 		}
+
+		// If we're in follow mode and streaming, merge new logs
+		if m.follow && m.streaming && len(m.logs) > 0 {
+			// Create a map of existing logs by timestamp+message to avoid duplicates
+			existingLogs := make(map[string]bool)
+			for _, log := range m.logs {
+				key := log.Timestamp.Format(time.RFC3339Nano) + "|" + log.LogLine
+				existingLogs[key] = true
+			}
+
+			// Append only new logs that don't exist
+			for _, newLog := range newLogs {
+				key := newLog.Timestamp.Format(time.RFC3339Nano) + "|" + newLog.LogLine
+				if !existingLogs[key] {
+					m.logs = append(m.logs, newLog)
+				}
+			}
+
+			// Auto-scroll to bottom if new logs were added
+			if m.follow {
+				m.viewport.GotoBottom()
+			}
+		} else {
+			// Initial load or not in follow mode - replace all logs
+			m.logs = newLogs
+		}
+
 		m.loading = false
 		m.filterLogs()
 		m.updateViewport()
@@ -178,9 +199,48 @@ func (m LogViewerModel) Update(msg tea.Msg) (LogViewerModel, tea.Cmd) {
 		m.error = msg.Error
 		m.loading = false
 
+	case pollLogsTick:
+		// If we're in follow mode, fetch new logs
+		if m.follow && m.streaming {
+			// Load logs without setting loading flag to avoid UI flicker
+			cmds = append(cmds, m.loadLogs())
+			// Continue polling
+			cmds = append(cmds, m.pollLogsCmd())
+		}
+
 	case tea.KeyMsg:
+		// Handle search bar input first if focused
+		if m.searchBar.Focused() {
+			switch msg.String() {
+			case "esc":
+				// Unfocus search bar and clear search
+				m.searchBar.Blur()
+				m.searchTerm = ""
+				m.searchBar.SetValue("")
+				m.filterLogs()
+				m.updateViewport()
+			case "enter":
+				// Just unfocus the search bar (filtering already applied in real-time)
+				m.searchBar.Blur()
+			default:
+				// Let the search bar handle all other input
+				var cmd tea.Cmd
+				m.searchBar, cmd = m.searchBar.Update(msg)
+				cmds = append(cmds, cmd)
+
+				// Apply filter in real-time as user types
+				if m.searchBar.Value() != m.searchTerm {
+					m.searchTerm = m.searchBar.Value()
+					m.filterLogs()
+					m.updateViewport()
+				}
+			}
+			return m, tea.Batch(cmds...)
+		}
+
+		// Handle normal key bindings when search bar is not focused
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			return m, tea.Quit
 
 		case "/":
@@ -197,20 +257,14 @@ func (m LogViewerModel) Update(msg tea.Msg) (LogViewerModel, tea.Cmd) {
 			m.updateViewport()
 
 		case "F":
-			// Toggle follow mode (uppercase F to avoid conflict with split-view toggle)
+			// Toggle auto-refresh mode (uppercase F to avoid conflict with split-view toggle)
 			m.follow = !m.follow
+			m.streaming = m.follow
 			if m.follow {
 				m.viewport.GotoBottom()
-				if !m.streaming {
-					m.streaming = true
-					cmds = append(cmds, m.startStreaming())
-				}
+				// Resume polling if re-enabled
+				cmds = append(cmds, m.pollLogsCmd())
 			}
-
-		case "r":
-			// Reload logs
-			m.loading = true
-			cmds = append(cmds, m.loadLogs())
 
 		case "g":
 			// Go to top
@@ -222,10 +276,8 @@ func (m LogViewerModel) Update(msg tea.Msg) (LogViewerModel, tea.Cmd) {
 
 		case "enter":
 			if m.searchBar.Focused() {
-				m.searchTerm = m.searchBar.Value()
+				// Just unfocus the search bar (filtering already applied in real-time)
 				m.searchBar.Blur()
-				m.filterLogs()
-				m.updateViewport()
 			}
 		}
 
@@ -234,6 +286,13 @@ func (m LogViewerModel) Update(msg tea.Msg) (LogViewerModel, tea.Cmd) {
 			var cmd tea.Cmd
 			m.searchBar, cmd = m.searchBar.Update(msg)
 			cmds = append(cmds, cmd)
+
+			// Apply filter in real-time as user types
+			if m.searchBar.Value() != m.searchTerm {
+				m.searchTerm = m.searchBar.Value()
+				m.filterLogs()
+				m.updateViewport()
+			}
 		} else {
 			// Handle viewport navigation
 			var cmd tea.Cmd
@@ -268,6 +327,11 @@ func (m *LogViewerModel) filterLogs() {
 func (m *LogViewerModel) updateViewport() {
 	var content strings.Builder
 
+	// Highlight style for search matches
+	highlightStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("226")). // Yellow background
+		Foreground(lipgloss.Color("16"))   // Black text
+
 	for _, log := range m.filteredLogs {
 		timestamp := log.Timestamp.Format("15:04:05.000")
 
@@ -288,10 +352,45 @@ func (m *LogViewerModel) updateViewport() {
 
 		level := levelStyle.Render(fmt.Sprintf("[%-5s]", log.LogLevel))
 
+		// Highlight search term in log line if present
+		logLine := log.LogLine
+		if m.searchTerm != "" {
+			// Case-insensitive highlighting
+			searchLower := strings.ToLower(m.searchTerm)
+			logLower := strings.ToLower(logLine)
+
+			// Find all occurrences and highlight them
+			var result strings.Builder
+			lastEnd := 0
+
+			for {
+				idx := strings.Index(logLower[lastEnd:], searchLower)
+				if idx == -1 {
+					// No more matches, append the rest
+					result.WriteString(logLine[lastEnd:])
+					break
+				}
+
+				// Calculate actual position in original string
+				actualIdx := lastEnd + idx
+
+				// Append text before match
+				result.WriteString(logLine[lastEnd:actualIdx])
+
+				// Append highlighted match (preserve original case)
+				highlighted := highlightStyle.Render(logLine[actualIdx : actualIdx+len(m.searchTerm)])
+				result.WriteString(highlighted)
+
+				lastEnd = actualIdx + len(m.searchTerm)
+			}
+
+			logLine = result.String()
+		}
+
 		content.WriteString(fmt.Sprintf("%s %s %s\n",
 			timestamp,
 			level,
-			log.LogLine,
+			logLine,
 		))
 	}
 
@@ -344,7 +443,7 @@ func (m LogViewerModel) View() string {
 	statusItems = append(statusItems, fmt.Sprintf("Scroll: %d%%", scrollPercent))
 
 	if m.follow {
-		statusItems = append(statusItems, "Following")
+		statusItems = append(statusItems, "Auto-refresh ON")
 	}
 
 	if m.searchTerm != "" {
@@ -364,8 +463,7 @@ func (m LogViewerModel) View() string {
 
 	shortcuts := []string{
 		"[/] Search",
-		"[F] Follow",
-		"[r] Reload",
+		"[F] Toggle Auto-refresh",
 		"[g/G] Top/Bottom",
 		"[f] Toggle View",
 		"[Esc] Back",
