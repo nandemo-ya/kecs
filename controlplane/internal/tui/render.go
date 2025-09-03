@@ -446,11 +446,28 @@ func (m Model) renderResourcePanel() string {
 	case ViewTaskDescribe:
 		content = m.renderTaskDescribe()
 	case ViewLogs:
-		if m.logViewer != nil {
-			// If log viewer is active, use its render
+		// In split-view mode, the resource panel should show the previous view's content
+		// not the log viewer itself (which is shown in the bottom portion)
+		if m.logSplitView && m.previousView != ViewLogs {
+			// Render the content from the previous view
+			switch m.previousView {
+			case ViewTasks:
+				content = m.renderTasksList(resourceHeight - 4)
+			case ViewServices:
+				content = m.renderServicesList(resourceHeight - 4)
+			case ViewClusters:
+				content = m.renderClustersList(resourceHeight - 4)
+			case ViewTaskDescribe:
+				content = m.renderTaskDescribe()
+			default:
+				content = "Previous view content"
+			}
+		} else if m.logViewer != nil {
+			// If not in split view or no previous view, show log viewer
 			return m.logViewer.View()
+		} else {
+			content = m.renderLogsContent(resourceHeight - 4)
 		}
-		content = m.renderLogsContent(resourceHeight - 4)
 	case ViewHelp:
 		content = m.renderHelpContent(resourceHeight - 4)
 	case ViewTaskDefinitionFamilies:

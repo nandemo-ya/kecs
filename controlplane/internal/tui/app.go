@@ -339,6 +339,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logViewerContainer = msg.container
 		m.currentView = ViewLogs
 
+		// Start with split-view mode by default (more natural UX)
+		m.logSplitView = true
+
 		// Initialize the log viewer to start loading logs
 		cmd := m.logViewer.Init()
 		if cmd != nil {
