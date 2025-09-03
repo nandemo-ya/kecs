@@ -190,20 +190,14 @@ func (m Model) renderTaskDescribe() string {
 	// Join sections with more spacing
 	content := strings.Join(sections, "\n\n")
 
-	// Add padding to content
-	contentStyle := lipgloss.NewStyle().
-		Padding(1, 2) // Top/bottom: 1, Left/right: 2
+	// Don't add padding here since it's now handled by the resource panel
+	// content = contentStyle.Render(content)
 
-	content = contentStyle.Render(content)
-
-	// Add header and footer
-	header := m.renderTaskDescribeHeader(detail)
-	footer := m.renderTaskDescribeFooter()
-
-	// Calculate available height for content
-	contentHeight := m.height - lipgloss.Height(header) - lipgloss.Height(footer) - 2
-	if contentHeight < 1 {
-		contentHeight = 1
+	// Calculate available height for content within resource panel
+	// Use a more conservative estimate for the resource panel context
+	contentHeight := 20 // Default height for resource panel content
+	if m.height > 10 {
+		contentHeight = m.height - 10 // Leave space for navigation, header, footer
 	}
 
 	// Apply scrolling if needed
@@ -261,43 +255,8 @@ func (m Model) renderTaskDescribe() string {
 		}
 	}
 
-	// Combine all parts
-	return lipgloss.JoinVertical(
-		lipgloss.Top,
-		header,
-		content,
-		footer,
-	)
-}
-
-func (m Model) renderTaskDescribeHeader(detail *TaskDetail) string {
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("220")).
-		Background(lipgloss.Color("235")).
-		Width(m.width).
-		Padding(0, 1)
-
-	taskID := extractTaskID(detail.TaskARN)
-	status := detail.LastStatus
-
-	statusColor := "244"
-	switch strings.ToUpper(status) {
-	case "RUNNING":
-		statusColor = "82"
-	case "PENDING":
-		statusColor = "226"
-	case "STOPPED":
-		statusColor = "196"
-	}
-
-	statusStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(statusColor)).
-		Bold(true)
-
-	title := fmt.Sprintf("Task: %s [%s]", taskID, statusStyle.Render(status))
-
-	return headerStyle.Render(title)
+	// Return content only (no header/footer since it's in the resource panel now)
+	return content
 }
 
 func (m Model) renderTaskOverview(detail *TaskDetail) string {
@@ -319,10 +278,21 @@ func (m Model) renderTaskOverview(detail *TaskDetail) string {
 	lines = append(lines, titleStyle.Render("Overview"))
 	lines = append(lines, "") // Empty line after title
 
-	// Task Definition
+	// Task Definition - extract family:revision from ARN
+	taskDefDisplay := detail.TaskDefinition
+	if taskDefDisplay != "" {
+		// Try to extract family:revision from ARN format
+		// Example: arn:aws:ecs:region:account:task-definition/family:revision
+		parts := strings.Split(taskDefDisplay, "/")
+		if len(parts) > 1 {
+			taskDefDisplay = parts[len(parts)-1]
+		}
+	} else {
+		taskDefDisplay = "-"
+	}
 	lines = append(lines, fmt.Sprintf("%s %s",
 		labelStyle.Render("Task Definition:"),
-		valueStyle.Render(detail.TaskDefinition)))
+		valueStyle.Render(taskDefDisplay)))
 
 	// Service
 	if detail.ServiceName != "" {
@@ -617,24 +587,6 @@ func (m Model) renderTaskTimestamps(detail *TaskDetail) string {
 	return sectionStyle.Render(strings.Join(lines, "\n"))
 }
 
-func (m Model) renderTaskDescribeFooter() string {
-	footerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("241")).
-		Width(m.width).
-		Align(lipgloss.Center).
-		MarginTop(1)
-
-	shortcuts := []string{
-		"l: Logs",
-		"↑↓: Scroll",
-		"r: Restart",
-		"s: Stop",
-		"ESC: Back",
-	}
-
-	return footerStyle.Render(strings.Join(shortcuts, " • "))
-}
-
 func (m Model) renderLoadingTaskDetails() string {
 	loadingStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("226")).
@@ -687,17 +639,40 @@ func (m Model) loadTaskDetailsCmd() tea.Cmd {
 			detail.StoppedAt = task.StoppedAt
 		}
 
-		// Get task definition to extract dependsOn and essential information
+		// Get task definition to extract container details
 		var containerDependencies map[string][]ContainerDependency
 		var containerEssential map[string]bool
+		var containerImages map[string]string
+		var containerResources map[string]struct{ CPU, Memory string }
 		if task.TaskDefinitionArn != "" {
 			taskDef, err := m.apiClient.DescribeTaskDefinition(ctx, m.selectedInstance, task.TaskDefinitionArn)
 			if err == nil && taskDef != nil && taskDef.ContainerDefinitions != nil {
 				containerDependencies = make(map[string][]ContainerDependency)
 				containerEssential = make(map[string]bool)
+				containerImages = make(map[string]string)
+				containerResources = make(map[string]struct{ CPU, Memory string })
+
 				for _, containerDef := range taskDef.ContainerDefinitions {
 					// Store essential flag
 					containerEssential[containerDef.Name] = containerDef.Essential
+
+					// Store image
+					if containerDef.Image != "" {
+						containerImages[containerDef.Name] = containerDef.Image
+					}
+
+					// Store resource limits
+					cpu := "-"
+					memory := "-"
+					if containerDef.Cpu > 0 {
+						cpu = fmt.Sprintf("%d", containerDef.Cpu)
+					}
+					if containerDef.Memory > 0 {
+						memory = fmt.Sprintf("%d", containerDef.Memory)
+					} else if containerDef.MemoryReservation > 0 {
+						memory = fmt.Sprintf("%d", containerDef.MemoryReservation)
+					}
+					containerResources[containerDef.Name] = struct{ CPU, Memory string }{cpu, memory}
 
 					// Store dependencies
 					if len(containerDef.DependsOn) > 0 {
@@ -720,6 +695,22 @@ func (m Model) loadTaskDetailsCmd() tea.Cmd {
 				Name:   container.Name,
 				Status: container.LastStatus,
 				Reason: container.Reason,
+			}
+
+			// Add image from task definition
+			if image, ok := containerImages[container.Name]; ok {
+				containerDetail.Image = image
+			} else {
+				containerDetail.Image = "-"
+			}
+
+			// Add resource information
+			if resources, ok := containerResources[container.Name]; ok {
+				containerDetail.CPU = resources.CPU
+				containerDetail.Memory = resources.Memory
+			} else {
+				containerDetail.CPU = "-"
+				containerDetail.Memory = "-"
 			}
 
 			if container.ExitCode != nil {

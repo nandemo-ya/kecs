@@ -819,10 +819,8 @@ func (m Model) View() string {
 		return m.renderClusterCreateOverlay()
 	}
 
-	// For task describe, use full screen
-	if m.currentView == ViewTaskDescribe {
-		return m.renderTaskDescribe()
-	}
+	// ViewTaskDescribe is now rendered in the normal layout, not full screen
+	// So we don't need a special case here
 
 	// For confirm dialog, use overlay
 	if m.currentView == ViewConfirmDialog {
