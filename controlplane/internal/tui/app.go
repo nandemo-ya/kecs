@@ -2034,46 +2034,28 @@ func (m Model) renderLogViewForSplit(height int) string {
 	adjustedViewer.height = height
 
 	// Update the viewport dimensions in the adjusted viewer
-	// Account for header (2 lines), footer (1 line), and search bar (2 lines) space
-	// Plus borders (2 lines)
-	headerHeight := 2
+	// Account for actual component heights based on log_viewer.go View() method:
+	// - header: 1 line
+	// - status: 1 line
+	// - search bar: 1 line
+	// - footer: 1 line
+	// No borders needed in split view
+	headerHeight := 1
+	statusHeight := 1
+	searchHeight := 1
 	footerHeight := 1
-	searchHeight := 2
-	borderHeight := 2
-	viewportHeight := height - headerHeight - footerHeight - searchHeight - borderHeight
+	viewportHeight := height - headerHeight - statusHeight - searchHeight - footerHeight
 	if viewportHeight < 3 {
 		viewportHeight = 3
 	}
 
-	adjustedViewer.viewport.Width = m.width - 4 // Account for borders
+	adjustedViewer.viewport.Width = m.width - 2 // Small margin for readability
 	adjustedViewer.viewport.Height = viewportHeight
 
 	// Update search bar width
-	adjustedViewer.searchBar.Width = m.width - 4
+	adjustedViewer.searchBar.Width = m.width - 2
 
-	// Add split-view indicator to the view
-	splitViewStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#cba6f7")). // Purple border to indicate split mode
-		Width(m.width).
-		Height(height)
-
-	logContent := adjustedViewer.View()
-
-	// Add split-view mode indicator
-	splitHeader := lipgloss.NewStyle().
-		Background(lipgloss.Color("#6c7086")).
-		Foreground(lipgloss.Color("#cdd6f4")).
-		Padding(0, 1).
-		Width(m.width - 4).
-		Render("Split View - Logs | Press 'f' to toggle fullscreen")
-
-	// Combine header with log content
-	contentWithHeader := lipgloss.JoinVertical(
-		lipgloss.Top,
-		splitHeader,
-		logContent,
-	)
-
-	return splitViewStyle.Render(contentWithHeader)
+	// Return the adjusted viewer directly without extra borders or headers
+	// The log viewer itself already has all necessary UI elements
+	return adjustedViewer.View()
 }

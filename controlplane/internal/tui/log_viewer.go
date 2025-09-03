@@ -317,10 +317,23 @@ func (m LogViewerModel) View() string {
 
 	header := headerStyle.Render(fmt.Sprintf("Logs: %s/%s", m.taskArn, m.container))
 
-	// Status line
+	// Status line with scroll position
 	statusItems := []string{
 		fmt.Sprintf("Lines: %d", len(m.filteredLogs)),
 	}
+
+	// Add scroll position indicator
+	scrollPercent := 0
+	if m.viewport.TotalLineCount() > 0 {
+		scrollPercent = int(float64(m.viewport.YOffset) / float64(max(1, m.viewport.TotalLineCount()-m.viewport.Height)) * 100)
+		if scrollPercent > 100 {
+			scrollPercent = 100
+		}
+		if scrollPercent < 0 {
+			scrollPercent = 0
+		}
+	}
+	statusItems = append(statusItems, fmt.Sprintf("Scroll: %d%%", scrollPercent))
 
 	if m.follow {
 		statusItems = append(statusItems, "Following")
