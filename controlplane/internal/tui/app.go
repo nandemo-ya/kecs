@@ -665,16 +665,20 @@ func (m Model) renderSplitViewWithLogs() string {
 		}
 
 		navigationPanel := m.renderNavigationPanel()
-		resourcePanel := m.renderResourcePanel()
+		// Directly render the tasks list for the resource panel
+		tasksContent := m.renderTasksList(resourcePanelHeight - 4)
 
 		// Resize panels to fit in split view
 		navigationPanel = lipgloss.NewStyle().
 			Height(navPanelHeight - 4). // Account for borders
 			Render(navigationPanel)
 
-		resourcePanel = lipgloss.NewStyle().
-			Height(resourcePanelHeight - 4). // Account for borders
-			Render(resourcePanel)
+		resourcePanel := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#585b70")).
+			Width(m.width - 2).
+			Height(resourcePanelHeight).
+			Render(tasksContent)
 
 		mainView = lipgloss.JoinVertical(
 			lipgloss.Top,
@@ -695,15 +699,19 @@ func (m Model) renderSplitViewWithLogs() string {
 		}
 
 		navigationPanel := m.renderNavigationPanel()
-		resourcePanel := m.renderResourcePanel()
+		// Directly render the services list for the resource panel
+		servicesContent := m.renderServicesList(resourcePanelHeight - 4)
 
 		navigationPanel = lipgloss.NewStyle().
 			Height(navPanelHeight - 4).
 			Render(navigationPanel)
 
-		resourcePanel = lipgloss.NewStyle().
-			Height(resourcePanelHeight - 4).
-			Render(resourcePanel)
+		resourcePanel := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#585b70")).
+			Width(m.width - 2).
+			Height(resourcePanelHeight).
+			Render(servicesContent)
 
 		mainView = lipgloss.JoinVertical(
 			lipgloss.Top,
@@ -720,6 +728,39 @@ func (m Model) renderSplitViewWithLogs() string {
 			lines = lines[:mainViewHeight-2]
 		}
 		mainView = strings.Join(lines, "\n")
+
+	case ViewClusters:
+		// Clusters view layout
+		navPanelHeight := int(float64(mainViewHeight-1) * 0.3)
+		resourcePanelHeight := mainViewHeight - navPanelHeight - 1
+
+		if navPanelHeight < 6 {
+			navPanelHeight = 6
+		}
+		if resourcePanelHeight < 6 {
+			resourcePanelHeight = 6
+		}
+
+		navigationPanel := m.renderNavigationPanel()
+		// Directly render the clusters list for the resource panel
+		clustersContent := m.renderClustersList(resourcePanelHeight - 4)
+
+		navigationPanel = lipgloss.NewStyle().
+			Height(navPanelHeight - 4).
+			Render(navigationPanel)
+
+		resourcePanel := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#585b70")).
+			Width(m.width - 2).
+			Height(resourcePanelHeight).
+			Render(clustersContent)
+
+		mainView = lipgloss.JoinVertical(
+			lipgloss.Top,
+			navigationPanel,
+			resourcePanel,
+		)
 
 	default:
 		// Fallback: show a simple message
