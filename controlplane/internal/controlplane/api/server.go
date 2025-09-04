@@ -31,6 +31,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/middleware"
 	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
@@ -1251,8 +1252,9 @@ func (s *Server) SetupRoutes() http.Handler {
 	// Apply middleware
 	handler := http.Handler(router)
 	handler = SecurityHeadersMiddleware(handler)
+	handler = middleware.APILoggingMiddleware()(handler)
 	handler = CORSMiddleware(handler)
-	handler = LoggingMiddleware(handler)
+	// Remove the old simple LoggingMiddleware as it's replaced by the new one
 
 	return handler
 }
