@@ -1338,10 +1338,13 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.selectedService = ""
 	case "d":
 		// Describe task
-		if len(m.tasks) > 0 {
+		if len(m.tasks) > 0 && m.taskCursor < len(m.tasks) {
 			m.selectedTask = m.tasks[m.taskCursor].ID
 			m.previousView = m.currentView
 			m.currentView = ViewTaskDescribe
+			m.selectedTaskDetail = nil // Clear previous details
+			m.taskDescribeScroll = 0
+			return m, m.loadTaskDetailsCmd()
 		}
 	case "/":
 		m.searchMode = true

@@ -605,6 +605,8 @@ func (m Model) loadTaskDetailsCmd() tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
+		// Debug: Log that we're loading task details
+		// This will help us see if the function is being called
 		// Get full task details from API
 		tasks, err := m.apiClient.DescribeTasks(ctx, m.selectedInstance, m.selectedCluster, []string{m.selectedTask})
 		if err != nil || len(tasks) == 0 {
