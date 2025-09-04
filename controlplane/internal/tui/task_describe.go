@@ -644,20 +644,28 @@ func (m Model) loadTaskDetailsCmd() tea.Cmd {
 		var containerEssential map[string]bool
 		var containerImages map[string]string
 		var containerResources map[string]struct{ CPU, Memory string }
+
+		// Initialize maps regardless of task definition fetch result
+		containerDependencies = make(map[string][]ContainerDependency)
+		containerEssential = make(map[string]bool)
+		containerImages = make(map[string]string)
+		containerResources = make(map[string]struct{ CPU, Memory string })
+
 		if task.TaskDefinitionArn != "" {
+			// First, try to extract family:revision from the ARN itself as fallback
+			// Format: arn:aws:ecs:region:account-id:task-definition/family:revision
+			if parts := strings.Split(task.TaskDefinitionArn, "/"); len(parts) >= 2 {
+				detail.TaskDefinition = parts[len(parts)-1]
+			}
+
 			taskDef, err := m.apiClient.DescribeTaskDefinition(ctx, m.selectedInstance, task.TaskDefinitionArn)
 			if err == nil && taskDef != nil {
-				// Update task definition display to family:revision format
+				// Update task definition display to family:revision format if we got valid data
 				if taskDef.Family != "" && taskDef.Revision > 0 {
 					detail.TaskDefinition = fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision)
 				}
 
 				if taskDef.ContainerDefinitions != nil {
-					containerDependencies = make(map[string][]ContainerDependency)
-					containerEssential = make(map[string]bool)
-					containerImages = make(map[string]string)
-					containerResources = make(map[string]struct{ CPU, Memory string })
-
 					for _, containerDef := range taskDef.ContainerDefinitions {
 						// Store essential flag
 						containerEssential[containerDef.Name] = containerDef.Essential
