@@ -12,6 +12,7 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/middleware"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
@@ -145,6 +146,9 @@ func (s *Server) setupRoutes() http.Handler {
 
 	// Add middleware
 	handler := http.Handler(router)
+
+	// Add logging middleware
+	handler = middleware.AdminLoggingMiddleware()(handler)
 
 	// Add CORS middleware if allowed origins are configured
 	if len(s.config.Server.AllowedOrigins) > 0 {
