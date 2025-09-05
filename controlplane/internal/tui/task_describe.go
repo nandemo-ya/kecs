@@ -602,15 +602,30 @@ func (m Model) renderLoadingTaskDetails() string {
 
 func (m Model) loadTaskDetailsCmd() tea.Cmd {
 	return func() tea.Msg {
+		if debugLogger := GetDebugLogger(); debugLogger != nil {
+			debugLogger.LogWithCaller("loadTaskDetailsCmd", "Starting to load task details for task: %s, instance: %s, cluster: %s",
+				m.selectedTask, m.selectedInstance, m.selectedCluster)
+		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		// Debug: Log that we're loading task details
 		// This will help us see if the function is being called
 		// Get full task details from API
+		if debugLogger := GetDebugLogger(); debugLogger != nil {
+			debugLogger.LogWithCaller("loadTaskDetailsCmd", "Calling DescribeTasks API")
+		}
 		tasks, err := m.apiClient.DescribeTasks(ctx, m.selectedInstance, m.selectedCluster, []string{m.selectedTask})
 		if err != nil || len(tasks) == 0 {
+			if debugLogger := GetDebugLogger(); debugLogger != nil {
+				debugLogger.LogWithCaller("loadTaskDetailsCmd", "DescribeTasks failed: err=%v, tasks_len=%d", err, len(tasks))
+			}
 			return errMsg{err: fmt.Errorf("failed to load task details: %w", err)}
+		}
+
+		if debugLogger := GetDebugLogger(); debugLogger != nil {
+			debugLogger.LogWithCaller("loadTaskDetailsCmd", "DescribeTasks succeeded, got %d tasks", len(tasks))
 		}
 
 		task := tasks[0]
@@ -654,14 +669,26 @@ func (m Model) loadTaskDetailsCmd() tea.Cmd {
 		containerResources = make(map[string]struct{ CPU, Memory string })
 
 		if task.TaskDefinitionArn != "" {
+			if debugLogger := GetDebugLogger(); debugLogger != nil {
+				debugLogger.LogWithCaller("loadTaskDetailsCmd", "Task has TaskDefinitionArn: %s", task.TaskDefinitionArn)
+			}
 			// First, try to extract family:revision from the ARN itself as fallback
 			// Format: arn:aws:ecs:region:account-id:task-definition/family:revision
 			if parts := strings.Split(task.TaskDefinitionArn, "/"); len(parts) >= 2 {
 				detail.TaskDefinition = parts[len(parts)-1]
+				if debugLogger := GetDebugLogger(); debugLogger != nil {
+					debugLogger.LogWithCaller("loadTaskDetailsCmd", "Extracted task definition from ARN: %s", detail.TaskDefinition)
+				}
 			}
 
+			if debugLogger := GetDebugLogger(); debugLogger != nil {
+				debugLogger.LogWithCaller("loadTaskDetailsCmd", "Calling DescribeTaskDefinition API")
+			}
 			taskDef, err := m.apiClient.DescribeTaskDefinition(ctx, m.selectedInstance, task.TaskDefinitionArn)
 			if err == nil && taskDef != nil {
+				if debugLogger := GetDebugLogger(); debugLogger != nil {
+					debugLogger.LogWithCaller("loadTaskDetailsCmd", "DescribeTaskDefinition succeeded: Family=%s, Revision=%d", taskDef.Family, taskDef.Revision)
+				}
 				// Update task definition display to family:revision format if we got valid data
 				if taskDef.Family != "" && taskDef.Revision > 0 {
 					detail.TaskDefinition = fmt.Sprintf("%s:%d", taskDef.Family, taskDef.Revision)
@@ -703,6 +730,14 @@ func (m Model) loadTaskDetailsCmd() tea.Cmd {
 						}
 					}
 				}
+			} else {
+				if debugLogger := GetDebugLogger(); debugLogger != nil {
+					debugLogger.LogWithCaller("loadTaskDetailsCmd", "DescribeTaskDefinition failed: err=%v", err)
+				}
+			}
+		} else {
+			if debugLogger := GetDebugLogger(); debugLogger != nil {
+				debugLogger.LogWithCaller("loadTaskDetailsCmd", "Task has no TaskDefinitionArn")
 			}
 		}
 
@@ -749,6 +784,11 @@ func (m Model) loadTaskDetailsCmd() tea.Cmd {
 
 		// Set network mode (default to awsvpc for now)
 		detail.NetworkMode = "awsvpc"
+
+		if debugLogger := GetDebugLogger(); debugLogger != nil {
+			debugLogger.LogWithCaller("loadTaskDetailsCmd", "Returning task detail with TaskDefinition=%s, Containers=%d",
+				detail.TaskDefinition, len(detail.Containers))
+		}
 
 		return taskDetailLoadedMsg{detail: detail}
 	}

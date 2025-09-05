@@ -22,12 +22,23 @@ type refreshInstancesMsg struct{}
 
 // Run starts the TUI application
 func Run() error {
+	// Initialize debug logger
+	debugLogger := GetDebugLogger()
+	if debugLogger != nil {
+		debugLogger.StartSession()
+		defer debugLogger.Close()
+	}
+
 	// Suppress logging output while in TUI mode
 	// This prevents k3d and other components from writing logs to the terminal
 	logging.SetOutput(io.Discard)
 
 	// Load configuration
 	cfg := LoadConfig()
+
+	if debugLogger != nil {
+		debugLogger.Log("TUI started with config: UseMockData=%v", cfg.UseMockData)
+	}
 
 	// Create API client
 	client := CreateAPIClient(cfg)
@@ -302,6 +313,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case taskDetailLoadedMsg:
 		// Handle loaded task details
+		if debugLogger := GetDebugLogger(); debugLogger != nil {
+			if msg.detail != nil {
+				debugLogger.LogWithCaller("Update", "taskDetailLoadedMsg received with TaskDefinition=%s, Containers=%d",
+					msg.detail.TaskDefinition, len(msg.detail.Containers))
+			} else {
+				debugLogger.LogWithCaller("Update", "taskDetailLoadedMsg received with nil detail")
+			}
+		}
 		m.selectedTaskDetail = msg.detail
 		m.taskDescribeScroll = 0 // Reset scroll position when new details are loaded
 
@@ -1294,12 +1313,19 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "enter":
 		// View task details
 		if len(m.tasks) > 0 && m.taskCursor < len(m.tasks) {
+			if debugLogger := GetDebugLogger(); debugLogger != nil {
+				debugLogger.LogWithCaller("handleTasksKeys", "Enter pressed - navigating to task detail view for task: %s", m.tasks[m.taskCursor].ID)
+			}
 			m.selectedTask = m.tasks[m.taskCursor].ID
 			m.previousView = m.currentView
 			m.currentView = ViewTaskDescribe
 			m.selectedTaskDetail = nil // Clear previous details
 			m.taskDescribeScroll = 0
-			return m, m.loadTaskDetailsCmd()
+			cmd := m.loadTaskDetailsCmd()
+			if debugLogger := GetDebugLogger(); debugLogger != nil {
+				debugLogger.LogWithCaller("handleTasksKeys", "loadTaskDetailsCmd() called, returning command")
+			}
+			return m, cmd
 		}
 	case "l":
 		// View logs for selected task
@@ -1336,16 +1362,6 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "s":
 		m.currentView = ViewServices
 		m.selectedService = ""
-	case "d":
-		// Describe task
-		if len(m.tasks) > 0 && m.taskCursor < len(m.tasks) {
-			m.selectedTask = m.tasks[m.taskCursor].ID
-			m.previousView = m.currentView
-			m.currentView = ViewTaskDescribe
-			m.selectedTaskDetail = nil // Clear previous details
-			m.taskDescribeScroll = 0
-			return m, m.loadTaskDetailsCmd()
-		}
 	case "/":
 		m.searchMode = true
 		m.searchQuery = ""
