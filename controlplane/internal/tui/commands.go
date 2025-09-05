@@ -751,6 +751,23 @@ type logViewerCreatedMsg struct {
 	container string
 }
 
+// stopTaskCmd stops a running task
+func (m Model) stopTaskCmd(taskArn string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		// Call StopTask API with a reason
+		err := m.apiClient.StopTask(ctx, m.selectedInstance, m.selectedCluster, taskArn, "User requested stop via TUI")
+		if err != nil {
+			return errMsg{err: fmt.Errorf("failed to stop task: %w", err)}
+		}
+
+		// Return a message to trigger data refresh
+		return refreshInstancesMsg{}
+	}
+}
+
 // deleteInstanceCmd initiates instance deletion
 func (m Model) deleteInstanceCmd(instanceName string) tea.Cmd {
 	return func() tea.Msg {

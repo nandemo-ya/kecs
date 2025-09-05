@@ -1337,6 +1337,7 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 	case ViewTasks:
 		leftShortcuts = append(leftShortcuts,
 			keyStyle.Render("<enter>")+" "+descStyle.Render("Describe"),
+			keyStyle.Render("<s>")+" "+descStyle.Render("Stop task"),
 			keyStyle.Render("<l>")+" "+descStyle.Render("Logs"),
 			keyStyle.Render("<esc>")+" "+descStyle.Render("Back"),
 			keyStyle.Render("<t>")+" "+descStyle.Render("Task defs"),

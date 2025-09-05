@@ -654,9 +654,41 @@ func (c *HTTPClient) RunTask(ctx context.Context, instanceName, clusterName stri
 	return &task, nil
 }
 
-func (c *HTTPClient) StopTask(ctx context.Context, instanceName, clusterName, taskArn string) error {
+func (c *HTTPClient) StopTask(ctx context.Context, instanceName, clusterName, taskArn string, reason string) error {
+	// Get instance info to find API port
+	if c.k3dProvider != nil {
+		inst, err := c.k3dProvider.GetInstance(ctx, instanceName)
+		if err != nil {
+			return fmt.Errorf("failed to get instance: %w", err)
+		}
+
+		// Call the instance's ECS API directly
+		apiURL := fmt.Sprintf("http://localhost:%d/v1/StopTask", inst.APIPort)
+		client := &http.Client{Timeout: 5 * time.Second}
+
+		reqBody, _ := json.Marshal(map[string]interface{}{
+			"cluster": clusterName,
+			"task":    taskArn,
+			"reason":  reason,
+		})
+
+		resp, err := client.Post(apiURL, "application/json", bytes.NewReader(reqBody))
+		if err != nil {
+			return fmt.Errorf("failed to call StopTask: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("StopTask returned status %d: %s", resp.StatusCode, string(body))
+		}
+
+		return nil
+	}
+
+	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/tasks/%s", url.PathEscape(instanceName), url.PathEscape(taskArn))
-	req := map[string]string{"cluster": clusterName}
+	req := map[string]string{"cluster": clusterName, "reason": reason}
 	return c.doRequest(ctx, "DELETE", path, req, nil)
 }
 

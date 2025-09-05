@@ -49,7 +49,7 @@ type Client interface {
 	ListTasks(ctx context.Context, instanceName, clusterName string, serviceName string) ([]string, error)
 	DescribeTasks(ctx context.Context, instanceName, clusterName string, taskArns []string) ([]Task, error)
 	RunTask(ctx context.Context, instanceName, clusterName string, taskDef string) (*Task, error)
-	StopTask(ctx context.Context, instanceName, clusterName, taskArn string) error
+	StopTask(ctx context.Context, instanceName, clusterName, taskArn string, reason string) error
 	GetTaskLogs(ctx context.Context, instanceName, clusterName, taskArn string, tail int64) ([]LogEntry, error)
 
 	// Task Definition operations
