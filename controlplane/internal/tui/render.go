@@ -379,10 +379,34 @@ func (m Model) renderNavigationPanel() string {
 		navHeight = 10 // Minimum height for navigation content
 	}
 
-	// Calculate column widths (7:3 ratio)
+	// Adaptive layout based on terminal width
 	totalWidth := m.width - 4 // Account for panel borders
-	leftColumnWidth := int(float64(totalWidth) * 0.7)
-	rightColumnWidth := totalWidth - leftColumnWidth - 1 // -1 for gap between columns
+
+	// Determine layout mode based on terminal width
+	// < 100: Single column (shortcuts inline)
+	// 100-140: Two columns with single-column shortcuts
+	// > 140: Two columns with dual-column shortcuts
+	var useInlineShortcuts bool
+	var leftColumnWidth, rightColumnWidth int
+
+	if totalWidth < 100 {
+		// Very narrow - use single column with inline shortcuts
+		useInlineShortcuts = true
+		leftColumnWidth = totalWidth
+		rightColumnWidth = 0
+	} else {
+		// Two column mode
+		useInlineShortcuts = false
+		// Use 55:45 ratio for better balance
+		leftColumnWidth = int(float64(totalWidth) * 0.55)
+		rightColumnWidth = totalWidth - leftColumnWidth - 1 // -1 for gap
+
+		// Ensure minimum widths
+		if rightColumnWidth < 40 {
+			rightColumnWidth = 40
+			leftColumnWidth = totalWidth - rightColumnWidth - 1
+		}
+	}
 
 	// Left column: header, breadcrumb, and summary
 	header := m.renderHeader()
@@ -396,24 +420,40 @@ func (m Model) renderNavigationPanel() string {
 	}
 	topSeparator := separatorStyle.Render(strings.Repeat("─", separatorWidth))
 
-	// Combine left column elements
-	leftColumn := lipgloss.JoinVertical(
-		lipgloss.Top,
-		header,
-		breadcrumb,
-		topSeparator,
-		summary,
-	)
+	var navContent string
 
-	// Right column: shortcuts (vertical list)
-	rightColumn := m.renderShortcutsColumn(rightColumnWidth, navHeight-4)
+	if useInlineShortcuts {
+		// Single column mode - shortcuts below summary
+		shortcuts := m.renderShortcutsInline(leftColumnWidth - 2)
+		navContent = lipgloss.JoinVertical(
+			lipgloss.Top,
+			header,
+			breadcrumb,
+			topSeparator,
+			summary,
+			topSeparator,
+			shortcuts,
+		)
+	} else {
+		// Two column mode
+		leftColumn := lipgloss.JoinVertical(
+			lipgloss.Top,
+			header,
+			breadcrumb,
+			topSeparator,
+			summary,
+		)
 
-	// Join columns horizontally
-	navContent := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		lipgloss.NewStyle().Width(leftColumnWidth).Render(leftColumn),
-		lipgloss.NewStyle().Width(rightColumnWidth).Render(rightColumn),
-	)
+		// Right column: shortcuts (adaptive layout)
+		rightColumn := m.renderShortcutsColumn(rightColumnWidth, navHeight-4)
+
+		// Join columns horizontally
+		navContent = lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			lipgloss.NewStyle().Width(leftColumnWidth).Render(leftColumn),
+			lipgloss.NewStyle().Width(rightColumnWidth).Render(rightColumn),
+		)
+	}
 
 	// Apply navigation panel style with fixed height
 	return navigationPanelStyle.
@@ -1295,95 +1335,80 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		PaddingLeft(1).
 		Width(width)
 
-	// Split width into two columns
+	// Get all shortcuts
+	viewBindings, globalBindings := m.keyBindings.GetAllBindingsForView(m.currentView, m)
+
+	// For narrow columns (< 80), use single column layout
+	if width < 80 {
+		var allShortcuts []string
+
+		// Add view-specific shortcuts first
+		for _, binding := range viewBindings {
+			if binding.Condition == nil || binding.Condition(m) {
+				keyStr := FormatKeyString(binding.Keys)
+				shortcut := fmt.Sprintf("%s %s",
+					keyStyle.Render(keyStr),
+					descStyle.Render(binding.Description))
+				allShortcuts = append(allShortcuts, shortcut)
+			}
+		}
+
+		// Add separator if we have view shortcuts
+		if len(allShortcuts) > 0 {
+			allShortcuts = append(allShortcuts, "")
+		}
+
+		// Add global shortcuts
+		for _, binding := range globalBindings {
+			keyStr := FormatKeyString(binding.Keys)
+			shortcut := fmt.Sprintf("%s %s",
+				keyStyle.Render(keyStr),
+				descStyle.Render(binding.Description))
+			allShortcuts = append(allShortcuts, shortcut)
+		}
+
+		// Special case shortcuts for task def JSON view
+		if m.currentView == ViewTaskDefinitionRevisions && m.showTaskDefJSON {
+			allShortcuts = append(allShortcuts,
+				keyStyle.Render("^U")+" "+descStyle.Render("Scroll up"),
+				keyStyle.Render("^D")+" "+descStyle.Render("Scroll down"),
+			)
+		}
+
+		content := strings.Join(allShortcuts, "\n")
+		return columnStyle.Height(height).Render(content)
+	}
+
+	// For wider columns, use two-column layout
 	halfWidth := (width - 3) / 2 // -3 for border and padding
 
 	// Left column: Screen-specific shortcuts
 	var leftShortcuts []string
-
-	// Add view-specific shortcuts
-	switch m.currentView {
-	case ViewInstances:
-		leftShortcuts = append(leftShortcuts,
-			keyStyle.Render("<n>")+" "+descStyle.Render("New instance"),
-			keyStyle.Render("<enter>")+" "+descStyle.Render("Select"),
-			keyStyle.Render("<s>")+" "+descStyle.Render("Start/Stop"),
-			keyStyle.Render("<d>")+" "+descStyle.Render("Delete"),
-		)
-		// Only show Task defs shortcut if an instance is selected
-		if m.selectedInstance != "" {
-			leftShortcuts = append(leftShortcuts,
-				keyStyle.Render("<t>")+" "+descStyle.Render("Task defs"),
-			)
-		}
-	case ViewClusters:
-		leftShortcuts = append(leftShortcuts,
-			keyStyle.Render("<enter>")+" "+descStyle.Render("Select"),
-			keyStyle.Render("<n>")+" "+descStyle.Render("Create cluster"),
-			keyStyle.Render("<i>")+" "+descStyle.Render("Instances"),
-			keyStyle.Render("<s>")+" "+descStyle.Render("Services"),
-			keyStyle.Render("<t>")+" "+descStyle.Render("Task defs"),
-			keyStyle.Render("<T>")+" "+descStyle.Render("All tasks"),
-		)
-	case ViewServices:
-		leftShortcuts = append(leftShortcuts,
-			keyStyle.Render("<enter>")+" "+descStyle.Render("Select"),
-			keyStyle.Render("<s>")+" "+descStyle.Render("Scale"),
-			keyStyle.Render("<u>")+" "+descStyle.Render("Update"),
-			keyStyle.Render("<r>")+" "+descStyle.Render("Refresh"),
-			keyStyle.Render("<l>")+" "+descStyle.Render("Logs"),
-			keyStyle.Render("<t>")+" "+descStyle.Render("Task defs"),
-		)
-	case ViewTasks:
-		leftShortcuts = append(leftShortcuts,
-			keyStyle.Render("<enter>")+" "+descStyle.Render("Describe"),
-			keyStyle.Render("<s>")+" "+descStyle.Render("Stop task"),
-			keyStyle.Render("<l>")+" "+descStyle.Render("Logs"),
-			keyStyle.Render("<esc>")+" "+descStyle.Render("Back"),
-			keyStyle.Render("<t>")+" "+descStyle.Render("Task defs"),
-		)
-	case ViewLogs:
-		leftShortcuts = append(leftShortcuts,
-			keyStyle.Render("<f>")+" "+descStyle.Render("Toggle split-view"),
-			keyStyle.Render("<s>")+" "+descStyle.Render("Save"),
-		)
-	case ViewTaskDescribe:
-		leftShortcuts = append(leftShortcuts,
-			keyStyle.Render("<l>")+" "+descStyle.Render("View Logs"),
-			keyStyle.Render("<r>")+" "+descStyle.Render("Restart"),
-			keyStyle.Render("<s>")+" "+descStyle.Render("Stop"),
-		)
-	case ViewTaskDefinitionFamilies:
-		leftShortcuts = append(leftShortcuts,
-			keyStyle.Render("<enter>")+" "+descStyle.Render("Select"),
-			keyStyle.Render("<N>")+" "+descStyle.Render("New"),
-			keyStyle.Render("<C>")+" "+descStyle.Render("Copy latest"),
-		)
-	case ViewTaskDefinitionRevisions:
-		leftShortcuts = append(leftShortcuts,
-			keyStyle.Render("<enter>")+" "+descStyle.Render("Toggle JSON"),
-			keyStyle.Render("<y>")+" "+descStyle.Render("Yank name"),
-			keyStyle.Render("<e>")+" "+descStyle.Render("Edit"),
-			keyStyle.Render("<c>")+" "+descStyle.Render("Copy JSON"),
-			keyStyle.Render("<d>")+" "+descStyle.Render("Deregister"),
-		)
-		if m.showTaskDefJSON {
-			leftShortcuts = append(leftShortcuts,
-				keyStyle.Render("<ctrl-u>")+" "+descStyle.Render("Scroll up"),
-				keyStyle.Render("<ctrl-d>")+" "+descStyle.Render("Scroll down"),
-			)
+	for _, binding := range viewBindings {
+		if binding.Condition == nil || binding.Condition(m) {
+			keyStr := FormatKeyString(binding.Keys)
+			shortcut := fmt.Sprintf("%s %s",
+				keyStyle.Render(keyStr),
+				descStyle.Render(binding.Description))
+			leftShortcuts = append(leftShortcuts, shortcut)
 		}
 	}
 
+	// Add special case shortcuts that aren't in the registry yet
+	if m.currentView == ViewTaskDefinitionRevisions && m.showTaskDefJSON {
+		leftShortcuts = append(leftShortcuts,
+			keyStyle.Render("^U")+" "+descStyle.Render("Scroll up"),
+			keyStyle.Render("^D")+" "+descStyle.Render("Scroll down"),
+		)
+	}
+
 	// Right column: Global shortcuts
-	rightShortcuts := []string{
-		keyStyle.Render("<↑>/<k>") + " " + descStyle.Render("Move up"),
-		keyStyle.Render("<↓>/<j>") + " " + descStyle.Render("Move down"),
-		keyStyle.Render("<esc>") + " " + descStyle.Render("Back"),
-		keyStyle.Render("<:>") + " " + descStyle.Render("Command"),
-		keyStyle.Render("</>") + " " + descStyle.Render("Search"),
-		keyStyle.Render("<?>") + " " + descStyle.Render("Help"),
-		keyStyle.Render("<ctrl-c>") + " " + descStyle.Render("Quit"),
+	var rightShortcuts []string
+	for _, binding := range globalBindings {
+		keyStr := FormatKeyString(binding.Keys)
+		rightShortcuts = append(rightShortcuts,
+			keyStyle.Render(keyStr)+" "+descStyle.Render(binding.Description),
+		)
 	}
 
 	// Create left column with screen-specific shortcuts
@@ -1407,6 +1432,51 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 	)
 
 	return columnStyle.Height(height).Render(columnsContent)
+}
+
+// renderShortcutsInline renders shortcuts in a compact inline format for narrow terminals
+func (m Model) renderShortcutsInline(width int) string {
+	// Style for inline shortcuts
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true)
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9399b2"))
+
+	// Get all shortcuts
+	viewBindings, globalBindings := m.keyBindings.GetAllBindingsForView(m.currentView, m)
+
+	// Build inline shortcuts string
+	var shortcuts []string
+
+	// Add most important view-specific shortcuts (limit to 3-4)
+	count := 0
+	for _, binding := range viewBindings {
+		if count >= 3 {
+			break
+		}
+		if binding.Condition == nil || binding.Condition(m) {
+			keyStr := FormatKeyString(binding.Keys)
+			shortcuts = append(shortcuts, fmt.Sprintf("%s %s",
+				keyStyle.Render(keyStr),
+				descStyle.Render(binding.Description)))
+			count++
+		}
+	}
+
+	// Add essential global shortcuts
+	essentialGlobals := []KeyAction{ActionBack, ActionHelp, ActionQuit}
+	for _, action := range essentialGlobals {
+		for _, binding := range globalBindings {
+			if binding.Action == action {
+				keyStr := FormatKeyString(binding.Keys)
+				shortcuts = append(shortcuts, fmt.Sprintf("%s %s",
+					keyStyle.Render(keyStr),
+					descStyle.Render(binding.Description)))
+				break
+			}
+		}
+	}
+
+	// Join with separator
+	return strings.Join(shortcuts, " │ ")
 }
 
 // renderLogsContent renders the logs content with the given height constraint

@@ -74,54 +74,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
-	// Handle global keys first
+	// Handle key messages using the keybinding system
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// Global navigation
-		switch msg.String() {
-		case "ctrl+c":
-			// Exit application (k9s style - only Ctrl+C exits)
-			if !m.searchMode && !m.commandMode && m.currentView != ViewTaskDefinitionEditor {
-				return m, tea.Quit
-			}
-		case "esc":
-			// Go back to previous view or cancel current mode (k9s style)
-			if m.searchMode {
-				m.searchMode = false
-				m.searchQuery = ""
-			} else if m.commandMode {
-				m.commandMode = false
-				m.commandInput = ""
-			} else if m.showHelp {
-				m.showHelp = false
-			} else if m.currentView == ViewCommandPalette {
-				m.currentView = m.previousView
-				m.commandPalette.Reset()
-			} else if m.currentView == ViewTaskDescribe {
-				m.currentView = m.previousView
-			} else if m.currentView == ViewTaskDefinitionRevisions && m.showTaskDefJSON {
-				// Special case: just hide JSON view without navigating
-				m.showTaskDefJSON = false
-			} else if m.currentView != ViewInstances {
-				// Go back to previous view if not at root
-				m.goBack()
-				return m, m.loadDataFromAPI()
-			}
-			return m, nil
-		case "?":
-			if !m.searchMode && !m.commandMode {
-				m.showHelp = !m.showHelp
-				if m.showHelp {
-					m.previousView = m.currentView
-					m.currentView = ViewHelp
-				} else {
-					m.currentView = m.previousView
-				}
-			}
-			return m, nil
-		}
+		keyStr := msg.String()
 
-		// Handle input modes
+		// Handle special input modes first
 		if m.searchMode {
 			return m.handleSearchInput(msg)
 		}
@@ -148,28 +106,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleServiceUpdateDialogKeys(msg)
 		}
 
-		// View-specific key handling
+		// Check for global key action
+		if action, found := m.keyBindings.GetGlobalAction(keyStr); found {
+			return m.executeAction(action)
+		}
+
+		// Check for view-specific key action
+		if action, found := m.keyBindings.GetViewAction(m.currentView, keyStr); found {
+			return m.executeAction(action)
+		}
+
+		// Handle special view dialogs that need custom key handling
 		switch m.currentView {
-		case ViewInstances:
-			m, cmd = m.handleInstancesKeys(msg)
-		case ViewClusters:
-			m, cmd = m.handleClustersKeys(msg)
-		case ViewServices:
-			m, cmd = m.handleServicesKeys(msg)
-		case ViewTasks:
-			m, cmd = m.handleTasksKeys(msg)
-		case ViewTaskDescribe:
-			m, cmd = m.handleTaskDescribeKeys(msg)
-		case ViewLogs:
-			m, cmd = m.handleLogsKeys(msg)
 		case ViewHelp:
 			m, cmd = m.handleHelpKeys(msg)
 		case ViewConfirmDialog:
 			m, cmd = m.handleConfirmDialogKeys(msg)
-		case ViewTaskDefinitionFamilies:
-			m, cmd = m.handleTaskDefinitionFamiliesKeys(msg)
-		case ViewTaskDefinitionRevisions:
-			m, cmd = m.handleTaskDefinitionRevisionsKeys(msg)
 		case ViewTaskDefinitionEditor:
 			m, cmd = m.handleTaskDefinitionEditorKeys(msg)
 		case ViewClusterCreate:

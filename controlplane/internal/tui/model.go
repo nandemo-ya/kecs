@@ -275,6 +275,9 @@ type Model struct {
 	updatingInProgress  bool
 	updatingServiceName string
 	updatingTaskDef     string
+
+	// Key bindings registry
+	keyBindings *KeyBindingsRegistry
 }
 
 // NewModel creates a new application model
@@ -292,6 +295,7 @@ func NewModel() Model {
 		apiClient:        api.NewMockClient(),
 		taskDefJSONCache: make(map[int]string),
 		spinner:          s,
+		keyBindings:      NewKeyBindingsRegistry(),
 	}
 }
 
@@ -310,6 +314,7 @@ func NewModelWithClient(client api.Client) Model {
 		apiClient:        client,
 		taskDefJSONCache: make(map[int]string),
 		spinner:          s,
+		keyBindings:      NewKeyBindingsRegistry(),
 	}
 }
 
