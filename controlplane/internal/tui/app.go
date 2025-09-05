@@ -1360,8 +1360,25 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 		m.selectedTask = ""
 	case "s":
-		m.currentView = ViewServices
-		m.selectedService = ""
+		// Stop selected task
+		if len(m.tasks) > 0 && m.taskCursor < len(m.tasks) {
+			task := m.tasks[m.taskCursor]
+			// Create stop task confirmation dialog
+			m.confirmDialog = StopTaskDialog(
+				task.ID,
+				func() error {
+					// This will be executed when user confirms
+					return nil
+				},
+				func() {
+					// This will be executed when user cancels
+				},
+			)
+			// Store the command to execute after confirmation
+			m.pendingCommand = m.stopTaskCmd(task.ARN)
+			m.previousView = m.currentView
+			m.currentView = ViewConfirmDialog
+		}
 	case "/":
 		m.searchMode = true
 		m.searchQuery = ""

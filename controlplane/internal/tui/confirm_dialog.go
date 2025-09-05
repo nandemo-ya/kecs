@@ -158,3 +158,10 @@ func StopInstanceDialog(instanceName string, onStop func() error, onCancel func(
 	message := fmt.Sprintf("Stop instance '%s'?\nAll running tasks will be terminated.", instanceName)
 	return NewConfirmDialog(title, message, onStop, onCancel)
 }
+
+// StopTaskDialog creates a confirmation dialog for stopping a task
+func StopTaskDialog(taskID string, onStop func() error, onCancel func()) *ConfirmDialog {
+	title := "Stop Task"
+	message := fmt.Sprintf("Are you sure you want to stop task '%s'?", taskID)
+	return NewConfirmDialog(title, message, onStop, onCancel)
+}

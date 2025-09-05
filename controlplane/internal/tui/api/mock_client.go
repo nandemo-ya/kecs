@@ -482,8 +482,9 @@ func (c *MockClient) RunTask(ctx context.Context, instanceName, clusterName stri
 	return &task, nil
 }
 
-func (c *MockClient) StopTask(ctx context.Context, instanceName, clusterName, taskArn string) error {
-	// Mock implementation
+func (c *MockClient) StopTask(ctx context.Context, instanceName, clusterName, taskArn string, reason string) error {
+	// Mock implementation - simulate stopping a task
+	// In a real scenario, this would find the task and update its status
 	return nil
 }
 
