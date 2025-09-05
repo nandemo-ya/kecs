@@ -2,8 +2,6 @@ package tui
 
 import (
 	"context"
-	"log"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -75,15 +73,6 @@ func (m Model) executeServiceUpdate() (Model, tea.Cmd) {
 	d := m.serviceUpdateDialog
 	newTaskDef := d.GetSelectedTaskDef()
 	serviceName := d.serviceName
-
-	// Log to file for debugging (optional)
-	if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
-		if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			logger := log.New(f, "", log.LstdFlags)
-			logger.Printf("Updating service: %s to task def: %s\n", serviceName, newTaskDef)
-			f.Close()
-		}
-	}
 
 	// Close dialog and show progress
 	m.serviceUpdateDialog = nil
@@ -202,16 +191,6 @@ type TaskDefinitionsFetchedMsg struct {
 // updateService creates a command to update the service
 func (m Model) updateService(serviceName string, taskDef string) tea.Cmd {
 	return func() tea.Msg {
-		// Log to file for debugging (optional)
-		if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
-			if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				logger := log.New(f, "", log.LstdFlags)
-				logger.Printf("API Call: UpdateService - instance: %s, cluster: %s, service: %s, taskDef: %s\n",
-					m.selectedInstance, m.selectedCluster, serviceName, taskDef)
-				f.Close()
-			}
-		}
-
 		// Call UpdateService API
 		err := m.apiClient.UpdateServiceTaskDefinition(
 			m.selectedInstance,

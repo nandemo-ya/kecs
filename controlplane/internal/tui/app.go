@@ -3,8 +3,6 @@ package tui
 import (
 	"fmt"
 	"io"
-	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -158,34 +156,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case TaskDefinitionsFetchedMsg:
 		// Handle fetched task definitions and open dialog
-		if msg.Error != nil {
-			// Still show dialog with fallback data if there was an error
-			if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
-				if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-					logger := log.New(f, "", log.LstdFlags)
-					logger.Printf("Error fetching task definitions: %v\n", msg.Error)
-					f.Close()
-				}
-			}
-		}
+		// Show dialog even if there was an error (with fallback data)
 		m.serviceUpdateDialog = NewServiceUpdateDialog(msg.ServiceName, msg.CurrentTaskDef, msg.TaskDefs)
 		return m, nil
 	case ServiceUpdatedMsg:
 		// Handle service update completion
 		m.updatingInProgress = false
-
-		// Log the result for debugging
-		if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
-			if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				logger := log.New(f, "", log.LstdFlags)
-				if msg.Success {
-					logger.Printf("Service updated successfully: %s to %s\n", msg.ServiceName, msg.TaskDef)
-				} else {
-					logger.Printf("Service update failed: %v\n", msg.Error)
-				}
-				f.Close()
-			}
-		}
 
 		if msg.Success {
 			// Refresh services to show updated task definition
@@ -198,19 +174,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ServiceScaledMsg:
 		// Handle service scaling completion
 		m.scalingInProgress = false
-
-		// Log the result for debugging
-		if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
-			if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				logger := log.New(f, "", log.LstdFlags)
-				if msg.Success {
-					logger.Printf("Service scaled successfully: %s to %d\n", msg.ServiceName, msg.DesiredCount)
-				} else {
-					logger.Printf("Service scaling failed: %v\n", msg.Error)
-				}
-				f.Close()
-			}
-		}
 
 		if msg.Success {
 			// Refresh services to show updated count

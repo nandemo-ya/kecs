@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"log"
-	"os"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -73,15 +71,6 @@ func (m Model) executeServiceScale() (Model, tea.Cmd) {
 	desiredCount := d.GetDesiredCount()
 	serviceName := d.serviceName
 
-	// Log to file for debugging (optional)
-	if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
-		if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			logger := log.New(f, "", log.LstdFlags)
-			logger.Printf("Scaling service: %s to %d\n", serviceName, desiredCount)
-			f.Close()
-		}
-	}
-
 	// Close dialog and show progress
 	m.serviceScaleDialog = nil
 	m.scalingInProgress = true
@@ -109,16 +98,6 @@ func (m Model) executeServiceScale() (Model, tea.Cmd) {
 // scaleService creates a command to scale the service
 func (m Model) scaleService(serviceNameOrArn string, serviceName string, desiredCount int) tea.Cmd {
 	return func() tea.Msg {
-		// Log to file for debugging (optional)
-		if logFile := os.Getenv("KECS_TUI_DEBUG_LOG"); logFile != "" {
-			if f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				logger := log.New(f, "", log.LstdFlags)
-				logger.Printf("API Call: UpdateServiceDesiredCount - instance: %s, cluster: %s, service: %s, desired: %d\n",
-					m.selectedInstance, m.selectedCluster, serviceName, desiredCount)
-				f.Close()
-			}
-		}
-
 		// Call UpdateService API
 		err := m.apiClient.UpdateServiceDesiredCount(
 			m.selectedInstance,
