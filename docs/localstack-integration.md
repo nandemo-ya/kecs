@@ -233,18 +233,27 @@ iam.create_role(
 )
 ```
 
-## Manual LocalStack Deployment
+## LocalStack Deployment
 
-If you need to deploy LocalStack manually:
+LocalStack is automatically deployed when you create a KECS instance with LocalStack enabled:
 
 ```bash
-# Apply Kubernetes manifests
-kubectl apply -f deployments/kubernetes/localstack/
+# Start KECS with LocalStack enabled (default)
+kecs start
 
-# Check deployment
-kubectl -n kecs-system get pods
-kubectl -n kecs-system get svc
+# Or explicitly enable LocalStack
+kecs start --localstack
+
+# Check LocalStack deployment
+kubectl -n kecs-system get pods -l app=localstack
+kubectl -n kecs-system get svc localstack
 ```
+
+The KECS CLI automatically handles:
+- LocalStack container deployment
+- Service configuration
+- Persistent volume setup
+- Network configuration
 
 ## Troubleshooting
 
