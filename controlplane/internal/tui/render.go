@@ -95,70 +95,60 @@ func (m Model) getHeaderShortcuts() string {
 
 	switch m.currentView {
 	case ViewInstances:
+		// Show only the most important shortcuts in the header
 		shortcuts = []string{
-			keyStyle.Render("<N>") + sepStyle.Render(" New"),
+			keyStyle.Render("↵") + sepStyle.Render(" Select"),
+			keyStyle.Render("n") + sepStyle.Render(" New"),
+			keyStyle.Render("s") + sepStyle.Render(" Start/Stop"),
+			keyStyle.Render("?") + sepStyle.Render(" Help"),
 		}
-		if m.selectedInstance != "" {
-			shortcuts = append(shortcuts, keyStyle.Render("<t>")+sepStyle.Render(" TaskDefs"))
-		}
-		shortcuts = append(shortcuts,
-			keyStyle.Render("<:>")+sepStyle.Render(" Cmd"),
-			keyStyle.Render("</>")+sepStyle.Render(" Search"),
-			keyStyle.Render("<?>")+sepStyle.Render(" Help"),
-		)
 	case ViewClusters:
 		shortcuts = []string{
-			keyStyle.Render("<↵>") + sepStyle.Render(" Select"),
-			keyStyle.Render("<n>") + sepStyle.Render(" Create"),
-			keyStyle.Render("<T>") + sepStyle.Render(" Tasks"),
-			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
-			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
-			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
+			keyStyle.Render("↵") + sepStyle.Render(" Select"),
+			keyStyle.Render("n") + sepStyle.Render(" Create"),
+			keyStyle.Render("T") + sepStyle.Render(" Tasks"),
+			keyStyle.Render("ESC") + sepStyle.Render(" Back"),
+			keyStyle.Render("?") + sepStyle.Render(" Help"),
 		}
 	case ViewServices:
 		shortcuts = []string{
-			keyStyle.Render("<s>") + sepStyle.Render(" Scale"),
-			keyStyle.Render("<u>") + sepStyle.Render(" Update"),
-			keyStyle.Render("<r>") + sepStyle.Render(" Refresh"),
-			keyStyle.Render("<l>") + sepStyle.Render(" Logs"),
-			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
+			keyStyle.Render("s") + sepStyle.Render(" Scale"),
+			keyStyle.Render("u") + sepStyle.Render(" Update"),
+			keyStyle.Render("l") + sepStyle.Render(" Logs"),
+			keyStyle.Render("ESC") + sepStyle.Render(" Back"),
 		}
 	case ViewTasks:
 		shortcuts = []string{
-			keyStyle.Render("<↵>") + sepStyle.Render(" Describe"),
-			keyStyle.Render("<l>") + sepStyle.Render(" Logs"),
-			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
-			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
+			keyStyle.Render("↵") + sepStyle.Render(" Describe"),
+			keyStyle.Render("l") + sepStyle.Render(" Logs"),
+			keyStyle.Render("s") + sepStyle.Render(" Stop"),
+			keyStyle.Render("ESC") + sepStyle.Render(" Back"),
 		}
 	case ViewLogs:
 		shortcuts = []string{
-			keyStyle.Render("<f>") + sepStyle.Render(" Toggle View"),
-			keyStyle.Render("<s>") + sepStyle.Render(" Save"),
-			keyStyle.Render("<Esc>") + sepStyle.Render(" Back"),
+			keyStyle.Render("f") + sepStyle.Render(" Toggle"),
+			keyStyle.Render("s") + sepStyle.Render(" Save"),
+			keyStyle.Render("ESC") + sepStyle.Render(" Back"),
 		}
 	case ViewTaskDefinitionFamilies:
 		shortcuts = []string{
-			keyStyle.Render("<↵>") + sepStyle.Render(" Select"),
-			keyStyle.Render("<N>") + sepStyle.Render(" New"),
-			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
-			keyStyle.Render("</>") + sepStyle.Render(" Search"),
+			keyStyle.Render("↵") + sepStyle.Render(" Select"),
+			keyStyle.Render("N") + sepStyle.Render(" New"),
+			keyStyle.Render("C") + sepStyle.Render(" Copy"),
+			keyStyle.Render("ESC") + sepStyle.Render(" Back"),
 		}
 	case ViewTaskDefinitionRevisions:
 		shortcuts = []string{
-			keyStyle.Render("<↵>") + sepStyle.Render(" JSON"),
-			keyStyle.Render("<e>") + sepStyle.Render(" Edit"),
-			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
-		}
-		if m.showTaskDefJSON {
-			shortcuts = append(shortcuts,
-				keyStyle.Render("<^U/^D>")+sepStyle.Render(" Scroll"),
-			)
+			keyStyle.Render("↵") + sepStyle.Render(" JSON"),
+			keyStyle.Render("e") + sepStyle.Render(" Edit"),
+			keyStyle.Render("y") + sepStyle.Render(" Yank"),
+			keyStyle.Render("ESC") + sepStyle.Render(" Back"),
 		}
 	default:
 		shortcuts = []string{
-			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
-			keyStyle.Render("</>") + sepStyle.Render(" Search"),
-			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
+			keyStyle.Render(":") + sepStyle.Render(" Cmd"),
+			keyStyle.Render("/") + sepStyle.Render(" Search"),
+			keyStyle.Render("?") + sepStyle.Render(" Help"),
 		}
 	}
 
@@ -1343,22 +1333,35 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		var allShortcuts []string
 
 		// Add view-specific shortcuts first
-		for _, binding := range viewBindings {
-			if binding.Condition == nil || binding.Condition(m) {
-				keyStr := FormatKeyString(binding.Keys)
-				shortcut := fmt.Sprintf("%s %s",
-					keyStyle.Render(keyStr),
-					descStyle.Render(binding.Description))
-				allShortcuts = append(allShortcuts, shortcut)
-			}
-		}
+		if len(viewBindings) > 0 {
+			// Add section header
+			allShortcuts = append(allShortcuts, lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#f5c2e7")).
+				Bold(true).
+				Render("View Shortcuts"))
+			allShortcuts = append(allShortcuts, strings.Repeat("─", 20))
 
-		// Add separator if we have view shortcuts
-		if len(allShortcuts) > 0 {
+			for _, binding := range viewBindings {
+				if binding.Condition == nil || binding.Condition(m) {
+					keyStr := FormatKeyString(binding.Keys)
+					shortcut := fmt.Sprintf("%s %s",
+						keyStyle.Render(keyStr),
+						descStyle.Render(binding.Description))
+					allShortcuts = append(allShortcuts, shortcut)
+				}
+			}
+
+			// Add separator if we have view shortcuts
 			allShortcuts = append(allShortcuts, "")
 		}
 
 		// Add global shortcuts
+		allShortcuts = append(allShortcuts, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#f5c2e7")).
+			Bold(true).
+			Render("Global Shortcuts"))
+		allShortcuts = append(allShortcuts, strings.Repeat("─", 20))
+
 		for _, binding := range globalBindings {
 			keyStr := FormatKeyString(binding.Keys)
 			shortcut := fmt.Sprintf("%s %s",
@@ -1384,6 +1387,14 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 
 	// Left column: Screen-specific shortcuts
 	var leftShortcuts []string
+
+	// Add header for view shortcuts
+	leftShortcuts = append(leftShortcuts, lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#f5c2e7")).
+		Bold(true).
+		Render("View Shortcuts"))
+	leftShortcuts = append(leftShortcuts, strings.Repeat("─", halfWidth-2))
+
 	for _, binding := range viewBindings {
 		if binding.Condition == nil || binding.Condition(m) {
 			keyStr := FormatKeyString(binding.Keys)
@@ -1404,11 +1415,20 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 
 	// Right column: Global shortcuts
 	var rightShortcuts []string
+
+	// Add header for global shortcuts
+	rightShortcuts = append(rightShortcuts, lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#f5c2e7")).
+		Bold(true).
+		Render("Global Shortcuts"))
+	rightShortcuts = append(rightShortcuts, strings.Repeat("─", halfWidth-2))
+
 	for _, binding := range globalBindings {
 		keyStr := FormatKeyString(binding.Keys)
-		rightShortcuts = append(rightShortcuts,
-			keyStyle.Render(keyStr)+" "+descStyle.Render(binding.Description),
-		)
+		shortcut := fmt.Sprintf("%s %s",
+			keyStyle.Render(keyStr),
+			descStyle.Render(binding.Description))
+		rightShortcuts = append(rightShortcuts, shortcut)
 	}
 
 	// Create left column with screen-specific shortcuts
