@@ -1632,10 +1632,11 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 			// Create API options
 			opts := api.CreateInstanceOptions{
-				Name:       formData["instanceName"].(string),
-				APIPort:    formData["apiPort"].(int),
-				AdminPort:  formData["adminPort"].(int),
-				LocalStack: formData["localStack"].(bool),
+				Name:               formData["instanceName"].(string),
+				APIPort:            formData["apiPort"].(int),
+				AdminPort:          formData["adminPort"].(int),
+				LocalStack:         formData["localStack"].(bool),
+				AdditionalServices: formData["additionalServices"].(string),
 			}
 
 			// Initialize creation steps
@@ -1683,10 +1684,11 @@ func (m Model) handleInstanceCreateInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 			// Create API options
 			opts := api.CreateInstanceOptions{
-				Name:       formData["instanceName"].(string),
-				APIPort:    formData["apiPort"].(int),
-				AdminPort:  formData["adminPort"].(int),
-				LocalStack: formData["localStack"].(bool),
+				Name:               formData["instanceName"].(string),
+				APIPort:            formData["apiPort"].(int),
+				AdminPort:          formData["adminPort"].(int),
+				LocalStack:         formData["localStack"].(bool),
+				AdditionalServices: formData["additionalServices"].(string),
 			}
 
 			// Initialize creation steps

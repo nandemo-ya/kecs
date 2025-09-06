@@ -14,6 +14,7 @@ type FormField int
 const (
 	FieldInstanceCloseButton FormField = iota // × button at top-right
 	FieldInstanceName
+	FieldAdditionalServices
 	FieldSubmit
 	FieldCancel
 )
@@ -27,7 +28,8 @@ type CreationStep struct {
 // InstanceForm represents the instance creation form state
 type InstanceForm struct {
 	// Form fields
-	instanceName string
+	instanceName       string
+	additionalServices string
 
 	// UI state
 	focusedField FormField
@@ -43,7 +45,8 @@ type InstanceForm struct {
 	elapsedTime       string    // Time elapsed as string
 
 	// Validation state
-	nameError string
+	nameError     string
+	servicesError string
 }
 
 // NewInstanceForm creates a new instance form with defaults
@@ -52,8 +55,9 @@ func NewInstanceForm() *InstanceForm {
 	defaultName, _ := utils.GenerateRandomName()
 
 	return &InstanceForm{
-		instanceName: defaultName,
-		focusedField: FieldInstanceName, // Start with instance name field, not close button
+		instanceName:       defaultName,
+		additionalServices: "",
+		focusedField:       FieldInstanceName, // Start with instance name field, not close button
 	}
 }
 
@@ -63,8 +67,9 @@ func NewInstanceFormWithSuggestions(instances []Instance) *InstanceForm {
 	defaultName, _ := utils.GenerateRandomName()
 
 	return &InstanceForm{
-		instanceName: defaultName,
-		focusedField: FieldInstanceName, // Start with instance name field, not close button
+		instanceName:       defaultName,
+		additionalServices: "",
+		focusedField:       FieldInstanceName, // Start with instance name field, not close button
 	}
 }
 
@@ -124,6 +129,10 @@ func (f *InstanceForm) RemoveLastChar() {
 		if len(f.instanceName) > 0 {
 			f.instanceName = f.instanceName[:len(f.instanceName)-1]
 		}
+	case FieldAdditionalServices:
+		if len(f.additionalServices) > 0 {
+			f.additionalServices = f.additionalServices[:len(f.additionalServices)-1]
+		}
 	}
 }
 
@@ -141,6 +150,20 @@ func (f *InstanceForm) Validate() bool {
 		valid = false
 	}
 
+	// Validate additional services (optional)
+	if f.additionalServices != "" {
+		// Simple validation: check for basic format
+		services := strings.Split(f.additionalServices, ",")
+		for _, service := range services {
+			service = strings.TrimSpace(service)
+			if service != "" && !isValidServiceName(service) {
+				f.servicesError = "Invalid service name: " + service
+				valid = false
+				break
+			}
+		}
+	}
+
 	// Ports are now automatically allocated, no validation needed
 
 	return valid
@@ -150,10 +173,11 @@ func (f *InstanceForm) Validate() bool {
 func (f *InstanceForm) GetFormData() map[string]interface{} {
 	// Ports will be automatically allocated
 	return map[string]interface{}{
-		"instanceName": f.instanceName,
-		"apiPort":      0,    // 0 means auto-allocate
-		"adminPort":    0,    // 0 means auto-allocate
-		"localStack":   true, // Always enabled
+		"instanceName":       f.instanceName,
+		"apiPort":            0,    // 0 means auto-allocate
+		"adminPort":          0,    // 0 means auto-allocate
+		"localStack":         true, // Always enabled
+		"additionalServices": f.additionalServices,
 	}
 }
 
@@ -183,6 +207,7 @@ func (f *InstanceForm) CreateMockInstance() (*Instance, error) {
 // clearValidationErrors clears all validation errors
 func (f *InstanceForm) clearValidationErrors() {
 	f.nameError = ""
+	f.servicesError = ""
 }
 
 // GetCurrentFieldValue returns the value of the currently focused field
@@ -190,7 +215,24 @@ func (f *InstanceForm) GetCurrentFieldValue() string {
 	switch f.focusedField {
 	case FieldInstanceName:
 		return f.instanceName
+	case FieldAdditionalServices:
+		return f.additionalServices
 	default:
 		return ""
 	}
+}
+
+// isValidServiceName checks if a service name is valid
+func isValidServiceName(service string) bool {
+	// Allow alphanumeric characters, hyphens, and underscores
+	// This is a basic validation - LocalStack will do more thorough validation
+	if len(service) == 0 || len(service) > 50 {
+		return false
+	}
+	for _, ch := range service {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_') {
+			return false
+		}
+	}
+	return true
 }

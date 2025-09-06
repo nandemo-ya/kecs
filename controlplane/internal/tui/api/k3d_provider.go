@@ -182,10 +182,10 @@ func (p *K3dInstanceProvider) getContainerInfo(ctx context.Context, containerNam
 func (p *K3dInstanceProvider) CreateInstance(ctx context.Context, opts CreateInstanceOptions) (*Instance, error) {
 	// Convert TUI options to instance.StartOptions
 	startOpts := instance.StartOptions{
-		InstanceName: opts.Name,
-		ApiPort:      opts.APIPort,
-		AdminPort:    opts.AdminPort,
-		NoLocalStack: !opts.LocalStack,
+		InstanceName:                 opts.Name,
+		ApiPort:                      opts.APIPort,
+		AdminPort:                    opts.AdminPort,
+		AdditionalLocalStackServices: opts.AdditionalServices,
 	}
 
 	// Use the instance manager to start the instance

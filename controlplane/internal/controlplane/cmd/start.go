@@ -38,13 +38,13 @@ const (
 )
 
 var (
-	startInstanceName string
-	startDataDir      string
-	startApiPort      int
-	startAdminPort    int
-	startConfigFile   string
-	startNoLocalStack bool
-	startTimeout      time.Duration
+	startInstanceName            string
+	startDataDir                 string
+	startApiPort                 int
+	startAdminPort               int
+	startConfigFile              string
+	startAdditionalLocalServices string
+	startTimeout                 time.Duration
 )
 
 var startCmd = &cobra.Command{
@@ -63,7 +63,7 @@ func init() {
 	startCmd.Flags().IntVar(&startApiPort, "api-port", 5373, "AWS API port")
 	startCmd.Flags().IntVar(&startAdminPort, "admin-port", 5374, "Admin API port")
 	startCmd.Flags().StringVar(&startConfigFile, "config", "", "Configuration file path")
-	startCmd.Flags().BoolVar(&startNoLocalStack, "no-localstack", false, "Disable LocalStack deployment")
+	startCmd.Flags().StringVar(&startAdditionalLocalServices, "additional-localstack-services", "", "Additional LocalStack services (comma-separated, e.g., s3,dynamodb,sqs)")
 	startCmd.Flags().DurationVar(&startTimeout, "timeout", 10*time.Minute, "Timeout for cluster creation")
 }
 
@@ -96,12 +96,12 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	// Set up start options
 	opts := instance.StartOptions{
-		InstanceName: startInstanceName,
-		DataDir:      startDataDir,
-		ConfigFile:   startConfigFile,
-		NoLocalStack: startNoLocalStack,
-		ApiPort:      startApiPort,
-		AdminPort:    startAdminPort,
+		InstanceName:                 startInstanceName,
+		DataDir:                      startDataDir,
+		ConfigFile:                   startConfigFile,
+		AdditionalLocalStackServices: startAdditionalLocalServices,
+		ApiPort:                      startApiPort,
+		AdminPort:                    startAdminPort,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), startTimeout)
