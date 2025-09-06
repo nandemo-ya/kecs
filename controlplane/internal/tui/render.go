@@ -435,7 +435,7 @@ func (m Model) renderNavigationPanel() string {
 		)
 
 		// Right column: shortcuts (adaptive layout)
-		rightColumn := m.renderShortcutsColumn(rightColumnWidth, navHeight-4)
+		rightColumn := m.renderShortcutsColumn(rightColumnWidth)
 
 		// Join columns horizontally
 		navContent = lipgloss.JoinHorizontal(
@@ -1312,7 +1312,7 @@ func (m Model) renderTasksList(maxHeight int) string {
 }
 
 // renderShortcutsColumn renders the shortcuts column for the navigation panel
-func (m Model) renderShortcutsColumn(width, height int) string {
+func (m Model) renderShortcutsColumn(width int) string {
 	// Style for k9s-like shortcuts
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true)
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9399b2"))
@@ -1379,7 +1379,8 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		}
 
 		content := strings.Join(allShortcuts, "\n")
-		return columnStyle.Height(height).Render(content)
+		// Don't restrict height, let it flow naturally
+		return columnStyle.Render(content)
 	}
 
 	// For wider columns, use two-column layout
@@ -1451,7 +1452,8 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		rightColumn,
 	)
 
-	return columnStyle.Height(height).Render(columnsContent)
+	// Don't restrict height, let it flow naturally
+	return columnStyle.Render(columnsContent)
 }
 
 // renderShortcutsInline renders shortcuts in a compact inline format for narrow terminals
