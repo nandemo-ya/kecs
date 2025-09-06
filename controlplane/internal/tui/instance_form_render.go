@@ -114,6 +114,18 @@ func (m Model) renderInstanceForm() string {
 	}
 	content = append(content, "")
 
+	// Additional LocalStack Services field
+	servicesLabel := formLabelStyle.Render("Additional LocalStack Services:")
+	content = append(content, servicesLabel)
+	servicesInput := m.renderFormInput(f.additionalServices, f.focusedField == FieldAdditionalServices)
+	content = append(content, servicesInput)
+	content = append(content, formHelpStyle.Render("  (optional, comma-separated: e.g., s3,dynamodb,sqs)"))
+	content = append(content, formHelpStyle.Render("  Required services (iam, logs, ssm, secretsmanager) are always enabled"))
+	if f.servicesError != "" {
+		content = append(content, "  "+formErrorStyle.Render(f.servicesError))
+	}
+	content = append(content, "")
+
 	// Ports are automatically allocated
 	content = append(content, formLabelStyle.Render("Ports will be automatically allocated"))
 	content = append(content, formHelpStyle.Render("API Port: 5373 (or next available)"))

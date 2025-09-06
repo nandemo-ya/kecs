@@ -20,6 +20,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
@@ -29,12 +30,12 @@ import (
 
 // StartOptions contains options for starting a KECS instance
 type StartOptions struct {
-	InstanceName string
-	DataDir      string
-	ConfigFile   string
-	NoLocalStack bool
-	ApiPort      int
-	AdminPort    int
+	InstanceName                 string
+	DataDir                      string
+	ConfigFile                   string
+	AdditionalLocalStackServices string // Comma-separated list of additional LocalStack services
+	ApiPort                      int
+	AdminPort                    int
 }
 
 // CreationStatus represents the status of instance creation
@@ -153,9 +154,16 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Override with options
-	if opts.NoLocalStack {
-		cfg.LocalStack.Enabled = false
+	// LocalStack is always enabled
+	cfg.LocalStack.Enabled = true
+
+	// Add additional services if specified
+	if opts.AdditionalLocalStackServices != "" {
+		additionalServices := strings.Split(opts.AdditionalLocalStackServices, ",")
+		for i := range additionalServices {
+			additionalServices[i] = strings.TrimSpace(additionalServices[i])
+		}
+		cfg.LocalStack.Services = mergeLocalStackServices(cfg.LocalStack.Services, additionalServices)
 	}
 
 	// Set up data directory
@@ -432,7 +440,8 @@ func (m *Manager) Restart(ctx context.Context, instanceName string) error {
 		InstanceName: instanceName,
 		ApiPort:      savedConfig.APIPort,
 		AdminPort:    savedConfig.AdminPort,
-		NoLocalStack: !savedConfig.LocalStack,
+		// LocalStack is always enabled, no additional services for restart
+		AdditionalLocalStackServices: "",
 	}
 
 	// Use restartInstance to handle the restart
@@ -448,9 +457,16 @@ func (m *Manager) restartInstance(ctx context.Context, opts StartOptions) error 
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Override with options
-	if opts.NoLocalStack {
-		cfg.LocalStack.Enabled = false
+	// LocalStack is always enabled
+	cfg.LocalStack.Enabled = true
+
+	// Add additional services if specified
+	if opts.AdditionalLocalStackServices != "" {
+		additionalServices := strings.Split(opts.AdditionalLocalStackServices, ",")
+		for i := range additionalServices {
+			additionalServices[i] = strings.TrimSpace(additionalServices[i])
+		}
+		cfg.LocalStack.Services = mergeLocalStackServices(cfg.LocalStack.Services, additionalServices)
 	}
 
 	// Load saved instance config if available
@@ -660,4 +676,36 @@ func findAvailablePort(startPort int, usedPorts map[int]bool) int {
 	return startPort
 }
 
-// Helper functions will be implemented below...
+// mergeLocalStackServices merges required services with additional services
+func mergeLocalStackServices(baseServices []string, additionalServices []string) []string {
+	// Define required services that are always included
+	requiredServices := []string{"iam", "logs", "ssm", "secretsmanager"}
+
+	// Create a map to track unique services
+	serviceMap := make(map[string]bool)
+
+	// Add required services
+	for _, service := range requiredServices {
+		serviceMap[service] = true
+	}
+
+	// Add base services from configuration
+	for _, service := range baseServices {
+		serviceMap[service] = true
+	}
+
+	// Add additional services
+	for _, service := range additionalServices {
+		if service != "" {
+			serviceMap[service] = true
+		}
+	}
+
+	// Convert map back to slice
+	result := make([]string, 0, len(serviceMap))
+	for service := range serviceMap {
+		result = append(result, service)
+	}
+
+	return result
+}

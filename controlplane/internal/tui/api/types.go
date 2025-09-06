@@ -34,10 +34,11 @@ type Instance struct {
 
 // CreateInstanceOptions contains options for creating a new instance
 type CreateInstanceOptions struct {
-	Name       string `json:"name"`
-	APIPort    int    `json:"apiPort"`
-	AdminPort  int    `json:"adminPort"`
-	LocalStack bool   `json:"localStack"`
+	Name               string `json:"name"`
+	APIPort            int    `json:"apiPort"`
+	AdminPort          int    `json:"adminPort"`
+	LocalStack         bool   `json:"localStack"`
+	AdditionalServices string `json:"additionalServices,omitempty"`
 }
 
 // Cluster represents an ECS cluster

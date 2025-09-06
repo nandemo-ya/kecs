@@ -34,7 +34,8 @@ type InstanceConfig struct {
 	AdminPort int `yaml:"adminPort"`
 
 	// Feature toggles
-	LocalStack bool `yaml:"localStack"`
+	LocalStack                   bool   `yaml:"localStack"`
+	AdditionalLocalStackServices string `yaml:"additionalLocalStackServices,omitempty"`
 
 	// Data directory
 	DataDir string `yaml:"dataDir"`
@@ -55,12 +56,13 @@ func SaveInstanceConfig(instanceName string, opts StartOptions) error {
 
 	// Create config
 	config := InstanceConfig{
-		Name:       instanceName,
-		CreatedAt:  time.Now(),
-		APIPort:    opts.ApiPort,
-		AdminPort:  opts.AdminPort,
-		LocalStack: !opts.NoLocalStack,
-		DataDir:    opts.DataDir,
+		Name:                         instanceName,
+		CreatedAt:                    time.Now(),
+		APIPort:                      opts.ApiPort,
+		AdminPort:                    opts.AdminPort,
+		LocalStack:                   true, // LocalStack is always enabled
+		DataDir:                      opts.DataDir,
+		AdditionalLocalStackServices: opts.AdditionalLocalStackServices,
 	}
 
 	// If DataDir is empty, set default
