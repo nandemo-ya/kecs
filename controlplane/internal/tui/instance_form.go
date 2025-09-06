@@ -119,6 +119,9 @@ func (f *InstanceForm) UpdateField(value string) {
 	case FieldInstanceName:
 		f.instanceName = value
 		f.nameError = ""
+	case FieldAdditionalServices:
+		f.additionalServices = value
+		f.servicesError = ""
 	}
 }
 
