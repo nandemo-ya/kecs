@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: kecs-system
-  labels:
-    app.kubernetes.io/name: kecs-system
-    app.kubernetes.io/managed-by: kecs
-    app.kubernetes.io/component: localstack

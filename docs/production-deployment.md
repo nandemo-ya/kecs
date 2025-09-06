@@ -66,24 +66,26 @@ Key environment variables:
 
 ### Kubernetes Deployment
 
-1. Create namespace:
+**Note:** KECS is designed to be deployed using the `kecs` CLI tool which handles all Kubernetes resource creation automatically. Manual Kubernetes deployment is not recommended.
+
+For local development and testing:
 ```bash
-kubectl create namespace kecs-system
+# Download the KECS binary
+curl -sSL https://github.com/nandemo-ya/kecs/releases/latest/download/kecs-$(uname -s)-$(uname -m) -o kecs
+chmod +x kecs
+
+# Start KECS instance (creates k3d cluster automatically)
+./kecs start
+
+# Or use the TUI for interactive management
+./kecs tui
 ```
 
-2. Deploy KECS:
-```bash
-kubectl apply -f deployments/kubernetes/production/
-```
-
-3. Access the service:
-```bash
-# Port forward for local access
-kubectl port-forward -n kecs-system svc/kecs-controlplane 8080:80
-
-# Or use Ingress (configure domain in ingress.yaml first)
-kubectl apply -f deployments/kubernetes/production/ingress.yaml
-```
+The `kecs` command automatically:
+- Creates a k3d Kubernetes cluster
+- Deploys all necessary Kubernetes resources
+- Manages the control plane lifecycle
+- Handles storage and networking configuration
 
 ### Docker Compose Deployment
 
