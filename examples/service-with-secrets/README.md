@@ -55,9 +55,6 @@ kecs start
 
 # Wait for KECS and LocalStack to be ready
 kecs status
-
-# LocalStack is automatically available at port 4566
-# No need to manually start LocalStack
 ```
 
 ### 2. Create the ECS Cluster
