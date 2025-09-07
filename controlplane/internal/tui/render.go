@@ -446,6 +446,12 @@ func (m Model) renderNavigationPanel() string {
 	}
 
 	// Apply navigation panel style with fixed height
+	// Use minimum height to ensure shortcuts are visible
+	minHeight := 12 // Minimum height to show shortcuts
+	if navHeight-4 < minHeight {
+		navHeight = minHeight + 4
+	}
+
 	return navigationPanelStyle.
 		Width(m.width - 4). // Account for borders and padding
 		Height(navHeight - 4).
