@@ -1345,7 +1345,6 @@ func (m Model) renderShortcutsColumn(width int) string {
 				Foreground(lipgloss.Color("#f5c2e7")).
 				Bold(true).
 				Render("View Shortcuts"))
-			allShortcuts = append(allShortcuts, strings.Repeat("─", 20))
 
 			for _, binding := range viewBindings {
 				if binding.Condition == nil || binding.Condition(m) {
@@ -1366,7 +1365,6 @@ func (m Model) renderShortcutsColumn(width int) string {
 			Foreground(lipgloss.Color("#f5c2e7")).
 			Bold(true).
 			Render("Global Shortcuts"))
-		allShortcuts = append(allShortcuts, strings.Repeat("─", 20))
 
 		for _, binding := range globalBindings {
 			keyStr := FormatKeyString(binding.Keys)
@@ -1400,7 +1398,6 @@ func (m Model) renderShortcutsColumn(width int) string {
 		Foreground(lipgloss.Color("#f5c2e7")).
 		Bold(true).
 		Render("View Shortcuts"))
-	leftShortcuts = append(leftShortcuts, strings.Repeat("─", halfWidth-2))
 
 	for _, binding := range viewBindings {
 		if binding.Condition == nil || binding.Condition(m) {
@@ -1428,7 +1425,6 @@ func (m Model) renderShortcutsColumn(width int) string {
 		Foreground(lipgloss.Color("#f5c2e7")).
 		Bold(true).
 		Render("Global Shortcuts"))
-	rightShortcuts = append(rightShortcuts, strings.Repeat("─", halfWidth-2))
 
 	for _, binding := range globalBindings {
 		keyStr := FormatKeyString(binding.Keys)
