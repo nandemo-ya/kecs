@@ -541,7 +541,7 @@ func (c *MockClient) ListTaskDefinitionRevisions(ctx context.Context, instanceNa
 }
 
 func (c *MockClient) DescribeTaskDefinition(ctx context.Context, instanceName string, taskDefArn string) (*TaskDefinition, error) {
-	// Mock implementation - return sample task definition
+	// Mock implementation - return sample task definition with comprehensive container details
 	return &TaskDefinition{
 		TaskDefinitionArn: taskDefArn,
 		Family:            "nginx-app",
@@ -561,7 +561,50 @@ func (c *MockClient) DescribeTaskDefinition(ctx context.Context, instanceName st
 				Essential: true,
 				Environment: []KeyValuePair{
 					{Name: "ENV", Value: "production"},
+					{Name: "APP_NAME", Value: "nginx-server"},
+					{Name: "LOG_LEVEL", Value: "info"},
 				},
+				MountPoints: []MountPoint{
+					{
+						SourceVolume:  "nginx-config",
+						ContainerPath: "/etc/nginx/conf.d",
+						ReadOnly:      true,
+					},
+					{
+						SourceVolume:  "app-data",
+						ContainerPath: "/var/www/html",
+						ReadOnly:      false,
+					},
+				},
+				HealthCheck: &HealthCheck{
+					Command:     []string{"CMD-SHELL", "curl -f http://localhost/health || exit 1"},
+					Interval:    30,
+					Timeout:     5,
+					Retries:     3,
+					StartPeriod: 60,
+				},
+				LogConfiguration: &LogConfiguration{
+					LogDriver: "awslogs",
+					Options: map[string]string{
+						"awslogs-group":         "/ecs/nginx-app",
+						"awslogs-region":        "us-east-1",
+						"awslogs-stream-prefix": "nginx",
+					},
+				},
+				Secrets: []Secret{
+					{
+						Name:      "DB_PASSWORD",
+						ValueFrom: "arn:aws:secretsmanager:us-east-1:000000000000:secret:db-password-xyz123",
+					},
+					{
+						Name:      "API_KEY",
+						ValueFrom: "arn:aws:ssm:us-east-1:000000000000:parameter/api-key",
+					},
+				},
+				Command:          []string{"nginx", "-g", "daemon off;"},
+				EntryPoint:       []string{"/docker-entrypoint.sh"},
+				WorkingDirectory: "/usr/share/nginx/html",
+				User:             "nginx:nginx",
 			},
 		},
 		RequiresCompatibilities: []string{"EC2", "FARGATE"},
