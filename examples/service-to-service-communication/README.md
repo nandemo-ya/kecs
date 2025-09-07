@@ -354,10 +354,7 @@ aws ecs update-service \
 
 With Route53 integration, services can communicate across different KECS clusters:
 
-1. Enable Route53 integration:
-   ```bash
-   export LOCALSTACK_ENDPOINT=http://localhost:4566
-   ```
+1. KECS includes Route53 integration automatically
 
 2. Services in different clusters can use the same namespace for discovery
 

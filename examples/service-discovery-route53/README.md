@@ -11,13 +11,12 @@ This example demonstrates how to use KECS Service Discovery with Route53 integra
 ### 1. Start KECS with Route53 Integration
 
 ```bash
-# Set environment variables for LocalStack access
-export LOCALSTACK_ENDPOINT=http://localhost:4566
+# Set environment variables
 export AWS_ACCESS_KEY_ID=test
 export AWS_SECRET_ACCESS_KEY=test
 export AWS_REGION=us-east-1
 
-# Start KECS (LocalStack is automatically started with Route53 support)
+# Start KECS (includes Route53 support)
 kecs start --name discovery-demo
 ```
 
@@ -101,18 +100,17 @@ dig SRV _http._tcp.backend.production.local
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `LOCALSTACK_ENDPOINT` | LocalStack endpoint URL | - |
-| `AWS_ENDPOINT_URL` | Alternative endpoint setting | - |
-| `AWS_ACCESS_KEY_ID` | AWS access key (test for LocalStack) | - |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key (test for LocalStack) | - |
+| `AWS_ENDPOINT_URL` | KECS endpoint URL | http://localhost:5373 |
+| `AWS_ACCESS_KEY_ID` | AWS access key | test |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key | test |
 | `AWS_REGION` | AWS region | us-east-1 |
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                 LocalStack                       │
-│                 Route53 Service                  │
+│              KECS with Route53                   │
+│            (Integrated Service)                  │
 └────────────────────┬────────────────────────────┘
                      │
     ┌────────────────┴────────────────┐
@@ -134,9 +132,9 @@ dig SRV _http._tcp.backend.production.local
 
 ### Route53 Not Working
 
-1. Check LocalStack is running:
+1. Check KECS is running:
    ```bash
-   curl http://localhost:4566/_localstack/health
+   kecs status
    ```
 
 2. Verify environment variables are set
@@ -150,9 +148,9 @@ dig SRV _http._tcp.backend.production.local
 
 ### Cross-Cluster Discovery Fails
 
-1. Ensure both clusters use the same LocalStack instance
+1. Ensure both clusters are properly configured
 2. Verify namespaces are created in both clusters
 3. Check Route53 hosted zones:
    ```bash
-   aws route53 list-hosted-zones --endpoint-url http://localhost:4566
+   aws route53 list-hosted-zones --endpoint-url http://localhost:5373
    ```

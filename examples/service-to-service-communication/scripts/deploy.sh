@@ -9,8 +9,7 @@ set -e
 CLUSTER_NAME="default"
 NAMESPACE_NAME="production.local"
 VPC_ID="vpc-default"
-KECS_ENDPOINT=${KECS_ENDPOINT:-"http://localhost:8080"}
-LOCALSTACK_ENDPOINT=${LOCALSTACK_ENDPOINT:-"http://localhost:4566"}
+KECS_ENDPOINT=${KECS_ENDPOINT:-"http://localhost:5373"}
 
 # Colors for output
 RED='\033[0;31m'

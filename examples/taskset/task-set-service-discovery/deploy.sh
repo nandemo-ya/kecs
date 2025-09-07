@@ -9,7 +9,7 @@ echo
 CLUSTER_NAME=${CLUSTER_NAME:-default}
 SERVICE_NAME="webapp-sd-service"
 TASKSET_ID="ts-sd-$(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)"
-ENDPOINT=${KECS_ENDPOINT:-http://localhost:8080}
+ENDPOINT=${KECS_ENDPOINT:-http://localhost:5373}
 
 # Step 1: Register task definition
 echo "1. Registering task definition..."

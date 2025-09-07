@@ -155,18 +155,15 @@ kubectl port-forward -n default <pod-name> 8080:80
 kubectl exec -it -n default <pod-name> -c <container-name> -- sh
 ```
 
-### Working with LocalStack
+### Working with KECS
 
-KECS automatically starts LocalStack when you create an instance, providing support for additional AWS services like Secrets Manager, SSM Parameter Store, IAM, and ELBv2.
+KECS automatically includes LocalStack support when you create an instance, providing integrated support for additional AWS services like Secrets Manager, SSM Parameter Store, IAM, and ELBv2.
 
 ```bash
-# LocalStack is automatically available at port 4566 after KECS instance creation
-# No need to manually start LocalStack
-
-# Use different endpoints for different services
-aws ecs create-cluster --endpoint-url http://localhost:8080      # KECS for ECS (API port)
-aws secretsmanager create-secret --endpoint-url http://localhost:4566  # LocalStack for Secrets
-aws ssm put-parameter --endpoint-url http://localhost:4566       # LocalStack for Parameter Store
+# All AWS services are available through KECS endpoint
+aws ecs create-cluster --endpoint-url http://localhost:5373
+aws secretsmanager create-secret --endpoint-url http://localhost:5373
+aws ssm put-parameter --endpoint-url http://localhost:5373
 ```
 
 ## Advanced Usage

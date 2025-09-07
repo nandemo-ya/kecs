@@ -42,15 +42,8 @@ This example demonstrates how to securely inject secrets from AWS Secrets Manage
 
 ## Prerequisites
 
-1. KECS running locally (port 8080)
-2. LocalStack (for Secrets Manager and SSM, port 4566)
-3. AWS CLI configured
-
-### Endpoint URLs
-
-This example uses two different endpoints:
-- **KECS (http://localhost:4566)**: For ECS APIs (clusters, services, tasks)
-- **LocalStack (http://localhost:4566)**: For AWS services (Secrets Manager, SSM, IAM)
+1. KECS running locally
+2. AWS CLI configured
 
 ## Setup Instructions
 
@@ -71,7 +64,7 @@ kecs status
 
 ```bash
 aws ecs create-cluster --cluster-name default \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 3. Create SSM Parameters
@@ -83,7 +76,7 @@ aws ssm put-parameter \
   --value "postgresql://app_user:password@db.example.com:5432/myapp" \
   --type "SecureString" \
   --description "Production database connection string" \
-  --endpoint-url http://localhost:4566  # LocalStack for SSM
+  --endpoint-url http://localhost:5373
 
 # API Key
 aws ssm put-parameter \
@@ -91,7 +84,7 @@ aws ssm put-parameter \
   --value "sk_live_abcdef123456789" \
   --type "SecureString" \
   --description "Production API key" \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Feature Flags
 aws ssm put-parameter \
@@ -99,11 +92,11 @@ aws ssm put-parameter \
   --value '{"new_ui": true, "beta_features": false, "maintenance_mode": false}' \
   --type "String" \
   --description "Feature flags configuration" \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Verify parameters
 aws ssm describe-parameters \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query "Parameters[*].[Name,Type,Description]" \
   --output table
 ```
@@ -116,25 +109,25 @@ aws secretsmanager create-secret \
   --name "myapp/prod/db" \
   --description "Production database password" \
   --secret-string '{"password": "super-secret-db-password"}' \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # JWT signing secret
 aws secretsmanager create-secret \
   --name "myapp/prod/jwt" \
   --description "JWT signing secret" \
   --secret-string '{"secret": "jwt-signing-secret-key-here"}' \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Encryption key
 aws secretsmanager create-secret \
   --name "myapp/prod/encryption" \
   --description "Data encryption key" \
   --secret-string '{"key": "AES256-encryption-key-32-bytes!!"}' \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # List secrets
 aws secretsmanager list-secrets \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query "SecretList[*].[Name,Description]" \
   --output table
 ```
@@ -179,14 +172,14 @@ aws iam create-policy \
       }
     ]
   }' \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Attach policies to execution role
 # Note: ecsTaskExecutionRole is auto-created by KECS, we just need to attach additional policies
 aws iam attach-role-policy \
   --role-name ecsTaskExecutionRole \
   --policy-arn arn:aws:iam::000000000000:policy/ECSSecretsPolicy \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Create Task Role
 aws iam create-role \
@@ -199,7 +192,7 @@ aws iam create-role \
       "Action": "sts:AssumeRole"
     }]
   }' \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 6. Create CloudWatch Log Group
@@ -207,7 +200,7 @@ aws iam create-role \
 ```bash
 aws logs create-log-group \
   --log-group-name /ecs/service-with-secrets \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ## Deployment
@@ -218,12 +211,12 @@ aws logs create-log-group \
 # Register task definition
 aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Create service
 aws ecs create-service \
   --cli-input-json file://service_def.json \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ## Verification
@@ -235,7 +228,7 @@ aws ecs create-service \
 aws ecs describe-services \
   --cluster default \
   --services service-with-secrets \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'services[0].{Status:status,Desired:desiredCount,Running:runningCount}'
 ```
 
@@ -298,13 +291,13 @@ aws ssm put-parameter \
   --value "sk_live_new_key_987654321" \
   --type "SecureString" \
   --overwrite \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Update a secret in Secrets Manager
 aws secretsmanager update-secret \
   --secret-id "myapp/prod/jwt" \
   --secret-string '{"secret": "new-jwt-signing-secret-key"}' \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Force service update to pick up new secrets
 aws ecs update-service \
@@ -342,7 +335,7 @@ aws ecs wait services-stable \
 
 ```bash
 aws logs tail /ecs/service-with-secrets \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --follow
 ```
 
@@ -353,12 +346,12 @@ aws logs tail /ecs/service-with-secrets \
 aws sts assume-role \
   --role-arn arn:aws:iam::000000000000:role/ecsTaskExecutionRole \
   --role-session-name test-session \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # List attached policies
 aws iam list-attached-role-policies \
   --role-name ecsTaskExecutionRole \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### Debug Secret Access
@@ -367,13 +360,13 @@ aws iam list-attached-role-policies \
 # Check if secrets exist
 aws secretsmanager describe-secret \
   --secret-id "myapp/prod/db" \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Check if parameters exist
 aws ssm get-parameter \
   --name "/myapp/prod/database_url" \
   --with-decryption \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ## Cleanup
@@ -384,56 +377,56 @@ aws ecs delete-service \
   --cluster default \
   --service service-with-secrets \
   --force \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Delete secrets
 aws secretsmanager delete-secret \
   --secret-id "myapp/prod/db" \
   --force-delete-without-recovery \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 aws secretsmanager delete-secret \
   --secret-id "myapp/prod/jwt" \
   --force-delete-without-recovery \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 aws secretsmanager delete-secret \
   --secret-id "myapp/prod/encryption" \
   --force-delete-without-recovery \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Delete SSM parameters
 aws ssm delete-parameter \
   --name "/myapp/prod/database_url" \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 aws ssm delete-parameter \
   --name "/myapp/prod/api_key" \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 aws ssm delete-parameter \
   --name "/myapp/prod/feature_flags" \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Delete IAM resources
 # Note: Only detach the policy from ecsTaskExecutionRole, don't delete the role itself as it's managed by KECS
 aws iam detach-role-policy \
   --role-name ecsTaskExecutionRole \
   --policy-arn arn:aws:iam::000000000000:policy/ECSSecretsPolicy \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 aws iam delete-policy \
   --policy-arn arn:aws:iam::000000000000:policy/ECSSecretsPolicy \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 aws iam delete-role \
   --role-name ecsTaskRole \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Delete log group
 aws logs delete-log-group \
   --log-group-name /ecs/service-with-secrets \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Stop LocalStack
 docker stop localstack

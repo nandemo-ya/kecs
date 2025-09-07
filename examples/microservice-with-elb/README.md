@@ -51,7 +51,6 @@ This example demonstrates deploying a microservice API with Application Load Bal
 
 1. KECS running locally
 2. AWS CLI configured to point to KECS endpoint
-3. LocalStack (optional, for full ALB functionality)
 
 ## Setup Instructions
 
@@ -77,7 +76,7 @@ aws ecs create-cluster --cluster-name default \
 ```bash
 aws logs create-log-group \
   --log-group-name /ecs/microservice-api \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts LocalStack. No need to create it manually.
@@ -87,7 +86,7 @@ Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts
 ```bash
 # Create VPC (if not exists)
 VPC_ID=$(aws ec2 describe-vpcs \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'Vpcs[0].VpcId' --output text)
 
 # Create Application Load Balancer
@@ -98,7 +97,7 @@ ALB_ARN=$(aws elbv2 create-load-balancer \
   --scheme internet-facing \
   --type application \
   --ip-address-type ipv4 \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'LoadBalancers[0].LoadBalancerArn' --output text)
 
 echo "ALB ARN: $ALB_ARN"
@@ -117,7 +116,7 @@ TG_ARN=$(aws elbv2 create-target-group \
   --healthy-threshold-count 2 \
   --unhealthy-threshold-count 3 \
   --matcher HttpCode=200 \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'TargetGroups[0].TargetGroupArn' --output text)
 
 echo "Target Group ARN: $TG_ARN"
@@ -128,7 +127,7 @@ LISTENER_ARN=$(aws elbv2 create-listener \
   --protocol HTTP \
   --port 80 \
   --default-actions Type=forward,TargetGroupArn=$TG_ARN \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'Listeners[0].ListenerArn' --output text)
 
 echo "Listener ARN: $LISTENER_ARN"
@@ -140,7 +139,7 @@ aws elbv2 create-rule \
   --priority 1 \
   --conditions Field=path-pattern,Values="/api/users*" \
   --actions Type=forward,TargetGroupArn=$TG_ARN \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Rule for /api/products
 aws elbv2 create-rule \
@@ -148,7 +147,7 @@ aws elbv2 create-rule \
   --priority 2 \
   --conditions Field=path-pattern,Values="/api/products*" \
   --actions Type=forward,TargetGroupArn=$TG_ARN \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Rule for /api/*
 aws elbv2 create-rule \
@@ -156,7 +155,7 @@ aws elbv2 create-rule \
   --priority 10 \
   --conditions Field=path-pattern,Values="/api/*" \
   --actions Type=forward,TargetGroupArn=$TG_ARN \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 6. Update service_def.json with actual Target Group ARN
@@ -197,7 +196,7 @@ aws ecs update-service \
 # Get ALB DNS name
 ALB_DNS=$(aws elbv2 describe-load-balancers \
   --names microservice-alb \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'LoadBalancers[0].DNSName' --output text)
 
 echo "ALB DNS: $ALB_DNS"
@@ -205,7 +204,7 @@ echo "ALB DNS: $ALB_DNS"
 # Check target health
 aws elbv2 describe-target-health \
   --target-group-arn $TG_ARN \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### 2. Test API Endpoints through ALB
@@ -273,7 +272,7 @@ aws ecs describe-services \
 # Monitor target group health
 watch -n 5 "aws elbv2 describe-target-health \
   --target-group-arn $TG_ARN \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'TargetHealthDescriptions[*].{Target:Target.Id,Health:TargetHealth.State}' \
   --output table"
 ```
@@ -335,7 +334,7 @@ aws elbv2 modify-load-balancer-attributes \
   --load-balancer-arn $ALB_ARN \
   --attributes Key=access_logs.s3.enabled,Value=true \
     Key=access_logs.s3.bucket,Value=my-alb-logs \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### Debug Unhealthy Targets
@@ -344,12 +343,12 @@ aws elbv2 modify-load-balancer-attributes \
 # Check why targets are unhealthy
 aws elbv2 describe-target-health \
   --target-group-arn $TG_ARN \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'TargetHealthDescriptions[?TargetHealth.State!=`healthy`]'
 
 # Check task logs
 aws logs tail /ecs/microservice-api --follow \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### Verify Network Configuration
@@ -358,7 +357,7 @@ aws logs tail /ecs/microservice-api --follow \
 # Check security group rules
 aws ec2 describe-security-groups \
   --group-ids sg-alb-public sg-api-service \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ## Cleanup
@@ -367,26 +366,26 @@ aws ec2 describe-security-groups \
 # Delete listener rules
 aws elbv2 describe-rules \
   --listener-arn $LISTENER_ARN \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --query 'Rules[?Priority!=`default`].RuleArn' \
   --output text | xargs -n1 aws elbv2 delete-rule \
-  --endpoint-url http://localhost:4566 \
+  --endpoint-url http://localhost:5373 \
   --rule-arn
 
 # Delete listener
 aws elbv2 delete-listener \
   --listener-arn $LISTENER_ARN \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Delete target group
 aws elbv2 delete-target-group \
   --target-group-arn $TG_ARN \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Delete load balancer
 aws elbv2 delete-load-balancer \
   --load-balancer-arn $ALB_ARN \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Delete ECS service
 aws ecs delete-service \
@@ -403,5 +402,5 @@ aws ecs deregister-task-definition \
 # Delete log group
 aws logs delete-log-group \
   --log-group-name /ecs/microservice-api \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```

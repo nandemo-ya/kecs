@@ -8,7 +8,7 @@ set -e
 CLUSTER_NAME="${CLUSTER_NAME:-default}"
 SERVICE_NAME="webapp-service"
 AWS_REGION="${AWS_REGION:-us-east-1}"
-AWS_ENDPOINT="${AWS_ENDPOINT_URL:-http://localhost:8080}"
+AWS_ENDPOINT="${AWS_ENDPOINT_URL:-http://localhost:5373}"
 
 # Colors for output
 BLUE='\033[0;34m'
@@ -281,7 +281,7 @@ main() {
             echo "  cleanup  - Delete all resources"
             echo ""
             echo "Environment variables:"
-            echo "  AWS_ENDPOINT_URL - KECS endpoint (default: http://localhost:8080)"
+            echo "  AWS_ENDPOINT_URL - KECS endpoint (default: http://localhost:5373)"
             echo "  AWS_REGION      - AWS region (default: us-east-1)"
             echo "  CLUSTER_NAME    - ECS cluster name (default: default)"
             exit 1

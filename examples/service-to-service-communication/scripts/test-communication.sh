@@ -6,7 +6,7 @@ set -e
 
 # Configuration
 NAMESPACE_NAME="production.local"
-KECS_ENDPOINT=${KECS_ENDPOINT:-"http://localhost:8080"}
+KECS_ENDPOINT=${KECS_ENDPOINT:-"http://localhost:5373"}
 
 # Colors for output
 RED='\033[0;31m'
