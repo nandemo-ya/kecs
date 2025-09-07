@@ -1360,18 +1360,53 @@ func (m Model) renderShortcutsColumn(width int) string {
 			allShortcuts = append(allShortcuts, "")
 		}
 
-		// Add global shortcuts
+		// Add global shortcuts header
 		allShortcuts = append(allShortcuts, lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#f5c2e7")).
 			Bold(true).
 			Render("Global Shortcuts"))
 
-		for _, binding := range globalBindings {
-			keyStr := FormatKeyString(binding.Keys)
-			shortcut := fmt.Sprintf("%s %s",
-				keyStyle.Render(keyStr),
-				descStyle.Render(binding.Description))
-			allShortcuts = append(allShortcuts, shortcut)
+		// Format global shortcuts in 2 columns if there are enough
+		if len(globalBindings) >= 6 && width >= 60 {
+			// Split into two columns
+			mid := (len(globalBindings) + 1) / 2
+			colWidth := (width - 10) / 2 // Leave some padding
+
+			for i := 0; i < mid; i++ {
+				// Left column item
+				leftBinding := globalBindings[i]
+				leftKeyStr := FormatKeyString(leftBinding.Keys)
+				leftShortcut := fmt.Sprintf("%s %s",
+					keyStyle.Render(leftKeyStr),
+					descStyle.Render(leftBinding.Description))
+
+				// Right column item (if exists)
+				rightShortcut := ""
+				if i+mid < len(globalBindings) {
+					rightBinding := globalBindings[i+mid]
+					rightKeyStr := FormatKeyString(rightBinding.Keys)
+					rightShortcut = fmt.Sprintf("%s %s",
+						keyStyle.Render(rightKeyStr),
+						descStyle.Render(rightBinding.Description))
+				}
+
+				// Combine both columns
+				line := lipgloss.JoinHorizontal(
+					lipgloss.Top,
+					lipgloss.NewStyle().Width(colWidth).Render(leftShortcut),
+					lipgloss.NewStyle().Width(colWidth).Render(rightShortcut),
+				)
+				allShortcuts = append(allShortcuts, line)
+			}
+		} else {
+			// Single column for narrow terminals or few shortcuts
+			for _, binding := range globalBindings {
+				keyStr := FormatKeyString(binding.Keys)
+				shortcut := fmt.Sprintf("%s %s",
+					keyStyle.Render(keyStr),
+					descStyle.Render(binding.Description))
+				allShortcuts = append(allShortcuts, shortcut)
+			}
 		}
 
 		// Special case shortcuts for task def JSON view
@@ -1426,12 +1461,47 @@ func (m Model) renderShortcutsColumn(width int) string {
 		Bold(true).
 		Render("Global Shortcuts"))
 
-	for _, binding := range globalBindings {
-		keyStr := FormatKeyString(binding.Keys)
-		shortcut := fmt.Sprintf("%s %s",
-			keyStyle.Render(keyStr),
-			descStyle.Render(binding.Description))
-		rightShortcuts = append(rightShortcuts, shortcut)
+	// Format global shortcuts in 2 sub-columns within the right column
+	if len(globalBindings) >= 6 && halfWidth >= 40 {
+		// Split into two sub-columns
+		mid := (len(globalBindings) + 1) / 2
+		subColWidth := (halfWidth - 4) / 2 // Leave some padding
+
+		for i := 0; i < mid; i++ {
+			// Left sub-column item
+			leftBinding := globalBindings[i]
+			leftKeyStr := FormatKeyString(leftBinding.Keys)
+			leftShortcut := fmt.Sprintf("%s %s",
+				keyStyle.Render(leftKeyStr),
+				descStyle.Render(leftBinding.Description))
+
+			// Right sub-column item (if exists)
+			rightShortcut := ""
+			if i+mid < len(globalBindings) {
+				rightBinding := globalBindings[i+mid]
+				rightKeyStr := FormatKeyString(rightBinding.Keys)
+				rightShortcut = fmt.Sprintf("%s %s",
+					keyStyle.Render(rightKeyStr),
+					descStyle.Render(rightBinding.Description))
+			}
+
+			// Combine both sub-columns
+			line := lipgloss.JoinHorizontal(
+				lipgloss.Top,
+				lipgloss.NewStyle().Width(subColWidth).Render(leftShortcut),
+				lipgloss.NewStyle().Width(subColWidth).Render(rightShortcut),
+			)
+			rightShortcuts = append(rightShortcuts, line)
+		}
+	} else {
+		// Single column for narrow space
+		for _, binding := range globalBindings {
+			keyStr := FormatKeyString(binding.Keys)
+			shortcut := fmt.Sprintf("%s %s",
+				keyStyle.Render(keyStr),
+				descStyle.Render(binding.Description))
+			rightShortcuts = append(rightShortcuts, shortcut)
+		}
 	}
 
 	// Create left column with screen-specific shortcuts
