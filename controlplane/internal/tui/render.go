@@ -95,70 +95,60 @@ func (m Model) getHeaderShortcuts() string {
 
 	switch m.currentView {
 	case ViewInstances:
+		// Show only the most important shortcuts in the header
 		shortcuts = []string{
-			keyStyle.Render("<N>") + sepStyle.Render(" New"),
+			keyStyle.Render("↵") + sepStyle.Render(" Select"),
+			keyStyle.Render("n") + sepStyle.Render(" New"),
+			keyStyle.Render("s") + sepStyle.Render(" Start/Stop"),
+			keyStyle.Render("?") + sepStyle.Render(" Help"),
 		}
-		if m.selectedInstance != "" {
-			shortcuts = append(shortcuts, keyStyle.Render("<t>")+sepStyle.Render(" TaskDefs"))
-		}
-		shortcuts = append(shortcuts,
-			keyStyle.Render("<:>")+sepStyle.Render(" Cmd"),
-			keyStyle.Render("</>")+sepStyle.Render(" Search"),
-			keyStyle.Render("<?>")+sepStyle.Render(" Help"),
-		)
 	case ViewClusters:
 		shortcuts = []string{
-			keyStyle.Render("<↵>") + sepStyle.Render(" Select"),
-			keyStyle.Render("<n>") + sepStyle.Render(" Create"),
-			keyStyle.Render("<T>") + sepStyle.Render(" Tasks"),
-			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
-			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
-			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
+			keyStyle.Render("↵") + sepStyle.Render(" Select"),
+			keyStyle.Render("n") + sepStyle.Render(" Create"),
+			keyStyle.Render("T") + sepStyle.Render(" Tasks"),
+			keyStyle.Render("ESC") + sepStyle.Render(" Back"),
+			keyStyle.Render("?") + sepStyle.Render(" Help"),
 		}
 	case ViewServices:
 		shortcuts = []string{
-			keyStyle.Render("<s>") + sepStyle.Render(" Scale"),
-			keyStyle.Render("<u>") + sepStyle.Render(" Update"),
-			keyStyle.Render("<r>") + sepStyle.Render(" Refresh"),
-			keyStyle.Render("<l>") + sepStyle.Render(" Logs"),
-			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
+			keyStyle.Render("s") + sepStyle.Render(" Scale"),
+			keyStyle.Render("u") + sepStyle.Render(" Update"),
+			keyStyle.Render("l") + sepStyle.Render(" Logs"),
+			keyStyle.Render("ESC") + sepStyle.Render(" Back"),
 		}
 	case ViewTasks:
 		shortcuts = []string{
-			keyStyle.Render("<↵>") + sepStyle.Render(" Describe"),
-			keyStyle.Render("<l>") + sepStyle.Render(" Logs"),
-			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
-			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
+			keyStyle.Render("↵") + sepStyle.Render(" Describe"),
+			keyStyle.Render("l") + sepStyle.Render(" Logs"),
+			keyStyle.Render("s") + sepStyle.Render(" Stop"),
+			keyStyle.Render("ESC") + sepStyle.Render(" Back"),
 		}
 	case ViewLogs:
 		shortcuts = []string{
-			keyStyle.Render("<f>") + sepStyle.Render(" Toggle View"),
-			keyStyle.Render("<s>") + sepStyle.Render(" Save"),
-			keyStyle.Render("<Esc>") + sepStyle.Render(" Back"),
+			keyStyle.Render("f") + sepStyle.Render(" Toggle"),
+			keyStyle.Render("s") + sepStyle.Render(" Save"),
+			keyStyle.Render("ESC") + sepStyle.Render(" Back"),
 		}
 	case ViewTaskDefinitionFamilies:
 		shortcuts = []string{
-			keyStyle.Render("<↵>") + sepStyle.Render(" Select"),
-			keyStyle.Render("<N>") + sepStyle.Render(" New"),
-			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
-			keyStyle.Render("</>") + sepStyle.Render(" Search"),
+			keyStyle.Render("↵") + sepStyle.Render(" Select"),
+			keyStyle.Render("N") + sepStyle.Render(" New"),
+			keyStyle.Render("C") + sepStyle.Render(" Copy"),
+			keyStyle.Render("ESC") + sepStyle.Render(" Back"),
 		}
 	case ViewTaskDefinitionRevisions:
 		shortcuts = []string{
-			keyStyle.Render("<↵>") + sepStyle.Render(" JSON"),
-			keyStyle.Render("<e>") + sepStyle.Render(" Edit"),
-			keyStyle.Render("<ESC>") + sepStyle.Render(" Back"),
-		}
-		if m.showTaskDefJSON {
-			shortcuts = append(shortcuts,
-				keyStyle.Render("<^U/^D>")+sepStyle.Render(" Scroll"),
-			)
+			keyStyle.Render("↵") + sepStyle.Render(" JSON"),
+			keyStyle.Render("e") + sepStyle.Render(" Edit"),
+			keyStyle.Render("y") + sepStyle.Render(" Yank"),
+			keyStyle.Render("ESC") + sepStyle.Render(" Back"),
 		}
 	default:
 		shortcuts = []string{
-			keyStyle.Render("<:>") + sepStyle.Render(" Cmd"),
-			keyStyle.Render("</>") + sepStyle.Render(" Search"),
-			keyStyle.Render("<?>") + sepStyle.Render(" Help"),
+			keyStyle.Render(":") + sepStyle.Render(" Cmd"),
+			keyStyle.Render("/") + sepStyle.Render(" Search"),
+			keyStyle.Render("?") + sepStyle.Render(" Help"),
 		}
 	}
 
@@ -167,126 +157,102 @@ func (m Model) getHeaderShortcuts() string {
 }
 
 func (m Model) renderHeader() string {
-	// Calculate the actual available width for left column
-	totalWidth := m.width - 4 // Account for panel borders
-	leftColumnWidth := int(float64(totalWidth) * 0.7)
-	maxContentWidth := leftColumnWidth - 2 // Account for header padding
-
 	// Build the header content
 	headerText := fmt.Sprintf("KECS %s", version.GetVersion())
 	if m.selectedInstance != "" {
 		headerText = fmt.Sprintf("KECS %s | Instance: %s", version.GetVersion(), m.selectedInstance)
 	}
 
-	// Check if we need to truncate
-	if lipgloss.Width(headerText) > maxContentWidth {
-		if m.selectedInstance != "" {
-			// Shorten instance name
-			instanceName := m.selectedInstance
-			prefix := fmt.Sprintf("KECS %s | ", version.GetVersion())
-			maxInstanceWidth := maxContentWidth - len(prefix) - 3 // -3 for "..."
-			if maxInstanceWidth > 0 && len(instanceName) > maxInstanceWidth {
-				instanceName = instanceName[:maxInstanceWidth] + "..."
-			}
-			headerText = prefix + instanceName
-		}
-	}
-
-	// Apply header style with proper width
-	return headerStyle.Width(maxContentWidth).Render(headerText)
+	// Let the header flow naturally without width constraints
+	return headerStyle.Render(headerText)
 }
 
 func (m Model) renderBreadcrumb() string {
 	parts := []string{}
 
 	// Build breadcrumb based on current navigation
-	if m.currentView == ViewInstances || m.selectedInstance != "" {
-		if m.currentView == ViewInstances {
-			parts = append(parts, "[Instances]")
-		} else {
-			parts = append(parts, "Instances")
-		}
+	// Skip instance part since it's shown in the header
+
+	// Clusters breadcrumb
+	if m.currentView == ViewClusters {
+		parts = append(parts, "[Clusters]")
+	} else if m.selectedCluster != "" {
+		// Format: Cluster(name) - don't truncate here, let the full-width logic handle it
+		parts = append(parts, fmt.Sprintf("Cluster(%s)", m.selectedCluster))
 	}
 
-	if m.selectedInstance != "" {
-		parts = append(parts, ">", m.selectedInstance)
-
-		if m.currentView == ViewClusters {
-			parts = append(parts, ">", "[Clusters]")
-		} else if m.selectedCluster != "" {
-			parts = append(parts, ">", "Clusters")
+	// Services breadcrumb
+	if m.currentView == ViewServices && len(parts) > 0 {
+		parts = append(parts, ">", "[Services]")
+	} else if m.selectedService != "" {
+		if len(parts) == 0 && m.selectedCluster != "" {
+			// Add cluster if it's not already there
+			parts = append(parts, fmt.Sprintf("Cluster(%s)", m.selectedCluster))
 		}
-	}
-
-	if m.selectedCluster != "" {
-		parts = append(parts, ">", m.selectedCluster)
-
-		if m.currentView == ViewServices {
-			parts = append(parts, ">", "[Services]")
-		} else if m.selectedService != "" {
-			parts = append(parts, ">", "Services")
+		if len(parts) > 0 {
+			parts = append(parts, ">")
 		}
-	}
-
-	if m.selectedService != "" {
-		parts = append(parts, ">", m.selectedService)
+		// Format: Service(name) - don't truncate here, let the full-width logic handle it
+		parts = append(parts, fmt.Sprintf("Service(%s)", m.selectedService))
 	}
 
 	// Show Tasks breadcrumb whether service is selected or not
 	if m.currentView == ViewTasks {
+		if len(parts) > 0 {
+			parts = append(parts, ">")
+		}
 		if m.selectedService == "" {
 			// Showing all tasks in cluster
-			parts = append(parts, ">", "[All Tasks]")
+			parts = append(parts, "[All Tasks]")
 		} else {
 			// Showing tasks for specific service
-			parts = append(parts, ">", "[Tasks]")
+			parts = append(parts, "[Tasks]")
 		}
 	}
 
-	if m.currentView == ViewLogs {
-		if m.selectedTask != "" {
-			// Truncate long task IDs to prevent overflow
-			taskID := m.selectedTask
-			maxTaskIDLength := 20
-			if len(taskID) > maxTaskIDLength {
-				taskID = taskID[:maxTaskIDLength-3] + "..."
-			}
-			parts = append(parts, ">", taskID)
+	// Task Describe view
+	if m.currentView == ViewTaskDescribe && m.selectedTask != "" {
+		if len(parts) > 0 {
+			parts = append(parts, ">")
 		}
-		parts = append(parts, ">", "[Logs]")
+		// Show full task ID without truncation
+		parts = append(parts, fmt.Sprintf("Task(%s)", m.selectedTask))
+	}
+
+	// Logs view
+	if m.currentView == ViewLogs {
+		if m.selectedTask != "" && m.currentView != ViewTaskDescribe {
+			if len(parts) > 0 {
+				parts = append(parts, ">")
+			}
+			// Show full task ID without truncation
+			parts = append(parts, fmt.Sprintf("Task(%s)", m.selectedTask))
+		}
+		if len(parts) > 0 {
+			parts = append(parts, ">")
+		}
+		parts = append(parts, "[Logs]")
 	}
 
 	// Task Definition navigation
 	if m.currentView == ViewTaskDefinitionFamilies || m.currentView == ViewTaskDefinitionRevisions {
-		parts = append(parts, ">", "[Task Definitions]")
+		parts = append(parts, "[Task Definitions]")
 
 		if m.currentView == ViewTaskDefinitionRevisions && m.selectedFamily != "" {
 			parts = append(parts, ">", m.selectedFamily)
 		}
 	}
 
-	breadcrumb := strings.Join(parts, " ")
-
-	// Calculate the same width as header for consistency
-	totalWidth := m.width - 4 // Account for panel borders
-	leftColumnWidth := int(float64(totalWidth) * 0.7)
-	maxContentWidth := leftColumnWidth - 2 // Account for breadcrumb padding
-
-	// Ensure breadcrumb doesn't exceed available width
-	if lipgloss.Width(breadcrumb) > maxContentWidth {
-		// Truncate from the beginning if too long
-		for lipgloss.Width(breadcrumb) > maxContentWidth && len(breadcrumb) > 0 {
-			// Find first space and remove everything before it
-			if idx := strings.Index(breadcrumb, " > "); idx >= 0 {
-				breadcrumb = "..." + breadcrumb[idx+2:]
-			} else {
-				// If no separator found, just truncate
-				breadcrumb = "..." + breadcrumb[3:]
-			}
-		}
+	// Handle empty breadcrumb
+	if len(parts) == 0 {
+		// Don't show anything if there's no navigation context
+		return ""
 	}
 
-	return breadcrumbStyle.Width(maxContentWidth).Render(breadcrumb)
+	breadcrumb := strings.Join(parts, " ")
+
+	// Let the breadcrumb flow naturally without width constraints
+	return breadcrumbStyle.Render(breadcrumb)
 }
 
 func (m Model) renderFooter() string {
@@ -375,91 +341,60 @@ func (m Model) renderFooter() string {
 func (m Model) renderNavigationPanel() string {
 	// Calculate height for navigation panel (30% of available height)
 	navHeight := int(float64(m.height-1) * 0.3) // -1 for footer
-	if navHeight < 10 {
-		navHeight = 10 // Minimum height for navigation content
+
+	// Ensure minimum height for all content (including shortcuts)
+	// Need at least: header(1) + breadcrumb(1) + separator(1) + summary(1-2) + separator(1) + view shortcuts(1) + global shortcuts(1) = 7-8 lines
+	minRequiredHeight := 9
+	if navHeight < minRequiredHeight {
+		navHeight = minRequiredHeight
 	}
 
-	// Adaptive layout based on terminal width
-	totalWidth := m.width - 4 // Account for panel borders
+	// Calculate actual available width inside the panel
+	panelWidth := m.width - 6 // Account for panel borders and padding
 
-	// Determine layout mode based on terminal width
-	// < 100: Single column (shortcuts inline)
-	// 100-140: Two columns with single-column shortcuts
-	// > 140: Two columns with dual-column shortcuts
-	var useInlineShortcuts bool
-	var leftColumnWidth, rightColumnWidth int
-
-	if totalWidth < 100 {
-		// Very narrow - use single column with inline shortcuts
-		useInlineShortcuts = true
-		leftColumnWidth = totalWidth
-		rightColumnWidth = 0
-	} else {
-		// Two column mode
-		useInlineShortcuts = false
-		// Use 55:45 ratio for better balance
-		leftColumnWidth = int(float64(totalWidth) * 0.55)
-		rightColumnWidth = totalWidth - leftColumnWidth - 1 // -1 for gap
-
-		// Ensure minimum widths
-		if rightColumnWidth < 40 {
-			rightColumnWidth = 40
-			leftColumnWidth = totalWidth - rightColumnWidth - 1
-		}
-	}
-
-	// Left column: header, breadcrumb, and summary
+	// Header and breadcrumb use full width
 	header := m.renderHeader()
 	breadcrumb := m.renderBreadcrumb()
 	summary := m.renderSummary()
 
-	// Add separator line after breadcrumb
-	separatorWidth := leftColumnWidth - 2 // Account for padding
-	if separatorWidth < 20 {
-		separatorWidth = 20
+	// Add separator line - match the actual panel width
+	separatorWidth := panelWidth
+	if separatorWidth > m.width-8 {
+		separatorWidth = m.width - 8 // Ensure it doesn't overflow
 	}
 	topSeparator := separatorStyle.Render(strings.Repeat("─", separatorWidth))
 
-	var navContent string
+	// Render shortcuts as single lines at the bottom
+	viewShortcuts := m.renderViewShortcutsLine(panelWidth)
+	globalShortcuts := m.renderGlobalShortcutsLine(panelWidth)
 
-	if useInlineShortcuts {
-		// Single column mode - shortcuts below summary
-		shortcuts := m.renderShortcutsInline(leftColumnWidth - 2)
-		navContent = lipgloss.JoinVertical(
-			lipgloss.Top,
-			header,
-			breadcrumb,
-			topSeparator,
-			summary,
-			topSeparator,
-			shortcuts,
-		)
-	} else {
-		// Two column mode
-		leftColumn := lipgloss.JoinVertical(
-			lipgloss.Top,
-			header,
-			breadcrumb,
-			topSeparator,
-			summary,
-		)
-
-		// Right column: shortcuts (adaptive layout)
-		rightColumn := m.renderShortcutsColumn(rightColumnWidth, navHeight-4)
-
-		// Join columns horizontally
-		navContent = lipgloss.JoinHorizontal(
-			lipgloss.Top,
-			lipgloss.NewStyle().Width(leftColumnWidth).Render(leftColumn),
-			lipgloss.NewStyle().Width(rightColumnWidth).Render(rightColumn),
-		)
+	// Stack all components vertically
+	var components []string
+	components = append(components, header)
+	if breadcrumb != "" {
+		components = append(components, breadcrumb)
+	}
+	components = append(components, topSeparator)
+	components = append(components, summary)
+	// Only one separator line before shortcuts
+	if viewShortcuts != "" {
+		components = append(components, viewShortcuts)
+	}
+	if globalShortcuts != "" {
+		components = append(components, globalShortcuts)
 	}
 
-	// Apply navigation panel style with fixed height
+	navContent := lipgloss.JoinVertical(lipgloss.Top, components...)
+
+	// Don't restrict height too much - let content determine minimum
+	actualContentHeight := len(components) + 2 // Add padding
+	if navHeight < actualContentHeight {
+		navHeight = actualContentHeight
+	}
+
 	return navigationPanelStyle.
 		Width(m.width - 4). // Account for borders and padding
 		Height(navHeight - 4).
-		MaxHeight(navHeight - 4).
 		Render(navContent)
 }
 
@@ -1321,8 +1256,95 @@ func (m Model) renderTasksList(maxHeight int) string {
 	return strings.Join(rows, "\n")
 }
 
+// renderViewShortcutsLine renders view-specific shortcuts in a single line
+func (m Model) renderViewShortcutsLine(width int) string {
+	// Style for shortcuts
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true)
+	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f5c2e7")).Bold(true)
+
+	// Get view-specific shortcuts
+	viewBindings, _ := m.keyBindings.GetAllBindingsForView(m.currentView, m)
+
+	if len(viewBindings) == 0 {
+		return ""
+	}
+
+	// Build shortcuts string
+	var shortcuts []string
+	for _, binding := range viewBindings {
+		if binding.Condition == nil || binding.Condition(m) {
+			keyStr := FormatKeyString(binding.Keys)
+			shortcut := keyStyle.Render(keyStr) + sepStyle.Render(" "+binding.Description)
+			shortcuts = append(shortcuts, shortcut)
+		}
+	}
+
+	// Limit to fit on one line
+	line := headerStyle.Render("View: ") + strings.Join(shortcuts, "  ")
+
+	// Truncate if too long
+	if lipgloss.Width(line) > width {
+		// Show only the most important shortcuts
+		if len(shortcuts) > 3 {
+			shortcuts = shortcuts[:3]
+			line = headerStyle.Render("View: ") + strings.Join(shortcuts, "  ") + sepStyle.Render("  ...")
+		}
+	}
+
+	return line
+}
+
+// renderGlobalShortcutsLine renders global shortcuts in a single line
+func (m Model) renderGlobalShortcutsLine(width int) string {
+	// Style for shortcuts
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true)
+	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f5c2e7")).Bold(true)
+
+	// Get global shortcuts
+	_, globalBindings := m.keyBindings.GetAllBindingsForView(m.currentView, m)
+
+	// Build shortcuts string - focus on most important ones
+	var shortcuts []string
+
+	// Priority order for global shortcuts to show
+	priorityActions := []KeyAction{
+		ActionMoveUp,
+		ActionMoveDown,
+		ActionBack,
+		ActionHelp,
+		ActionRefresh,
+		ActionQuit,
+	}
+
+	for _, action := range priorityActions {
+		for _, binding := range globalBindings {
+			if binding.Action == action {
+				keyStr := FormatKeyString(binding.Keys)
+				shortcut := keyStyle.Render(keyStr) + sepStyle.Render(" "+binding.Description)
+				shortcuts = append(shortcuts, shortcut)
+				break
+			}
+		}
+	}
+
+	line := headerStyle.Render("Global: ") + strings.Join(shortcuts, "  ")
+
+	// Truncate if too long
+	if lipgloss.Width(line) > width {
+		// Show fewer shortcuts
+		if len(shortcuts) > 4 {
+			shortcuts = shortcuts[:4]
+			line = headerStyle.Render("Global: ") + strings.Join(shortcuts, "  ") + sepStyle.Render("  ...")
+		}
+	}
+
+	return line
+}
+
 // renderShortcutsColumn renders the shortcuts column for the navigation panel
-func (m Model) renderShortcutsColumn(width, height int) string {
+func (m Model) renderShortcutsColumn(width int) string {
 	// Style for k9s-like shortcuts
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true)
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9399b2"))
@@ -1343,28 +1365,71 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		var allShortcuts []string
 
 		// Add view-specific shortcuts first
-		for _, binding := range viewBindings {
-			if binding.Condition == nil || binding.Condition(m) {
+		if len(viewBindings) > 0 {
+			// Add section header
+			allShortcuts = append(allShortcuts, lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#f5c2e7")).
+				Bold(true).
+				Render("View Shortcuts"))
+
+			for _, binding := range viewBindings {
+				if binding.Condition == nil || binding.Condition(m) {
+					keyStr := FormatKeyString(binding.Keys)
+					shortcut := fmt.Sprintf("%s %s",
+						keyStyle.Render(keyStr),
+						descStyle.Render(binding.Description))
+					allShortcuts = append(allShortcuts, shortcut)
+				}
+			}
+		}
+
+		// Add global shortcuts header
+		allShortcuts = append(allShortcuts, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#f5c2e7")).
+			Bold(true).
+			Render("Global Shortcuts"))
+
+		// Format global shortcuts in 2 columns if there are enough
+		if len(globalBindings) >= 6 && width >= 60 {
+			// Split into two columns
+			mid := (len(globalBindings) + 1) / 2
+			colWidth := (width - 10) / 2 // Leave some padding
+
+			for i := 0; i < mid; i++ {
+				// Left column item
+				leftBinding := globalBindings[i]
+				leftKeyStr := FormatKeyString(leftBinding.Keys)
+				leftShortcut := fmt.Sprintf("%s %s",
+					keyStyle.Render(leftKeyStr),
+					descStyle.Render(leftBinding.Description))
+
+				// Right column item (if exists)
+				rightShortcut := ""
+				if i+mid < len(globalBindings) {
+					rightBinding := globalBindings[i+mid]
+					rightKeyStr := FormatKeyString(rightBinding.Keys)
+					rightShortcut = fmt.Sprintf("%s %s",
+						keyStyle.Render(rightKeyStr),
+						descStyle.Render(rightBinding.Description))
+				}
+
+				// Combine both columns
+				line := lipgloss.JoinHorizontal(
+					lipgloss.Top,
+					lipgloss.NewStyle().Width(colWidth).Render(leftShortcut),
+					lipgloss.NewStyle().Width(colWidth).Render(rightShortcut),
+				)
+				allShortcuts = append(allShortcuts, line)
+			}
+		} else {
+			// Single column for narrow terminals or few shortcuts
+			for _, binding := range globalBindings {
 				keyStr := FormatKeyString(binding.Keys)
 				shortcut := fmt.Sprintf("%s %s",
 					keyStyle.Render(keyStr),
 					descStyle.Render(binding.Description))
 				allShortcuts = append(allShortcuts, shortcut)
 			}
-		}
-
-		// Add separator if we have view shortcuts
-		if len(allShortcuts) > 0 {
-			allShortcuts = append(allShortcuts, "")
-		}
-
-		// Add global shortcuts
-		for _, binding := range globalBindings {
-			keyStr := FormatKeyString(binding.Keys)
-			shortcut := fmt.Sprintf("%s %s",
-				keyStyle.Render(keyStr),
-				descStyle.Render(binding.Description))
-			allShortcuts = append(allShortcuts, shortcut)
 		}
 
 		// Special case shortcuts for task def JSON view
@@ -1376,62 +1441,96 @@ func (m Model) renderShortcutsColumn(width, height int) string {
 		}
 
 		content := strings.Join(allShortcuts, "\n")
-		return columnStyle.Height(height).Render(content)
+		// Don't restrict height, let it flow naturally
+		return columnStyle.Render(content)
 	}
 
-	// For wider columns, use two-column layout
-	halfWidth := (width - 3) / 2 // -3 for border and padding
+	// For wider columns, show shortcuts in a single column with sections
+	var allShortcuts []string
 
-	// Left column: Screen-specific shortcuts
-	var leftShortcuts []string
-	for _, binding := range viewBindings {
-		if binding.Condition == nil || binding.Condition(m) {
+	// Add view-specific shortcuts first
+	if len(viewBindings) > 0 {
+		// Add header for view shortcuts
+		allShortcuts = append(allShortcuts, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#f5c2e7")).
+			Bold(true).
+			Render("View Shortcuts"))
+
+		for _, binding := range viewBindings {
+			if binding.Condition == nil || binding.Condition(m) {
+				keyStr := FormatKeyString(binding.Keys)
+				shortcut := fmt.Sprintf("%s %s",
+					keyStyle.Render(keyStr),
+					descStyle.Render(binding.Description))
+				allShortcuts = append(allShortcuts, shortcut)
+			}
+		}
+
+		// Add special case shortcuts that aren't in the registry yet
+		if m.currentView == ViewTaskDefinitionRevisions && m.showTaskDefJSON {
+			allShortcuts = append(allShortcuts,
+				keyStyle.Render("^U")+" "+descStyle.Render("Scroll up"),
+				keyStyle.Render("^D")+" "+descStyle.Render("Scroll down"),
+			)
+		}
+
+		// Add a blank line between sections
+		allShortcuts = append(allShortcuts, "")
+	}
+
+	// Add header for global shortcuts
+	allShortcuts = append(allShortcuts, lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#f5c2e7")).
+		Bold(true).
+		Render("Global Shortcuts"))
+
+	// Format global shortcuts in 2 columns if space allows
+	effectiveWidth := width - 4 // Account for padding and borders
+	if len(globalBindings) >= 6 && effectiveWidth >= 60 {
+		// Split into two columns
+		mid := (len(globalBindings) + 1) / 2
+		colWidth := effectiveWidth / 2
+
+		for i := 0; i < mid; i++ {
+			// Left column item
+			leftBinding := globalBindings[i]
+			leftKeyStr := FormatKeyString(leftBinding.Keys)
+			leftShortcut := fmt.Sprintf("%s %s",
+				keyStyle.Render(leftKeyStr),
+				descStyle.Render(leftBinding.Description))
+
+			// Right column item (if exists)
+			rightShortcut := ""
+			if i+mid < len(globalBindings) {
+				rightBinding := globalBindings[i+mid]
+				rightKeyStr := FormatKeyString(rightBinding.Keys)
+				rightShortcut = fmt.Sprintf("%s %s",
+					keyStyle.Render(rightKeyStr),
+					descStyle.Render(rightBinding.Description))
+			}
+
+			// Combine both columns with proper spacing
+			line := lipgloss.JoinHorizontal(
+				lipgloss.Top,
+				lipgloss.NewStyle().Width(colWidth).MaxWidth(colWidth).Render(leftShortcut),
+				lipgloss.NewStyle().Width(colWidth).MaxWidth(colWidth).Render(rightShortcut),
+			)
+			allShortcuts = append(allShortcuts, line)
+		}
+	} else {
+		// Single column for narrow space or few shortcuts
+		for _, binding := range globalBindings {
 			keyStr := FormatKeyString(binding.Keys)
 			shortcut := fmt.Sprintf("%s %s",
 				keyStyle.Render(keyStr),
 				descStyle.Render(binding.Description))
-			leftShortcuts = append(leftShortcuts, shortcut)
+			allShortcuts = append(allShortcuts, shortcut)
 		}
 	}
 
-	// Add special case shortcuts that aren't in the registry yet
-	if m.currentView == ViewTaskDefinitionRevisions && m.showTaskDefJSON {
-		leftShortcuts = append(leftShortcuts,
-			keyStyle.Render("^U")+" "+descStyle.Render("Scroll up"),
-			keyStyle.Render("^D")+" "+descStyle.Render("Scroll down"),
-		)
-	}
-
-	// Right column: Global shortcuts
-	var rightShortcuts []string
-	for _, binding := range globalBindings {
-		keyStr := FormatKeyString(binding.Keys)
-		rightShortcuts = append(rightShortcuts,
-			keyStyle.Render(keyStr)+" "+descStyle.Render(binding.Description),
-		)
-	}
-
-	// Create left column with screen-specific shortcuts
-	leftColumn := lipgloss.NewStyle().
-		Width(halfWidth).
-		Align(lipgloss.Left).
-		Render(strings.Join(leftShortcuts, "\n"))
-
-	// Create right column with global shortcuts
-	rightColumn := lipgloss.NewStyle().
-		Width(halfWidth).
-		Align(lipgloss.Left).
-		PaddingLeft(1).
-		Render(strings.Join(rightShortcuts, "\n"))
-
-	// Join columns horizontally
-	columnsContent := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		leftColumn,
-		rightColumn,
-	)
-
-	return columnStyle.Height(height).Render(columnsContent)
+	content := strings.Join(allShortcuts, "\n")
+	// Don't restrict height, let it flow naturally
+	return columnStyle.Render(content)
 }
 
 // renderShortcutsInline renders shortcuts in a compact inline format for narrow terminals
