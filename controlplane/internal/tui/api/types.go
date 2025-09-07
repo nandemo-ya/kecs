@@ -251,6 +251,13 @@ type ContainerDefinition struct {
 	MountPoints       []MountPoint          `json:"mountPoints,omitempty"`
 	VolumesFrom       []VolumeFrom          `json:"volumesFrom,omitempty"`
 	DependsOn         []ContainerDependency `json:"dependsOn,omitempty"`
+	HealthCheck       *HealthCheck          `json:"healthCheck,omitempty"`
+	LogConfiguration  *LogConfiguration     `json:"logConfiguration,omitempty"`
+	Secrets           []Secret              `json:"secrets,omitempty"`
+	Command           []string              `json:"command,omitempty"`
+	EntryPoint        []string              `json:"entryPoint,omitempty"`
+	WorkingDirectory  string                `json:"workingDirectory,omitempty"`
+	User              string                `json:"user,omitempty"`
 }
 
 // PortMapping represents a port mapping for a container
@@ -277,6 +284,27 @@ type VolumeFrom struct {
 type ContainerDependency struct {
 	ContainerName string `json:"containerName"`
 	Condition     string `json:"condition"` // START, COMPLETE, SUCCESS, HEALTHY
+}
+
+// HealthCheck represents container health check configuration
+type HealthCheck struct {
+	Command     []string `json:"command"`
+	Interval    int      `json:"interval,omitempty"`
+	Timeout     int      `json:"timeout,omitempty"`
+	Retries     int      `json:"retries,omitempty"`
+	StartPeriod int      `json:"startPeriod,omitempty"`
+}
+
+// LogConfiguration represents container logging configuration
+type LogConfiguration struct {
+	LogDriver string            `json:"logDriver"`
+	Options   map[string]string `json:"options,omitempty"`
+}
+
+// Secret represents a secret to inject into the container
+type Secret struct {
+	Name      string `json:"name"`
+	ValueFrom string `json:"valueFrom"`
 }
 
 // TaskDefinitionRevision represents summary info for a task definition revision

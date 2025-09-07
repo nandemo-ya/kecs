@@ -17,6 +17,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -157,6 +158,13 @@ type ContainerDetail struct {
 	DependsOn       []ContainerDependency // Dependencies on other containers
 	Environment     []EnvironmentVariable // Environment variables
 	MountPoints     []MountPoint          // Volume mount points
+	HealthCheck     *HealthCheck          // Health check configuration
+	LogConfig       *LogConfiguration     // Logging configuration
+	Secrets         []Secret              // Secrets from Parameter Store or Secrets Manager
+	Command         []string              // Command override
+	EntryPoint      []string              // Entry point override
+	WorkingDir      string                // Working directory
+	User            string                // User to run as
 }
 
 // EnvironmentVariable represents an environment variable
@@ -170,6 +178,27 @@ type MountPoint struct {
 	SourceVolume  string
 	ContainerPath string
 	ReadOnly      bool
+}
+
+// HealthCheck represents container health check configuration
+type HealthCheck struct {
+	Command     []string
+	Interval    int
+	Timeout     int
+	Retries     int
+	StartPeriod int
+}
+
+// LogConfiguration represents container logging configuration
+type LogConfiguration struct {
+	LogDriver string
+	Options   map[string]string
+}
+
+// Secret represents a secret from Parameter Store or Secrets Manager
+type Secret struct {
+	Name      string
+	ValueFrom string
 }
 
 // ContainerDependency represents a dependency on another container
@@ -323,16 +352,18 @@ func (m Model) renderTaskOverviewCompact(detail *TaskDetail, width int) string {
 		taskDefDisplay = "-"
 	}
 	lines = append(lines, "")
-	lines = append(lines, labelStyle.Render("Task Definition:"))
-	lines = append(lines, valueStyle.Render(taskDefDisplay))
+	lines = append(lines, fmt.Sprintf("%s %s",
+		labelStyle.Render("Task Definition:"),
+		valueStyle.Render(taskDefDisplay)))
 
 	// Launch Type
 	launchType := detail.LaunchType
 	if launchType == "" {
 		launchType = "FARGATE"
 	}
-	lines = append(lines, labelStyle.Render("Launch Type:"))
-	lines = append(lines, valueStyle.Render(launchType))
+	lines = append(lines, fmt.Sprintf("%s %s",
+		labelStyle.Render("Launch Type:"),
+		valueStyle.Render(launchType)))
 
 	// Resources
 	cpu := detail.CPU
@@ -343,8 +374,9 @@ func (m Model) renderTaskOverviewCompact(detail *TaskDetail, width int) string {
 	if memory == "" {
 		memory = "-"
 	}
-	lines = append(lines, labelStyle.Render("Resources:"))
-	lines = append(lines, valueStyle.Render(fmt.Sprintf("CPU: %s, Memory: %s", cpu, memory)))
+	lines = append(lines, fmt.Sprintf("%s %s",
+		labelStyle.Render("Resources:"),
+		valueStyle.Render(fmt.Sprintf("CPU: %s, Memory: %s", cpu, memory))))
 
 	// Health
 	if detail.HealthStatus != "" {
@@ -355,8 +387,9 @@ func (m Model) renderTaskOverviewCompact(detail *TaskDetail, width int) string {
 			healthColor = "196"
 		}
 		healthStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(healthColor))
-		lines = append(lines, labelStyle.Render("Health:"))
-		lines = append(lines, healthStyle.Render(detail.HealthStatus))
+		lines = append(lines, fmt.Sprintf("%s %s",
+			labelStyle.Render("Health:"),
+			healthStyle.Render(detail.HealthStatus)))
 	}
 
 	return columnStyle.Render(strings.Join(lines, "\n"))
@@ -388,16 +421,18 @@ func (m Model) renderTaskNetworkCompact(detail *TaskDetail, width int) string {
 		networkMode = "awsvpc"
 	}
 	lines = append(lines, "")
-	lines = append(lines, labelStyle.Render("Mode:"))
-	lines = append(lines, valueStyle.Render(networkMode))
+	lines = append(lines, fmt.Sprintf("%s %s",
+		labelStyle.Render("Mode:"),
+		valueStyle.Render(networkMode)))
 
 	// IPs
-	lines = append(lines, labelStyle.Render("IPs:"))
+	ipsValue := "-"
 	if len(detail.IPs) > 0 {
-		lines = append(lines, valueStyle.Render(strings.Join(detail.IPs, ", ")))
-	} else {
-		lines = append(lines, valueStyle.Render("-"))
+		ipsValue = strings.Join(detail.IPs, ", ")
 	}
+	lines = append(lines, fmt.Sprintf("%s %s",
+		labelStyle.Render("IPs:"),
+		valueStyle.Render(ipsValue)))
 
 	return columnStyle.Render(strings.Join(lines, "\n"))
 }
@@ -423,20 +458,24 @@ func (m Model) renderTaskTimestampsCompact(detail *TaskDetail, width int) string
 	lines = append(lines, titleStyle.Render("Timestamps"))
 
 	lines = append(lines, "")
-	lines = append(lines, labelStyle.Render("Created:"))
-	lines = append(lines, valueStyle.Render(detail.CreatedAt.Format("15:04:05")))
-	lines = append(lines, valueStyle.Render(fmt.Sprintf("(%s ago)", formatDuration(time.Since(detail.CreatedAt)))))
+	lines = append(lines, fmt.Sprintf("%s %s",
+		labelStyle.Render("Created:"),
+		valueStyle.Render(detail.CreatedAt.Format("15:04:05"))))
+	lines = append(lines, fmt.Sprintf("%s",
+		valueStyle.Render(fmt.Sprintf("(%s ago)", formatDuration(time.Since(detail.CreatedAt))))))
 
 	// Started
 	if detail.StartedAt != nil && !detail.StartedAt.IsZero() {
-		lines = append(lines, labelStyle.Render("Started:"))
-		lines = append(lines, valueStyle.Render(detail.StartedAt.Format("15:04:05")))
+		lines = append(lines, fmt.Sprintf("%s %s",
+			labelStyle.Render("Started:"),
+			valueStyle.Render(detail.StartedAt.Format("15:04:05"))))
 	}
 
 	// Stopped
 	if detail.StoppedAt != nil && !detail.StoppedAt.IsZero() {
-		lines = append(lines, labelStyle.Render("Stopped:"))
-		lines = append(lines, valueStyle.Render(detail.StoppedAt.Format("15:04:05")))
+		lines = append(lines, fmt.Sprintf("%s %s",
+			labelStyle.Render("Stopped:"),
+			valueStyle.Render(detail.StoppedAt.Format("15:04:05"))))
 	}
 
 	return columnStyle.Render(strings.Join(lines, "\n"))
@@ -889,6 +928,99 @@ func (m Model) renderContainerDetail(container ContainerDetail, width int) strin
 		}
 	}
 
+	// Health Check
+	if container.HealthCheck != nil {
+		lines = append(lines, "")
+		healthLabel := lipgloss.NewStyle().Bold(true).Render("Health Check:")
+		lines = append(lines, healthLabel)
+		if len(container.HealthCheck.Command) > 0 {
+			lines = append(lines, fmt.Sprintf("  Command: %s", strings.Join(container.HealthCheck.Command, " ")))
+		}
+		if container.HealthCheck.Interval > 0 {
+			lines = append(lines, fmt.Sprintf("  Interval: %ds", container.HealthCheck.Interval))
+		}
+		if container.HealthCheck.Timeout > 0 {
+			lines = append(lines, fmt.Sprintf("  Timeout: %ds", container.HealthCheck.Timeout))
+		}
+		if container.HealthCheck.Retries > 0 {
+			lines = append(lines, fmt.Sprintf("  Retries: %d", container.HealthCheck.Retries))
+		}
+		if container.HealthCheck.StartPeriod > 0 {
+			lines = append(lines, fmt.Sprintf("  Start Period: %ds", container.HealthCheck.StartPeriod))
+		}
+	}
+
+	// Health Status
+	if container.HealthStatus != "" && container.HealthStatus != "UNKNOWN" {
+		if container.HealthCheck == nil {
+			lines = append(lines, "")
+		}
+		healthStatusLabel := lipgloss.NewStyle().Bold(true).Render("Health Status:")
+		healthStatusColor := "244"
+		switch container.HealthStatus {
+		case "HEALTHY":
+			healthStatusColor = "82"
+		case "UNHEALTHY":
+			healthStatusColor = "196"
+		}
+		healthStatusStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(healthStatusColor))
+		lines = append(lines, fmt.Sprintf("%s %s", healthStatusLabel, healthStatusStyle.Render(container.HealthStatus)))
+	}
+
+	// Log Configuration
+	if container.LogConfig != nil {
+		lines = append(lines, "")
+		logLabel := lipgloss.NewStyle().Bold(true).Render("Log Configuration:")
+		lines = append(lines, logLabel)
+		lines = append(lines, fmt.Sprintf("  Driver: %s", container.LogConfig.LogDriver))
+		if len(container.LogConfig.Options) > 0 {
+			lines = append(lines, "  Options:")
+			// Sort keys for consistent display order
+			var keys []string
+			for key := range container.LogConfig.Options {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
+				lines = append(lines, fmt.Sprintf("    %s: %s", key, container.LogConfig.Options[key]))
+			}
+		}
+	}
+
+	// Secrets
+	if len(container.Secrets) > 0 {
+		lines = append(lines, "")
+		secretsLabel := lipgloss.NewStyle().Bold(true).Render("Secrets:")
+		lines = append(lines, secretsLabel)
+		for _, secret := range container.Secrets {
+			lines = append(lines, fmt.Sprintf("  %s: %s", secret.Name, secret.ValueFrom))
+		}
+	}
+
+	// Command and EntryPoint
+	if len(container.Command) > 0 {
+		lines = append(lines, "")
+		cmdLabel := lipgloss.NewStyle().Bold(true).Render("Command:")
+		lines = append(lines, fmt.Sprintf("%s %s", cmdLabel, strings.Join(container.Command, " ")))
+	}
+	if len(container.EntryPoint) > 0 {
+		lines = append(lines, "")
+		entryLabel := lipgloss.NewStyle().Bold(true).Render("Entry Point:")
+		lines = append(lines, fmt.Sprintf("%s %s", entryLabel, strings.Join(container.EntryPoint, " ")))
+	}
+
+	// Working Directory and User
+	if container.WorkingDir != "" {
+		lines = append(lines, "")
+		workDirLabel := lipgloss.NewStyle().Bold(true).Render("Working Dir:")
+		lines = append(lines, fmt.Sprintf("%s %s", workDirLabel, container.WorkingDir))
+	}
+	if container.User != "" {
+		lines = append(lines, "")
+		userLabel := lipgloss.NewStyle().Bold(true).Render("User:")
+		lines = append(lines, fmt.Sprintf("%s %s", userLabel, container.User))
+	}
+
 	return strings.Join(lines, "\n")
 }
 
@@ -1077,12 +1209,30 @@ func (m Model) loadTaskDetailsCmd() tea.Cmd {
 		var containerEssential map[string]bool
 		var containerImages map[string]string
 		var containerResources map[string]struct{ CPU, Memory string }
+		var containerHealthChecks map[string]*HealthCheck
+		var containerLogConfigs map[string]*LogConfiguration
+		var containerSecrets map[string][]Secret
+		var containerEnvironments map[string][]EnvironmentVariable
+		var containerMountPoints map[string][]MountPoint
+		var containerCommands map[string][]string
+		var containerEntryPoints map[string][]string
+		var containerWorkingDirs map[string]string
+		var containerUsers map[string]string
 
 		// Initialize maps regardless of task definition fetch result
 		containerDependencies = make(map[string][]ContainerDependency)
 		containerEssential = make(map[string]bool)
 		containerImages = make(map[string]string)
 		containerResources = make(map[string]struct{ CPU, Memory string })
+		containerHealthChecks = make(map[string]*HealthCheck)
+		containerLogConfigs = make(map[string]*LogConfiguration)
+		containerSecrets = make(map[string][]Secret)
+		containerEnvironments = make(map[string][]EnvironmentVariable)
+		containerMountPoints = make(map[string][]MountPoint)
+		containerCommands = make(map[string][]string)
+		containerEntryPoints = make(map[string][]string)
+		containerWorkingDirs = make(map[string]string)
+		containerUsers = make(map[string]string)
 
 		if task.TaskDefinitionArn != "" {
 			if debugLogger := GetDebugLogger(); debugLogger != nil {
@@ -1144,6 +1294,78 @@ func (m Model) loadTaskDetailsCmd() tea.Cmd {
 							}
 							containerDependencies[containerDef.Name] = deps
 						}
+
+						// Store health check
+						if containerDef.HealthCheck != nil {
+							containerHealthChecks[containerDef.Name] = &HealthCheck{
+								Command:     containerDef.HealthCheck.Command,
+								Interval:    containerDef.HealthCheck.Interval,
+								Timeout:     containerDef.HealthCheck.Timeout,
+								Retries:     containerDef.HealthCheck.Retries,
+								StartPeriod: containerDef.HealthCheck.StartPeriod,
+							}
+						}
+
+						// Store log configuration
+						if containerDef.LogConfiguration != nil {
+							containerLogConfigs[containerDef.Name] = &LogConfiguration{
+								LogDriver: containerDef.LogConfiguration.LogDriver,
+								Options:   containerDef.LogConfiguration.Options,
+							}
+						}
+
+						// Store secrets
+						if len(containerDef.Secrets) > 0 {
+							var secrets []Secret
+							for _, s := range containerDef.Secrets {
+								secrets = append(secrets, Secret{
+									Name:      s.Name,
+									ValueFrom: s.ValueFrom,
+								})
+							}
+							containerSecrets[containerDef.Name] = secrets
+						}
+
+						// Store environment variables
+						if len(containerDef.Environment) > 0 {
+							var envVars []EnvironmentVariable
+							for _, e := range containerDef.Environment {
+								envVars = append(envVars, EnvironmentVariable{
+									Name:  e.Name,
+									Value: e.Value,
+								})
+							}
+							containerEnvironments[containerDef.Name] = envVars
+						}
+
+						// Store mount points
+						if len(containerDef.MountPoints) > 0 {
+							var mounts []MountPoint
+							for _, m := range containerDef.MountPoints {
+								mounts = append(mounts, MountPoint{
+									SourceVolume:  m.SourceVolume,
+									ContainerPath: m.ContainerPath,
+									ReadOnly:      m.ReadOnly,
+								})
+							}
+							containerMountPoints[containerDef.Name] = mounts
+						}
+
+						// Store command and entrypoint
+						if len(containerDef.Command) > 0 {
+							containerCommands[containerDef.Name] = containerDef.Command
+						}
+						if len(containerDef.EntryPoint) > 0 {
+							containerEntryPoints[containerDef.Name] = containerDef.EntryPoint
+						}
+
+						// Store working directory and user
+						if containerDef.WorkingDirectory != "" {
+							containerWorkingDirs[containerDef.Name] = containerDef.WorkingDirectory
+						}
+						if containerDef.User != "" {
+							containerUsers[containerDef.Name] = containerDef.User
+						}
 					}
 				}
 			} else {
@@ -1193,6 +1415,51 @@ func (m Model) loadTaskDetailsCmd() tea.Cmd {
 			// Add essential flag if available
 			if essential, ok := containerEssential[container.Name]; ok {
 				containerDetail.Essential = essential
+			}
+
+			// Add health check if available
+			if healthCheck, ok := containerHealthChecks[container.Name]; ok {
+				containerDetail.HealthCheck = healthCheck
+			}
+
+			// Add log configuration if available
+			if logConfig, ok := containerLogConfigs[container.Name]; ok {
+				containerDetail.LogConfig = logConfig
+			}
+
+			// Add secrets if available
+			if secrets, ok := containerSecrets[container.Name]; ok {
+				containerDetail.Secrets = secrets
+			}
+
+			// Add environment variables if available
+			if envVars, ok := containerEnvironments[container.Name]; ok {
+				containerDetail.Environment = envVars
+			}
+
+			// Add mount points if available
+			if mounts, ok := containerMountPoints[container.Name]; ok {
+				containerDetail.MountPoints = mounts
+			}
+
+			// Add command if available
+			if command, ok := containerCommands[container.Name]; ok {
+				containerDetail.Command = command
+			}
+
+			// Add entrypoint if available
+			if entryPoint, ok := containerEntryPoints[container.Name]; ok {
+				containerDetail.EntryPoint = entryPoint
+			}
+
+			// Add working directory if available
+			if workingDir, ok := containerWorkingDirs[container.Name]; ok {
+				containerDetail.WorkingDir = workingDir
+			}
+
+			// Add user if available
+			if user, ok := containerUsers[container.Name]; ok {
+				containerDetail.User = user
 			}
 
 			detail.Containers = append(detail.Containers, containerDetail)
