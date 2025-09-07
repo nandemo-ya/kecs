@@ -8,8 +8,7 @@ echo "============================================"
 # Configuration
 CLUSTER_NAME=${CLUSTER_NAME:-"default"}
 REGION=${REGION:-"us-east-1"}
-LOCALSTACK_ENDPOINT=${LOCALSTACK_ENDPOINT:-"http://localhost:4566"}
-AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-"http://localhost:8080"}
+AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-"http://localhost:5373"}
 
 # Create log group in LocalStack
 echo "1. Creating CloudWatch log group in LocalStack..."

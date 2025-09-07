@@ -4,7 +4,7 @@
 
 set -e
 
-KECS_ENDPOINT="${KECS_ENDPOINT:-http://localhost:8080}"
+KECS_ENDPOINT="${KECS_ENDPOINT:-http://localhost:5373}"
 CLUSTER_NAME="${CLUSTER_NAME:-default}"
 SERVICE_NAME="webapp-service"
 REGION="us-east-1"

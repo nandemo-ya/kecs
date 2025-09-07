@@ -3,7 +3,7 @@
 # Setup script for creating secrets in LocalStack
 # This script creates SSM parameters and Secrets Manager secrets for testing
 
-ENDPOINT_URL=${ENDPOINT_URL:-http://localhost:8080}
+ENDPOINT_URL=${ENDPOINT_URL:-http://localhost:5373}
 REGION=${REGION:-us-east-1}
 
 echo "Creating SSM Parameters..."

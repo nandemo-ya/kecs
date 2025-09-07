@@ -7,7 +7,6 @@ This directory contains practical examples demonstrating how to use KECS (Kubern
 Each example is self-contained with:
 - `task_def.json` - ECS task definition
 - `service_def.json` - ECS service definition (except for batch jobs)
-- `ecspresso.yml` - ecspresso configuration for easy deployment
 - `README.md` - Detailed documentation including setup, deployment, and testing
 
 ## Available Examples
@@ -95,11 +94,6 @@ Each example is self-contained with:
    aws ecs list-clusters --endpoint-url http://localhost:5373
    ```
 
-4. **Install ecspresso** (optional but recommended)
-   ```bash
-   brew install kayac/tap/ecspresso
-   # Or download from https://github.com/kayac/ecspresso/releases
-   ```
 
 ### Quick Start
 
@@ -110,12 +104,7 @@ Each example is self-contained with:
 
 2. Follow the README in that directory for specific setup instructions
 
-3. Deploy using ecspresso:
-   ```bash
-   ecspresso deploy --config ecspresso.yml
-   ```
-
-4. Or deploy using AWS CLI:
+3. Deploy using AWS CLI:
    ```bash
    aws ecs register-task-definition --cli-input-json file://task_def.json --endpoint-url http://localhost:5373
    aws ecs create-service --cli-input-json file://service_def.json --endpoint-url http://localhost:5373
@@ -123,30 +112,26 @@ Each example is self-contained with:
 
 ## Common Patterns
 
-### Using ecspresso
+### Using AWS CLI
 
-ecspresso simplifies ECS deployments with features like:
-- Unified configuration management
-- Deployment status tracking
-- Log streaming
-- Service scaling
+Deploy and manage services using AWS CLI commands:
 
-Basic commands:
 ```bash
 # Deploy service
-ecspresso deploy --config ecspresso.yml
+aws ecs register-task-definition --cli-input-json file://task_def.json --endpoint-url http://localhost:5373
+aws ecs create-service --cli-input-json file://service_def.json --endpoint-url http://localhost:5373
 
-# Check status
-ecspresso status --config ecspresso.yml
+# Check service status
+aws ecs describe-services --cluster default --services <service-name> --endpoint-url http://localhost:5373
 
-# View logs
-ecspresso logs --config ecspresso.yml
+# View task logs (via kubectl)
+kubectl logs -n default <pod-name> -c <container-name>
 
 # Scale service
-ecspresso scale --config ecspresso.yml --tasks 5
+aws ecs update-service --cluster default --service <service-name> --desired-count 5 --endpoint-url http://localhost:5373
 
 # Run one-off task
-ecspresso run --config ecspresso.yml
+aws ecs run-task --cluster default --task-definition <task-def> --endpoint-url http://localhost:5373
 ```
 
 ### Testing with Kubernetes
@@ -170,34 +155,28 @@ kubectl port-forward -n default <pod-name> 8080:80
 kubectl exec -it -n default <pod-name> -c <container-name> -- sh
 ```
 
-### Working with LocalStack
+### Working with KECS
 
-Some examples require additional AWS services. Use LocalStack for local development:
+KECS automatically includes LocalStack support when you create an instance, providing integrated support for additional AWS services like Secrets Manager, SSM Parameter Store, IAM, and ELBv2.
 
 ```bash
-# Start LocalStack with required services
-docker run -d \
-  --name localstack \
-  -p 4566:4566 \
-  -e SERVICES=secretsmanager,ssm,iam,elbv2 \
-  localstack/localstack
-
-# Use different endpoints for different services
-aws ecs create-cluster --endpoint-url http://localhost:5373      # KECS for ECS
-aws secretsmanager create-secret --endpoint-url http://localhost:4566  # LocalStack for Secrets
+# All AWS services are available through KECS endpoint
+aws ecs create-cluster --endpoint-url http://localhost:5373
+aws secretsmanager create-secret --endpoint-url http://localhost:5373
+aws ssm put-parameter --endpoint-url http://localhost:5373
 ```
 
 ## Advanced Usage
 
 ### Environment-Specific Deployments
 
-Use ecspresso with environment variables:
+Use environment variables with your deployment scripts:
 ```bash
 # Development
-ENV=dev ecspresso deploy --config ecspresso.yml
+ENV=dev aws ecs update-service --cluster default --service my-service --task-definition my-task:dev --endpoint-url http://localhost:5373
 
 # Production
-ENV=prod ecspresso deploy --config ecspresso.yml
+ENV=prod aws ecs update-service --cluster default --service my-service --task-definition my-task:prod --endpoint-url http://localhost:5373
 ```
 
 ### CI/CD Integration
@@ -228,7 +207,7 @@ Modify task definitions for your needs:
    - Use kubectl port-forward for testing
 
 3. **Secrets not loading**
-   - Ensure LocalStack is running
+   - Check if KECS instance is running (LocalStack is included)
    - Check IAM permissions
    - Verify secret ARNs
 
@@ -259,17 +238,15 @@ To add a new example:
 2. Include all required files:
    - `task_def.json`
    - `service_def.json` (if applicable)
-   - `ecspresso.yml`
    - `README.md`
 3. Follow the existing examples' structure
-4. Test thoroughly with both ecspresso and AWS CLI
+4. Test thoroughly with AWS CLI
 5. Document any special requirements or dependencies
 
 ## Additional Resources
 
 - [KECS Documentation](https://kecs.io)
 - [ECS Best Practices Guide](https://docs.aws.amazon.com/AmazonECS/latest/bestpracticesguide/)
-- [ecspresso Documentation](https://github.com/kayac/ecspresso)
 - [LocalStack Documentation](https://docs.localstack.cloud/)
 
 ## Legacy Examples
