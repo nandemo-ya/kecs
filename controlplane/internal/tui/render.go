@@ -1420,7 +1420,7 @@ func (m Model) renderShortcutsColumn(width int) string {
 	}
 
 	// For wider columns, use two-column layout
-	halfWidth := (width - 3) / 2 // -3 for border and padding
+	halfWidth := (width - 2) / 2 // -2 for gap between columns
 
 	// Left column: Screen-specific shortcuts
 	var leftShortcuts []string
@@ -1511,7 +1511,6 @@ func (m Model) renderShortcutsColumn(width int) string {
 	rightColumn := lipgloss.NewStyle().
 		Width(halfWidth).
 		Align(lipgloss.Left).
-		PaddingLeft(1).
 		Render(strings.Join(rightShortcuts, "\n"))
 
 	// Join columns horizontally
