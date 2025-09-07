@@ -239,6 +239,30 @@ func (r *KeyBindingsRegistry) GetViewAction(view ViewType, key string) (KeyActio
 	return "", false
 }
 
+// mergeUniqueKeys merges two key slices, removing duplicates while preserving order
+func mergeUniqueKeys(existing, new []string) []string {
+	keySet := make(map[string]bool)
+	var result []string
+
+	// Add existing keys first (preserving order)
+	for _, key := range existing {
+		if !keySet[key] {
+			keySet[key] = true
+			result = append(result, key)
+		}
+	}
+
+	// Add new keys that aren't already present
+	for _, key := range new {
+		if !keySet[key] {
+			keySet[key] = true
+			result = append(result, key)
+		}
+	}
+
+	return result
+}
+
 // GetGlobalBindings returns all global key bindings in a stable order
 func (r *KeyBindingsRegistry) GetGlobalBindings() []KeyBinding {
 	// Define the order of global actions for consistent display
@@ -259,8 +283,8 @@ func (r *KeyBindingsRegistry) GetGlobalBindings() []KeyBinding {
 	uniqueBindings := make(map[KeyAction]KeyBinding)
 	for _, binding := range r.globalBindings {
 		if existing, found := uniqueBindings[binding.Action]; found {
-			// Merge keys from duplicate bindings
-			existing.Keys = append(existing.Keys, binding.Keys...)
+			// Merge keys from duplicate bindings (removing duplicates)
+			existing.Keys = mergeUniqueKeys(existing.Keys, binding.Keys)
 			uniqueBindings[binding.Action] = existing
 		} else {
 			uniqueBindings[binding.Action] = binding
@@ -338,8 +362,8 @@ func (r *KeyBindingsRegistry) GetViewBindings(view ViewType) []KeyBinding {
 	uniqueBindings := make(map[KeyAction]KeyBinding)
 	for _, binding := range viewMap {
 		if existing, found := uniqueBindings[binding.Action]; found {
-			// Merge keys from duplicate bindings
-			existing.Keys = append(existing.Keys, binding.Keys...)
+			// Merge keys from duplicate bindings (removing duplicates)
+			existing.Keys = mergeUniqueKeys(existing.Keys, binding.Keys)
 			uniqueBindings[binding.Action] = existing
 		} else {
 			uniqueBindings[binding.Action] = binding
