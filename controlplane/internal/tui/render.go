@@ -1355,9 +1355,6 @@ func (m Model) renderShortcutsColumn(width int) string {
 					allShortcuts = append(allShortcuts, shortcut)
 				}
 			}
-
-			// Add separator if we have view shortcuts
-			allShortcuts = append(allShortcuts, "")
 		}
 
 		// Add global shortcuts header
