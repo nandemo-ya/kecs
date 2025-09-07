@@ -58,16 +58,11 @@ This example demonstrates deploying a microservice API with Application Load Bal
 ### 1. Start KECS and LocalStack
 
 ```bash
-# Start KECS
+# Start KECS (LocalStack with ALB support is automatically included)
 kecs start
 
-# Optional: Start LocalStack for ALB support
-docker run -d \
-  --name localstack \
-  -p 4566:4566 \
-  -e SERVICES=elbv2,iam,logs \
-  -e DEBUG=1 \
-  localstack/localstack
+# LocalStack is automatically available at port 4566
+# No need to manually start LocalStack
 ```
 
 ### 2. Create the ECS Cluster

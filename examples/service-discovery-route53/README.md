@@ -4,35 +4,24 @@ This example demonstrates how to use KECS Service Discovery with Route53 integra
 
 ## Prerequisites
 
-1. LocalStack running with Route53 enabled
-2. KECS instance running with Route53 integration configured
+1. KECS instance running (LocalStack with Route53 is automatically included)
 
 ## Setup
 
-### 1. Start LocalStack
+### 1. Start KECS with Route53 Integration
 
 ```bash
-docker run -d \
-  --name localstack \
-  -p 4566:4566 \
-  -e SERVICES=route53 \
-  localstack/localstack
-```
-
-### 2. Start KECS with Route53 Integration
-
-```bash
-# Set environment variables
+# Set environment variables for LocalStack access
 export LOCALSTACK_ENDPOINT=http://localhost:4566
 export AWS_ACCESS_KEY_ID=test
 export AWS_SECRET_ACCESS_KEY=test
 export AWS_REGION=us-east-1
 
-# Start KECS
+# Start KECS (LocalStack is automatically started with Route53 support)
 kecs start --name discovery-demo
 ```
 
-### 3. Create Service Discovery Namespace
+### 2. Create Service Discovery Namespace
 
 ```bash
 # Create a private DNS namespace

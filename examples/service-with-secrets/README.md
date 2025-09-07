@@ -57,22 +57,14 @@ This example uses two different endpoints:
 ### 1. Start KECS and LocalStack
 
 ```bash
-# Start KECS
+# Start KECS (LocalStack is automatically started with KECS)
 kecs start
 
-# Start LocalStack with required services
-docker run -d \
-  --name localstack \
-  -p 4566:4566 \
-  -e SERVICES=secretsmanager,ssm,iam,logs,ecs \
-  -e DEBUG=1 \
-  localstack/localstack
+# Wait for KECS and LocalStack to be ready
+kecs status
 
-# Wait for LocalStack to be ready
-until curl -s http://localhost:4566/_localstack/health | grep -q '"ssm": "available"'; do
-  echo "Waiting for LocalStack..."
-  sleep 2
-done
+# LocalStack is automatically available at port 4566
+# No need to manually start LocalStack
 ```
 
 ### 2. Create the ECS Cluster
