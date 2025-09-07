@@ -87,29 +87,25 @@ TASK_ARN=$(aws ecs list-tasks \
   --endpoint-url http://localhost:5373 \
   --query 'taskArns[0]' --output text)
 
-# Describe task to get IP address
-TASK_IP=$(aws ecs describe-tasks \
+# Describe task to check status
+aws ecs describe-tasks \
   --cluster default \
   --tasks $TASK_ARN \
   --endpoint-url http://localhost:5373 \
-  --query 'tasks[0].containers[0].networkInterfaces[0].privateIpv4Address' \
-  --output text)
+  --query 'tasks[0].{Status:lastStatus,DesiredStatus:desiredStatus,TaskArn:taskArn}'
 ```
 
-### 4. Test the Nginx Server
-
-Since KECS runs tasks in Kubernetes, you can access the nginx server through port-forwarding:
+### 4. Check CloudWatch Logs
 
 ```bash
-# Get the pod name
-POD_NAME=$(kubectl get pods -n default -l app=single-task-nginx -o jsonpath='{.items[0].metadata.name}')
+# View recent logs
+aws logs tail /ecs/single-task-nginx \
+  --endpoint-url http://localhost:5373
 
-# Port forward to access nginx
-kubectl port-forward -n default $POD_NAME 8888:80
-
-# In another terminal, test nginx
-curl http://localhost:8888/
-# Expected output: Default nginx welcome page HTML
+# Follow logs in real-time
+aws logs tail /ecs/single-task-nginx \
+  --endpoint-url http://localhost:5373 \
+  --follow
 ```
 
 ## Key Points to Verify
@@ -118,7 +114,6 @@ curl http://localhost:8888/
 2. **Service Status**: desiredCount should match runningCount
 3. **Health Checks**: Container should pass health checks
 4. **Logs**: Check CloudWatch logs for any errors
-5. **Network Access**: Nginx should respond on port 80
 
 ## Troubleshooting
 
@@ -130,11 +125,14 @@ aws logs tail /ecs/single-task-nginx \
   --follow
 ```
 
-### Check Pod Status in Kubernetes
+### Check Service Events
 
 ```bash
-kubectl get pods -n default -l app=single-task-nginx
-kubectl describe pod -n default $POD_NAME
+aws ecs describe-services \
+  --cluster default \
+  --services single-task-nginx \
+  --endpoint-url http://localhost:5373 \
+  --query 'services[0].events[0:5]'
 ```
 
 ## Cleanup
