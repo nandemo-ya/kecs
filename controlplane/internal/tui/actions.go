@@ -23,6 +23,11 @@ import (
 
 // executeAction handles both global and view-specific actions
 func (m Model) executeAction(action KeyAction) (Model, tea.Cmd) {
+	// For certain views, handle MoveUp/MoveDown specially
+	if m.currentView == ViewTaskDescribe && (action == ActionMoveUp || action == ActionMoveDown) {
+		return m.executeTaskDescribeAction(action)
+	}
+
 	// Check if it's a global action first
 	// Global actions are: Quit, Back, Help, Search, Command, MoveUp, MoveDown, Refresh, GoHome, SwitchInstance
 	switch action {
@@ -407,13 +412,19 @@ func (m Model) executeTaskDescribeAction(action KeyAction) (Model, tea.Cmd) {
 
 	switch action {
 	case ActionMoveUp:
-		if m.taskDescribeScroll > 0 {
-			m.taskDescribeScroll--
+		// Move container selection up
+		if m.selectedTaskDetail != nil && len(m.selectedTaskDetail.Containers) > 0 {
+			if m.selectedContainer > 0 {
+				m.selectedContainer--
+			}
 		}
 
 	case ActionMoveDown:
-		if m.taskDescribeScroll < maxScroll {
-			m.taskDescribeScroll++
+		// Move container selection down
+		if m.selectedTaskDetail != nil && len(m.selectedTaskDetail.Containers) > 0 {
+			if m.selectedContainer < len(m.selectedTaskDetail.Containers)-1 {
+				m.selectedContainer++
+			}
 		}
 
 	case ActionPageUp:
@@ -438,8 +449,8 @@ func (m Model) executeTaskDescribeAction(action KeyAction) (Model, tea.Cmd) {
 		if m.selectedTaskDetail != nil {
 			m.previousView = m.currentView
 			containerName := ""
-			if len(m.selectedTaskDetail.Containers) > 0 {
-				containerName = m.selectedTaskDetail.Containers[0].Name
+			if len(m.selectedTaskDetail.Containers) > 0 && m.selectedContainer < len(m.selectedTaskDetail.Containers) {
+				containerName = m.selectedTaskDetail.Containers[m.selectedContainer].Name
 			}
 			return m, m.viewTaskLogsCmd(m.selectedTaskDetail.TaskARN, containerName)
 		}

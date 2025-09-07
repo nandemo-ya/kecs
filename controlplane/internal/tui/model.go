@@ -184,6 +184,7 @@ type Model struct {
 	selectedTask       string
 	selectedTaskDetail *TaskDetail // Detailed task information
 	taskDescribeScroll int         // Scroll position for task describe view
+	selectedContainer  int         // Selected container index in task describe view
 
 	// List cursors
 	instanceCursor int

@@ -155,6 +155,21 @@ type ContainerDetail struct {
 	HealthStatus    string
 	NetworkBindings []NetworkBinding
 	DependsOn       []ContainerDependency // Dependencies on other containers
+	Environment     []EnvironmentVariable // Environment variables
+	MountPoints     []MountPoint          // Volume mount points
+}
+
+// EnvironmentVariable represents an environment variable
+type EnvironmentVariable struct {
+	Name  string
+	Value string
+}
+
+// MountPoint represents a volume mount point
+type MountPoint struct {
+	SourceVolume  string
+	ContainerPath string
+	ReadOnly      bool
 }
 
 // ContainerDependency represents a dependency on another container
@@ -179,15 +194,33 @@ func (m Model) renderTaskDescribe() string {
 
 	detail := m.selectedTaskDetail
 
-	// Create sections with proper spacing
+	// Calculate available width for 3-column layout
+	availableWidth := m.width - 10 // Account for padding and borders
+	columnWidth := availableWidth / 3
+
+	// Render Overview, Network, and Timestamps in 3 columns
+	overviewSection := m.renderTaskOverviewCompact(detail, columnWidth)
+	networkSection := m.renderTaskNetworkCompact(detail, columnWidth)
+	timestampsSection := m.renderTaskTimestampsCompact(detail, columnWidth)
+
+	// Join the three sections horizontally
+	topSection := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		overviewSection,
+		networkSection,
+		timestampsSection,
+	)
+
+	// Render containers section with horizontal layout
+	containersSection := m.renderTaskContainersHorizontal(detail, availableWidth)
+
+	// Join sections vertically
 	sections := []string{
-		m.renderTaskOverview(detail),
-		m.renderTaskContainers(detail),
-		m.renderTaskNetwork(detail),
-		m.renderTaskTimestamps(detail),
+		topSection,
+		containersSection,
 	}
 
-	// Join sections with more spacing
+	// Join sections with spacing
 	content := strings.Join(sections, "\n\n")
 
 	// Don't add padding here since it's now handled by the resource panel
@@ -257,6 +290,156 @@ func (m Model) renderTaskDescribe() string {
 
 	// Return content only (no header/footer since it's in the resource panel now)
 	return content
+}
+
+// renderTaskOverviewCompact renders a compact overview for 3-column layout
+func (m Model) renderTaskOverviewCompact(detail *TaskDetail, width int) string {
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("214"))
+
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("244"))
+
+	valueStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252"))
+
+	columnStyle := lipgloss.NewStyle().
+		Width(width).
+		MaxWidth(width).
+		Padding(0, 1)
+
+	var lines []string
+	lines = append(lines, titleStyle.Render("Overview"))
+
+	// Task Definition - compact format
+	taskDefDisplay := detail.TaskDefinition
+	if taskDefDisplay != "" {
+		parts := strings.Split(taskDefDisplay, "/")
+		if len(parts) > 1 {
+			taskDefDisplay = parts[len(parts)-1]
+		}
+	} else {
+		taskDefDisplay = "-"
+	}
+	lines = append(lines, "")
+	lines = append(lines, labelStyle.Render("Task Definition:"))
+	lines = append(lines, valueStyle.Render(taskDefDisplay))
+
+	// Launch Type
+	launchType := detail.LaunchType
+	if launchType == "" {
+		launchType = "FARGATE"
+	}
+	lines = append(lines, labelStyle.Render("Launch Type:"))
+	lines = append(lines, valueStyle.Render(launchType))
+
+	// Resources
+	cpu := detail.CPU
+	if cpu == "" {
+		cpu = "-"
+	}
+	memory := detail.Memory
+	if memory == "" {
+		memory = "-"
+	}
+	lines = append(lines, labelStyle.Render("Resources:"))
+	lines = append(lines, valueStyle.Render(fmt.Sprintf("CPU: %s, Memory: %s", cpu, memory)))
+
+	// Health
+	if detail.HealthStatus != "" {
+		healthColor := "244"
+		if detail.HealthStatus == "HEALTHY" {
+			healthColor = "82"
+		} else if detail.HealthStatus == "UNHEALTHY" {
+			healthColor = "196"
+		}
+		healthStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(healthColor))
+		lines = append(lines, labelStyle.Render("Health:"))
+		lines = append(lines, healthStyle.Render(detail.HealthStatus))
+	}
+
+	return columnStyle.Render(strings.Join(lines, "\n"))
+}
+
+// renderTaskNetworkCompact renders a compact network section for 3-column layout
+func (m Model) renderTaskNetworkCompact(detail *TaskDetail, width int) string {
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("214"))
+
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("244"))
+
+	valueStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252"))
+
+	columnStyle := lipgloss.NewStyle().
+		Width(width).
+		MaxWidth(width).
+		Padding(0, 1)
+
+	var lines []string
+	lines = append(lines, titleStyle.Render("Network"))
+
+	// Network Mode
+	networkMode := detail.NetworkMode
+	if networkMode == "" {
+		networkMode = "awsvpc"
+	}
+	lines = append(lines, "")
+	lines = append(lines, labelStyle.Render("Mode:"))
+	lines = append(lines, valueStyle.Render(networkMode))
+
+	// IPs
+	lines = append(lines, labelStyle.Render("IPs:"))
+	if len(detail.IPs) > 0 {
+		lines = append(lines, valueStyle.Render(strings.Join(detail.IPs, ", ")))
+	} else {
+		lines = append(lines, valueStyle.Render("-"))
+	}
+
+	return columnStyle.Render(strings.Join(lines, "\n"))
+}
+
+// renderTaskTimestampsCompact renders a compact timestamps section for 3-column layout
+func (m Model) renderTaskTimestampsCompact(detail *TaskDetail, width int) string {
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("214"))
+
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("244"))
+
+	valueStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252"))
+
+	columnStyle := lipgloss.NewStyle().
+		Width(width).
+		MaxWidth(width).
+		Padding(0, 1)
+
+	var lines []string
+	lines = append(lines, titleStyle.Render("Timestamps"))
+
+	lines = append(lines, "")
+	lines = append(lines, labelStyle.Render("Created:"))
+	lines = append(lines, valueStyle.Render(detail.CreatedAt.Format("15:04:05")))
+	lines = append(lines, valueStyle.Render(fmt.Sprintf("(%s ago)", formatDuration(time.Since(detail.CreatedAt)))))
+
+	// Started
+	if detail.StartedAt != nil && !detail.StartedAt.IsZero() {
+		lines = append(lines, labelStyle.Render("Started:"))
+		lines = append(lines, valueStyle.Render(detail.StartedAt.Format("15:04:05")))
+	}
+
+	// Stopped
+	if detail.StoppedAt != nil && !detail.StoppedAt.IsZero() {
+		lines = append(lines, labelStyle.Render("Stopped:"))
+		lines = append(lines, valueStyle.Render(detail.StoppedAt.Format("15:04:05")))
+	}
+
+	return columnStyle.Render(strings.Join(lines, "\n"))
 }
 
 func (m Model) renderTaskOverview(detail *TaskDetail) string {
@@ -474,6 +657,239 @@ func (m Model) renderTaskContainers(detail *TaskDetail) string {
 	}
 
 	return sectionStyle.Render(strings.Join(sections, "\n"))
+}
+
+// renderTaskContainersHorizontal renders containers in a 2-column layout with selectable list
+func (m Model) renderTaskContainersHorizontal(detail *TaskDetail, width int) string {
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("214"))
+
+	sectionStyle := lipgloss.NewStyle().
+		MarginBottom(1)
+
+	// Title
+	title := titleStyle.Render(fmt.Sprintf("Containers (%d)", len(detail.Containers)))
+
+	numContainers := len(detail.Containers)
+	if numContainers == 0 {
+		return sectionStyle.Render(title + "\n\nNo containers")
+	}
+
+	// Calculate widths for 2-column layout
+	listWidth := 25                      // Fixed width for container list (reduced since no border)
+	detailWidth := width - listWidth - 4 // -4 for margin/padding between columns
+
+	// Ensure minimum widths
+	if detailWidth < 40 {
+		detailWidth = 40
+	}
+
+	// Build container list (left column)
+	listStyle := lipgloss.NewStyle().
+		Width(listWidth).
+		Padding(0, 1)
+
+	var listItems []string
+	for i, container := range detail.Containers {
+		// Container status color
+		statusColor := "244"
+		switch strings.ToUpper(container.Status) {
+		case "RUNNING":
+			statusColor = "82"
+		case "PENDING":
+			statusColor = "226"
+		case "STOPPED":
+			statusColor = "196"
+		}
+
+		statusStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor))
+
+		// Format container name with selection indicator
+		nameDisplay := container.Name
+		if len(nameDisplay) > listWidth-6 { // Leave space for status indicator
+			nameDisplay = nameDisplay[:listWidth-9] + "..."
+		}
+
+		itemStyle := lipgloss.NewStyle()
+		if i == m.selectedContainer {
+			// Highlight selected container
+			itemStyle = itemStyle.
+				Background(lipgloss.Color("237")).
+				Foreground(lipgloss.Color("220")).
+				Bold(true)
+			listItems = append(listItems, itemStyle.Render(fmt.Sprintf("▶ %s [%s]",
+				nameDisplay,
+				statusStyle.Render(strings.ToUpper(container.Status[:1])))))
+		} else {
+			listItems = append(listItems, fmt.Sprintf("  %s [%s]",
+				nameDisplay,
+				statusStyle.Render(strings.ToUpper(container.Status[:1]))))
+		}
+	}
+
+	containerList := listStyle.Render(strings.Join(listItems, "\n"))
+
+	// Build container detail (right column)
+	detailStyle := lipgloss.NewStyle().
+		Width(detailWidth).
+		Padding(0, 1)
+
+	// Ensure selected container index is valid
+	if m.selectedContainer >= len(detail.Containers) {
+		m.selectedContainer = 0
+	}
+
+	selectedContainer := detail.Containers[m.selectedContainer]
+	detailContent := m.renderContainerDetail(selectedContainer, detailWidth-2) // -2 for padding
+
+	containerDetail := detailStyle.Render(detailContent)
+
+	// Join the two columns
+	columnsRow := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		containerList,
+		lipgloss.NewStyle().Width(2).Render("  "), // Spacer
+		containerDetail,
+	)
+
+	// Combine title and columns
+	return sectionStyle.Render(title + "\n\n" + columnsRow)
+}
+
+// renderContainerDetail renders detailed information for a single container
+func (m Model) renderContainerDetail(container ContainerDetail, width int) string {
+	var lines []string
+
+	// Container name and status header
+	statusColor := "244"
+	switch strings.ToUpper(container.Status) {
+	case "RUNNING":
+		statusColor = "82"
+	case "PENDING":
+		statusColor = "226"
+	case "STOPPED":
+		statusColor = "196"
+	}
+
+	nameStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("220"))
+	statusStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor))
+
+	header := fmt.Sprintf("%s [%s]",
+		nameStyle.Render(container.Name),
+		statusStyle.Render(container.Status))
+
+	if container.Essential {
+		header += " " + lipgloss.NewStyle().
+			Foreground(lipgloss.Color("214")).
+			Render("(essential)")
+	}
+
+	lines = append(lines, header)
+	lines = append(lines, "") // Empty line after header
+
+	// Image
+	if container.Image != "" {
+		imageLabel := lipgloss.NewStyle().Bold(true).Render("Image:")
+		lines = append(lines, fmt.Sprintf("%s %s", imageLabel, container.Image))
+	} else {
+		lines = append(lines, lipgloss.NewStyle().Bold(true).Render("Image:")+" -")
+	}
+
+	// Resources
+	cpu := container.CPU
+	if cpu == "" {
+		cpu = "-"
+	}
+	memory := container.Memory
+	if memory == "" {
+		memory = "-"
+	}
+	resourceLabel := lipgloss.NewStyle().Bold(true).Render("Resources:")
+	lines = append(lines, fmt.Sprintf("%s CPU=%s, Memory=%s", resourceLabel, cpu, memory))
+
+	// Exit code and reason
+	if container.ExitCode != nil {
+		exitColor := "82"
+		if *container.ExitCode != 0 {
+			exitColor = "196"
+		}
+		exitStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(exitColor))
+		exitLabel := lipgloss.NewStyle().Bold(true).Render("Exit Code:")
+		lines = append(lines, fmt.Sprintf("%s %s", exitLabel,
+			exitStyle.Render(fmt.Sprintf("%d", *container.ExitCode))))
+
+		if container.Reason != "" {
+			reasonLabel := lipgloss.NewStyle().Bold(true).Render("Reason:")
+			lines = append(lines, fmt.Sprintf("%s %s", reasonLabel, container.Reason))
+		}
+	}
+
+	// Environment variables (if present, show first few)
+	if len(container.Environment) > 0 {
+		lines = append(lines, "")
+		envLabel := lipgloss.NewStyle().Bold(true).Render("Environment:")
+		lines = append(lines, envLabel)
+		maxEnvVars := 5
+		for i, env := range container.Environment {
+			if i >= maxEnvVars {
+				lines = append(lines, fmt.Sprintf("  ... and %d more", len(container.Environment)-maxEnvVars))
+				break
+			}
+			lines = append(lines, fmt.Sprintf("  %s=%s", env.Name, env.Value))
+		}
+	}
+
+	// Dependencies
+	if len(container.DependsOn) > 0 {
+		lines = append(lines, "")
+		depsLabel := lipgloss.NewStyle().Bold(true).Render("Dependencies:")
+		lines = append(lines, depsLabel)
+		for _, dep := range container.DependsOn {
+			conditionColor := "244"
+			switch dep.Condition {
+			case "START":
+				conditionColor = "220"
+			case "COMPLETE":
+				conditionColor = "214"
+			case "SUCCESS":
+				conditionColor = "82"
+			case "HEALTHY":
+				conditionColor = "46"
+			}
+			condStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(conditionColor))
+			lines = append(lines, fmt.Sprintf("  %s (%s)",
+				dep.ContainerName, condStyle.Render(dep.Condition)))
+		}
+	}
+
+	// Network bindings
+	if len(container.NetworkBindings) > 0 {
+		lines = append(lines, "")
+		portsLabel := lipgloss.NewStyle().Bold(true).Render("Port Mappings:")
+		lines = append(lines, portsLabel)
+		for _, binding := range container.NetworkBindings {
+			lines = append(lines, fmt.Sprintf("  %d:%d/%s",
+				binding.HostPort, binding.ContainerPort, binding.Protocol))
+		}
+	}
+
+	// Mount points
+	if len(container.MountPoints) > 0 {
+		lines = append(lines, "")
+		mountsLabel := lipgloss.NewStyle().Bold(true).Render("Mount Points:")
+		lines = append(lines, mountsLabel)
+		for _, mount := range container.MountPoints {
+			readOnly := ""
+			if mount.ReadOnly {
+				readOnly = " (ro)"
+			}
+			lines = append(lines, fmt.Sprintf("  %s → %s%s",
+				mount.SourceVolume, mount.ContainerPath, readOnly))
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func (m Model) renderTaskNetwork(detail *TaskDetail) string {

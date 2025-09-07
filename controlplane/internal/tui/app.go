@@ -1154,68 +1154,8 @@ func (m Model) handleServicesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleTaskDescribeKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
-	// Calculate content size for proper scroll limits
-	// This is a simplified check - the actual calculation happens in render
-	maxScroll := 100 // Default reasonable max
-	if m.selectedTaskDetail != nil {
-		// Rough estimate: each section has about 10-20 lines
-		estimatedLines := 30                                        // Overview + Network + Timestamps
-		estimatedLines += len(m.selectedTaskDetail.Containers) * 10 // Each container ~10 lines
-		maxScroll = estimatedLines
-	}
-
-	switch msg.String() {
-	case "up", "k":
-		if m.taskDescribeScroll > 0 {
-			m.taskDescribeScroll--
-		}
-	case "down", "j":
-		// Check against estimated max
-		if m.taskDescribeScroll < maxScroll {
-			m.taskDescribeScroll++
-		}
-	case "pgup", "ctrl+u":
-		// Page up
-		m.taskDescribeScroll -= 10
-		if m.taskDescribeScroll < 0 {
-			m.taskDescribeScroll = 0
-		}
-	case "pgdown", "ctrl+d":
-		// Page down
-		m.taskDescribeScroll += 10
-		if m.taskDescribeScroll > maxScroll {
-			m.taskDescribeScroll = maxScroll
-		}
-	case "home", "g":
-		// Go to top
-		m.taskDescribeScroll = 0
-	case "end", "G":
-		// Go to bottom (will be adjusted in render)
-		m.taskDescribeScroll = maxScroll
-	case "l":
-		// View logs for the detailed task
-		if m.selectedTaskDetail != nil {
-			m.previousView = m.currentView
-			// Use first container name if available
-			containerName := ""
-			if len(m.selectedTaskDetail.Containers) > 0 {
-				containerName = m.selectedTaskDetail.Containers[0].Name
-			}
-			// Open log viewer with the task ARN
-			return m, m.viewTaskLogsCmd(m.selectedTaskDetail.TaskARN, containerName)
-		}
-	case "esc", "backspace":
-		// Go back to tasks list
-		m.currentView = m.previousView
-		m.selectedTaskDetail = nil
-		m.taskDescribeScroll = 0
-	case "r":
-		// TODO: Implement restart task
-		// This would require calling StopTask and then RunTask
-	case "s":
-		// TODO: Implement stop task
-		// This would require calling StopTask API
-	}
+	// This function is deprecated - all task describe actions are handled via executeTaskDescribeAction
+	// Keep this function for now but it should not be called
 	return m, nil
 }
 
@@ -1236,6 +1176,7 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.currentView = ViewTaskDescribe
 			m.selectedTaskDetail = nil // Clear previous details
 			m.taskDescribeScroll = 0
+			m.selectedContainer = 0 // Reset container selection
 			cmd := m.loadTaskDetailsCmd()
 			if debugLogger := GetDebugLogger(); debugLogger != nil {
 				debugLogger.LogWithCaller("handleTasksKeys", "loadTaskDetailsCmd() called, returning command")
