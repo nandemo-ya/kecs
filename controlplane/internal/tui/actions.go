@@ -16,6 +16,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -167,7 +168,7 @@ func (m Model) executeInstanceAction(action KeyAction) (Model, tea.Cmd) {
 	case ActionToggleInstance:
 		if len(m.instances) > 0 && m.instanceCursor < len(m.instances) {
 			instanceName := m.instances[m.instanceCursor].Name
-			instanceStatus := m.instances[m.instanceCursor].Status
+			instanceStatus := strings.ToLower(m.instances[m.instanceCursor].Status)
 
 			if instanceStatus == "stopped" {
 				m.confirmDialog = StartInstanceDialog(
