@@ -113,21 +113,7 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 		opts.InstanceName = generateInstanceName()
 	}
 
-	// Handle automatic port allocation
-	if opts.ApiPort == 0 || opts.AdminPort == 0 {
-		allocatedApiPort, allocatedAdminPort, err := m.allocatePorts(ctx, opts.ApiPort, opts.AdminPort)
-		if err != nil {
-			return fmt.Errorf("failed to allocate ports: %w", err)
-		}
-		if opts.ApiPort == 0 {
-			opts.ApiPort = allocatedApiPort
-		}
-		if opts.AdminPort == 0 {
-			opts.AdminPort = allocatedAdminPort
-		}
-	}
-
-	// Check if instance already exists and is stopped
+	// Check if instance already exists
 	exists, err := m.k3dManager.ClusterExists(ctx, opts.InstanceName)
 	if err != nil {
 		return fmt.Errorf("failed to check cluster existence: %w", err)
@@ -144,8 +130,37 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 			return fmt.Errorf("instance '%s' is already running", opts.InstanceName)
 		}
 
+		// Load saved instance config for restart BEFORE allocating ports
+		savedConfig, err := LoadInstanceConfig(opts.InstanceName)
+		if err == nil {
+			// Use saved config values if not overridden by command line
+			if opts.ApiPort == 0 {
+				opts.ApiPort = savedConfig.APIPort
+			}
+			if opts.AdminPort == 0 {
+				opts.AdminPort = savedConfig.AdminPort
+			}
+			if opts.DataDir == "" {
+				opts.DataDir = savedConfig.DataDir
+			}
+		}
+
 		// Instance exists but is stopped - restart it
 		return m.restartInstance(ctx, opts)
+	}
+
+	// Handle automatic port allocation for NEW instances only
+	if opts.ApiPort == 0 || opts.AdminPort == 0 {
+		allocatedApiPort, allocatedAdminPort, err := m.allocatePorts(ctx, opts.ApiPort, opts.AdminPort)
+		if err != nil {
+			return fmt.Errorf("failed to allocate ports: %w", err)
+		}
+		if opts.ApiPort == 0 {
+			opts.ApiPort = allocatedApiPort
+		}
+		if opts.AdminPort == 0 {
+			opts.AdminPort = allocatedAdminPort
+		}
 	}
 
 	// Load configuration
@@ -502,9 +517,36 @@ func (m *Manager) restartInstance(ctx context.Context, opts StartOptions) error 
 	// Enable k3d registry
 	m.k3dManager.SetEnableRegistry(true)
 
-	// Step 1: Start the k3d cluster
+	// Calculate NodePort for API access
+	apiNodePort := int32(opts.ApiPort)
+	if apiNodePort < 30000 {
+		apiNodePort = apiNodePort + 22000
+	}
+	if apiNodePort < 30000 || apiNodePort > 32767 {
+		apiNodePort = 30080 // fallback to default
+	}
+	logging.Info("Calculated API NodePort", "hostPort", opts.ApiPort, "nodePort", apiNodePort)
+
+	// Calculate NodePort for Admin access
+	adminNodePort := int32(opts.AdminPort)
+	if adminNodePort < 30000 {
+		adminNodePort = adminNodePort + 22000
+	}
+	if adminNodePort < 30000 || adminNodePort > 32767 {
+		adminNodePort = 30081 // fallback to default
+	}
+	logging.Info("Calculated Admin NodePort", "hostPort", opts.AdminPort, "nodePort", adminNodePort)
+
+	// Create port mappings for k3d cluster
+	portMappings := map[int32]int32{
+		int32(opts.ApiPort):   apiNodePort,   // Map host API port to NodePort for ECS API
+		int32(opts.AdminPort): adminNodePort, // Map host Admin port to NodePort for Admin API
+	}
+
+	// Step 1: Start the k3d cluster with port mappings
 	m.updateStatus(opts.InstanceName, "Starting k3d cluster", "running")
-	if err := m.k3dManager.StartCluster(ctx, opts.InstanceName); err != nil {
+	clusterName := fmt.Sprintf("kecs-%s", opts.InstanceName)
+	if err := m.k3dManager.StartClusterWithPorts(ctx, clusterName, portMappings); err != nil {
 		m.updateStatus(opts.InstanceName, "Starting k3d cluster", "failed", err.Error())
 		return fmt.Errorf("failed to start k3d cluster: %w", err)
 	}
@@ -594,11 +636,9 @@ func (m *Manager) restartInstance(ctx context.Context, opts StartOptions) error 
 	delete(m.creationStatus, opts.InstanceName)
 	m.statusMu.Unlock()
 
-	// Save updated instance configuration
-	if err := SaveInstanceConfig(opts.InstanceName, opts); err != nil {
-		// Log warning but don't fail - config saving is not critical
-		// TODO: Add proper logging here
-	}
+	// Don't save config during restart - it was already saved during initial creation
+	// and we've loaded the existing config. Saving here would overwrite the original
+	// port configuration with the potentially modified values.
 
 	return nil
 }

@@ -187,6 +187,24 @@ func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, c
 		return fmt.Errorf("failed to create data directory: %w", err)
 	}
 
+	// Calculate NodePort for API access
+	apiNodePort := int32(opts.ApiPort)
+	if apiNodePort < 30000 {
+		apiNodePort = apiNodePort + 22000
+	}
+	if apiNodePort < 30000 || apiNodePort > 32767 {
+		apiNodePort = 30080 // fallback to default
+	}
+
+	// Calculate NodePort for Admin access
+	adminNodePort := int32(opts.AdminPort)
+	if adminNodePort < 30000 {
+		adminNodePort = adminNodePort + 22000
+	}
+	if adminNodePort < 30000 || adminNodePort > 32767 {
+		adminNodePort = 30081 // fallback to default
+	}
+
 	// Create control plane config
 	controlPlaneConfig := &resources.ControlPlaneConfig{
 		Image:           cfg.Server.ControlPlaneImage,
@@ -199,6 +217,8 @@ func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, c
 		DataHostPath:    dataDir,                                 // Use hostPath for data persistence
 		APIPort:         80,                                      // Service port (external facing)
 		AdminPort:       resources.ControlPlaneInternalAdminPort, // Admin service port
+		APINodePort:     apiNodePort,                             // NodePort for API access
+		AdminNodePort:   adminNodePort,                           // NodePort for Admin access
 		LogLevel:        cfg.Server.LogLevel,
 	}
 

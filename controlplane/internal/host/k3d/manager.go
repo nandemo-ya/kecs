@@ -114,6 +114,96 @@ func (k *K3dClusterManager) AddVolumeMount(mount VolumeMount) {
 	k.config.VolumeMounts = append(k.config.VolumeMounts, mount)
 }
 
+// StartClusterWithPorts starts a previously stopped k3d cluster with port mappings
+func (k *K3dClusterManager) StartClusterWithPorts(ctx context.Context, clusterName string, portMappings map[int32]int32) error {
+	// Skip actual cluster start in CI/test mode
+	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+		logging.Info("CI/TEST MODE: Simulating cluster start", "cluster", clusterName)
+		return nil
+	}
+
+	normalizedName := k.normalizeClusterName(clusterName)
+
+	// Check if cluster exists
+	exists, err := k.ClusterExists(ctx, clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to check if cluster exists: %w", err)
+	}
+
+	if !exists {
+		return fmt.Errorf("cluster does not exist: %s", normalizedName)
+	}
+
+	// Get the cluster
+	clusters, err := client.ClusterList(ctx, k.runtime)
+	if err != nil {
+		return fmt.Errorf("failed to list clusters: %w", err)
+	}
+
+	var cluster *k3d.Cluster
+	for _, c := range clusters {
+		if c.Name == normalizedName {
+			cluster = c
+			break
+		}
+	}
+
+	if cluster == nil {
+		return fmt.Errorf("cluster not found: %s", normalizedName)
+	}
+
+	// Try to start the cluster normally first
+	logging.Info("Starting k3d cluster", "cluster", normalizedName)
+	startOpts := k3d.ClusterStartOpts{
+		WaitForServer: true,
+		Timeout:       60 * time.Second,
+	}
+
+	if err := client.ClusterStart(ctx, k.runtime, cluster, startOpts); err != nil {
+		// If normal start fails due to DNS fix issues, try workaround with port mappings
+		if strings.Contains(err.Error(), "Host Gateway IP is missing") ||
+			strings.Contains(err.Error(), "Cannot enable DNS fix") {
+			logging.Warn("Normal start failed due to DNS fix issue, attempting workaround with port mappings", "error", err)
+			return k.startClusterWithWorkaroundAndPorts(ctx, normalizedName, cluster, portMappings)
+		}
+		return fmt.Errorf("failed to start cluster: %w", err)
+	}
+
+	logging.Info("k3d cluster started successfully", "cluster", normalizedName)
+	return nil
+}
+
+// startClusterWithWorkaroundAndPorts handles the DNS fix issue by recreating the cluster with port mappings
+func (k *K3dClusterManager) startClusterWithWorkaroundAndPorts(ctx context.Context, normalizedName string, cluster *k3d.Cluster, portMappings map[int32]int32) error {
+	logging.Info("Using workaround: recreating cluster with preserved data and port mappings", "cluster", normalizedName)
+
+	// Save the original cluster configuration
+	volumeMounts := k.config.VolumeMounts
+
+	// Delete the problematic cluster
+	logging.Info("Deleting stopped cluster", "cluster", normalizedName)
+	if err := client.ClusterDelete(ctx, k.runtime, cluster, k3d.ClusterDeleteOpts{SkipRegistryCheck: false}); err != nil {
+		return fmt.Errorf("failed to delete cluster for workaround: %w", err)
+	}
+
+	// Recreate the cluster with the same configuration
+	logging.Info("Recreating cluster with preserved data and port mappings", "cluster", normalizedName)
+
+	// Restore the volume mounts to preserve data
+	k.config.VolumeMounts = volumeMounts
+
+	// Use the denormalized name for recreation (without "kecs-" prefix)
+	denormalizedName := strings.TrimPrefix(normalizedName, "kecs-")
+
+	// Use CreateClusterWithPortMapping with the provided port mappings
+	if err := k.CreateClusterWithPortMapping(ctx, denormalizedName, portMappings); err != nil {
+		return fmt.Errorf("failed to recreate cluster with port mappings: %w", err)
+	}
+
+	logging.Info("Cluster recreated successfully with preserved data and port mappings", "cluster", normalizedName)
+	return nil
+}
+
 // CreateCluster creates a new k3d cluster with optimizations based on environment
 func (k *K3dClusterManager) CreateCluster(ctx context.Context, clusterName string) error {
 	// Skip actual cluster creation in CI/test mode
@@ -605,6 +695,36 @@ func (k *K3dClusterManager) startClusterWithWorkaround(ctx context.Context, norm
 	// Save the original cluster configuration
 	volumeMounts := k.config.VolumeMounts
 
+	// Extract port mappings from the original cluster
+	var portMappings map[int32]int32
+	if cluster != nil && len(cluster.Nodes) > 0 {
+		// Find the server node
+		for _, node := range cluster.Nodes {
+			if node.Role == k3d.ServerRole && node.Ports != nil {
+				portMappings = make(map[int32]int32)
+				// Extract port mappings from the node
+				for port, bindings := range node.Ports {
+					if len(bindings) > 0 {
+						// Parse the container port (NodePort)
+						containerPort := int32(port.Int())
+						// Parse the host port
+						if hostPort := bindings[0].HostPort; hostPort != "" {
+							var hostPortInt int32
+							fmt.Sscanf(hostPort, "%d", &hostPortInt)
+							if hostPortInt > 0 {
+								portMappings[hostPortInt] = containerPort
+								logging.Info("Preserving port mapping",
+									"hostPort", hostPortInt,
+									"nodePort", containerPort)
+							}
+						}
+					}
+				}
+				break
+			}
+		}
+	}
+
 	// Delete the problematic cluster
 	logging.Info("Deleting stopped cluster", "cluster", normalizedName)
 	if err := client.ClusterDelete(ctx, k.runtime, cluster, k3d.ClusterDeleteOpts{SkipRegistryCheck: false}); err != nil {
@@ -619,8 +739,17 @@ func (k *K3dClusterManager) startClusterWithWorkaround(ctx context.Context, norm
 
 	// Use the denormalized name for recreation (without "kecs-" prefix)
 	denormalizedName := strings.TrimPrefix(normalizedName, "kecs-")
-	if err := k.CreateCluster(ctx, denormalizedName); err != nil {
-		return fmt.Errorf("failed to recreate cluster: %w", err)
+
+	// If we have port mappings, use CreateClusterWithPortMapping
+	if len(portMappings) > 0 {
+		if err := k.CreateClusterWithPortMapping(ctx, denormalizedName, portMappings); err != nil {
+			return fmt.Errorf("failed to recreate cluster with port mappings: %w", err)
+		}
+	} else {
+		// Fallback to regular CreateCluster if no port mappings found
+		if err := k.CreateCluster(ctx, denormalizedName); err != nil {
+			return fmt.Errorf("failed to recreate cluster: %w", err)
+		}
 	}
 
 	logging.Info("Cluster recreated successfully with preserved data", "cluster", normalizedName)
