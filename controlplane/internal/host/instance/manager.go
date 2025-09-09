@@ -490,6 +490,18 @@ func (m *Manager) restartInstance(ctx context.Context, opts StartOptions) error 
 		opts.DataDir = filepath.Join(home, ".kecs", "instances", opts.InstanceName, "data")
 	}
 
+	// Set up volume mounts before starting the cluster
+	volumeMounts := []k3d.VolumeMount{
+		{
+			HostPath:      opts.DataDir,
+			ContainerPath: opts.DataDir, // Mount to same path in container
+		},
+	}
+	m.k3dManager.SetVolumeMounts(volumeMounts)
+
+	// Enable k3d registry
+	m.k3dManager.SetEnableRegistry(true)
+
 	// Step 1: Start the k3d cluster
 	m.updateStatus(opts.InstanceName, "Starting k3d cluster", "running")
 	if err := m.k3dManager.StartCluster(ctx, opts.InstanceName); err != nil {
