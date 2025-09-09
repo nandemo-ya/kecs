@@ -13,10 +13,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	apiconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/admin"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
+	"github.com/nandemo-ya/kecs/controlplane/internal/restoration"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/cache"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 	"github.com/nandemo-ya/kecs/controlplane/internal/webhook"
@@ -245,6 +247,31 @@ func runServer(cmd *cobra.Command) {
 				}
 			}
 		}
+	}
+
+	// Perform state restoration from DuckDB if available
+	if apiServer != nil && !apiconfig.GetBool("features.testMode") {
+		logging.Info("Checking for state restoration from DuckDB...")
+
+		// Create restoration service
+		restorationService := restoration.NewService(
+			storage,
+			apiServer.GetTaskManager(),
+			apiServer.GetServiceManager(),
+			apiServer.GetLocalStackManager(),
+		)
+
+		// Perform restoration (non-blocking, best effort)
+		go func() {
+			restorationCtx, restorationCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer restorationCancel()
+
+			if err := restorationService.RestoreAll(restorationCtx); err != nil {
+				logging.Error("Failed to restore state from DuckDB", "error", err)
+			} else {
+				logging.Info("State restoration from DuckDB completed successfully")
+			}
+		}()
 	}
 
 	// Set up graceful shutdown
