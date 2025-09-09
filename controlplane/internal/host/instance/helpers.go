@@ -17,6 +17,8 @@ package instance
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -24,9 +26,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/host/k3d"
 	kecs "github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
 )
 
@@ -64,8 +68,32 @@ func (m *Manager) createCluster(ctx context.Context, instanceName string, cfg *c
 		int32(opts.AdminPort): adminNodePort, // Map host Admin port to NodePort for Admin API
 	}
 
-	// LocalStack port mapping is no longer needed as it's accessed only internally
-	// This prevents port conflicts when running multiple instances
+	// Set up data directory for direct hostPath mounting
+	// This ensures that DuckDB data persists across instance restarts
+	home, _ := os.UserHomeDir()
+	dataDir := filepath.Join(home, ".kecs", "instances", instanceName, "data")
+
+	// Ensure the data directory exists
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return fmt.Errorf("failed to create data directory: %w", err)
+	}
+
+	// Configure volume mounts for persistent storage
+	// Map the host data directory directly to container
+	volumeMounts := []k3d.VolumeMount{
+		{
+			HostPath:      dataDir,
+			ContainerPath: dataDir, // Mount to same path in container
+		},
+	}
+
+	// Set volume mounts using the setter method
+	m.k3dManager.SetVolumeMounts(volumeMounts)
+
+	// Log volume mounts for debugging
+	logging.Info("Setting volume mounts for k3d cluster",
+		"volumeMounts", volumeMounts,
+		"dataDir", dataDir)
 
 	// Enable k3d registry
 	m.k3dManager.SetEnableRegistry(true)
@@ -150,6 +178,15 @@ func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, c
 		return fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
+	// Set up data directory path for hostPath volume
+	home, _ := os.UserHomeDir()
+	dataDir := filepath.Join(home, ".kecs", "instances", instanceName, "data")
+
+	// Ensure data directory exists
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return fmt.Errorf("failed to create data directory: %w", err)
+	}
+
 	// Create control plane config
 	controlPlaneConfig := &resources.ControlPlaneConfig{
 		Image:           cfg.Server.ControlPlaneImage,
@@ -159,6 +196,7 @@ func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, c
 		CPULimit:        "1000m",
 		MemoryLimit:     "1Gi",
 		StorageSize:     "10Gi",
+		DataHostPath:    dataDir,                                 // Use hostPath for data persistence
 		APIPort:         80,                                      // Service port (external facing)
 		AdminPort:       resources.ControlPlaneInternalAdminPort, // Admin service port
 		LogLevel:        cfg.Server.LogLevel,
@@ -195,7 +233,7 @@ func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, c
 		}
 	}
 
-	// Create PVC
+	// Create PVC (only if not using hostPath)
 	if controlPlaneResources.PVC != nil {
 		if _, err := client.CoreV1().PersistentVolumeClaims("kecs-system").Create(ctx, controlPlaneResources.PVC, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("failed to create PVC: %w", err)

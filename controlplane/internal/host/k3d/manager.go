@@ -104,6 +104,16 @@ func (k *K3dClusterManager) SetEnableRegistry(enable bool) {
 	k.config.EnableRegistry = enable
 }
 
+// SetVolumeMounts sets the volume mounts for the cluster
+func (k *K3dClusterManager) SetVolumeMounts(mounts []VolumeMount) {
+	k.config.VolumeMounts = mounts
+}
+
+// AddVolumeMount adds a volume mount to the cluster configuration
+func (k *K3dClusterManager) AddVolumeMount(mount VolumeMount) {
+	k.config.VolumeMounts = append(k.config.VolumeMounts, mount)
+}
+
 // CreateCluster creates a new k3d cluster with optimizations based on environment
 func (k *K3dClusterManager) CreateCluster(ctx context.Context, clusterName string) error {
 	// Skip actual cluster creation in CI/test mode

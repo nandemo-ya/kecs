@@ -69,6 +69,9 @@ type ControlPlaneConfig struct {
 	// Storage
 	StorageSize string
 
+	// HostPath for direct volume mount (alternative to PVC)
+	DataHostPath string // If set, use hostPath instead of PVC
+
 	// Ports
 	APIPort   int32
 	AdminPort int32
@@ -103,16 +106,22 @@ func CreateControlPlaneResources(config *ControlPlaneConfig) *ControlPlaneResour
 		config = DefaultControlPlaneConfig()
 	}
 
-	return &ControlPlaneResources{
+	resources := &ControlPlaneResources{
 		Namespace:          createNamespace(),
 		ServiceAccount:     createServiceAccount(),
 		ClusterRole:        createClusterRole(),
 		ClusterRoleBinding: createClusterRoleBinding(),
 		ConfigMap:          createConfigMap(config),
-		PVC:                createPVC(config),
 		Services:           createServices(config),
 		Deployment:         createDeployment(config),
 	}
+
+	// Only create PVC if not using hostPath
+	if config.DataHostPath == "" {
+		resources.PVC = createPVC(config)
+	}
+
+	return resources
 }
 
 // createNamespace creates the kecs-system namespace
@@ -591,26 +600,7 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 							},
 						},
 					},
-					Volumes: []corev1.Volume{
-						{
-							Name: "config",
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: ControlPlaneConfigMap,
-									},
-								},
-							},
-						},
-						{
-							Name: "data",
-							VolumeSource: corev1.VolumeSource{
-								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: ControlPlanePVC,
-								},
-							},
-						},
-					},
+					Volumes: createVolumes(config),
 				},
 			},
 		},

@@ -1269,3 +1269,18 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GetKubeClient() k8s.Interface {
 	return s.kubeClient
 }
+
+// GetTaskManager returns the task manager
+func (s *Server) GetTaskManager() *kubernetes.TaskManager {
+	return s.taskManager
+}
+
+// GetServiceManager returns the service manager
+func (s *Server) GetServiceManager() *kubernetes.ServiceManager {
+	return s.serviceManager
+}
+
+// GetLocalStackManager returns the LocalStack manager
+func (s *Server) GetLocalStackManager() localstack.Manager {
+	return s.localStackManager
+}
