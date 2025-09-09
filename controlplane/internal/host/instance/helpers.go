@@ -17,6 +17,8 @@ package instance
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -24,6 +26,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	"github.com/nandemo-ya/kecs/controlplane/internal/host/k3d"
 	kecs "github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
@@ -64,8 +67,27 @@ func (m *Manager) createCluster(ctx context.Context, instanceName string, cfg *c
 		int32(opts.AdminPort): adminNodePort, // Map host Admin port to NodePort for Admin API
 	}
 
-	// LocalStack port mapping is no longer needed as it's accessed only internally
-	// This prevents port conflicts when running multiple instances
+	// Set up persistent volume directory for k3s storage
+	// This ensures that PVC data persists across instance restarts
+	home, _ := os.UserHomeDir()
+	k3sStorageDir := filepath.Join(home, ".kecs", "instances", instanceName, "k3s-storage")
+
+	// Ensure the k3s storage directory exists
+	if err := os.MkdirAll(k3sStorageDir, 0755); err != nil {
+		return fmt.Errorf("failed to create k3s storage directory: %w", err)
+	}
+
+	// Configure volume mounts for persistent storage
+	// This maps the host directory to the k3s local-path provisioner directory
+	volumeMounts := []k3d.VolumeMount{
+		{
+			HostPath:      k3sStorageDir,
+			ContainerPath: "/var/lib/rancher/k3s/storage",
+		},
+	}
+
+	// Set volume mounts using the setter method
+	m.k3dManager.SetVolumeMounts(volumeMounts)
 
 	// Enable k3d registry
 	m.k3dManager.SetEnableRegistry(true)
