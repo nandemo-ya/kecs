@@ -76,6 +76,10 @@ type ControlPlaneConfig struct {
 	APIPort   int32
 	AdminPort int32
 
+	// NodePorts for external access
+	APINodePort   int32
+	AdminNodePort int32
+
 	// Features
 	Debug    bool
 	LogLevel string
@@ -340,7 +344,7 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 						Port:       config.APIPort,
 						TargetPort: intstr.FromInt(ControlPlaneInternalAPIPort),
 						Protocol:   corev1.ProtocolTCP,
-						NodePort:   30080, // Fixed NodePort for external access
+						NodePort:   config.APINodePort, // Dynamic NodePort from config
 					},
 				},
 				Type: corev1.ServiceTypeNodePort,
@@ -367,7 +371,7 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 						Port:       config.AdminPort,
 						TargetPort: intstr.FromInt(ControlPlaneInternalAdminPort),
 						Protocol:   corev1.ProtocolTCP,
-						NodePort:   30081, // Fixed NodePort for admin API
+						NodePort:   config.AdminNodePort, // Dynamic NodePort from config
 					},
 				},
 				Type: corev1.ServiceTypeNodePort,

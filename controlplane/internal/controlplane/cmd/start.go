@@ -60,8 +60,8 @@ func init() {
 
 	startCmd.Flags().StringVar(&startInstanceName, "instance", "", "KECS instance name (auto-generated if not specified)")
 	startCmd.Flags().StringVar(&startDataDir, "data-dir", "", "Data directory (default: ~/.kecs/data)")
-	startCmd.Flags().IntVar(&startApiPort, "api-port", 5373, "AWS API port")
-	startCmd.Flags().IntVar(&startAdminPort, "admin-port", 5374, "Admin API port")
+	startCmd.Flags().IntVar(&startApiPort, "api-port", 0, "AWS API port (default: 5373)")
+	startCmd.Flags().IntVar(&startAdminPort, "admin-port", 0, "Admin API port (default: 5374)")
 	startCmd.Flags().StringVar(&startConfigFile, "config", "", "Configuration file path")
 	startCmd.Flags().StringVar(&startAdditionalLocalServices, "additional-localstack-services", "", "Additional LocalStack services (comma-separated, e.g., s3,dynamodb,sqs)")
 	startCmd.Flags().DurationVar(&startTimeout, "timeout", 10*time.Minute, "Timeout for cluster creation")
