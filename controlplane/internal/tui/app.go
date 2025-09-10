@@ -1450,21 +1450,26 @@ func (m Model) handleConfirmDialogKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 	case "enter", " ":
 		// Execute the selected action
+		// Check if Yes was selected (focused = true)
+		wasYesSelected := m.confirmDialog.focused
+
 		err := m.confirmDialog.Execute()
 		if err != nil {
 			m.err = err
 		}
+
 		// Store pending command if any
 		cmd := m.pendingCommand
 		// Clear dialog and pending command
 		m.confirmDialog = nil
 		m.pendingCommand = nil
 		m.currentView = m.previousView
-		// Execute pending command if it exists, otherwise reload data
-		if cmd != nil {
+
+		// Only execute pending command if Yes was selected
+		if wasYesSelected && cmd != nil {
 			return m, cmd
 		}
-		// Reload data after potential deletion
+		// Reload data after potential action
 		return m, m.loadDataFromAPI()
 	case "esc":
 		// Cancel and go back (k9s style - only ESC cancels)
@@ -1474,6 +1479,7 @@ func (m Model) handleConfirmDialogKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.confirmDialog = nil
 		m.pendingCommand = nil // Clear pending command on cancel
 		m.currentView = m.previousView
+		return m, m.loadDataFromAPI()
 	}
 	return m, nil
 }
