@@ -181,7 +181,7 @@ func (p *K3dInstanceProvider) getContainerInfo(ctx context.Context, containerNam
 // CreateInstance creates a new KECS instance using instance.Manager
 func (p *K3dInstanceProvider) CreateInstance(ctx context.Context, opts CreateInstanceOptions) (*Instance, error) {
 	// Convert TUI options to instance.StartOptions
-	startOpts := instance.StartOptions{
+	startOpts := &instance.StartOptions{
 		InstanceName:                 opts.Name,
 		ApiPort:                      opts.APIPort,
 		AdminPort:                    opts.AdminPort,
@@ -341,8 +341,8 @@ func (p *K3dInstanceProvider) StopInstance(ctx context.Context, name string) err
 }
 
 func (p *K3dInstanceProvider) DeleteInstance(ctx context.Context, name string) error {
-	// Use instance manager to destroy the instance (without deleting data)
-	return p.instanceManager.Destroy(ctx, name, false)
+	// Use instance manager to destroy the instance (always deletes all data)
+	return p.instanceManager.Destroy(ctx, name)
 }
 
 // GetInstanceCreationStatus returns the creation status for an instance

@@ -7,10 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	dockerclient "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -773,6 +775,8 @@ func (k *K3dClusterManager) DeleteCluster(ctx context.Context, clusterName strin
 
 	if !exists {
 		logging.Info("k3d cluster does not exist", "cluster", normalizedName)
+		// Even if cluster doesn't exist, try to clean up Docker network
+		k.cleanupDockerNetwork(ctx, normalizedName)
 		return nil
 	}
 
@@ -806,8 +810,44 @@ func (k *K3dClusterManager) DeleteCluster(ctx context.Context, clusterName strin
 		}
 	}
 
+	// Clean up Docker network if it still exists (as a fallback)
+	k.cleanupDockerNetwork(ctx, normalizedName)
+
 	logging.Info("Successfully deleted k3d cluster", "cluster", normalizedName)
 	return nil
+}
+
+// cleanupDockerNetwork removes the Docker network associated with the k3d cluster
+func (k *K3dClusterManager) cleanupDockerNetwork(ctx context.Context, clusterName string) {
+	// Network name format: k3d-<normalizedName>
+	// clusterName is already normalized (e.g., "kecs-cleanup-test")
+	networkName := fmt.Sprintf("k3d-%s", clusterName)
+
+	// Use Docker client to remove the network
+	dockerClient, err := dockerclient.NewClientWithOpts(dockerclient.FromEnv, dockerclient.WithAPIVersionNegotiation())
+	if err != nil {
+		logging.Warn("Failed to create Docker client for network cleanup", "error", err)
+		return
+	}
+	defer dockerClient.Close()
+
+	// First, disconnect the registry from the network if it's connected
+	// The registry is shared across multiple instances, so we just disconnect it
+	registryName := "kecs-registry"
+	if err := dockerClient.NetworkDisconnect(ctx, networkName, registryName, true); err != nil {
+		// Registry might not be connected, that's okay
+		logging.Debug("Registry disconnection from network", "network", networkName, "registry", registryName, "error", err)
+	} else {
+		logging.Info("Disconnected registry from network", "network", networkName, "registry", registryName)
+	}
+
+	// Try to remove the network
+	if err := dockerClient.NetworkRemove(ctx, networkName); err != nil {
+		// Network might already be removed or still in use, just log it
+		logging.Debug("Failed to remove Docker network", "network", networkName, "error", err)
+	} else {
+		logging.Info("Removed Docker network", "network", networkName)
+	}
 }
 
 // ClusterExists checks if a k3d cluster exists
@@ -2100,4 +2140,43 @@ func (k *K3dClusterManager) getRESTConfig(clusterName string) (*rest.Config, err
 	}
 
 	return config, nil
+}
+
+// GetKubernetesAPIPort returns the Kubernetes API port for a cluster
+func (k *K3dClusterManager) GetKubernetesAPIPort(ctx context.Context, clusterName string) (int, error) {
+	normalizedName := k.normalizeClusterName(clusterName)
+
+	// Get the serverlb container to find the exposed port
+	cmd := exec.CommandContext(ctx, "docker", "ps", "--filter", fmt.Sprintf("name=k3d-%s-serverlb", normalizedName), "--format", "{{.Ports}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get container info: %w", err)
+	}
+
+	// Parse the port from output like "80/tcp, 0.0.0.0:32773->6443/tcp"
+	portStr := string(output)
+	if portStr == "" {
+		return 0, fmt.Errorf("no port mapping found for cluster %s", normalizedName)
+	}
+
+	// Extract the host port from the mapping
+	parts := strings.Split(portStr, "->")
+	if len(parts) < 2 {
+		return 0, fmt.Errorf("unexpected port format: %s", portStr)
+	}
+
+	// Extract port number from "0.0.0.0:32773"
+	hostPart := parts[0]
+	colonIdx := strings.LastIndex(hostPart, ":")
+	if colonIdx == -1 {
+		return 0, fmt.Errorf("no port found in: %s", hostPart)
+	}
+
+	portNumStr := strings.TrimSpace(hostPart[colonIdx+1:])
+	port, err := strconv.Atoi(portNumStr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse port number %s: %w", portNumStr, err)
+	}
+
+	return port, nil
 }

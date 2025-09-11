@@ -1037,3 +1037,191 @@ func (tm *TaskManager) addPodInfoToTaskAttributes(task *storage.Task, podName, n
 	task.Attributes = string(attributesJSON)
 	return nil
 }
+
+// RestoreTask restores a standalone task from DuckDB to Kubernetes
+func (tm *TaskManager) RestoreTask(ctx context.Context, task *storage.Task) error {
+	if task == nil {
+		return fmt.Errorf("task is nil")
+	}
+
+	// Initialize client if needed
+	if err := tm.InitializeClient(); err != nil {
+		return fmt.Errorf("failed to initialize kubernetes client: %w", err)
+	}
+
+	// Extract cluster name from ARN
+	clusterName := tm.extractClusterNameFromARN(task.ClusterARN)
+	namespace := fmt.Sprintf("ecs-%s", clusterName)
+
+	// Check if pod already exists
+	podName := fmt.Sprintf("task-%s", task.ID)
+	_, err := tm.Clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+	if err == nil {
+		logging.Info("Pod already exists, skipping restoration",
+			"pod", podName,
+			"namespace", namespace)
+		return nil
+	}
+	if !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to check pod existence: %w", err)
+	}
+
+	// Get task definition from storage
+	family, revision := parseTaskDefinitionARN(task.TaskDefinitionARN)
+	taskDef, err := tm.storage.TaskDefinitionStore().Get(ctx, family, revision)
+	if err != nil {
+		return fmt.Errorf("failed to get task definition: %w", err)
+	}
+	if taskDef == nil {
+		return fmt.Errorf("task definition not found: %s", task.TaskDefinitionARN)
+	}
+
+	// Parse the task definition JSON from ContainerDefinitions field
+	var taskDefData map[string]interface{}
+	taskDefData = make(map[string]interface{})
+
+	// Parse container definitions
+	var containerDefs []interface{}
+	if taskDef.ContainerDefinitions != "" {
+		if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
+			return fmt.Errorf("failed to parse container definitions: %w", err)
+		}
+		taskDefData["containerDefinitions"] = containerDefs
+	}
+
+	// Create pod from task definition
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"ecs.amazonaws.com/task-arn": task.ARN,
+				"ecs.cluster":                clusterName,
+				"ecs.task":                   task.ID,
+				"ecs.managed":                "true",
+				"kecs.dev/task-id":           task.ID,
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers:    []corev1.Container{},
+			RestartPolicy: corev1.RestartPolicyAlways,
+		},
+	}
+
+	// Add containers from task definition
+	if containerDefs, ok := taskDefData["containerDefinitions"].([]interface{}); ok {
+		for _, containerDef := range containerDefs {
+			if containerMap, ok := containerDef.(map[string]interface{}); ok {
+				container := tm.createContainerFromDefinition(containerMap)
+				pod.Spec.Containers = append(pod.Spec.Containers, container)
+			}
+		}
+	}
+
+	// Ensure namespace exists
+	if err := tm.ensureNamespace(ctx, namespace); err != nil {
+		return fmt.Errorf("failed to ensure namespace: %w", err)
+	}
+
+	// Create the pod
+	_, err = tm.Clientset.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create pod in Kubernetes: %w", err)
+	}
+
+	// Start watching the pod for status updates
+	go tm.watchPodStatus(context.Background(), task.ARN, namespace, podName)
+
+	logging.Info("Successfully restored standalone task",
+		"taskArn", task.ARN,
+		"pod", podName,
+		"namespace", namespace)
+
+	return nil
+}
+
+// Helper functions for RestoreTask
+
+// extractClusterNameFromARN extracts cluster name from ARN
+func (tm *TaskManager) extractClusterNameFromARN(arn string) string {
+	if arn == "" {
+		return "default"
+	}
+	parts := strings.Split(arn, "/")
+	if len(parts) >= 2 {
+		return parts[len(parts)-1]
+	}
+	return "default"
+}
+
+// createContainerFromDefinition creates a Kubernetes container from ECS container definition
+func (tm *TaskManager) createContainerFromDefinition(containerDef map[string]interface{}) corev1.Container {
+	container := corev1.Container{
+		Name: "main",
+	}
+
+	if name, ok := containerDef["name"].(string); ok {
+		container.Name = name
+	}
+
+	if image, ok := containerDef["image"].(string); ok {
+		container.Image = image
+	}
+
+	// Add port mappings
+	if portMappings, ok := containerDef["portMappings"].([]interface{}); ok {
+		for _, portMapping := range portMappings {
+			if pm, ok := portMapping.(map[string]interface{}); ok {
+				if containerPort, ok := pm["containerPort"].(float64); ok {
+					container.Ports = append(container.Ports, corev1.ContainerPort{
+						ContainerPort: int32(containerPort),
+					})
+				}
+			}
+		}
+	}
+
+	// Add environment variables
+	if envVars, ok := containerDef["environment"].([]interface{}); ok {
+		for _, envVar := range envVars {
+			if ev, ok := envVar.(map[string]interface{}); ok {
+				if name, ok := ev["name"].(string); ok {
+					if value, ok := ev["value"].(string); ok {
+						container.Env = append(container.Env, corev1.EnvVar{
+							Name:  name,
+							Value: value,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return container
+}
+
+// ensureNamespace creates a namespace if it doesn't exist
+func (tm *TaskManager) ensureNamespace(ctx context.Context, namespace string) error {
+	_, err := tm.Clientset.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Create namespace
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
+					Labels: map[string]string{
+						"kecs.dev/managed-by": "kecs",
+					},
+				},
+			}
+			_, err = tm.Clientset.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to create namespace: %w", err)
+			}
+			logging.Info("Created namespace", "namespace", namespace)
+		} else {
+			return fmt.Errorf("failed to get namespace: %w", err)
+		}
+	}
+	return nil
+}
