@@ -10,6 +10,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
@@ -1192,6 +1193,77 @@ func (sm *ServiceManager) createContainerFromDefinition(containerDef map[string]
 				}
 			}
 		}
+	}
+
+	// Add command
+	if command, ok := containerDef["command"].([]interface{}); ok {
+		for _, cmd := range command {
+			if cmdStr, ok := cmd.(string); ok {
+				container.Command = append(container.Command, cmdStr)
+			}
+		}
+	}
+
+	// Add entrypoint (in ECS, entryPoint maps to container.Command)
+	if entryPoint, ok := containerDef["entryPoint"].([]interface{}); ok {
+		// If entryPoint is specified, it takes precedence over command
+		container.Command = []string{}
+		for _, ep := range entryPoint {
+			if epStr, ok := ep.(string); ok {
+				container.Command = append(container.Command, epStr)
+			}
+		}
+		// In this case, command becomes args
+		if command, ok := containerDef["command"].([]interface{}); ok {
+			container.Args = []string{}
+			for _, cmd := range command {
+				if cmdStr, ok := cmd.(string); ok {
+					container.Args = append(container.Args, cmdStr)
+				}
+			}
+		}
+	}
+
+	// Add resource limits if specified
+	resources := corev1.ResourceRequirements{}
+	hasResources := false
+
+	if memory, ok := containerDef["memory"].(float64); ok && memory > 0 {
+		if resources.Limits == nil {
+			resources.Limits = corev1.ResourceList{}
+		}
+		if resources.Requests == nil {
+			resources.Requests = corev1.ResourceList{}
+		}
+		memQuantity := resource.NewQuantity(int64(memory)*1024*1024, resource.BinarySI) // Convert MiB to bytes
+		resources.Limits[corev1.ResourceMemory] = *memQuantity
+		resources.Requests[corev1.ResourceMemory] = *memQuantity
+		hasResources = true
+	}
+
+	if cpu, ok := containerDef["cpu"].(float64); ok && cpu > 0 {
+		if resources.Limits == nil {
+			resources.Limits = corev1.ResourceList{}
+		}
+		if resources.Requests == nil {
+			resources.Requests = corev1.ResourceList{}
+		}
+		// ECS CPU units: 1024 = 1 vCPU
+		cpuQuantity := resource.NewMilliQuantity(int64(cpu), resource.DecimalSI) // Convert to millicores
+		resources.Limits[corev1.ResourceCPU] = *cpuQuantity
+		resources.Requests[corev1.ResourceCPU] = *cpuQuantity
+		hasResources = true
+	}
+
+	if hasResources {
+		container.Resources = resources
+	}
+
+	// Set essential flag (for later use in deployment strategy)
+	if _, ok := containerDef["essential"].(bool); ok {
+		// Store as annotation or label for reference
+		// This information could be used by the controller
+		// For now, we just note it - essential containers affect pod lifecycle
 	}
 
 	return container
