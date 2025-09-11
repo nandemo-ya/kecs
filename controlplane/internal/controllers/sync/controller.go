@@ -430,8 +430,16 @@ func isECSManagedPod(pod *corev1.Pod) bool {
 	if val, exists := pod.Labels["kecs.dev/managed-by"]; exists && val == "kecs" {
 		return true
 	}
-	// Also check for ECS-specific labels
+	// Check for ECS-specific labels
 	if _, exists := pod.Labels["ecs.amazonaws.com/task-arn"]; exists {
+		return true
+	}
+	// Check for ecs.managed label (used in restored deployments)
+	if _, exists := pod.Labels["ecs.managed"]; exists {
+		return true
+	}
+	// Check for ecs.service label (used in restored deployments)
+	if _, exists := pod.Labels["ecs.service"]; exists {
 		return true
 	}
 	return false
@@ -446,6 +454,16 @@ func isECSManagedDeployment(deployment *appsv1.Deployment) bool {
 
 	// Check labels
 	if val, exists := deployment.Labels["kecs.dev/managed-by"]; exists && val == "kecs" {
+		return true
+	}
+
+	// Check for ecs.managed label (used in restored deployments)
+	if val, exists := deployment.Labels["ecs.managed"]; exists && val == "true" {
+		return true
+	}
+
+	// Check for ecs.service label (used in restored deployments)
+	if _, exists := deployment.Labels["ecs.service"]; exists {
 		return true
 	}
 

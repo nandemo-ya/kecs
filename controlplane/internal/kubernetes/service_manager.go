@@ -87,12 +87,16 @@ func (sm *ServiceManager) processExistingPods() {
 		return
 	}
 
+	logging.Info("Processing existing pods in namespaces", "count", len(namespaces.Items))
 	processedCount := 0
 	for _, ns := range namespaces.Items {
 		// Skip system namespaces
 		if ns.Name == "kube-system" || ns.Name == "kube-public" || ns.Name == "kube-node-lease" || ns.Name == "kecs-system" {
+			logging.Debug("Skipping system namespace", "namespace", ns.Name)
 			continue
 		}
+
+		logging.Debug("Checking namespace for ECS pods", "namespace", ns.Name)
 
 		// List pods in namespace
 		pods, err := sm.clientset.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
@@ -101,9 +105,22 @@ func (sm *ServiceManager) processExistingPods() {
 			continue
 		}
 
+		if len(pods.Items) > 0 {
+			logging.Debug("Found pods in namespace", "namespace", ns.Name, "count", len(pods.Items))
+		}
+
 		for _, pod := range pods.Items {
-			// Check if pod is managed by ECS
-			if _, exists := pod.Labels["ecs.amazonaws.com/task-arn"]; !exists {
+			// Check if pod is managed by ECS - check multiple possible labels
+			isECSManaged := false
+			if _, exists := pod.Labels["ecs.amazonaws.com/task-arn"]; exists {
+				isECSManaged = true
+			} else if _, exists := pod.Labels["ecs.managed"]; exists {
+				isECSManaged = true
+			} else if _, exists := pod.Labels["ecs.service"]; exists {
+				isECSManaged = true
+			}
+
+			if !isECSManaged {
 				continue
 			}
 
@@ -112,18 +129,26 @@ func (sm *ServiceManager) processExistingPods() {
 				continue
 			}
 
-			// Get service name from labels
+			// Get service name from labels - check multiple possible labels
 			serviceName := pod.Labels["ecs.amazonaws.com/service-name"]
 			if serviceName == "" {
 				serviceName = pod.Labels["kecs.dev/service"]
+			}
+			if serviceName == "" {
+				serviceName = pod.Labels["ecs.service"]
 			}
 			if serviceName == "" {
 				continue
 			}
 
 			// Extract cluster name from namespace
+			// Namespace format is typically "ecs-<cluster-name>" or "<cluster-name>-<region>"
 			clusterName := "default"
-			if strings.Contains(ns.Name, "-") {
+			if strings.HasPrefix(ns.Name, "ecs-") {
+				// For ecs-default, ecs-production, etc.
+				clusterName = strings.TrimPrefix(ns.Name, "ecs-")
+			} else if strings.Contains(ns.Name, "-") {
+				// For default-us-east-1, production-eu-west-1, etc.
 				parts := strings.Split(ns.Name, "-")
 				if len(parts) > 0 {
 					clusterName = parts[0]
@@ -1020,10 +1045,11 @@ func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.S
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"ecs.service":         service.ServiceName,
-						"ecs.cluster":         clusterName,
-						"ecs.task-definition": fmt.Sprintf("%s:%d", family, revision),
-						"ecs.managed":         "true",
+						"ecs.service":                  service.ServiceName,
+						"ecs.cluster":                  clusterName,
+						"ecs.task-definition-family":   family,
+						"ecs.task-definition-revision": fmt.Sprintf("%d", revision),
+						"ecs.managed":                  "true",
 					},
 				},
 				Spec: corev1.PodSpec{
