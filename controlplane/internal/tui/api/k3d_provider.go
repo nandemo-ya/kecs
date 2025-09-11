@@ -341,8 +341,8 @@ func (p *K3dInstanceProvider) StopInstance(ctx context.Context, name string) err
 }
 
 func (p *K3dInstanceProvider) DeleteInstance(ctx context.Context, name string) error {
-	// Use instance manager to destroy the instance (without deleting data)
-	return p.instanceManager.Destroy(ctx, name, false)
+	// Use instance manager to destroy the instance (always deletes all data)
+	return p.instanceManager.Destroy(ctx, name)
 }
 
 // GetInstanceCreationStatus returns the creation status for an instance

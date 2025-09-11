@@ -12,14 +12,13 @@ import (
 
 var (
 	destroyInstanceName string
-	destroyDeleteData   bool
 	destroyForce        bool
 )
 
 var destroyCmd = &cobra.Command{
 	Use:   "destroy",
 	Short: "Destroy KECS instance",
-	Long:  `Destroy the KECS instance by deleting its k3d cluster and optionally its persistent data.`,
+	Long:  `Destroy the KECS instance by deleting its k3d cluster and all associated data.`,
 	RunE:  runDestroy,
 }
 
@@ -27,7 +26,6 @@ func init() {
 	RootCmd.AddCommand(destroyCmd)
 
 	destroyCmd.Flags().StringVar(&destroyInstanceName, "instance", "", "KECS instance name to destroy (required)")
-	destroyCmd.Flags().BoolVar(&destroyDeleteData, "delete-data", false, "Delete persistent data")
 	destroyCmd.Flags().BoolVar(&destroyForce, "force", false, "Force destroy without confirmation")
 }
 
@@ -78,8 +76,8 @@ func runDestroy(cmd *cobra.Command, args []string) error {
 	}
 
 	// Destroy the instance
-	fmt.Println("Deleting k3d cluster...")
-	if err := manager.Destroy(ctx, destroyInstanceName, destroyDeleteData); err != nil {
+	fmt.Println("Deleting k3d cluster and cleaning up...")
+	if err := manager.Destroy(ctx, destroyInstanceName); err != nil {
 		if err.Error() == fmt.Sprintf("instance '%s' does not exist", destroyInstanceName) {
 			fmt.Printf("KECS instance '%s' does not exist\n", destroyInstanceName)
 			return nil
@@ -88,12 +86,7 @@ func runDestroy(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("✅ KECS instance '%s' has been destroyed\n", destroyInstanceName)
-
-	if destroyDeleteData {
-		fmt.Println("Instance data has been deleted.")
-	} else {
-		fmt.Println("Instance data preserved. Use --delete-data to remove it.")
-	}
+	fmt.Println("Instance directory and all data have been removed.")
 
 	return nil
 }

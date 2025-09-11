@@ -336,7 +336,7 @@ func (m *Manager) Stop(ctx context.Context, instanceName string) error {
 }
 
 // Destroy destroys a KECS instance
-func (m *Manager) Destroy(ctx context.Context, instanceName string, deleteData bool) error {
+func (m *Manager) Destroy(ctx context.Context, instanceName string) error {
 	// Check if instance exists
 	exists, err := m.k3dManager.ClusterExists(ctx, instanceName)
 	if err != nil {
@@ -347,24 +347,19 @@ func (m *Manager) Destroy(ctx context.Context, instanceName string, deleteData b
 		return fmt.Errorf("instance '%s' does not exist", instanceName)
 	}
 
-	// Delete the k3d cluster
+	// Delete the k3d cluster (this will also clean up Docker networks)
 	if err := m.k3dManager.DeleteCluster(ctx, instanceName); err != nil {
 		return fmt.Errorf("failed to delete instance: %w", err)
 	}
 
-	// Delete data if requested
-	if deleteData {
-		home, _ := os.UserHomeDir()
-		dataDir := filepath.Join(home, ".kecs", "instances", instanceName, "data")
+	// Always remove entire instance directory
+	home, _ := os.UserHomeDir()
+	instanceDir := filepath.Join(home, ".kecs", "instances", instanceName)
 
-		if err := os.RemoveAll(dataDir); err != nil {
-			// Non-fatal error - just log it
-			// TODO: Add proper logging here
-		}
-
-		// Also delete the instance directory if it's empty
-		instanceDir := filepath.Join(home, ".kecs", "instances", instanceName)
-		os.Remove(instanceDir) // This will only succeed if directory is empty
+	if err := os.RemoveAll(instanceDir); err != nil {
+		// Non-fatal error - just log it
+		// TODO: Add proper logging here
+		fmt.Printf("Warning: failed to remove instance directory %s: %v\n", instanceDir, err)
 	}
 
 	return nil

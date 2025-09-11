@@ -48,7 +48,7 @@ var _ = Describe("Manager", func() {
 
 	Describe("Destroy", func() {
 		It("should return error when destroying non-existent instance", func() {
-			err := manager.Destroy(ctx, "non-existent-instance", false)
+			err := manager.Destroy(ctx, "non-existent-instance")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("does not exist"))
 		})
