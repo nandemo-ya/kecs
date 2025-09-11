@@ -1031,6 +1031,16 @@ func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.S
 		taskDefData["containerDefinitions"] = containerDefs
 	}
 
+	// Parse volumes from the Volumes field
+	var volumes []interface{}
+	if taskDef.Volumes != "" {
+		if err := json.Unmarshal([]byte(taskDef.Volumes), &volumes); err != nil {
+			logging.Warn("Failed to parse volumes", "error", err)
+		} else {
+			taskDefData["volumes"] = volumes
+		}
+	}
+
 	// Create deployment spec from the stored service configuration
 	var replicas int32 = int32(service.DesiredCount)
 	deployment := &appsv1.Deployment{
@@ -1077,6 +1087,28 @@ func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.S
 					deployment.Spec.Template.Spec.Containers,
 					container,
 				)
+			}
+		}
+	}
+
+	// Add volumes from task definition
+	if volumes, ok := taskDefData["volumes"].([]interface{}); ok {
+		for _, volume := range volumes {
+			if volumeMap, ok := volume.(map[string]interface{}); ok {
+				if volumeName, ok := volumeMap["name"].(string); ok {
+					// Create an emptyDir volume for each ECS volume
+					// In ECS, host volumes are typically ephemeral storage
+					k8sVolume := corev1.Volume{
+						Name: volumeName,
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{},
+						},
+					}
+					deployment.Spec.Template.Spec.Volumes = append(
+						deployment.Spec.Template.Spec.Volumes,
+						k8sVolume,
+					)
+				}
 			}
 		}
 	}
@@ -1257,6 +1289,27 @@ func (sm *ServiceManager) createContainerFromDefinition(containerDef map[string]
 
 	if hasResources {
 		container.Resources = resources
+	}
+
+	// Add mount points
+	if mountPoints, ok := containerDef["mountPoints"].([]interface{}); ok {
+		for _, mountPoint := range mountPoints {
+			if mp, ok := mountPoint.(map[string]interface{}); ok {
+				if sourceVolume, ok := mp["sourceVolume"].(string); ok {
+					if containerPath, ok := mp["containerPath"].(string); ok {
+						volumeMount := corev1.VolumeMount{
+							Name:      sourceVolume,
+							MountPath: containerPath,
+						}
+						// Check for readOnly flag
+						if readOnly, ok := mp["readOnly"].(bool); ok {
+							volumeMount.ReadOnly = readOnly
+						}
+						container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+					}
+				}
+			}
+		}
 	}
 
 	// Set essential flag (for later use in deployment strategy)
