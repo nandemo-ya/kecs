@@ -73,21 +73,28 @@ jobs:
           LOGIC_COUNT=${LOGIC_COUNT:-0}
           STYLE_COUNT=${STYLE_COUNT:-0}
           
-          # Create summary
-          SUMMARY="## Greptile Review Summary\n\n"
-          SUMMARY+="- **Critical Issues**: ${CRITICAL_COUNT}\n"
-          SUMMARY+="- **Logic Issues**: ${LOGIC_COUNT}\n"
-          SUMMARY+="- **Style Suggestions**: ${STYLE_COUNT}\n\n"
+          # Create summary with proper newlines
+          SUMMARY="## Greptile Review Summary
+
+- **Critical Issues**: ${CRITICAL_COUNT}
+- **Logic Issues**: ${LOGIC_COUNT}
+- **Style Suggestions**: ${STYLE_COUNT}
+
+"
           
           if [ "$CRITICAL_COUNT" -gt 0 ]; then
-            SUMMARY+="❌ **Action Required**: Fix compilation errors before merge\n"
+            SUMMARY+="❌ **Action Required**: Fix compilation errors before merge
+"
           elif [ "$LOGIC_COUNT" -gt 0 ]; then
-            SUMMARY+="⚠️ **Review Required**: Logic issues detected\n"
+            SUMMARY+="⚠️ **Review Required**: Logic issues detected
+"
           else
-            SUMMARY+="✅ **No blocking issues found**\n"
+            SUMMARY+="✅ **No blocking issues found
+"
           fi
           
-          SUMMARY+="\nSee [Greptile Workflow Guide](https://github.com/${{ github.repository }}/blob/main/docs/greptile-workflow.md) for handling reviews."
+          SUMMARY+="
+See [Greptile Workflow Guide](https://github.com/${{ github.repository }}/blob/main/docs/greptile-workflow.md) for handling reviews."
           
           # Check if we already posted a summary
           EXISTING=$(gh api repos/${{ github.repository }}/issues/${PR_NUMBER}/comments --jq '.[] | select(.body | contains("Greptile Review Summary")) | .id' | head -1)
