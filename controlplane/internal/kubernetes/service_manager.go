@@ -142,15 +142,22 @@ func (sm *ServiceManager) processExistingPods() {
 			}
 
 			// Extract cluster name from namespace
-			// Namespace format is typically "ecs-<cluster-name>" or "<cluster-name>-<region>"
+			// Namespace format is typically "<cluster-name>-<region>" (e.g., default-us-east-1)
+			// Legacy format "ecs-<cluster-name>" is also supported for backward compatibility
 			clusterName := "default"
 			if strings.HasPrefix(ns.Name, "ecs-") {
-				// For ecs-default, ecs-production, etc.
+				// Legacy format: ecs-default, ecs-production, etc.
 				clusterName = strings.TrimPrefix(ns.Name, "ecs-")
 			} else if strings.Contains(ns.Name, "-") {
-				// For default-us-east-1, production-eu-west-1, etc.
+				// Standard format: default-us-east-1, production-eu-west-1, etc.
+				// Take everything before the first region component
 				parts := strings.Split(ns.Name, "-")
-				if len(parts) > 0 {
+				if len(parts) >= 3 {
+					// Likely format: <cluster>-<region-part1>-<region-part2>-<region-part3>
+					// For us-east-1, eu-west-1, ap-northeast-1, etc.
+					clusterName = parts[0]
+				} else if len(parts) > 0 {
+					// Simple format with single dash
 					clusterName = parts[0]
 				}
 			}
@@ -984,7 +991,8 @@ func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.S
 
 	// Extract cluster name from ARN
 	clusterName := sm.extractClusterNameFromARN(service.ClusterARN)
-	namespace := fmt.Sprintf("ecs-%s", clusterName)
+	// Use the same namespace format as regular service creation: <cluster>-<region>
+	namespace := fmt.Sprintf("%s-%s", clusterName, service.Region)
 
 	// Check if deployment already exists
 	deploymentName := service.ServiceName
