@@ -358,8 +358,7 @@ func (m *Manager) Destroy(ctx context.Context, instanceName string) error {
 
 	if err := os.RemoveAll(instanceDir); err != nil {
 		// Non-fatal error - just log it
-		// TODO: Add proper logging here
-		fmt.Printf("Warning: failed to remove instance directory %s: %v\n", instanceDir, err)
+		logging.Warn("Failed to remove instance directory", "path", instanceDir, "error", err)
 	}
 
 	return nil
