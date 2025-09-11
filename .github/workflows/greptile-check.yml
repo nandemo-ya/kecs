@@ -19,7 +19,7 @@ jobs:
       - name: Wait for Greptile Review
         run: |
           echo "Waiting for Greptile to analyze PR..."
-          sleep 60  # Give Greptile time to analyze (increased to 60s)
+          sleep 60  # Give Greptile time to analyze
       
       - name: Check for Critical Issues
         env:
