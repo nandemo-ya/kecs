@@ -95,7 +95,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	}
 
 	// Set up start options
-	opts := instance.StartOptions{
+	opts := &instance.StartOptions{
 		InstanceName:                 startInstanceName,
 		DataDir:                      startDataDir,
 		ConfigFile:                   startConfigFile,
@@ -160,7 +160,7 @@ func determineInstanceToStart(manager *k3d.K3dClusterManager) (string, bool, err
 }
 
 // showStartCompletionMessage displays the completion message after successful start
-func showStartCompletionMessage(opts instance.StartOptions) {
+func showStartCompletionMessage(opts *instance.StartOptions) {
 	fmt.Printf(msgInstanceReady, opts.InstanceName)
 	fmt.Println(msgNextSteps)
 	fmt.Printf("AWS API: http://localhost:%d\n", opts.ApiPort)

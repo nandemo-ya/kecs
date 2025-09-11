@@ -41,7 +41,7 @@ func generateInstanceName() string {
 }
 
 // createCluster creates the k3d cluster
-func (m *Manager) createCluster(ctx context.Context, instanceName string, cfg *config.Config, opts StartOptions) error {
+func (m *Manager) createCluster(ctx context.Context, instanceName string, cfg *config.Config, opts *StartOptions) error {
 	clusterName := fmt.Sprintf("kecs-%s", instanceName)
 
 	// Calculate NodePort for API access
@@ -165,7 +165,7 @@ func (m *Manager) createOrUpdateNamespace(ctx context.Context, instanceName stri
 }
 
 // deployControlPlane deploys the KECS control plane
-func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, cfg *config.Config, opts StartOptions) error {
+func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, cfg *config.Config, opts *StartOptions) error {
 
 	clusterName := fmt.Sprintf("kecs-%s", instanceName)
 	kubeconfig, err := m.k3dManager.GetKubeConfig(context.Background(), clusterName)

@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -943,4 +944,273 @@ func (sm *ServiceManager) handlePodDeletion(ctx context.Context, pod *corev1.Pod
 	}
 
 	logging.Info("Marked task as STOPPED due to pod deletion", "pod", pod.Name, "task", taskARN)
+}
+
+// RestoreService restores a service from DuckDB to Kubernetes
+func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.Service) error {
+	if service == nil {
+		return fmt.Errorf("service is nil")
+	}
+
+	// Ensure kubernetes client is initialized
+	if err := sm.initializeClient(); err != nil {
+		return fmt.Errorf("failed to initialize kubernetes client: %w", err)
+	}
+
+	// Extract cluster name from ARN
+	clusterName := sm.extractClusterNameFromARN(service.ClusterARN)
+	namespace := fmt.Sprintf("ecs-%s", clusterName)
+
+	// Check if deployment already exists
+	deploymentName := service.ServiceName
+	_, err := sm.clientset.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
+	if err == nil {
+		logging.Info("Deployment already exists, skipping restoration",
+			"deployment", deploymentName,
+			"namespace", namespace)
+		return nil
+	}
+	if !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to check deployment existence: %w", err)
+	}
+
+	// Get task definition from storage - extract family and revision from ARN
+	family, revision := parseTaskDefinitionARN(service.TaskDefinitionARN)
+	taskDef, err := sm.storage.TaskDefinitionStore().Get(ctx, family, revision)
+	if err != nil {
+		return fmt.Errorf("failed to get task definition: %w", err)
+	}
+	if taskDef == nil {
+		return fmt.Errorf("task definition not found: %s", service.TaskDefinitionARN)
+	}
+
+	// Parse the task definition JSON from ContainerDefinitions field
+	var taskDefData map[string]interface{}
+	taskDefData = make(map[string]interface{})
+
+	// Parse container definitions
+	var containerDefs []interface{}
+	if taskDef.ContainerDefinitions != "" {
+		if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
+			return fmt.Errorf("failed to parse container definitions: %w", err)
+		}
+		taskDefData["containerDefinitions"] = containerDefs
+	}
+
+	// Create deployment spec from the stored service configuration
+	var replicas int32 = int32(service.DesiredCount)
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deploymentName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"ecs.service": service.ServiceName,
+				"ecs.cluster": clusterName,
+				"ecs.managed": "true",
+			},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"ecs.service": service.ServiceName,
+					"ecs.cluster": clusterName,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"ecs.service":         service.ServiceName,
+						"ecs.cluster":         clusterName,
+						"ecs.task-definition": fmt.Sprintf("%s:%d", family, revision),
+						"ecs.managed":         "true",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{},
+				},
+			},
+		},
+	}
+
+	// Add containers from task definition
+	if containerDefs, ok := taskDefData["containerDefinitions"].([]interface{}); ok {
+		for _, containerDef := range containerDefs {
+			if containerMap, ok := containerDef.(map[string]interface{}); ok {
+				container := sm.createContainerFromDefinition(containerMap)
+				deployment.Spec.Template.Spec.Containers = append(
+					deployment.Spec.Template.Spec.Containers,
+					container,
+				)
+			}
+		}
+	}
+
+	// Ensure namespace exists
+	if err := sm.ensureNamespace(ctx, sm.clientset, namespace); err != nil {
+		return fmt.Errorf("failed to ensure namespace: %w", err)
+	}
+
+	// Apply the deployment
+	_, err = sm.clientset.AppsV1().Deployments(namespace).Create(ctx, deployment, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create deployment in Kubernetes: %w", err)
+	}
+
+	// Create service if there are port mappings
+	if sm.hasPortMappings(taskDefData) {
+		k8sService := sm.createK8sServiceFromDefinition(namespace, service.ServiceName, taskDefData)
+		_, err = sm.clientset.CoreV1().Services(namespace).Create(ctx, k8sService, metav1.CreateOptions{})
+		if err != nil && !errors.IsAlreadyExists(err) {
+			logging.Warn("Failed to create Kubernetes service", "error", err)
+		}
+	}
+
+	// Start watching pods for this deployment to create ECS tasks
+	if sm.taskManager != nil {
+		// Get cluster from storage
+		cluster, err := sm.storage.ClusterStore().Get(ctx, clusterName)
+		if err != nil {
+			logging.Warn("Failed to get cluster for watching pods", "error", err)
+		} else {
+			go sm.watchServicePods(context.Background(), deployment, cluster, service)
+		}
+	}
+
+	logging.Info("Successfully restored service",
+		"serviceName", service.ServiceName,
+		"namespace", namespace,
+		"desiredCount", service.DesiredCount)
+
+	return nil
+}
+
+// Helper functions for RestoreService
+
+// parseTaskDefinitionARN extracts family and revision from task definition ARN
+// Example: arn:aws:ecs:us-east-1:000000000000:task-definition/nginx:1
+func parseTaskDefinitionARN(arn string) (string, int) {
+	parts := strings.Split(arn, "/")
+	if len(parts) < 2 {
+		return "", 0
+	}
+
+	defParts := strings.Split(parts[len(parts)-1], ":")
+	if len(defParts) != 2 {
+		return defParts[0], 0
+	}
+
+	var revision int
+	fmt.Sscanf(defParts[1], "%d", &revision)
+	return defParts[0], revision
+}
+
+// extractClusterNameFromARN extracts cluster name from ARN
+func (sm *ServiceManager) extractClusterNameFromARN(arn string) string {
+	if arn == "" {
+		return "default"
+	}
+	parts := strings.Split(arn, "/")
+	if len(parts) >= 2 {
+		return parts[len(parts)-1]
+	}
+	return "default"
+}
+
+// createContainerFromDefinition creates a Kubernetes container from ECS container definition
+func (sm *ServiceManager) createContainerFromDefinition(containerDef map[string]interface{}) corev1.Container {
+	container := corev1.Container{
+		Name: "main",
+	}
+
+	if name, ok := containerDef["name"].(string); ok {
+		container.Name = name
+	}
+
+	if image, ok := containerDef["image"].(string); ok {
+		container.Image = image
+	}
+
+	// Add port mappings
+	if portMappings, ok := containerDef["portMappings"].([]interface{}); ok {
+		for _, portMapping := range portMappings {
+			if pm, ok := portMapping.(map[string]interface{}); ok {
+				if containerPort, ok := pm["containerPort"].(float64); ok {
+					container.Ports = append(container.Ports, corev1.ContainerPort{
+						ContainerPort: int32(containerPort),
+					})
+				}
+			}
+		}
+	}
+
+	// Add environment variables
+	if envVars, ok := containerDef["environment"].([]interface{}); ok {
+		for _, envVar := range envVars {
+			if ev, ok := envVar.(map[string]interface{}); ok {
+				if name, ok := ev["name"].(string); ok {
+					if value, ok := ev["value"].(string); ok {
+						container.Env = append(container.Env, corev1.EnvVar{
+							Name:  name,
+							Value: value,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return container
+}
+
+// hasPortMappings checks if task definition has port mappings
+func (sm *ServiceManager) hasPortMappings(taskDefData map[string]interface{}) bool {
+	if containerDefs, ok := taskDefData["containerDefinitions"].([]interface{}); ok {
+		for _, containerDef := range containerDefs {
+			if containerMap, ok := containerDef.(map[string]interface{}); ok {
+				if portMappings, ok := containerMap["portMappings"].([]interface{}); ok && len(portMappings) > 0 {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// createK8sServiceFromDefinition creates a Kubernetes service from task definition
+func (sm *ServiceManager) createK8sServiceFromDefinition(namespace, serviceName string, taskDefData map[string]interface{}) *corev1.Service {
+	k8sService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{
+				"ecs.service": serviceName,
+			},
+			Ports: []corev1.ServicePort{},
+		},
+	}
+
+	// Add ports from container definitions
+	if containerDefs, ok := taskDefData["containerDefinitions"].([]interface{}); ok {
+		for _, containerDef := range containerDefs {
+			if containerMap, ok := containerDef.(map[string]interface{}); ok {
+				if portMappings, ok := containerMap["portMappings"].([]interface{}); ok {
+					for _, portMapping := range portMappings {
+						if pm, ok := portMapping.(map[string]interface{}); ok {
+							if containerPort, ok := pm["containerPort"].(float64); ok {
+								k8sService.Spec.Ports = append(k8sService.Spec.Ports, corev1.ServicePort{
+									Port:       int32(containerPort),
+									TargetPort: intstr.FromInt(int(containerPort)),
+								})
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return k8sService
 }

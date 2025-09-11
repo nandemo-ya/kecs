@@ -32,6 +32,7 @@ type InstanceConfig struct {
 	// Port configuration
 	APIPort   int `yaml:"apiPort"`
 	AdminPort int `yaml:"adminPort"`
+	KubePort  int `yaml:"kubePort,omitempty"` // Kubernetes API server port
 
 	// Feature toggles
 	LocalStack                   bool   `yaml:"localStack"`
@@ -42,7 +43,7 @@ type InstanceConfig struct {
 }
 
 // SaveInstanceConfig saves the instance configuration to a YAML file
-func SaveInstanceConfig(instanceName string, opts StartOptions) error {
+func SaveInstanceConfig(instanceName string, opts *StartOptions) error {
 	// Create instance directory if it doesn't exist
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -60,6 +61,7 @@ func SaveInstanceConfig(instanceName string, opts StartOptions) error {
 		CreatedAt:                    time.Now(),
 		APIPort:                      opts.ApiPort,
 		AdminPort:                    opts.AdminPort,
+		KubePort:                     opts.KubePort,
 		LocalStack:                   true, // LocalStack is always enabled
 		DataDir:                      opts.DataDir,
 		AdditionalLocalStackServices: opts.AdditionalLocalStackServices,
@@ -149,4 +151,35 @@ func ListInstanceConfigs() ([]InstanceConfig, error) {
 	}
 
 	return configs, nil
+}
+
+// UpdateInstanceKubePort updates the Kubernetes API port in the saved config
+func UpdateInstanceKubePort(instanceName string, kubePort int) error {
+	// Load existing config
+	config, err := LoadInstanceConfig(instanceName)
+	if err != nil {
+		return fmt.Errorf("failed to load instance config: %w", err)
+	}
+
+	// Update KubePort
+	config.KubePort = kubePort
+
+	// Marshal to YAML
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	// Write back to file
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	configPath := filepath.Join(home, ".kecs", "instances", instanceName, "config.yaml")
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
 }

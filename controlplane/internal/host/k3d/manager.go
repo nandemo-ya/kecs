@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -2100,4 +2101,43 @@ func (k *K3dClusterManager) getRESTConfig(clusterName string) (*rest.Config, err
 	}
 
 	return config, nil
+}
+
+// GetKubernetesAPIPort returns the Kubernetes API port for a cluster
+func (k *K3dClusterManager) GetKubernetesAPIPort(ctx context.Context, clusterName string) (int, error) {
+	normalizedName := k.normalizeClusterName(clusterName)
+
+	// Get the serverlb container to find the exposed port
+	cmd := exec.CommandContext(ctx, "docker", "ps", "--filter", fmt.Sprintf("name=k3d-%s-serverlb", normalizedName), "--format", "{{.Ports}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get container info: %w", err)
+	}
+
+	// Parse the port from output like "80/tcp, 0.0.0.0:32773->6443/tcp"
+	portStr := string(output)
+	if portStr == "" {
+		return 0, fmt.Errorf("no port mapping found for cluster %s", normalizedName)
+	}
+
+	// Extract the host port from the mapping
+	parts := strings.Split(portStr, "->")
+	if len(parts) < 2 {
+		return 0, fmt.Errorf("unexpected port format: %s", portStr)
+	}
+
+	// Extract port number from "0.0.0.0:32773"
+	hostPart := parts[0]
+	colonIdx := strings.LastIndex(hostPart, ":")
+	if colonIdx == -1 {
+		return 0, fmt.Errorf("no port found in: %s", hostPart)
+	}
+
+	portNumStr := strings.TrimSpace(hostPart[colonIdx+1:])
+	port, err := strconv.Atoi(portNumStr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse port number %s: %w", portNumStr, err)
+	}
+
+	return port, nil
 }
