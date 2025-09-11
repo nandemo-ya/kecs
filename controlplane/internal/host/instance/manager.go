@@ -36,6 +36,7 @@ type StartOptions struct {
 	AdditionalLocalStackServices string // Comma-separated list of additional LocalStack services
 	ApiPort                      int
 	AdminPort                    int
+	KubePort                     int // Kubernetes API server port (0 for auto-assign)
 }
 
 // CreationStatus represents the status of instance creation
@@ -107,7 +108,7 @@ func (m *Manager) GetCreationStatus(instanceName string) *CreationStatus {
 }
 
 // Start starts a KECS instance with the given options
-func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
+func (m *Manager) Start(ctx context.Context, opts *StartOptions) error {
 	// Generate instance name if not provided
 	if opts.InstanceName == "" {
 		opts.InstanceName = generateInstanceName()
@@ -139,6 +140,9 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 			}
 			if opts.AdminPort == 0 {
 				opts.AdminPort = savedConfig.AdminPort
+			}
+			if opts.KubePort == 0 {
+				opts.KubePort = savedConfig.KubePort
 			}
 			if opts.DataDir == "" {
 				opts.DataDir = savedConfig.DataDir
@@ -205,6 +209,20 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 		return fmt.Errorf("failed to create k3d cluster: %w", err)
 	}
 	m.updateStatus(opts.InstanceName, "Creating k3d cluster", "done")
+
+	// Get and save the Kubernetes API port after cluster creation
+	kubePort, err := m.k3dManager.GetKubernetesAPIPort(ctx, fmt.Sprintf("kecs-%s", opts.InstanceName))
+	if err != nil {
+		logging.Warn("Failed to get Kubernetes API port", "error", err)
+	} else {
+		// Update the saved config with the actual Kubernetes API port
+		if err := UpdateInstanceKubePort(opts.InstanceName, kubePort); err != nil {
+			logging.Warn("Failed to update Kubernetes API port in config", "error", err)
+		} else {
+			logging.Info("Saved Kubernetes API port", "instance", opts.InstanceName, "port", kubePort)
+			opts.KubePort = kubePort // Update in-memory options as well
+		}
+	}
 
 	// Step 2: Create namespace
 	m.updateStatus(opts.InstanceName, "Creating namespace", "running")
@@ -460,11 +478,11 @@ func (m *Manager) Restart(ctx context.Context, instanceName string) error {
 	}
 
 	// Use restartInstance to handle the restart
-	return m.restartInstance(ctx, opts)
+	return m.restartInstance(ctx, &opts)
 }
 
 // restartInstance restarts a stopped instance and redeploys all components
-func (m *Manager) restartInstance(ctx context.Context, opts StartOptions) error {
+func (m *Manager) restartInstance(ctx context.Context, opts *StartOptions) error {
 
 	// Load configuration
 	cfg, err := config.LoadConfig(opts.ConfigFile)
@@ -493,6 +511,9 @@ func (m *Manager) restartInstance(ctx context.Context, opts StartOptions) error 
 		}
 		if opts.AdminPort == 0 {
 			opts.AdminPort = savedConfig.AdminPort
+		}
+		if opts.KubePort == 0 {
+			opts.KubePort = savedConfig.KubePort
 		}
 		if opts.DataDir == "" {
 			opts.DataDir = savedConfig.DataDir
@@ -559,6 +580,20 @@ func (m *Manager) restartInstance(ctx context.Context, opts StartOptions) error 
 		return fmt.Errorf("cluster did not become ready: %w", err)
 	}
 	m.updateStatus(opts.InstanceName, "Waiting for cluster", "done")
+
+	// Get and save the Kubernetes API port
+	kubePort, err := m.k3dManager.GetKubernetesAPIPort(ctx, fmt.Sprintf("kecs-%s", opts.InstanceName))
+	if err != nil {
+		logging.Warn("Failed to get Kubernetes API port", "error", err)
+	} else {
+		// Update the saved config with the actual Kubernetes API port
+		if err := UpdateInstanceKubePort(opts.InstanceName, kubePort); err != nil {
+			logging.Warn("Failed to update Kubernetes API port in config", "error", err)
+		} else {
+			logging.Info("Saved Kubernetes API port", "instance", opts.InstanceName, "port", kubePort)
+			opts.KubePort = kubePort // Update in-memory options as well
+		}
+	}
 
 	// Step 3: Recreate namespace (in case it was deleted)
 	m.updateStatus(opts.InstanceName, "Creating namespace", "running")

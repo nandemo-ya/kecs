@@ -58,18 +58,17 @@ func (s *Service) RestoreAll(ctx context.Context) error {
 	// 2. Task definitions are already persisted in DuckDB
 	logging.Info("Task definitions are already persisted in DuckDB, no restoration needed")
 
-	// 3. Log services found
-	if err := s.logServices(ctx); err != nil {
-		logging.Error("Failed to log services", "error", err)
+	// 3. Restore services (which will also recreate their tasks)
+	if err := s.restoreServices(ctx); err != nil {
+		logging.Error("Failed to restore services", "error", err)
 	}
 
-	// 4. Log tasks found
-	if err := s.logTasks(ctx); err != nil {
-		logging.Error("Failed to log tasks", "error", err)
+	// 4. Restore standalone tasks (not managed by services)
+	if err := s.restoreStandaloneTasks(ctx); err != nil {
+		logging.Error("Failed to restore standalone tasks", "error", err)
 	}
 
-	logging.Info("ECS resource restoration scan completed")
-	logging.Info("Note: Actual Kubernetes resource recreation will happen through normal ECS API operations")
+	logging.Info("ECS resource restoration completed")
 	return nil
 }
 
@@ -89,8 +88,8 @@ func (s *Service) logClusters(ctx context.Context, clusters []*storage.Cluster) 
 	return nil
 }
 
-// logServices logs all services found in DuckDB
-func (s *Service) logServices(ctx context.Context) error {
+// restoreServices restores all services found in DuckDB
+func (s *Service) restoreServices(ctx context.Context) error {
 	// List all services across all clusters
 	services, _, err := s.storage.ServiceStore().List(ctx, "", "", "", 1000, "")
 	if err != nil {
@@ -98,31 +97,39 @@ func (s *Service) logServices(ctx context.Context) error {
 	}
 
 	activeCount := 0
+	restoredCount := 0
 	for _, service := range services {
 		if service.Status == "ACTIVE" {
 			activeCount++
-			logging.Info("Found active service in DuckDB",
+			logging.Info("Restoring service from DuckDB",
 				"serviceName", service.ServiceName,
 				"clusterArn", extractClusterName(service.ClusterARN),
 				"desiredCount", service.DesiredCount,
-				"runningCount", service.RunningCount,
 				"taskDefinition", service.TaskDefinitionARN)
+
+			// Check if the service deployment already exists in Kubernetes
+			if s.serviceManager != nil {
+				if err := s.serviceManager.RestoreService(ctx, service); err != nil {
+					logging.Error("Failed to restore service",
+						"serviceName", service.ServiceName,
+						"error", err)
+				} else {
+					restoredCount++
+				}
+			}
 		}
 	}
 
-	logging.Info("Found services in DuckDB",
+	logging.Info("Service restoration completed",
 		"totalCount", len(services),
-		"activeCount", activeCount)
-
-	// Note: Actual service restoration would happen through the normal
-	// ECS CreateService/UpdateService API calls which already handle
-	// creating the necessary Kubernetes deployments
+		"activeCount", activeCount,
+		"restoredCount", restoredCount)
 
 	return nil
 }
 
-// logTasks logs all tasks found in DuckDB
-func (s *Service) logTasks(ctx context.Context) error {
+// restoreStandaloneTasks restores standalone tasks (not managed by services)
+func (s *Service) restoreStandaloneTasks(ctx context.Context) error {
 	// List all tasks across all clusters
 	tasks, err := s.storage.TaskStore().List(ctx, "", storage.TaskFilters{
 		MaxResults: 1000,
@@ -131,32 +138,38 @@ func (s *Service) logTasks(ctx context.Context) error {
 		return fmt.Errorf("failed to list tasks from storage: %w", err)
 	}
 
-	runningCount := 0
-	pendingCount := 0
+	standaloneCount := 0
+	restoredCount := 0
 	for _, task := range tasks {
-		if task.LastStatus == "RUNNING" {
-			runningCount++
-			logging.Debug("Found running task in DuckDB",
+		// Skip tasks that are managed by services (have a service group)
+		if task.Group != "" && strings.HasPrefix(task.Group, "service:") {
+			continue
+		}
+
+		// Only restore tasks that were running or pending
+		if task.LastStatus == "RUNNING" || task.LastStatus == "PENDING" {
+			standaloneCount++
+			logging.Info("Restoring standalone task from DuckDB",
 				"taskArn", task.ARN,
-				"group", task.Group,
-				"startedBy", task.StartedBy)
-		} else if task.LastStatus == "PENDING" {
-			pendingCount++
-			logging.Debug("Found pending task in DuckDB",
-				"taskArn", task.ARN,
-				"group", task.Group,
-				"startedBy", task.StartedBy)
+				"taskDefinition", task.TaskDefinitionARN,
+				"lastStatus", task.LastStatus)
+
+			// Restore the task using TaskManager
+			if s.taskManager != nil {
+				if err := s.taskManager.RestoreTask(ctx, task); err != nil {
+					logging.Error("Failed to restore standalone task",
+						"taskArn", task.ARN,
+						"error", err)
+				} else {
+					restoredCount++
+				}
+			}
 		}
 	}
 
-	logging.Info("Found tasks in DuckDB",
-		"totalCount", len(tasks),
-		"runningCount", runningCount,
-		"pendingCount", pendingCount)
-
-	// Note: Tasks that belong to services will be recreated automatically
-	// when the service deployments are restored. Standalone tasks would
-	// need to be recreated through RunTask API calls.
+	logging.Info("Standalone task restoration completed",
+		"standaloneCount", standaloneCount,
+		"restoredCount", restoredCount)
 
 	return nil
 }

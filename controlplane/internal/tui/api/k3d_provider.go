@@ -181,7 +181,7 @@ func (p *K3dInstanceProvider) getContainerInfo(ctx context.Context, containerNam
 // CreateInstance creates a new KECS instance using instance.Manager
 func (p *K3dInstanceProvider) CreateInstance(ctx context.Context, opts CreateInstanceOptions) (*Instance, error) {
 	// Convert TUI options to instance.StartOptions
-	startOpts := instance.StartOptions{
+	startOpts := &instance.StartOptions{
 		InstanceName:                 opts.Name,
 		ApiPort:                      opts.APIPort,
 		AdminPort:                    opts.AdminPort,
