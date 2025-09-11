@@ -174,6 +174,98 @@ func (k *K3dClusterManager) StartClusterWithPorts(ctx context.Context, clusterNa
 	return nil
 }
 
+// StartClusterWithPortsAndKubePort starts a previously stopped k3d cluster with port mappings and attempts to use saved Kubernetes API port
+func (k *K3dClusterManager) StartClusterWithPortsAndKubePort(ctx context.Context, clusterName string, portMappings map[int32]int32, savedKubePort int) error {
+	// Skip actual cluster start in CI/test mode
+	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+		logging.Info("CI/TEST MODE: Simulating cluster start", "cluster", clusterName)
+		return nil
+	}
+
+	normalizedName := k.normalizeClusterName(clusterName)
+
+	// Check if cluster exists
+	exists, err := k.ClusterExists(ctx, clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to check if cluster exists: %w", err)
+	}
+
+	if !exists {
+		return fmt.Errorf("cluster does not exist: %s", normalizedName)
+	}
+
+	// Get the cluster
+	clusters, err := client.ClusterList(ctx, k.runtime)
+	if err != nil {
+		return fmt.Errorf("failed to list clusters: %w", err)
+	}
+
+	var cluster *k3d.Cluster
+	for _, c := range clusters {
+		if c.Name == normalizedName {
+			cluster = c
+			break
+		}
+	}
+
+	if cluster == nil {
+		return fmt.Errorf("cluster not found: %s", normalizedName)
+	}
+
+	// Try to start the cluster normally first
+	logging.Info("Starting k3d cluster", "cluster", normalizedName)
+	startOpts := k3d.ClusterStartOpts{
+		WaitForServer: true,
+		Timeout:       60 * time.Second,
+	}
+
+	if err := client.ClusterStart(ctx, k.runtime, cluster, startOpts); err != nil {
+		// If normal start fails due to DNS fix issues, try workaround with port mappings
+		if strings.Contains(err.Error(), "Host Gateway IP is missing") ||
+			strings.Contains(err.Error(), "Cannot enable DNS fix") {
+			logging.Warn("Normal start failed due to DNS fix issue, attempting workaround with port mappings", "error", err)
+			return k.startClusterWithWorkaroundAndPortsWithKubePort(ctx, normalizedName, cluster, portMappings, savedKubePort)
+		}
+		return fmt.Errorf("failed to start cluster: %w", err)
+	}
+
+	logging.Info("k3d cluster started successfully", "cluster", normalizedName)
+	return nil
+}
+
+// startClusterWithWorkaroundAndPortsWithKubePort handles the DNS fix issue by recreating the cluster with port mappings and Kubernetes API port
+func (k *K3dClusterManager) startClusterWithWorkaroundAndPortsWithKubePort(ctx context.Context, normalizedName string, cluster *k3d.Cluster, portMappings map[int32]int32, savedKubePort int) error {
+	logging.Info("Using workaround: recreating cluster with preserved data and port mappings",
+		"cluster", normalizedName,
+		"savedKubePort", savedKubePort)
+
+	// Save the original cluster configuration
+	volumeMounts := k.config.VolumeMounts
+
+	// Delete the problematic cluster
+	logging.Info("Deleting stopped cluster", "cluster", normalizedName)
+	if err := client.ClusterDelete(ctx, k.runtime, cluster, k3d.ClusterDeleteOpts{SkipRegistryCheck: false}); err != nil {
+		return fmt.Errorf("failed to delete cluster for workaround: %w", err)
+	}
+
+	// Recreate the cluster with the same configuration
+	logging.Info("Recreating cluster with preserved data and port mappings", "cluster", normalizedName)
+
+	// Restore the volume mounts to preserve data
+	k.config.VolumeMounts = volumeMounts
+
+	// Use the denormalized name for recreation (without "kecs-" prefix)
+	denormalizedName := strings.TrimPrefix(normalizedName, "kecs-")
+
+	// Use CreateClusterWithPortMappingAndKubePort with the provided port mappings and Kubernetes API port
+	if err := k.CreateClusterWithPortMappingAndKubePort(ctx, denormalizedName, portMappings, savedKubePort); err != nil {
+		return fmt.Errorf("failed to recreate cluster with port mappings: %w", err)
+	}
+
+	logging.Info("Cluster recreated successfully with preserved data and port mappings", "cluster", normalizedName)
+	return nil
+}
+
 // startClusterWithWorkaroundAndPorts handles the DNS fix issue by recreating the cluster with port mappings
 func (k *K3dClusterManager) startClusterWithWorkaroundAndPorts(ctx context.Context, normalizedName string, cluster *k3d.Cluster, portMappings map[int32]int32) error {
 	logging.Info("Using workaround: recreating cluster with preserved data and port mappings", "cluster", normalizedName)
@@ -396,11 +488,22 @@ func (k *K3dClusterManager) CreateClusterWithPortMapping(ctx context.Context, cl
 	}
 
 	// Use standard creation with port mappings
-	return k.createClusterStandardWithPorts(ctx, clusterName, portMappings)
+	return k.createClusterStandardWithPorts(ctx, clusterName, portMappings, 0)
+}
+
+// CreateClusterWithPortMappingAndKubePort creates a new k3d cluster with specified port mappings and Kubernetes API port
+func (k *K3dClusterManager) CreateClusterWithPortMappingAndKubePort(ctx context.Context, clusterName string, portMappings map[int32]int32, kubePort int) error {
+	// Use optimized creation for test mode or when explicitly requested
+	if config.GetBool("features.testMode") || config.GetBool("kubernetes.k3dOptimized") {
+		return k.CreateClusterOptimized(ctx, clusterName)
+	}
+
+	// Use standard creation with port mappings and Kubernetes API port
+	return k.createClusterStandardWithPorts(ctx, clusterName, portMappings, kubePort)
 }
 
 // createClusterStandardWithPorts creates a standard k3d cluster with custom port mappings
-func (k *K3dClusterManager) createClusterStandardWithPorts(ctx context.Context, clusterName string, portMappings map[int32]int32) error {
+func (k *K3dClusterManager) createClusterStandardWithPorts(ctx context.Context, clusterName string, portMappings map[int32]int32, kubePort int) error {
 	normalizedName := k.normalizeClusterName(clusterName)
 
 	// Check if cluster already exists
@@ -493,6 +596,23 @@ func (k *K3dClusterManager) createClusterStandardWithPorts(ctx context.Context, 
 		}
 	}
 
+	// Configure Kubernetes API exposure
+	kubeAPIExposure := &k3d.ExposureOpts{
+		Host: k3d.DefaultAPIHost,
+	}
+
+	// If we have a saved Kubernetes API port, try to use it
+	if kubePort > 0 {
+		logging.Info("Attempting to use saved Kubernetes API port", "port", kubePort)
+		kubeAPIExposure.PortMapping = nat.PortMapping{
+			Port: "6443/tcp",
+			Binding: nat.PortBinding{
+				HostIP:   "0.0.0.0",
+				HostPort: fmt.Sprintf("%d", kubePort),
+			},
+		}
+	}
+
 	cluster := &k3d.Cluster{
 		Name:  normalizedName,
 		Nodes: []*k3d.Node{serverNode},
@@ -502,10 +622,8 @@ func (k *K3dClusterManager) createClusterStandardWithPorts(ctx context.Context, 
 				Managed: false,
 			},
 		},
-		Token: fmt.Sprintf("kecs-%s-token", normalizedName),
-		KubeAPI: &k3d.ExposureOpts{
-			Host: k3d.DefaultAPIHost,
-		},
+		Token:   fmt.Sprintf("kecs-%s-token", normalizedName),
+		KubeAPI: kubeAPIExposure,
 	}
 
 	// Registry connection will be handled after cluster creation

@@ -564,10 +564,10 @@ func (m *Manager) restartInstance(ctx context.Context, opts *StartOptions) error
 		int32(opts.AdminPort): adminNodePort, // Map host Admin port to NodePort for Admin API
 	}
 
-	// Step 1: Start the k3d cluster with port mappings
+	// Step 1: Start the k3d cluster with port mappings and saved Kubernetes API port
 	m.updateStatus(opts.InstanceName, "Starting k3d cluster", "running")
 	clusterName := fmt.Sprintf("kecs-%s", opts.InstanceName)
-	if err := m.k3dManager.StartClusterWithPorts(ctx, clusterName, portMappings); err != nil {
+	if err := m.k3dManager.StartClusterWithPortsAndKubePort(ctx, clusterName, portMappings, opts.KubePort); err != nil {
 		m.updateStatus(opts.InstanceName, "Starting k3d cluster", "failed", err.Error())
 		return fmt.Errorf("failed to start k3d cluster: %w", err)
 	}
