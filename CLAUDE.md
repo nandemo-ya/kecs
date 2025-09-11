@@ -299,3 +299,35 @@ func TestClusterLifecycle(t *testing.T) {
     utils.AssertClusterActive(t, client, "test-cluster")
 }
 ```
+
+## Claude Code Sub-Agents
+
+KECS project includes specialized sub-agents for Claude Code to handle specific tasks:
+
+### greptile-review-resolver
+A specialized agent that resolves issues identified by Greptile's automated PR review.
+
+**When to use**: After creating a PR when Greptile has posted review comments that need to be resolved.
+
+**What it does**:
+1. Fetches and analyzes all Greptile review comments
+2. Categorizes issues by severity (compilation errors, logic issues, style suggestions)
+3. Automatically fixes critical compilation errors
+4. Creates fix commits with clear messages
+5. Documents why certain suggestions were not implemented
+6. Creates follow-up issues for deferred improvements
+
+**Example usage**:
+```
+User: "Greptile found issues in PR #594. Please resolve them."
+Assistant: *Launches greptile-review-resolver agent*
+Agent: 
+- Fetches PR #594 comments
+- Identifies 3 compilation errors, 2 logic issues, 4 style suggestions
+- Fixes compilation errors (missing methods)
+- Fixes critical logic issue (context propagation)
+- Creates follow-up issue for refactoring duplicated code
+- Commits fixes with message "fix: Resolve Greptile review comments for PR #594"
+```
+
+The agent follows the workflow documented in `docs/greptile-workflow.md` and ensures all blocking issues are resolved before the PR can be merged.

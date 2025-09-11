@@ -1,0 +1,103 @@
+name: Greptile Review Check
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  check-greptile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Wait for Greptile Review
+        run: |
+          echo "Waiting for Greptile to analyze PR..."
+          sleep 60  # Give Greptile time to analyze
+      
+      - name: Check for Critical Issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          echo "Checking PR #${PR_NUMBER} for Greptile comments..."
+          
+          # Get review comments only for files changed in this PR
+          CHANGED_FILES=$(gh pr diff ${PR_NUMBER} --name-only | paste -sd "|" -)
+          COMMENTS=$(gh api repos/${{ github.repository }}/pulls/${PR_NUMBER}/comments --jq ".[] | select(.path | test(\"$CHANGED_FILES\")) | .body" || echo "")
+          
+          # Check for compilation errors (be specific to avoid false positives)
+          if echo "$COMMENTS" | grep -qi "compilation error\|will cause a compilation error\|will cause build failure"; then
+            echo "::error::❌ Greptile found compilation errors. Please fix before merge."
+            echo "Run 'gh pr view ${PR_NUMBER} --comments' to see details"
+            exit 1
+          fi
+          
+          # Check for critical logic errors
+          if echo "$COMMENTS" | grep -qi "data loss\|security\|vulnerability\|unsafe\|race condition"; then
+            echo "::warning::⚠️ Greptile found potential critical issues. Please review carefully."
+            echo "Run 'gh pr view ${PR_NUMBER} --comments' to see details"
+          fi
+          
+          # Check confidence score from PR description
+          PR_BODY=$(gh api repos/${{ github.repository }}/pulls/${PR_NUMBER} --jq '.body' || echo "")
+          if echo "$PR_BODY" | grep -q "Confidence score: [12]/5"; then
+            echo "::warning::⚠️ Greptile confidence score is low (1-2/5). Careful review required."
+          fi
+          
+          echo "✅ Greptile check completed. Please review any comments before merging."
+      
+      - name: Post Summary Comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          
+          # Count different types of issues (only for files changed in this PR)
+          CHANGED_FILES=$(gh pr diff ${PR_NUMBER} --name-only | paste -sd "|" -)
+          COMMENTS=$(gh api repos/${{ github.repository }}/pulls/${PR_NUMBER}/comments --jq ".[] | select(.path | test(\"$CHANGED_FILES\")) | .body" || echo "")
+          
+          CRITICAL_COUNT=$(echo "$COMMENTS" | grep -c "compilation error\|will cause a compilation error" || true)
+          LOGIC_COUNT=$(echo "$COMMENTS" | grep -c "logic:" || true)
+          STYLE_COUNT=$(echo "$COMMENTS" | grep -c "style:" || true)
+          
+          # Ensure counts are numbers
+          CRITICAL_COUNT=${CRITICAL_COUNT:-0}
+          LOGIC_COUNT=${LOGIC_COUNT:-0}
+          STYLE_COUNT=${STYLE_COUNT:-0}
+          
+          # Create summary using printf for proper newlines
+          SUMMARY=$(printf "## Greptile Review Summary\n\n")
+          SUMMARY+=$(printf "%s\n" "- **Critical Issues**: $CRITICAL_COUNT")
+          SUMMARY+=$(printf "%s\n" "- **Logic Issues**: $LOGIC_COUNT")
+          SUMMARY+=$(printf "%s\n\n" "- **Style Suggestions**: $STYLE_COUNT")
+          
+          if [ "$CRITICAL_COUNT" -gt 0 ]; then
+            SUMMARY+=$(printf "%s\n" "❌ **Action Required**: Fix compilation errors before merge")
+          elif [ "$LOGIC_COUNT" -gt 0 ]; then
+            SUMMARY+=$(printf "%s\n" "⚠️ **Review Required**: Logic issues detected")
+          else
+            SUMMARY+=$(printf "%s\n" "✅ **No blocking issues found")
+          fi
+          
+          SUMMARY+=$(printf "\n%s" "See [Greptile Workflow Guide](https://github.com/${{ github.repository }}/blob/main/docs/greptile-workflow.md) for handling reviews.")
+          
+          # Check if we already posted a summary
+          EXISTING=$(gh api repos/${{ github.repository }}/issues/${PR_NUMBER}/comments --jq '.[] | select(.body | contains("Greptile Review Summary")) | .id' | head -1)
+          
+          if [ -n "$EXISTING" ]; then
+            # Update existing comment
+            gh api repos/${{ github.repository }}/issues/comments/${EXISTING} \
+              --method PATCH \
+              -f body="$SUMMARY"
+          else
+            # Create new comment
+            gh pr comment ${PR_NUMBER} --body "$SUMMARY"
+          fi
