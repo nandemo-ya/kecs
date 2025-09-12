@@ -1043,33 +1043,98 @@ func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.S
 
 	// Create deployment spec from the stored service configuration
 	var replicas int32 = int32(service.DesiredCount)
+
+	// Create deployment labels
+	deploymentLabels := map[string]string{
+		"ecs.service": service.ServiceName,
+		"ecs.cluster": clusterName,
+		"ecs.managed": "true",
+	}
+
+	// Create pod labels
+	podLabels := map[string]string{
+		"app":                          service.ServiceName,
+		"ecs.service":                  service.ServiceName,
+		"ecs.cluster":                  clusterName,
+		"ecs.task-definition-family":   family,
+		"ecs.task-definition-revision": fmt.Sprintf("%d", revision),
+		"ecs.managed":                  "true",
+		"kecs.dev/service":             service.ServiceName,
+		"kecs.dev/cluster":             clusterName,
+		"kecs.dev/launch-type":         service.LaunchType,
+		"kecs.dev/managed-by":          "kecs",
+	}
+
+	// Create pod annotations
+	podAnnotations := map[string]string{
+		"kecs.dev/service-arn":         service.ARN,
+		"kecs.dev/task-definition":     service.TaskDefinitionARN,
+		"kecs.dev/scheduling-strategy": service.SchedulingStrategy,
+		"kecs.dev/service-registries":  service.ServiceRegistries,
+	}
+
+	// Add network configuration annotations if available
+	if service.NetworkConfiguration != "" {
+		// Parse and add network configuration annotations
+		var netConfig map[string]interface{}
+		if err := json.Unmarshal([]byte(service.NetworkConfiguration), &netConfig); err == nil {
+			if awsvpcConfig, ok := netConfig["awsvpcConfiguration"].(map[string]interface{}); ok {
+				// Add network mode
+				podAnnotations["ecs.amazonaws.com/network-mode"] = "awsvpc"
+
+				// Add subnets
+				if subnets, ok := awsvpcConfig["subnets"].([]interface{}); ok {
+					subnetList := make([]string, 0, len(subnets))
+					for _, subnet := range subnets {
+						if s, ok := subnet.(string); ok {
+							subnetList = append(subnetList, s)
+						}
+					}
+					if len(subnetList) > 0 {
+						podAnnotations["ecs.amazonaws.com/subnets"] = strings.Join(subnetList, ",")
+					}
+				}
+
+				// Add security groups
+				if secGroups, ok := awsvpcConfig["securityGroups"].([]interface{}); ok {
+					sgList := make([]string, 0, len(secGroups))
+					for _, sg := range secGroups {
+						if s, ok := sg.(string); ok {
+							sgList = append(sgList, s)
+						}
+					}
+					if len(sgList) > 0 {
+						podAnnotations["ecs.amazonaws.com/security-groups"] = strings.Join(sgList, ",")
+					}
+				}
+
+				// Add assign public IP
+				if assignPublicIp, ok := awsvpcConfig["assignPublicIp"].(string); ok {
+					podAnnotations["ecs.amazonaws.com/assign-public-ip"] = assignPublicIp
+				}
+			}
+		}
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deploymentName,
 			Namespace: namespace,
-			Labels: map[string]string{
-				"ecs.service": service.ServiceName,
-				"ecs.cluster": clusterName,
-				"ecs.managed": "true",
-			},
+			Labels:    deploymentLabels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
+					"app":         service.ServiceName,
 					"ecs.service": service.ServiceName,
 					"ecs.cluster": clusterName,
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"ecs.service":                  service.ServiceName,
-						"ecs.cluster":                  clusterName,
-						"ecs.task-definition-family":   family,
-						"ecs.task-definition-revision": fmt.Sprintf("%d", revision),
-						"ecs.managed":                  "true",
-					},
+					Labels:      podLabels,
+					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{},
@@ -1080,6 +1145,8 @@ func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.S
 
 	// Add containers from task definition
 	if containerDefs, ok := taskDefData["containerDefinitions"].([]interface{}); ok {
+		// Check if any container has CloudWatch logs configured
+		hasCloudWatchLogs := false
 		for _, containerDef := range containerDefs {
 			if containerMap, ok := containerDef.(map[string]interface{}); ok {
 				container := sm.createContainerFromDefinition(containerMap)
@@ -1087,7 +1154,54 @@ func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.S
 					deployment.Spec.Template.Spec.Containers,
 					container,
 				)
+
+				// Check for CloudWatch logs configuration
+				if logConfig, exists := containerMap["logConfiguration"]; exists {
+					if logConfigMap, ok := logConfig.(map[string]interface{}); ok {
+						if logDriver, exists := logConfigMap["logDriver"]; exists {
+							if driver, ok := logDriver.(string); ok && driver == "awslogs" {
+								hasCloudWatchLogs = true
+								containerName := ""
+								if name, ok := containerMap["name"].(string); ok {
+									containerName = name
+								}
+
+								// Add CloudWatch logs annotations for this container
+								if options, exists := logConfigMap["options"]; exists {
+									if optionsMap, ok := options.(map[string]interface{}); ok {
+										// Add log group annotation
+										if logGroup, exists := optionsMap["awslogs-group"]; exists {
+											if group, ok := logGroup.(string); ok && group != "" {
+												key := fmt.Sprintf("kecs.dev/container-%s-logs-group", containerName)
+												podAnnotations[key] = group
+											}
+										}
+										// Add log stream prefix annotation
+										if streamPrefix, exists := optionsMap["awslogs-stream-prefix"]; exists {
+											if prefix, ok := streamPrefix.(string); ok && prefix != "" {
+												key := fmt.Sprintf("kecs.dev/container-%s-logs-stream-prefix", containerName)
+												podAnnotations[key] = prefix
+											}
+										}
+										// Add region annotation
+										if region, exists := optionsMap["awslogs-region"]; exists {
+											if r, ok := region.(string); ok && r != "" {
+												key := fmt.Sprintf("kecs.dev/container-%s-logs-region", containerName)
+												podAnnotations[key] = r
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
 			}
+		}
+
+		// Add global CloudWatch logs enabled annotation if needed
+		if hasCloudWatchLogs {
+			podAnnotations["kecs.dev/cloudwatch-logs-enabled"] = "true"
 		}
 	}
 
