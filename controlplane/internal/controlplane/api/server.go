@@ -93,8 +93,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		storage:    storage,
 	}
 
-	// Initialize service manager
-	serviceManager := kubernetes.NewServiceManager(storage)
+	// Initialize service manager with region and account ID
+	serviceManager := kubernetes.NewServiceManagerWithConfig(storage, region, accountID)
 	s.serviceManager = serviceManager
 	logging.Info("ServiceManager initialized", "nil", serviceManager == nil)
 

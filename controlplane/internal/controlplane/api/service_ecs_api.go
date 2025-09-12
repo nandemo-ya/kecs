@@ -33,13 +33,13 @@ func (api *DefaultECSAPI) getServiceManager() (*kubernetes.ServiceManager, error
 	// In test mode, we can return a ServiceManager
 	// as the ServiceManager handles test mode internally
 	if config.GetBool("features.testMode") {
-		return kubernetes.NewServiceManager(api.storage), nil
+		return kubernetes.NewServiceManagerWithConfig(api.storage, api.region, api.accountID), nil
 	}
 
 	// Create a new ServiceManager instance
 	// Note: This creates a new instance which may not have the proper in-cluster configuration
 	logging.Warn("Creating new ServiceManager instance - this should be avoided in production")
-	return kubernetes.NewServiceManager(api.storage), nil
+	return kubernetes.NewServiceManagerWithConfig(api.storage, api.region, api.accountID), nil
 }
 
 // CreateService implements the CreateService operation
