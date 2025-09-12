@@ -10,13 +10,13 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	generated "github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
+	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/utils"
@@ -27,6 +27,8 @@ type ServiceManager struct {
 	storage     storage.Storage
 	clientset   kubernetes.Interface
 	taskManager *TaskManager
+	region      string
+	accountID   string
 }
 
 // SetTaskManager sets or updates the task manager
@@ -37,6 +39,11 @@ func (sm *ServiceManager) SetTaskManager(taskManager *TaskManager) {
 
 // NewServiceManager creates a new ServiceManager
 func NewServiceManager(storage storage.Storage) *ServiceManager {
+	return NewServiceManagerWithConfig(storage, "", "")
+}
+
+// NewServiceManagerWithConfig creates a new ServiceManager with region and account ID
+func NewServiceManagerWithConfig(storage storage.Storage, region, accountID string) *ServiceManager {
 	// Create TaskManager if storage is available
 	var taskManager *TaskManager
 	if storage != nil {
@@ -48,9 +55,19 @@ func NewServiceManager(storage storage.Storage) *ServiceManager {
 		}
 	}
 
+	// Use default values if not provided
+	if region == "" {
+		region = "us-east-1"
+	}
+	if accountID == "" {
+		accountID = "000000000000"
+	}
+
 	sm := &ServiceManager{
 		storage:     storage,
 		taskManager: taskManager,
+		region:      region,
+		accountID:   accountID,
 	}
 
 	// Don't initialize kubernetes client here - it will be initialized on first use
@@ -1008,7 +1025,16 @@ func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.S
 		return fmt.Errorf("failed to check deployment existence: %w", err)
 	}
 
-	// Get task definition from storage - extract family and revision from ARN
+	// Get cluster from storage
+	cluster, err := sm.storage.ClusterStore().Get(ctx, clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get cluster: %w", err)
+	}
+	if cluster == nil {
+		return fmt.Errorf("cluster not found: %s", clusterName)
+	}
+
+	// Get task definition from storage
 	family, revision := parseTaskDefinitionARN(service.TaskDefinitionARN)
 	taskDef, err := sm.storage.TaskDefinitionStore().Get(ctx, family, revision)
 	if err != nil {
@@ -1018,213 +1044,23 @@ func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.S
 		return fmt.Errorf("task definition not found: %s", service.TaskDefinitionARN)
 	}
 
-	// Parse the task definition JSON from ContainerDefinitions field
-	var taskDefData map[string]interface{}
-	taskDefData = make(map[string]interface{})
-
-	// Parse container definitions
-	var containerDefs []interface{}
-	if taskDef.ContainerDefinitions != "" {
-		if err := json.Unmarshal([]byte(taskDef.ContainerDefinitions), &containerDefs); err != nil {
-			return fmt.Errorf("failed to parse container definitions: %w", err)
-		}
-		taskDefData["containerDefinitions"] = containerDefs
-	}
-
-	// Parse volumes from the Volumes field
-	var volumes []interface{}
-	if taskDef.Volumes != "" {
-		if err := json.Unmarshal([]byte(taskDef.Volumes), &volumes); err != nil {
-			logging.Warn("Failed to parse volumes", "error", err)
-		} else {
-			taskDefData["volumes"] = volumes
-		}
-	}
-
-	// Create deployment spec from the stored service configuration
-	var replicas int32 = int32(service.DesiredCount)
-
-	// Create deployment labels
-	deploymentLabels := map[string]string{
-		"ecs.service": service.ServiceName,
-		"ecs.cluster": clusterName,
-		"ecs.managed": "true",
-	}
-
-	// Create pod labels
-	podLabels := map[string]string{
-		"app":                          service.ServiceName,
-		"ecs.service":                  service.ServiceName,
-		"ecs.cluster":                  clusterName,
-		"ecs.task-definition-family":   family,
-		"ecs.task-definition-revision": fmt.Sprintf("%d", revision),
-		"ecs.managed":                  "true",
-		"kecs.dev/service":             service.ServiceName,
-		"kecs.dev/cluster":             clusterName,
-		"kecs.dev/launch-type":         service.LaunchType,
-		"kecs.dev/managed-by":          "kecs",
-	}
-
-	// Create pod annotations
-	podAnnotations := map[string]string{
-		"kecs.dev/service-arn":         service.ARN,
-		"kecs.dev/task-definition":     service.TaskDefinitionARN,
-		"kecs.dev/scheduling-strategy": service.SchedulingStrategy,
-		"kecs.dev/service-registries":  service.ServiceRegistries,
-	}
-
-	// Add network configuration annotations if available
+	// Parse network configuration if available
+	var networkConfig *generated.NetworkConfiguration
 	if service.NetworkConfiguration != "" {
-		// Parse and add network configuration annotations
-		var netConfig map[string]interface{}
-		if err := json.Unmarshal([]byte(service.NetworkConfiguration), &netConfig); err == nil {
-			if awsvpcConfig, ok := netConfig["awsvpcConfiguration"].(map[string]interface{}); ok {
-				// Add network mode
-				podAnnotations["ecs.amazonaws.com/network-mode"] = "awsvpc"
-
-				// Add subnets
-				if subnets, ok := awsvpcConfig["subnets"].([]interface{}); ok {
-					subnetList := make([]string, 0, len(subnets))
-					for _, subnet := range subnets {
-						if s, ok := subnet.(string); ok {
-							subnetList = append(subnetList, s)
-						}
-					}
-					if len(subnetList) > 0 {
-						podAnnotations["ecs.amazonaws.com/subnets"] = strings.Join(subnetList, ",")
-					}
-				}
-
-				// Add security groups
-				if secGroups, ok := awsvpcConfig["securityGroups"].([]interface{}); ok {
-					sgList := make([]string, 0, len(secGroups))
-					for _, sg := range secGroups {
-						if s, ok := sg.(string); ok {
-							sgList = append(sgList, s)
-						}
-					}
-					if len(sgList) > 0 {
-						podAnnotations["ecs.amazonaws.com/security-groups"] = strings.Join(sgList, ",")
-					}
-				}
-
-				// Add assign public IP
-				if assignPublicIp, ok := awsvpcConfig["assignPublicIp"].(string); ok {
-					podAnnotations["ecs.amazonaws.com/assign-public-ip"] = assignPublicIp
-				}
-			}
+		networkConfig = &generated.NetworkConfiguration{}
+		if err := json.Unmarshal([]byte(service.NetworkConfiguration), networkConfig); err != nil {
+			logging.Warn("Failed to parse network configuration", "error", err)
+			networkConfig = nil
 		}
 	}
 
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      deploymentName,
-			Namespace: namespace,
-			Labels:    deploymentLabels,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app":         service.ServiceName,
-					"ecs.service": service.ServiceName,
-					"ecs.cluster": clusterName,
-				},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels:      podLabels,
-					Annotations: podAnnotations,
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{},
-				},
-			},
-		},
-	}
-
-	// Add containers from task definition
-	if containerDefs, ok := taskDefData["containerDefinitions"].([]interface{}); ok {
-		// Check if any container has CloudWatch logs configured
-		hasCloudWatchLogs := false
-		for _, containerDef := range containerDefs {
-			if containerMap, ok := containerDef.(map[string]interface{}); ok {
-				container := sm.createContainerFromDefinition(containerMap)
-				deployment.Spec.Template.Spec.Containers = append(
-					deployment.Spec.Template.Spec.Containers,
-					container,
-				)
-
-				// Check for CloudWatch logs configuration
-				if logConfig, exists := containerMap["logConfiguration"]; exists {
-					if logConfigMap, ok := logConfig.(map[string]interface{}); ok {
-						if logDriver, exists := logConfigMap["logDriver"]; exists {
-							if driver, ok := logDriver.(string); ok && driver == "awslogs" {
-								hasCloudWatchLogs = true
-								containerName := ""
-								if name, ok := containerMap["name"].(string); ok {
-									containerName = name
-								}
-
-								// Add CloudWatch logs annotations for this container
-								if options, exists := logConfigMap["options"]; exists {
-									if optionsMap, ok := options.(map[string]interface{}); ok {
-										// Add log group annotation
-										if logGroup, exists := optionsMap["awslogs-group"]; exists {
-											if group, ok := logGroup.(string); ok && group != "" {
-												key := fmt.Sprintf("kecs.dev/container-%s-logs-group", containerName)
-												podAnnotations[key] = group
-											}
-										}
-										// Add log stream prefix annotation
-										if streamPrefix, exists := optionsMap["awslogs-stream-prefix"]; exists {
-											if prefix, ok := streamPrefix.(string); ok && prefix != "" {
-												key := fmt.Sprintf("kecs.dev/container-%s-logs-stream-prefix", containerName)
-												podAnnotations[key] = prefix
-											}
-										}
-										// Add region annotation
-										if region, exists := optionsMap["awslogs-region"]; exists {
-											if r, ok := region.(string); ok && r != "" {
-												key := fmt.Sprintf("kecs.dev/container-%s-logs-region", containerName)
-												podAnnotations[key] = r
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// Add global CloudWatch logs enabled annotation if needed
-		if hasCloudWatchLogs {
-			podAnnotations["kecs.dev/cloudwatch-logs-enabled"] = "true"
-		}
-	}
-
-	// Add volumes from task definition
-	if volumes, ok := taskDefData["volumes"].([]interface{}); ok {
-		for _, volume := range volumes {
-			if volumeMap, ok := volume.(map[string]interface{}); ok {
-				if volumeName, ok := volumeMap["name"].(string); ok {
-					// Create an emptyDir volume for each ECS volume
-					// In ECS, host volumes are typically ephemeral storage
-					k8sVolume := corev1.Volume{
-						Name: volumeName,
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{},
-						},
-					}
-					deployment.Spec.Template.Spec.Volumes = append(
-						deployment.Spec.Template.Spec.Volumes,
-						k8sVolume,
-					)
-				}
-			}
-		}
+	// Use ServiceConverter to create deployment - this ensures consistency with normal service creation
+	serviceConverter := converters.NewServiceConverter(sm.region, sm.accountID)
+	deployment, kubeService, err := serviceConverter.ConvertServiceToDeploymentWithNetworkConfig(
+		service, taskDef, cluster, networkConfig,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to convert service to deployment: %w", err)
 	}
 
 	// Ensure namespace exists
@@ -1238,10 +1074,9 @@ func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.S
 		return fmt.Errorf("failed to create deployment in Kubernetes: %w", err)
 	}
 
-	// Create service if there are port mappings
-	if sm.hasPortMappings(taskDefData) {
-		k8sService := sm.createK8sServiceFromDefinition(namespace, service.ServiceName, taskDefData)
-		_, err = sm.clientset.CoreV1().Services(namespace).Create(ctx, k8sService, metav1.CreateOptions{})
+	// Create Kubernetes service if provided
+	if kubeService != nil {
+		_, err = sm.clientset.CoreV1().Services(namespace).Create(ctx, kubeService, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			logging.Warn("Failed to create Kubernetes service", "error", err)
 		}
@@ -1249,13 +1084,7 @@ func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.S
 
 	// Start watching pods for this deployment to create ECS tasks
 	if sm.taskManager != nil {
-		// Get cluster from storage
-		cluster, err := sm.storage.ClusterStore().Get(ctx, clusterName)
-		if err != nil {
-			logging.Warn("Failed to get cluster for watching pods", "error", err)
-		} else {
-			go sm.watchServicePods(context.Background(), deployment, cluster, service)
-		}
+		go sm.watchServicePods(context.Background(), deployment, cluster, service)
 	}
 
 	logging.Info("Successfully restored service",
@@ -1296,194 +1125,4 @@ func (sm *ServiceManager) extractClusterNameFromARN(arn string) string {
 		return parts[len(parts)-1]
 	}
 	return "default"
-}
-
-// createContainerFromDefinition creates a Kubernetes container from ECS container definition
-func (sm *ServiceManager) createContainerFromDefinition(containerDef map[string]interface{}) corev1.Container {
-	container := corev1.Container{
-		Name: "main",
-	}
-
-	if name, ok := containerDef["name"].(string); ok {
-		container.Name = name
-	}
-
-	if image, ok := containerDef["image"].(string); ok {
-		container.Image = image
-	}
-
-	// Add port mappings
-	if portMappings, ok := containerDef["portMappings"].([]interface{}); ok {
-		for _, portMapping := range portMappings {
-			if pm, ok := portMapping.(map[string]interface{}); ok {
-				if containerPort, ok := pm["containerPort"].(float64); ok {
-					container.Ports = append(container.Ports, corev1.ContainerPort{
-						ContainerPort: int32(containerPort),
-					})
-				}
-			}
-		}
-	}
-
-	// Add environment variables
-	if envVars, ok := containerDef["environment"].([]interface{}); ok {
-		for _, envVar := range envVars {
-			if ev, ok := envVar.(map[string]interface{}); ok {
-				if name, ok := ev["name"].(string); ok {
-					if value, ok := ev["value"].(string); ok {
-						container.Env = append(container.Env, corev1.EnvVar{
-							Name:  name,
-							Value: value,
-						})
-					}
-				}
-			}
-		}
-	}
-
-	// Add command
-	if command, ok := containerDef["command"].([]interface{}); ok {
-		for _, cmd := range command {
-			if cmdStr, ok := cmd.(string); ok {
-				container.Command = append(container.Command, cmdStr)
-			}
-		}
-	}
-
-	// Add entrypoint (in ECS, entryPoint maps to container.Command)
-	if entryPoint, ok := containerDef["entryPoint"].([]interface{}); ok {
-		// If entryPoint is specified, it takes precedence over command
-		container.Command = []string{}
-		for _, ep := range entryPoint {
-			if epStr, ok := ep.(string); ok {
-				container.Command = append(container.Command, epStr)
-			}
-		}
-		// In this case, command becomes args
-		if command, ok := containerDef["command"].([]interface{}); ok {
-			container.Args = []string{}
-			for _, cmd := range command {
-				if cmdStr, ok := cmd.(string); ok {
-					container.Args = append(container.Args, cmdStr)
-				}
-			}
-		}
-	}
-
-	// Add resource limits if specified
-	resources := corev1.ResourceRequirements{}
-	hasResources := false
-
-	if memory, ok := containerDef["memory"].(float64); ok && memory > 0 {
-		if resources.Limits == nil {
-			resources.Limits = corev1.ResourceList{}
-		}
-		if resources.Requests == nil {
-			resources.Requests = corev1.ResourceList{}
-		}
-		memQuantity := resource.NewQuantity(int64(memory)*1024*1024, resource.BinarySI) // Convert MiB to bytes
-		resources.Limits[corev1.ResourceMemory] = *memQuantity
-		resources.Requests[corev1.ResourceMemory] = *memQuantity
-		hasResources = true
-	}
-
-	if cpu, ok := containerDef["cpu"].(float64); ok && cpu > 0 {
-		if resources.Limits == nil {
-			resources.Limits = corev1.ResourceList{}
-		}
-		if resources.Requests == nil {
-			resources.Requests = corev1.ResourceList{}
-		}
-		// ECS CPU units: 1024 = 1 vCPU
-		cpuQuantity := resource.NewMilliQuantity(int64(cpu), resource.DecimalSI) // Convert to millicores
-		resources.Limits[corev1.ResourceCPU] = *cpuQuantity
-		resources.Requests[corev1.ResourceCPU] = *cpuQuantity
-		hasResources = true
-	}
-
-	if hasResources {
-		container.Resources = resources
-	}
-
-	// Add mount points
-	if mountPoints, ok := containerDef["mountPoints"].([]interface{}); ok {
-		for _, mountPoint := range mountPoints {
-			if mp, ok := mountPoint.(map[string]interface{}); ok {
-				if sourceVolume, ok := mp["sourceVolume"].(string); ok {
-					if containerPath, ok := mp["containerPath"].(string); ok {
-						volumeMount := corev1.VolumeMount{
-							Name:      sourceVolume,
-							MountPath: containerPath,
-						}
-						// Check for readOnly flag
-						if readOnly, ok := mp["readOnly"].(bool); ok {
-							volumeMount.ReadOnly = readOnly
-						}
-						container.VolumeMounts = append(container.VolumeMounts, volumeMount)
-					}
-				}
-			}
-		}
-	}
-
-	// Set essential flag (for later use in deployment strategy)
-	if _, ok := containerDef["essential"].(bool); ok {
-		// Store as annotation or label for reference
-		// This information could be used by the controller
-		// For now, we just note it - essential containers affect pod lifecycle
-	}
-
-	return container
-}
-
-// hasPortMappings checks if task definition has port mappings
-func (sm *ServiceManager) hasPortMappings(taskDefData map[string]interface{}) bool {
-	if containerDefs, ok := taskDefData["containerDefinitions"].([]interface{}); ok {
-		for _, containerDef := range containerDefs {
-			if containerMap, ok := containerDef.(map[string]interface{}); ok {
-				if portMappings, ok := containerMap["portMappings"].([]interface{}); ok && len(portMappings) > 0 {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-// createK8sServiceFromDefinition creates a Kubernetes service from task definition
-func (sm *ServiceManager) createK8sServiceFromDefinition(namespace, serviceName string, taskDefData map[string]interface{}) *corev1.Service {
-	k8sService := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: namespace,
-		},
-		Spec: corev1.ServiceSpec{
-			Selector: map[string]string{
-				"ecs.service": serviceName,
-			},
-			Ports: []corev1.ServicePort{},
-		},
-	}
-
-	// Add ports from container definitions
-	if containerDefs, ok := taskDefData["containerDefinitions"].([]interface{}); ok {
-		for _, containerDef := range containerDefs {
-			if containerMap, ok := containerDef.(map[string]interface{}); ok {
-				if portMappings, ok := containerMap["portMappings"].([]interface{}); ok {
-					for _, portMapping := range portMappings {
-						if pm, ok := portMapping.(map[string]interface{}); ok {
-							if containerPort, ok := pm["containerPort"].(float64); ok {
-								k8sService.Spec.Ports = append(k8sService.Spec.Ports, corev1.ServicePort{
-									Port:       int32(containerPort),
-									TargetPort: intstr.FromInt(int(containerPort)),
-								})
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return k8sService
 }
