@@ -111,6 +111,22 @@ func (r *WebhookRegistrar) Register(ctx context.Context, caBundle []byte) error 
 	return nil
 }
 
+// IsRegistered checks if the webhook configuration exists and is valid
+func (r *WebhookRegistrar) IsRegistered(ctx context.Context) bool {
+	configName := "kecs-webhook-config"
+
+	config, err := r.clientset.AdmissionregistrationV1().
+		MutatingWebhookConfigurations().
+		Get(ctx, configName, metav1.GetOptions{})
+
+	if err != nil || config == nil {
+		return false
+	}
+
+	// Check if webhook has at least one webhook configured
+	return len(config.Webhooks) > 0
+}
+
 // Unregister removes the webhook configuration
 func (r *WebhookRegistrar) Unregister(ctx context.Context) error {
 	configName := "kecs-webhook-config"

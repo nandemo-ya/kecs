@@ -178,6 +178,7 @@ func runServer(cmd *cobra.Command) {
 
 	// Start webhook server if Kubernetes client is available
 	var webhookServer *webhook.Server
+	var webhookRegistrar *webhook.WebhookRegistrar
 	if apiServer != nil && apiServer.GetKubeClient() != nil {
 		logging.Info("Starting webhook server for pod mutation")
 
@@ -230,7 +231,7 @@ func runServer(cmd *cobra.Command) {
 				} else {
 					// Create webhook registrar
 					// Note: Service port is 443, which maps to targetPort 9443
-					registrar := webhook.NewWebhookRegistrar(
+					webhookRegistrar = webhook.NewWebhookRegistrar(
 						apiServer.GetKubeClient(),
 						"kecs-system",
 						"kecs-webhook",
@@ -239,10 +240,12 @@ func runServer(cmd *cobra.Command) {
 
 					// Register the webhook configuration
 					webhookCtx := context.Background()
-					if err := registrar.Register(webhookCtx, certData); err != nil {
+					if err := webhookRegistrar.Register(webhookCtx, certData); err != nil {
 						logging.Error("Failed to register webhook configuration", "error", err)
+						webhookRegistrar = nil // Clear registrar on failure
 					} else {
 						logging.Info("Webhook configuration registered successfully")
+						webhookServer.SetReady()
 					}
 				}
 			}
@@ -263,6 +266,31 @@ func runServer(cmd *cobra.Command) {
 
 		// Perform restoration (non-blocking, best effort)
 		go func() {
+			// Wait for webhook to be fully registered if it's enabled
+			if webhookServer != nil && webhookRegistrar != nil {
+				logging.Info("Waiting for webhook registration to complete before restoration...")
+
+				// Wait up to 10 seconds for webhook to be registered
+				timeout := time.After(10 * time.Second)
+				ticker := time.NewTicker(500 * time.Millisecond)
+				defer ticker.Stop()
+
+				for {
+					select {
+					case <-timeout:
+						logging.Warn("Timeout waiting for webhook registration, proceeding with restoration")
+						goto startRestoration
+					case <-ticker.C:
+						ctx := context.Background()
+						if webhookRegistrar.IsRegistered(ctx) && webhookServer.IsReady() {
+							logging.Info("Webhook is registered and ready, starting restoration")
+							goto startRestoration
+						}
+					}
+				}
+			}
+
+		startRestoration:
 			restorationCtx, restorationCancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer restorationCancel()
 
