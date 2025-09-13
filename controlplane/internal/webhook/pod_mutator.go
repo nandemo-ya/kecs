@@ -91,6 +91,13 @@ func (m *PodMutator) Handle(w http.ResponseWriter, r *http.Request) {
 
 // mutate performs the actual pod mutation
 func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
+	// Debug log to track webhook invocations
+	logging.Info("Webhook mutate called",
+		"namespace", req.Namespace,
+		"name", req.Name,
+		"operation", req.Operation,
+		"uid", req.UID)
+
 	// Parse pod from request
 	var pod corev1.Pod
 	if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
@@ -103,6 +110,12 @@ func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.Admi
 		}
 	}
 
+	// Debug log pod labels
+	logging.Debug("Pod labels before processing",
+		"pod", pod.Name,
+		"namespace", pod.Namespace,
+		"labels", pod.Labels)
+
 	// Only process KECS-managed pods
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)
@@ -110,6 +123,10 @@ func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.Admi
 
 	if pod.Labels["kecs.dev/managed-by"] != "kecs" {
 		// Not a KECS pod, allow without mutation
+		logging.Debug("Pod not managed by KECS, skipping mutation",
+			"pod", pod.Name,
+			"namespace", pod.Namespace,
+			"managed-by", pod.Labels["kecs.dev/managed-by"])
 		return &admissionv1.AdmissionResponse{
 			Allowed: true,
 		}
@@ -118,6 +135,10 @@ func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.Admi
 	// Check if task ID already exists
 	if _, exists := pod.Labels["kecs.dev/task-id"]; exists {
 		// Task ID already set, allow without mutation
+		logging.Debug("Task ID already exists, skipping mutation",
+			"pod", pod.Name,
+			"namespace", pod.Namespace,
+			"taskId", pod.Labels["kecs.dev/task-id"])
 		return &admissionv1.AdmissionResponse{
 			Allowed: true,
 		}
