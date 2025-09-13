@@ -69,7 +69,7 @@ func NewProxyHandler(localStackURL string, ecsHandler, elbv2Handler, sdHandler h
 // ServeHTTP implements http.Handler interface
 func (h *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Log incoming request
-	logging.Debug("Incoming request",
+	logging.Info("ProxyHandler incoming request",
 		"method", r.Method,
 		"path", r.URL.Path,
 		"x-amz-target", r.Header.Get("X-Amz-Target"),
@@ -229,6 +229,11 @@ func (h *ProxyHandler) isELBv2Request(r *http.Request) bool {
 	// Check for ELBv2-specific content
 	bodyStr := string(bodyBytes)
 
+	// Log the body for debugging
+	if len(bodyStr) > 0 {
+		logging.Debug("Checking if request is ELBv2", "body_preview", bodyStr[:min(len(bodyStr), 200)])
+	}
+
 	// Check for common ELBv2 action parameters
 	elbv2Actions := []string{
 		"CreateLoadBalancer",
@@ -266,6 +271,7 @@ func (h *ProxyHandler) isELBv2Request(r *http.Request) bool {
 	// Check if body contains Action=<ELBv2Action>
 	for _, action := range elbv2Actions {
 		if strings.Contains(bodyStr, "Action="+action) {
+			logging.Info("Detected ELBv2 request", "action", action, "body", bodyStr[:min(len(bodyStr), 500)])
 			return true
 		}
 	}
