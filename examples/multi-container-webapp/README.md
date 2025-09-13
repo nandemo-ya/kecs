@@ -45,7 +45,27 @@ This example demonstrates a multi-container web application with frontend, backe
 1. KECS running locally
 2. AWS CLI configured to point to KECS endpoint
 
-## Setup Instructions
+## Quick Start
+
+### Fastest Deployment (Recommended)
+
+```bash
+# 1. Start KECS
+kecs start
+
+# 2. Deploy everything with ELBv2
+./deploy_with_elb.sh
+
+# 3. Test the application
+kubectl port-forward -n kecs-system svc/traefik 8888:80
+curl -H "Host: multi-container-webapp-alb" http://localhost:8888/
+```
+
+That's it! The script handles all setup automatically.
+
+## Manual Setup Instructions
+
+If you prefer to set up resources manually:
 
 ### 1. Start KECS
 
@@ -72,7 +92,7 @@ Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts
 
 ## Deployment
 
-### Using AWS CLI
+### Option 1: Simple Deployment (Without Load Balancer)
 
 ```bash
 # Register task definition
@@ -86,9 +106,58 @@ aws ecs create-service \
   --endpoint-url http://localhost:5373
 ```
 
+### Option 2: Automated Deployment with Application Load Balancer (ELBv2)
+
+The recommended approach for production-like deployment with load balancing.
+
+#### One-Command Deployment
+
+```bash
+# Deploy everything with a single script
+./deploy_with_elb.sh
+
+# This automatically:
+# - Creates ECS cluster
+# - Registers task definition
+# - Sets up Application Load Balancer (ALB)
+# - Creates Target Group with health checks
+# - Configures HTTP Listener with routing rules
+# - Generates service definition with actual Target Group ARN
+# - Creates and starts the ECS service
+# - Waits for deployment to stabilize
+# - Verifies target health
+```
+
+
+#### Architecture with ELBv2
+
+```
+                         Internet
+                            │
+                            ▼
+                  ┌─────────────────┐
+                  │      ALB        │
+                  │   (Port 80)     │
+                  └────────┬────────┘
+                           │
+              ┌────────────┴────────────┐
+              │    Target Group        │
+              │  (Health Check: /)     │
+              └────────────┬────────────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         ▼                 ▼                 ▼
+   ┌───────────┐    ┌───────────┐    ┌───────────┐
+   │  Task 1   │    │  Task 2   │    │  Task 3   │
+   │ nginx:80  │    │ nginx:80  │    │ nginx:80  │
+   └───────────┘    └───────────┘    └───────────┘
+```
+
 ## Verification
 
-### 1. Check Service and Tasks
+### For Standard Deployment
+
+#### 1. Check Service and Tasks
 
 ```bash
 # Check service status
@@ -113,7 +182,7 @@ aws ecs describe-tasks \
   --query 'tasks[*].{TaskArn:taskArn,Status:lastStatus,Containers:containers[*].{Name:name,Status:lastStatus}}'
 ```
 
-### 2. Test Container Communication
+#### 2. Test Container Communication
 
 ```bash
 # Get a task's pod name
@@ -143,7 +212,7 @@ kubectl exec -n default $POD_NAME -c frontend-nginx -- wget -q -O - http://local
 kill $PF_PID $PF_API_PID
 ```
 
-### 3. Verify Shared Volume
+#### 3. Verify Shared Volume
 
 ```bash
 # Check shared data written by backend
@@ -158,7 +227,7 @@ kubectl exec -n default $POD_NAME -c sidecar-logger -- tail -n 5 /data/health.lo
 kubectl exec -n default $POD_NAME -c frontend-nginx -- ls -la /usr/share/nginx/html/
 ```
 
-### 4. Check Container Dependencies
+#### 4. Check Container Dependencies
 
 ```bash
 # View container startup order in pod events
@@ -166,6 +235,105 @@ kubectl describe pod -n default $POD_NAME | grep -A 20 "Events:"
 
 # Check container health status
 kubectl get pod -n default $POD_NAME -o json | jq '.status.containerStatuses[] | {name: .name, ready: .ready, started: .started}'
+```
+
+### For ELBv2 Deployment
+
+#### 1. Check ALB and Target Health
+
+```bash
+# Get ALB details
+ALB_ARN=$(aws elbv2 describe-load-balancers \
+  --names multi-container-webapp-alb \
+  --endpoint-url http://localhost:5373 \
+  --query 'LoadBalancers[0].LoadBalancerArn' --output text)
+
+ALB_DNS=$(aws elbv2 describe-load-balancers \
+  --load-balancer-arns $ALB_ARN \
+  --endpoint-url http://localhost:5373 \
+  --query 'LoadBalancers[0].DNSName' --output text)
+
+echo "ALB DNS: $ALB_DNS"
+
+# Check target health
+TG_ARN=$(aws elbv2 describe-target-groups \
+  --names multi-container-webapp-tg \
+  --endpoint-url http://localhost:5373 \
+  --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+aws elbv2 describe-target-health \
+  --target-group-arn $TG_ARN \
+  --endpoint-url http://localhost:5373 \
+  --query 'TargetHealthDescriptions[*].{Target:Target.Id,Health:TargetHealth.State}' \
+  --output table
+```
+
+#### 2. Test through Load Balancer
+
+Since KECS runs in Kubernetes, access the ALB through port-forwarding:
+
+```bash
+# Port forward to Traefik (acting as ALB)
+kubectl port-forward -n kecs-system svc/traefik 8888:80 &
+PF_ALB=$!
+
+# Test through load balancer
+curl -H "Host: multi-container-webapp-alb" http://localhost:8888/
+
+# Test API endpoint through ALB
+curl -H "Host: multi-container-webapp-alb" http://localhost:8888/api/status
+
+# Test health check endpoint
+curl -H "Host: multi-container-webapp-alb" http://localhost:8888/health
+
+# Test load balancing across multiple tasks
+for i in {1..10}; do
+  echo "Request $i:"
+  curl -s -H "Host: multi-container-webapp-alb" http://localhost:8888/ | head -n 1
+  sleep 0.5
+done
+
+# Monitor target group health
+watch -n 5 "aws elbv2 describe-target-health \
+  --target-group-arn $TG_ARN \
+  --endpoint-url http://localhost:5373 \
+  --query 'TargetHealthDescriptions[*].{Target:Target.Id,Health:TargetHealth.State}' \
+  --output table"
+
+# Clean up port forward
+kill $PF_ALB
+```
+
+#### 3. Test Failover and Auto-Recovery
+
+```bash
+# Get a task ARN
+TASK_ARN=$(aws ecs list-tasks \
+  --cluster multi-container-cluster \
+  --service-name multi-container-webapp-elb \
+  --endpoint-url http://localhost:5373 \
+  --query 'taskArns[0]' --output text)
+
+# Stop one task to test failover
+aws ecs stop-task \
+  --cluster multi-container-cluster \
+  --task $TASK_ARN \
+  --reason "Testing failover" \
+  --endpoint-url http://localhost:5373
+
+# Monitor service recovery (ECS should launch a new task automatically)
+watch "aws ecs describe-services \
+  --cluster multi-container-cluster \
+  --services multi-container-webapp-elb \
+  --endpoint-url http://localhost:5373 \
+  --query 'services[0].{Desired:desiredCount,Running:runningCount,Pending:pendingCount}'"
+
+# Verify new task is registered with target group
+aws elbv2 describe-target-health \
+  --target-group-arn $TG_ARN \
+  --endpoint-url http://localhost:5373 \
+  --query 'TargetHealthDescriptions[*].{Target:Target.Id,Health:TargetHealth.State,Description:TargetHealth.Description}' \
+  --output table
 ```
 
 ## Key Points to Verify
@@ -218,6 +386,8 @@ kubectl describe pod -n default $POD_NAME | grep -A 5 "Mounts:"
 
 ## Cleanup
 
+### For Standard Deployment
+
 ```bash
 # Delete service
 aws ecs delete-service \
@@ -242,9 +412,31 @@ aws logs delete-log-group \
   --log-group-name /ecs/multi-container-webapp \
   --endpoint-url http://localhost:5373
 
-# Delete IAM roles (if created for this example)
-# Note: ecsTaskExecutionRole is managed by KECS, no need to delete it
+# Delete cluster (if created for this example)
+aws ecs delete-cluster \
+  --cluster default \
+  --endpoint-url http://localhost:5373
 ```
+
+### For ELBv2 Deployment
+
+#### Complete Cleanup (Recommended)
+
+```bash
+# Remove ALL resources with a single script
+./cleanup_all.sh
+
+# This removes:
+# - ECS Service
+# - All running tasks
+# - Application Load Balancer
+# - Target Group and Listeners
+# - Task Definitions
+# - CloudWatch Log Group
+# - ECS Cluster
+# - Generated configuration files
+```
+
 
 ## Advanced Testing
 
