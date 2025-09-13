@@ -38,6 +38,7 @@ func NewServer(cfg Config) (*Server, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mutate/pods", podMutator.Handle)
 	mux.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("/readyz", readyzHandler)
 
 	// Create server
 	server := &http.Server{
@@ -60,12 +61,17 @@ func NewServer(cfg Config) (*Server, error) {
 		server.TLSConfig = tlsConfig
 	}
 
-	return &Server{
+	s := &Server{
 		server:     server,
 		podMutator: podMutator,
 		tlsConfig:  tlsConfig,
 		ready:      false,
-	}, nil
+	}
+
+	// Store server instance for readyz handler
+	webhookServerInstance = s
+
+	return s, nil
 }
 
 // Start starts the webhook server
@@ -122,4 +128,30 @@ func (s *Server) IsReady() bool {
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
+}
+
+// Global reference to webhook server for readyz handler
+var webhookServerInstance *Server
+
+// readyzHandler handles readiness check requests
+func readyzHandler(w http.ResponseWriter, r *http.Request) {
+	if webhookServerInstance == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte("Server not initialized"))
+		return
+	}
+
+	if !webhookServerInstance.IsReady() {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte("Server not ready"))
+		return
+	}
+
+	// Additional checks can be added here:
+	// - Check if pod mutator is initialized
+	// - Check if TLS is properly configured (if required)
+	// - Check if storage connection is available
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Ready"))
 }

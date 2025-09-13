@@ -22,6 +22,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/cache"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 	"github.com/nandemo-ya/kecs/controlplane/internal/webhook"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -282,10 +283,45 @@ func runServer(cmd *cobra.Command) {
 						goto startRestoration
 					case <-ticker.C:
 						ctx := context.Background()
-						if webhookRegistrar.IsRegistered(ctx) && webhookServer.IsReady() {
-							logging.Info("Webhook is registered and ready, starting restoration")
-							goto startRestoration
+						// Check if webhook configuration is registered
+						if !webhookRegistrar.IsRegistered(ctx) {
+							logging.Debug("Webhook configuration not yet registered")
+							continue
 						}
+
+						// Check if webhook server reports ready
+						if !webhookServer.IsReady() {
+							logging.Debug("Webhook server not yet ready")
+							continue
+						}
+
+						// Check if webhook service endpoints are available
+						if apiServer.GetKubeClient() != nil {
+							endpoints, err := apiServer.GetKubeClient().CoreV1().Endpoints("kecs-system").Get(ctx, "kecs-webhook", metav1.GetOptions{})
+							if err != nil || endpoints == nil || len(endpoints.Subsets) == 0 {
+								logging.Debug("Webhook service endpoints not yet available")
+								continue
+							}
+
+							// Check if endpoints have addresses
+							hasAddresses := false
+							for _, subset := range endpoints.Subsets {
+								if len(subset.Addresses) > 0 {
+									hasAddresses = true
+									break
+								}
+							}
+							if !hasAddresses {
+								logging.Debug("Webhook service endpoints have no addresses")
+								continue
+							}
+						}
+
+						// All checks passed, add a small delay for Kubernetes API server sync
+						logging.Info("Webhook is registered and endpoints are ready, waiting for API server sync...")
+						time.Sleep(1 * time.Second)
+						logging.Info("Starting restoration")
+						goto startRestoration
 					}
 				}
 			}
