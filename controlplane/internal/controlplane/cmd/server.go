@@ -377,7 +377,9 @@ func runServer(cmd *cobra.Command) {
 			// Mark all running/pending tasks as stopped before shutdown
 			logging.Info("Marking running tasks as stopped...")
 			clusters, err := storage.ClusterStore().List(shutdownCtx)
-			if err == nil && len(clusters) > 0 {
+			if err != nil {
+				logging.Warn("Failed to list clusters for shutdown cleanup", "error", err)
+			} else if len(clusters) > 0 {
 				for _, cluster := range clusters {
 					// Get all running or pending tasks
 					tasks, err := storage.TaskStore().List(shutdownCtx, cluster.ARN, storageTypes.TaskFilters{
