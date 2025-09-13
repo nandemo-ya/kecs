@@ -19,6 +19,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/restoration"
+	storageTypes "github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/cache"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 	"github.com/nandemo-ya/kecs/controlplane/internal/webhook"
@@ -372,6 +373,51 @@ func runServer(cmd *cobra.Command) {
 		// Persist state before shutdown
 		if storage != nil {
 			logging.Info("Persisting state before shutdown...")
+
+			// Mark all running/pending tasks as stopped before shutdown
+			logging.Info("Marking running tasks as stopped...")
+			clusters, err := storage.ClusterStore().List(shutdownCtx)
+			if err != nil {
+				logging.Warn("Failed to list clusters for shutdown cleanup", "error", err)
+			} else if len(clusters) > 0 {
+				for _, cluster := range clusters {
+					// Get all running or pending tasks
+					tasks, err := storage.TaskStore().List(shutdownCtx, cluster.ARN, storageTypes.TaskFilters{
+						MaxResults: 1000,
+					})
+					if err != nil {
+						logging.Warn("Failed to list tasks for cluster",
+							"cluster", cluster.Name, "error", err)
+						continue
+					}
+
+					// Update tasks that are still running or pending
+					now := time.Now()
+					updatedCount := 0
+					for _, task := range tasks {
+						if task.LastStatus == "RUNNING" || task.LastStatus == "PENDING" {
+							task.LastStatus = "STOPPED"
+							task.DesiredStatus = "STOPPED"
+							task.StoppedAt = &now
+							task.StoppedReason = "KECS instance shutdown"
+							task.Version++
+
+							if err := storage.TaskStore().Update(shutdownCtx, task); err != nil {
+								logging.Warn("Failed to update task status to STOPPED",
+									"task", task.ARN, "error", err)
+							} else {
+								updatedCount++
+							}
+						}
+					}
+
+					if updatedCount > 0 {
+						logging.Info("Marked tasks as stopped",
+							"cluster", cluster.Name,
+							"count", updatedCount)
+					}
+				}
+			}
 			// Storage should handle its own graceful shutdown
 		}
 
