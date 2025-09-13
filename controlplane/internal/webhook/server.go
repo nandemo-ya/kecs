@@ -16,6 +16,7 @@ type Server struct {
 	server     *http.Server
 	podMutator *PodMutator
 	tlsConfig  *tls.Config
+	ready      bool
 }
 
 // Config holds webhook server configuration
@@ -63,6 +64,7 @@ func NewServer(cfg Config) (*Server, error) {
 		server:     server,
 		podMutator: podMutator,
 		tlsConfig:  tlsConfig,
+		ready:      false,
 	}, nil
 }
 
@@ -97,11 +99,23 @@ func (s *Server) Start(ctx context.Context) error {
 // Shutdown gracefully shuts down the webhook server
 func (s *Server) Shutdown() error {
 	logging.Info("Shutting down webhook server")
+	s.ready = false
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	return s.server.Shutdown(ctx)
+}
+
+// SetReady marks the webhook server as ready
+func (s *Server) SetReady() {
+	s.ready = true
+	logging.Info("Webhook server marked as ready")
+}
+
+// IsReady returns whether the webhook server is ready
+func (s *Server) IsReady() bool {
+	return s.ready
 }
 
 // healthHandler handles health check requests
