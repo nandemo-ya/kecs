@@ -208,7 +208,18 @@ func (r *Router) extractAction(req *http.Request) string {
 	}
 
 	// Check query parameter
-	return req.URL.Query().Get("Action")
+	if action := req.URL.Query().Get("Action"); action != "" {
+		return action
+	}
+
+	// Check form data (POST body)
+	if req.Method == "POST" && req.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
+		if err := req.ParseForm(); err == nil {
+			return req.FormValue("Action")
+		}
+	}
+
+	return ""
 }
 
 // handleAddListenerCertificates handles the AddListenerCertificates operation

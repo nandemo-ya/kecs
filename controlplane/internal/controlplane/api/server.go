@@ -20,7 +20,7 @@ import (
 	apiconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controllers/sync"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
-	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
+	_ "github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated_elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
@@ -58,7 +58,7 @@ type Server struct {
 	secretsManagerIntegration secretsmanager.Integration
 	s3Integration             s3.Integration
 	elbv2Integration          elbv2.Integration
-	elbv2Router               *generated_elbv2.Router
+	elbv2Router               *ELBv2RouterWrapper
 	serviceDiscoveryAPI       *ServiceDiscoveryAPI
 	syncController            *sync.SyncController
 	secretsController         *sync.SecretsController
@@ -415,9 +415,10 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		elbv2Integration := elbv2.NewK8sIntegration(s.region, s.accountID)
 		s.elbv2Integration = elbv2Integration
 
-		// Initialize ELBv2 API and router
+		// Initialize ELBv2 API and router with wrapper for form data support
 		elbv2API := NewELBv2API(storage, elbv2Integration, s.region, s.accountID)
-		s.elbv2Router = generated_elbv2.NewRouter(elbv2API)
+		// Use wrapper to handle form data from AWS CLI
+		s.elbv2Router = NewELBv2RouterWrapper(elbv2API)
 
 		logging.Info("ELBv2 integration and API initialized successfully")
 	} else {
@@ -1247,7 +1248,13 @@ func (s *Server) SetupRoutes() http.Handler {
 
 	// AWS API endpoints (generated) - handle everything else
 	// This should be last as it's a catch-all for AWS API requests
-	router.PathPrefix("/").Handler(s.proxyHandler)
+	logging.Error("DEBUG: Checking proxyHandler", "nil", s.proxyHandler == nil)
+	if s.proxyHandler != nil {
+		logging.Error("DEBUG: Setting up ProxyHandler for / path")
+		router.PathPrefix("/").Handler(s.proxyHandler)
+	} else {
+		logging.Error("ProxyHandler is nil, cannot set up routing")
+	}
 
 	// Apply middleware
 	handler := http.Handler(router)
