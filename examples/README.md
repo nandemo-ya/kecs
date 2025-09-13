@@ -19,34 +19,31 @@ Each example is self-contained with:
 - Good starting point for learning KECS
 
 ### 2. [multi-container-webapp](./multi-container-webapp/)
-**Multi-container application with dependencies**
+**Multi-container application with ELBv2 support**
 - Frontend nginx + backend API + sidecar logger
 - Container dependencies and startup order
 - Shared volumes between containers
 - Inter-container communication
+- **Application Load Balancer (ALB) integration**
+- **Automated deployment with ELBv2**
+- **Target group health checks and load distribution**
+- **One-command deployment script**
 
-### 3. [microservice-with-elb](./microservice-with-elb/)
-**Microservice with load balancer integration**
-- Application Load Balancer (ALB) setup
-- Path-based routing rules
-- Target group health checks
-- Load distribution across multiple tasks
-
-### 4. [service-with-secrets](./service-with-secrets/)
+### 3. [service-with-secrets](./service-with-secrets/)
 **Secure secret management**
 - AWS Secrets Manager integration
 - SSM Parameter Store usage
 - Environment variable injection
 - No hardcoded credentials
 
-### 5. [batch-job-simple](./batch-job-simple/)
+### 4. [batch-job-simple](./batch-job-simple/)
 **One-off batch processing tasks**
 - Standalone task execution (no service)
 - Job scheduling patterns
 - Parallel processing examples
 - Task chaining with dependencies
 
-### 6. [service-to-service-communication](./service-to-service-communication/)
+### 5. [service-to-service-communication](./service-to-service-communication/)
 **Inter-service communication with Service Discovery**
 - Frontend and backend service architecture
 - DNS-based service discovery (AWS Cloud Map compatible)
@@ -54,7 +51,7 @@ Each example is self-contained with:
 - Cross-service API calls using DNS names
 - Load balancing across multiple instances
 
-### 7. [service-discovery-route53](./service-discovery-route53/)
+### 6. [service-discovery-route53](./service-discovery-route53/)
 **Service Discovery with Route53 Integration**
 - LocalStack Route53 integration (OSS compatible)
 - Cross-cluster service communication
