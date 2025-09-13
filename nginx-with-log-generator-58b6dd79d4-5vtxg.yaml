@@ -17,7 +17,7 @@ metadata:
     kecs.dev/service-arn: ""
     kecs.dev/service-registries: "null"
     kecs.dev/task-definition: ""
-  creationTimestamp: "2025-09-12T14:23:30Z"
+  creationTimestamp: "2025-09-13T01:20:16Z"
   generateName: nginx-with-log-generator-58b6dd79d4-
   labels:
     app: nginx-with-log-generator
@@ -25,8 +25,9 @@ metadata:
     kecs.dev/launch-type: FARGATE
     kecs.dev/managed-by: kecs
     kecs.dev/service: nginx-with-log-generator
+    kecs.dev/task-id: e5ad2292fe624298b59ae423a769ed26
     pod-template-hash: 58b6dd79d4
-  name: nginx-with-log-generator-58b6dd79d4-6cd2g
+  name: nginx-with-log-generator-58b6dd79d4-5vtxg
   namespace: default-us-east-1
   ownerReferences:
   - apiVersion: apps/v1
@@ -34,9 +35,9 @@ metadata:
     controller: true
     kind: ReplicaSet
     name: nginx-with-log-generator-58b6dd79d4
-    uid: 4180ca1e-704e-47b0-ab5d-b497eec5d6f6
-  resourceVersion: "798"
-  uid: 26c5dadb-b486-4d21-a34f-9775ed596e5d
+    uid: b49ff4f2-a57b-47bc-b909-718e1e5a1962
+  resourceVersion: "734"
+  uid: be9610df-296e-46e2-9a00-e62eb547474f
 spec:
   containers:
   - image: nginx:latest
@@ -53,7 +54,7 @@ spec:
     terminationMessagePolicy: File
     volumeMounts:
     - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-      name: kube-api-access-kwlbc
+      name: kube-api-access-jz2dz
       readOnly: true
   - command:
     - /bin/sh
@@ -72,11 +73,11 @@ spec:
     terminationMessagePolicy: File
     volumeMounts:
     - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-      name: kube-api-access-kwlbc
+      name: kube-api-access-jz2dz
       readOnly: true
   dnsPolicy: ClusterFirst
   enableServiceLinks: true
-  nodeName: k3d-kecs-peaceful-hermann-server-0
+  nodeName: k3d-kecs-wonderful-keldysh-server-0
   preemptionPolicy: PreemptLowerPriority
   priority: 0
   restartPolicy: Always
@@ -95,7 +96,7 @@ spec:
     operator: Exists
     tolerationSeconds: 300
   volumes:
-  - name: kube-api-access-kwlbc
+  - name: kube-api-access-jz2dz
     projected:
       defaultMode: 420
       sources:
@@ -116,27 +117,27 @@ spec:
 status:
   conditions:
   - lastProbeTime: null
-    lastTransitionTime: "2025-09-12T14:23:40Z"
+    lastTransitionTime: "2025-09-13T01:20:32Z"
     status: "True"
     type: PodReadyToStartContainers
   - lastProbeTime: null
-    lastTransitionTime: "2025-09-12T14:23:30Z"
+    lastTransitionTime: "2025-09-13T01:20:16Z"
     status: "True"
     type: Initialized
   - lastProbeTime: null
-    lastTransitionTime: "2025-09-12T14:23:40Z"
+    lastTransitionTime: "2025-09-13T01:20:32Z"
     status: "True"
     type: Ready
   - lastProbeTime: null
-    lastTransitionTime: "2025-09-12T14:23:40Z"
+    lastTransitionTime: "2025-09-13T01:20:32Z"
     status: "True"
     type: ContainersReady
   - lastProbeTime: null
-    lastTransitionTime: "2025-09-12T14:23:30Z"
+    lastTransitionTime: "2025-09-13T01:20:16Z"
     status: "True"
     type: PodScheduled
   containerStatuses:
-  - containerID: containerd://ad82cdbd3ee0b5170ce8bbe60c712300d6780e009257050d7f810c4db49cdab4
+  - containerID: containerd://d392f5e368be65ef472a2a6aae81a11d79d37e203e279dc3d3da327f53cbd513
     image: docker.io/curlimages/curl:latest
     imageID: docker.io/curlimages/curl@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6
     lastState: {}
@@ -146,13 +147,13 @@ status:
     started: true
     state:
       running:
-        startedAt: "2025-09-12T14:23:39Z"
+        startedAt: "2025-09-13T01:20:31Z"
     volumeMounts:
     - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-      name: kube-api-access-kwlbc
+      name: kube-api-access-jz2dz
       readOnly: true
       recursiveReadOnly: Disabled
-  - containerID: containerd://059e29d2d32f3f57fcc95a89c9f46641c60ef54172ee5bb714879108ed59e397
+  - containerID: containerd://f9823c4b187d80941a6c88545459f7916205b1ff065a1bfdbbd58ddae55ffc56
     image: docker.io/library/nginx:latest
     imageID: docker.io/library/nginx@sha256:d5f28ef21aabddd098f3dbc21fe5b7a7d7a184720bc07da0b6c9b9820e97f25e
     lastState: {}
@@ -162,18 +163,18 @@ status:
     started: true
     state:
       running:
-        startedAt: "2025-09-12T14:23:33Z"
+        startedAt: "2025-09-13T01:20:26Z"
     volumeMounts:
     - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-      name: kube-api-access-kwlbc
+      name: kube-api-access-jz2dz
       readOnly: true
       recursiveReadOnly: Disabled
   hostIP: 192.168.97.2
   hostIPs:
   - ip: 192.168.97.2
   phase: Running
-  podIP: 10.42.0.13
+  podIP: 10.42.0.10
   podIPs:
-  - ip: 10.42.0.13
+  - ip: 10.42.0.10
   qosClass: Burstable
-  startTime: "2025-09-12T14:23:30Z"
+  startTime: "2025-09-13T01:20:16Z"

@@ -1,26 +1,42 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  creationTimestamp: "2025-09-12T14:33:54Z"
-  generateName: nginx-with-log-generator-687f8b9b5d-
+  annotations:
+    ecs.amazonaws.com/assign-public-ip: ENABLED
+    ecs.amazonaws.com/network-mode: awsvpc
+    ecs.amazonaws.com/security-groups: sg-nginx-web
+    ecs.amazonaws.com/subnets: subnet-12345678,subnet-87654321
+    kecs.dev/cloudwatch-logs-enabled: "true"
+    kecs.dev/container-log-generator-logs-group: /ecs/nginx-with-log-generator
+    kecs.dev/container-log-generator-logs-region: us-east-1
+    kecs.dev/container-log-generator-logs-stream-prefix: log-generator
+    kecs.dev/container-nginx-logs-group: /ecs/nginx-with-log-generator
+    kecs.dev/container-nginx-logs-region: us-east-1
+    kecs.dev/container-nginx-logs-stream-prefix: nginx
+    kecs.dev/scheduling-strategy: REPLICA
+    kecs.dev/service-arn: arn:aws:ecs:us-east-1:000000000000:service/default/nginx-with-log-generator
+    kecs.dev/service-registries: "null"
+    kecs.dev/task-definition: arn:aws:ecs:us-east-1:000000000000:task-definition/nginx-with-log-generator:1
+  creationTimestamp: "2025-09-13T01:30:18Z"
+  generateName: nginx-with-log-generator-78cc97f7c-
   labels:
-    ecs.cluster: default
-    ecs.managed: "true"
-    ecs.service: nginx-with-log-generator
-    ecs.task-definition-family: nginx-with-log-generator
-    ecs.task-definition-revision: "1"
-    pod-template-hash: 687f8b9b5d
-  name: nginx-with-log-generator-687f8b9b5d-xctks
+    app: nginx-with-log-generator
+    kecs.dev/cluster: default
+    kecs.dev/launch-type: FARGATE
+    kecs.dev/managed-by: kecs
+    kecs.dev/service: nginx-with-log-generator
+    pod-template-hash: 78cc97f7c
+  name: nginx-with-log-generator-78cc97f7c-qffqj
   namespace: default-us-east-1
   ownerReferences:
   - apiVersion: apps/v1
     blockOwnerDeletion: true
     controller: true
     kind: ReplicaSet
-    name: nginx-with-log-generator-687f8b9b5d
-    uid: 537c0fc8-9864-4158-9cc9-e101eef6f905
-  resourceVersion: "704"
-  uid: 13801f1c-7516-4d01-be66-0d1056e403b7
+    name: nginx-with-log-generator-78cc97f7c
+    uid: 30d0bf3a-6202-4630-8432-526a611a0d09
+  resourceVersion: "639"
+  uid: 5c4f159f-eeb3-440a-b688-38a5b59a7974
 spec:
   containers:
   - image: nginx:latest
@@ -30,17 +46,14 @@ spec:
     - containerPort: 80
       protocol: TCP
     resources:
-      limits:
-        cpu: 128m
-        memory: 256Mi
       requests:
-        cpu: 128m
+        cpu: 125m
         memory: 256Mi
     terminationMessagePath: /dev/termination-log
     terminationMessagePolicy: File
     volumeMounts:
     - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-      name: kube-api-access-dlcg6
+      name: kube-api-access-rqktj
       readOnly: true
   - command:
     - /bin/sh
@@ -52,21 +65,18 @@ spec:
     imagePullPolicy: Always
     name: log-generator
     resources:
-      limits:
-        cpu: 128m
-        memory: 256Mi
       requests:
-        cpu: 128m
+        cpu: 125m
         memory: 256Mi
     terminationMessagePath: /dev/termination-log
     terminationMessagePolicy: File
     volumeMounts:
     - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-      name: kube-api-access-dlcg6
+      name: kube-api-access-rqktj
       readOnly: true
   dnsPolicy: ClusterFirst
   enableServiceLinks: true
-  nodeName: k3d-kecs-peaceful-hermann-server-0
+  nodeName: k3d-kecs-wonderful-keldysh-server-0
   preemptionPolicy: PreemptLowerPriority
   priority: 0
   restartPolicy: Always
@@ -85,7 +95,7 @@ spec:
     operator: Exists
     tolerationSeconds: 300
   volumes:
-  - name: kube-api-access-dlcg6
+  - name: kube-api-access-rqktj
     projected:
       defaultMode: 420
       sources:
@@ -106,27 +116,27 @@ spec:
 status:
   conditions:
   - lastProbeTime: null
-    lastTransitionTime: "2025-09-12T14:34:14Z"
+    lastTransitionTime: "2025-09-13T01:30:33Z"
     status: "True"
     type: PodReadyToStartContainers
   - lastProbeTime: null
-    lastTransitionTime: "2025-09-12T14:33:54Z"
+    lastTransitionTime: "2025-09-13T01:30:18Z"
     status: "True"
     type: Initialized
   - lastProbeTime: null
-    lastTransitionTime: "2025-09-12T14:34:14Z"
+    lastTransitionTime: "2025-09-13T01:30:33Z"
     status: "True"
     type: Ready
   - lastProbeTime: null
-    lastTransitionTime: "2025-09-12T14:34:14Z"
+    lastTransitionTime: "2025-09-13T01:30:33Z"
     status: "True"
     type: ContainersReady
   - lastProbeTime: null
-    lastTransitionTime: "2025-09-12T14:33:54Z"
+    lastTransitionTime: "2025-09-13T01:30:18Z"
     status: "True"
     type: PodScheduled
   containerStatuses:
-  - containerID: containerd://d2277fed3a172574dd322119bc893460d27d821dd1cfbac1e9507aed3028d433
+  - containerID: containerd://d57cf1f9c4d49f5aeced3be56d0291401969abe5b332a9525e762196175b7a4a
     image: docker.io/curlimages/curl:latest
     imageID: docker.io/curlimages/curl@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6
     lastState: {}
@@ -136,13 +146,13 @@ status:
     started: true
     state:
       running:
-        startedAt: "2025-09-12T14:34:13Z"
+        startedAt: "2025-09-13T01:30:33Z"
     volumeMounts:
     - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-      name: kube-api-access-dlcg6
+      name: kube-api-access-rqktj
       readOnly: true
       recursiveReadOnly: Disabled
-  - containerID: containerd://ea4a1cd45caa2a1e4a0994a2ef893fa8f323b4ef4c54f5d076e68eaac30bd511
+  - containerID: containerd://c28b4452fc81c496be1e078115b9ca76c752371375bac6e76f478b80e8a5e29b
     image: docker.io/library/nginx:latest
     imageID: docker.io/library/nginx@sha256:d5f28ef21aabddd098f3dbc21fe5b7a7d7a184720bc07da0b6c9b9820e97f25e
     lastState: {}
@@ -152,18 +162,18 @@ status:
     started: true
     state:
       running:
-        startedAt: "2025-09-12T14:34:07Z"
+        startedAt: "2025-09-13T01:30:28Z"
     volumeMounts:
     - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-      name: kube-api-access-dlcg6
+      name: kube-api-access-rqktj
       readOnly: true
       recursiveReadOnly: Disabled
   hostIP: 192.168.97.2
   hostIPs:
   - ip: 192.168.97.2
   phase: Running
-  podIP: 10.42.0.12
+  podIP: 10.42.0.9
   podIPs:
-  - ip: 10.42.0.12
-  qosClass: Guaranteed
-  startTime: "2025-09-12T14:33:54Z"
+  - ip: 10.42.0.9
+  qosClass: Burstable
+  startTime: "2025-09-13T01:30:18Z"

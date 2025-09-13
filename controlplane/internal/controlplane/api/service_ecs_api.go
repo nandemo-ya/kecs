@@ -259,11 +259,14 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 
 		// Convert ECS service to Kubernetes Deployment
 		storageServiceTemp := &storage.Service{
-			ServiceName:       req.ServiceName,
-			DesiredCount:      int(desiredCount),
-			LaunchType:        string(launchType),
-			LoadBalancers:     string(loadBalancersJSON),
-			ServiceRegistries: string(serviceRegistriesJSON),
+			ARN:                serviceARN,
+			ServiceName:        req.ServiceName,
+			TaskDefinitionARN:  taskDefArn,
+			DesiredCount:       int(desiredCount),
+			LaunchType:         string(launchType),
+			SchedulingStrategy: string(schedulingStrategy),
+			LoadBalancers:      string(loadBalancersJSON),
+			ServiceRegistries:  string(serviceRegistriesJSON),
 		}
 		deployment, kubeService, err = serviceConverter.ConvertServiceToDeploymentWithNetworkConfig(
 			storageServiceTemp,
