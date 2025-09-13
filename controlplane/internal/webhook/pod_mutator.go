@@ -121,12 +121,17 @@ func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.Admi
 		pod.Labels = make(map[string]string)
 	}
 
-	if pod.Labels["kecs.dev/managed-by"] != "kecs" {
+	// Check if this is a KECS-managed pod
+	// Either it has kecs.dev/managed-by label or it's a service pod with kecs.dev/service label
+	isKECSManaged := pod.Labels["kecs.dev/managed-by"] == "kecs" || pod.Labels["kecs.dev/service"] != ""
+
+	if !isKECSManaged {
 		// Not a KECS pod, allow without mutation
 		logging.Debug("Pod not managed by KECS, skipping mutation",
 			"pod", pod.Name,
 			"namespace", pod.Namespace,
-			"managed-by", pod.Labels["kecs.dev/managed-by"])
+			"managed-by", pod.Labels["kecs.dev/managed-by"],
+			"service", pod.Labels["kecs.dev/service"])
 		return &admissionv1.AdmissionResponse{
 			Allowed: true,
 		}
