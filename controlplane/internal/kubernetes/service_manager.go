@@ -680,7 +680,7 @@ func (sm *ServiceManager) ensureNamespace(ctx context.Context, kubeClient kubern
 		logging.Warn("ensureNamespace received different client than sm.clientset!")
 	}
 
-	_, err := kubeClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	ns, err := kubeClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Create namespace
@@ -689,6 +689,7 @@ func (sm *ServiceManager) ensureNamespace(ctx context.Context, kubeClient kubern
 					Name: namespace,
 					Labels: map[string]string{
 						"kecs.dev/managed-by": "kecs",
+						"kecs.dev/managed":    "true",
 					},
 				},
 			}
@@ -700,6 +701,34 @@ func (sm *ServiceManager) ensureNamespace(ctx context.Context, kubeClient kubern
 				"namespace", namespace)
 		} else {
 			return fmt.Errorf("failed to get namespace: %w", err)
+		}
+	} else {
+		// Namespace exists, check if it has the required labels
+		needsUpdate := false
+		if ns.Labels == nil {
+			ns.Labels = make(map[string]string)
+			needsUpdate = true
+		}
+		if ns.Labels["kecs.dev/managed"] != "true" {
+			ns.Labels["kecs.dev/managed"] = "true"
+			needsUpdate = true
+		}
+		if ns.Labels["kecs.dev/managed-by"] != "kecs" {
+			ns.Labels["kecs.dev/managed-by"] = "kecs"
+			needsUpdate = true
+		}
+
+		if needsUpdate {
+			_, err = kubeClient.CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{})
+			if err != nil {
+				logging.Warn("Failed to update namespace labels",
+					"namespace", namespace,
+					"error", err)
+				// Don't fail the operation if we can't update labels
+			} else {
+				logging.Info("Updated namespace labels",
+					"namespace", namespace)
+			}
 		}
 	}
 	return nil
@@ -1076,9 +1105,10 @@ func (sm *ServiceManager) RestoreService(ctx context.Context, service *storage.S
 
 	// Create Kubernetes service if provided
 	if kubeService != nil {
-		_, err = sm.clientset.CoreV1().Services(namespace).Create(ctx, kubeService, metav1.CreateOptions{})
-		if err != nil && !errors.IsAlreadyExists(err) {
-			logging.Warn("Failed to create Kubernetes service", "error", err)
+		if err := sm.createKubernetesService(ctx, sm.clientset, kubeService); err != nil {
+			// Don't fail the entire operation if service creation fails
+			logging.Warn("Failed to create kubernetes service",
+				"error", err)
 		}
 	}
 
