@@ -141,6 +141,13 @@ func (h *ProxyHandler) shouldRouteToELBv2(r *http.Request) bool {
 		return true
 	}
 
+	// Check for ELBv2 Action in form data (used by AWS CLI)
+	if r.Method == "POST" && r.URL.Path == "/" {
+		if h.isELBv2Request(r) {
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -200,6 +207,65 @@ func (h *ProxyHandler) isECSRequest(r *http.Request) bool {
 
 	for _, action := range ecsActions {
 		if strings.Contains(bodyStr, action) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isELBv2Request examines the request body to determine if it's an ELBv2 request
+func (h *ProxyHandler) isELBv2Request(r *http.Request) bool {
+	// Read body
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		logging.Error("Failed to read request body", "error", err)
+		return false
+	}
+
+	// Restore body for subsequent handlers
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+	// Check for ELBv2-specific content
+	bodyStr := string(bodyBytes)
+
+	// Check for common ELBv2 action parameters
+	elbv2Actions := []string{
+		"CreateLoadBalancer",
+		"DeleteLoadBalancer",
+		"DescribeLoadBalancers",
+		"ModifyLoadBalancerAttributes",
+		"CreateTargetGroup",
+		"DeleteTargetGroup",
+		"DescribeTargetGroups",
+		"ModifyTargetGroup",
+		"RegisterTargets",
+		"DeregisterTargets",
+		"DescribeTargetHealth",
+		"CreateListener",
+		"DeleteListener",
+		"DescribeListeners",
+		"ModifyListener",
+		"CreateRule",
+		"DeleteRule",
+		"DescribeRules",
+		"ModifyRule",
+		"SetRulePriorities",
+		"DescribeLoadBalancerAttributes",
+		"DescribeTargetGroupAttributes",
+		"ModifyTargetGroupAttributes",
+		"DescribeAccountLimits",
+		"DescribeListenerCertificates",
+		"AddListenerCertificates",
+		"RemoveListenerCertificates",
+		"DescribeTags",
+		"AddTags",
+		"RemoveTags",
+	}
+
+	// Check if body contains Action=<ELBv2Action>
+	for _, action := range elbv2Actions {
+		if strings.Contains(bodyStr, "Action="+action) {
 			return true
 		}
 	}
