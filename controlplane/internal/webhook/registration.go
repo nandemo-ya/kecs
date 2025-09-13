@@ -76,12 +76,8 @@ func (r *WebhookRegistrar) Register(ctx context.Context, caBundle []byte) error 
 						"kecs.dev/managed": "true",
 					},
 				},
-				// Only mutate pods with KECS labels
-				ObjectSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"kecs.dev/managed-by": "kecs",
-					},
-				},
+				// ObjectSelector removed - filtering is done within the webhook handler
+				// to avoid blocking pods that don't have the label yet
 			},
 		},
 	}
