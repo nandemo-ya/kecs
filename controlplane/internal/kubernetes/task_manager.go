@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -30,6 +31,7 @@ type TaskManager struct {
 	storage                 storage.Storage
 	serviceDiscoveryManager servicediscovery.Manager
 	logCollector            *LogCollector
+	k3dPortManager          *K3dPortManager
 }
 
 // NewTaskManager creates a new task manager
@@ -53,6 +55,7 @@ func NewTaskManagerWithServiceDiscovery(storage storage.Storage, sdManager servi
 			storage:                 storage,
 			serviceDiscoveryManager: sdManager,
 			logCollector:            nil, // Will be initialized when clientset is available
+			k3dPortManager:          nil, // Will be initialized when needed
 		}, nil
 	}
 
@@ -84,6 +87,15 @@ func NewTaskManagerWithServiceDiscovery(storage storage.Storage, sdManager servi
 	} else {
 		logging.Debug("Task log collection disabled - no TaskLogStore available")
 	}
+
+	// Initialize K3dPortManager
+	// Get cluster name from environment or use default
+	clusterName := os.Getenv("KECS_INSTANCE_NAME")
+	if clusterName == "" {
+		clusterName = "default"
+	}
+	tm.k3dPortManager = NewK3dPortManager(clusterName)
+	logging.Info("K3d port manager initialized", "clusterName", clusterName)
 
 	return tm, nil
 }
@@ -180,10 +192,57 @@ func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *st
 		}
 	}
 
+	// Check if assignPublicIp is enabled
+	assignPublicIp := false
+	if assignPublicIpValue, ok := pod.Annotations["ecs.amazonaws.com/assign-public-ip"]; ok {
+		assignPublicIp = assignPublicIpValue == "true" || assignPublicIpValue == "ENABLED"
+	}
+
+	// Handle port allocation for assignPublicIp
+	var allocatedPorts []int32
+	if assignPublicIp && tm.k3dPortManager != nil {
+		logging.Info("Task has assignPublicIp enabled, allocating ports", "task", task.ARN)
+
+		// Allocate ports for each container port
+		for _, container := range pod.Spec.Containers {
+			for _, port := range container.Ports {
+				hostPort, err := tm.k3dPortManager.AllocateAndMapPort(ctx, task.ARN, port.ContainerPort, string(port.Protocol))
+				if err != nil {
+					// Clean up any already allocated ports
+					for _, p := range allocatedPorts {
+						tm.k3dPortManager.GetPortManager().ReleasePort(p)
+					}
+					return fmt.Errorf("failed to allocate port for container %s: %w", container.Name, err)
+				}
+				allocatedPorts = append(allocatedPorts, hostPort)
+				logging.Info("Allocated port for task",
+					"task", task.ARN,
+					"container", container.Name,
+					"containerPort", port.ContainerPort,
+					"hostPort", hostPort,
+					"nodePort", tm.k3dPortManager.GetNodePortForHost(hostPort))
+			}
+		}
+	}
+
 	// Create the pod
 	createdPod, err := tm.Clientset.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
+		// Clean up allocated ports if pod creation fails
+		if tm.k3dPortManager != nil {
+			for _, p := range allocatedPorts {
+				tm.k3dPortManager.GetPortManager().ReleasePort(p)
+			}
+		}
 		return fmt.Errorf("failed to create pod: %w", err)
+	}
+
+	// Create NodePort service for the pod if assignPublicIp is enabled
+	if assignPublicIp && len(allocatedPorts) > 0 && tm.k3dPortManager != nil {
+		if err := tm.createNodePortService(ctx, createdPod, task, allocatedPorts); err != nil {
+			logging.Warn("Failed to create NodePort service for task", "task", task.ARN, "error", err)
+			// Don't fail the task creation, just log the error
+		}
 	}
 
 	// Update task with pod information
@@ -192,6 +251,12 @@ func (tm *TaskManager) CreateTask(ctx context.Context, pod *corev1.Pod, task *st
 	task.LastStatus = "PENDING"
 	task.Connectivity = "CONNECTED"
 	task.ConnectivityAt = &task.CreatedAt
+
+	// Add public IP information if assignPublicIp is enabled
+	if assignPublicIp && len(allocatedPorts) > 0 {
+		// Store allocated ports in task attributes
+		tm.addPublicIpInfoToTask(task, allocatedPorts)
+	}
 
 	// Add pod name and namespace to task attributes for easy lookup
 	if err := tm.addPodInfoToTaskAttributes(task, createdPod.Name, createdPod.Namespace); err != nil {
@@ -231,6 +296,23 @@ func (tm *TaskManager) StopTask(ctx context.Context, cluster, taskID, reason str
 
 	if err := tm.storage.TaskStore().Update(ctx, task); err != nil {
 		return fmt.Errorf("failed to update task: %w", err)
+	}
+
+	// Release allocated ports if K3dPortManager is available
+	if tm.k3dPortManager != nil {
+		if err := tm.k3dPortManager.ReleaseTaskPorts(ctx, task.ARN); err != nil {
+			logging.Warn("Failed to release ports for task", "task", task.ARN, "error", err)
+			// Don't fail the stop operation, just log the error
+		}
+
+		// Delete NodePort service if it exists
+		if tm.Clientset != nil && task.Namespace != "" {
+			serviceName := fmt.Sprintf("task-%s", task.ID)
+			err := tm.Clientset.CoreV1().Services(task.Namespace).Delete(ctx, serviceName, metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				logging.Warn("Failed to delete NodePort service", "service", serviceName, "error", err)
+			}
+		}
 	}
 
 	// Collect logs before deleting the pod
@@ -1224,4 +1306,135 @@ func (tm *TaskManager) ensureNamespace(ctx context.Context, namespace string) er
 		}
 	}
 	return nil
+}
+
+// createNodePortService creates a NodePort service for a task with assignPublicIp
+func (tm *TaskManager) createNodePortService(ctx context.Context, pod *corev1.Pod, task *storage.Task, allocatedPorts []int32) error {
+	if tm.Clientset == nil || tm.k3dPortManager == nil {
+		return fmt.Errorf("kubernetes client or k3d port manager not initialized")
+	}
+
+	serviceName := fmt.Sprintf("task-%s", task.ID)
+
+	// Create service ports
+	var servicePorts []corev1.ServicePort
+	portIndex := 0
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			if portIndex >= len(allocatedPorts) {
+				break
+			}
+
+			nodePort := tm.k3dPortManager.GetNodePortForHost(allocatedPorts[portIndex])
+			servicePorts = append(servicePorts, corev1.ServicePort{
+				Name:       fmt.Sprintf("%s-%d", container.Name, port.ContainerPort),
+				Port:       port.ContainerPort,
+				TargetPort: intstr.FromInt(int(port.ContainerPort)),
+				NodePort:   nodePort,
+				Protocol:   port.Protocol,
+			})
+			portIndex++
+		}
+	}
+
+	// Create the service
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: pod.Namespace,
+			Labels: map[string]string{
+				"kecs.dev/task-id":    task.ID,
+				"kecs.dev/task-arn":   task.ARN,
+				"kecs.dev/managed-by": "kecs",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeNodePort,
+			Selector: map[string]string{
+				"kecs.dev/task-id": task.ID,
+			},
+			Ports: servicePorts,
+		},
+	}
+
+	_, err := tm.Clientset.CoreV1().Services(pod.Namespace).Create(ctx, service, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create NodePort service: %w", err)
+	}
+
+	logging.Info("Created NodePort service for task",
+		"task", task.ARN,
+		"service", serviceName,
+		"ports", len(servicePorts))
+
+	return nil
+}
+
+// addPublicIpInfoToTask adds public IP and port information to task
+func (tm *TaskManager) addPublicIpInfoToTask(task *storage.Task, allocatedPorts []int32) {
+	// Get the host IP (in k3d, this is localhost)
+	hostIP := "127.0.0.1"
+
+	// Parse existing attachments or create new
+	var attachments []types.Attachment
+	if task.Attachments != "" {
+		_ = json.Unmarshal([]byte(task.Attachments), &attachments)
+	}
+
+	// Add public IP attachment
+	publicIpAttachment := types.Attachment{
+		Id:     ptr(fmt.Sprintf("public-ip-%s", task.ID)),
+		Type:   ptr("PublicIp"),
+		Status: ptr("ATTACHED"),
+		Details: []types.KeyValuePair{
+			{
+				Name:  ptr("publicIp"),
+				Value: ptr(hostIP),
+			},
+		},
+	}
+
+	// Add allocated ports to details
+	for i, port := range allocatedPorts {
+		publicIpAttachment.Details = append(publicIpAttachment.Details, types.KeyValuePair{
+			Name:  ptr(fmt.Sprintf("hostPort%d", i)),
+			Value: ptr(fmt.Sprintf("%d", port)),
+		})
+
+		// Also add NodePort mapping
+		nodePort := tm.k3dPortManager.GetNodePortForHost(port)
+		publicIpAttachment.Details = append(publicIpAttachment.Details, types.KeyValuePair{
+			Name:  ptr(fmt.Sprintf("nodePort%d", i)),
+			Value: ptr(fmt.Sprintf("%d", nodePort)),
+		})
+	}
+
+	attachments = append(attachments, publicIpAttachment)
+
+	// Update task attachments
+	if attachmentsJSON, err := json.Marshal(attachments); err == nil {
+		task.Attachments = string(attachmentsJSON)
+	}
+
+	// Also add to task attributes for easier access
+	var attributes []map[string]interface{}
+	if task.Attributes != "" && task.Attributes != "[]" {
+		_ = json.Unmarshal([]byte(task.Attributes), &attributes)
+	}
+
+	attributes = append(attributes, map[string]interface{}{
+		"name":  "kecs.dev/public-ip",
+		"value": hostIP,
+	})
+
+	for i, port := range allocatedPorts {
+		attributes = append(attributes, map[string]interface{}{
+			"name":  fmt.Sprintf("kecs.dev/host-port-%d", i),
+			"value": fmt.Sprintf("%d", port),
+		})
+	}
+
+	if attributesJSON, err := json.Marshal(attributes); err == nil {
+		task.Attributes = string(attributesJSON)
+	}
 }
