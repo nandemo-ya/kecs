@@ -1344,8 +1344,11 @@ func (tm *TaskManager) createNodePortService(ctx context.Context, pod *corev1.Po
 			Namespace: pod.Namespace,
 			Labels: map[string]string{
 				"kecs.dev/task-id":    task.ID,
-				"kecs.dev/task-arn":   task.ARN,
 				"kecs.dev/managed-by": "kecs",
+				"kecs.dev/type":       "task-nodeport",
+			},
+			Annotations: map[string]string{
+				"kecs.dev/task-arn": task.ARN, // Store ARN in annotation instead of label
 			},
 		},
 		Spec: corev1.ServiceSpec{

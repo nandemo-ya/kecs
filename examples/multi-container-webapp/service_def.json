@@ -1,6 +1,6 @@
 {
   "serviceName": "multi-container-webapp",
-  "cluster": "default",
+  "cluster": "multi-container-cluster",
   "taskDefinition": "multi-container-webapp:latest",
   "desiredCount": 2,
   "launchType": "FARGATE",

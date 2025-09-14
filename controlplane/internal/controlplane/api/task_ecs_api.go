@@ -767,8 +767,12 @@ func parseSecretsManagerARN(arn string) secretsmanager.SecretReference {
 
 // Helper function to get namespace from cluster
 func getNamespaceFromCluster(cluster *storage.Cluster) string {
-	// Default to "default" namespace
-	// In the future, this could be derived from cluster configuration
+	// Use the same namespace pattern as services: <cluster-name>-<region>
+	// This ensures tasks and services use the same namespace
+	if cluster.Name != "" && cluster.Region != "" {
+		return fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
+	}
+	// Fallback to default if cluster info is incomplete
 	return "default"
 }
 
