@@ -16,6 +16,7 @@ import (
 	apiconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/admin"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
+	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/restoration"
@@ -251,6 +252,25 @@ func runServer(cmd *cobra.Command) {
 					}
 				}
 			}
+		}
+	}
+
+	// Deploy global Traefik if Kubernetes client is available
+	if apiServer != nil && apiServer.GetKubeClient() != nil {
+		logging.Info("Deploying global Traefik for ALB support...")
+
+		traefikManager := kubernetes.NewTraefikManager(apiServer.GetKubeClient())
+
+		// Check if already deployed
+		if !traefikManager.IsDeployed(context.Background()) {
+			if err := traefikManager.DeployGlobalTraefik(context.Background()); err != nil {
+				logging.Error("Failed to deploy global Traefik", "error", err)
+				// Don't fail startup, continue without Traefik
+			} else {
+				logging.Info("Global Traefik deployed successfully")
+			}
+		} else {
+			logging.Info("Global Traefik is already deployed")
 		}
 	}
 

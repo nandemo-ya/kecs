@@ -86,17 +86,14 @@ func (i *k8sIntegration) CreateLoadBalancer(ctx context.Context, name string, su
 		})
 	}
 
-	// Deploy Traefik for this load balancer
-	if err := i.deployTraefikForLoadBalancer(ctx, name, arn); err != nil {
-		return nil, fmt.Errorf("failed to deploy Traefik for load balancer %s: %w", name, err)
-	}
-
 	// Store in memory with lock
 	i.mu.Lock()
 	i.loadBalancers[arn] = lb
 	i.mu.Unlock()
 
-	logging.Debug("Created load balancer with DNS and Traefik deployment", "arn", arn, "dnsName", lb.DNSName)
+	// Note: Traefik is now deployed globally, not per-LoadBalancer
+	// The global Traefik instance handles all ALB traffic based on Host headers
+	logging.Debug("Created virtual load balancer", "arn", arn, "dnsName", lb.DNSName)
 	return lb, nil
 }
 
@@ -815,49 +812,36 @@ func (i *k8sIntegration) deployTargetGroupResources(ctx context.Context, tgName,
 	return nil
 }
 
-// updateTraefikConfigForListener updates Traefik configuration for a new listener
+// updateTraefikConfigForListener creates IngressRoute for global Traefik with Host header routing
 func (i *k8sIntegration) updateTraefikConfigForListener(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
-	if i.kubeClient == nil {
-		logging.Debug("No kubeClient available, skipping Traefik config update for listener", "listenerArn", listenerArn)
+	if i.dynamicClient == nil {
+		logging.Debug("No dynamicClient available, skipping IngressRoute creation for listener", "listenerArn", listenerArn)
 		return nil
 	}
 
-	namespace := "kecs-system"
-	traefikName := fmt.Sprintf("traefik-elbv2-%s", lbName)
-
-	// Update the ConfigMap with new listener configuration
-	cm, err := i.kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, fmt.Sprintf("%s-config", traefikName), metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get ConfigMap: %w", err)
-	}
-
-	// Update the traefik.yml to include the new listener port
-	traefikYaml := cm.Data["traefik.yml"]
-	if !strings.Contains(traefikYaml, fmt.Sprintf(":%d", port)) {
-		// Add new entrypoint for the listener
-		newEntry := fmt.Sprintf(`
-  listener%d:
-    address: ":%d"`, port, port)
-
-		// Insert after the existing entryPoints
-		traefikYaml = strings.Replace(traefikYaml, "entryPoints:", "entryPoints:"+newEntry, 1)
-		cm.Data["traefik.yml"] = traefikYaml
-
-		// Update ConfigMap
-		_, err = i.kubeClient.CoreV1().ConfigMaps(namespace).Update(ctx, cm, metav1.UpdateOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to update ConfigMap: %w", err)
+	// Get the load balancer to retrieve its DNS name
+	i.mu.RLock()
+	var lbDNSName string
+	for _, lb := range i.loadBalancers {
+		if lb.Name == lbName {
+			lbDNSName = lb.DNSName
+			break
 		}
 	}
+	i.mu.RUnlock()
 
-	// Create or update IngressRoute CRD for routing rules
+	if lbDNSName == "" {
+		return fmt.Errorf("could not find DNS name for load balancer: %s", lbName)
+	}
+
+	// Create IngressRoute for the global Traefik instance with Host header routing
 	if targetGroupName != "" {
-		if err := i.updateIngressRoute(ctx, lbName, listenerArn, port, protocol, targetGroupName); err != nil {
-			return fmt.Errorf("failed to create/update IngressRoute: %w", err)
+		if err := i.createGlobalIngressRoute(ctx, lbName, lbDNSName, listenerArn, port, protocol, targetGroupName); err != nil {
+			return fmt.Errorf("failed to create IngressRoute for global Traefik: %w", err)
 		}
 	}
 
-	logging.Debug("Updated Traefik configuration for listener", "port", port)
+	logging.Debug("Created IngressRoute for global Traefik", "lbName", lbName, "host", lbDNSName, "port", port)
 	return nil
 }
 
@@ -960,6 +944,99 @@ func (i *k8sIntegration) deleteIngressRoute(ctx context.Context, lbName string, 
 	}
 
 	logging.Debug("Deleted IngressRoute", "ingressRouteName", ingressRouteName)
+	return nil
+}
+
+// createGlobalIngressRoute creates a Traefik IngressRoute for the global Traefik instance
+// It uses Host header-based routing to distinguish between different ALBs
+func (i *k8sIntegration) createGlobalIngressRoute(ctx context.Context, lbName, lbDNSName, listenerArn string, port int32, protocol, targetGroupName string) error {
+	if i.dynamicClient == nil {
+		logging.Debug("No dynamicClient available, skipping global IngressRoute creation")
+		return nil
+	}
+
+	namespace := "kecs-system"
+	// Generate a unique name for this ALB's IngressRoute
+	ingressRouteName := fmt.Sprintf("alb-%s-port-%d", sanitizeName(lbName), port)
+
+	// Determine the entry point based on port
+	var entryPoint string
+	switch port {
+	case 80:
+		entryPoint = "web"
+	case 443:
+		entryPoint = "websecure"
+	default:
+		// For other ports, we'll need to ensure the global Traefik has this port configured
+		entryPoint = fmt.Sprintf("port-%d", port)
+	}
+
+	// Create the IngressRoute unstructured object with Host header matching
+	ingressRoute := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "traefik.io/v1alpha1",
+			"kind":       "IngressRoute",
+			"metadata": map[string]interface{}{
+				"name":      ingressRouteName,
+				"namespace": namespace,
+				"annotations": map[string]interface{}{
+					"kecs.io/elbv2-listener-arn":  listenerArn,
+					"kecs.io/elbv2-load-balancer": lbName,
+					"kecs.io/elbv2-target-group":  targetGroupName,
+					"kecs.io/elbv2-dns-name":      lbDNSName,
+				},
+				"labels": map[string]interface{}{
+					"kecs.io/elbv2-load-balancer": lbName,
+					"kecs.io/component":           "elbv2-listener",
+					"kecs.io/traefik-scope":       "global",
+				},
+			},
+			"spec": map[string]interface{}{
+				"entryPoints": []string{entryPoint},
+				"routes": []interface{}{
+					map[string]interface{}{
+						// Match based on Host header for this specific ALB
+						"match":    fmt.Sprintf("Host(`%s`) && PathPrefix(`/`)", lbDNSName),
+						"kind":     "Rule",
+						"priority": 100, // Higher priority for host-specific rules
+						"services": []interface{}{
+							map[string]interface{}{
+								"name": fmt.Sprintf("tg-%s", targetGroupName),
+								"port": port,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Define the GVR for IngressRoute
+	gvr := schema.GroupVersionResource{
+		Group:    "traefik.io",
+		Version:  "v1alpha1",
+		Resource: "ingressroutes",
+	}
+
+	// Check if IngressRoute already exists
+	existing, err := i.dynamicClient.Resource(gvr).Namespace(namespace).Get(ctx, ingressRouteName, metav1.GetOptions{})
+	if err == nil {
+		// Update existing IngressRoute
+		existing.Object["spec"] = ingressRoute.Object["spec"]
+		_, err = i.dynamicClient.Resource(gvr).Namespace(namespace).Update(ctx, existing, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to update global IngressRoute: %w", err)
+		}
+		logging.Debug("Updated global IngressRoute", "name", ingressRouteName, "host", lbDNSName)
+	} else {
+		// Create new IngressRoute
+		_, err = i.dynamicClient.Resource(gvr).Namespace(namespace).Create(ctx, ingressRoute, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to create global IngressRoute: %w", err)
+		}
+		logging.Debug("Created global IngressRoute", "name", ingressRouteName, "host", lbDNSName)
+	}
+
 	return nil
 }
 
