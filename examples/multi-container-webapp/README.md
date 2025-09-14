@@ -153,6 +153,88 @@ The recommended approach for production-like deployment with load balancing.
    └───────────┘    └───────────┘    └───────────┘
 ```
 
+### Option 3: Direct Access with assignPublicIp
+
+For development and testing, you can use `assignPublicIp` to access tasks directly without load balancer or port-forwarding.
+
+#### Architecture with assignPublicIp
+
+```
+                     Host Machine
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+  localhost:32000    localhost:32001    (more ports...)
+        │                  │
+        ▼                  ▼
+┌──────────────────────────────────────────────┐
+│     k3d-<cluster>-serverlb (Docker)          │
+│                                              │
+│  32000→30000   32001→30001   (port mapping) │
+└──────────────────────────────────────────────┘
+        │                  │
+        ▼                  ▼
+┌──────────────────────────────────────────────┐
+│    Kubernetes NodePort Service               │
+│                                              │
+│  NodePort:30000    NodePort:30001           │
+│    (nginx:80)      (backend:3000)           │
+└──────────────────────────────────────────────┘
+                      │
+                      ▼
+              ┌───────────────┐
+              │   ECS Task    │
+              │               │
+              │ ┌───────────┐ │
+              │ │  nginx    │ │
+              │ │  :80      │ │
+              │ └───────────┘ │
+              │               │
+              │ ┌───────────┐ │
+              │ │  backend  │ │
+              │ │  :3000    │ │
+              │ └───────────┘ │
+              └───────────────┘
+```
+
+#### Deployment with assignPublicIp
+
+```bash
+# Register task definition
+aws ecs register-task-definition \
+  --cli-input-json file://task_def.json \
+  --endpoint-url http://localhost:5373
+
+# Run task with assignPublicIp
+aws ecs run-task \
+  --cluster multi-container-cluster \
+  --task-definition multi-container-webapp:1 \
+  --network-configuration '{
+    "awsvpcConfiguration": {
+      "assignPublicIp": "ENABLED"
+    }
+  }' \
+  --endpoint-url http://localhost:5373
+
+# Get allocated ports from task details
+TASK_ARN=$(aws ecs list-tasks \
+  --cluster multi-container-cluster \
+  --endpoint-url http://localhost:5373 \
+  --query 'taskArns[0]' --output text)
+
+aws ecs describe-tasks \
+  --cluster multi-container-cluster \
+  --tasks $TASK_ARN \
+  --endpoint-url http://localhost:5373 \
+  --query 'tasks[0].containers[*].networkBindings'
+
+# Access the application directly (example ports)
+curl http://localhost:32000/  # nginx frontend
+curl http://localhost:32001/api/health  # backend API
+```
+
+**Note**: The k3d cluster must be started with port range mapping `32000-32999:30000-30999` for this to work. See [assignPublicIp documentation](/docs/assign-public-ip.md) for details.
+
 ## Verification
 
 ### For Standard Deployment
