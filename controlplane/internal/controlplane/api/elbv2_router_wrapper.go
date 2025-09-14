@@ -139,6 +139,7 @@ type Listener struct {
 type Action struct {
 	Type           string `xml:"Type"`
 	TargetGroupArn string `xml:"TargetGroupArn"`
+	Order          int32  `xml:"Order,omitempty"`
 }
 
 // RegisterTargets response structures
@@ -202,6 +203,79 @@ type DeleteTargetGroupResponse struct {
 	XMLName          xml.Name         `xml:"DeleteTargetGroupResponse"`
 	XMLNS            string           `xml:"xmlns,attr"`
 	ResponseMetadata ResponseMetadata `xml:"ResponseMetadata"`
+}
+
+// CreateRule response structures
+type CreateRuleResponse struct {
+	XMLName          xml.Name         `xml:"CreateRuleResponse"`
+	XMLNS            string           `xml:"xmlns,attr"`
+	Result           CreateRuleResult `xml:"CreateRuleResult"`
+	ResponseMetadata ResponseMetadata `xml:"ResponseMetadata"`
+}
+
+type CreateRuleResult struct {
+	Rules []Rule `xml:"Rules>member"`
+}
+
+type Rule struct {
+	Actions    []Action        `xml:"Actions>member"`
+	Conditions []RuleCondition `xml:"Conditions>member"`
+	IsDefault  bool            `xml:"IsDefault"`
+	Priority   string          `xml:"Priority"`
+	RuleArn    string          `xml:"RuleArn"`
+}
+
+type RuleCondition struct {
+	Field                   string                   `xml:"Field,omitempty"`
+	HostHeaderConfig        *HostHeaderConfig        `xml:"HostHeaderConfig,omitempty"`
+	HttpHeaderConfig        *HttpHeaderConfig        `xml:"HttpHeaderConfig,omitempty"`
+	HttpRequestMethodConfig *HttpRequestMethodConfig `xml:"HttpRequestMethodConfig,omitempty"`
+	PathPatternConfig       *PathPatternConfig       `xml:"PathPatternConfig,omitempty"`
+	QueryStringConfig       *QueryStringConfig       `xml:"QueryStringConfig,omitempty"`
+	SourceIpConfig          *SourceIpConfig          `xml:"SourceIpConfig,omitempty"`
+	Values                  []string                 `xml:"Values>member,omitempty"`
+}
+
+type PathPatternConfig struct {
+	Values []string `xml:"Values>member"`
+}
+
+type HostHeaderConfig struct {
+	Values []string `xml:"Values>member"`
+}
+
+type HttpHeaderConfig struct {
+	Values []string `xml:"Values>member"`
+}
+
+type HttpRequestMethodConfig struct {
+	Values []string `xml:"Values>member"`
+}
+
+type QueryStringConfig struct {
+	Values []QueryStringKeyValuePair `xml:"Values>member"`
+}
+
+type QueryStringKeyValuePair struct {
+	Key   string `xml:"Key,omitempty"`
+	Value string `xml:"Value,omitempty"`
+}
+
+type SourceIpConfig struct {
+	Values []string `xml:"Values>member"`
+}
+
+// DescribeRules response structures
+type DescribeRulesResponse struct {
+	XMLName          xml.Name            `xml:"DescribeRulesResponse"`
+	XMLNS            string              `xml:"xmlns,attr"`
+	Result           DescribeRulesResult `xml:"DescribeRulesResult"`
+	ResponseMetadata ResponseMetadata    `xml:"ResponseMetadata"`
+}
+
+type DescribeRulesResult struct {
+	Rules      []Rule  `xml:"Rules>member"`
+	NextMarker *string `xml:"NextMarker,omitempty"`
 }
 
 // NewELBv2RouterWrapper creates a new wrapper for the ELBv2 router
@@ -771,6 +845,149 @@ func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) 
 			w.writeXML(resp, xmlResp)
 			return
 
+		case "CreateRule":
+			// Convert form data to CreateRuleInput
+			input := &generated_elbv2.CreateRuleInput{}
+
+			// Parse ListenerArn (required)
+			input.ListenerArn = values.Get("ListenerArn")
+
+			// Parse Priority (required)
+			if priorityStr := values.Get("Priority"); priorityStr != "" {
+				priority, _ := strconv.Atoi(priorityStr)
+				input.Priority = int32(priority)
+			}
+
+			// Parse Conditions
+			conditions := []generated_elbv2.RuleCondition{}
+			for i := 1; ; i++ {
+				fieldKey := fmt.Sprintf("Conditions.member.%d.Field", i)
+				if field := values.Get(fieldKey); field != "" {
+					condition := generated_elbv2.RuleCondition{
+						Field: &field,
+					}
+
+					// Parse Values for this condition
+					conditionValues := []string{}
+					for j := 1; ; j++ {
+						valueKey := fmt.Sprintf("Conditions.member.%d.Values.member.%d", i, j)
+						if value := values.Get(valueKey); value != "" {
+							conditionValues = append(conditionValues, value)
+						} else {
+							break
+						}
+					}
+					condition.Values = conditionValues
+
+					// Parse PathPatternConfig if present
+					if pathValues := values.Get(fmt.Sprintf("Conditions.member.%d.PathPatternConfig.Values.member.1", i)); pathValues != "" {
+						pathPatternValues := []string{}
+						for j := 1; ; j++ {
+							pathKey := fmt.Sprintf("Conditions.member.%d.PathPatternConfig.Values.member.%d", i, j)
+							if value := values.Get(pathKey); value != "" {
+								pathPatternValues = append(pathPatternValues, value)
+							} else {
+								break
+							}
+						}
+						condition.PathPatternConfig = &generated_elbv2.PathPatternConditionConfig{
+							Values: pathPatternValues,
+						}
+					}
+
+					conditions = append(conditions, condition)
+				} else {
+					break
+				}
+			}
+			input.Conditions = conditions
+
+			// Parse Actions
+			actions := []generated_elbv2.Action{}
+			for i := 1; ; i++ {
+				typeKey := fmt.Sprintf("Actions.member.%d.Type", i)
+				if actionType := values.Get(typeKey); actionType != "" {
+					action := generated_elbv2.Action{}
+					actionTypeEnum := generated_elbv2.ActionTypeEnum(actionType)
+					action.Type = actionTypeEnum
+
+					// Parse TargetGroupArn for forward action
+					if tgArn := values.Get(fmt.Sprintf("Actions.member.%d.TargetGroupArn", i)); tgArn != "" {
+						action.TargetGroupArn = &tgArn
+					}
+
+					// Parse Order if present
+					if orderStr := values.Get(fmt.Sprintf("Actions.member.%d.Order", i)); orderStr != "" {
+						order, _ := strconv.Atoi(orderStr)
+						order32 := int32(order)
+						action.Order = &order32
+					}
+
+					actions = append(actions, action)
+				} else {
+					break
+				}
+			}
+			input.Actions = actions
+
+			// Call the API
+			output, err := w.api.CreateRule(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertCreateRuleToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
+		case "DescribeRules":
+			// Convert form data to DescribeRulesInput
+			input := &generated_elbv2.DescribeRulesInput{}
+
+			// Parse ListenerArn
+			if listenerArn := values.Get("ListenerArn"); listenerArn != "" {
+				input.ListenerArn = &listenerArn
+			}
+
+			// Parse RuleArns if present
+			if arns := values["RuleArns.member.1"]; len(arns) > 0 {
+				input.RuleArns = []string{}
+				for i := 1; ; i++ {
+					key := fmt.Sprintf("RuleArns.member.%d", i)
+					if val := values.Get(key); val != "" {
+						input.RuleArns = append(input.RuleArns, val)
+					} else {
+						break
+					}
+				}
+			}
+
+			// Parse PageSize if present
+			if pageSizeStr := values.Get("PageSize"); pageSizeStr != "" {
+				pageSize, _ := strconv.Atoi(pageSizeStr)
+				pageSize32 := int32(pageSize)
+				input.PageSize = &pageSize32
+			}
+
+			// Parse Marker if present
+			if marker := values.Get("Marker"); marker != "" {
+				input.Marker = &marker
+			}
+
+			// Call the API
+			output, err := w.api.DescribeRules(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertDescribeRulesToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
 		default:
 			logging.Info("Handling default case for action", "action", action)
 			// For other actions, return an error for now
@@ -1297,5 +1514,151 @@ func (w *ELBv2RouterWrapper) convertDeleteTargetGroupToXML(output *generated_elb
 			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
 		},
 	}
+	return resp
+}
+
+// convertCreateRuleToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertCreateRuleToXML(output *generated_elbv2.CreateRuleOutput) *CreateRuleResponse {
+	resp := &CreateRuleResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil && output.Rules != nil {
+		for _, rule := range output.Rules {
+			xmlRule := Rule{}
+			if rule.RuleArn != nil {
+				xmlRule.RuleArn = *rule.RuleArn
+			}
+			if rule.Priority != nil {
+				xmlRule.Priority = *rule.Priority
+			}
+			if rule.IsDefault != nil {
+				xmlRule.IsDefault = *rule.IsDefault
+			}
+
+			// Convert actions
+			for _, action := range rule.Actions {
+				xmlAction := Action{
+					Type: string(action.Type),
+				}
+				if action.TargetGroupArn != nil {
+					xmlAction.TargetGroupArn = *action.TargetGroupArn
+				}
+				if action.Order != nil {
+					xmlAction.Order = *action.Order
+				}
+				xmlRule.Actions = append(xmlRule.Actions, xmlAction)
+			}
+
+			// Convert conditions
+			for _, condition := range rule.Conditions {
+				xmlCondition := RuleCondition{}
+				if condition.Field != nil {
+					xmlCondition.Field = *condition.Field
+				}
+				if condition.Values != nil {
+					xmlCondition.Values = condition.Values
+				}
+
+				// Convert PathPatternConfig
+				if condition.PathPatternConfig != nil && condition.PathPatternConfig.Values != nil {
+					xmlCondition.PathPatternConfig = &PathPatternConfig{
+						Values: condition.PathPatternConfig.Values,
+					}
+				}
+
+				// Convert HostHeaderConfig
+				if condition.HostHeaderConfig != nil && condition.HostHeaderConfig.Values != nil {
+					xmlCondition.HostHeaderConfig = &HostHeaderConfig{
+						Values: condition.HostHeaderConfig.Values,
+					}
+				}
+
+				xmlRule.Conditions = append(xmlRule.Conditions, xmlCondition)
+			}
+
+			resp.Result.Rules = append(resp.Result.Rules, xmlRule)
+		}
+	}
+
+	return resp
+}
+
+// convertDescribeRulesToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertDescribeRulesToXML(output *generated_elbv2.DescribeRulesOutput) *DescribeRulesResponse {
+	resp := &DescribeRulesResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil {
+		if output.NextMarker != nil {
+			resp.Result.NextMarker = output.NextMarker
+		}
+
+		if output.Rules != nil {
+			for _, rule := range output.Rules {
+				xmlRule := Rule{}
+				if rule.RuleArn != nil {
+					xmlRule.RuleArn = *rule.RuleArn
+				}
+				if rule.Priority != nil {
+					xmlRule.Priority = *rule.Priority
+				}
+				if rule.IsDefault != nil {
+					xmlRule.IsDefault = *rule.IsDefault
+				}
+
+				// Convert actions
+				for _, action := range rule.Actions {
+					xmlAction := Action{
+						Type: string(action.Type),
+					}
+					if action.TargetGroupArn != nil {
+						xmlAction.TargetGroupArn = *action.TargetGroupArn
+					}
+					if action.Order != nil {
+						xmlAction.Order = *action.Order
+					}
+					xmlRule.Actions = append(xmlRule.Actions, xmlAction)
+				}
+
+				// Convert conditions
+				for _, condition := range rule.Conditions {
+					xmlCondition := RuleCondition{}
+					if condition.Field != nil {
+						xmlCondition.Field = *condition.Field
+					}
+					if condition.Values != nil {
+						xmlCondition.Values = condition.Values
+					}
+
+					// Convert PathPatternConfig
+					if condition.PathPatternConfig != nil && condition.PathPatternConfig.Values != nil {
+						xmlCondition.PathPatternConfig = &PathPatternConfig{
+							Values: condition.PathPatternConfig.Values,
+						}
+					}
+
+					// Convert HostHeaderConfig
+					if condition.HostHeaderConfig != nil && condition.HostHeaderConfig.Values != nil {
+						xmlCondition.HostHeaderConfig = &HostHeaderConfig{
+							Values: condition.HostHeaderConfig.Values,
+						}
+					}
+
+					xmlRule.Conditions = append(xmlRule.Conditions, xmlCondition)
+				}
+
+				resp.Result.Rules = append(resp.Result.Rules, xmlRule)
+			}
+		}
+	}
+
 	return resp
 }

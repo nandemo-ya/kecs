@@ -38,6 +38,9 @@ TASK_DEF_ARN=$(aws ecs register-task-definition \
   --query 'taskDefinition.taskDefinitionArn' --output text)
 echo "Task Definition ARN: $TASK_DEF_ARN"
 
+# Extract revision number from ARN
+TASK_DEF_REVISION=$(echo $TASK_DEF_ARN | sed 's/.*://')
+
 # Step 4: Setup ELB resources
 echo ""
 echo "Step 4: Setting up Application Load Balancer..."
@@ -86,7 +89,7 @@ TG_ARN=$(aws elbv2 create-target-group \
   --health-check-timeout-seconds 5 \
   --healthy-threshold-count 2 \
   --unhealthy-threshold-count 3 \
-  --matcher HttpCode=200,301,302,404 \
+  --matcher 'HttpCode="200,301,302,404"' \
   --tags Key=Application,Value=$TASK_DEF_NAME Key=Environment,Value=development \
   --endpoint-url $ENDPOINT_URL \
   --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null) || \
@@ -159,7 +162,7 @@ cat > service_def_generated.json <<EOF
 {
   "serviceName": "$SERVICE_NAME",
   "cluster": "$CLUSTER_NAME",
-  "taskDefinition": "$TASK_DEF_NAME:latest",
+  "taskDefinition": "$TASK_DEF_NAME:$TASK_DEF_REVISION",
   "desiredCount": 3,
   "launchType": "FARGATE",
   "platformVersion": "LATEST",
@@ -233,7 +236,7 @@ if [ "$SERVICE_STATUS" == "ACTIVE" ]; then
     --cluster $CLUSTER_NAME \
     --service $SERVICE_NAME \
     --desired-count 3 \
-    --task-definition $TASK_DEF_NAME:latest \
+    --task-definition $TASK_DEF_NAME:$TASK_DEF_REVISION \
     --endpoint-url $ENDPOINT_URL \
     --output table
 else
