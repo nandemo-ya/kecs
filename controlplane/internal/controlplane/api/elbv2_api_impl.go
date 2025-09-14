@@ -250,10 +250,71 @@ func (api *ELBv2APIImpl) CreateTargetGroup(ctx context.Context, input *generated
 	arn := fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:targetgroup/%s/%s",
 		api.region, api.accountID, input.Name, uuid.New().String()[:8])
 
+	// Default values
+	protocol := "HTTP"
+	if input.Protocol != nil {
+		protocol = string(*input.Protocol)
+	}
+
+	port := int32(80)
+	if input.Port != nil {
+		port = *input.Port
+	}
+
+	vpcId := "vpc-default"
+	if input.VpcId != nil {
+		vpcId = *input.VpcId
+	}
+
+	targetType := "instance"
+	if input.TargetType != nil {
+		targetType = string(*input.TargetType)
+	}
+
 	// Determine health check protocol
-	healthCheckProtocol := "HTTP"
+	healthCheckProtocol := protocol // Default to same as protocol
 	if input.HealthCheckProtocol != nil {
 		healthCheckProtocol = string(*input.HealthCheckProtocol)
+	}
+
+	healthCheckPath := "/"
+	if input.HealthCheckPath != nil {
+		healthCheckPath = *input.HealthCheckPath
+	}
+
+	healthCheckPort := "traffic-port"
+	if input.HealthCheckPort != nil {
+		healthCheckPort = *input.HealthCheckPort
+	}
+
+	healthyThresholdCount := int32(2)
+	if input.HealthyThresholdCount != nil {
+		healthyThresholdCount = *input.HealthyThresholdCount
+	}
+
+	unhealthyThresholdCount := int32(5)
+	if input.UnhealthyThresholdCount != nil {
+		unhealthyThresholdCount = *input.UnhealthyThresholdCount
+	}
+
+	healthCheckTimeoutSeconds := int32(5)
+	if input.HealthCheckTimeoutSeconds != nil {
+		healthCheckTimeoutSeconds = *input.HealthCheckTimeoutSeconds
+	}
+
+	healthCheckIntervalSeconds := int32(30)
+	if input.HealthCheckIntervalSeconds != nil {
+		healthCheckIntervalSeconds = *input.HealthCheckIntervalSeconds
+	}
+
+	matcher := "200"
+	if input.Matcher != nil && input.Matcher.HttpCode != nil {
+		matcher = *input.Matcher.HttpCode
+	}
+
+	healthCheckEnabled := true
+	if input.HealthCheckEnabled != nil {
+		healthCheckEnabled = *input.HealthCheckEnabled
 	}
 
 	// Create target group in storage
@@ -261,19 +322,19 @@ func (api *ELBv2APIImpl) CreateTargetGroup(ctx context.Context, input *generated
 	dbTG := &storage.ELBv2TargetGroup{
 		ARN:                        arn,
 		Name:                       input.Name,
-		Protocol:                   string(*input.Protocol),
-		Port:                       *input.Port,
-		VpcID:                      *input.VpcId,
-		TargetType:                 "instance",
-		HealthCheckEnabled:         true,
-		HealthCheckPath:            "/",
+		Protocol:                   protocol,
+		Port:                       port,
+		VpcID:                      vpcId,
+		TargetType:                 targetType,
+		HealthCheckEnabled:         healthCheckEnabled,
+		HealthCheckPath:            healthCheckPath,
 		HealthCheckProtocol:        healthCheckProtocol,
-		HealthCheckPort:            "traffic-port",
-		HealthyThresholdCount:      2,
-		UnhealthyThresholdCount:    5,
-		HealthCheckTimeoutSeconds:  5,
-		HealthCheckIntervalSeconds: 30,
-		Matcher:                    "200",
+		HealthCheckPort:            healthCheckPort,
+		HealthyThresholdCount:      healthyThresholdCount,
+		UnhealthyThresholdCount:    unhealthyThresholdCount,
+		HealthCheckTimeoutSeconds:  healthCheckTimeoutSeconds,
+		HealthCheckIntervalSeconds: healthCheckIntervalSeconds,
+		Matcher:                    matcher,
 		LoadBalancerArns:           []string{},
 		Tags:                       make(map[string]string),
 		Region:                     api.region,
@@ -287,26 +348,32 @@ func (api *ELBv2APIImpl) CreateTargetGroup(ctx context.Context, input *generated
 	}
 
 	// Create target group in Kubernetes
-	if _, err := api.elbv2Integration.CreateTargetGroup(ctx, input.Name, *input.Port, string(*input.Protocol), *input.VpcId); err != nil {
+	if _, err := api.elbv2Integration.CreateTargetGroup(ctx, input.Name, port, protocol, vpcId); err != nil {
 		return nil, fmt.Errorf("failed to create target group in Kubernetes: %w", err)
 	}
 
 	// Create response
+	protocolEnum := generated_elbv2.ProtocolEnum(protocol)
+	healthCheckProtocolEnum := generated_elbv2.ProtocolEnum(healthCheckProtocol)
+	targetTypeEnum := generated_elbv2.TargetTypeEnum(targetType)
+
 	output := &generated_elbv2.CreateTargetGroupOutput{
 		TargetGroups: []generated_elbv2.TargetGroup{
 			{
 				TargetGroupArn:             &arn,
 				TargetGroupName:            &input.Name,
-				Protocol:                   input.Protocol,
-				Port:                       input.Port,
-				VpcId:                      input.VpcId,
-				HealthCheckPath:            utils.Ptr("/"),
-				HealthCheckProtocol:        (*generated_elbv2.ProtocolEnum)(&healthCheckProtocol),
-				HealthCheckPort:            utils.Ptr("traffic-port"),
-				HealthyThresholdCount:      utils.Ptr(int32(2)),
-				UnhealthyThresholdCount:    utils.Ptr(int32(5)),
-				HealthCheckTimeoutSeconds:  utils.Ptr(int32(5)),
-				HealthCheckIntervalSeconds: utils.Ptr(int32(30)),
+				Protocol:                   &protocolEnum,
+				Port:                       &port,
+				VpcId:                      &vpcId,
+				TargetType:                 &targetTypeEnum,
+				HealthCheckEnabled:         &healthCheckEnabled,
+				HealthCheckPath:            &healthCheckPath,
+				HealthCheckProtocol:        &healthCheckProtocolEnum,
+				HealthCheckPort:            &healthCheckPort,
+				HealthyThresholdCount:      &healthyThresholdCount,
+				UnhealthyThresholdCount:    &unhealthyThresholdCount,
+				HealthCheckTimeoutSeconds:  &healthCheckTimeoutSeconds,
+				HealthCheckIntervalSeconds: &healthCheckIntervalSeconds,
 				LoadBalancerArns:           []string{},
 			},
 		},
@@ -539,13 +606,24 @@ func (api *ELBv2APIImpl) CreateListener(ctx context.Context, input *generated_el
 	arn := fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:listener/app/%s/%s",
 		api.region, api.accountID, uuid.New().String()[:8], uuid.New().String()[:8])
 
+	// Default values
+	port := int32(80)
+	if input.Port != nil {
+		port = *input.Port
+	}
+
+	protocol := "HTTP"
+	if input.Protocol != nil {
+		protocol = string(*input.Protocol)
+	}
+
 	// Create listener in storage
 	now := time.Now()
 	dbListener := &storage.ELBv2Listener{
 		ARN:             arn,
 		LoadBalancerArn: input.LoadBalancerArn,
-		Port:            *input.Port,
-		Protocol:        string(*input.Protocol),
+		Port:            port,
+		Protocol:        protocol,
 		DefaultActions:  "[]", // JSON encoded empty array
 		SslPolicy:       "",
 		Certificates:    "[]", // JSON encoded empty array
@@ -568,19 +646,20 @@ func (api *ELBv2APIImpl) CreateListener(ctx context.Context, input *generated_el
 	}
 
 	// Create listener in Kubernetes
-	if _, err := api.elbv2Integration.CreateListener(ctx, input.LoadBalancerArn, *input.Port, string(*input.Protocol), targetGroupArn); err != nil {
+	if _, err := api.elbv2Integration.CreateListener(ctx, input.LoadBalancerArn, port, protocol, targetGroupArn); err != nil {
 		return nil, fmt.Errorf("failed to create listener in Kubernetes: %w", err)
 	}
 
 	// Create response
+	protocolEnum := generated_elbv2.ProtocolEnum(protocol)
 	output := &generated_elbv2.CreateListenerOutput{
 		Listeners: []generated_elbv2.Listener{
 			{
 				ListenerArn:     &arn,
 				LoadBalancerArn: &input.LoadBalancerArn,
-				Port:            input.Port,
-				Protocol:        input.Protocol,
-				DefaultActions:  []generated_elbv2.Action{},
+				Port:            &port,
+				Protocol:        &protocolEnum,
+				DefaultActions:  input.DefaultActions, // Pass through the actions from input
 			},
 		},
 	}
