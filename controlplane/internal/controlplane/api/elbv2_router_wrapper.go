@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -64,6 +65,82 @@ type ResponseMetadata struct {
 	RequestId string `xml:"RequestId"`
 }
 
+// Target Group response structures
+type CreateTargetGroupResponse struct {
+	XMLName          xml.Name                `xml:"CreateTargetGroupResponse"`
+	XMLNS            string                  `xml:"xmlns,attr"`
+	Result           CreateTargetGroupResult `xml:"CreateTargetGroupResult"`
+	ResponseMetadata ResponseMetadata        `xml:"ResponseMetadata"`
+}
+
+type CreateTargetGroupResult struct {
+	TargetGroups []TargetGroup `xml:"TargetGroups>member"`
+}
+
+type DescribeTargetGroupsResponse struct {
+	XMLName          xml.Name                   `xml:"DescribeTargetGroupsResponse"`
+	XMLNS            string                     `xml:"xmlns,attr"`
+	Result           DescribeTargetGroupsResult `xml:"DescribeTargetGroupsResult"`
+	ResponseMetadata ResponseMetadata           `xml:"ResponseMetadata"`
+}
+
+type DescribeTargetGroupsResult struct {
+	TargetGroups []TargetGroup `xml:"TargetGroups>member"`
+}
+
+type TargetGroup struct {
+	TargetGroupArn             string `xml:"TargetGroupArn"`
+	TargetGroupName            string `xml:"TargetGroupName"`
+	Protocol                   string `xml:"Protocol"`
+	Port                       int32  `xml:"Port"`
+	VpcId                      string `xml:"VpcId"`
+	HealthCheckEnabled         bool   `xml:"HealthCheckEnabled"`
+	HealthCheckIntervalSeconds int32  `xml:"HealthCheckIntervalSeconds"`
+	HealthCheckPath            string `xml:"HealthCheckPath"`
+	HealthCheckPort            string `xml:"HealthCheckPort"`
+	HealthCheckProtocol        string `xml:"HealthCheckProtocol"`
+	HealthCheckTimeoutSeconds  int32  `xml:"HealthCheckTimeoutSeconds"`
+	HealthyThresholdCount      int32  `xml:"HealthyThresholdCount"`
+	UnhealthyThresholdCount    int32  `xml:"UnhealthyThresholdCount"`
+	TargetType                 string `xml:"TargetType"`
+}
+
+// Listener response structures
+type CreateListenerResponse struct {
+	XMLName          xml.Name             `xml:"CreateListenerResponse"`
+	XMLNS            string               `xml:"xmlns,attr"`
+	Result           CreateListenerResult `xml:"CreateListenerResult"`
+	ResponseMetadata ResponseMetadata     `xml:"ResponseMetadata"`
+}
+
+type CreateListenerResult struct {
+	Listeners []Listener `xml:"Listeners>member"`
+}
+
+type DescribeListenersResponse struct {
+	XMLName          xml.Name                `xml:"DescribeListenersResponse"`
+	XMLNS            string                  `xml:"xmlns,attr"`
+	Result           DescribeListenersResult `xml:"DescribeListenersResult"`
+	ResponseMetadata ResponseMetadata        `xml:"ResponseMetadata"`
+}
+
+type DescribeListenersResult struct {
+	Listeners []Listener `xml:"Listeners>member"`
+}
+
+type Listener struct {
+	ListenerArn     string   `xml:"ListenerArn"`
+	LoadBalancerArn string   `xml:"LoadBalancerArn"`
+	Port            int32    `xml:"Port"`
+	Protocol        string   `xml:"Protocol"`
+	DefaultActions  []Action `xml:"DefaultActions>member"`
+}
+
+type Action struct {
+	Type           string `xml:"Type"`
+	TargetGroupArn string `xml:"TargetGroupArn"`
+}
+
 // NewELBv2RouterWrapper creates a new wrapper for the ELBv2 router
 func NewELBv2RouterWrapper(api generated_elbv2.ElasticLoadBalancing_v10API) *ELBv2RouterWrapper {
 	return &ELBv2RouterWrapper{
@@ -74,13 +151,25 @@ func NewELBv2RouterWrapper(api generated_elbv2.ElasticLoadBalancing_v10API) *ELB
 
 // Route handles the HTTP request, converting form data to JSON when necessary
 func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) {
-	logging.Debug("ELBv2RouterWrapper.Route called",
+	// Recover from any panics
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Error("Panic in ELBv2RouterWrapper.Route", "error", r)
+			w.writeError(resp, http.StatusInternalServerError, "InternalError", fmt.Sprintf("Internal error: %v", r))
+		}
+	}()
+
+	contentType := req.Header.Get("Content-Type")
+	logging.Info("ELBv2RouterWrapper.Route called",
 		"method", req.Method,
 		"path", req.URL.Path,
-		"content-type", req.Header.Get("Content-Type"))
+		"content-type", contentType)
 
 	// If it's form data, convert it to JSON format expected by the generated code
-	if req.Method == "POST" && strings.Contains(req.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
+	isFormData := req.Method == "POST" && strings.Contains(contentType, "application/x-www-form-urlencoded")
+	logging.Info("Checking if form data", "isFormData", isFormData, "method", req.Method, "contentType", contentType)
+
+	if isFormData {
 		// Parse form data
 		bodyBytes, err := io.ReadAll(req.Body)
 		if err != nil {
@@ -101,6 +190,7 @@ func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) 
 			"body", string(bodyBytes))
 
 		// Handle specific actions
+		logging.Info("About to switch on action", "action", action, "length", len(action))
 		switch action {
 		case "DescribeLoadBalancers":
 			// Convert form data to DescribeLoadBalancersInput
@@ -219,11 +309,253 @@ func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) 
 			w.writeXML(resp, xmlResp)
 			return
 
+		case "CreateTargetGroup":
+			// Convert form data to CreateTargetGroupInput
+			input := &generated_elbv2.CreateTargetGroupInput{}
+
+			// Parse Name (required)
+			input.Name = values.Get("Name")
+
+			// Parse Protocol
+			if protocol := values.Get("Protocol"); protocol != "" {
+				protocolEnum := generated_elbv2.ProtocolEnum(protocol)
+				input.Protocol = &protocolEnum
+			}
+
+			// Parse Port
+			if portStr := values.Get("Port"); portStr != "" {
+				port, _ := strconv.Atoi(portStr)
+				port32 := int32(port)
+				input.Port = &port32
+			}
+
+			// Parse VpcId
+			if vpcId := values.Get("VpcId"); vpcId != "" {
+				input.VpcId = &vpcId
+			}
+
+			// Parse TargetType
+			if targetType := values.Get("TargetType"); targetType != "" {
+				targetTypeEnum := generated_elbv2.TargetTypeEnum(targetType)
+				input.TargetType = &targetTypeEnum
+			}
+
+			// Parse HealthCheckEnabled
+			if healthCheckEnabled := values.Get("HealthCheckEnabled"); healthCheckEnabled != "" {
+				enabled := healthCheckEnabled == "true"
+				input.HealthCheckEnabled = &enabled
+			}
+
+			// Parse HealthCheckPath
+			if healthCheckPath := values.Get("HealthCheckPath"); healthCheckPath != "" {
+				input.HealthCheckPath = &healthCheckPath
+			}
+
+			// Parse HealthCheckIntervalSeconds
+			if intervalStr := values.Get("HealthCheckIntervalSeconds"); intervalStr != "" {
+				interval, _ := strconv.Atoi(intervalStr)
+				interval32 := int32(interval)
+				input.HealthCheckIntervalSeconds = &interval32
+			}
+
+			// Parse HealthCheckTimeoutSeconds
+			if timeoutStr := values.Get("HealthCheckTimeoutSeconds"); timeoutStr != "" {
+				timeout, _ := strconv.Atoi(timeoutStr)
+				timeout32 := int32(timeout)
+				input.HealthCheckTimeoutSeconds = &timeout32
+			}
+
+			// Parse HealthyThresholdCount
+			if healthyStr := values.Get("HealthyThresholdCount"); healthyStr != "" {
+				healthy, _ := strconv.Atoi(healthyStr)
+				healthy32 := int32(healthy)
+				input.HealthyThresholdCount = &healthy32
+			}
+
+			// Parse UnhealthyThresholdCount
+			if unhealthyStr := values.Get("UnhealthyThresholdCount"); unhealthyStr != "" {
+				unhealthy, _ := strconv.Atoi(unhealthyStr)
+				unhealthy32 := int32(unhealthy)
+				input.UnhealthyThresholdCount = &unhealthy32
+			}
+
+			// Parse Matcher (HttpCode)
+			if matcherCode := values.Get("Matcher.HttpCode"); matcherCode != "" {
+				matcher := &generated_elbv2.Matcher{
+					HttpCode: &matcherCode,
+				}
+				input.Matcher = matcher
+			}
+
+			// Parse Tags
+			tags := []generated_elbv2.Tag{}
+			for i := 1; ; i++ {
+				keyParam := fmt.Sprintf("Tags.member.%d.Key", i)
+				valueParam := fmt.Sprintf("Tags.member.%d.Value", i)
+				key := values.Get(keyParam)
+				value := values.Get(valueParam)
+				if key == "" {
+					break
+				}
+				tags = append(tags, generated_elbv2.Tag{
+					Key:   key,
+					Value: &value,
+				})
+			}
+			if len(tags) > 0 {
+				input.Tags = tags
+			}
+
+			// Call the API
+			logging.Info("Calling CreateTargetGroup API", "input", input)
+			output, err := w.api.CreateTargetGroup(req.Context(), input)
+			if err != nil {
+				logging.Error("CreateTargetGroup API failed", "error", err)
+				w.writeAPIError(resp, err)
+				return
+			}
+			logging.Info("CreateTargetGroup API succeeded", "output", output)
+
+			// Convert to XML response
+			xmlResp := w.convertCreateTargetGroupToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
+		case "DescribeTargetGroups":
+			// Convert form data to DescribeTargetGroupsInput
+			input := &generated_elbv2.DescribeTargetGroupsInput{}
+
+			// Parse TargetGroupArns if present
+			if arns := values["TargetGroupArns.member.1"]; len(arns) > 0 {
+				input.TargetGroupArns = []string{}
+				for i := 1; ; i++ {
+					key := fmt.Sprintf("TargetGroupArns.member.%d", i)
+					if val := values.Get(key); val != "" {
+						input.TargetGroupArns = append(input.TargetGroupArns, val)
+					} else {
+						break
+					}
+				}
+			}
+
+			// Parse Names if present
+			if names := values["Names.member.1"]; len(names) > 0 {
+				input.Names = []string{}
+				for i := 1; ; i++ {
+					key := fmt.Sprintf("Names.member.%d", i)
+					if val := values.Get(key); val != "" {
+						input.Names = append(input.Names, val)
+					} else {
+						break
+					}
+				}
+			}
+
+			// Call the API
+			output, err := w.api.DescribeTargetGroups(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertDescribeTargetGroupsToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
+		case "CreateListener":
+			// Convert form data to CreateListenerInput
+			input := &generated_elbv2.CreateListenerInput{}
+
+			// Parse LoadBalancerArn (required)
+			input.LoadBalancerArn = values.Get("LoadBalancerArn")
+
+			// Parse Protocol (required)
+			if protocol := values.Get("Protocol"); protocol != "" {
+				protocolEnum := generated_elbv2.ProtocolEnum(protocol)
+				input.Protocol = &protocolEnum
+			}
+
+			// Parse Port (required)
+			if portStr := values.Get("Port"); portStr != "" {
+				port, _ := strconv.Atoi(portStr)
+				port32 := int32(port)
+				input.Port = &port32
+			}
+
+			// Parse DefaultActions
+			if actionType := values.Get("DefaultActions.member.1.Type"); actionType != "" {
+				actions := []generated_elbv2.Action{}
+				for i := 1; ; i++ {
+					typeKey := fmt.Sprintf("DefaultActions.member.%d.Type", i)
+					if actionType := values.Get(typeKey); actionType == "" {
+						break
+					} else {
+						action := generated_elbv2.Action{}
+						actionTypeEnum := generated_elbv2.ActionTypeEnum(actionType)
+						action.Type = actionTypeEnum
+
+						// Parse TargetGroupArn for forward action
+						if tgArn := values.Get(fmt.Sprintf("DefaultActions.member.%d.TargetGroupArn", i)); tgArn != "" {
+							action.TargetGroupArn = &tgArn
+						}
+
+						actions = append(actions, action)
+					}
+				}
+				input.DefaultActions = actions
+			}
+
+			// Call the API
+			output, err := w.api.CreateListener(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertCreateListenerToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
+		case "DescribeListeners":
+			// Convert form data to DescribeListenersInput
+			input := &generated_elbv2.DescribeListenersInput{}
+
+			// Parse LoadBalancerArn
+			if lbArn := values.Get("LoadBalancerArn"); lbArn != "" {
+				input.LoadBalancerArn = &lbArn
+			}
+
+			// Parse ListenerArns if present
+			if arns := values["ListenerArns.member.1"]; len(arns) > 0 {
+				input.ListenerArns = []string{}
+				for i := 1; ; i++ {
+					key := fmt.Sprintf("ListenerArns.member.%d", i)
+					if val := values.Get(key); val != "" {
+						input.ListenerArns = append(input.ListenerArns, val)
+					} else {
+						break
+					}
+				}
+			}
+
+			// Call the API
+			output, err := w.api.DescribeListeners(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertDescribeListenersToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
 		default:
-			// For other actions, try to route with the action in the header
-			// This allows the generated router to handle it
-			req.Header.Set("X-Amz-Target", "ElasticLoadBalancing."+action)
-			w.innerRouter.Route(resp, req)
+			logging.Info("Handling default case for action", "action", action)
+			// For other actions, return an error for now
+			w.writeError(resp, http.StatusNotImplemented, "NotImplemented", fmt.Sprintf("Action %s not yet implemented", action))
 			return
 		}
 	} else {
@@ -365,6 +697,210 @@ func (w *ELBv2RouterWrapper) convertCreateLoadBalancerToXML(output *generated_el
 				xmlLB.IpAddressType = string(*lb.IpAddressType)
 			}
 			resp.Result.LoadBalancers = append(resp.Result.LoadBalancers, xmlLB)
+		}
+	}
+
+	return resp
+}
+
+// convertCreateTargetGroupToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertCreateTargetGroupToXML(output *generated_elbv2.CreateTargetGroupOutput) *CreateTargetGroupResponse {
+	resp := &CreateTargetGroupResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil && output.TargetGroups != nil {
+		for _, tg := range output.TargetGroups {
+			xmlTG := TargetGroup{}
+			if tg.TargetGroupArn != nil {
+				xmlTG.TargetGroupArn = *tg.TargetGroupArn
+			}
+			if tg.TargetGroupName != nil {
+				xmlTG.TargetGroupName = *tg.TargetGroupName
+			}
+			if tg.Protocol != nil {
+				xmlTG.Protocol = string(*tg.Protocol)
+			}
+			if tg.Port != nil {
+				xmlTG.Port = int32(*tg.Port)
+			}
+			if tg.VpcId != nil {
+				xmlTG.VpcId = *tg.VpcId
+			}
+			if tg.HealthCheckEnabled != nil {
+				xmlTG.HealthCheckEnabled = *tg.HealthCheckEnabled
+			}
+			if tg.HealthCheckIntervalSeconds != nil {
+				xmlTG.HealthCheckIntervalSeconds = int32(*tg.HealthCheckIntervalSeconds)
+			}
+			if tg.HealthCheckTimeoutSeconds != nil {
+				xmlTG.HealthCheckTimeoutSeconds = int32(*tg.HealthCheckTimeoutSeconds)
+			}
+			if tg.HealthyThresholdCount != nil {
+				xmlTG.HealthyThresholdCount = int32(*tg.HealthyThresholdCount)
+			}
+			if tg.UnhealthyThresholdCount != nil {
+				xmlTG.UnhealthyThresholdCount = int32(*tg.UnhealthyThresholdCount)
+			}
+			if tg.HealthCheckPath != nil {
+				xmlTG.HealthCheckPath = *tg.HealthCheckPath
+			}
+			if tg.HealthCheckPort != nil {
+				xmlTG.HealthCheckPort = *tg.HealthCheckPort
+			}
+			if tg.HealthCheckProtocol != nil {
+				xmlTG.HealthCheckProtocol = string(*tg.HealthCheckProtocol)
+			}
+			if tg.TargetType != nil {
+				xmlTG.TargetType = string(*tg.TargetType)
+			}
+			resp.Result.TargetGroups = append(resp.Result.TargetGroups, xmlTG)
+		}
+	}
+
+	return resp
+}
+
+// convertDescribeTargetGroupsToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertDescribeTargetGroupsToXML(output *generated_elbv2.DescribeTargetGroupsOutput) *DescribeTargetGroupsResponse {
+	resp := &DescribeTargetGroupsResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil && output.TargetGroups != nil {
+		for _, tg := range output.TargetGroups {
+			xmlTG := TargetGroup{}
+			if tg.TargetGroupArn != nil {
+				xmlTG.TargetGroupArn = *tg.TargetGroupArn
+			}
+			if tg.TargetGroupName != nil {
+				xmlTG.TargetGroupName = *tg.TargetGroupName
+			}
+			if tg.Protocol != nil {
+				xmlTG.Protocol = string(*tg.Protocol)
+			}
+			if tg.Port != nil {
+				xmlTG.Port = int32(*tg.Port)
+			}
+			if tg.VpcId != nil {
+				xmlTG.VpcId = *tg.VpcId
+			}
+			if tg.HealthCheckEnabled != nil {
+				xmlTG.HealthCheckEnabled = *tg.HealthCheckEnabled
+			}
+			if tg.HealthCheckIntervalSeconds != nil {
+				xmlTG.HealthCheckIntervalSeconds = int32(*tg.HealthCheckIntervalSeconds)
+			}
+			if tg.HealthCheckTimeoutSeconds != nil {
+				xmlTG.HealthCheckTimeoutSeconds = int32(*tg.HealthCheckTimeoutSeconds)
+			}
+			if tg.HealthyThresholdCount != nil {
+				xmlTG.HealthyThresholdCount = int32(*tg.HealthyThresholdCount)
+			}
+			if tg.UnhealthyThresholdCount != nil {
+				xmlTG.UnhealthyThresholdCount = int32(*tg.UnhealthyThresholdCount)
+			}
+			if tg.HealthCheckPath != nil {
+				xmlTG.HealthCheckPath = *tg.HealthCheckPath
+			}
+			if tg.HealthCheckPort != nil {
+				xmlTG.HealthCheckPort = *tg.HealthCheckPort
+			}
+			if tg.HealthCheckProtocol != nil {
+				xmlTG.HealthCheckProtocol = string(*tg.HealthCheckProtocol)
+			}
+			if tg.TargetType != nil {
+				xmlTG.TargetType = string(*tg.TargetType)
+			}
+			resp.Result.TargetGroups = append(resp.Result.TargetGroups, xmlTG)
+		}
+	}
+
+	return resp
+}
+
+// convertCreateListenerToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertCreateListenerToXML(output *generated_elbv2.CreateListenerOutput) *CreateListenerResponse {
+	resp := &CreateListenerResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil && output.Listeners != nil {
+		for _, l := range output.Listeners {
+			xmlListener := Listener{}
+			if l.ListenerArn != nil {
+				xmlListener.ListenerArn = *l.ListenerArn
+			}
+			if l.LoadBalancerArn != nil {
+				xmlListener.LoadBalancerArn = *l.LoadBalancerArn
+			}
+			if l.Port != nil {
+				xmlListener.Port = int32(*l.Port)
+			}
+			if l.Protocol != nil {
+				xmlListener.Protocol = string(*l.Protocol)
+			}
+			if l.DefaultActions != nil {
+				for _, action := range l.DefaultActions {
+					xmlAction := Action{}
+					xmlAction.Type = string(action.Type)
+					if action.TargetGroupArn != nil {
+						xmlAction.TargetGroupArn = *action.TargetGroupArn
+					}
+					xmlListener.DefaultActions = append(xmlListener.DefaultActions, xmlAction)
+				}
+			}
+			resp.Result.Listeners = append(resp.Result.Listeners, xmlListener)
+		}
+	}
+
+	return resp
+}
+
+// convertDescribeListenersToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertDescribeListenersToXML(output *generated_elbv2.DescribeListenersOutput) *DescribeListenersResponse {
+	resp := &DescribeListenersResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil && output.Listeners != nil {
+		for _, l := range output.Listeners {
+			xmlListener := Listener{}
+			if l.ListenerArn != nil {
+				xmlListener.ListenerArn = *l.ListenerArn
+			}
+			if l.LoadBalancerArn != nil {
+				xmlListener.LoadBalancerArn = *l.LoadBalancerArn
+			}
+			if l.Port != nil {
+				xmlListener.Port = int32(*l.Port)
+			}
+			if l.Protocol != nil {
+				xmlListener.Protocol = string(*l.Protocol)
+			}
+			if l.DefaultActions != nil {
+				for _, action := range l.DefaultActions {
+					xmlAction := Action{}
+					xmlAction.Type = string(action.Type)
+					if action.TargetGroupArn != nil {
+						xmlAction.TargetGroupArn = *action.TargetGroupArn
+					}
+					xmlListener.DefaultActions = append(xmlListener.DefaultActions, xmlAction)
+				}
+			}
+			resp.Result.Listeners = append(resp.Result.Listeners, xmlListener)
 		}
 	}
 
