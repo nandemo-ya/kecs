@@ -622,32 +622,8 @@ func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) 
 			// Parse TargetGroupArn (required)
 			input.TargetGroupArn = values.Get("TargetGroupArn")
 
-			// Parse Targets
-			input.Targets = []generated_elbv2.TargetDescription{}
-			for i := 1; ; i++ {
-				idKey := fmt.Sprintf("Targets.member.%d.Id", i)
-				if id := values.Get(idKey); id != "" {
-					target := generated_elbv2.TargetDescription{
-						Id: id,
-					}
-
-					// Parse Port if present
-					if portStr := values.Get(fmt.Sprintf("Targets.member.%d.Port", i)); portStr != "" {
-						port, _ := strconv.Atoi(portStr)
-						port32 := int32(port)
-						target.Port = &port32
-					}
-
-					// Parse AvailabilityZone if present
-					if az := values.Get(fmt.Sprintf("Targets.member.%d.AvailabilityZone", i)); az != "" {
-						target.AvailabilityZone = &az
-					}
-
-					input.Targets = append(input.Targets, target)
-				} else {
-					break
-				}
-			}
+			// Parse Targets using helper function
+			input.Targets = w.parseTargets(values)
 
 			// Call the API
 			output, err := w.api.RegisterTargets(req.Context(), input)
@@ -668,32 +644,8 @@ func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) 
 			// Parse TargetGroupArn (required)
 			input.TargetGroupArn = values.Get("TargetGroupArn")
 
-			// Parse Targets
-			input.Targets = []generated_elbv2.TargetDescription{}
-			for i := 1; ; i++ {
-				idKey := fmt.Sprintf("Targets.member.%d.Id", i)
-				if id := values.Get(idKey); id != "" {
-					target := generated_elbv2.TargetDescription{
-						Id: id,
-					}
-
-					// Parse Port if present
-					if portStr := values.Get(fmt.Sprintf("Targets.member.%d.Port", i)); portStr != "" {
-						port, _ := strconv.Atoi(portStr)
-						port32 := int32(port)
-						target.Port = &port32
-					}
-
-					// Parse AvailabilityZone if present
-					if az := values.Get(fmt.Sprintf("Targets.member.%d.AvailabilityZone", i)); az != "" {
-						target.AvailabilityZone = &az
-					}
-
-					input.Targets = append(input.Targets, target)
-				} else {
-					break
-				}
-			}
+			// Parse Targets using helper function
+			input.Targets = w.parseTargets(values)
 
 			// Call the API
 			output, err := w.api.DeregisterTargets(req.Context(), input)
@@ -714,33 +666,9 @@ func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) 
 			// Parse TargetGroupArn (required)
 			input.TargetGroupArn = values.Get("TargetGroupArn")
 
-			// Parse Targets if present
+			// Parse Targets if present using helper function
 			if values.Get("Targets.member.1.Id") != "" {
-				input.Targets = []generated_elbv2.TargetDescription{}
-				for i := 1; ; i++ {
-					idKey := fmt.Sprintf("Targets.member.%d.Id", i)
-					if id := values.Get(idKey); id != "" {
-						target := generated_elbv2.TargetDescription{
-							Id: id,
-						}
-
-						// Parse Port if present
-						if portStr := values.Get(fmt.Sprintf("Targets.member.%d.Port", i)); portStr != "" {
-							port, _ := strconv.Atoi(portStr)
-							port32 := int32(port)
-							target.Port = &port32
-						}
-
-						// Parse AvailabilityZone if present
-						if az := values.Get(fmt.Sprintf("Targets.member.%d.AvailabilityZone", i)); az != "" {
-							target.AvailabilityZone = &az
-						}
-
-						input.Targets = append(input.Targets, target)
-					} else {
-						break
-					}
-				}
+				input.Targets = w.parseTargets(values)
 			}
 
 			// Call the API
@@ -894,6 +822,37 @@ func (w *ELBv2RouterWrapper) writeXML(resp http.ResponseWriter, data interface{}
 	if err := encoder.Encode(data); err != nil {
 		logging.Error("Failed to encode XML response", "error", err)
 	}
+}
+
+// parseTargets parses target descriptions from form values
+func (w *ELBv2RouterWrapper) parseTargets(values url.Values) []generated_elbv2.TargetDescription {
+	targets := []generated_elbv2.TargetDescription{}
+	for i := 1; ; i++ {
+		idKey := fmt.Sprintf("Targets.member.%d.Id", i)
+		if id := values.Get(idKey); id != "" {
+			target := generated_elbv2.TargetDescription{
+				Id: id,
+			}
+
+			// Parse Port if present
+			if portStr := values.Get(fmt.Sprintf("Targets.member.%d.Port", i)); portStr != "" {
+				if port, err := strconv.Atoi(portStr); err == nil {
+					port32 := int32(port)
+					target.Port = &port32
+				}
+			}
+
+			// Parse AvailabilityZone if present
+			if az := values.Get(fmt.Sprintf("Targets.member.%d.AvailabilityZone", i)); az != "" {
+				target.AvailabilityZone = &az
+			}
+
+			targets = append(targets, target)
+		} else {
+			break
+		}
+	}
+	return targets
 }
 
 // convertDescribeLoadBalancersToXML converts the API output to XML format
