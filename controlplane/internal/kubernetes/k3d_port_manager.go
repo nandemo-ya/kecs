@@ -32,19 +32,18 @@ func (k *K3dPortManager) AddPortMapping(ctx context.Context, hostPort, nodePort 
 	nodeName := fmt.Sprintf("k3d-%s-serverlb", k.clusterName)
 	portMapping := fmt.Sprintf("%d:%d", hostPort, nodePort)
 
-	logging.Info("Adding port mapping to k3d node",
+	logging.Info("Port mapping configured (k3d command skipped - running in container)",
 		"node", nodeName,
-		"mapping", portMapping)
+		"mapping", portMapping,
+		"note", "Ensure k3d cluster was started with port range 32000-32999:30000-30999")
 
-	cmd := exec.CommandContext(ctx, "k3d", "node", "edit", nodeName, "--port-add", portMapping)
-	output, err := cmd.CombinedOutput()
+	// Skip actual k3d command execution since we're running inside the container
+	// The k3d cluster should be pre-configured with the necessary port range
+	// This requires the cluster to be started with:
+	// k3d cluster create --port "32000-32999:30000-30999@server:0"
 
-	if err != nil {
-		return fmt.Errorf("failed to add port mapping: %w, output: %s", err, string(output))
-	}
-
-	logging.Info("Successfully added port mapping",
-		"node", nodeName,
+	// We still track the port allocation but don't execute the k3d command
+	logging.Info("Port allocation tracked successfully",
 		"hostPort", hostPort,
 		"nodePort", nodePort)
 
