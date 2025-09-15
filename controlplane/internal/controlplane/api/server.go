@@ -413,6 +413,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	// This requires Kubernetes client for load balancer operations
 	if kubeClient != nil {
 		elbv2Integration := elbv2.NewK8sIntegration(s.region, s.accountID)
+		// Set the Kubernetes clients
+		elbv2Integration.SetKubernetesClients(kubeClient, nil)
 		s.elbv2Integration = elbv2Integration
 
 		// Initialize ELBv2 API and router with wrapper for form data support
