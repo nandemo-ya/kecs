@@ -314,6 +314,30 @@ func (m *Manager) deployLocalStack(ctx context.Context, instanceName string, cfg
 
 // deployTraefik is deprecated and does nothing
 func (m *Manager) deployTraefik(ctx context.Context, instanceName string, cfg *config.Config, apiPort int) error {
+	clusterName := fmt.Sprintf("kecs-%s", instanceName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(context.Background(), clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	client, err := kubernetes.NewForConfig(kubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	// Create TraefikManager and deploy global Traefik
+	traefikManager := kecs.NewTraefikManager(client)
+
+	// Check if already deployed
+	if !traefikManager.IsDeployed(ctx) {
+		if err := traefikManager.DeployGlobalTraefik(ctx); err != nil {
+			return fmt.Errorf("failed to deploy global Traefik: %w", err)
+		}
+		logging.Info("Global Traefik deployed successfully", "instance", instanceName)
+	} else {
+		logging.Info("Global Traefik is already deployed", "instance", instanceName)
+	}
+
 	return nil
 }
 
