@@ -217,6 +217,22 @@ func createClusterRole() *rbacv1.ClusterRole {
 				Resources: []string{"mutatingwebhookconfigurations", "validatingwebhookconfigurations"},
 				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
 			},
+			// Traefik CRDs
+			{
+				APIGroups: []string{"traefik.io", "traefik.containo.us"},
+				Resources: []string{
+					"ingressroutes", "ingressroutetcps", "ingressrouteudps",
+					"middlewares", "middlewaretcps", "serverstransports",
+					"tlsoptions", "tlsstores", "traefikservices",
+				},
+				Verbs: []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			},
+			// Ingress extensions
+			{
+				APIGroups: []string{"extensions", "networking.k8s.io"},
+				Resources: []string{"ingresses/status", "ingressclasses"},
+				Verbs:     []string{"get", "list", "watch", "update"},
+			},
 		},
 	}
 }

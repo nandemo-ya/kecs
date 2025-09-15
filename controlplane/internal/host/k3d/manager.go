@@ -225,6 +225,36 @@ func (k *K3dClusterManager) CreateCluster(ctx context.Context, clusterName strin
 
 // createClusterStandard creates a standard k3d cluster (original implementation)
 func (k *K3dClusterManager) createClusterStandard(ctx context.Context, clusterName string) error {
+	// Default ALB port mappings for Traefik NodePorts
+	// These provide fixed host ports for ALB listeners
+	defaultPortMappings := map[int32]int32{
+		8080: 30880, // HTTP (ALB port 80 -> Host 8080 -> NodePort 30880)
+		8443: 30443, // HTTPS (ALB port 443 -> Host 8443 -> NodePort 30443)
+	}
+
+	// Add optional port range for custom ALB listeners (8000-8099 -> 30800-30899)
+	if startPort := config.GetInt("kubernetes.albPortRangeStart"); startPort > 0 {
+		endPort := config.GetInt("kubernetes.albPortRangeEnd")
+		if endPort == 0 {
+			endPort = startPort + 99 // Default range of 100 ports
+		}
+
+		for i := int32(0); i <= int32(endPort-startPort); i++ {
+			hostPort := int32(startPort) + i
+			nodePort := int32(30800) + i
+			defaultPortMappings[hostPort] = nodePort
+		}
+		logging.Info("Adding custom ALB port range",
+			"hostPorts", fmt.Sprintf("%d-%d", startPort, endPort),
+			"nodePorts", fmt.Sprintf("%d-%d", 30800, 30800+(endPort-startPort)))
+	}
+
+	// Use createClusterStandardWithPorts with default ALB port mappings
+	return k.createClusterStandardWithPorts(ctx, clusterName, defaultPortMappings)
+}
+
+// createClusterStandardOriginal creates a standard k3d cluster without default port mappings
+func (k *K3dClusterManager) createClusterStandardOriginal(ctx context.Context, clusterName string) error {
 	normalizedName := k.normalizeClusterName(clusterName)
 
 	// Check if cluster already exists
@@ -1380,6 +1410,35 @@ func (k *K3dClusterManager) CreateClusterOptimized(ctx context.Context, clusterN
 		serverNode.Volumes = volumes
 		logging.Info("Adding volume mounts to optimized cluster", "volumes", volumes)
 	}
+
+	// Add default ALB port mappings for optimized clusters too
+	portMap := nat.PortMap{}
+	// Standard ALB ports
+	portMap[nat.Port("30880/tcp")] = []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "8080"}}
+	portMap[nat.Port("30443/tcp")] = []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "8443"}}
+
+	// Add optional port range for custom ALB listeners
+	if startPort := config.GetInt("kubernetes.albPortRangeStart"); startPort > 0 {
+		endPort := config.GetInt("kubernetes.albPortRangeEnd")
+		if endPort == 0 {
+			endPort = startPort + 99 // Default range of 100 ports
+		}
+
+		for i := 0; i <= endPort-startPort; i++ {
+			hostPort := startPort + i
+			nodePort := 30800 + i
+			portKey := fmt.Sprintf("%d/tcp", nodePort)
+			portMap[nat.Port(portKey)] = []nat.PortBinding{
+				{HostIP: "0.0.0.0", HostPort: fmt.Sprintf("%d", hostPort)},
+			}
+		}
+		logging.Info("Adding custom ALB port range to optimized cluster",
+			"hostPorts", fmt.Sprintf("%d-%d", startPort, endPort),
+			"nodePorts", fmt.Sprintf("%d-%d", 30800, 30800+(endPort-startPort)))
+	}
+
+	serverNode.Ports = portMap
+	logging.Info("Added ALB port mappings to optimized cluster", "defaultPorts", "8080->30880, 8443->30443")
 
 	// Create minimal cluster configuration
 	// In container mode, check if KECS network is specified
