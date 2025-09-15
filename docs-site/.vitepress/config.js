@@ -30,26 +30,31 @@ export default defineConfig({
               text: 'Getting Started',
               items: [
                 { text: 'Introduction', link: '/guides/getting-started' },
+                { text: 'CLI Commands', link: '/guides/cli-commands' },
                 { text: 'Quick Start', link: '/guides/quick-start' }
               ]
             },
             {
-              text: 'Core Concepts',
+              text: 'Core Features',
               items: [
                 { text: 'Services', link: '/guides/services' },
                 { text: 'Task Definitions', link: '/guides/task-definitions' },
+                { text: 'ELBv2 Integration', link: '/guides/elbv2-integration' },
+                { text: 'TUI Interface', link: '/guides/tui-interface' }
               ]
             },
             {
               text: 'Operations',
               items: [
-                { text: 'Kubeconfig Management', link: '/guides/kubeconfig-management' }
+                { text: 'Kubeconfig Management', link: '/guides/kubeconfig-management' },
+                { text: 'Hot Reload Development', link: '/guides/hot-reload' }
               ]
             },
             {
               text: 'Integration',
               items: [
-                { text: 'LocalStack Integration', link: '/guides/localstack-integration' }
+                { text: 'LocalStack Integration', link: '/guides/localstack-integration' },
+                { text: 'Networking', link: '/guides/networking' }
               ]
             },
             {
@@ -62,7 +67,8 @@ export default defineConfig({
             {
               text: 'Reference',
               items: [
-                { text: 'Troubleshooting', link: '/guides/troubleshooting' }
+                { text: 'Troubleshooting', link: '/guides/troubleshooting' },
+                { text: 'Examples', link: '/guides/examples' }
               ]
             }
           ],
@@ -85,7 +91,6 @@ export default defineConfig({
               text: 'Deployment',
               items: [
                 { text: 'Local Development', link: '/deployment/local' },
-                { text: 'Kind Deployment', link: '/deployment/kind' },
                 { text: 'Production Deployment', link: '/deployment/production' },
                 { text: 'Configuration', link: '/deployment/configuration' }
               ]
@@ -191,7 +196,6 @@ export default defineConfig({
               text: 'デプロイメント',
               items: [
                 { text: 'ローカル開発', link: '/ja/deployment/local' },
-                { text: 'Kind デプロイメント', link: '/ja/deployment/kind' },
                 { text: '本番環境デプロイメント', link: '/ja/deployment/production' },
                 { text: '設定', link: '/ja/deployment/configuration' }
               ]

@@ -7,7 +7,7 @@ This guide covers setting up KECS for local development, including building from
 ## Prerequisites
 
 - Go 1.21 or later
-- Docker Desktop (for Kind integration)
+- Docker
 - Make
 - Git
 
@@ -289,6 +289,5 @@ rm -rf ~/.kecs/data/kecs.db
 
 ## Next Steps
 
-- [Kind Deployment](./kind) - Deploy to Kind clusters
 - [Testing Guide](/guides/integration-testing) - Write and run tests
 - [Contributing](/development/contributing) - Contribute to KECS
