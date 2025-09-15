@@ -312,10 +312,10 @@ func (m *Manager) deployLocalStack(ctx context.Context, instanceName string, cfg
 	return nil
 }
 
-// deployTraefik is deprecated and does nothing
+// deployTraefik deploys the global Traefik instance for ALB support
 func (m *Manager) deployTraefik(ctx context.Context, instanceName string, cfg *config.Config, apiPort int) error {
 	clusterName := fmt.Sprintf("kecs-%s", instanceName)
-	kubeconfig, err := m.k3dManager.GetKubeConfig(context.Background(), clusterName)
+	kubeconfig, err := m.k3dManager.GetKubeConfig(ctx, clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to get kubeconfig: %w", err)
 	}
