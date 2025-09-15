@@ -33,9 +33,10 @@ type k8sIntegration struct {
 	kubeClient    kubernetes.Interface
 	dynamicClient dynamic.Interface
 	ruleManager   *RuleManager
+	store         storage.ELBv2Store // Database storage for persistence
 
 	// In-memory storage for load balancers and target groups
-	// In production, this should be persisted
+	// This acts as a cache, with database as the source of truth
 	mu            sync.RWMutex
 	loadBalancers map[string]*LoadBalancer
 	targetGroups  map[string]*TargetGroup
@@ -50,6 +51,7 @@ func NewK8sIntegration(region, accountID string) *k8sIntegration {
 		accountID:     accountID,
 		kubeClient:    nil, // Will be set later when needed
 		dynamicClient: nil, // Will be set later when needed
+		store:         nil, // Will be set later when needed
 		loadBalancers: make(map[string]*LoadBalancer),
 		targetGroups:  make(map[string]*TargetGroup),
 		listeners:     make(map[string]*Listener),
@@ -65,6 +67,11 @@ func (i *k8sIntegration) SetKubernetesClients(kubeClient kubernetes.Interface, d
 	i.dynamicClient = dynamicClient
 	// RuleManager requires storage, which we don't have here
 	// It will be initialized separately if needed
+}
+
+// SetStorage sets the storage backend for persistence
+func (i *k8sIntegration) SetStorage(store storage.ELBv2Store) {
+	i.store = store
 }
 
 // CreateLoadBalancer creates a virtual load balancer and deploys Traefik
@@ -101,6 +108,35 @@ func (i *k8sIntegration) CreateLoadBalancer(ctx context.Context, name string, su
 	i.mu.Lock()
 	i.loadBalancers[arn] = lb
 	i.mu.Unlock()
+
+	// Save to database if available
+	if i.store != nil {
+		dbLB := &storage.ELBv2LoadBalancer{
+			ARN:            lb.Arn,
+			Name:           lb.Name,
+			DNSName:        lb.DNSName,
+			State:          lb.State,
+			Type:           lb.Type,
+			Scheme:         lb.Scheme,
+			VpcID:          lb.VpcId,
+			Subnets:        subnets,
+			SecurityGroups: securityGroups,
+			Region:         i.region,
+			AccountID:      i.accountID,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
+		}
+
+		// Add availability zones
+		for _, az := range lb.AvailabilityZones {
+			dbLB.AvailabilityZones = append(dbLB.AvailabilityZones, az.ZoneName)
+		}
+
+		if err := i.store.CreateLoadBalancer(ctx, dbLB); err != nil {
+			logging.Warn("Failed to save load balancer to database", "error", err, "arn", arn)
+			// Continue anyway - in-memory is still working
+		}
+	}
 
 	// Note: Traefik is now deployed globally, not per-LoadBalancer
 	// The global Traefik instance handles all ALB traffic based on Host headers
@@ -253,16 +289,42 @@ func (i *k8sIntegration) CreateListener(ctx context.Context, loadBalancerArn str
 	i.mu.RLock()
 	lb, exists := i.loadBalancers[loadBalancerArn]
 	if !exists {
-		// If not in memory, create a minimal entry for DNS name generation
 		i.mu.RUnlock()
-		i.mu.Lock()
-		lb = &LoadBalancer{
-			Arn:     loadBalancerArn,
-			Name:    lbName,
-			DNSName: fmt.Sprintf("%s-%s.%s.elb.amazonaws.com", lbName, generateID(), i.region),
+
+		// Try to get from database if available
+		if i.store != nil {
+			dbLB, err := i.store.GetLoadBalancer(ctx, loadBalancerArn)
+			if err == nil && dbLB != nil {
+				// Convert from storage type to our internal type
+				lb = &LoadBalancer{
+					Arn:     dbLB.ARN,
+					Name:    dbLB.Name,
+					DNSName: dbLB.DNSName,
+					State:   dbLB.State,
+					Type:    dbLB.Type,
+					Scheme:  dbLB.Scheme,
+					VpcId:   dbLB.VpcID,
+				}
+
+				// Cache it in memory
+				i.mu.Lock()
+				i.loadBalancers[loadBalancerArn] = lb
+				i.mu.Unlock()
+			}
 		}
-		i.loadBalancers[loadBalancerArn] = lb
-		i.mu.Unlock()
+
+		// If still not found, create a minimal entry for DNS name generation
+		if lb == nil {
+			i.mu.Lock()
+			lb = &LoadBalancer{
+				Arn:     loadBalancerArn,
+				Name:    lbName,
+				DNSName: fmt.Sprintf("%s-%s.%s.elb.amazonaws.com", lbName, generateID(), i.region),
+			}
+			i.loadBalancers[loadBalancerArn] = lb
+			i.mu.Unlock()
+		}
+
 		i.mu.RLock()
 	}
 
@@ -388,10 +450,48 @@ func (i *k8sIntegration) GetLoadBalancer(ctx context.Context, arn string) (*Load
 	logging.Debug("Getting virtual load balancer", "arn", arn)
 
 	i.mu.RLock()
-	defer i.mu.RUnlock()
-
 	lb, exists := i.loadBalancers[arn]
-	if !exists {
+	i.mu.RUnlock()
+
+	if !exists && i.store != nil {
+		// Try to get from database
+		dbLB, err := i.store.GetLoadBalancer(ctx, arn)
+		if err == nil && dbLB != nil {
+			// Convert from storage type to our internal type
+			lb = &LoadBalancer{
+				Arn:            dbLB.ARN,
+				Name:           dbLB.Name,
+				DNSName:        dbLB.DNSName,
+				State:          dbLB.State,
+				Type:           dbLB.Type,
+				Scheme:         dbLB.Scheme,
+				VpcId:          dbLB.VpcID,
+				SecurityGroups: dbLB.SecurityGroups,
+				CreatedTime:    dbLB.CreatedAt.Format(time.RFC3339),
+			}
+
+			// Convert availability zones
+			for idx, azName := range dbLB.AvailabilityZones {
+				var subnet string
+				if idx < len(dbLB.Subnets) {
+					subnet = dbLB.Subnets[idx]
+				}
+				lb.AvailabilityZones = append(lb.AvailabilityZones, AvailabilityZone{
+					ZoneName: azName,
+					SubnetId: subnet,
+				})
+			}
+
+			// Cache it in memory
+			i.mu.Lock()
+			i.loadBalancers[arn] = lb
+			i.mu.Unlock()
+
+			return lb, nil
+		}
+	}
+
+	if lb == nil {
 		return nil, fmt.Errorf("load balancer not found: %s", arn)
 	}
 
