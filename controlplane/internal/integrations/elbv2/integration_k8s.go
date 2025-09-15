@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -271,6 +273,33 @@ func (i *k8sIntegration) CreateListener(ctx context.Context, loadBalancerArn str
 	// Update Traefik configuration with new listener
 	if err := i.updateTraefikConfigForListener(ctx, lbName, arn, port, protocol, targetGroupName); err != nil {
 		return nil, fmt.Errorf("failed to update Traefik configuration: %w", err)
+	}
+
+	// Check if k3d port mapping exists for this listener
+	// Note: Port mappings should be pre-configured when creating k3d cluster
+	hostPort := calculateHostPort(port, lbName)
+	nodePort := getTraefikNodePort(port)
+	clusterName := getClusterNameFromEnvironment()
+
+	logging.Info("Checking k3d port mapping for ALB listener",
+		"listenerPort", port,
+		"hostPort", hostPort,
+		"nodePort", nodePort,
+		"albName", lbName)
+
+	// Try to add port mapping (will fail if not pre-configured in k3d)
+	if err := i.addK3dPortMapping(ctx, clusterName, hostPort, nodePort); err != nil {
+		// This is expected if port is not in pre-configured range
+		logging.Debug("k3d port mapping not available",
+			"error", err,
+			"hostPort", hostPort,
+			"nodePort", nodePort,
+			"note", "Port may not be in pre-configured range. Use kubectl port-forward if needed.")
+	} else {
+		logging.Info("ALB listener is accessible directly",
+			"url", fmt.Sprintf("http://localhost:%d", hostPort),
+			"albDNS", lb.DNSName,
+			"usage", fmt.Sprintf("curl -H 'Host: %s' http://localhost:%d/", lb.DNSName, hostPort))
 	}
 
 	// Store in memory with lock
@@ -1122,4 +1151,97 @@ func (i *k8sIntegration) SyncRulesToListener(ctx context.Context, storageInstanc
 
 	// Sync rules using the rule manager
 	return i.ruleManager.SyncRulesForListener(ctx, storageImpl, listenerArn, lbName, port)
+}
+
+// addK3dPortMapping adds a port mapping to the k3d cluster's load balancer
+func (i *k8sIntegration) addK3dPortMapping(ctx context.Context, clusterName string, hostPort, nodePort int32) error {
+	// Skip if running in container mode (k3d command not available)
+	if os.Getenv("KECS_CONTAINER_MODE") == "true" {
+		logging.Info("Running in container mode, k3d port mapping should be pre-configured",
+			"hostPort", hostPort,
+			"nodePort", nodePort,
+			"note", "Ensure k3d cluster was started with appropriate port mappings")
+		return nil
+	}
+
+	// Format: k3d node edit k3d-<cluster>-serverlb --port-add <hostPort>:<nodePort>
+	nodeName := fmt.Sprintf("k3d-%s-serverlb", clusterName)
+	portMapping := fmt.Sprintf("%d:%d", hostPort, nodePort)
+
+	logging.Info("Adding k3d port mapping for ALB listener",
+		"node", nodeName,
+		"mapping", portMapping)
+
+	cmd := exec.CommandContext(ctx, "k3d", "node", "edit", nodeName, "--port-add", portMapping)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		// Check if the error is because the port is already mapped
+		if strings.Contains(string(output), "already") || strings.Contains(string(output), "exists") {
+			logging.Info("Port mapping already exists",
+				"hostPort", hostPort,
+				"nodePort", nodePort)
+			return nil
+		}
+		return fmt.Errorf("failed to add k3d port mapping: %w, output: %s", err, string(output))
+	}
+
+	logging.Info("Successfully added k3d port mapping",
+		"hostPort", hostPort,
+		"nodePort", nodePort)
+	return nil
+}
+
+// calculateHostPort calculates the host port based on listener port and ALB name
+func calculateHostPort(listenerPort int32, lbName string) int32 {
+	// Default mapping for common ports
+	switch listenerPort {
+	case 80:
+		return 8080
+	case 443:
+		return 8443
+	case 8080:
+		// For alternative ALBs, use 8088
+		if !strings.Contains(lbName, "default") && !strings.Contains(lbName, "main") {
+			return 8088
+		}
+		return 8080
+	default:
+		// For custom ports, try to use 8000 + last two digits
+		// This provides a predictable mapping
+		base := int32(8000)
+		offset := listenerPort % 100
+		return base + offset
+	}
+}
+
+// getTraefikNodePort returns the Traefik NodePort for a given listener port
+func getTraefikNodePort(listenerPort int32) int32 {
+	// Standard port mappings
+	switch listenerPort {
+	case 80:
+		return 30880 // Standard HTTP
+	case 443:
+		return 30443 // Standard HTTPS
+	case 8080:
+		return 30880 // Alternative HTTP (same NodePort)
+	default:
+		// For custom ports, map to 30800 + offset
+		// This assumes ports 8000-8099 are mapped to NodePorts 30800-30899
+		if listenerPort >= 8000 && listenerPort <= 8099 {
+			return 30800 + (listenerPort - 8000)
+		}
+		// For other custom ports, use modulo to stay in range
+		return 30800 + (listenerPort % 100)
+	}
+}
+
+// getClusterNameFromEnvironment gets the k3d cluster name
+func getClusterNameFromEnvironment() string {
+	// Try to get from environment variable
+	if clusterName := os.Getenv("KECS_CLUSTER_NAME"); clusterName != "" {
+		return clusterName
+	}
+	// Default to "kecs-cluster"
+	return "kecs-cluster"
 }

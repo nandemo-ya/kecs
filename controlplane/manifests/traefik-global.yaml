@@ -1,0 +1,182 @@
+---
+# Global Traefik deployment for handling all ALB traffic
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traefik
+  namespace: kecs-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: traefik
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+      - endpoints
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+      - networking.k8s.io
+    resources:
+      - ingresses
+      - ingressclasses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+      - networking.k8s.io
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+  - apiGroups:
+      - traefik.io
+      - traefik.containo.us
+    resources:
+      - ingressroutes
+      - ingressroutetcps
+      - ingressrouteudps
+      - middlewares
+      - middlewaretcps
+      - serverstransports
+      - tlsoptions
+      - tlsstores
+      - traefikservices
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: traefik
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traefik
+subjects:
+  - kind: ServiceAccount
+    name: traefik
+    namespace: kecs-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-config
+  namespace: kecs-system
+data:
+  traefik.yaml: |
+    global:
+      checkNewVersion: false
+      sendAnonymousUsage: false
+    
+    api:
+      dashboard: true
+      debug: true
+    
+    entryPoints:
+      web:
+        address: ":80"
+      websecure:
+        address: ":443"
+    
+    providers:
+      kubernetescrd:
+        allowCrossNamespace: true
+      kubernetesingress:
+        allowEmptyServices: true
+    
+    log:
+      level: INFO
+    
+    accessLog: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik
+  namespace: kecs-system
+  labels:
+    app: traefik
+    kecs.io/component: elbv2-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traefik
+  template:
+    metadata:
+      labels:
+        app: traefik
+        kecs.io/component: elbv2-proxy
+    spec:
+      serviceAccountName: traefik
+      containers:
+      - name: traefik
+        image: traefik:v3.0
+        args:
+          - --configfile=/config/traefik.yaml
+        ports:
+        - name: web
+          containerPort: 80
+          protocol: TCP
+        - name: websecure
+          containerPort: 443
+          protocol: TCP
+        - name: admin
+          containerPort: 8080
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /config
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: config
+        configMap:
+          name: traefik-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: kecs-system
+  labels:
+    app: traefik
+    kecs.io/component: elbv2-proxy
+spec:
+  type: LoadBalancer
+  selector:
+    app: traefik
+  ports:
+  - name: web
+    port: 80
+    targetPort: 80
+    protocol: TCP
+    nodePort: 30880  # Fixed NodePort for external access
+  - name: websecure
+    port: 443
+    targetPort: 443
+    protocol: TCP
+    nodePort: 30443  # Fixed NodePort for HTTPS
+  - name: admin
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+    nodePort: 30808  # Fixed NodePort for Traefik dashboard
