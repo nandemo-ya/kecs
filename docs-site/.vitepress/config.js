@@ -91,7 +91,6 @@ export default defineConfig({
               text: 'Deployment',
               items: [
                 { text: 'Local Development', link: '/deployment/local' },
-                { text: 'Kind Deployment', link: '/deployment/kind' },
                 { text: 'Production Deployment', link: '/deployment/production' },
                 { text: 'Configuration', link: '/deployment/configuration' }
               ]
@@ -197,7 +196,6 @@ export default defineConfig({
               text: 'デプロイメント',
               items: [
                 { text: 'ローカル開発', link: '/ja/deployment/local' },
-                { text: 'Kind デプロイメント', link: '/ja/deployment/kind' },
                 { text: '本番環境デプロイメント', link: '/ja/deployment/production' },
                 { text: '設定', link: '/ja/deployment/configuration' }
               ]
