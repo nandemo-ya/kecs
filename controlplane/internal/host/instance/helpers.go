@@ -66,6 +66,8 @@ func (m *Manager) createCluster(ctx context.Context, instanceName string, cfg *c
 	portMappings := map[int32]int32{
 		int32(opts.ApiPort):   apiNodePort,   // Map host API port to NodePort for ECS API
 		int32(opts.AdminPort): adminNodePort, // Map host Admin port to NodePort for Admin API
+		8080:                  30880,         // HTTP (ALB port 80 -> Host 8080 -> NodePort 30880)
+		8443:                  30443,         // HTTPS (ALB port 443 -> Host 8443 -> NodePort 30443)
 	}
 
 	// Set up data directory for direct hostPath mounting
