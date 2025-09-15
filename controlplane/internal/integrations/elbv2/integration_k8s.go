@@ -12,6 +12,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -43,7 +44,7 @@ type k8sIntegration struct {
 }
 
 // NewK8sIntegration creates a new Kubernetes-based ELBv2 integration
-func NewK8sIntegration(region, accountID string) Integration {
+func NewK8sIntegration(region, accountID string) *k8sIntegration {
 	integration := &k8sIntegration{
 		region:        region,
 		accountID:     accountID,
@@ -56,6 +57,14 @@ func NewK8sIntegration(region, accountID string) Integration {
 	}
 	// RuleManager will be initialized when dynamicClient is set
 	return integration
+}
+
+// SetKubernetesClients sets the Kubernetes clients for the integration
+func (i *k8sIntegration) SetKubernetesClients(kubeClient kubernetes.Interface, dynamicClient dynamic.Interface) {
+	i.kubeClient = kubeClient
+	i.dynamicClient = dynamicClient
+	// RuleManager requires storage, which we don't have here
+	// It will be initialized separately if needed
 }
 
 // CreateLoadBalancer creates a virtual load balancer and deploys Traefik
@@ -232,22 +241,47 @@ func (i *k8sIntegration) DeregisterTargets(ctx context.Context, targetGroupArn s
 func (i *k8sIntegration) CreateListener(ctx context.Context, loadBalancerArn string, port int32, protocol string, targetGroupArn string) (*Listener, error) {
 	logging.Debug("Creating listener for load balancer", "port", port, "loadBalancerArn", loadBalancerArn)
 
+	// Extract load balancer name from ARN
+	// ARN format: arn:aws:elasticloadbalancing:region:account:loadbalancer/app/name/id
+	lbName := ""
+	if parts := strings.Split(loadBalancerArn, "/"); len(parts) >= 3 {
+		lbName = parts[len(parts)-2]
+	} else {
+		return nil, fmt.Errorf("invalid load balancer ARN format: %s", loadBalancerArn)
+	}
+
 	i.mu.RLock()
 	lb, exists := i.loadBalancers[loadBalancerArn]
 	if !exists {
+		// If not in memory, create a minimal entry for DNS name generation
 		i.mu.RUnlock()
-		return nil, fmt.Errorf("load balancer not found: %s", loadBalancerArn)
+		i.mu.Lock()
+		lb = &LoadBalancer{
+			Arn:     loadBalancerArn,
+			Name:    lbName,
+			DNSName: fmt.Sprintf("%s-%s.%s.elb.amazonaws.com", lbName, generateID(), i.region),
+		}
+		i.loadBalancers[loadBalancerArn] = lb
+		i.mu.Unlock()
+		i.mu.RLock()
 	}
-	lbName := lb.Name
 
-	tg, exists := i.targetGroups[targetGroupArn]
-	if !exists && targetGroupArn != "" {
-		i.mu.RUnlock()
-		return nil, fmt.Errorf("target group not found: %s", targetGroupArn)
-	}
+	// Extract target group name from ARN if provided
 	var targetGroupName string
-	if tg != nil {
-		targetGroupName = tg.Name
+	if targetGroupArn != "" {
+		tg, exists := i.targetGroups[targetGroupArn]
+		if !exists {
+			// Extract target group name from ARN
+			// ARN format: arn:aws:elasticloadbalancing:region:account:targetgroup/name/id
+			if parts := strings.Split(targetGroupArn, "/"); len(parts) >= 2 {
+				targetGroupName = parts[len(parts)-2]
+			} else {
+				i.mu.RUnlock()
+				return nil, fmt.Errorf("invalid target group ARN format: %s", targetGroupArn)
+			}
+		} else {
+			targetGroupName = tg.Name
+		}
 	}
 	i.mu.RUnlock()
 
@@ -327,16 +361,22 @@ func (i *k8sIntegration) DeleteListener(ctx context.Context, arn string) error {
 	var lbName string
 	if lbExists {
 		lbName = lb.Name
+	} else {
+		// Extract load balancer name from ARN if not in memory
+		// ARN format: arn:aws:elasticloadbalancing:region:account:loadbalancer/app/name/id
+		if parts := strings.Split(listener.LoadBalancerArn, "/"); len(parts) >= 3 {
+			lbName = parts[len(parts)-2]
+		}
 	}
 
 	delete(i.listeners, arn)
 	i.mu.Unlock()
 
-	// Delete IngressRoute CRD if we have the necessary info
-	if lbName != "" && i.dynamicClient != nil {
-		if err := i.deleteIngressRoute(ctx, lbName, listener.Port); err != nil {
-			logging.Debug("Failed to delete IngressRoute for listener", "arn", arn, "error", err)
-			// Don't fail the operation if IngressRoute deletion fails
+	// Delete Ingress if we have the necessary info
+	if lbName != "" && i.kubeClient != nil {
+		if err := i.deleteGlobalIngress(ctx, lbName, listener.Port); err != nil {
+			logging.Debug("Failed to delete Ingress for listener", "arn", arn, "error", err)
+			// Don't fail the operation if Ingress deletion fails
 		}
 	}
 
@@ -841,36 +881,26 @@ func (i *k8sIntegration) deployTargetGroupResources(ctx context.Context, tgName,
 	return nil
 }
 
-// updateTraefikConfigForListener creates IngressRoute for global Traefik with Host header routing
+// updateTraefikConfigForListener creates Ingress for global Traefik with Host header routing
 func (i *k8sIntegration) updateTraefikConfigForListener(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
-	if i.dynamicClient == nil {
-		logging.Debug("No dynamicClient available, skipping IngressRoute creation for listener", "listenerArn", listenerArn)
+	if i.kubeClient == nil {
+		logging.Debug("No kubeClient available, skipping Ingress creation for listener", "listenerArn", listenerArn)
 		return nil
 	}
 
-	// Get the load balancer to retrieve its DNS name
-	i.mu.RLock()
-	var lbDNSName string
-	for _, lb := range i.loadBalancers {
-		if lb.Name == lbName {
-			lbDNSName = lb.DNSName
-			break
-		}
-	}
-	i.mu.RUnlock()
+	// Generate a DNS name for the load balancer
+	// Since we're using Host header routing, the actual DNS name format is important
+	// Format: <lb-name>-<hash>.region.elb.amazonaws.com
+	lbDNSName := fmt.Sprintf("%s-%s.%s.elb.amazonaws.com", lbName, generateID()[:8], i.region)
 
-	if lbDNSName == "" {
-		return fmt.Errorf("could not find DNS name for load balancer: %s", lbName)
-	}
-
-	// Create IngressRoute for the global Traefik instance with Host header routing
+	// Create Ingress for the global Traefik instance with Host header routing
 	if targetGroupName != "" {
-		if err := i.createGlobalIngressRoute(ctx, lbName, lbDNSName, listenerArn, port, protocol, targetGroupName); err != nil {
-			return fmt.Errorf("failed to create IngressRoute for global Traefik: %w", err)
+		if err := i.createGlobalIngress(ctx, lbName, lbDNSName, listenerArn, port, protocol, targetGroupName); err != nil {
+			return fmt.Errorf("failed to create Ingress for global Traefik: %w", err)
 		}
 	}
 
-	logging.Debug("Created IngressRoute for global Traefik", "lbName", lbName, "host", lbDNSName, "port", port)
+	logging.Debug("Created Ingress for global Traefik", "lbName", lbName, "host", lbDNSName, "port", port)
 	return nil
 }
 
@@ -976,62 +1006,61 @@ func (i *k8sIntegration) deleteIngressRoute(ctx context.Context, lbName string, 
 	return nil
 }
 
-// createGlobalIngressRoute creates a Traefik IngressRoute for the global Traefik instance
+// createGlobalIngress creates a standard Kubernetes Ingress for the global Traefik instance
 // It uses Host header-based routing to distinguish between different ALBs
-func (i *k8sIntegration) createGlobalIngressRoute(ctx context.Context, lbName, lbDNSName, listenerArn string, port int32, protocol, targetGroupName string) error {
-	if i.dynamicClient == nil {
-		logging.Debug("No dynamicClient available, skipping global IngressRoute creation")
+func (i *k8sIntegration) createGlobalIngress(ctx context.Context, lbName, lbDNSName, listenerArn string, port int32, protocol, targetGroupName string) error {
+	if i.kubeClient == nil {
+		logging.Debug("No kubeClient available, skipping global Ingress creation")
 		return nil
 	}
 
 	namespace := "kecs-system"
-	// Generate a unique name for this ALB's IngressRoute
-	ingressRouteName := fmt.Sprintf("alb-%s-port-%d", sanitizeName(lbName), port)
+	// Generate a unique name for this ALB's Ingress
+	ingressName := fmt.Sprintf("alb-%s-port-%d", sanitizeName(lbName), port)
 
-	// Determine the entry point based on port
-	var entryPoint string
-	switch port {
-	case 80:
-		entryPoint = "web"
-	case 443:
-		entryPoint = "websecure"
-	default:
-		// For other ports, we'll need to ensure the global Traefik has this port configured
-		entryPoint = fmt.Sprintf("port-%d", port)
+	// Create path type for Ingress
+	pathType := networkingv1.PathTypePrefix
+
+	// Create the backend service port
+	backendPort := networkingv1.ServiceBackendPort{
+		Number: port,
 	}
 
-	// Create the IngressRoute unstructured object with Host header matching
-	ingressRoute := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "traefik.io/v1alpha1",
-			"kind":       "IngressRoute",
-			"metadata": map[string]interface{}{
-				"name":      ingressRouteName,
-				"namespace": namespace,
-				"annotations": map[string]interface{}{
-					"kecs.io/elbv2-listener-arn":  listenerArn,
-					"kecs.io/elbv2-load-balancer": lbName,
-					"kecs.io/elbv2-target-group":  targetGroupName,
-					"kecs.io/elbv2-dns-name":      lbDNSName,
-				},
-				"labels": map[string]interface{}{
-					"kecs.io/elbv2-load-balancer": lbName,
-					"kecs.io/component":           "elbv2-listener",
-					"kecs.io/traefik-scope":       "global",
-				},
+	// Create the Ingress object
+	ingress := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ingressName,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"kecs.io/elbv2-listener-arn":  listenerArn,
+				"kecs.io/elbv2-load-balancer": lbName,
+				"kecs.io/elbv2-target-group":  targetGroupName,
+				"kecs.io/elbv2-dns-name":      lbDNSName,
 			},
-			"spec": map[string]interface{}{
-				"entryPoints": []string{entryPoint},
-				"routes": []interface{}{
-					map[string]interface{}{
-						// Match based on Host header for this specific ALB
-						"match":    fmt.Sprintf("Host(`%s`) && PathPrefix(`/`)", lbDNSName),
-						"kind":     "Rule",
-						"priority": 100, // Higher priority for host-specific rules
-						"services": []interface{}{
-							map[string]interface{}{
-								"name": fmt.Sprintf("tg-%s", targetGroupName),
-								"port": port,
+			Labels: map[string]string{
+				"kecs.io/elbv2-load-balancer": lbName,
+				"kecs.io/component":           "elbv2-listener",
+				"kecs.io/traefik-scope":       "global",
+			},
+		},
+		Spec: networkingv1.IngressSpec{
+			Rules: []networkingv1.IngressRule{
+				{
+					// Use Host header to route to this specific ALB
+					Host: lbDNSName,
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									Path:     "/",
+									PathType: &pathType,
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: fmt.Sprintf("tg-%s", targetGroupName),
+											Port: backendPort,
+										},
+									},
+								},
 							},
 						},
 					},
@@ -1040,32 +1069,45 @@ func (i *k8sIntegration) createGlobalIngressRoute(ctx context.Context, lbName, l
 		},
 	}
 
-	// Define the GVR for IngressRoute
-	gvr := schema.GroupVersionResource{
-		Group:    "traefik.io",
-		Version:  "v1alpha1",
-		Resource: "ingressroutes",
-	}
-
-	// Check if IngressRoute already exists
-	existing, err := i.dynamicClient.Resource(gvr).Namespace(namespace).Get(ctx, ingressRouteName, metav1.GetOptions{})
+	// Check if Ingress already exists
+	existing, err := i.kubeClient.NetworkingV1().Ingresses(namespace).Get(ctx, ingressName, metav1.GetOptions{})
 	if err == nil {
-		// Update existing IngressRoute
-		existing.Object["spec"] = ingressRoute.Object["spec"]
-		_, err = i.dynamicClient.Resource(gvr).Namespace(namespace).Update(ctx, existing, metav1.UpdateOptions{})
+		// Update existing Ingress
+		existing.Spec = ingress.Spec
+		_, err = i.kubeClient.NetworkingV1().Ingresses(namespace).Update(ctx, existing, metav1.UpdateOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to update global IngressRoute: %w", err)
+			return fmt.Errorf("failed to update global Ingress: %w", err)
 		}
-		logging.Debug("Updated global IngressRoute", "name", ingressRouteName, "host", lbDNSName)
+		logging.Debug("Updated global Ingress", "name", ingressName, "host", lbDNSName)
 	} else {
-		// Create new IngressRoute
-		_, err = i.dynamicClient.Resource(gvr).Namespace(namespace).Create(ctx, ingressRoute, metav1.CreateOptions{})
+		// Create new Ingress
+		_, err = i.kubeClient.NetworkingV1().Ingresses(namespace).Create(ctx, ingress, metav1.CreateOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to create global IngressRoute: %w", err)
+			return fmt.Errorf("failed to create global Ingress: %w", err)
 		}
-		logging.Debug("Created global IngressRoute", "name", ingressRouteName, "host", lbDNSName)
+		logging.Debug("Created global Ingress", "name", ingressName, "host", lbDNSName)
 	}
 
+	return nil
+}
+
+// deleteGlobalIngress deletes a standard Kubernetes Ingress
+func (i *k8sIntegration) deleteGlobalIngress(ctx context.Context, lbName string, port int32) error {
+	if i.kubeClient == nil {
+		logging.Debug("No kubeClient available, skipping global Ingress deletion")
+		return nil
+	}
+
+	namespace := "kecs-system"
+	ingressName := fmt.Sprintf("alb-%s-port-%d", sanitizeName(lbName), port)
+
+	// Delete the Ingress
+	err := i.kubeClient.NetworkingV1().Ingresses(namespace).Delete(ctx, ingressName, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete global Ingress: %w", err)
+	}
+
+	logging.Debug("Deleted global Ingress", "name", ingressName)
 	return nil
 }
 
