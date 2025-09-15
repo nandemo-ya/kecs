@@ -234,7 +234,7 @@ func (m *Manager) Start(ctx context.Context, opts *StartOptions) error {
 
 	// Step 3: Deploy components in parallel
 	var wg sync.WaitGroup
-	errChan := make(chan error, 4) // Increased channel size for Vector
+	errChan := make(chan error, 5) // Increased channel size for Vector and Traefik
 
 	// Deploy Control Plane
 	wg.Add(1)
@@ -247,6 +247,19 @@ func (m *Manager) Start(ctx context.Context, opts *StartOptions) error {
 			return
 		}
 		m.updateStatus(opts.InstanceName, "Deploying control plane", "done")
+	}()
+
+	// Deploy Traefik for ALB support
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		m.updateStatus(opts.InstanceName, "Deploying Traefik", "running")
+		if err := m.deployTraefik(ctx, opts.InstanceName, cfg, opts.ApiPort); err != nil {
+			m.updateStatus(opts.InstanceName, "Deploying Traefik", "failed", err.Error())
+			errChan <- fmt.Errorf("failed to deploy Traefik: %w", err)
+			return
+		}
+		m.updateStatus(opts.InstanceName, "Deploying Traefik", "done")
 	}()
 
 	// Deploy LocalStack if enabled
@@ -599,7 +612,7 @@ func (m *Manager) restartInstance(ctx context.Context, opts *StartOptions) error
 
 	// Step 4: Deploy components in parallel
 	var wg sync.WaitGroup
-	errChan := make(chan error, 4)
+	errChan := make(chan error, 5) // Increased for Traefik
 
 	// Deploy Control Plane
 	wg.Add(1)
@@ -612,6 +625,19 @@ func (m *Manager) restartInstance(ctx context.Context, opts *StartOptions) error
 			return
 		}
 		m.updateStatus(opts.InstanceName, "Deploying control plane", "done")
+	}()
+
+	// Deploy Traefik for ALB support
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		m.updateStatus(opts.InstanceName, "Deploying Traefik", "running")
+		if err := m.deployTraefik(ctx, opts.InstanceName, cfg, opts.ApiPort); err != nil {
+			m.updateStatus(opts.InstanceName, "Deploying Traefik", "failed", err.Error())
+			errChan <- fmt.Errorf("failed to deploy Traefik: %w", err)
+			return
+		}
+		m.updateStatus(opts.InstanceName, "Deploying Traefik", "done")
 	}()
 
 	// Deploy LocalStack if enabled
