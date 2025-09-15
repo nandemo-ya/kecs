@@ -415,6 +415,10 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		elbv2Integration := elbv2.NewK8sIntegration(s.region, s.accountID)
 		// Set the Kubernetes clients
 		elbv2Integration.SetKubernetesClients(kubeClient, nil)
+		// Set storage for persistence (if available)
+		if storage != nil {
+			elbv2Integration.SetStorage(storage.ELBv2Store())
+		}
 		s.elbv2Integration = elbv2Integration
 
 		// Initialize ELBv2 API and router with wrapper for form data support
