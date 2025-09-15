@@ -26,12 +26,11 @@ kecs start [flags]
 **Flags:**
 - `--instance string`: Instance name (default: auto-generated)
 - `--api-port int`: API port for ECS/ELBv2 APIs (default: 5373)
-- `--admin-port int`: Admin port for health/metrics (default: 8081)
-- `--localstack-port int`: LocalStack port (default: 4566)
-- `--no-localstack`: Disable LocalStack integration
-- `--no-traefik`: Disable Traefik gateway
-- `--image string`: KECS Docker image to use
-- `--k3d-args string`: Additional arguments for k3d cluster create
+- `--admin-port int`: Admin port for health/metrics (default: 5374)
+- `--data-dir string`: Data directory (default: ~/.kecs/data)
+- `--config string`: Configuration file path
+- `--additional-localstack-services string`: Additional LocalStack services (comma-separated)
+- `--timeout duration`: Timeout for cluster creation (default: 10m)
 
 **Examples:**
 ```bash
@@ -57,20 +56,15 @@ kecs stop [flags]
 ```
 
 **Flags:**
-- `--instance string`: Instance name to stop
-- `--all`: Stop all running instances
-- `--force`: Force stop without confirmation
+- `--instance string`: Instance name to stop (required)
 
 **Examples:**
 ```bash
-# Stop with interactive selection
-kecs stop
-
 # Stop specific instance
 kecs stop --instance dev
 
-# Stop all instances
-kecs stop --all
+# Stop another instance
+kecs stop --instance staging
 ```
 
 ### kecs restart

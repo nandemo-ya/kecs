@@ -76,7 +76,7 @@ KECS (Kubernetes-based ECS Compatible Service) provides a complete local Amazon 
 - Auto-scaling capabilities
 
 ### 🌐 Unified AWS Experience
-- Single endpoint for all AWS services (port 4566)
+- Single endpoint for all AWS services (port 5373)
 - Built-in LocalStack integration
 - Automatic IAM role creation (`ecsTaskExecutionRole`)
 - Seamless AWS CLI/SDK compatibility

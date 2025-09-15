@@ -63,7 +63,7 @@ kecs start
 # Start with a specific instance name
 kecs start --instance dev
 
-# Start with custom ports
+# Start with custom ports  
 kecs start --instance staging --api-port 8080 --admin-port 8081
 ```
 
@@ -175,8 +175,8 @@ kecs stop --instance dev
 # Stop with interactive selection
 kecs stop
 
-# Stop all instances
-kecs stop --all
+# Stop specific instance
+kecs stop --instance myinstance
 ```
 
 ## Advanced Configuration
@@ -249,7 +249,7 @@ kecs tui
 lsof -i :5373
 
 # Use different ports
-kecs start --api-port 8080 --localstack-port 5374
+kecs start --api-port 8080 --admin-port 8081
 ```
 
 ### k3d Issues
