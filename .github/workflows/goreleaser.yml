@@ -36,9 +36,9 @@ jobs:
           # For now, we'll build on macOS runners for macOS binaries
       
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
+          version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -61,17 +61,20 @@ jobs:
 
       - name: Build macOS binaries
         run: |
+          # Navigate to controlplane directory where go.mod exists
+          cd controlplane
+          
           # Build for macOS amd64
           CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build \
             -ldflags "-s -w -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version=${{ github.ref_name }}" \
-            -o kecs-darwin-amd64 \
-            ./controlplane/cmd/controlplane
+            -o ../kecs-darwin-amd64 \
+            ./cmd/controlplane
           
           # Build for macOS arm64
           CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build \
             -ldflags "-s -w -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version=${{ github.ref_name }}" \
-            -o kecs-darwin-arm64 \
-            ./controlplane/cmd/controlplane
+            -o ../kecs-darwin-arm64 \
+            ./cmd/controlplane
           
           # Create archives
           tar czf kecs_${{ github.ref_name }}_Darwin_x86_64.tar.gz kecs-darwin-amd64 README.md LICENSE
