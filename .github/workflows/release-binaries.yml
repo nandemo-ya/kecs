@@ -64,6 +64,9 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
+          # Navigate to controlplane directory where go.mod exists
+          cd controlplane
+          
           # Set cross-compilation environment for Linux ARM64
           if [ "${{ matrix.goos }}" = "linux" ] && [ "${{ matrix.goarch }}" = "arm64" ]; then
             export CC=aarch64-linux-gnu-gcc
@@ -73,8 +76,8 @@ jobs:
           # Build the binary
           go build \
             -ldflags "-s -w -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version=${{ steps.version.outputs.version }}" \
-            -o kecs-${{ matrix.goos }}-${{ matrix.goarch }} \
-            ./controlplane/cmd/controlplane
+            -o ../kecs-${{ matrix.goos }}-${{ matrix.goarch }} \
+            ./cmd/controlplane
 
       - name: Create archive
         run: |
