@@ -146,6 +146,7 @@ release:
   prerelease: auto
   mode: keep-existing
   
+# Homebrew formula update
 brews:
   - name: kecs
     repository:
@@ -153,29 +154,29 @@ brews:
       name: homebrew-kecs
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    
+
     # Formula template
     commit_author:
       name: kecs-bot
       email: kecs-bot@nandemo-ya.github.io
-    
+
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-    
+
     homepage: "https://github.com/nandemo-ya/kecs"
     description: "Kubernetes-based ECS Compatible Service - Run ECS workloads on Kubernetes"
     license: "Apache-2.0"
-    
+
     # Dependencies
     dependencies:
       - name: docker
         type: optional
       - name: kubectl
         type: optional
-    
+
     # Installation test
     test: |
       system "#{bin}/kecs", "version"
-    
+
     # Caveats for users
     caveats: |
       KECS requires a Kubernetes cluster to run workloads.
@@ -183,11 +184,11 @@ brews:
         - Docker Desktop with Kubernetes enabled
         - k3d: brew install k3d
         - kind: brew install kind
-      
+
       Quick start:
         kecs start  # Start KECS in a container
         kecs status # Check status
-      
+
       For more information:
         https://github.com/nandemo-ya/kecs
 

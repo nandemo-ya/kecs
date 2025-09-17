@@ -10,8 +10,9 @@ permissions:
   packages: write
 
 jobs:
+  # Single job using GoReleaser for all platforms
   goreleaser:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest  # Use macOS for CGO support with DuckDB
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,17 +24,8 @@ jobs:
         with:
           go-version: '1.25'
 
-      # Install cross-compilation tools
-      - name: Install cross-compilation tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            gcc-x86-64-linux-gnu g++-x86-64-linux-gnu \
-            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          
-          # Install osxcross for macOS cross-compilation
-          # This is complex and typically done in a Docker container
-          # For now, we'll build on macOS runners for macOS binaries
+      # Note: GoReleaser will handle cross-compilation automatically
+      # For Linux builds, it will use CGO_ENABLED=0 or Docker if available
       
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
@@ -45,102 +37,5 @@ jobs:
           # Token for updating homebrew-kecs repository
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
 
-  # Build macOS binaries on macOS runner
-  # Required for CGO dependencies like DuckDB
-  goreleaser-darwin:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-
-      - name: Build macOS binaries
-        run: |
-          # Navigate to controlplane directory where go.mod exists
-          cd controlplane
-          
-          # Build for macOS amd64 with CGO enabled
-          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build \
-            -ldflags "-s -w -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version=${{ github.ref_name }}" \
-            -o ../kecs-darwin-amd64 \
-            ./cmd/controlplane
-
-          # Build for macOS arm64 with CGO enabled
-          CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build \
-            -ldflags "-s -w -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version=${{ github.ref_name }}" \
-            -o ../kecs-darwin-arm64 \
-            ./cmd/controlplane
-          
-          # Go back to root directory for archives
-          cd ..
-
-          # Create archives
-          tar czf kecs_${{ github.ref_name }}_Darwin_x86_64.tar.gz kecs-darwin-amd64 README.md LICENSE
-          tar czf kecs_${{ github.ref_name }}_Darwin_arm64.tar.gz kecs-darwin-arm64 README.md LICENSE
-          
-          # Generate checksums
-          shasum -a 256 kecs_*.tar.gz > checksums-darwin.txt
-
-      - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: darwin-binaries
-          path: |
-            kecs_*.tar.gz
-            checksums-darwin.txt
-
-  # Combine all artifacts and create release
-  create-release:
-    needs: [goreleaser, goreleaser-darwin]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
-
-      - name: Merge checksums
-        run: |
-          cat ./artifacts/*/checksums*.txt > checksums.txt
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            ./artifacts/**/*.tar.gz
-            ./artifacts/**/*.zip
-            checksums.txt
-          draft: false
-          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
-          generate_release_notes: true
-          body: |
-            ## Installation
-            
-            ### Homebrew (macOS/Linux)
-            ```bash
-            brew tap nandemo-ya/kecs
-            brew install kecs
-            ```
-            
-            ### Direct Download
-            Download the appropriate binary for your platform from the assets below.
-            
-            ### Docker
-            ```bash
-            docker pull ghcr.io/nandemo-ya/kecs:${{ github.ref_name }}
-            ```
-            
-            ## What's Changed
-            
-            Auto-generated release notes are below.
+      # Note: The separate macOS build job and create-release job are no longer needed
+      # GoReleaser handles all platforms and creates the release automatically
