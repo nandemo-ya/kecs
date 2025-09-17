@@ -3,7 +3,7 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
+    tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ main ]
 
@@ -15,6 +15,8 @@ jobs:
   test:
     name: Test
     runs-on: [self-hosted, linux, medium]
+    # Skip tests on tag pushes
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     defaults:
       run:
         working-directory: ./controlplane
@@ -39,10 +41,15 @@ jobs:
 
   build-and-push:
     name: Build and Push Docker image
-    needs: test
+    needs: [test]
     runs-on: [self-hosted, linux, medium]
-    # Only run on main branch pushes and tags, not on PRs
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    # Run on main branch pushes and tags, not on PRs
+    # For tags, test job is skipped so we use always() to ensure this runs
+    if: |
+      always() && 
+      github.event_name == 'push' && 
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
+      !contains(needs.test.result, 'failure')
     permissions:
       contents: read
       packages: write
@@ -58,25 +65,66 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Get Git tag
-        id: git_tag
-        run: echo "TAG=$(git describe --tags --always)" >> $GITHUB_OUTPUT
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./controlplane
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.git_tag.outputs.TAG }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          labels: |
-            org.opencontainers.image.title=${{ github.repository }}
-            org.opencontainers.image.description=Kubernetes-based ECS Compatible Service
-            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.version=${{ steps.git_tag.outputs.TAG }}
-            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
-            org.opencontainers.image.revision=${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    # Only run on tag pushes
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          generate_release_notes: true
+          body: |
+            ## Docker Image
+            
+            ```bash
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            ```
+            
+            ## Installation
+            
+            ### Homebrew (macOS/Linux)
+            ```bash
+            brew tap nandemo-ya/kecs
+            brew install kecs
+            ```
+            
+            ### Direct Download
+            Download the appropriate binary for your platform from the release assets.
+            
+            ## What's Changed
+            
+            Auto-generated release notes are below.
