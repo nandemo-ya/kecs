@@ -24,8 +24,9 @@ jobs:
         with:
           go-version: '1.25'
 
-      # Note: GoReleaser will handle cross-compilation automatically
-      # For Linux builds, it will use CGO_ENABLED=0 or Docker if available
+      # Linux builds will use CGO_ENABLED=0 for cross-compilation
+      # Note: This means Linux builds won't have DuckDB support
+      # Alternative: Use Docker or separate Linux runners for full CGO support
       
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6

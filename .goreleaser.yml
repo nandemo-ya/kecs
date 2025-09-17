@@ -36,18 +36,15 @@ builds:
           - CC=oa64-clang
           - CXX=oa64-clang++
       # Linux specific build settings
+      # CGO_ENABLED=0 for cross-compilation from macOS
       - goos: linux
         goarch: amd64
         env:
-          - CGO_ENABLED=1
-          - CC=x86_64-linux-gnu-gcc
-          - CXX=x86_64-linux-gnu-g++
+          - CGO_ENABLED=0
       - goos: linux
         goarch: arm64
         env:
-          - CGO_ENABLED=1
-          - CC=aarch64-linux-gnu-gcc
-          - CXX=aarch64-linux-gnu-g++
+          - CGO_ENABLED=0
     ldflags:
       - -s -w
       - -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version={{.Version}}
