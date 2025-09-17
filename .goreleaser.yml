@@ -5,8 +5,8 @@ version: 2
 
 before:
   hooks:
-    - cd controlplane && go mod tidy
-    - cd controlplane && go mod download
+    - sh -c "cd controlplane && go mod tidy"
+    - sh -c "cd controlplane && go mod download"
 
 builds:
   - id: kecs
