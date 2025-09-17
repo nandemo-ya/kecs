@@ -65,16 +65,17 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get Git describe
+        id: git_describe
+        run: echo "GIT_DESCRIBE=$(git describe --tags --always)" >> $GITHUB_OUTPUT
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha
+            type=raw,value=${{ steps.git_describe.outputs.GIT_DESCRIBE }}
+            type=raw,value=latest
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
