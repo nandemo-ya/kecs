@@ -46,6 +46,7 @@ jobs:
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
 
   # Build macOS binaries on macOS runner
+  # Required for CGO dependencies like DuckDB
   goreleaser-darwin:
     runs-on: macos-latest
     steps:
@@ -64,18 +65,21 @@ jobs:
           # Navigate to controlplane directory where go.mod exists
           cd controlplane
           
-          # Build for macOS amd64
+          # Build for macOS amd64 with CGO enabled
           CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build \
             -ldflags "-s -w -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version=${{ github.ref_name }}" \
             -o ../kecs-darwin-amd64 \
             ./cmd/controlplane
-          
-          # Build for macOS arm64
+
+          # Build for macOS arm64 with CGO enabled
           CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build \
             -ldflags "-s -w -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version=${{ github.ref_name }}" \
             -o ../kecs-darwin-arm64 \
             ./cmd/controlplane
           
+          # Go back to root directory for archives
+          cd ..
+
           # Create archives
           tar czf kecs_${{ github.ref_name }}_Darwin_x86_64.tar.gz kecs-darwin-amd64 README.md LICENSE
           tar czf kecs_${{ github.ref_name }}_Darwin_arm64.tar.gz kecs-darwin-arm64 README.md LICENSE
