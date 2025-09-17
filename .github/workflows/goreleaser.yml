@@ -12,7 +12,7 @@ permissions:
 jobs:
   # Single job using GoReleaser for all platforms
   goreleaser:
-    runs-on: macos-latest  # Use macOS for CGO support with DuckDB
+    runs-on: ubuntu-latest  # CGO not needed for kecs CLI
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,9 +24,8 @@ jobs:
         with:
           go-version: '1.25'
 
-      # Linux builds will use CGO_ENABLED=0 for cross-compilation
-      # Note: This means Linux builds won't have DuckDB support
-      # Alternative: Use Docker or separate Linux runners for full CGO support
+      # All builds use CGO_ENABLED=0 since kecs CLI doesn't need DuckDB
+      # DuckDB is only needed in the controlplane container, which is built separately
       
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6

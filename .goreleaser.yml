@@ -13,7 +13,7 @@ builds:
     main: ./controlplane/cmd/controlplane
     binary: kecs
     env:
-      - CGO_ENABLED=1
+      - CGO_ENABLED=0  # kecs CLI doesn't need DuckDB (only controlplane in container needs it)
     goos:
       - darwin
       - linux
@@ -26,15 +26,11 @@ builds:
       - goos: darwin
         goarch: amd64
         env:
-          - CGO_ENABLED=1
-          - CC=o64-clang
-          - CXX=o64-clang++
+          - CGO_ENABLED=0  # kecs CLI doesn't need DuckDB
       - goos: darwin
         goarch: arm64
         env:
-          - CGO_ENABLED=1
-          - CC=oa64-clang
-          - CXX=oa64-clang++
+          - CGO_ENABLED=0  # kecs CLI doesn't need DuckDB
       # Linux specific build settings
       # CGO_ENABLED=0 for cross-compilation from macOS
       - goos: linux
