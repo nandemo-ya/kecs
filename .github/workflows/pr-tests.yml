@@ -1,4 +1,4 @@
-name: Full CI Check
+name: PR Tests
 
 on:
   pull_request:
