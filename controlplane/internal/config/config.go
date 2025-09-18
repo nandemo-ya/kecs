@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/localstack"
+	"github.com/nandemo-ya/kecs/controlplane/internal/version"
 )
 
 // Config represents the KECS configuration
@@ -94,7 +95,7 @@ func InitConfig() error {
 		v.SetDefault("server.logLevel", "info")
 		v.SetDefault("server.allowedOrigins", []string{})
 		v.SetDefault("server.endpoint", "")
-		v.SetDefault("server.controlPlaneImage", "ghcr.io/nandemo-ya/kecs:latest")
+		v.SetDefault("server.controlPlaneImage", computeControlPlaneImage())
 
 		// Kubernetes defaults
 		v.SetDefault("kubernetes.kubeconfigPath", "")
@@ -382,4 +383,18 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// computeControlPlaneImage determines the appropriate image tag based on CLI version
+func computeControlPlaneImage() string {
+	ver := version.GetVersion()
+
+	// dirtyビルドやコミットハッシュの場合はlatest
+	if strings.Contains(ver, "-dirty") || !strings.HasPrefix(ver, "v") {
+		return "ghcr.io/nandemo-ya/kecs:latest"
+	}
+
+	// セマンティックバージョン（プレリリース版含む）はそのまま使用
+	// v1.0.0, v1.0.0-alpha.1, v1.0.0-rc.2 など
+	return fmt.Sprintf("ghcr.io/nandemo-ya/kecs:%s", ver)
 }
