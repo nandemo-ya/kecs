@@ -1,3 +1,6 @@
+//go:build !nocli
+// +build !nocli
+
 package cmd
 
 import (

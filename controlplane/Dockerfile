@@ -32,7 +32,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         amd64) export CC=x86_64-linux-gnu-gcc CXX=x86_64-linux-gnu-g++ ;; \
     esac && \
     CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -ldflags="-s -w" -o controlplane ./cmd/controlplane
+    go build -ldflags="-s -w" -o kecs-server ./cmd/controlplane
 
 # Stage 3: Final image
 FROM debian:stable-slim
@@ -51,8 +51,8 @@ RUN groupadd -g 1000 kecs && \
     chown -R kecs:kecs /data
 
 # Copy the binary
-COPY --from=builder /app/controlplane /controlplane
-RUN chmod +x /controlplane
+COPY --from=builder /app/kecs-server /kecs-server
+RUN chmod +x /kecs-server
 
 USER kecs
 WORKDIR /data
@@ -63,4 +63,4 @@ ENV KECS_DATA_DIR=/data
 
 EXPOSE 8080 8081
 
-ENTRYPOINT ["/controlplane"]
+ENTRYPOINT ["/kecs-server", "server"]

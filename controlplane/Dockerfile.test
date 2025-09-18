@@ -32,16 +32,16 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         amd64) export CC=x86_64-linux-gnu-gcc CXX=x86_64-linux-gnu-g++ ;; \
     esac && \
     CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -ldflags="-s -w" -o controlplane ./cmd/controlplane
+    go build -ldflags="-s -w" -o kecs-server ./cmd/controlplane
 
 # Stage 3: Final image - use distroless/cc without nonroot for test
 # This allows access to docker socket for k3d operations
 FROM gcr.io/distroless/cc-debian12:latest
-COPY --from=builder /app/controlplane /controlplane
+COPY --from=builder /app/kecs-server /kecs-server
 
 ENV PORT=8080
 ENV ADMIN_PORT=8081
 
 EXPOSE 8080 8081
 
-ENTRYPOINT ["/controlplane", "server"]
+ENTRYPOINT ["/kecs-server", "server"]

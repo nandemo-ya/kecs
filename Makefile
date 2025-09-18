@@ -1,7 +1,8 @@
 # KECS (Kubernetes-based ECS Compatible Service) Makefile
 
 # Variables
-BINARY_NAME=kecs
+CLI_BINARY_NAME=kecs
+SERVER_BINARY_NAME=kecs-server
 MAIN_PKG=./controlplane/cmd/controlplane
 GO=go
 GOFMT=gofmt
@@ -32,11 +33,21 @@ CONTROLPLANE_DIR=./controlplane
 .PHONY: all
 all: clean fmt vet test build
 
-# Build the application
+# Build both CLI and server
 .PHONY: build
-build:
-	@echo "Building $(BINARY_NAME)..."
-	cd $(CONTROLPLANE_DIR) && $(GO) build $(LDFLAGS) -o ../bin/$(BINARY_NAME) ./cmd/controlplane
+build: build-cli build-server
+
+# Build CLI (without DuckDB/CGO)
+.PHONY: build-cli
+build-cli:
+	@echo "Building $(CLI_BINARY_NAME) (CLI only, no DuckDB)..."
+	cd $(CONTROLPLANE_DIR) && CGO_ENABLED=0 $(GO) build -tags nocli $(LDFLAGS) -o ../bin/$(CLI_BINARY_NAME) ./cmd/controlplane
+
+# Build server (with DuckDB/CGO)
+.PHONY: build-server
+build-server:
+	@echo "Building $(SERVER_BINARY_NAME) (with DuckDB support)..."
+	cd $(CONTROLPLANE_DIR) && CGO_ENABLED=1 $(GO) build $(LDFLAGS) -o ../bin/$(SERVER_BINARY_NAME) ./cmd/controlplane
 
 # Build TUI v2 mock application
 .PHONY: build-tui2
@@ -58,11 +69,17 @@ generate:
 	cd $(CONTROLPLANE_DIR) && ../bin/codegen -service ecs -input cmd/codegen/ecs.json -output internal/controlplane/api/generated_v2 -package api
 
 
-# Run the application
+# Run the CLI
 .PHONY: run
-run: build
-	@echo "Running $(BINARY_NAME)..."
-	./bin/$(BINARY_NAME)
+run: build-cli
+	@echo "Running $(CLI_BINARY_NAME) (CLI)..."
+	./bin/$(CLI_BINARY_NAME)
+
+# Run the server
+.PHONY: run-server
+run-server: build-server
+	@echo "Running $(SERVER_BINARY_NAME) (Server with DuckDB)..."
+	./bin/$(SERVER_BINARY_NAME) server
 
 # Clean build artifacts
 .PHONY: clean
@@ -184,9 +201,9 @@ hot-reload: docker-push-dev
 	kubectl rollout status deployment/kecs-controlplane -n kecs-system && \
 	echo "✅ Controlplane updated successfully!"
 
-# Dev workflow: Build and hot reload in one command
+# Dev workflow: Build server and hot reload in one command
 .PHONY: dev
-dev: build hot-reload
+dev: build-server hot-reload
 	@echo "✅ Development build and deploy completed!"
 
 # Dev workflow with logs: Build, reload and tail logs
@@ -239,24 +256,35 @@ docker-push-separated: docker-build-separated
 .PHONY: docker-build-awsproxy
 docker-build-awsproxy:
 	@echo "Building AWS Proxy Docker image..."
-	$(DOCKER) build -t $(DOCKER_REGISTRY)/aws-proxy:$(VERSION) -f $(CONTROLPLANE_DIR)/awsproxy/Dockerfile $(CONTROLPLANE_DIR)
-	$(DOCKER) tag $(DOCKER_REGISTRY)/aws-proxy:$(VERSION) $(DOCKER_REGISTRY)/aws-proxy:latest
+	$(DOCKER) build -t $(DOCKER_IMAGE)-awsproxy:$(VERSION) -f $(CONTROLPLANE_DIR)/awsproxy/Dockerfile $(CONTROLPLANE_DIR)
+	$(DOCKER) tag $(DOCKER_IMAGE)-awsproxy:$(VERSION) $(DOCKER_IMAGE)-awsproxy:latest
 
 # Push AWS Proxy Docker image
 .PHONY: docker-push-awsproxy
 docker-push-awsproxy: docker-build-awsproxy
 	@echo "Pushing AWS Proxy Docker image..."
-	$(DOCKER) push $(DOCKER_REGISTRY)/aws-proxy:$(VERSION)
-	$(DOCKER) push $(DOCKER_REGISTRY)/aws-proxy:latest
+	$(DOCKER) push $(DOCKER_IMAGE)-awsproxy:$(VERSION)
+	$(DOCKER) push $(DOCKER_IMAGE)-awsproxy:latest
 
 
 # Help target
 .PHONY: help
 help:
 	@echo "KECS Makefile targets:"
+	@echo ""
+	@echo "Building:"
 	@echo "  all            - Run clean, fmt, vet, test, and build"
-	@echo "  build          - Build the application"
-	@echo "  run            - Run the application"
+	@echo "  build          - Build both CLI and server binaries"
+	@echo "  build-cli      - Build CLI binary (no DuckDB/CGO)"
+	@echo "  build-server   - Build server binary (with DuckDB/CGO)"
+	@echo "  build-tui2     - Build TUI v2 mock application"
+	@echo ""
+	@echo "Running:"
+	@echo "  run            - Build and run CLI"
+	@echo "  run-server     - Build and run server with DuckDB"
+	@echo "  run-tui2       - Build and run TUI v2 mock"
+	@echo ""
+	@echo "Code Quality:"
 	@echo "  clean          - Clean build artifacts"
 	@echo "  fmt            - Format code and organize imports"
 	@echo "  test           - Run tests"
@@ -265,16 +293,20 @@ help:
 	@echo "  lint           - Run golangci-lint"
 	@echo "  lint-fix       - Run golangci-lint and fix issues automatically"
 	@echo "  deps           - Install dependencies"
-	@echo "  docker-build   - Build Docker image"
+	@echo ""
+	@echo "Docker:"
+	@echo "  docker-build   - Build Docker image (server)"
 	@echo "  docker-push    - Push Docker image"
 	@echo "  docker-build-dev - Build Docker image for k3d registry (dev mode)"
 	@echo "  docker-push-dev - Push Docker image to k3d registry (dev mode)"
-	@echo "  hot-reload     - Build and replace controlplane in running KECS instance"
-	@echo "  dev            - Build binary and hot reload controlplane (development workflow)"
-	@echo "  dev-logs       - Same as 'dev' but also tail controlplane logs"
 	@echo "  docker-build-awsproxy - Build AWS Proxy Docker image"
 	@echo "  docker-push-awsproxy  - Push AWS Proxy Docker image"
-	@echo "  build-tui2     - Build TUI v2 mock application"
+	@echo ""
+	@echo "Development:"
+	@echo "  hot-reload     - Build and replace controlplane in running KECS instance"
+	@echo "  dev            - Build server and hot reload controlplane"
+	@echo "  dev-logs       - Same as 'dev' but also tail controlplane logs"
+	@echo "  generate       - Generate code from AWS API definitions"
 	@echo "  help           - Show this help message"
 	@echo ""
 	@echo "Development workflow (Docker hot-reload):"
