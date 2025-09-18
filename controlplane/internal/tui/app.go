@@ -124,6 +124,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m, cmd = m.handleTaskDefinitionEditorKeys(msg)
 		case ViewClusterCreate:
 			m, cmd = m.handleClusterCreateKeys(msg)
+		case ViewLoadBalancers, ViewTargetGroups, ViewListeners:
+			m, cmd = m.handleELBv2Keys(msg)
 		}
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -494,6 +496,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reload clusters
 		cmds = append(cmds, m.loadDataFromAPI())
 
+	case elbv2DataLoadedMsg:
+		// Update ELBv2 data
+		if len(msg.loadBalancers) > 0 {
+			m.loadBalancers = msg.loadBalancers
+		}
+		if len(msg.targetGroups) > 0 {
+			m.targetGroups = msg.targetGroups
+		}
+		if msg.listeners != nil { // Check for nil to allow empty list
+			m.listeners = msg.listeners
+		}
+
 	case errMsg:
 		// Handle API errors
 		m.err = msg.err
@@ -773,6 +787,11 @@ func (m Model) View() string {
 		}
 		// Fallback if editor is nil
 		return m.View()
+	}
+
+	// For ELBv2 views, use the special ELBv2 rendering
+	if m.currentView == ViewLoadBalancers || m.currentView == ViewTargetGroups || m.currentView == ViewListeners {
+		return m.renderELBv2View()
 	}
 
 	// For logs view with active log viewer, use full screen or split view
@@ -1081,6 +1100,14 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 				m.selectedService = ""
 				return m, m.loadDataFromAPI()
 			}
+		}
+	case "e":
+		// Navigate to ELBv2 resources
+		if m.selectedInstance != "" {
+			m.currentView = ViewLoadBalancers
+			m.elbv2SubView = 0 // Start with load balancers
+			m.lbCursor = 0
+			return m, m.loadELBv2DataCmd()
 		}
 	}
 	return m, nil

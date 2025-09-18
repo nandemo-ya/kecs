@@ -60,6 +60,11 @@ type Client interface {
 	RegisterTaskDefinition(ctx context.Context, instanceName string, taskDef interface{}) (string, error)
 	DeregisterTaskDefinition(ctx context.Context, instanceName string, taskDefArn string) error
 
+	// ELBv2 operations
+	ListLoadBalancers(ctx context.Context, instanceName string) ([]ELBv2LoadBalancer, error)
+	ListTargetGroups(ctx context.Context, instanceName string) ([]ELBv2TargetGroup, error)
+	ListListeners(ctx context.Context, instanceName, loadBalancerArn string) ([]ELBv2Listener, error)
+
 	// Health check
 	HealthCheck(ctx context.Context, instanceName string) error
 

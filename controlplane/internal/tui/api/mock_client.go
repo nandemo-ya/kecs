@@ -649,6 +649,95 @@ func (c *MockClient) GetTaskLogs(ctx context.Context, instanceName, clusterName,
 }
 
 // Close implements Client interface
+// ELBv2 operations
+
+func (c *MockClient) ListLoadBalancers(ctx context.Context, instanceName string) ([]ELBv2LoadBalancer, error) {
+	return []ELBv2LoadBalancer{
+		{
+			LoadBalancerArn:  "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/50dc6c495c0c9188",
+			LoadBalancerName: "my-alb",
+			DNSName:          "my-alb-1234567890.us-east-1.elb.amazonaws.com",
+			Type:             "application",
+			Scheme:           "internet-facing",
+			State:            "active",
+			VpcId:            "vpc-12345678",
+			Subnets:          []string{"subnet-12345678", "subnet-87654321"},
+			CreatedTime:      time.Now().Add(-24 * time.Hour),
+		},
+		{
+			LoadBalancerArn:  "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/my-nlb/40dc6c495c0c9177",
+			LoadBalancerName: "my-nlb",
+			DNSName:          "my-nlb-0987654321.us-east-1.elb.amazonaws.com",
+			Type:             "network",
+			Scheme:           "internal",
+			State:            "active",
+			VpcId:            "vpc-12345678",
+			Subnets:          []string{"subnet-12345678"},
+			CreatedTime:      time.Now().Add(-48 * time.Hour),
+		},
+	}, nil
+}
+
+func (c *MockClient) ListTargetGroups(ctx context.Context, instanceName string) ([]ELBv2TargetGroup, error) {
+	return []ELBv2TargetGroup{
+		{
+			TargetGroupArn:         "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/73e2d6bc24d8a067",
+			TargetGroupName:        "my-targets",
+			Port:                   80,
+			Protocol:               "HTTP",
+			TargetType:             "instance",
+			VpcId:                  "vpc-12345678",
+			HealthCheckEnabled:     true,
+			HealthCheckPath:        "/health",
+			HealthyTargetCount:     2,
+			UnhealthyTargetCount:   0,
+			RegisteredTargetsCount: 2,
+		},
+		{
+			TargetGroupArn:         "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-targets/83e2d6bc24d8a099",
+			TargetGroupName:        "api-targets",
+			Port:                   8080,
+			Protocol:               "HTTP",
+			TargetType:             "ip",
+			VpcId:                  "vpc-12345678",
+			HealthCheckEnabled:     true,
+			HealthCheckPath:        "/api/health",
+			HealthyTargetCount:     3,
+			UnhealthyTargetCount:   1,
+			RegisteredTargetsCount: 4,
+		},
+	}, nil
+}
+
+func (c *MockClient) ListListeners(ctx context.Context, instanceName, loadBalancerArn string) ([]ELBv2Listener, error) {
+	return []ELBv2Listener{
+		{
+			ListenerArn:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/50dc6c495c0c9188/50dc6c495c0c9189",
+			LoadBalancerArn: loadBalancerArn,
+			Port:            80,
+			Protocol:        "HTTP",
+			DefaultActions: []ELBv2ListenerAction{
+				{
+					Type:           "forward",
+					TargetGroupArn: "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/73e2d6bc24d8a067",
+				},
+			},
+		},
+		{
+			ListenerArn:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/50dc6c495c0c9188/50dc6c495c0c9190",
+			LoadBalancerArn: loadBalancerArn,
+			Port:            443,
+			Protocol:        "HTTPS",
+			DefaultActions: []ELBv2ListenerAction{
+				{
+					Type:           "forward",
+					TargetGroupArn: "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-targets/83e2d6bc24d8a099",
+				},
+			},
+		},
+	}, nil
+}
+
 func (c *MockClient) Close() error {
 	return nil
 }

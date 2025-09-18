@@ -923,6 +923,181 @@ func (c *HTTPClient) GetInstanceCreationStatus(ctx context.Context, name string)
 	return &status, nil
 }
 
+// ELBv2 operations
+
+// ListLoadBalancers retrieves all load balancers in the instance
+func (c *HTTPClient) ListLoadBalancers(ctx context.Context, instanceName string) ([]ELBv2LoadBalancer, error) {
+	// Construct the ELBv2 API endpoint
+	url := fmt.Sprintf("http://localhost:%d/", c.getPortForInstance(instanceName))
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader("{}"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("X-Amz-Target", "ElasticLoadBalancing_V2.DescribeLoadBalancers")
+	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		LoadBalancers []ELBv2LoadBalancer `json:"LoadBalancers"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.LoadBalancers, nil
+}
+
+// ListTargetGroups retrieves all target groups in the instance
+func (c *HTTPClient) ListTargetGroups(ctx context.Context, instanceName string) ([]ELBv2TargetGroup, error) {
+	url := fmt.Sprintf("http://localhost:%d/", c.getPortForInstance(instanceName))
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader("{}"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("X-Amz-Target", "ElasticLoadBalancing_V2.DescribeTargetGroups")
+	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		TargetGroups []ELBv2TargetGroup `json:"TargetGroups"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Fetch target health for each target group
+	for i := range result.TargetGroups {
+		tg := &result.TargetGroups[i]
+		health, err := c.getTargetHealth(ctx, instanceName, tg.TargetGroupArn)
+		if err == nil {
+			tg.HealthyTargetCount = health.Healthy
+			tg.UnhealthyTargetCount = health.Unhealthy
+			tg.RegisteredTargetsCount = health.Total
+		}
+	}
+
+	return result.TargetGroups, nil
+}
+
+// ListListeners retrieves all listeners for a specific load balancer
+func (c *HTTPClient) ListListeners(ctx context.Context, instanceName, loadBalancerArn string) ([]ELBv2Listener, error) {
+	url := fmt.Sprintf("http://localhost:%d/", c.getPortForInstance(instanceName))
+
+	body := fmt.Sprintf(`{"LoadBalancerArn":"%s"}`, loadBalancerArn)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("X-Amz-Target", "ElasticLoadBalancing_V2.DescribeListeners")
+	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Listeners []ELBv2Listener `json:"Listeners"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.Listeners, nil
+}
+
+// Helper methods
+
+// getPortForInstance returns the API port for the given instance
+func (c *HTTPClient) getPortForInstance(instanceName string) int {
+	// Default port - TODO: look up actual port from instance
+	return 8080
+}
+
+// getTargetHealth retrieves target health counts for a target group
+func (c *HTTPClient) getTargetHealth(ctx context.Context, instanceName, targetGroupArn string) (*struct {
+	Healthy   int
+	Unhealthy int
+	Total     int
+}, error) {
+	url := fmt.Sprintf("http://localhost:%d/", c.getPortForInstance(instanceName))
+
+	body := fmt.Sprintf(`{"TargetGroupArn":"%s"}`, targetGroupArn)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("X-Amz-Target", "ElasticLoadBalancing_V2.DescribeTargetHealth")
+	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		TargetHealthDescriptions []struct {
+			TargetHealth struct {
+				State string `json:"State"`
+			} `json:"TargetHealth"`
+		} `json:"TargetHealthDescriptions"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	health := &struct {
+		Healthy   int
+		Unhealthy int
+		Total     int
+	}{}
+
+	for _, thd := range result.TargetHealthDescriptions {
+		health.Total++
+		if thd.TargetHealth.State == "healthy" {
+			health.Healthy++
+		} else {
+			health.Unhealthy++
+		}
+	}
+
+	return health, nil
+}
+
 // Close cleans up resources
 func (c *HTTPClient) Close() error {
 	if c.k3dProvider != nil {

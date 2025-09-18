@@ -323,3 +323,46 @@ type CreationStatus struct {
 	Status  string `json:"status"`  // "pending", "running", "done", "failed"
 	Message string `json:"message"` // Optional message
 }
+
+// ELBv2LoadBalancer represents a load balancer from ELBv2 API
+type ELBv2LoadBalancer struct {
+	LoadBalancerArn  string    `json:"LoadBalancerArn"`
+	LoadBalancerName string    `json:"LoadBalancerName"`
+	DNSName          string    `json:"DNSName,omitempty"`
+	Type             string    `json:"Type,omitempty"`
+	Scheme           string    `json:"Scheme,omitempty"`
+	State            string    `json:"State,omitempty"`
+	VpcId            string    `json:"VpcId,omitempty"`
+	Subnets          []string  `json:"Subnets,omitempty"`
+	CreatedTime      time.Time `json:"CreatedTime,omitempty"`
+}
+
+// ELBv2TargetGroup represents a target group from ELBv2 API
+type ELBv2TargetGroup struct {
+	TargetGroupArn         string `json:"TargetGroupArn"`
+	TargetGroupName        string `json:"TargetGroupName"`
+	Port                   int32  `json:"Port,omitempty"`
+	Protocol               string `json:"Protocol,omitempty"`
+	TargetType             string `json:"TargetType,omitempty"`
+	VpcId                  string `json:"VpcId,omitempty"`
+	HealthCheckEnabled     bool   `json:"HealthCheckEnabled,omitempty"`
+	HealthCheckPath        string `json:"HealthCheckPath,omitempty"`
+	HealthyTargetCount     int    `json:"HealthyTargetCount,omitempty"`
+	UnhealthyTargetCount   int    `json:"UnhealthyTargetCount,omitempty"`
+	RegisteredTargetsCount int    `json:"RegisteredTargetsCount,omitempty"`
+}
+
+// ELBv2Listener represents a listener from ELBv2 API
+type ELBv2Listener struct {
+	ListenerArn     string                `json:"ListenerArn"`
+	LoadBalancerArn string                `json:"LoadBalancerArn"`
+	Port            int32                 `json:"Port,omitempty"`
+	Protocol        string                `json:"Protocol,omitempty"`
+	DefaultActions  []ELBv2ListenerAction `json:"DefaultActions,omitempty"`
+}
+
+// ELBv2ListenerAction represents a listener action
+type ELBv2ListenerAction struct {
+	Type           string `json:"Type"`
+	TargetGroupArn string `json:"TargetGroupArn,omitempty"`
+}

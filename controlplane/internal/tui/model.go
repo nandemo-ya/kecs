@@ -31,6 +31,9 @@ const (
 	ViewTaskDefinitionEditor
 	ViewTaskDefinitionDiff
 	ViewClusterCreate
+	ViewLoadBalancers
+	ViewTargetGroups
+	ViewListeners
 )
 
 // String returns the string representation of ViewType
@@ -68,6 +71,12 @@ func (v ViewType) String() string {
 		return "Task Definition Diff"
 	case ViewClusterCreate:
 		return "Cluster Create"
+	case ViewLoadBalancers:
+		return "Load Balancers"
+	case ViewTargetGroups:
+		return "Target Groups"
+	case ViewListeners:
+		return "Listeners"
 	default:
 		return "Unknown"
 	}
@@ -148,6 +157,51 @@ type TaskDefinitionRevision struct {
 	Memory    string
 	CreatedAt time.Time
 	JSON      string // Complete task definition JSON
+}
+
+// LoadBalancer represents an ELBv2 load balancer
+type LoadBalancer struct {
+	ARN       string
+	Name      string
+	DNSName   string
+	Type      string // application, network, gateway
+	Scheme    string // internet-facing, internal
+	State     string // active, provisioning, failed, etc.
+	VpcID     string
+	Subnets   []string
+	CreatedAt time.Time
+}
+
+// TargetGroup represents an ELBv2 target group
+type TargetGroup struct {
+	ARN                    string
+	Name                   string
+	Port                   int
+	Protocol               string
+	TargetType             string // instance, ip, lambda
+	VpcID                  string
+	HealthCheckEnabled     bool
+	HealthCheckPath        string
+	HealthyTargetCount     int
+	UnhealthyTargetCount   int
+	RegisteredTargetsCount int
+	CreatedAt              time.Time
+}
+
+// Listener represents an ELBv2 listener
+type Listener struct {
+	ARN             string
+	LoadBalancerARN string
+	Port            int
+	Protocol        string           // HTTP, HTTPS, TCP, TLS, UDP, TCP_UDP
+	DefaultActions  []ListenerAction // List of default actions
+	RuleCount       int
+}
+
+// ListenerAction represents an action for a listener
+type ListenerAction struct {
+	Type           string // forward, redirect, fixed-response, etc.
+	TargetGroupArn string // If action is forward
 }
 
 // TaskDefinitionEditor manages task definition JSON editing
@@ -279,6 +333,17 @@ type Model struct {
 
 	// Key bindings registry
 	keyBindings *KeyBindingsRegistry
+
+	// ELBv2 state
+	loadBalancers  []LoadBalancer
+	targetGroups   []TargetGroup
+	listeners      []Listener
+	selectedLB     string // Selected load balancer ARN
+	selectedTG     string // Selected target group ARN
+	lbCursor       int
+	tgCursor       int
+	listenerCursor int
+	elbv2SubView   int // 0=LoadBalancers, 1=TargetGroups, 2=Listeners
 }
 
 // NewModel creates a new application model
