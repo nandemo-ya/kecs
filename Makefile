@@ -41,13 +41,13 @@ build: build-cli build-server
 .PHONY: build-cli
 build-cli:
 	@echo "Building $(CLI_BINARY_NAME) (CLI only, no DuckDB)..."
-	cd $(CONTROLPLANE_DIR) && CGO_ENABLED=0 $(GO) build -tags nocli $(LDFLAGS) -o ../bin/$(CLI_BINARY_NAME) ../cmd/controlplane
+	cd $(CONTROLPLANE_DIR) && CGO_ENABLED=0 $(GO) build -tags nocli $(LDFLAGS) -o ../bin/$(CLI_BINARY_NAME) ./cmd/controlplane
 
 # Build server (with DuckDB/CGO)
 .PHONY: build-server
 build-server:
 	@echo "Building $(SERVER_BINARY_NAME) (with DuckDB support)..."
-	cd $(CONTROLPLANE_DIR) && CGO_ENABLED=1 $(GO) build $(LDFLAGS) -o ../bin/$(SERVER_BINARY_NAME) ../cmd/controlplane
+	cd $(CONTROLPLANE_DIR) && CGO_ENABLED=1 $(GO) build $(LDFLAGS) -o ../bin/$(SERVER_BINARY_NAME) ./cmd/controlplane
 
 # Build TUI v2 mock application
 .PHONY: build-tui2
