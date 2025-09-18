@@ -10,11 +10,13 @@ before:
 
 builds:
   - id: kecs
-    main: ./cmd/controlplane
+    main: ../cmd/controlplane
     binary: kecs
     dir: ./controlplane  # Set working directory to controlplane where go.mod exists
     env:
       - CGO_ENABLED=0  # kecs CLI doesn't need DuckDB (only controlplane in container needs it)
+    tags:
+      - nocli  # Build without server command to avoid DuckDB dependency
     goos:
       - darwin
       - linux
