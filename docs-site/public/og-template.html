@@ -15,7 +15,7 @@
             width: 1200px;
             height: 630px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #ffffff;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -28,14 +28,24 @@
             position: absolute;
             width: 100%;
             height: 100%;
-            opacity: 0.1;
+            opacity: 0.03;
             background-image:
-                repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.1) 35px, rgba(255,255,255,.1) 70px);
+                repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(102,126,234,.3) 35px, rgba(102,126,234,.3) 70px);
+        }
+
+        /* Top accent bar */
+        .accent-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
         }
 
         .container {
             text-align: center;
-            color: white;
+            color: #1a202c;
             z-index: 1;
             padding: 60px;
         }
@@ -51,13 +61,16 @@
         .logo-image {
             width: 150px;
             height: 150px;
-            filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.2));
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
         }
 
         .logo-text {
             font-size: 100px;
             font-weight: 900;
-            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             letter-spacing: -2px;
         }
 
@@ -65,7 +78,7 @@
             font-size: 36px;
             font-weight: 300;
             margin-bottom: 40px;
-            opacity: 0.95;
+            color: #4a5568;
             line-height: 1.3;
         }
 
@@ -80,19 +93,20 @@
             display: flex;
             align-items: center;
             font-size: 20px;
-            opacity: 0.9;
+            color: #2d3748;
+            font-weight: 500;
         }
 
         .feature-icon {
-            width: 24px;
-            height: 24px;
+            width: 36px;
+            height: 36px;
             margin-right: 10px;
-            background: rgba(255, 255, 255, 0.3);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
+            font-size: 18px;
         }
 
         .url {
@@ -100,13 +114,14 @@
             bottom: 40px;
             right: 60px;
             font-size: 24px;
-            opacity: 0.8;
-            font-weight: 500;
+            color: #667eea;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
     <div class="pattern"></div>
+    <div class="accent-bar"></div>
     <div class="container">
         <div class="logo-container">
             <img src="../assets/logo.svg" alt="KECS Logo" class="logo-image" />
