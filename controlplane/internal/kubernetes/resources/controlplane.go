@@ -2,6 +2,7 @@ package resources
 
 import (
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -9,6 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/version"
 )
 
 // Helper functions
@@ -91,7 +94,7 @@ type ControlPlaneConfig struct {
 // DefaultControlPlaneConfig returns default configuration
 func DefaultControlPlaneConfig() *ControlPlaneConfig {
 	return &ControlPlaneConfig{
-		Image:           "ghcr.io/nandemo-ya/kecs:latest",
+		Image:           computeControlPlaneImage(),
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		CPURequest:      "100m",
 		MemoryRequest:   "128Mi",
@@ -102,6 +105,20 @@ func DefaultControlPlaneConfig() *ControlPlaneConfig {
 		AdminPort:       ControlPlaneInternalAdminPort, // Keep admin port as internal
 		LogLevel:        "info",
 	}
+}
+
+// computeControlPlaneImage determines the appropriate image tag based on CLI version
+func computeControlPlaneImage() string {
+	ver := version.GetVersion()
+
+	// dirtyビルドやコミットハッシュの場合はlatest
+	if strings.Contains(ver, "-dirty") || !strings.HasPrefix(ver, "v") {
+		return "ghcr.io/nandemo-ya/kecs:latest"
+	}
+
+	// セマンティックバージョン（プレリリース版含む）はそのまま使用
+	// v1.0.0, v1.0.0-alpha.1, v1.0.0-rc.2 など
+	return fmt.Sprintf("ghcr.io/nandemo-ya/kecs:%s", ver)
 }
 
 // CreateControlPlaneResources creates all resources for the control plane
