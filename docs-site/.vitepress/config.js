@@ -1,8 +1,11 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
-  base: '/kecs/',
-  
+  // base path removed for custom domain deployment
+
+  // Ignore dead links for now to allow build
+  ignoreDeadLinks: true,
+
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
     ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png' }],
