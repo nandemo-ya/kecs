@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1200, height=630">
+    <title>KECS OG Image</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1200px;
+            height: 630px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Background pattern */
+        .pattern {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0.03;
+            background-image:
+                repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(102,126,234,.3) 35px, rgba(102,126,234,.3) 70px);
+        }
+
+        /* Top accent bar */
+        .accent-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .container {
+            text-align: center;
+            color: #1a202c;
+            z-index: 1;
+            padding: 60px;
+        }
+
+        .logo-container {
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+        }
+
+        .logo-image {
+            width: 150px;
+            height: 150px;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
+        }
+
+        .logo-text {
+            font-size: 100px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -2px;
+        }
+
+        .tagline {
+            font-size: 36px;
+            font-weight: 300;
+            margin-bottom: 40px;
+            color: #4a5568;
+            line-height: 1.3;
+        }
+
+        .features {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 50px;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            font-size: 20px;
+            color: #2d3748;
+            font-weight: 500;
+        }
+
+        .feature-icon {
+            width: 36px;
+            height: 36px;
+            margin-right: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .url {
+            position: absolute;
+            bottom: 40px;
+            right: 60px;
+            font-size: 24px;
+            color: #667eea;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="pattern"></div>
+    <div class="accent-bar"></div>
+    <div class="container">
+        <div class="logo-container">
+            <img src="../assets/logo.svg" alt="KECS Logo" class="logo-image" />
+            <div class="logo-text">KECS</div>
+        </div>
+        <div class="tagline">
+            Kubernetes-based ECS Compatible Service<br>
+            Run Amazon ECS workloads anywhere
+        </div>
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">💻</div>
+                <span>Standalone</span>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔄</div>
+                <span>Full ECS API</span>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">☁️</div>
+                <span>AWS Integration</span>
+            </div>
+        </div>
+    </div>
+    <div class="url">kecs.dev</div>
+</body>
+</html>
