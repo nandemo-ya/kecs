@@ -105,9 +105,17 @@ kecs stop  # Shows a list to select from
 
 ```bash
 git clone https://github.com/nandemo-ya/kecs.git
-cd kecs/controlplane
-make build
+cd kecs
+make build          # Build both CLI and server binaries
+# or
+make build-cli      # Build CLI only (cross-platform compatible)
+make build-server   # Build server with DuckDB support
 ```
+
+#### Binary Architecture
+KECS uses a dual-binary architecture:
+- **kecs** (CLI): Command-line interface for managing KECS instances (no CGO dependencies)
+- **kecs-server**: Server binary with DuckDB support for data persistence (runs in containers)
 
 ### Development Setup
 
@@ -209,8 +217,14 @@ docker compose up
 #### Building Docker Images
 
 ```bash
-# Build API image
+# Build main Docker image (with kecs-server binary)
+make docker-build
+
+# Build API-only image
 make docker-build-api
+
+# Build for local k3d registry (development)
+make docker-build-dev
 ```
 
 ## API Endpoints

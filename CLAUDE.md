@@ -10,10 +10,18 @@ KECS (Kubernetes-based ECS Compatible Service) is a standalone service that prov
 
 ### Building and Running
 ```bash
-make build          # Build the binary to bin/kecs
-make run            # Build and run the application
+make build          # Build both CLI and server binaries
+make build-cli      # Build CLI binary only (bin/kecs - no DuckDB/CGO)
+make build-server   # Build server binary (bin/kecs-server - with DuckDB/CGO)
+make run            # Build and run CLI
+make run-server     # Build and run server
 make all            # Clean, format, vet, test, and build
 ```
+
+#### Binary Architecture
+KECS is split into two binaries to resolve cross-compilation issues:
+- **kecs** (CLI): Lightweight client without DuckDB, cross-platform compatible
+- **kecs-server**: Full server with DuckDB support, runs in containers
 
 ### Container-based Execution
 ```bash
