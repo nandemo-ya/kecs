@@ -111,13 +111,13 @@ func DefaultControlPlaneConfig() *ControlPlaneConfig {
 func computeControlPlaneImage() string {
 	ver := version.GetVersion()
 
-	// dirtyビルドやコミットハッシュの場合はlatest
+	// Use latest for dirty builds or commit hashes
 	if strings.Contains(ver, "-dirty") || !strings.HasPrefix(ver, "v") {
 		return "ghcr.io/nandemo-ya/kecs:latest"
 	}
 
-	// セマンティックバージョン（プレリリース版含む）はそのまま使用
-	// v1.0.0, v1.0.0-alpha.1, v1.0.0-rc.2 など
+	// Use semantic version (including pre-releases) directly
+	// e.g., v1.0.0, v1.0.0-alpha.1, v1.0.0-rc.2
 	return fmt.Sprintf("ghcr.io/nandemo-ya/kecs:%s", ver)
 }
 

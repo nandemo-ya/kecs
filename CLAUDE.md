@@ -33,7 +33,7 @@ kecs logs -f        # Follow container logs
 # Multiple instances
 kecs start --name dev --api-port 8080
 kecs start --name staging --api-port 8090 --auto-port
-kecs instances list # List all instances
+kecs list           # List all instances
 ```
 
 ### Testing and Code Quality
@@ -81,6 +81,25 @@ make dev-logs       # Build, hot reload, and tail logs
 
 # For specific instance
 KECS_INSTANCE=myinstance make dev
+```
+
+### Kubeconfig Management
+```bash
+# List all available KECS clusters
+kecs kubeconfig list
+
+# Get kubeconfig for a specific instance
+kecs kubeconfig get <instance-name>
+
+# Write kubeconfig to a file
+kecs kubeconfig get <instance-name> -o ~/.kube/kecs-config
+
+# Use the kubeconfig with kubectl
+export KUBECONFIG=$(kecs kubeconfig get <instance-name>)
+kubectl get pods -n kecs-system
+
+# Or specify inline
+kubectl --kubeconfig <(kecs kubeconfig get <instance-name>) get pods -n kecs-system
 ```
 
 ### Hot Reload Development
@@ -206,7 +225,6 @@ cd docs-site && npm run docs:build
 - **Implemented**: Clusters, Services, Tasks, Task Definitions, Tags, Attributes
 - **Storage**: DuckDB integration for persistence
 - **Kubernetes**: Task converter with secret management
-- **MCP Server**: TypeScript-based Model Context Protocol server for AI assistant integration
 - **Container Commands**: Docker-based background execution with multiple instance support
 - **In Progress**: Full Kubernetes task lifecycle management
 
@@ -217,38 +235,6 @@ KECS includes Docker container management commands similar to kind/k3d:
 - Automatic port conflict detection and resolution
 - Data persistence through volume mounts
 - See `docs/container-commands.md` for detailed usage
-
-## MCP Server Development
-
-KECS includes a Model Context Protocol (MCP) server for AI assistant integration:
-
-### MCP Server Overview
-The MCP server enables AI assistants like Claude to interact with KECS through natural language:
-- Located in `mcp-server/` directory
-- Built with TypeScript and the official MCP SDK
-- Provides tools for all ECS operations (clusters, services, tasks, task definitions)
-- Supports Claude Desktop and Claude Code (VS Code) integration
-
-### MCP Server Development
-```bash
-# Install dependencies
-cd mcp-server
-npm install
-
-# Development mode with hot-reloading
-npm run dev
-
-# Build for production
-npm run build
-
-# Run tests
-npm test
-```
-
-### MCP Server Configuration
-- **Claude Desktop**: Configure in `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Claude Code**: Configure in `~/Library/Application Support/Claude/claude_code_config.json`
-- Documentation available in `mcp-server/docs/` and `docs-site/docs/mcp-server/`
 
 ## Scenario Tests
 
