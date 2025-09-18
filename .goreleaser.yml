@@ -146,7 +146,7 @@ release:
 # Homebrew formula update
 brews:
   - name: kecs
-    folder: Formula
+    directory: Formula
     repository:
       owner: nandemo-ya
       name: homebrew-kecs
