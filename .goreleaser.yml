@@ -150,9 +150,12 @@ brews:
     repository:
       owner: nandemo-ya
       name: homebrew-kecs
+      branch: "{{ .ProjectName }}-{{ .Version }}"
       pull_request:
         enabled: true
         base:
+          owner: nandemo-ya
+          name: homebrew-kecs
           branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
