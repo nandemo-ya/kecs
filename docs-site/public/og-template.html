@@ -40,10 +40,23 @@
             padding: 60px;
         }
 
-        .logo {
-            font-size: 120px;
-            font-weight: 900;
+        .logo-container {
             margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+        }
+
+        .logo-image {
+            width: 150px;
+            height: 150px;
+            filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.2));
+        }
+
+        .logo-text {
+            font-size: 100px;
+            font-weight: 900;
             text-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
             letter-spacing: -2px;
         }
@@ -95,7 +108,10 @@
 <body>
     <div class="pattern"></div>
     <div class="container">
-        <div class="logo">KECS</div>
+        <div class="logo-container">
+            <img src="../assets/logo.svg" alt="KECS Logo" class="logo-image" />
+            <div class="logo-text">KECS</div>
+        </div>
         <div class="tagline">
             Kubernetes-based ECS Compatible Service<br>
             Run Amazon ECS workloads anywhere

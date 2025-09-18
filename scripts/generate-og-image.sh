@@ -49,9 +49,19 @@ const path = require('path');
 
     // Read the HTML template
     const htmlPath = path.join(__dirname, 'public', 'og-template.html');
-    const htmlContent = fs.readFileSync(htmlPath, 'utf8');
+    let htmlContent = fs.readFileSync(htmlPath, 'utf8');
 
-    // Load the HTML content
+    // Read and inline the SVG logo
+    const logoPath = path.join(__dirname, '..', 'assets', 'logo.svg');
+    const logoSvg = fs.readFileSync(logoPath, 'utf8');
+
+    // Convert SVG to base64 data URI
+    const logoDataUri = `data:image/svg+xml;base64,${Buffer.from(logoSvg).toString('base64')}`;
+
+    // Replace the image src with the data URI
+    htmlContent = htmlContent.replace('../assets/logo.svg', logoDataUri);
+
+    // Load the HTML content with inlined logo
     await page.setContent(htmlContent);
 
     // Wait for fonts to load
