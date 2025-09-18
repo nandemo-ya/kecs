@@ -5,8 +5,9 @@ version: 2
 
 before:
   hooks:
-    - sh -c "cd controlplane && go mod tidy"
-    - sh -c "cd controlplane && go mod download"
+    # Working directory is handled by builds.dir, so we can use simple commands
+    - go mod tidy -C ./controlplane
+    - go mod download -C ./controlplane
 
 builds:
   - id: kecs
@@ -64,7 +65,7 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
     files:
       - README.md
       - LICENSE
@@ -75,7 +76,7 @@ checksum:
   algorithm: sha256
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 
 changelog:
   sort: asc
