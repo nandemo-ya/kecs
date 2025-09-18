@@ -222,7 +222,7 @@ During recovery:
 
 5. **Recovery Testing**: Regularly test recovery procedures
    ```bash
-   ./scripts/test-state-recovery.sh
+   ./scripts/test/test-state-recovery.sh
    ```
 
 ## Future Improvements

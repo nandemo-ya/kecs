@@ -11,7 +11,7 @@
         "--context",
         "ide-assistant",
         "--project",
-        "/Users/stormcat/go/src/github.com/nandemo-ya/kecs"
+        "."
       ],
       "env": {}
     }

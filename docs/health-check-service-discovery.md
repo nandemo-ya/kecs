@@ -136,7 +136,7 @@ func (m *manager) buildEndpointSubsets(instances map[string]*Instance, service *
 Use the provided test script to verify the integration:
 
 ```bash
-./test-health-service-discovery.sh
+./scripts/test/test-health-service-discovery.sh
 ```
 
 The script will:
