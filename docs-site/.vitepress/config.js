@@ -7,10 +7,31 @@ export default defineConfig({
   ignoreDeadLinks: true,
 
   head: [
+    // Favicon
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
     ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png' }],
     ['link', { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16.png' }],
-    ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' }]
+    ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' }],
+
+    // Open Graph Protocol
+    ['meta', { property: 'og:title', content: 'KECS - Kubernetes-based ECS Compatible Service' }],
+    ['meta', { property: 'og:description', content: 'Run Amazon ECS workloads locally or on any Kubernetes cluster without AWS dependencies. Full ECS API compatibility with local development workflow.' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:url', content: 'https://kecs.dev' }],
+    ['meta', { property: 'og:image', content: 'https://kecs.dev/og-image.png' }],
+    ['meta', { property: 'og:image:width', content: '1200' }],
+    ['meta', { property: 'og:image:height', content: '630' }],
+    ['meta', { property: 'og:site_name', content: 'KECS Documentation' }],
+
+    // Twitter Card
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+    ['meta', { name: 'twitter:title', content: 'KECS - Kubernetes-based ECS Compatible Service' }],
+    ['meta', { name: 'twitter:description', content: 'Run Amazon ECS workloads locally or on any Kubernetes cluster without AWS dependencies.' }],
+    ['meta', { name: 'twitter:image', content: 'https://kecs.dev/og-image.png' }],
+
+    // Additional Meta
+    ['meta', { name: 'author', content: 'KECS Contributors' }],
+    ['meta', { name: 'keywords', content: 'KECS, Kubernetes, ECS, Amazon ECS, Container Orchestration, Local Development, Docker, k3d' }]
   ],
 
   // Locales configuration
