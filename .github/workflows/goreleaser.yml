@@ -12,7 +12,7 @@ permissions:
 jobs:
   # Single job using GoReleaser for all platforms
   goreleaser:
-    runs-on: ubuntu-latest  # CGO not needed for kecs CLI
+    runs-on: [self-hosted, linux, medium]  # Use self-hosted runner for better performance
     steps:
       - name: Checkout
         uses: actions/checkout@v4

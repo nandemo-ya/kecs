@@ -69,7 +69,7 @@ archives:
     files:
       - README.md
       - LICENSE
-      - docs/getting-started.md
+      - docs-site/guides/getting-started.md
 
 checksum:
   name_template: 'checksums.txt'
@@ -150,6 +150,10 @@ brews:
       owner: nandemo-ya
       name: homebrew-kecs
       branch: main
+      pull_request:
+        enabled: true
+        base:
+          branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
     # Formula template
