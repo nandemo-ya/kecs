@@ -559,7 +559,7 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 							Name:            "controlplane",
 							Image:           config.Image,
 							ImagePullPolicy: config.ImagePullPolicy,
-							Command:         []string{"/controlplane"},
+							Command:         []string{"/kecs-server"},
 							Args:            []string{"server"},
 							Env:             envVars,
 							Ports: []corev1.ContainerPort{
