@@ -208,6 +208,7 @@ func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, c
 	}
 
 	// Create control plane config
+	logging.Info("Using control plane image", "image", cfg.Server.ControlPlaneImage)
 	controlPlaneConfig := &resources.ControlPlaneConfig{
 		Image:           cfg.Server.ControlPlaneImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
