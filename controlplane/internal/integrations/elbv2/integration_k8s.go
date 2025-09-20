@@ -1067,6 +1067,82 @@ func (i *K8sIntegration) CreateTargetGroupServiceInNamespace(ctx context.Context
 		"namespace", namespace,
 		"targetGroup", tg.Name)
 
+	// Also create ExternalName Service in kecs-system to enable cross-namespace access
+	if namespace != "kecs-system" {
+		if err := i.createExternalNameServiceInKecsSystem(ctx, tg.Name, serviceName, namespace); err != nil {
+			logging.Warn("Failed to create ExternalName Service in kecs-system",
+				"error", err,
+				"targetGroup", tg.Name,
+				"targetNamespace", namespace)
+			// Don't fail the entire operation if ExternalName creation fails
+		}
+	}
+
+	return nil
+}
+
+// createExternalNameServiceInKecsSystem creates an ExternalName Service in kecs-system
+// that points to the actual Service in the ECS cluster namespace
+func (i *K8sIntegration) createExternalNameServiceInKecsSystem(ctx context.Context, targetGroupName, serviceName, targetNamespace string) error {
+	externalServiceName := fmt.Sprintf("tg-%s", targetGroupName)
+
+	// Check if ExternalName Service already exists
+	existingService, err := i.kubeClient.CoreV1().Services("kecs-system").Get(ctx, externalServiceName, metav1.GetOptions{})
+	if err == nil && existingService != nil {
+		// Update if it points to a different namespace/service
+		targetDNS := fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, targetNamespace)
+		if existingService.Spec.ExternalName != targetDNS {
+			existingService.Spec.ExternalName = targetDNS
+			_, err = i.kubeClient.CoreV1().Services("kecs-system").Update(ctx, existingService, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to update ExternalName Service: %w", err)
+			}
+			logging.Info("Updated ExternalName Service in kecs-system",
+				"serviceName", externalServiceName,
+				"targetDNS", targetDNS)
+		}
+		return nil
+	}
+
+	// Create ExternalName Service pointing to the service in the target namespace
+	externalService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      externalServiceName,
+			Namespace: "kecs-system",
+			Annotations: map[string]string{
+				"kecs.io/elbv2-target-group-name": targetGroupName,
+				"kecs.io/target-namespace":        targetNamespace,
+				"kecs.io/target-service":          serviceName,
+				"kecs.io/cross-namespace-proxy":   "true",
+			},
+			Labels: map[string]string{
+				"kecs.io/elbv2-target-group-name": targetGroupName,
+				"kecs.io/component":               "externalname-proxy",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Type:         corev1.ServiceTypeExternalName,
+			ExternalName: fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, targetNamespace),
+			Ports: []corev1.ServicePort{
+				{
+					Name:     "main",
+					Port:     80,
+					Protocol: corev1.ProtocolTCP,
+				},
+			},
+		},
+	}
+
+	_, err = i.kubeClient.CoreV1().Services("kecs-system").Create(ctx, externalService, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create ExternalName Service: %w", err)
+	}
+
+	logging.Info("Created ExternalName Service in kecs-system for cross-namespace access",
+		"externalServiceName", externalServiceName,
+		"targetService", fmt.Sprintf("%s.%s", serviceName, targetNamespace),
+		"targetGroupName", targetGroupName)
+
 	return nil
 }
 
