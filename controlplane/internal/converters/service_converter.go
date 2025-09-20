@@ -145,7 +145,10 @@ func (c *ServiceConverter) createDeployment(
 	// Add target group labels if LoadBalancers are configured
 	if service.LoadBalancers != "" {
 		var loadBalancers []types.LoadBalancer
-		if err := json.Unmarshal([]byte(service.LoadBalancers), &loadBalancers); err == nil {
+		if err := json.Unmarshal([]byte(service.LoadBalancers), &loadBalancers); err != nil {
+			logging.Warn("Failed to parse LoadBalancers JSON for service %s: %v", service.ServiceName, err)
+		} else {
+			var targetGroupNames []string
 			for _, lb := range loadBalancers {
 				if lb.TargetGroupArn != nil && *lb.TargetGroupArn != "" {
 					// Extract target group name from ARN
@@ -153,9 +156,15 @@ func (c *ServiceConverter) createDeployment(
 					parts := strings.Split(*lb.TargetGroupArn, "/")
 					if len(parts) >= 2 {
 						targetGroupName := parts[1]
-						labels["kecs.io/elbv2-target-group-name"] = targetGroupName
+						targetGroupNames = append(targetGroupNames, targetGroupName)
 					}
 				}
+			}
+			// If multiple target groups, use comma-separated list
+			if len(targetGroupNames) > 0 {
+				labels["kecs.io/elbv2-target-group-names"] = strings.Join(targetGroupNames, ",")
+				// Also keep the first one as the primary for backward compatibility
+				labels["kecs.io/elbv2-target-group-name"] = targetGroupNames[0]
 			}
 		}
 	}

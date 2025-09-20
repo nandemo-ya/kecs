@@ -1489,6 +1489,9 @@ func (i *K8sIntegration) UpdateIngressRouteForService(ctx context.Context, targe
 		if existingService.Annotations == nil {
 			existingService.Annotations = make(map[string]string)
 		}
+		if existingService.Labels == nil {
+			existingService.Labels = make(map[string]string)
+		}
 		existingService.Annotations["kecs.io/target-namespace"] = namespace
 		existingService.Annotations["kecs.io/target-service"] = serviceName
 		existingService.Labels["kecs.io/target-namespace"] = namespace
