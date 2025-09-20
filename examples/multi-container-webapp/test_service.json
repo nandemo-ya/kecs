@@ -1,0 +1,62 @@
+{
+  "serviceName": "webapp-test",
+  "cluster": "multi-container-cluster",
+  "taskDefinition": "multi-container-webapp:2",
+  "desiredCount": 3,
+  "launchType": "FARGATE",
+  "platformVersion": "LATEST",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": [
+        "subnet-12345678",
+        "subnet-87654321"
+      ],
+      "securityGroups": [
+        "sg-webapp"
+      ],
+      "assignPublicIp": "ENABLED"
+    }
+  },
+  "loadBalancers": [
+    {
+      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/multi-container-webapp-tg/0e2c41b9",
+      "containerName": "frontend-nginx",
+      "containerPort": 80
+    }
+  ],
+  "healthCheckGracePeriodSeconds": 60,
+  "deploymentConfiguration": {
+    "maximumPercent": 200,
+    "minimumHealthyPercent": 100,
+    "deploymentCircuitBreaker": {
+      "enable": true,
+      "rollback": true
+    }
+  },
+  "placementStrategy": [
+    {
+      "type": "spread",
+      "field": "attribute:ecs.availability-zone"
+    }
+  ],
+  "enableECSManagedTags": true,
+  "propagateTags": "TASK_DEFINITION",
+  "tags": [
+    {
+      "key": "Environment",
+      "value": "development"
+    },
+    {
+      "key": "Application",
+      "value": "multi-container-webapp"
+    },
+    {
+      "key": "Type",
+      "value": "webapp"
+    },
+    {
+      "key": "LoadBalanced",
+      "value": "true"
+    }
+  ]
+}

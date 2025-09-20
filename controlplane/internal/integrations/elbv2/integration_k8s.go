@@ -25,9 +25,9 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
-// k8sIntegration implements the Integration interface using Kubernetes Services
+// K8sIntegration implements the Integration interface using Kubernetes Services
 // instead of actual ELBv2 API calls. This avoids the need for LocalStack Pro.
-type k8sIntegration struct {
+type K8sIntegration struct {
 	region        string
 	accountID     string
 	kubeClient    kubernetes.Interface
@@ -45,8 +45,8 @@ type k8sIntegration struct {
 }
 
 // NewK8sIntegration creates a new Kubernetes-based ELBv2 integration
-func NewK8sIntegration(region, accountID string) *k8sIntegration {
-	integration := &k8sIntegration{
+func NewK8sIntegration(region, accountID string) *K8sIntegration {
+	integration := &K8sIntegration{
 		region:        region,
 		accountID:     accountID,
 		kubeClient:    nil, // Will be set later when needed
@@ -62,7 +62,7 @@ func NewK8sIntegration(region, accountID string) *k8sIntegration {
 }
 
 // SetKubernetesClients sets the Kubernetes clients for the integration
-func (i *k8sIntegration) SetKubernetesClients(kubeClient kubernetes.Interface, dynamicClient dynamic.Interface) {
+func (i *K8sIntegration) SetKubernetesClients(kubeClient kubernetes.Interface, dynamicClient dynamic.Interface) {
 	i.kubeClient = kubeClient
 	i.dynamicClient = dynamicClient
 	// RuleManager requires storage, which we don't have here
@@ -70,12 +70,12 @@ func (i *k8sIntegration) SetKubernetesClients(kubeClient kubernetes.Interface, d
 }
 
 // SetStorage sets the storage backend for persistence
-func (i *k8sIntegration) SetStorage(store storage.ELBv2Store) {
+func (i *K8sIntegration) SetStorage(store storage.ELBv2Store) {
 	i.store = store
 }
 
 // CreateLoadBalancer creates a virtual load balancer and deploys Traefik
-func (i *k8sIntegration) CreateLoadBalancer(ctx context.Context, name string, subnets []string, securityGroups []string) (*LoadBalancer, error) {
+func (i *K8sIntegration) CreateLoadBalancer(ctx context.Context, name string, subnets []string, securityGroups []string) (*LoadBalancer, error) {
 	logging.Debug("Creating load balancer with Traefik deployment", "name", name)
 
 	// Generate ARN
@@ -145,7 +145,7 @@ func (i *k8sIntegration) CreateLoadBalancer(ctx context.Context, name string, su
 }
 
 // DeleteLoadBalancer deletes a virtual load balancer
-func (i *k8sIntegration) DeleteLoadBalancer(ctx context.Context, arn string) error {
+func (i *K8sIntegration) DeleteLoadBalancer(ctx context.Context, arn string) error {
 	logging.Debug("Deleting virtual load balancer", "arn", arn)
 
 	i.mu.Lock()
@@ -160,7 +160,7 @@ func (i *k8sIntegration) DeleteLoadBalancer(ctx context.Context, arn string) err
 }
 
 // CreateTargetGroup creates a virtual target group and Kubernetes resources
-func (i *k8sIntegration) CreateTargetGroup(ctx context.Context, name string, port int32, protocol string, vpcId string) (*TargetGroup, error) {
+func (i *K8sIntegration) CreateTargetGroup(ctx context.Context, name string, port int32, protocol string, vpcId string) (*TargetGroup, error) {
 	logging.Debug("Creating target group with Kubernetes resources", "name", name)
 
 	// Generate ARN
@@ -198,7 +198,7 @@ func (i *k8sIntegration) CreateTargetGroup(ctx context.Context, name string, por
 }
 
 // DeleteTargetGroup deletes a virtual target group
-func (i *k8sIntegration) DeleteTargetGroup(ctx context.Context, arn string) error {
+func (i *K8sIntegration) DeleteTargetGroup(ctx context.Context, arn string) error {
 	logging.Debug("Deleting virtual target group", "arn", arn)
 
 	i.mu.Lock()
@@ -214,7 +214,7 @@ func (i *k8sIntegration) DeleteTargetGroup(ctx context.Context, arn string) erro
 }
 
 // RegisterTargets registers targets with a virtual target group
-func (i *k8sIntegration) RegisterTargets(ctx context.Context, targetGroupArn string, targets []Target) error {
+func (i *K8sIntegration) RegisterTargets(ctx context.Context, targetGroupArn string, targets []Target) error {
 	logging.Debug("Registering targets with virtual target group", "targetCount", len(targets), "targetGroupArn", targetGroupArn)
 
 	i.mu.Lock()
@@ -255,7 +255,7 @@ func (i *k8sIntegration) RegisterTargets(ctx context.Context, targetGroupArn str
 }
 
 // DeregisterTargets deregisters targets from a virtual target group
-func (i *k8sIntegration) DeregisterTargets(ctx context.Context, targetGroupArn string, targets []Target) error {
+func (i *K8sIntegration) DeregisterTargets(ctx context.Context, targetGroupArn string, targets []Target) error {
 	logging.Debug("Deregistering targets from virtual target group", "targetCount", len(targets), "targetGroupArn", targetGroupArn)
 
 	i.mu.Lock()
@@ -274,7 +274,7 @@ func (i *k8sIntegration) DeregisterTargets(ctx context.Context, targetGroupArn s
 }
 
 // CreateListener creates a virtual listener and updates Traefik configuration
-func (i *k8sIntegration) CreateListener(ctx context.Context, loadBalancerArn string, port int32, protocol string, targetGroupArn string) (*Listener, error) {
+func (i *K8sIntegration) CreateListener(ctx context.Context, loadBalancerArn string, port int32, protocol string, targetGroupArn string) (*Listener, error) {
 	logging.Debug("Creating listener for load balancer", "port", port, "loadBalancerArn", loadBalancerArn)
 
 	// Extract load balancer name from ARN
@@ -408,7 +408,7 @@ func (i *k8sIntegration) CreateListener(ctx context.Context, loadBalancerArn str
 }
 
 // DeleteListener deletes a virtual listener
-func (i *k8sIntegration) DeleteListener(ctx context.Context, arn string) error {
+func (i *K8sIntegration) DeleteListener(ctx context.Context, arn string) error {
 	logging.Debug("Deleting virtual listener", "arn", arn)
 
 	i.mu.Lock()
@@ -446,7 +446,7 @@ func (i *k8sIntegration) DeleteListener(ctx context.Context, arn string) error {
 }
 
 // GetLoadBalancer gets virtual load balancer details
-func (i *k8sIntegration) GetLoadBalancer(ctx context.Context, arn string) (*LoadBalancer, error) {
+func (i *K8sIntegration) GetLoadBalancer(ctx context.Context, arn string) (*LoadBalancer, error) {
 	logging.Debug("Getting virtual load balancer", "arn", arn)
 
 	i.mu.RLock()
@@ -499,7 +499,7 @@ func (i *k8sIntegration) GetLoadBalancer(ctx context.Context, arn string) (*Load
 }
 
 // GetTargetHealth gets the health status of virtual targets
-func (i *k8sIntegration) GetTargetHealth(ctx context.Context, targetGroupArn string) ([]TargetHealth, error) {
+func (i *K8sIntegration) GetTargetHealth(ctx context.Context, targetGroupArn string) ([]TargetHealth, error) {
 	logging.Debug("Getting target health for virtual target group", "targetGroupArn", targetGroupArn)
 
 	i.mu.RLock()
@@ -523,7 +523,7 @@ func (i *k8sIntegration) GetTargetHealth(ctx context.Context, targetGroupArn str
 }
 
 // CheckTargetHealthWithK8s performs health check using Kubernetes pod status
-func (i *k8sIntegration) CheckTargetHealthWithK8s(ctx context.Context, targetIP string, targetPort int32, targetGroupArn string) (string, error) {
+func (i *K8sIntegration) CheckTargetHealthWithK8s(ctx context.Context, targetIP string, targetPort int32, targetGroupArn string) (string, error) {
 	logging.Debug("Checking target health with Kubernetes", "targetIP", targetIP, "targetPort", targetPort)
 
 	if i.kubeClient == nil {
@@ -549,7 +549,7 @@ func (i *k8sIntegration) CheckTargetHealthWithK8s(ctx context.Context, targetIP 
 }
 
 // findPodByIP finds a pod by its IP address across all namespaces
-func (i *k8sIntegration) findPodByIP(ctx context.Context, targetIP string) (*corev1.Pod, error) {
+func (i *K8sIntegration) findPodByIP(ctx context.Context, targetIP string) (*corev1.Pod, error) {
 	// List pods across all namespaces
 	pods, err := i.kubeClient.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -566,7 +566,7 @@ func (i *k8sIntegration) findPodByIP(ctx context.Context, targetIP string) (*cor
 }
 
 // checkPodReadiness checks if a pod is ready and healthy
-func (i *k8sIntegration) checkPodReadiness(pod *corev1.Pod, targetPort int32) (string, error) {
+func (i *K8sIntegration) checkPodReadiness(pod *corev1.Pod, targetPort int32) (string, error) {
 	// Check pod phase first
 	if pod.Status.Phase != corev1.PodRunning {
 		logging.Debug("Pod is not running", "namespace", pod.Namespace, "name", pod.Name, "phase", pod.Status.Phase)
@@ -599,7 +599,7 @@ func (i *k8sIntegration) checkPodReadiness(pod *corev1.Pod, targetPort int32) (s
 }
 
 // isPodPortExposed checks if a pod exposes the given port
-func (i *k8sIntegration) isPodPortExposed(pod *corev1.Pod, targetPort int32) bool {
+func (i *K8sIntegration) isPodPortExposed(pod *corev1.Pod, targetPort int32) bool {
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
 			if port.ContainerPort == targetPort {
@@ -611,7 +611,7 @@ func (i *k8sIntegration) isPodPortExposed(pod *corev1.Pod, targetPort int32) boo
 }
 
 // performBasicConnectivityCheck performs a basic TCP connectivity check
-func (i *k8sIntegration) performBasicConnectivityCheck(targetIP string, targetPort int32) (string, error) {
+func (i *K8sIntegration) performBasicConnectivityCheck(targetIP string, targetPort int32) (string, error) {
 	timeout := 5 * time.Second
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", targetIP, targetPort), timeout)
 	if err != nil {
@@ -641,7 +641,7 @@ func getResourceName(arn string) string {
 }
 
 // deployTraefikForLoadBalancer deploys Traefik resources for a load balancer
-func (i *k8sIntegration) deployTraefikForLoadBalancer(ctx context.Context, lbName, lbArn string) error {
+func (i *K8sIntegration) deployTraefikForLoadBalancer(ctx context.Context, lbName, lbArn string) error {
 	if i.kubeClient == nil {
 		// If no kubeClient is available, just log and continue
 		logging.Debug("No kubeClient available, skipping Traefik deployment for load balancer", "lbName", lbName)
@@ -681,7 +681,7 @@ func (i *k8sIntegration) deployTraefikForLoadBalancer(ctx context.Context, lbNam
 }
 
 // createNamespaceIfNotExists creates the namespace if it doesn't exist
-func (i *k8sIntegration) createNamespaceIfNotExists(ctx context.Context, namespace string) error {
+func (i *K8sIntegration) createNamespaceIfNotExists(ctx context.Context, namespace string) error {
 	_, err := i.kubeClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 	if err != nil {
 		// Namespace doesn't exist, create it
@@ -699,7 +699,7 @@ func (i *k8sIntegration) createNamespaceIfNotExists(ctx context.Context, namespa
 }
 
 // createServiceAccount creates a ServiceAccount for Traefik with load balancer annotations
-func (i *k8sIntegration) createServiceAccount(ctx context.Context, namespace, traefikName, lbName, lbArn string) error {
+func (i *K8sIntegration) createServiceAccount(ctx context.Context, namespace, traefikName, lbName, lbArn string) error {
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      traefikName,
@@ -725,7 +725,7 @@ func (i *k8sIntegration) createServiceAccount(ctx context.Context, namespace, tr
 }
 
 // createConfigMap creates a ConfigMap for Traefik configuration
-func (i *k8sIntegration) createConfigMap(ctx context.Context, namespace, traefikName, lbName, lbArn string) error {
+func (i *K8sIntegration) createConfigMap(ctx context.Context, namespace, traefikName, lbName, lbArn string) error {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-config", traefikName),
@@ -767,7 +767,7 @@ log:
 }
 
 // createDeployment creates a Deployment for Traefik
-func (i *k8sIntegration) createDeployment(ctx context.Context, namespace, traefikName, lbName, lbArn string) error {
+func (i *K8sIntegration) createDeployment(ctx context.Context, namespace, traefikName, lbName, lbArn string) error {
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      traefikName,
@@ -870,7 +870,7 @@ func (i *k8sIntegration) createDeployment(ctx context.Context, namespace, traefi
 }
 
 // createService creates a Service for Traefik
-func (i *k8sIntegration) createService(ctx context.Context, namespace, traefikName, lbName, lbArn string) error {
+func (i *K8sIntegration) createService(ctx context.Context, namespace, traefikName, lbName, lbArn string) error {
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      traefikName,
@@ -931,40 +931,125 @@ func mustParseResource(s string) resource.Quantity {
 }
 
 // deployTargetGroupResources deploys Kubernetes resources for a target group
-func (i *k8sIntegration) deployTargetGroupResources(ctx context.Context, tgName, tgArn string, port int32, protocol string) error {
+func (i *K8sIntegration) deployTargetGroupResources(ctx context.Context, tgName, tgArn string, port int32, protocol string) error {
 	if i.kubeClient == nil {
 		logging.Debug("No kubeClient available, skipping target group resources deployment", "tgName", tgName)
 		return nil
 	}
 
-	namespace := "kecs-system"
-	serviceName := fmt.Sprintf("tg-%s", tgName)
+	// Don't create the Service here anymore
+	// It will be created later when we know which namespace (ECS cluster) it belongs to
+	// For now, just log that we're deferring Service creation
 
-	// Create a Service for the target group
+	logging.Debug("Deferring Service creation for target group until ECS service is created",
+		"tgName", tgName,
+		"tgArn", tgArn,
+		"port", port,
+		"protocol", protocol)
+
+	// Store target group metadata for later use
+	// This metadata will be used when creating the Service in the correct namespace
+	if i.store != nil {
+		// Store in database for persistence
+		tgRecord := &storage.ELBv2TargetGroup{
+			ARN:       tgArn,
+			Name:      tgName,
+			Port:      port,
+			Protocol:  protocol,
+			Region:    i.region,
+			AccountID: i.accountID,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+
+		if err := i.store.CreateTargetGroup(ctx, tgRecord); err != nil {
+			logging.Warn("Failed to store target group metadata", "error", err, "tgName", tgName)
+			// Continue anyway - we can still work without persistence
+		}
+	}
+
+	return nil
+}
+
+// CreateTargetGroupServiceInNamespace creates a Kubernetes Service for a target group in a specific namespace
+// This is called when an ECS service is created with a load balancer configuration
+func (i *K8sIntegration) CreateTargetGroupServiceInNamespace(ctx context.Context, targetGroupArn, namespace string) error {
+	if i.kubeClient == nil {
+		logging.Debug("No kubeClient available, skipping target group Service creation", "targetGroupArn", targetGroupArn)
+		return nil
+	}
+
+	// Get target group from memory first
+	i.mu.RLock()
+	tg, exists := i.targetGroups[targetGroupArn]
+	i.mu.RUnlock()
+
+	// If not found in memory, try to get from database storage
+	if !exists && i.store != nil {
+		dbTG, err := i.store.GetTargetGroup(ctx, targetGroupArn)
+		if err == nil && dbTG != nil {
+			// Convert from storage type to our internal type
+			tg = &TargetGroup{
+				Arn:      dbTG.ARN,
+				Name:     dbTG.Name,
+				Port:     dbTG.Port,
+				Protocol: dbTG.Protocol,
+				VpcId:    "vpc-default", // Default VPC for consistency
+			}
+
+			// Cache it in memory for future use
+			i.mu.Lock()
+			i.targetGroups[targetGroupArn] = tg
+			if i.targetHealth[targetGroupArn] == nil {
+				i.targetHealth[targetGroupArn] = make(map[string]*TargetHealth)
+			}
+			i.mu.Unlock()
+
+			exists = true
+		}
+	}
+
+	if !exists {
+		return fmt.Errorf("target group not found: %s", targetGroupArn)
+	}
+
+	serviceName := fmt.Sprintf("tg-%s", tg.Name)
+
+	// Check if Service already exists in the namespace
+	existingService, err := i.kubeClient.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+	if err == nil && existingService != nil {
+		logging.Debug("Service for target group already exists in namespace",
+			"serviceName", serviceName,
+			"namespace", namespace,
+			"targetGroup", tg.Name)
+		return nil
+	}
+
+	// Create a Service for the target group in the ECS cluster's namespace
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				"kecs.io/elbv2-target-group-name":     tgName,
-				"kecs.io/elbv2-target-group-arn":      tgArn,
-				"kecs.io/elbv2-target-group-protocol": protocol,
+				"kecs.io/elbv2-target-group-name":     tg.Name,
+				"kecs.io/elbv2-target-group-arn":      targetGroupArn,
+				"kecs.io/elbv2-target-group-protocol": tg.Protocol,
 			},
 			Labels: map[string]string{
-				"kecs.io/elbv2-target-group-name": tgName,
+				"kecs.io/elbv2-target-group-name": tg.Name,
 				"kecs.io/component":               "target-group",
 			},
 		},
 		Spec: corev1.ServiceSpec{
 			Type: corev1.ServiceTypeClusterIP,
 			Selector: map[string]string{
-				"kecs.io/elbv2-target-group-name": tgName,
+				"kecs.io/elbv2-target-group-name": tg.Name,
 			},
 			Ports: []corev1.ServicePort{
 				{
 					Name:       "main",
-					Port:       port,
-					TargetPort: intstr.FromInt(int(port)),
+					Port:       tg.Port,
+					TargetPort: intstr.FromInt(int(tg.Port)),
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},
@@ -972,17 +1057,21 @@ func (i *k8sIntegration) deployTargetGroupResources(ctx context.Context, tgName,
 	}
 
 	// Create the service
-	_, err := i.kubeClient.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
+	_, err = i.kubeClient.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create Service for target group: %w", err)
+		return fmt.Errorf("failed to create Service for target group in namespace %s: %w", namespace, err)
 	}
 
-	logging.Debug("Created Service for target group", "serviceName", serviceName, "tgName", tgName)
+	logging.Info("Created Service for target group in ECS cluster namespace",
+		"serviceName", serviceName,
+		"namespace", namespace,
+		"targetGroup", tg.Name)
+
 	return nil
 }
 
 // updateTraefikConfigForListener creates Ingress for global Traefik with Host header routing
-func (i *k8sIntegration) updateTraefikConfigForListener(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
+func (i *K8sIntegration) updateTraefikConfigForListener(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
 	if i.kubeClient == nil {
 		logging.Debug("No kubeClient available, skipping Ingress creation for listener", "listenerArn", listenerArn)
 		return nil
@@ -1005,7 +1094,7 @@ func (i *k8sIntegration) updateTraefikConfigForListener(ctx context.Context, lbN
 }
 
 // createIngressRoute creates a Traefik IngressRoute CRD for routing to target groups
-func (i *k8sIntegration) createIngressRoute(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
+func (i *K8sIntegration) createIngressRoute(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
 	if i.dynamicClient == nil {
 		logging.Debug("No dynamicClient available, skipping IngressRoute creation")
 		return nil
@@ -1080,7 +1169,7 @@ func sanitizeName(name string) string {
 }
 
 // deleteIngressRoute deletes a Traefik IngressRoute CRD
-func (i *k8sIntegration) deleteIngressRoute(ctx context.Context, lbName string, port int32) error {
+func (i *K8sIntegration) deleteIngressRoute(ctx context.Context, lbName string, port int32) error {
 	if i.dynamicClient == nil {
 		logging.Debug("No dynamicClient available, skipping IngressRoute deletion")
 		return nil
@@ -1108,7 +1197,7 @@ func (i *k8sIntegration) deleteIngressRoute(ctx context.Context, lbName string, 
 
 // createGlobalIngress creates a standard Kubernetes Ingress for the global Traefik instance
 // It uses Host header-based routing to distinguish between different ALBs
-func (i *k8sIntegration) createGlobalIngress(ctx context.Context, lbName, lbDNSName, listenerArn string, port int32, protocol, targetGroupName string) error {
+func (i *K8sIntegration) createGlobalIngress(ctx context.Context, lbName, lbDNSName, listenerArn string, port int32, protocol, targetGroupName string) error {
 	if i.kubeClient == nil {
 		logging.Debug("No kubeClient available, skipping global Ingress creation")
 		return nil
@@ -1192,7 +1281,7 @@ func (i *k8sIntegration) createGlobalIngress(ctx context.Context, lbName, lbDNSN
 }
 
 // deleteGlobalIngress deletes a standard Kubernetes Ingress
-func (i *k8sIntegration) deleteGlobalIngress(ctx context.Context, lbName string, port int32) error {
+func (i *K8sIntegration) deleteGlobalIngress(ctx context.Context, lbName string, port int32) error {
 	if i.kubeClient == nil {
 		logging.Debug("No kubeClient available, skipping global Ingress deletion")
 		return nil
@@ -1212,7 +1301,7 @@ func (i *k8sIntegration) deleteGlobalIngress(ctx context.Context, lbName string,
 }
 
 // updateIngressRoute updates an existing Traefik IngressRoute CRD
-func (i *k8sIntegration) updateIngressRoute(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
+func (i *K8sIntegration) updateIngressRoute(ctx context.Context, lbName, listenerArn string, port int32, protocol, targetGroupName string) error {
 	if i.dynamicClient == nil {
 		logging.Debug("No dynamicClient available, skipping IngressRoute update")
 		return nil
@@ -1274,7 +1363,7 @@ func (i *k8sIntegration) updateIngressRoute(ctx context.Context, lbName, listene
 }
 
 // SyncRulesToListener synchronizes ELBv2 rules to Traefik IngressRoute
-func (i *k8sIntegration) SyncRulesToListener(ctx context.Context, storageInstance interface{}, listenerArn string, lbName string, port int32) error {
+func (i *K8sIntegration) SyncRulesToListener(ctx context.Context, storageInstance interface{}, listenerArn string, lbName string, port int32) error {
 	// Cast storage to the correct type
 	storageImpl, ok := storageInstance.(storage.Storage)
 	if !ok {
@@ -1296,7 +1385,7 @@ func (i *k8sIntegration) SyncRulesToListener(ctx context.Context, storageInstanc
 }
 
 // addK3dPortMapping adds a port mapping to the k3d cluster's load balancer
-func (i *k8sIntegration) addK3dPortMapping(ctx context.Context, clusterName string, hostPort, nodePort int32) error {
+func (i *K8sIntegration) addK3dPortMapping(ctx context.Context, clusterName string, hostPort, nodePort int32) error {
 	// Skip if running in container mode (k3d command not available)
 	if os.Getenv("KECS_CONTAINER_MODE") == "true" {
 		logging.Info("Running in container mode, k3d port mapping should be pre-configured",

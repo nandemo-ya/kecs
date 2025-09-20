@@ -15,6 +15,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
+	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
@@ -396,6 +397,36 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		storageService.Status = "ACTIVE"
 		if err := api.storage.ServiceStore().Update(ctx, storageService); err != nil {
 			logging.Warn("Failed to update service status", "error", err)
+		}
+	}
+
+	// Handle LoadBalancer (ELBv2) integration if LoadBalancers are specified
+	if len(req.LoadBalancers) > 0 && api.elbv2Integration != nil {
+		logging.Info("Service has LoadBalancers, creating target group services in namespace",
+			"serviceName", req.ServiceName,
+			"namespace", namespace,
+			"loadBalancersCount", len(req.LoadBalancers))
+
+		// For each load balancer/target group, create the Service in the correct namespace
+		for _, lb := range req.LoadBalancers {
+			if lb.TargetGroupArn != nil && *lb.TargetGroupArn != "" {
+				// Try to cast the integration to access the new method
+				if k8sIntegration, ok := api.elbv2Integration.(*elbv2.K8sIntegration); ok {
+					if err := k8sIntegration.CreateTargetGroupServiceInNamespace(ctx, *lb.TargetGroupArn, namespace); err != nil {
+						logging.Warn("Failed to create target group service in namespace",
+							"error", err,
+							"targetGroupArn", *lb.TargetGroupArn,
+							"namespace", namespace)
+						// Don't fail service creation, but log the error
+					} else {
+						logging.Info("Successfully created target group service in namespace",
+							"targetGroupArn", *lb.TargetGroupArn,
+							"namespace", namespace)
+					}
+				} else {
+					logging.Error("ELBv2 integration does not support CreateTargetGroupServiceInNamespace")
+				}
+			}
 		}
 	}
 
