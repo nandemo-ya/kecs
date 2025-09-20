@@ -23,9 +23,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 // HTTPClient implements the Client interface using HTTP
@@ -1186,10 +1190,41 @@ func (c *HTTPClient) ListListeners(ctx context.Context, instanceName, loadBalanc
 
 // Helper methods
 
+// instanceConfig represents the minimal instance configuration we need
+type instanceConfig struct {
+	APIPort int `yaml:"apiPort"`
+}
+
 // getPortForInstance returns the API port for the given instance
 func (c *HTTPClient) getPortForInstance(instanceName string) int {
-	// TODO: look up actual port from instance configuration
-	// For now, return the default KECS port
+	// Get home directory
+	home, err := os.UserHomeDir()
+	if err != nil {
+		// Fall back to default port if we can't get home directory
+		return 5373
+	}
+
+	// Build config file path
+	configPath := filepath.Join(home, ".kecs", "instances", instanceName, "config.yaml")
+
+	// Read config file
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		// Fall back to default port if config file doesn't exist
+		return 5373
+	}
+
+	// Parse YAML
+	var config instanceConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		// Fall back to default port if we can't parse the config
+		return 5373
+	}
+
+	// Return the configured port or default if not set
+	if config.APIPort > 0 {
+		return config.APIPort
+	}
 	return 5373
 }
 
