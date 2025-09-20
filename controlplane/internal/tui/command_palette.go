@@ -215,6 +215,60 @@ func (cp *CommandPalette) initCommands() {
 				return m.currentView == ViewServices || m.currentView == ViewTasks
 			},
 		},
+		{
+			Name:        "goto loadbalancers",
+			Description: "Navigate to load balancers view",
+			Category:    CommandCategoryNavigation,
+			Shortcut:    "b",
+			Aliases:     []string{"loadbalancers", "lb", "alb", "elb"},
+			Handler: func(m *Model) (string, error) {
+				if m.selectedInstance == "" {
+					return "", fmt.Errorf("no instance selected")
+				}
+				m.currentView = ViewLoadBalancers
+				return "Navigated to load balancers", nil
+			},
+			Available: func(m *Model) bool {
+				return m.selectedInstance != "" && (m.currentView == ViewClusters || m.currentView == ViewTargetGroups || m.currentView == ViewListeners)
+			},
+		},
+		{
+			Name:        "goto targetgroups",
+			Description: "Navigate to target groups view",
+			Category:    CommandCategoryNavigation,
+			Shortcut:    "g",
+			Aliases:     []string{"targetgroups", "tg", "targets"},
+			Handler: func(m *Model) (string, error) {
+				if m.selectedInstance == "" {
+					return "", fmt.Errorf("no instance selected")
+				}
+				m.currentView = ViewTargetGroups
+				return "Navigated to target groups", nil
+			},
+			Available: func(m *Model) bool {
+				return m.selectedInstance != "" && (m.currentView == ViewClusters || m.currentView == ViewLoadBalancers || m.currentView == ViewListeners)
+			},
+		},
+		{
+			Name:        "goto listeners",
+			Description: "Navigate to listeners for selected load balancer",
+			Category:    CommandCategoryNavigation,
+			Aliases:     []string{"listeners", "listen"},
+			Handler: func(m *Model) (string, error) {
+				if m.currentView != ViewLoadBalancers {
+					return "", fmt.Errorf("select a load balancer first")
+				}
+				if len(m.loadBalancers) > m.lbCursor {
+					m.selectedLB = m.loadBalancers[m.lbCursor].ARN
+					m.currentView = ViewListeners
+					return fmt.Sprintf("Navigated to listeners for %s", m.loadBalancers[m.lbCursor].Name), nil
+				}
+				return "", fmt.Errorf("no load balancer selected")
+			},
+			Available: func(m *Model) bool {
+				return m.currentView == ViewLoadBalancers && len(m.loadBalancers) > 0
+			},
+		},
 
 		// Create commands
 		{

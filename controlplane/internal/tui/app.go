@@ -104,13 +104,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleServiceUpdateDialogKeys(msg)
 		}
 
+		// Handle ELBv2 views first - they have custom key handling
+		if m.currentView == ViewLoadBalancers || m.currentView == ViewTargetGroups || m.currentView == ViewListeners {
+			if debugLogger := GetDebugLogger(); debugLogger != nil {
+				debugLogger.LogWithCaller("Update", "ELBv2 view detected (%s) - routing key '%s' directly to handleELBv2Keys", m.currentView.String(), keyStr)
+			}
+			return m.handleELBv2Keys(msg)
+		}
+
 		// Check for global key action
 		if action, found := m.keyBindings.GetGlobalAction(keyStr); found {
+			if debugLogger := GetDebugLogger(); debugLogger != nil {
+				debugLogger.LogWithCaller("Update", "Global action '%s' found for key '%s' in view %s - calling executeAction", action, keyStr, m.currentView.String())
+			}
 			return m.executeAction(action)
 		}
 
 		// Check for view-specific key action
 		if action, found := m.keyBindings.GetViewAction(m.currentView, keyStr); found {
+			if debugLogger := GetDebugLogger(); debugLogger != nil {
+				debugLogger.LogWithCaller("Update", "View-specific action '%s' found for key '%s' in view %s - calling executeAction", action, keyStr, m.currentView.String())
+			}
 			return m.executeAction(action)
 		}
 
@@ -494,6 +508,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reload clusters
 		cmds = append(cmds, m.loadDataFromAPI())
 
+	case elbv2DataLoadedMsg:
+		// Update ELBv2 data - always update even if empty (could be error or no resources)
+		m.loadBalancers = msg.loadBalancers
+		m.targetGroups = msg.targetGroups
+		m.listeners = msg.listeners
+
+		if debugLogger := GetDebugLogger(); debugLogger != nil {
+			debugLogger.LogWithCaller("Update", "ELBv2 data loaded - LBs: %d, TGs: %d, Listeners: %d",
+				len(m.loadBalancers), len(m.targetGroups), len(m.listeners))
+		}
+
 	case errMsg:
 		// Handle API errors
 		m.err = msg.err
@@ -773,6 +798,11 @@ func (m Model) View() string {
 		}
 		// Fallback if editor is nil
 		return m.View()
+	}
+
+	// For ELBv2 views, use the special ELBv2 rendering
+	if m.currentView == ViewLoadBalancers || m.currentView == ViewTargetGroups || m.currentView == ViewListeners {
+		return m.renderELBv2View()
 	}
 
 	// For logs view with active log viewer, use full screen or split view
@@ -1081,6 +1111,14 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 				m.selectedService = ""
 				return m, m.loadDataFromAPI()
 			}
+		}
+	case "e":
+		// Navigate to ELBv2 resources
+		if m.selectedInstance != "" {
+			m.currentView = ViewLoadBalancers
+			m.elbv2SubView = 0 // Start with load balancers
+			m.lbCursor = 0
+			return m, m.loadELBv2DataCmd()
 		}
 	}
 	return m, nil

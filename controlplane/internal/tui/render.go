@@ -579,6 +579,49 @@ func (m Model) renderSummary() string {
 			summary = fmt.Sprintf("Family: %s | Revisions: %d | Active: %d | Latest: %d",
 				m.selectedFamily, total, active, latestRev)
 		}
+
+	case ViewLoadBalancers:
+		if m.selectedInstance != "" {
+			active := 0
+			for _, lb := range m.loadBalancers {
+				if lb.State == "active" {
+					active++
+				}
+			}
+			summary = fmt.Sprintf("Load Balancers: %d | Active: %d | Instance: %s",
+				len(m.loadBalancers), active, m.selectedInstance)
+		}
+
+	case ViewTargetGroups:
+		if m.selectedInstance != "" {
+			healthy := 0
+			unhealthy := 0
+			for _, tg := range m.targetGroups {
+				if tg.HealthyTargetCount > 0 && tg.UnhealthyTargetCount == 0 {
+					healthy++
+				} else if tg.UnhealthyTargetCount > 0 {
+					unhealthy++
+				}
+			}
+			summary = fmt.Sprintf("Target Groups: %d | Healthy: %d | Unhealthy: %d | Instance: %s",
+				len(m.targetGroups), healthy, unhealthy, m.selectedInstance)
+		}
+
+	case ViewListeners:
+		if m.selectedInstance != "" && m.selectedLB != "" {
+			// Extract LB name from ARN if possible
+			lbName := m.selectedLB
+			if len(m.loadBalancers) > 0 {
+				for _, lb := range m.loadBalancers {
+					if lb.ARN == m.selectedLB {
+						lbName = lb.Name
+						break
+					}
+				}
+			}
+			summary = fmt.Sprintf("Listeners: %d | Load Balancer: %s",
+				len(m.listeners), lbName)
+		}
 	}
 
 	if summary == "" {
