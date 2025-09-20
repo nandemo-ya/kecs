@@ -32,6 +32,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// DefaultKECSPort is the default API port for KECS instances
+const DefaultKECSPort = 5373
+
 // HTTPClient implements the Client interface using HTTP
 type HTTPClient struct {
 	baseURL     string
@@ -1201,7 +1204,7 @@ func (c *HTTPClient) getPortForInstance(instanceName string) int {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		// Fall back to default port if we can't get home directory
-		return 5373
+		return DefaultKECSPort
 	}
 
 	// Build config file path
@@ -1211,21 +1214,21 @@ func (c *HTTPClient) getPortForInstance(instanceName string) int {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		// Fall back to default port if config file doesn't exist
-		return 5373
+		return DefaultKECSPort
 	}
 
 	// Parse YAML
 	var config instanceConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		// Fall back to default port if we can't parse the config
-		return 5373
+		return DefaultKECSPort
 	}
 
 	// Return the configured port or default if not set
 	if config.APIPort > 0 {
 		return config.APIPort
 	}
-	return 5373
+	return DefaultKECSPort
 }
 
 // XML response structures for Target Health
