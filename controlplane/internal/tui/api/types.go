@@ -324,17 +324,23 @@ type CreationStatus struct {
 	Message string `json:"message"` // Optional message
 }
 
+// ELBv2LoadBalancerState represents the state of a load balancer
+type ELBv2LoadBalancerState struct {
+	Code   string `json:"Code"`
+	Reason string `json:"Reason,omitempty"`
+}
+
 // ELBv2LoadBalancer represents a load balancer from ELBv2 API
 type ELBv2LoadBalancer struct {
-	LoadBalancerArn  string    `json:"LoadBalancerArn"`
-	LoadBalancerName string    `json:"LoadBalancerName"`
-	DNSName          string    `json:"DNSName,omitempty"`
-	Type             string    `json:"Type,omitempty"`
-	Scheme           string    `json:"Scheme,omitempty"`
-	State            string    `json:"State,omitempty"`
-	VpcId            string    `json:"VpcId,omitempty"`
-	Subnets          []string  `json:"Subnets,omitempty"`
-	CreatedTime      time.Time `json:"CreatedTime,omitempty"`
+	LoadBalancerArn  string                  `json:"LoadBalancerArn"`
+	LoadBalancerName string                  `json:"LoadBalancerName"`
+	DNSName          string                  `json:"DNSName,omitempty"`
+	Type             string                  `json:"Type,omitempty"`
+	Scheme           string                  `json:"Scheme,omitempty"`
+	State            *ELBv2LoadBalancerState `json:"State,omitempty"`
+	VpcId            string                  `json:"VpcId,omitempty"`
+	Subnets          []string                `json:"Subnets,omitempty"`
+	CreatedTime      time.Time               `json:"CreatedTime,omitempty"`
 }
 
 // ELBv2TargetGroup represents a target group from ELBv2 API

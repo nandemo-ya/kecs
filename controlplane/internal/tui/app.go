@@ -104,13 +104,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleServiceUpdateDialogKeys(msg)
 		}
 
+		// Handle ELBv2 views first - they have custom key handling
+		if m.currentView == ViewLoadBalancers || m.currentView == ViewTargetGroups || m.currentView == ViewListeners {
+			if debugLogger := GetDebugLogger(); debugLogger != nil {
+				debugLogger.LogWithCaller("Update", "ELBv2 view detected (%s) - routing key '%s' directly to handleELBv2Keys", m.currentView.String(), keyStr)
+			}
+			return m.handleELBv2Keys(msg)
+		}
+
 		// Check for global key action
 		if action, found := m.keyBindings.GetGlobalAction(keyStr); found {
+			if debugLogger := GetDebugLogger(); debugLogger != nil {
+				debugLogger.LogWithCaller("Update", "Global action '%s' found for key '%s' in view %s - calling executeAction", action, keyStr, m.currentView.String())
+			}
 			return m.executeAction(action)
 		}
 
 		// Check for view-specific key action
 		if action, found := m.keyBindings.GetViewAction(m.currentView, keyStr); found {
+			if debugLogger := GetDebugLogger(); debugLogger != nil {
+				debugLogger.LogWithCaller("Update", "View-specific action '%s' found for key '%s' in view %s - calling executeAction", action, keyStr, m.currentView.String())
+			}
 			return m.executeAction(action)
 		}
 
@@ -124,8 +138,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m, cmd = m.handleTaskDefinitionEditorKeys(msg)
 		case ViewClusterCreate:
 			m, cmd = m.handleClusterCreateKeys(msg)
-		case ViewLoadBalancers, ViewTargetGroups, ViewListeners:
-			m, cmd = m.handleELBv2Keys(msg)
 		}
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -497,15 +509,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.loadDataFromAPI())
 
 	case elbv2DataLoadedMsg:
-		// Update ELBv2 data
-		if len(msg.loadBalancers) > 0 {
-			m.loadBalancers = msg.loadBalancers
-		}
-		if len(msg.targetGroups) > 0 {
-			m.targetGroups = msg.targetGroups
-		}
-		if msg.listeners != nil { // Check for nil to allow empty list
-			m.listeners = msg.listeners
+		// Update ELBv2 data - always update even if empty (could be error or no resources)
+		m.loadBalancers = msg.loadBalancers
+		m.targetGroups = msg.targetGroups
+		m.listeners = msg.listeners
+
+		if debugLogger := GetDebugLogger(); debugLogger != nil {
+			debugLogger.LogWithCaller("Update", "ELBv2 data loaded - LBs: %d, TGs: %d, Listeners: %d",
+				len(m.loadBalancers), len(m.targetGroups), len(m.listeners))
 		}
 
 	case errMsg:

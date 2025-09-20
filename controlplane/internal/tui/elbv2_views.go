@@ -8,40 +8,50 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// renderELBv2View renders the ELBv2 resources view with tabs
+// renderELBv2View renders the ELBv2 resources view with navigation panel
 func (m Model) renderELBv2View() string {
 	if !m.ready {
 		return "Initializing..."
 	}
 
-	// Calculate heights
+	// Calculate heights following the ECS view pattern
 	footerHeight := 1
 	availableHeight := m.height - footerHeight
-	tabBarHeight := 3
-	contentHeight := availableHeight - tabBarHeight
+	navPanelHeight := int(float64(availableHeight) * 0.3)
+	resourcePanelHeight := availableHeight - navPanelHeight
 
-	// Render tab bar
-	tabBar := m.renderELBv2TabBar()
+	// Ensure minimum heights
+	if navPanelHeight < 10 {
+		navPanelHeight = 10
+	}
+	if resourcePanelHeight < 10 {
+		resourcePanelHeight = 10
+	}
 
-	// Render content based on selected sub-view
+	// Render navigation panel (30% height) - reuse the common navigation panel
+	navigationPanel := m.renderNavigationPanel()
+
+	// Render content based on current ELBv2 view
 	var content string
-	switch m.elbv2SubView {
-	case 0: // Load Balancers
-		content = m.renderLoadBalancersList(contentHeight - 4)
-	case 1: // Target Groups
-		content = m.renderTargetGroupsList(contentHeight - 4)
-	case 2: // Listeners
-		content = m.renderListenersList(contentHeight - 4)
+	contentHeight := resourcePanelHeight - 4 // Account for borders
+
+	switch m.currentView {
+	case ViewLoadBalancers:
+		content = m.renderLoadBalancersList(contentHeight)
+	case ViewTargetGroups:
+		content = m.renderTargetGroupsList(contentHeight)
+	case ViewListeners:
+		content = m.renderListenersList(contentHeight)
 	default:
-		content = m.renderLoadBalancersList(contentHeight - 4)
+		content = m.renderLoadBalancersList(contentHeight)
 	}
 
 	// Wrap content in a bordered panel
-	contentPanel := lipgloss.NewStyle().
+	resourcePanel := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#585b70")).
 		Width(m.width - 2).
-		Height(contentHeight).
+		Height(resourcePanelHeight).
 		Render(content)
 
 	// Render footer
@@ -50,55 +60,9 @@ func (m Model) renderELBv2View() string {
 	// Combine all components
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
-		tabBar,
-		contentPanel,
+		navigationPanel,
+		resourcePanel,
 		footer,
-	)
-}
-
-// renderELBv2TabBar renders the tab bar for ELBv2 views
-func (m Model) renderELBv2TabBar() string {
-	tabs := []string{"Load Balancers", "Target Groups", "Listeners"}
-	var tabsRendered []string
-
-	selectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#667eea")).
-		Foreground(lipgloss.Color("#ffffff")).
-		Padding(0, 2).
-		Bold(true)
-
-	unselectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#2d3748")).
-		Foreground(lipgloss.Color("#a0aec0")).
-		Padding(0, 2)
-
-	for i, tab := range tabs {
-		if i == m.elbv2SubView {
-			tabsRendered = append(tabsRendered, selectedStyle.Render(tab))
-		} else {
-			tabsRendered = append(tabsRendered, unselectedStyle.Render(tab))
-		}
-	}
-
-	tabLine := lipgloss.JoinHorizontal(lipgloss.Left, tabsRendered...)
-
-	// Add navigation hints
-	hints := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#718096")).
-		Render("  Tab: Switch view • esc: Back")
-
-	// Create header with instance/cluster info
-	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#a0aec0")).
-		Bold(true)
-
-	header := headerStyle.Render(fmt.Sprintf("ELBv2 Resources - Instance: %s", m.selectedInstance))
-
-	return lipgloss.JoinVertical(
-		lipgloss.Top,
-		header,
-		tabLine+hints,
-		"", // Empty line for spacing
 	)
 }
 
@@ -108,23 +72,38 @@ func (m Model) renderLoadBalancersList(height int) string {
 		emptyStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#718096")).
 			Align(lipgloss.Center, lipgloss.Center).
-			Width(m.width - 4).
-			Height(height)
+			Width(m.width-8).
+			Height(height).
+			Padding(1, 2)
 		return emptyStyle.Render("No load balancers found")
 	}
+
+	// Calculate column widths based on available width (similar to ECS views)
+	availableWidth := m.width - 8
+	nameWidth := int(float64(availableWidth) * 0.25)
+	typeWidth := int(float64(availableWidth) * 0.12)
+	schemeWidth := int(float64(availableWidth) * 0.15)
+	stateWidth := int(float64(availableWidth) * 0.12)
+	dnsWidth := int(float64(availableWidth) * 0.28)
+	ageWidth := int(float64(availableWidth) * 0.08)
 
 	// Header
 	headerStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#a0aec0")).
 		Bold(true)
 
-	header := fmt.Sprintf("%-30s %-15s %-15s %-10s %-50s %s",
-		"NAME", "TYPE", "SCHEME", "STATE", "DNS NAME", "AGE")
+	header := fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s",
+		nameWidth, "NAME",
+		typeWidth, "TYPE",
+		schemeWidth, "SCHEME",
+		stateWidth, "STATE",
+		dnsWidth, "DNS NAME",
+		ageWidth, "AGE")
 
 	// Rows
 	var rows []string
-	rows = append(rows, headerStyle.Render(header))
-	rows = append(rows, strings.Repeat("─", m.width-4))
+	rows = append(rows, "  "+headerStyle.Render(header))
+	rows = append(rows, "  "+strings.Repeat("─", availableWidth-2))
 
 	selectedStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("#2d3748")).
@@ -155,20 +134,20 @@ func (m Model) renderLoadBalancersList(height int) string {
 		if color, ok := stateColors[lb.State]; ok {
 			stateStyle = stateStyle.Foreground(color)
 		}
-		state := stateStyle.Render(fmt.Sprintf("%-10s", lb.State))
+		state := stateStyle.Render(fmt.Sprintf("%-*s", stateWidth, lb.State))
 
-		row := fmt.Sprintf("%-30s %-15s %-15s %s %-50s %s",
-			truncate(lb.Name, 30),
-			lb.Type,
-			lb.Scheme,
+		row := fmt.Sprintf("%-*s %-*s %-*s %s %-*s %-*s",
+			nameWidth, truncate(lb.Name, nameWidth),
+			typeWidth, truncate(lb.Type, typeWidth),
+			schemeWidth, lb.Scheme,
 			state,
-			dnsName,
-			age)
+			dnsWidth, truncate(dnsName, dnsWidth),
+			ageWidth, age)
 
 		if i == m.lbCursor {
-			rows = append(rows, selectedStyle.Render(row))
+			rows = append(rows, selectedStyle.Width(availableWidth).Render("▸ "+row))
 		} else {
-			rows = append(rows, normalStyle.Render(row))
+			rows = append(rows, "  "+normalStyle.Render(row))
 		}
 	}
 
@@ -188,23 +167,38 @@ func (m Model) renderTargetGroupsList(height int) string {
 		emptyStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#718096")).
 			Align(lipgloss.Center, lipgloss.Center).
-			Width(m.width - 4).
-			Height(height)
+			Width(m.width-8).
+			Height(height).
+			Padding(1, 2)
 		return emptyStyle.Render("No target groups found")
 	}
+
+	// Calculate column widths based on available width
+	availableWidth := m.width - 8
+	nameWidth := int(float64(availableWidth) * 0.30)
+	portWidth := int(float64(availableWidth) * 0.10)
+	protocolWidth := int(float64(availableWidth) * 0.12)
+	typeWidth := int(float64(availableWidth) * 0.15)
+	healthWidth := int(float64(availableWidth) * 0.20)
+	targetsWidth := int(float64(availableWidth) * 0.13)
 
 	// Header
 	headerStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#a0aec0")).
 		Bold(true)
 
-	header := fmt.Sprintf("%-30s %-8s %-8s %-10s %-20s %s",
-		"NAME", "PORT", "PROTOCOL", "TYPE", "HEALTH", "TARGETS")
+	header := fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s",
+		nameWidth, "NAME",
+		portWidth, "PORT",
+		protocolWidth, "PROTOCOL",
+		typeWidth, "TYPE",
+		healthWidth, "HEALTH",
+		targetsWidth, "TARGETS")
 
 	// Rows
 	var rows []string
-	rows = append(rows, headerStyle.Render(header))
-	rows = append(rows, strings.Repeat("─", m.width-4))
+	rows = append(rows, "  "+headerStyle.Render(header))
+	rows = append(rows, "  "+strings.Repeat("─", availableWidth-2))
 
 	selectedStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("#2d3748")).
@@ -225,20 +219,20 @@ func (m Model) renderTargetGroupsList(height int) string {
 		} else {
 			healthStyle = healthStyle.Foreground(lipgloss.Color("#48bb78")) // green for healthy
 		}
-		healthFormatted := healthStyle.Render(fmt.Sprintf("%-20s", health))
+		healthFormatted := healthStyle.Render(fmt.Sprintf("%-*s", healthWidth, health))
 
-		row := fmt.Sprintf("%-30s %-8d %-8s %-10s %s %d",
-			truncate(tg.Name, 30),
-			tg.Port,
-			tg.Protocol,
-			tg.TargetType,
+		row := fmt.Sprintf("%-*s %-*d %-*s %-*s %s %-*d",
+			nameWidth, truncate(tg.Name, nameWidth),
+			portWidth, tg.Port,
+			protocolWidth, tg.Protocol,
+			typeWidth, tg.TargetType,
 			healthFormatted,
-			tg.RegisteredTargetsCount)
+			targetsWidth, tg.RegisteredTargetsCount)
 
 		if i == m.tgCursor {
-			rows = append(rows, selectedStyle.Render(row))
+			rows = append(rows, selectedStyle.Width(availableWidth).Render("▸ "+row))
 		} else {
-			rows = append(rows, normalStyle.Render(row))
+			rows = append(rows, "  "+normalStyle.Render(row))
 		}
 	}
 
@@ -258,8 +252,9 @@ func (m Model) renderListenersList(height int) string {
 		emptyStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#718096")).
 			Align(lipgloss.Center, lipgloss.Center).
-			Width(m.width - 4).
-			Height(height)
+			Width(m.width-8).
+			Height(height).
+			Padding(1, 2)
 
 		if m.selectedLB == "" {
 			return emptyStyle.Render("Select a load balancer to view its listeners")
@@ -267,18 +262,30 @@ func (m Model) renderListenersList(height int) string {
 		return emptyStyle.Render("No listeners found for selected load balancer")
 	}
 
+	// Calculate column widths based on available width
+	availableWidth := m.width - 8
+	portWidth := int(float64(availableWidth) * 0.10)
+	protocolWidth := int(float64(availableWidth) * 0.12)
+	actionWidth := int(float64(availableWidth) * 0.18)
+	targetGroupWidth := int(float64(availableWidth) * 0.50)
+	rulesWidth := int(float64(availableWidth) * 0.10)
+
 	// Header
 	headerStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#a0aec0")).
 		Bold(true)
 
-	header := fmt.Sprintf("%-8s %-10s %-15s %-40s %s",
-		"PORT", "PROTOCOL", "ACTION", "TARGET GROUP", "RULES")
+	header := fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s",
+		portWidth, "PORT",
+		protocolWidth, "PROTOCOL",
+		actionWidth, "ACTION",
+		targetGroupWidth, "TARGET GROUP",
+		rulesWidth, "RULES")
 
 	// Rows
 	var rows []string
-	rows = append(rows, headerStyle.Render(header))
-	rows = append(rows, strings.Repeat("─", m.width-4))
+	rows = append(rows, "  "+headerStyle.Render(header))
+	rows = append(rows, "  "+strings.Repeat("─", availableWidth-2))
 
 	selectedStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("#2d3748")).
@@ -302,17 +309,17 @@ func (m Model) renderListenersList(height int) string {
 			}
 		}
 
-		row := fmt.Sprintf("%-8d %-10s %-15s %-40s %d",
-			listener.Port,
-			listener.Protocol,
-			action,
-			truncate(targetGroup, 40),
-			listener.RuleCount)
+		row := fmt.Sprintf("%-*d %-*s %-*s %-*s %-*d",
+			portWidth, listener.Port,
+			protocolWidth, listener.Protocol,
+			actionWidth, truncate(action, actionWidth),
+			targetGroupWidth, truncate(targetGroup, targetGroupWidth),
+			rulesWidth, listener.RuleCount)
 
 		if i == m.listenerCursor {
-			rows = append(rows, selectedStyle.Render(row))
+			rows = append(rows, selectedStyle.Width(availableWidth).Render("▸ "+row))
 		} else {
-			rows = append(rows, normalStyle.Render(row))
+			rows = append(rows, "  "+normalStyle.Render(row))
 		}
 	}
 

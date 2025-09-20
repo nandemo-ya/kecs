@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -925,18 +926,49 @@ func (c *HTTPClient) GetInstanceCreationStatus(ctx context.Context, name string)
 
 // ELBv2 operations
 
+// XML response structures for ELBv2 API
+type describeLoadBalancersResponse struct {
+	XMLName xml.Name                    `xml:"DescribeLoadBalancersResponse"`
+	Result  describeLoadBalancersResult `xml:"DescribeLoadBalancersResult"`
+}
+
+type describeLoadBalancersResult struct {
+	LoadBalancers []xmlLoadBalancer `xml:"LoadBalancers>member"`
+}
+
+type xmlLoadBalancer struct {
+	LoadBalancerArn       string     `xml:"LoadBalancerArn"`
+	LoadBalancerName      string     `xml:"LoadBalancerName"`
+	DNSName               string     `xml:"DNSName"`
+	CanonicalHostedZoneId string     `xml:"CanonicalHostedZoneId"`
+	Type                  string     `xml:"Type"`
+	Scheme                string     `xml:"Scheme"`
+	VpcId                 string     `xml:"VpcId"`
+	State                 xmlLBState `xml:"State"`
+	CreatedTime           string     `xml:"CreatedTime"`
+	IpAddressType         string     `xml:"IpAddressType"`
+}
+
+type xmlLBState struct {
+	Code   string `xml:"Code"`
+	Reason string `xml:"Reason"`
+}
+
 // ListLoadBalancers retrieves all load balancers in the instance
 func (c *HTTPClient) ListLoadBalancers(ctx context.Context, instanceName string) ([]ELBv2LoadBalancer, error) {
-	// Construct the ELBv2 API endpoint
-	url := fmt.Sprintf("http://localhost:%d/", c.getPortForInstance(instanceName))
+	// Construct the ELBv2 API endpoint using Form URL-encoded format
+	apiURL := fmt.Sprintf("http://localhost:%d/", c.getPortForInstance(instanceName))
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader("{}"))
+	// Prepare form data
+	formData := url.Values{}
+	formData.Set("Action", "DescribeLoadBalancers")
+	formData.Set("Version", "2015-12-01")
+
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(formData.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
-	req.Header.Set("X-Amz-Target", "ElasticLoadBalancing_V2.DescribeLoadBalancers")
-	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -945,30 +977,87 @@ func (c *HTTPClient) ListLoadBalancers(ctx context.Context, instanceName string)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result struct {
-		LoadBalancers []ELBv2LoadBalancer `json:"LoadBalancers"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	// Parse XML response
+	var xmlResp describeLoadBalancersResponse
+	if err := xml.NewDecoder(resp.Body).Decode(&xmlResp); err != nil {
+		return nil, fmt.Errorf("failed to decode XML response: %w", err)
 	}
 
-	return result.LoadBalancers, nil
+	// Convert to our internal types
+	var loadBalancers []ELBv2LoadBalancer
+	for _, lb := range xmlResp.Result.LoadBalancers {
+		// Parse created time
+		createdTime, _ := time.Parse(time.RFC3339, lb.CreatedTime)
+
+		loadBalancer := ELBv2LoadBalancer{
+			LoadBalancerArn:  lb.LoadBalancerArn,
+			LoadBalancerName: lb.LoadBalancerName,
+			DNSName:          lb.DNSName,
+			Type:             lb.Type,
+			Scheme:           lb.Scheme,
+			VpcId:            lb.VpcId,
+			CreatedTime:      createdTime,
+		}
+
+		// Handle State
+		if lb.State.Code != "" {
+			loadBalancer.State = &ELBv2LoadBalancerState{
+				Code:   lb.State.Code,
+				Reason: lb.State.Reason,
+			}
+		}
+
+		loadBalancers = append(loadBalancers, loadBalancer)
+	}
+
+	return loadBalancers, nil
+}
+
+// XML response structures for Target Groups
+type describeTargetGroupsResponse struct {
+	XMLName xml.Name                   `xml:"DescribeTargetGroupsResponse"`
+	Result  describeTargetGroupsResult `xml:"DescribeTargetGroupsResult"`
+}
+
+type describeTargetGroupsResult struct {
+	TargetGroups []xmlTargetGroup `xml:"TargetGroups>member"`
+}
+
+type xmlTargetGroup struct {
+	TargetGroupArn             string `xml:"TargetGroupArn"`
+	TargetGroupName            string `xml:"TargetGroupName"`
+	Protocol                   string `xml:"Protocol"`
+	Port                       int32  `xml:"Port"`
+	VpcId                      string `xml:"VpcId"`
+	HealthCheckEnabled         bool   `xml:"HealthCheckEnabled"`
+	HealthCheckPath            string `xml:"HealthCheckPath"`
+	HealthCheckProtocol        string `xml:"HealthCheckProtocol"`
+	HealthCheckPort            string `xml:"HealthCheckPort"`
+	HealthCheckIntervalSeconds int32  `xml:"HealthCheckIntervalSeconds"`
+	HealthCheckTimeoutSeconds  int32  `xml:"HealthCheckTimeoutSeconds"`
+	HealthyThresholdCount      int32  `xml:"HealthyThresholdCount"`
+	UnhealthyThresholdCount    int32  `xml:"UnhealthyThresholdCount"`
+	TargetType                 string `xml:"TargetType"`
 }
 
 // ListTargetGroups retrieves all target groups in the instance
 func (c *HTTPClient) ListTargetGroups(ctx context.Context, instanceName string) ([]ELBv2TargetGroup, error) {
-	url := fmt.Sprintf("http://localhost:%d/", c.getPortForInstance(instanceName))
+	apiURL := fmt.Sprintf("http://localhost:%d/", c.getPortForInstance(instanceName))
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader("{}"))
+	// Prepare form data
+	formData := url.Values{}
+	formData.Set("Action", "DescribeTargetGroups")
+	formData.Set("Version", "2015-12-01")
+
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(formData.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
-	req.Header.Set("X-Amz-Target", "ElasticLoadBalancing_V2.DescribeTargetGroups")
-	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -977,42 +1066,82 @@ func (c *HTTPClient) ListTargetGroups(ctx context.Context, instanceName string) 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result struct {
-		TargetGroups []ELBv2TargetGroup `json:"TargetGroups"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	// Parse XML response
+	var xmlResp describeTargetGroupsResponse
+	if err := xml.NewDecoder(resp.Body).Decode(&xmlResp); err != nil {
+		return nil, fmt.Errorf("failed to decode XML response: %w", err)
 	}
 
-	// Fetch target health for each target group
-	for i := range result.TargetGroups {
-		tg := &result.TargetGroups[i]
+	// Convert to our internal types
+	var targetGroups []ELBv2TargetGroup
+	for _, tg := range xmlResp.Result.TargetGroups {
+		targetGroup := ELBv2TargetGroup{
+			TargetGroupArn:     tg.TargetGroupArn,
+			TargetGroupName:    tg.TargetGroupName,
+			Protocol:           tg.Protocol,
+			Port:               tg.Port,
+			VpcId:              tg.VpcId,
+			TargetType:         tg.TargetType,
+			HealthCheckEnabled: tg.HealthCheckEnabled,
+			HealthCheckPath:    tg.HealthCheckPath,
+		}
+
+		// Fetch target health for each target group
 		health, err := c.getTargetHealth(ctx, instanceName, tg.TargetGroupArn)
 		if err == nil {
-			tg.HealthyTargetCount = health.Healthy
-			tg.UnhealthyTargetCount = health.Unhealthy
-			tg.RegisteredTargetsCount = health.Total
+			targetGroup.HealthyTargetCount = health.Healthy
+			targetGroup.UnhealthyTargetCount = health.Unhealthy
+			targetGroup.RegisteredTargetsCount = health.Total
 		}
+
+		targetGroups = append(targetGroups, targetGroup)
 	}
 
-	return result.TargetGroups, nil
+	return targetGroups, nil
+}
+
+// XML response structures for Listeners
+type describeListenersResponse struct {
+	XMLName xml.Name                `xml:"DescribeListenersResponse"`
+	Result  describeListenersResult `xml:"DescribeListenersResult"`
+}
+
+type describeListenersResult struct {
+	Listeners []xmlListener `xml:"Listeners>member"`
+}
+
+type xmlListener struct {
+	ListenerArn     string              `xml:"ListenerArn"`
+	LoadBalancerArn string              `xml:"LoadBalancerArn"`
+	Port            int32               `xml:"Port"`
+	Protocol        string              `xml:"Protocol"`
+	DefaultActions  []xmlListenerAction `xml:"DefaultActions>member"`
+}
+
+type xmlListenerAction struct {
+	Type           string `xml:"Type"`
+	TargetGroupArn string `xml:"TargetGroupArn"`
 }
 
 // ListListeners retrieves all listeners for a specific load balancer
 func (c *HTTPClient) ListListeners(ctx context.Context, instanceName, loadBalancerArn string) ([]ELBv2Listener, error) {
-	url := fmt.Sprintf("http://localhost:%d/", c.getPortForInstance(instanceName))
+	apiURL := fmt.Sprintf("http://localhost:%d/", c.getPortForInstance(instanceName))
 
-	body := fmt.Sprintf(`{"LoadBalancerArn":"%s"}`, loadBalancerArn)
-	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(body))
+	// Prepare form data
+	formData := url.Values{}
+	formData.Set("Action", "DescribeListeners")
+	formData.Set("LoadBalancerArn", loadBalancerArn)
+	formData.Set("Version", "2015-12-01")
+
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(formData.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
-	req.Header.Set("X-Amz-Target", "ElasticLoadBalancing_V2.DescribeListeners")
-	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -1021,25 +1150,71 @@ func (c *HTTPClient) ListListeners(ctx context.Context, instanceName, loadBalanc
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result struct {
-		Listeners []ELBv2Listener `json:"Listeners"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	// Parse XML response
+	var xmlResp describeListenersResponse
+	if err := xml.NewDecoder(resp.Body).Decode(&xmlResp); err != nil {
+		return nil, fmt.Errorf("failed to decode XML response: %w", err)
 	}
 
-	return result.Listeners, nil
+	// Convert to our internal types
+	var listeners []ELBv2Listener
+	for _, lst := range xmlResp.Result.Listeners {
+		listener := ELBv2Listener{
+			ListenerArn:     lst.ListenerArn,
+			LoadBalancerArn: lst.LoadBalancerArn,
+			Port:            lst.Port,
+			Protocol:        lst.Protocol,
+		}
+
+		// Convert actions
+		for _, act := range lst.DefaultActions {
+			listener.DefaultActions = append(listener.DefaultActions, ELBv2ListenerAction{
+				Type:           act.Type,
+				TargetGroupArn: act.TargetGroupArn,
+			})
+		}
+
+		listeners = append(listeners, listener)
+	}
+
+	return listeners, nil
 }
 
 // Helper methods
 
 // getPortForInstance returns the API port for the given instance
 func (c *HTTPClient) getPortForInstance(instanceName string) int {
-	// Default port - TODO: look up actual port from instance
-	return 8080
+	// TODO: look up actual port from instance configuration
+	// For now, return the default KECS port
+	return 5373
+}
+
+// XML response structures for Target Health
+type describeTargetHealthResponse struct {
+	XMLName xml.Name                   `xml:"DescribeTargetHealthResponse"`
+	Result  describeTargetHealthResult `xml:"DescribeTargetHealthResult"`
+}
+
+type describeTargetHealthResult struct {
+	TargetHealthDescriptions []xmlTargetHealthDescription `xml:"TargetHealthDescriptions>member"`
+}
+
+type xmlTargetHealthDescription struct {
+	Target       xmlTarget       `xml:"Target"`
+	TargetHealth xmlTargetHealth `xml:"TargetHealth"`
+}
+
+type xmlTarget struct {
+	Id   string `xml:"Id"`
+	Port int32  `xml:"Port"`
+}
+
+type xmlTargetHealth struct {
+	State string `xml:"State"`
 }
 
 // getTargetHealth retrieves target health counts for a target group
@@ -1048,16 +1223,19 @@ func (c *HTTPClient) getTargetHealth(ctx context.Context, instanceName, targetGr
 	Unhealthy int
 	Total     int
 }, error) {
-	url := fmt.Sprintf("http://localhost:%d/", c.getPortForInstance(instanceName))
+	apiURL := fmt.Sprintf("http://localhost:%d/", c.getPortForInstance(instanceName))
 
-	body := fmt.Sprintf(`{"TargetGroupArn":"%s"}`, targetGroupArn)
-	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(body))
+	// Prepare form data
+	formData := url.Values{}
+	formData.Set("Action", "DescribeTargetHealth")
+	formData.Set("TargetGroupArn", targetGroupArn)
+	formData.Set("Version", "2015-12-01")
+
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(formData.Encode()))
 	if err != nil {
 		return nil, err
 	}
-
-	req.Header.Set("X-Amz-Target", "ElasticLoadBalancing_V2.DescribeTargetHealth")
-	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -1069,14 +1247,9 @@ func (c *HTTPClient) getTargetHealth(ctx context.Context, instanceName, targetGr
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
 
-	var result struct {
-		TargetHealthDescriptions []struct {
-			TargetHealth struct {
-				State string `json:"State"`
-			} `json:"TargetHealth"`
-		} `json:"TargetHealthDescriptions"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	// Parse XML response
+	var xmlResp describeTargetHealthResponse
+	if err := xml.NewDecoder(resp.Body).Decode(&xmlResp); err != nil {
 		return nil, err
 	}
 
@@ -1084,13 +1257,15 @@ func (c *HTTPClient) getTargetHealth(ctx context.Context, instanceName, targetGr
 		Healthy   int
 		Unhealthy int
 		Total     int
-	}{}
+	}{
+		Total: len(xmlResp.Result.TargetHealthDescriptions),
+	}
 
-	for _, thd := range result.TargetHealthDescriptions {
-		health.Total++
-		if thd.TargetHealth.State == "healthy" {
+	for _, thd := range xmlResp.Result.TargetHealthDescriptions {
+		switch thd.TargetHealth.State {
+		case "healthy":
 			health.Healthy++
-		} else {
+		case "unhealthy", "unavailable", "draining":
 			health.Unhealthy++
 		}
 	}

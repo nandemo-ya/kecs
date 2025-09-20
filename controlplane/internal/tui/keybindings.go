@@ -30,12 +30,15 @@ const (
 	ActionGoHome   KeyAction = "go_home"
 
 	// Navigation actions
-	ActionSelect           KeyAction = "select"
-	ActionNavigateClusters KeyAction = "nav_clusters"
-	ActionNavigateServices KeyAction = "nav_services"
-	ActionNavigateTasks    KeyAction = "nav_tasks"
-	ActionNavigateTaskDefs KeyAction = "nav_task_defs"
-	ActionNavigateAllTasks KeyAction = "nav_all_tasks"
+	ActionSelect                KeyAction = "select"
+	ActionNavigateClusters      KeyAction = "nav_clusters"
+	ActionNavigateServices      KeyAction = "nav_services"
+	ActionNavigateTasks         KeyAction = "nav_tasks"
+	ActionNavigateTaskDefs      KeyAction = "nav_task_defs"
+	ActionNavigateAllTasks      KeyAction = "nav_all_tasks"
+	ActionNavigateLoadBalancers KeyAction = "nav_load_balancers"
+	ActionNavigateTargetGroups  KeyAction = "nav_target_groups"
+	ActionNavigateListeners     KeyAction = "nav_listeners"
 
 	// Instance actions
 	ActionNewInstance    KeyAction = "new_instance"
@@ -152,6 +155,8 @@ func (r *KeyBindingsRegistry) registerViewBindings() {
 		{Keys: []string{"s"}, Description: "Services", Action: ActionNavigateServices},
 		{Keys: []string{"t"}, Description: "Task defs", Action: ActionNavigateTaskDefs},
 		{Keys: []string{"T"}, Description: "All tasks", Action: ActionNavigateAllTasks},
+		{Keys: []string{"b"}, Description: "Load Balancers", Action: ActionNavigateLoadBalancers},
+		{Keys: []string{"g"}, Description: "Target Groups", Action: ActionNavigateTargetGroups},
 	})
 
 	// Services view
@@ -204,6 +209,31 @@ func (r *KeyBindingsRegistry) registerViewBindings() {
 		{Keys: []string{"e"}, Description: "Edit", Action: ActionEditTaskDef},
 		{Keys: []string{"c"}, Description: "Copy JSON", Action: ActionCopyJSON},
 		{Keys: []string{"d"}, Description: "Deregister", Action: ActionDeregisterTaskDef},
+	})
+
+	// Load Balancers view
+	r.registerViewKeys(ViewLoadBalancers, []KeyBinding{
+		{Keys: []string{"enter"}, Description: "View Listeners", Action: ActionNavigateListeners},
+		{Keys: []string{"g"}, Description: "Target Groups", Action: ActionNavigateTargetGroups},
+		{Keys: []string{"c"}, Description: "Clusters", Action: ActionNavigateClusters},
+		{Keys: []string{"y"}, Description: "Yank ARN", Action: ActionYank},
+	})
+
+	// Target Groups view
+	r.registerViewKeys(ViewTargetGroups, []KeyBinding{
+		{Keys: []string{"enter"}, Description: "View Targets", Action: ActionSelect},
+		{Keys: []string{"b"}, Description: "Load Balancers", Action: ActionNavigateLoadBalancers},
+		{Keys: []string{"c"}, Description: "Clusters", Action: ActionNavigateClusters},
+		{Keys: []string{"y"}, Description: "Yank ARN", Action: ActionYank},
+	})
+
+	// Listeners view
+	r.registerViewKeys(ViewListeners, []KeyBinding{
+		{Keys: []string{"enter"}, Description: "View Rules", Action: ActionSelect},
+		{Keys: []string{"b"}, Description: "Load Balancers", Action: ActionNavigateLoadBalancers},
+		{Keys: []string{"g"}, Description: "Target Groups", Action: ActionNavigateTargetGroups},
+		{Keys: []string{"c"}, Description: "Clusters", Action: ActionNavigateClusters},
+		{Keys: []string{"y"}, Description: "Yank ARN", Action: ActionYank},
 	})
 }
 
@@ -348,6 +378,9 @@ func (r *KeyBindingsRegistry) GetViewBindings(view ViewType) []KeyBinding {
 		ActionNavigateTasks,
 		ActionNavigateTaskDefs,
 		ActionNavigateAllTasks,
+		ActionNavigateLoadBalancers,
+		ActionNavigateTargetGroups,
+		ActionNavigateListeners,
 		ActionRestartTask,
 		ActionSaveLogs,
 		ActionHome,

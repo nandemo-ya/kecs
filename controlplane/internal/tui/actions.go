@@ -284,6 +284,20 @@ func (m Model) executeClusterAction(action KeyAction) (Model, tea.Cmd) {
 				return m, m.loadDataFromAPI()
 			}
 		}
+
+	case ActionNavigateLoadBalancers:
+		if m.selectedInstance != "" {
+			m.currentView = ViewLoadBalancers
+			m.lbCursor = 0
+			return m, m.loadELBv2DataCmd()
+		}
+
+	case ActionNavigateTargetGroups:
+		if m.selectedInstance != "" {
+			m.currentView = ViewTargetGroups
+			m.tgCursor = 0
+			return m, m.loadELBv2DataCmd()
+		}
 	}
 
 	return m, nil
