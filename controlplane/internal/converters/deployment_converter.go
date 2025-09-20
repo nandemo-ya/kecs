@@ -1,7 +1,9 @@
 package converters
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -23,15 +25,35 @@ type DeploymentInfo struct {
 
 // ConvertServiceToDeployment converts a service and task definition to deployment info
 func ConvertServiceToDeployment(service *storage.Service, taskDef *storage.TaskDefinition, namespace string) *DeploymentInfo {
+	labels := map[string]string{
+		"app":         service.ServiceName,
+		"ecs-service": service.ServiceName,
+		"ecs-cluster": service.ClusterARN,
+	}
+
+	// Add target group labels if LoadBalancers are configured
+	if service.LoadBalancers != "" {
+		var loadBalancers []types.LoadBalancer
+		if err := json.Unmarshal([]byte(service.LoadBalancers), &loadBalancers); err == nil {
+			for _, lb := range loadBalancers {
+				if lb.TargetGroupArn != nil && *lb.TargetGroupArn != "" {
+					// Extract target group name from ARN
+					// ARN format: arn:aws:elasticloadbalancing:region:account:targetgroup/name/id
+					parts := strings.Split(*lb.TargetGroupArn, "/")
+					if len(parts) >= 2 {
+						targetGroupName := parts[1]
+						labels["kecs.io/elbv2-target-group-name"] = targetGroupName
+					}
+				}
+			}
+		}
+	}
+
 	return &DeploymentInfo{
 		Name:      service.ServiceName,
 		Namespace: namespace,
 		Replicas:  int32(service.DesiredCount),
-		Labels: map[string]string{
-			"app":         service.ServiceName,
-			"ecs-service": service.ServiceName,
-			"ecs-cluster": service.ClusterARN,
-		},
+		Labels:    labels,
 	}
 }
 

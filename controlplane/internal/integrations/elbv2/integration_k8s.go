@@ -13,6 +13,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -1067,16 +1068,31 @@ func (i *K8sIntegration) CreateTargetGroupServiceInNamespace(ctx context.Context
 		"namespace", namespace,
 		"targetGroup", tg.Name)
 
-	// Also create ExternalName Service in kecs-system to enable cross-namespace access
-	if namespace != "kecs-system" {
-		if err := i.createExternalNameServiceInKecsSystem(ctx, tg.Name, serviceName, namespace); err != nil {
-			logging.Warn("Failed to create ExternalName Service in kecs-system",
-				"error", err,
-				"targetGroup", tg.Name,
-				"targetNamespace", namespace)
-			// Don't fail the entire operation if ExternalName creation fails
-		}
+	// Update the IngressRoute to point to the actual service in the correct namespace
+	// This implements the dynamic service discovery pattern
+	if err := i.UpdateIngressRouteForService(ctx, targetGroupArn, serviceName, namespace); err != nil {
+		logging.Warn("Failed to update IngressRoute for service",
+			"error", err,
+			"serviceName", serviceName,
+			"namespace", namespace,
+			"targetGroupArn", targetGroupArn)
+		// Don't fail the entire operation if IngressRoute update fails
 	}
+
+	// ExternalName Service is no longer needed with dynamic service discovery
+	// The IngressRoute/Ingress can now directly reference services in other namespaces
+	// Keeping this commented out in case we need to revert to this approach
+	/*
+		if namespace != "kecs-system" {
+			if err := i.createExternalNameServiceInKecsSystem(ctx, tg.Name, serviceName, namespace); err != nil {
+				logging.Warn("Failed to create ExternalName Service in kecs-system",
+					"error", err,
+					"targetGroup", tg.Name,
+					"targetNamespace", namespace)
+				// Don't fail the entire operation if ExternalName creation fails
+			}
+		}
+	*/
 
 	return nil
 }
@@ -1192,6 +1208,7 @@ func (i *K8sIntegration) createIngressRoute(ctx context.Context, lbName, listene
 					"kecs.io/elbv2-listener-arn":  listenerArn,
 					"kecs.io/elbv2-load-balancer": lbName,
 					"kecs.io/elbv2-target-group":  targetGroupName,
+					"kecs.io/pending-namespace":   "true", // Mark as waiting for namespace resolution
 				},
 				"labels": map[string]interface{}{
 					"kecs.io/elbv2-load-balancer": lbName,
@@ -1207,8 +1224,9 @@ func (i *K8sIntegration) createIngressRoute(ctx context.Context, lbName, listene
 						"priority": 50000, // Very low priority for default rule
 						"services": []interface{}{
 							map[string]interface{}{
-								"name": fmt.Sprintf("tg-%s", targetGroupName),
+								"name": "placeholder-service", // Placeholder until actual service is created
 								"port": port,
+								// Namespace will be added when service is created
 							},
 						},
 					},
@@ -1242,6 +1260,16 @@ func sanitizeName(name string) string {
 	result = strings.ReplaceAll(result, " ", "-")
 	// Remove any non-alphanumeric characters except hyphens
 	return result
+}
+
+// extractTargetGroupName extracts the target group name from an ARN
+// ARN format: arn:aws:elasticloadbalancing:region:account:targetgroup/name/id
+func extractTargetGroupName(arn string) string {
+	parts := strings.Split(arn, "/")
+	if len(parts) >= 2 {
+		return parts[1]
+	}
+	return ""
 }
 
 // deleteIngressRoute deletes a Traefik IngressRoute CRD
@@ -1435,6 +1463,163 @@ func (i *K8sIntegration) updateIngressRoute(ctx context.Context, lbName, listene
 	}
 
 	logging.Debug("Updated IngressRoute for listener routing to target group", "ingressRouteName", ingressRouteName, "port", port, "targetGroupName", targetGroupName)
+	return nil
+}
+
+// UpdateIngressRouteForService updates the Ingress when a service is created with a target group
+// This implements the dynamic service discovery pattern using ExternalName services
+func (i *K8sIntegration) UpdateIngressRouteForService(ctx context.Context, targetGroupArn, serviceName, namespace string) error {
+	if i.kubeClient == nil {
+		logging.Debug("No kubeClient available, skipping Ingress update for service")
+		return nil
+	}
+
+	// Get the listener associated with this target group
+	i.mu.RLock()
+	var listenerArn string
+	var listenerPort int32
+	var lbName string
+
+	// Find the listener that references this target group
+	for lArn, listener := range i.listeners {
+		for _, action := range listener.DefaultActions {
+			if action.TargetGroupArn == targetGroupArn {
+				listenerArn = lArn
+				listenerPort = listener.Port
+
+				// Get load balancer name
+				if lb, exists := i.loadBalancers[listener.LoadBalancerArn]; exists {
+					lbName = lb.Name
+				}
+				break
+			}
+		}
+		if listenerArn != "" {
+			break
+		}
+	}
+	i.mu.RUnlock()
+
+	if listenerArn == "" {
+		logging.Debug("No listener found for target group, skipping Ingress update",
+			"targetGroupArn", targetGroupArn)
+		return nil
+	}
+
+	// Extract target group name from ARN
+	targetGroupName := extractTargetGroupName(targetGroupArn)
+	if targetGroupName == "" {
+		return fmt.Errorf("failed to extract target group name from ARN: %s", targetGroupArn)
+	}
+
+	logging.Info("Updating Ingress for service creation",
+		"targetGroupArn", targetGroupArn,
+		"targetGroupName", targetGroupName,
+		"serviceName", serviceName,
+		"namespace", namespace,
+		"listenerPort", listenerPort,
+		"lbName", lbName)
+
+	// Create an ExternalName service in kecs-system that points to the service in the target namespace
+	// This is the cross-namespace service discovery solution
+	externalServiceName := fmt.Sprintf("tg-%s", targetGroupName)
+	externalService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      externalServiceName,
+			Namespace: "kecs-system",
+			Labels: map[string]string{
+				"kecs.io/component":        "elbv2-target",
+				"kecs.io/target-group":     targetGroupName,
+				"kecs.io/target-namespace": namespace,
+				"kecs.io/target-service":   serviceName,
+			},
+			Annotations: map[string]string{
+				"kecs.io/target-namespace": namespace,
+				"kecs.io/target-service":   serviceName,
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Type:         corev1.ServiceTypeExternalName,
+			ExternalName: fmt.Sprintf("tg-%s.%s.svc.cluster.local", targetGroupName, namespace),
+		},
+	}
+
+	// Create or update the ExternalName service
+	existingService, err := i.kubeClient.CoreV1().Services("kecs-system").Get(ctx, externalServiceName, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Create the service
+			_, err = i.kubeClient.CoreV1().Services("kecs-system").Create(ctx, externalService, metav1.CreateOptions{})
+			if err != nil {
+				logging.Error("Failed to create ExternalName service",
+					"error", err,
+					"serviceName", externalServiceName)
+				return fmt.Errorf("failed to create ExternalName service: %w", err)
+			}
+			logging.Info("Created ExternalName service for cross-namespace routing",
+				"externalServiceName", externalServiceName,
+				"targetService", serviceName,
+				"targetNamespace", namespace)
+		} else {
+			return fmt.Errorf("failed to get ExternalName service: %w", err)
+		}
+	} else {
+		// Update the existing service
+		existingService.Spec.ExternalName = fmt.Sprintf("tg-%s.%s.svc.cluster.local", targetGroupName, namespace)
+		if existingService.Annotations == nil {
+			existingService.Annotations = make(map[string]string)
+		}
+		existingService.Annotations["kecs.io/target-namespace"] = namespace
+		existingService.Annotations["kecs.io/target-service"] = serviceName
+		existingService.Labels["kecs.io/target-namespace"] = namespace
+		existingService.Labels["kecs.io/target-service"] = serviceName
+
+		_, err = i.kubeClient.CoreV1().Services("kecs-system").Update(ctx, existingService, metav1.UpdateOptions{})
+		if err != nil {
+			logging.Error("Failed to update ExternalName service",
+				"error", err,
+				"serviceName", externalServiceName)
+			return fmt.Errorf("failed to update ExternalName service: %w", err)
+		}
+		logging.Info("Updated ExternalName service for cross-namespace routing",
+			"externalServiceName", externalServiceName,
+			"targetService", serviceName,
+			"targetNamespace", namespace)
+	}
+
+	// Update the Ingress annotations
+	ingressName := fmt.Sprintf("alb-%s-port-%d", lbName, listenerPort)
+	ingress, err := i.kubeClient.NetworkingV1().Ingresses("kecs-system").Get(ctx, ingressName, metav1.GetOptions{})
+	if err != nil {
+		logging.Warn("Failed to get Ingress for update",
+			"error", err,
+			"ingressName", ingressName)
+		// Ingress doesn't exist yet, that's OK
+		return nil
+	}
+
+	// Update annotations on the Ingress to reflect the resolved namespace
+	if ingress.Annotations == nil {
+		ingress.Annotations = make(map[string]string)
+	}
+	ingress.Annotations["kecs.io/target-namespace"] = namespace
+	ingress.Annotations["kecs.io/target-service"] = serviceName
+
+	// Update the Ingress
+	_, err = i.kubeClient.NetworkingV1().Ingresses("kecs-system").Update(ctx, ingress, metav1.UpdateOptions{})
+	if err != nil {
+		logging.Error("Failed to update Ingress annotations",
+			"error", err,
+			"ingressName", ingressName)
+		return fmt.Errorf("failed to update Ingress: %w", err)
+	}
+
+	logging.Info("Successfully updated Ingress and created ExternalName service for dynamic service discovery",
+		"ingressName", ingressName,
+		"externalServiceName", externalServiceName,
+		"targetService", serviceName,
+		"targetNamespace", namespace)
+
 	return nil
 }
 

@@ -740,14 +740,37 @@ func (sm *ServiceManager) createDeployment(ctx context.Context, kubeClient kuber
 		ctx, deployment, metav1.CreateOptions{})
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
-			// Update existing deployment
+			// Get existing deployment
+			existing, err := kubeClient.AppsV1().Deployments(deployment.Namespace).Get(
+				ctx, deployment.Name, metav1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to get existing deployment: %w", err)
+			}
+
+			// Update the existing deployment with new spec
+			// Preserve resource version for update
+			deployment.ResourceVersion = existing.ResourceVersion
+
+			// Update labels in both deployment and pod template
+			if deployment.Labels != nil {
+				existing.Labels = deployment.Labels
+			}
+			if deployment.Spec.Template.Labels != nil {
+				existing.Spec.Template.Labels = deployment.Spec.Template.Labels
+			}
+
+			// Update the entire spec to ensure all changes are applied
+			existing.Spec = deployment.Spec
+
+			// Update deployment
 			_, err = kubeClient.AppsV1().Deployments(deployment.Namespace).Update(
-				ctx, deployment, metav1.UpdateOptions{})
+				ctx, existing, metav1.UpdateOptions{})
 			if err != nil {
 				return fmt.Errorf("failed to update existing deployment: %w", err)
 			}
-			logging.Info("Updated existing deployment",
-				"deploymentName", deployment.Name)
+			logging.Info("Updated existing deployment with new labels",
+				"deploymentName", deployment.Name,
+				"podLabels", deployment.Spec.Template.Labels)
 		} else {
 			return fmt.Errorf("failed to create deployment: %w", err)
 		}

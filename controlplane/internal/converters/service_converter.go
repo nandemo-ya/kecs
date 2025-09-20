@@ -142,6 +142,24 @@ func (c *ServiceConverter) createDeployment(
 		"app":                  service.ServiceName, // Standard Kubernetes label
 	}
 
+	// Add target group labels if LoadBalancers are configured
+	if service.LoadBalancers != "" {
+		var loadBalancers []types.LoadBalancer
+		if err := json.Unmarshal([]byte(service.LoadBalancers), &loadBalancers); err == nil {
+			for _, lb := range loadBalancers {
+				if lb.TargetGroupArn != nil && *lb.TargetGroupArn != "" {
+					// Extract target group name from ARN
+					// ARN format: arn:aws:elasticloadbalancing:region:account:targetgroup/name/id
+					parts := strings.Split(*lb.TargetGroupArn, "/")
+					if len(parts) >= 2 {
+						targetGroupName := parts[1]
+						labels["kecs.io/elbv2-target-group-name"] = targetGroupName
+					}
+				}
+			}
+		}
+	}
+
 	// Create annotations
 	annotations := map[string]string{
 		"kecs.dev/service-arn":         service.ARN,
