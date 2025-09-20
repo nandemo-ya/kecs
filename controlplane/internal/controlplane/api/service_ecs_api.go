@@ -424,7 +424,7 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 							"namespace", namespace)
 					}
 				} else {
-					logging.Warn("ELBv2 integration does not support CreateTargetGroupServiceInNamespace")
+					logging.Error("ELBv2 integration does not support CreateTargetGroupServiceInNamespace")
 				}
 			}
 		}

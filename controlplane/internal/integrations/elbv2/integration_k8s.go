@@ -979,10 +979,35 @@ func (i *K8sIntegration) CreateTargetGroupServiceInNamespace(ctx context.Context
 		return nil
 	}
 
-	// Get target group from storage or memory
+	// Get target group from memory first
 	i.mu.RLock()
 	tg, exists := i.targetGroups[targetGroupArn]
 	i.mu.RUnlock()
+
+	// If not found in memory, try to get from database storage
+	if !exists && i.store != nil {
+		dbTG, err := i.store.GetTargetGroup(ctx, targetGroupArn)
+		if err == nil && dbTG != nil {
+			// Convert from storage type to our internal type
+			tg = &TargetGroup{
+				Arn:      dbTG.ARN,
+				Name:     dbTG.Name,
+				Port:     dbTG.Port,
+				Protocol: dbTG.Protocol,
+				VpcId:    "vpc-default", // Default VPC for consistency
+			}
+
+			// Cache it in memory for future use
+			i.mu.Lock()
+			i.targetGroups[targetGroupArn] = tg
+			if i.targetHealth[targetGroupArn] == nil {
+				i.targetHealth[targetGroupArn] = make(map[string]*TargetHealth)
+			}
+			i.mu.Unlock()
+
+			exists = true
+		}
+	}
 
 	if !exists {
 		return fmt.Errorf("target group not found: %s", targetGroupArn)
