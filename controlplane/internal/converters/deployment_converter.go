@@ -1,7 +1,9 @@
 package converters
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -9,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/types"
 )
@@ -23,15 +26,44 @@ type DeploymentInfo struct {
 
 // ConvertServiceToDeployment converts a service and task definition to deployment info
 func ConvertServiceToDeployment(service *storage.Service, taskDef *storage.TaskDefinition, namespace string) *DeploymentInfo {
+	labels := map[string]string{
+		"app":         service.ServiceName,
+		"ecs-service": service.ServiceName,
+		"ecs-cluster": service.ClusterARN,
+	}
+
+	// Add target group labels if LoadBalancers are configured
+	if service.LoadBalancers != "" {
+		var loadBalancers []types.LoadBalancer
+		if err := json.Unmarshal([]byte(service.LoadBalancers), &loadBalancers); err != nil {
+			logging.Warn("Failed to parse LoadBalancers JSON for service %s: %v", service.ServiceName, err)
+		} else {
+			var targetGroupNames []string
+			for _, lb := range loadBalancers {
+				if lb.TargetGroupArn != nil && *lb.TargetGroupArn != "" {
+					// Extract target group name from ARN
+					// ARN format: arn:aws:elasticloadbalancing:region:account:targetgroup/name/id
+					parts := strings.Split(*lb.TargetGroupArn, "/")
+					if len(parts) >= 2 {
+						targetGroupName := parts[1]
+						targetGroupNames = append(targetGroupNames, targetGroupName)
+					}
+				}
+			}
+			// If multiple target groups, use comma-separated list
+			if len(targetGroupNames) > 0 {
+				labels["kecs.io/elbv2-target-group-names"] = strings.Join(targetGroupNames, ",")
+				// Also keep the first one as the primary for backward compatibility
+				labels["kecs.io/elbv2-target-group-name"] = targetGroupNames[0]
+			}
+		}
+	}
+
 	return &DeploymentInfo{
 		Name:      service.ServiceName,
 		Namespace: namespace,
 		Replicas:  int32(service.DesiredCount),
-		Labels: map[string]string{
-			"app":         service.ServiceName,
-			"ecs-service": service.ServiceName,
-			"ecs-cluster": service.ClusterARN,
-		},
+		Labels:    labels,
 	}
 }
 

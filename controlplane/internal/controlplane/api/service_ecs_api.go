@@ -411,6 +411,11 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 		for _, lb := range req.LoadBalancers {
 			if lb.TargetGroupArn != nil && *lb.TargetGroupArn != "" {
 				// Try to cast the integration to access the new method
+				logging.Info("Attempting to create target group service",
+					"integrationType", fmt.Sprintf("%T", api.elbv2Integration),
+					"targetGroupArn", *lb.TargetGroupArn,
+					"namespace", namespace)
+
 				if k8sIntegration, ok := api.elbv2Integration.(*elbv2.K8sIntegration); ok {
 					if err := k8sIntegration.CreateTargetGroupServiceInNamespace(ctx, *lb.TargetGroupArn, namespace); err != nil {
 						logging.Warn("Failed to create target group service in namespace",
@@ -424,7 +429,8 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 							"namespace", namespace)
 					}
 				} else {
-					logging.Error("ELBv2 integration does not support CreateTargetGroupServiceInNamespace")
+					logging.Error("ELBv2 integration does not support CreateTargetGroupServiceInNamespace",
+						"actualType", fmt.Sprintf("%T", api.elbv2Integration))
 				}
 			}
 		}
