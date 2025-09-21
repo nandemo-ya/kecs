@@ -238,6 +238,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tasks = msg.Tasks
 		m.logs = msg.Logs
 
+		// Set ready flag when data is loaded (in addition to window size)
+		if !m.ready && m.width > 0 && m.height > 0 {
+			m.ready = true
+		}
+
 		// Auto-select single instance for mock data too
 		if len(m.instances) == 1 && m.selectedInstance == "" && !m.autoSelectedInstance {
 			m.selectedInstance = m.instances[0].Name
@@ -264,6 +269,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clusters = msg.clusters
 		m.services = msg.services
 		m.tasks = msg.tasks
+
+		// Set ready flag when data is loaded (in addition to window size)
+		if !m.ready && m.width > 0 && m.height > 0 {
+			m.ready = true
+		}
 
 		// Auto-select single instance
 		if len(m.instances) == 1 && m.selectedInstance == "" && !m.autoSelectedInstance {
