@@ -396,6 +396,14 @@ func (m *Manager) List(ctx context.Context) ([]InstanceInfo, error) {
 
 		// Load instance config to get ports
 		cfg, _ := LoadInstanceConfig(clusterInfo.Name)
+		apiPort := 0
+		adminPort := 0
+		localStack := false
+		if cfg != nil {
+			apiPort = cfg.APIPort
+			adminPort = cfg.AdminPort
+			localStack = cfg.LocalStack
+		}
 
 		// Check for data directory
 		home, _ := os.UserHomeDir()
@@ -408,10 +416,10 @@ func (m *Manager) List(ctx context.Context) ([]InstanceInfo, error) {
 		instances = append(instances, InstanceInfo{
 			Name:       clusterInfo.Name,
 			Status:     status,
-			ApiPort:    cfg.APIPort,
-			AdminPort:  cfg.AdminPort,
+			ApiPort:    apiPort,
+			AdminPort:  adminPort,
 			HasData:    hasData,
-			LocalStack: cfg.LocalStack,
+			LocalStack: localStack,
 		})
 	}
 
