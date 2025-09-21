@@ -1997,74 +1997,148 @@ func (m Model) renderHelpContent(maxHeight int) string {
 	descStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#9399b2"))
 
+	subsectionStyle := lipgloss.NewStyle().
+		Bold(true).
+		Underline(true)
+
 	// Calculate column widths
 	totalWidth := m.width - 8 // Account for padding
 	columnWidth := totalWidth/2 - 2
 
-	// Left column: View-specific operations
+	// Build left column: View-specific operations
 	leftContent := []string{
 		sectionStyle.Render("View-Specific Operations"),
 		"",
-		lipgloss.NewStyle().Bold(true).Underline(true).Render("Instance Operations:"),
-		keyStyle.Render("<n>") + "           " + descStyle.Render("Create new instance"),
-		keyStyle.Render("<s>") + "           " + descStyle.Render("Stop/Start instance"),
-		keyStyle.Render("<d>") + "           " + descStyle.Render("Delete instance"),
-		keyStyle.Render("<ctrl-i>") + "     " + descStyle.Render("Quick switch instance"),
-		"",
-		lipgloss.NewStyle().Bold(true).Underline(true).Render("Cluster Operations:"),
-		keyStyle.Render("<n>") + "           " + descStyle.Render("Create new cluster"),
-		"",
-		lipgloss.NewStyle().Bold(true).Underline(true).Render("Service Operations:"),
-		keyStyle.Render("<s>") + "           " + descStyle.Render("Scale service"),
-		keyStyle.Render("<u>") + "           " + descStyle.Render("Update task definition"),
-		keyStyle.Render("<r>") + "           " + descStyle.Render("Refresh services"),
-		"",
-		lipgloss.NewStyle().Bold(true).Underline(true).Render("Task Definition Operations:"),
-		keyStyle.Render("<n>") + "           " + descStyle.Render("Create new task def"),
-		keyStyle.Render("<e>") + "           " + descStyle.Render("Edit as new revision"),
-		keyStyle.Render("<a>") + "           " + descStyle.Render("Activate revision"),
-		keyStyle.Render("<d>") + "           " + descStyle.Render("Diff/Deregister"),
-		"",
-		lipgloss.NewStyle().Bold(true).Underline(true).Render("Common Operations:"),
-		keyStyle.Render("<l>") + "           " + descStyle.Render("View logs"),
-		keyStyle.Render("<d>") + "           " + descStyle.Render("Describe resource"),
-		keyStyle.Render("<r>") + "           " + descStyle.Render("Refresh view"),
 	}
 
-	// Right column: Global navigation
-	rightContent := []string{
-		sectionStyle.Render("Global Navigation"),
-		"",
-		lipgloss.NewStyle().Bold(true).Underline(true).Render("Navigation:"),
-		keyStyle.Render("<↑>/<k>") + "      " + descStyle.Render("Move up"),
-		keyStyle.Render("<↓>/<j>") + "      " + descStyle.Render("Move down"),
-		keyStyle.Render("<enter>") + "      " + descStyle.Render("Select/Drill down"),
-		keyStyle.Render("<esc>") + "        " + descStyle.Render("Go back to parent"),
-		"",
-		lipgloss.NewStyle().Bold(true).Underline(true).Render("Quick Navigation:"),
-		keyStyle.Render("<i>") + "           " + descStyle.Render("Go to instances"),
-		keyStyle.Render("<c>") + "           " + descStyle.Render("Go to clusters"),
-		keyStyle.Render("<s>") + "           " + descStyle.Render("Go to services"),
-		keyStyle.Render("<t>") + "           " + descStyle.Render("Go to tasks"),
-		keyStyle.Render("<t>") + "           " + descStyle.Render("Go to task definitions"),
-		"",
-		lipgloss.NewStyle().Bold(true).Underline(true).Render("Search & Commands:"),
-		keyStyle.Render("</>") + "           " + descStyle.Render("Search in current view"),
-		keyStyle.Render("<:>") + "           " + descStyle.Render("Enter command mode"),
-		keyStyle.Render("<?>") + "           " + descStyle.Render("Show/hide this help"),
-		"",
-		lipgloss.NewStyle().Bold(true).Underline(true).Render("Clipboard:"),
-		keyStyle.Render("<y>") + "           " + descStyle.Render("Copy item name/ID"),
-		keyStyle.Render("<y>") + "           " + descStyle.Render("Copy full details"),
-		"",
-		lipgloss.NewStyle().Bold(true).Underline(true).Render("Application:"),
-		keyStyle.Render("<D>") + "           " + descStyle.Render("Delete current instance"),
-		keyStyle.Render("<ctrl-c>") + "     " + descStyle.Render("Quit application"),
-		"",
-		lipgloss.NewStyle().Bold(true).Underline(true).Render("JSON View (Task Defs):"),
-		keyStyle.Render("<ctrl-u>") + "     " + descStyle.Render("Scroll JSON up"),
-		keyStyle.Render("<ctrl-d>") + "     " + descStyle.Render("Scroll JSON down"),
+	// Group view-specific bindings by view
+	viewGroups := map[string][]KeyBinding{
+		"Instances":        []KeyBinding{},
+		"Clusters":         []KeyBinding{},
+		"Services":         []KeyBinding{},
+		"Tasks":            []KeyBinding{},
+		"Task Definitions": []KeyBinding{},
+		"Logs":             []KeyBinding{},
 	}
+
+	// Define view mappings in a stable order
+	viewMappings := []struct {
+		view     ViewType
+		viewName string
+	}{
+		{ViewInstances, "Instances"},
+		{ViewClusters, "Clusters"},
+		{ViewServices, "Services"},
+		{ViewTasks, "Tasks"},
+		{ViewTaskDefinitionFamilies, "Task Definitions"},
+		{ViewTaskDefinitionRevisions, "Task Definitions"},
+		{ViewLogs, "Logs"},
+	}
+
+	// Collect bindings for each view in stable order
+	for _, mapping := range viewMappings {
+		bindings := m.keyBindings.GetViewBindings(mapping.view)
+		for _, binding := range bindings {
+			// Filter out navigation bindings that will be shown in global
+			if binding.Action == ActionMoveUp || binding.Action == ActionMoveDown ||
+				binding.Action == ActionBack || binding.Action == ActionQuit {
+				continue
+			}
+			viewGroups[mapping.viewName] = append(viewGroups[mapping.viewName], binding)
+		}
+	}
+
+	// Add each view's bindings
+	for _, viewName := range []string{"Instances", "Clusters", "Services", "Tasks", "Task Definitions", "Logs"} {
+		bindings := viewGroups[viewName]
+		if len(bindings) > 0 {
+			leftContent = append(leftContent, subsectionStyle.Render(viewName+" Operations:"))
+			for _, binding := range bindings {
+				keyStr := FormatKeyString(binding.Keys)
+				// Pad key string for alignment
+				formattedKey := fmt.Sprintf("%-12s", keyStyle.Render(keyStr))
+				leftContent = append(leftContent, formattedKey+"  "+descStyle.Render(binding.Description))
+			}
+			leftContent = append(leftContent, "")
+		}
+	}
+
+	// Build right column: Global operations
+	rightContent := []string{
+		sectionStyle.Render("Global Shortcuts"),
+		"",
+	}
+
+	// Get global bindings
+	globalBindings := m.keyBindings.GetGlobalBindings()
+
+	// Group global bindings by category
+	navigationBindings := []KeyBinding{}
+	instanceBindings := []KeyBinding{}
+	utilityBindings := []KeyBinding{}
+	applicationBindings := []KeyBinding{}
+
+	for _, binding := range globalBindings {
+		switch binding.Action {
+		case ActionMoveUp, ActionMoveDown, ActionBack, ActionGoHome:
+			navigationBindings = append(navigationBindings, binding)
+		case ActionToggleInstance, ActionSwitchInstance, ActionDeleteInstance:
+			instanceBindings = append(instanceBindings, binding)
+		case ActionHelp, ActionSearch, ActionCommand, ActionRefresh:
+			utilityBindings = append(utilityBindings, binding)
+		case ActionQuit:
+			applicationBindings = append(applicationBindings, binding)
+		}
+	}
+
+	// Add navigation bindings
+	if len(navigationBindings) > 0 {
+		rightContent = append(rightContent, subsectionStyle.Render("Navigation:"))
+		for _, binding := range navigationBindings {
+			keyStr := FormatKeyString(binding.Keys)
+			formattedKey := fmt.Sprintf("%-12s", keyStyle.Render(keyStr))
+			rightContent = append(rightContent, formattedKey+"  "+descStyle.Render(binding.Description))
+		}
+		rightContent = append(rightContent, "")
+	}
+
+	// Add instance management bindings
+	if len(instanceBindings) > 0 {
+		rightContent = append(rightContent, subsectionStyle.Render("Instance Management:"))
+		for _, binding := range instanceBindings {
+			keyStr := FormatKeyString(binding.Keys)
+			formattedKey := fmt.Sprintf("%-12s", keyStyle.Render(keyStr))
+			rightContent = append(rightContent, formattedKey+"  "+descStyle.Render(binding.Description))
+		}
+		rightContent = append(rightContent, "")
+	}
+
+	// Add utility bindings
+	if len(utilityBindings) > 0 {
+		rightContent = append(rightContent, subsectionStyle.Render("Utilities:"))
+		for _, binding := range utilityBindings {
+			keyStr := FormatKeyString(binding.Keys)
+			formattedKey := fmt.Sprintf("%-12s", keyStyle.Render(keyStr))
+			rightContent = append(rightContent, formattedKey+"  "+descStyle.Render(binding.Description))
+		}
+		rightContent = append(rightContent, "")
+	}
+
+	// Add application bindings
+	if len(applicationBindings) > 0 {
+		rightContent = append(rightContent, subsectionStyle.Render("Application:"))
+		for _, binding := range applicationBindings {
+			keyStr := FormatKeyString(binding.Keys)
+			formattedKey := fmt.Sprintf("%-12s", keyStyle.Render(keyStr))
+			rightContent = append(rightContent, formattedKey+"  "+descStyle.Render(binding.Description))
+		}
+		rightContent = append(rightContent, "")
+	}
+
+	// Add special shortcuts not in the registry
+	rightContent = append(rightContent, subsectionStyle.Render("Special Keys:"))
+	rightContent = append(rightContent, fmt.Sprintf("%-12s", keyStyle.Render("Tab"))+"  "+descStyle.Render("Switch to next instance"))
+	rightContent = append(rightContent, fmt.Sprintf("%-12s", keyStyle.Render("Shift+Tab"))+"  "+descStyle.Render("Switch to previous instance"))
 
 	// Create styled columns
 	leftColumn := lipgloss.NewStyle().
@@ -2088,11 +2162,11 @@ func (m Model) renderHelpContent(maxHeight int) string {
 	)
 
 	// Add title and footer
-	title := titleStyle.Render("KECS TUI Help")
+	title := titleStyle.Render("KECS TUI Help - Keyboard Shortcuts")
 	footer := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6c7086")).
 		MarginTop(2).
-		Render("Press any key to close help...")
+		Render("Press ? to close help")
 
 	// Combine all parts
 	helpView := lipgloss.JoinVertical(

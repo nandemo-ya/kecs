@@ -299,15 +299,21 @@ func mergeUniqueKeys(existing, new []string) []string {
 func (r *KeyBindingsRegistry) GetGlobalBindings() []KeyBinding {
 	// Define the order of global actions for consistent display
 	actionOrder := []KeyAction{
+		// Navigation
 		ActionMoveUp,
 		ActionMoveDown,
 		ActionBack,
 		ActionGoHome,
+		// Instance Management
+		ActionToggleInstance,
+		ActionSwitchInstance,
+		ActionDeleteInstance,
+		// Utilities
 		ActionCommand,
 		ActionSearch,
 		ActionHelp,
 		ActionRefresh,
-		ActionSwitchInstance,
+		// Application
 		ActionQuit,
 	}
 
