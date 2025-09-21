@@ -67,6 +67,8 @@ jobs:
       # Run Trivy vulnerability scanner for filesystem
       - name: Run Trivy vulnerability scanner (filesystem)
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_PLATFORM: 'linux/arm64'  # Match self-hosted runner architecture
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -134,6 +136,8 @@ jobs:
       # Run Trivy vulnerability scanner for Docker image
       - name: Run Trivy vulnerability scanner (Docker image)
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_PLATFORM: 'linux/arm64'  # Match self-hosted runner architecture
         with:
           image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.git_describe.outputs.GIT_DESCRIBE }}'
           format: 'sarif'
