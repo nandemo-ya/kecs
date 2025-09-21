@@ -30,10 +30,10 @@ func (m Model) executeAction(action KeyAction) (Model, tea.Cmd) {
 	}
 
 	// Check if it's a global action first
-	// Global actions are: Quit, Back, Help, Search, Command, MoveUp, MoveDown, Refresh, GoHome, SwitchInstance
+	// Global actions are: Quit, Back, Help, Search, Command, MoveUp, MoveDown, Refresh, GoHome, SwitchInstance, DeleteInstance
 	switch action {
 	case ActionQuit, ActionBack, ActionHelp, ActionSearch, ActionCommand,
-		ActionMoveUp, ActionMoveDown, ActionRefresh, ActionGoHome, ActionSwitchInstance:
+		ActionMoveUp, ActionMoveDown, ActionRefresh, ActionGoHome, ActionSwitchInstance, ActionDeleteInstance:
 		return m.executeGlobalAction(action)
 	}
 
@@ -140,6 +140,27 @@ func (m Model) executeGlobalAction(action KeyAction) (Model, tea.Cmd) {
 			m.previousView = m.currentView
 			m.currentView = ViewInstanceSwitcher
 		}
+
+	case ActionDeleteInstance:
+		// Delete currently selected instance
+		if m.selectedInstance != "" {
+			if m.selectedInstance == "default" {
+				m.err = fmt.Errorf("Cannot delete default instance")
+				return m, nil
+			}
+			if m.isDeleting {
+				return m, nil
+			}
+
+			m.confirmDialog = DeleteInstanceDialog(
+				m.selectedInstance,
+				func() error { return nil },
+				func() {},
+			)
+			m.pendingCommand = m.deleteInstanceCmd(m.selectedInstance)
+			m.previousView = m.currentView
+			m.currentView = ViewConfirmDialog
+		}
 	}
 
 	return m, nil
@@ -194,27 +215,6 @@ func (m Model) executeInstanceAction(action KeyAction) (Model, tea.Cmd) {
 				m.err = fmt.Errorf("Cannot start/stop instance in %s state", instanceStatus)
 				return m, nil
 			}
-			m.previousView = m.currentView
-			m.currentView = ViewConfirmDialog
-		}
-
-	case ActionDeleteInstance:
-		if len(m.instances) > 0 && m.instanceCursor < len(m.instances) {
-			instanceName := m.instances[m.instanceCursor].Name
-			if instanceName == "default" {
-				m.err = fmt.Errorf("Cannot delete default instance")
-				return m, nil
-			}
-			if m.isDeleting {
-				return m, nil
-			}
-
-			m.confirmDialog = DeleteInstanceDialog(
-				instanceName,
-				func() error { return nil },
-				func() {},
-			)
-			m.pendingCommand = m.deleteInstanceCmd(instanceName)
 			m.previousView = m.currentView
 			m.currentView = ViewConfirmDialog
 		}
