@@ -232,6 +232,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case DataLoadedMsg:
+		// Store previous state to detect first load
+		wasEmpty := len(m.instances) == 0
+
 		m.instances = msg.Instances
 		m.clusters = msg.Clusters
 		m.services = msg.Services
@@ -243,27 +246,36 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ready = true
 		}
 
-		// Auto-select single instance for mock data too
-		if len(m.instances) == 1 && m.selectedInstance == "" && !m.autoSelectedInstance {
-			m.selectedInstance = m.instances[0].Name
-			m.autoSelectedInstance = true
-			m.currentView = ViewClusters
-			// Load clusters for the auto-selected instance
-			if m.useMockData {
-				cmds = append(cmds, mock.LoadAllData(
-					m.selectedInstance,
-					m.selectedCluster,
-					m.selectedService,
-					m.selectedTask,
-				))
+		// Handle instance selection and view switching
+		if wasEmpty && len(m.instances) > 0 {
+			// This is the first load with instances
+			if len(m.instances) == 1 {
+				// Auto-select single instance
+				m.selectedInstance = m.instances[0].Name
+				m.autoSelectedInstance = true
+				m.currentView = ViewClusters
+				// Load clusters for the auto-selected instance
+				if m.useMockData {
+					cmds = append(cmds, mock.LoadAllData(
+						m.selectedInstance,
+						m.selectedCluster,
+						m.selectedService,
+						m.selectedTask,
+					))
+				}
+			} else {
+				// Multiple instances - stay on instances view for selection
+				m.currentView = ViewInstances
 			}
-		} else if len(m.instances) > 0 && m.selectedInstance == "" && !m.autoSelectedInstance && m.currentView == ViewInstances {
-			// If we have instances but haven't selected one yet, and we're on the instances view,
-			// stay on the instances view so user can select
-			// This is the expected behavior when there are multiple instances
+		} else if len(m.instances) == 0 {
+			// No instances - show instances view
+			m.currentView = ViewInstances
 		}
 
 	case dataLoadedMsg:
+		// Store previous state to detect first load
+		wasEmpty := len(m.instances) == 0
+
 		// Handle API data
 		m.instances = msg.instances
 		m.clusters = msg.clusters
@@ -275,13 +287,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ready = true
 		}
 
-		// Auto-select single instance
-		if len(m.instances) == 1 && m.selectedInstance == "" && !m.autoSelectedInstance {
-			m.selectedInstance = m.instances[0].Name
-			m.autoSelectedInstance = true
-			m.currentView = ViewClusters
-			// Load clusters for the auto-selected instance
-			cmds = append(cmds, m.loadDataFromAPI())
+		// Handle instance selection and view switching
+		if wasEmpty && len(m.instances) > 0 {
+			// This is the first load with instances
+			if len(m.instances) == 1 {
+				// Auto-select single instance
+				m.selectedInstance = m.instances[0].Name
+				m.autoSelectedInstance = true
+				m.currentView = ViewClusters
+				// Load clusters for the auto-selected instance
+				cmds = append(cmds, m.loadDataFromAPI())
+			} else {
+				// Multiple instances - stay on instances view for selection
+				m.currentView = ViewInstances
+			}
+		} else if len(m.instances) == 0 {
+			// No instances - show instances view
+			m.currentView = ViewInstances
 		}
 
 	case logsLoadedMsg:
