@@ -30,6 +30,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // DefaultKECSPort is the default API port for KECS instances
@@ -45,7 +47,12 @@ type HTTPClient struct {
 // NewHTTPClient creates a new HTTP-based API client
 func NewHTTPClient(baseURL string) *HTTPClient {
 	// Create k3d provider for direct instance listing
-	k3dProvider, _ := NewK3dInstanceProvider() // Ignore error, will fallback to API
+	k3dProvider, err := NewK3dInstanceProvider()
+	if err != nil {
+		// Log error but continue - will fallback to API
+		// This is not critical as the TUI can still function without direct k3d access
+		logging.Warn("Failed to create k3d provider: %v (will fallback to API)", err)
+	}
 
 	return &HTTPClient{
 		baseURL: baseURL,
@@ -933,9 +940,41 @@ func (c *HTTPClient) HealthCheck(ctx context.Context, instanceName string) error
 		return nil
 	}
 
-	// Fallback to admin API path
-	path := fmt.Sprintf("/api/instances/%s/health", url.PathEscape(instanceName))
-	return c.doRequest(ctx, "GET", path, nil, nil)
+	// Fallback: Try to read config file to get admin port
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	// Read instance config to get admin port
+	configPath := filepath.Join(home, ".kecs", "instances", instanceName, "config.yaml")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read instance config: %w", err)
+	}
+
+	// Parse config to get admin port
+	var config struct {
+		AdminPort int `yaml:"adminPort"`
+	}
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("failed to parse instance config: %w", err)
+	}
+
+	// Call health endpoint directly
+	healthURL := fmt.Sprintf("http://localhost:%d/health", config.AdminPort)
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(healthURL)
+	if err != nil {
+		return fmt.Errorf("health check failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("health check returned status %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 // GetInstanceCreationStatus gets the creation status of an instance

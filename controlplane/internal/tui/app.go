@@ -226,9 +226,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case statusTickMsg:
 		// Update instance statuses periodically
 		cmds = append(cmds, statusTickCmd())
-		if m.currentView == ViewInstances {
-			cmds = append(cmds, m.updateInstanceStatusCmd())
-		}
+		// Always update instance status for health checks (needed for status indicator in all views)
+		cmds = append(cmds, m.updateInstanceStatusCmd())
 
 	case DataLoadedMsg:
 		// Store previous state to detect first load
@@ -856,27 +855,24 @@ func (m Model) View() string {
 	if len(m.instances) == 0 && m.currentView == ViewInstances {
 		// Welcome screen - no navigation panel, use full screen for welcome message
 		welcomeContent := m.renderNoInstancesView()
-		footer := m.renderFooter()
 
 		// Use full height for welcome content
-		availableHeight := m.height - 1 // -1 for footer
+		availableHeight := m.height
 		welcomePanel := lipgloss.NewStyle().
 			Height(availableHeight).
 			Width(m.width).
 			Render(welcomeContent)
 
-		return lipgloss.JoinVertical(lipgloss.Top,
-			welcomePanel,
-			footer,
-		)
+		return welcomePanel
 	}
 
 	// Normal layout with navigation panel
-	// Calculate exact heights for panels
-	footerHeight := 1
-	availableHeight := m.height - footerHeight
-	navPanelHeight := int(float64(availableHeight) * 0.3)
-	resourcePanelHeight := availableHeight - navPanelHeight
+	// Calculate exact heights for panels to fill entire screen
+	totalHeight := m.height
+
+	// Calculate base heights (30/70 split)
+	navPanelHeight := int(float64(totalHeight) * 0.3)
+	resourcePanelHeight := totalHeight - navPanelHeight
 
 	// Ensure minimum heights
 	if navPanelHeight < 10 {
@@ -886,22 +882,23 @@ func (m Model) View() string {
 		resourcePanelHeight = 10
 	}
 
+	// Adjust to ensure they exactly fill the screen
+	if navPanelHeight+resourcePanelHeight < totalHeight {
+		// Add any remaining height to the resource panel
+		resourcePanelHeight = totalHeight - navPanelHeight
+	}
+
 	// Render navigation panel (30% height)
-	navigationPanel := m.renderNavigationPanel()
+	navigationPanel := m.renderNavigationPanelWithHeight(navPanelHeight)
 
 	// Render resource panel (70% height)
-	resourcePanel := m.renderResourcePanel()
+	resourcePanel := m.renderResourcePanelWithHeight(resourcePanelHeight)
 
-	// Render footer
-	footer := m.renderFooter()
-
-	// Combine all components without extra spacing
-	// The panels already have their own borders and padding
+	// Combine panels - they should exactly fill the terminal height
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
 		navigationPanel,
 		resourcePanel,
-		footer,
 	)
 }
 

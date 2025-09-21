@@ -259,7 +259,7 @@ func (m Model) renderTaskDescribe() string {
 	// Use a more conservative estimate for the resource panel context
 	contentHeight := 20 // Default height for resource panel content
 	if m.height > 10 {
-		contentHeight = m.height - 10 // Leave space for navigation, header, footer
+		contentHeight = m.height - 9 // Leave space for navigation and header
 	}
 
 	// Apply scrolling if needed
