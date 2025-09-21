@@ -2166,7 +2166,7 @@ func (m Model) renderHelpContent(maxHeight int) string {
 	footer := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6c7086")).
 		MarginTop(2).
-		Render("Press any key to close help...")
+		Render("Press ? to close help")
 
 	// Combine all parts
 	helpView := lipgloss.JoinVertical(
