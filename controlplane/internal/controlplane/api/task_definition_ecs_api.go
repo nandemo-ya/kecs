@@ -172,7 +172,7 @@ func (api *DefaultECSAPI) RegisterTaskDefinition(ctx context.Context, req *gener
 	// Register the task definition
 	registeredTaskDef, err := api.storage.TaskDefinitionStore().Register(ctx, storageTaskDef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register task definition: %w", err)
+		return nil, toECSError(err, "RegisterTaskDefinition")
 	}
 
 	// Convert storage task definition to generated response

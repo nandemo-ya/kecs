@@ -358,7 +358,8 @@ func (api *DefaultECSAPI) CreateService(ctx context.Context, req *generated.Crea
 
 	// Save to storage first
 	if err := api.storage.ServiceStore().Create(ctx, storageService); err != nil {
-		return nil, fmt.Errorf("failed to create service: %w", err)
+		// Convert storage errors to appropriate ECS errors
+		return nil, toECSError(err, "CreateService")
 	}
 
 	logging.Info("Service created in storage, proceeding with Kubernetes deployment",
@@ -520,7 +521,8 @@ func (api *DefaultECSAPI) DeleteService(ctx context.Context, req *generated.Dele
 
 	// Delete from storage
 	if err := api.storage.ServiceStore().Delete(ctx, cluster.ARN, req.Service); err != nil {
-		return nil, fmt.Errorf("failed to delete service: %w", err)
+		// Convert storage errors to appropriate ECS errors
+		return nil, toECSError(err, "DeleteService")
 	}
 
 	// Decrement cluster's active service count
@@ -875,7 +877,8 @@ func (api *DefaultECSAPI) UpdateService(ctx context.Context, req *generated.Upda
 
 	// Single update at the end
 	if err := api.storage.ServiceStore().Update(ctx, existingService); err != nil {
-		return nil, fmt.Errorf("failed to update service: %w", err)
+		// Convert storage errors to appropriate ECS errors
+		return nil, toECSError(err, "UpdateService")
 	}
 
 	// Convert back to API response
