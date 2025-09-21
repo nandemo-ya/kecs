@@ -42,6 +42,9 @@ var (
 	statusInactiveStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#ff0000"))
 
+	statusErrorStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#ff0000"))
+
 	// Carousel styles
 	selectedItemStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#89dceb")).
@@ -221,9 +224,12 @@ func (m Model) renderInstanceCarousel() string {
 
 		// Status indicator
 		var statusIcon string
-		if inst.Status == "running" {
+		switch strings.ToLower(inst.Status) {
+		case "running":
 			statusIcon = statusActiveStyle.Render("●")
-		} else {
+		case "unhealthy":
+			statusIcon = statusErrorStyle.Render("●")
+		default:
 			statusIcon = statusInactiveStyle.Render("○")
 		}
 
@@ -382,65 +388,14 @@ func (m Model) renderFooter() string {
 		return footerStyle.Width(m.width).Render(content)
 	}
 
-	// Default footer shows status info
-	left := ""
-	right := ""
-
-	// Show instance status on the left
-	if m.selectedInstance != "" {
-		status := "Unknown"
-		for _, inst := range m.instances {
-			if inst.Name == m.selectedInstance {
-				// Check for various active states
-				if inst.Status == "ACTIVE" || inst.Status == "Running" || inst.Status == "running" {
-					status = statusActiveStyle.Render("● Active")
-				} else {
-					status = statusInactiveStyle.Render("○ Inactive")
-				}
-				break
-			}
-		}
-		left = fmt.Sprintf("Instance: %s", status)
-	}
-
-	// Show selection count on the right based on current view
-	switch m.currentView {
-	case ViewInstances:
-		right = fmt.Sprintf("Instances: %d", len(m.instances))
-	case ViewClusters:
-		right = fmt.Sprintf("Clusters: %d", len(m.filterClusters(m.clusters)))
-	case ViewServices:
-		right = fmt.Sprintf("Services: %d", len(m.filterServices(m.services)))
-	case ViewTasks:
-		right = fmt.Sprintf("Tasks: %d", len(m.filterTasks(m.tasks)))
-	case ViewLogs:
-		right = fmt.Sprintf("Logs: %d", len(m.filterLogs(m.logs)))
-	case ViewTaskDefinitionFamilies:
-		right = fmt.Sprintf("Families: %d", len(m.filterTaskDefFamilies(m.taskDefFamilies)))
-	case ViewTaskDefinitionRevisions:
-		right = fmt.Sprintf("Revisions: %d", len(m.taskDefRevisions))
-	}
-
-	// Calculate spacing
-	if left == "" && right == "" {
-		return footerStyle.Width(m.width).Render("")
-	}
-
-	leftWidth := lipgloss.Width(left)
-	rightWidth := lipgloss.Width(right)
-	gap := m.width - leftWidth - rightWidth - 4 // -4 for padding
-	if gap < 2 {
-		gap = 2
-	}
-
-	content := left + strings.Repeat(" ", gap) + right
-	return footerStyle.Width(m.width).Render(content)
+	// Default footer is empty (no status info)
+	return footerStyle.Width(m.width).Render("")
 }
 
 // renderNavigationPanel renders the top navigation panel (30% height)
 func (m Model) renderNavigationPanel() string {
 	// Calculate height for navigation panel (30% of available height)
-	navHeight := int(float64(m.height-1) * 0.3) // -1 for footer
+	navHeight := int(float64(m.height) * 0.3)
 
 	// Ensure minimum height for all content (including shortcuts)
 	// Need at least: header(1) + breadcrumb(1) + separator(1) + summary(1-2) + separator(1) + view shortcuts(1) + global shortcuts(1) = 7-8 lines
@@ -501,7 +456,7 @@ func (m Model) renderNavigationPanel() string {
 // renderResourcePanel renders the bottom resource panel (70% height)
 func (m Model) renderResourcePanel() string {
 	// Calculate height for resource panel (70% of available height)
-	resourceHeight := int(float64(m.height-1) * 0.7) // -1 for footer
+	resourceHeight := int(float64(m.height) * 0.7)
 	if resourceHeight < 10 {
 		resourceHeight = 10 // Minimum height
 	}
@@ -765,7 +720,7 @@ func (m Model) renderSummary() string {
 // renderNoInstancesView renders a view when no instances exist
 func (m Model) renderNoInstancesView() string {
 	// Use the full available height
-	height := m.height - 1 // -1 for footer only
+	height := m.height
 
 	// Create styled welcome message components
 	emojiStyle := lipgloss.NewStyle().
@@ -2534,4 +2489,116 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// renderNavigationPanelWithHeight renders the navigation panel with specified height
+func (m Model) renderNavigationPanelWithHeight(panelHeight int) string {
+	// Calculate actual available width inside the panel
+	panelWidth := m.width - 6 // Account for panel borders and padding
+
+	// Header and breadcrumb use full width
+	header := m.renderHeader()
+	breadcrumb := m.renderBreadcrumb()
+	summary := m.renderSummary()
+
+	// Add separator line - match the actual panel width
+	separatorWidth := panelWidth
+	if separatorWidth > m.width-8 {
+		separatorWidth = m.width - 8 // Ensure it doesn't overflow
+	}
+	topSeparator := separatorStyle.Render(strings.Repeat("─", separatorWidth))
+
+	// Render shortcuts as single lines at the bottom
+	viewShortcuts := m.renderViewShortcutsLine(panelWidth)
+	globalShortcuts := m.renderGlobalShortcutsLine(panelWidth)
+
+	// Stack all components vertically
+	var components []string
+	components = append(components, header)
+	if breadcrumb != "" {
+		components = append(components, breadcrumb)
+	}
+	components = append(components, topSeparator)
+	components = append(components, summary)
+	// Only one separator line before shortcuts
+	if viewShortcuts != "" {
+		components = append(components, viewShortcuts)
+	}
+	if globalShortcuts != "" {
+		components = append(components, globalShortcuts)
+	}
+
+	navContent := lipgloss.JoinVertical(lipgloss.Top, components...)
+
+	// Use the exact height provided, accounting for borders (2) and padding (2)
+	contentHeight := panelHeight - 4
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+
+	return navigationPanelStyle.
+		Width(m.width - 4). // Account for borders and padding
+		Height(contentHeight).
+		Render(navContent)
+}
+
+// renderResourcePanelWithHeight renders the resource panel with specified height
+func (m Model) renderResourcePanelWithHeight(panelHeight int) string {
+	var content string
+
+	// Use the provided height for content calculation
+	contentHeight := panelHeight - 4 // Account for borders and padding
+
+	// Render view-specific content
+	switch m.currentView {
+	case ViewInstances:
+		// Only show instances view when no instances exist (for creation prompt)
+		if len(m.instances) == 0 {
+			content = m.renderNoInstancesView()
+		} else {
+			// Should not normally reach here as we auto-select instances
+			content = m.renderClustersList(contentHeight)
+		}
+	case ViewClusters:
+		content = m.renderClustersList(contentHeight)
+	case ViewServices:
+		content = m.renderServicesList(contentHeight)
+	case ViewTasks:
+		content = m.renderTasksList(contentHeight)
+	case ViewTaskDescribe:
+		content = m.renderTaskDescribe()
+	case ViewLogs:
+		// In split-view mode, the resource panel should show the previous view's content
+		// not the log viewer itself (which is shown in the bottom portion)
+		if m.logSplitView && m.previousView != ViewLogs {
+			// Render the content from the previous view
+			switch m.previousView {
+			case ViewTasks:
+				content = m.renderTasksList(contentHeight)
+			case ViewServices:
+				content = m.renderServicesList(contentHeight)
+			case ViewClusters:
+				content = m.renderClustersList(contentHeight)
+			default:
+				content = "No content available"
+			}
+		} else if m.logViewer != nil {
+			// In fullscreen mode or if there's no split-view, show log viewer
+			content = m.logViewer.View()
+		} else {
+			// Log viewer not initialized yet
+			content = "Initializing log viewer..."
+		}
+	case ViewTaskDefinitionFamilies:
+		content = m.renderTaskDefFamiliesList(contentHeight)
+	case ViewTaskDefinitionRevisions:
+		content = m.renderTaskDefRevisionsList(contentHeight, m.width-8)
+	default:
+		content = "View not implemented"
+	}
+
+	return resourcePanelStyle.
+		Width(m.width - 4).    // Account for borders and padding
+		Height(contentHeight). // Use exact height provided
+		Render(content)
 }

@@ -86,11 +86,12 @@ func (m Model) renderCommandPaletteOverlay() string {
 }
 
 func (m Model) renderNormalView() string {
-	// Calculate exact heights for panels
-	footerHeight := 1
-	availableHeight := m.height - footerHeight
-	navPanelHeight := int(float64(availableHeight) * 0.3)
-	resourcePanelHeight := availableHeight - navPanelHeight
+	// Calculate exact heights for panels to fill entire screen
+	totalHeight := m.height
+
+	// Calculate base heights (30/70 split)
+	navPanelHeight := int(float64(totalHeight) * 0.3)
+	resourcePanelHeight := totalHeight - navPanelHeight
 
 	// Ensure minimum heights
 	if navPanelHeight < 10 {
@@ -100,21 +101,23 @@ func (m Model) renderNormalView() string {
 		resourcePanelHeight = 10
 	}
 
+	// Adjust to ensure they exactly fill the screen
+	if navPanelHeight+resourcePanelHeight < totalHeight {
+		// Add any remaining height to the resource panel
+		resourcePanelHeight = totalHeight - navPanelHeight
+	}
+
 	// Render navigation panel (30% height)
-	navigationPanel := m.renderNavigationPanel()
+	navigationPanel := m.renderNavigationPanelWithHeight(navPanelHeight)
 
 	// Render resource panel (70% height)
-	resourcePanel := m.renderResourcePanel()
+	resourcePanel := m.renderResourcePanelWithHeight(resourcePanelHeight)
 
-	// Render footer
-	footer := m.renderFooter()
-
-	// Combine all components
+	// Combine panels - they should exactly fill the terminal height
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
 		navigationPanel,
 		resourcePanel,
-		footer,
 	)
 }
 

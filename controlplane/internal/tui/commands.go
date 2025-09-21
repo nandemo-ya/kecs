@@ -268,7 +268,6 @@ func generateMockLogs(taskID string) []api.LogEntry {
 
 // createInstanceCmd creates a new instance via API
 func (m Model) createInstanceCmd(opts api.CreateInstanceOptions) tea.Cmd {
-
 	return func() tea.Msg {
 		// Increase timeout to 3 minutes for LocalStack and other components to start
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
@@ -495,7 +494,7 @@ func (m Model) updateInstanceStatusCmd() tea.Cmd {
 		tuiInstances := make([]Instance, len(instances))
 		for i, inst := range instances {
 			// Check health status if instance is running
-			if inst.Status == "running" {
+			if strings.ToLower(inst.Status) == "running" {
 				err := m.apiClient.HealthCheck(ctx, inst.Name)
 				if err != nil {
 					inst.Status = "unhealthy"
@@ -756,7 +755,6 @@ func (m Model) createClusterCmd(clusterName, region string) tea.Cmd {
 		// Note: Region is specified in the form but not yet used by the API
 		// In the future, this could be used to configure region-specific settings
 		cluster, err := m.apiClient.CreateCluster(ctx, m.selectedInstance, clusterName)
-
 		if err != nil {
 			return clusterCreatedMsg{
 				clusterName: clusterName,

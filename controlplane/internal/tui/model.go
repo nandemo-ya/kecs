@@ -395,6 +395,9 @@ func (m Model) Init() tea.Cmd {
 	// Load real data from API
 	cmds = append(cmds, m.loadDataFromAPI())
 
+	// Also immediately update instance status for health checks
+	cmds = append(cmds, m.updateInstanceStatusCmd())
+
 	return tea.Batch(cmds...)
 }
 

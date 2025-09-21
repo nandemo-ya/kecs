@@ -14,11 +14,12 @@ func (m Model) renderELBv2View() string {
 		return "Initializing..."
 	}
 
-	// Calculate heights following the ECS view pattern
-	footerHeight := 1
-	availableHeight := m.height - footerHeight
-	navPanelHeight := int(float64(availableHeight) * 0.3)
-	resourcePanelHeight := availableHeight - navPanelHeight
+	// Calculate exact heights for panels to fill entire screen
+	totalHeight := m.height
+
+	// Calculate base heights (30/70 split)
+	navPanelHeight := int(float64(totalHeight) * 0.3)
+	resourcePanelHeight := totalHeight - navPanelHeight
 
 	// Ensure minimum heights
 	if navPanelHeight < 10 {
@@ -28,8 +29,14 @@ func (m Model) renderELBv2View() string {
 		resourcePanelHeight = 10
 	}
 
-	// Render navigation panel (30% height) - reuse the common navigation panel
-	navigationPanel := m.renderNavigationPanel()
+	// Adjust to ensure they exactly fill the screen
+	if navPanelHeight+resourcePanelHeight < totalHeight {
+		// Add any remaining height to the resource panel
+		resourcePanelHeight = totalHeight - navPanelHeight
+	}
+
+	// Render navigation panel (30% height) - use height-specific version
+	navigationPanel := m.renderNavigationPanelWithHeight(navPanelHeight)
 
 	// Render content based on current ELBv2 view
 	var content string
@@ -54,15 +61,11 @@ func (m Model) renderELBv2View() string {
 		Height(resourcePanelHeight).
 		Render(content)
 
-	// Render footer
-	footer := m.renderFooter()
-
-	// Combine all components
+	// Combine all components (no footer now)
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
 		navigationPanel,
 		resourcePanel,
-		footer,
 	)
 }
 
