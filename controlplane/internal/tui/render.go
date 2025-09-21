@@ -175,7 +175,7 @@ func (m Model) getHeaderShortcuts() string {
 func (m Model) renderInstanceCarousel() string {
 	// Empty state
 	if len(m.instances) == 0 {
-		return emptyStateStyle.Render("No KECS instances | Press N to create instance")
+		return emptyStateStyle.Render("No KECS instances | Press i to create instance")
 	}
 
 	// Calculate visible instances
@@ -226,7 +226,7 @@ func (m Model) renderInstanceCarousel() string {
 	}
 
 	// Always show the create instance shortcut at the end
-	createShortcut := dimStyle.Render("│ Press N to create")
+	createShortcut := dimStyle.Render("│ Press i to create")
 	items = append(items, createShortcut)
 
 	// Join items with spacing

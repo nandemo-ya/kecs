@@ -932,8 +932,8 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 				m.clipboardMsgTime = time.Now()
 			}
 		}
-	case "n":
-		// Open instance creation form
+	case "i":
+		// Open instance creation form (i for "new instance")
 		if m.instanceForm == nil {
 			m.instanceForm = NewInstanceFormWithSuggestions(m.instances)
 		} else {
@@ -1091,8 +1091,16 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return m, m.loadDataFromAPI()
 		}
 	case "i":
-		m.currentView = ViewInstances
-		m.selectedInstance = ""
+		// Open instance creation form (i for "new instance")
+		if m.instanceForm == nil {
+			m.instanceForm = NewInstanceFormWithSuggestions(m.instances)
+		} else {
+			// Reset with new suggestions
+			m.instanceForm = NewInstanceFormWithSuggestions(m.instances)
+		}
+		m.previousView = m.currentView
+		m.currentView = ViewInstanceCreate
+		return m, nil
 	case "s":
 		if m.selectedCluster != "" {
 			m.currentView = ViewServices
