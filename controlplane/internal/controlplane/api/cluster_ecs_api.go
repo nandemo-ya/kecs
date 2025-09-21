@@ -131,7 +131,7 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 
 	// Save to storage
 	if err := api.storage.ClusterStore().Create(ctx, cluster); err != nil {
-		return nil, fmt.Errorf("failed to create cluster: %w", err)
+		return nil, toECSError(err, "CreateCluster")
 	}
 
 	// Create k8s namespace synchronously to ensure it exists before returning
@@ -348,12 +348,12 @@ func (api *DefaultECSAPI) DeleteCluster(ctx context.Context, req *generated.Dele
 	// Update status to INACTIVE
 	cluster.Status = "INACTIVE"
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
-		return nil, fmt.Errorf("failed to update cluster status: %w", err)
+		return nil, toECSError(err, "DeleteCluster")
 	}
 
 	// Delete the cluster
 	if err := api.storage.ClusterStore().Delete(ctx, cluster.Name); err != nil {
-		return nil, fmt.Errorf("failed to delete cluster: %w", err)
+		return nil, toECSError(err, "DeleteCluster")
 	}
 
 	// Invalidate cache for this cluster
@@ -431,7 +431,7 @@ func (api *DefaultECSAPI) UpdateCluster(ctx context.Context, req *generated.Upda
 
 	// Update the cluster
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
-		return nil, fmt.Errorf("failed to update cluster: %w", err)
+		return nil, toECSError(err, "UpdateCluster")
 	}
 
 	// Invalidate cache for this cluster
@@ -549,7 +549,7 @@ func (api *DefaultECSAPI) UpdateClusterSettings(ctx context.Context, req *genera
 
 	// Update the cluster
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
-		return nil, fmt.Errorf("failed to update cluster: %w", err)
+		return nil, toECSError(err, "UpdateCluster")
 	}
 
 	// Invalidate cache for this cluster
@@ -632,7 +632,7 @@ func (api *DefaultECSAPI) PutClusterCapacityProviders(ctx context.Context, req *
 
 	// Update the cluster
 	if err := api.storage.ClusterStore().Update(ctx, cluster); err != nil {
-		return nil, fmt.Errorf("failed to update cluster: %w", err)
+		return nil, toECSError(err, "UpdateCluster")
 	}
 
 	// Invalidate cache for this cluster
