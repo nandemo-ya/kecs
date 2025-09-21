@@ -129,20 +129,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		// Check for global key action
-		if action, found := m.keyBindings.GetGlobalAction(keyStr); found {
-			if debugLogger := GetDebugLogger(); debugLogger != nil {
-				debugLogger.LogWithCaller("Update", "Global action '%s' found for key '%s' in view %s - calling executeAction", action, keyStr, m.currentView.String())
-			}
-			return m.executeAction(action)
-		}
+		// Skip global and view-specific key actions for dialog views
+		// to prevent conflicts with text input (e.g., 'h' for home vs typing 'h')
+		isDialogView := m.currentView == ViewClusterCreate ||
+			m.currentView == ViewInstanceCreate ||
+			m.currentView == ViewTaskDefinitionEditor ||
+			m.currentView == ViewConfirmDialog
 
-		// Check for view-specific key action
-		if action, found := m.keyBindings.GetViewAction(m.currentView, keyStr); found {
-			if debugLogger := GetDebugLogger(); debugLogger != nil {
-				debugLogger.LogWithCaller("Update", "View-specific action '%s' found for key '%s' in view %s - calling executeAction", action, keyStr, m.currentView.String())
+		if !isDialogView {
+			// Check for global key action
+			if action, found := m.keyBindings.GetGlobalAction(keyStr); found {
+				if debugLogger := GetDebugLogger(); debugLogger != nil {
+					debugLogger.LogWithCaller("Update", "Global action '%s' found for key '%s' in view %s - calling executeAction", action, keyStr, m.currentView.String())
+				}
+				return m.executeAction(action)
 			}
-			return m.executeAction(action)
+
+			// Check for view-specific key action
+			if action, found := m.keyBindings.GetViewAction(m.currentView, keyStr); found {
+				if debugLogger := GetDebugLogger(); debugLogger != nil {
+					debugLogger.LogWithCaller("Update", "View-specific action '%s' found for key '%s' in view %s - calling executeAction", action, keyStr, m.currentView.String())
+				}
+				return m.executeAction(action)
+			}
 		}
 
 		// Handle special view dialogs that need custom key handling
