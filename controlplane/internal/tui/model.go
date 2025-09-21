@@ -435,6 +435,11 @@ func (m *Model) canGoBack() bool {
 	return m.currentView != ViewInstances
 }
 
+// isInDialogView checks if the current view is a dialog that shouldn't be interrupted
+func (m *Model) isInDialogView() bool {
+	return m.currentView == ViewInstanceCreate || m.currentView == ViewClusterCreate
+}
+
 func (m *Model) goBack() {
 	switch m.currentView {
 	case ViewClusters:
