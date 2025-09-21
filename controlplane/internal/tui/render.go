@@ -42,6 +42,21 @@ var (
 	statusInactiveStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#ff0000"))
 
+	// Carousel styles
+	selectedItemStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#89dceb")).
+				Bold(true)
+
+	normalItemStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#cdd6f4"))
+
+	dimStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#585b70"))
+
+	emptyStateStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#a6adc8")).
+			Italic(true)
+
 	// New styles for enhanced layout
 	navigationPanelStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
@@ -156,15 +171,81 @@ func (m Model) getHeaderShortcuts() string {
 	return strings.Join(shortcuts, "  ")
 }
 
-func (m Model) renderHeader() string {
-	// Build the header content
-	headerText := fmt.Sprintf("KECS %s", version.GetVersion())
-	if m.selectedInstance != "" {
-		headerText = fmt.Sprintf("KECS %s | Instance: %s", version.GetVersion(), m.selectedInstance)
+// renderInstanceCarousel renders the instance list as a horizontal carousel
+func (m Model) renderInstanceCarousel() string {
+	// Empty state
+	if len(m.instances) == 0 {
+		return emptyStateStyle.Render("No KECS instances | Press i to create instance")
 	}
 
-	// Let the header flow naturally without width constraints
-	return headerStyle.Render(headerText)
+	// Calculate visible instances
+	m.calculateMaxVisibleInstances()
+	m.updateCarouselOffset()
+
+	var items []string
+
+	// Add left navigation indicator if needed
+	if m.instanceCarouselOffset > 0 {
+		items = append(items, dimStyle.Render("◀"))
+	}
+
+	// Determine the range of instances to display
+	startIdx := m.instanceCarouselOffset
+	endIdx := startIdx + m.maxVisibleInstances
+	if endIdx > len(m.instances) {
+		endIdx = len(m.instances)
+	}
+
+	// Render visible instances
+	for i := startIdx; i < endIdx; i++ {
+		inst := m.instances[i]
+
+		// Status indicator
+		var statusIcon string
+		if inst.Status == "running" {
+			statusIcon = statusActiveStyle.Render("●")
+		} else {
+			statusIcon = statusInactiveStyle.Render("○")
+		}
+
+		// Format instance name with selection indicator
+		instDisplay := fmt.Sprintf("%s %s", statusIcon, inst.Name)
+		if inst.Name == m.selectedInstance {
+			// Highlight selected instance
+			instDisplay = selectedItemStyle.Render(fmt.Sprintf("[ %s ]", instDisplay))
+		} else {
+			instDisplay = normalItemStyle.Render(instDisplay)
+		}
+
+		items = append(items, instDisplay)
+	}
+
+	// Add right navigation indicator if needed
+	if endIdx < len(m.instances) {
+		items = append(items, dimStyle.Render("▶"))
+	}
+
+	// Always show the create instance shortcut at the end
+	createShortcut := dimStyle.Render("│ Press i to create")
+	items = append(items, createShortcut)
+
+	// Join items with spacing
+	return strings.Join(items, "  ")
+}
+
+func (m Model) renderHeader() string {
+	// Build the header with KECS version and instance carousel
+	headerLeft := fmt.Sprintf("KECS %s", version.GetVersion())
+
+	// Render instance carousel on the same line
+	instanceCarousel := m.renderInstanceCarousel()
+
+	// Combine header and carousel
+	if instanceCarousel != "" {
+		return headerStyle.Render(fmt.Sprintf("%s | %s", headerLeft, instanceCarousel))
+	}
+
+	return headerStyle.Render(headerLeft)
 }
 
 func (m Model) renderBreadcrumb() string {
@@ -411,7 +492,13 @@ func (m Model) renderResourcePanel() string {
 	// Render view-specific content
 	switch m.currentView {
 	case ViewInstances:
-		content = m.renderInstancesList(resourceHeight - 4) // Account for borders/padding
+		// Only show instances view when no instances exist (for creation prompt)
+		if len(m.instances) == 0 {
+			content = m.renderNoInstancesView()
+		} else {
+			// Should not normally reach here as we auto-select instances
+			content = m.renderClustersList(resourceHeight - 4)
+		}
 	case ViewClusters:
 		content = m.renderClustersList(resourceHeight - 4)
 	case ViewServices:
@@ -655,6 +742,43 @@ func (m Model) renderSummary() string {
 }
 
 // View-specific render methods
+
+// renderNoInstancesView renders a view when no instances exist
+func (m Model) renderNoInstancesView() string {
+	// Center the content
+	height := m.height - 10 // Account for header, footer, etc.
+	width := m.width - 4
+
+	// Create the welcome message
+	var lines []string
+	lines = append(lines, "")
+	lines = append(lines, "  🚀 Welcome to KECS")
+	lines = append(lines, "")
+	lines = append(lines, "  No KECS instances found.")
+	lines = append(lines, "")
+	lines = append(lines, "  Press 'i' to create your first instance")
+	lines = append(lines, "  Press '?' for help")
+	lines = append(lines, "")
+
+	// Center the content vertically
+	topPadding := (height - len(lines)) / 2
+	if topPadding > 0 {
+		padding := make([]string, topPadding)
+		lines = append(padding, lines...)
+	}
+
+	// Join all lines
+	content := strings.Join(lines, "\n")
+
+	// Apply styling
+	style := lipgloss.NewStyle().
+		Width(width).
+		Height(height).
+		Align(lipgloss.Center).
+		AlignVertical(lipgloss.Center)
+
+	return style.Render(content)
+}
 
 // renderInstancesList renders the instances list with the given height constraint
 func (m Model) renderInstancesList(maxHeight int) string {

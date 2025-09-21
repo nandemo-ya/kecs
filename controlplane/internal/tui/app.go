@@ -112,6 +112,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleELBv2Keys(msg)
 		}
 
+		// Handle Tab key for instance switching (only when no dialogs are open)
+		// Check if any dialog is active that needs Tab key
+		dialogActive := m.confirmDialog != nil ||
+			m.serviceScaleDialog != nil ||
+			m.serviceUpdateDialog != nil ||
+			m.instanceForm != nil ||
+			m.clusterForm != nil ||
+			m.currentView == ViewConfirmDialog ||
+			m.currentView == ViewClusterCreate ||
+			m.currentView == ViewInstanceCreate ||
+			m.currentView == ViewTaskDefinitionEditor
+
+		if !dialogActive {
+			if keyStr == "tab" {
+				return m.switchToNextInstance()
+			}
+			if keyStr == "shift+tab" {
+				return m.switchToPreviousInstance()
+			}
+		}
+
 		// Check for global key action
 		if action, found := m.keyBindings.GetGlobalAction(keyStr); found {
 			if debugLogger := GetDebugLogger(); debugLogger != nil {
@@ -138,6 +159,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m, cmd = m.handleTaskDefinitionEditorKeys(msg)
 		case ViewClusterCreate:
 			m, cmd = m.handleClusterCreateKeys(msg)
+		case ViewClusters:
+			// Handle ViewClusters keys including the "i" key for instance creation
+			m, cmd = m.handleClustersKeys(msg)
+		case ViewInstances:
+			// Handle ViewInstances keys including the "i" key for instance creation
+			m, cmd = m.handleInstancesKeys(msg)
 		}
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -205,18 +232,67 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case DataLoadedMsg:
+		// Store previous state to detect first load
+		wasEmpty := len(m.instances) == 0
+
 		m.instances = msg.Instances
 		m.clusters = msg.Clusters
 		m.services = msg.Services
 		m.tasks = msg.Tasks
 		m.logs = msg.Logs
 
+		// Set ready flag when data is loaded (in addition to window size)
+		if !m.ready && m.width > 0 && m.height > 0 {
+			m.ready = true
+		}
+
+		// Handle instance selection and view switching
+		if wasEmpty && len(m.instances) > 0 {
+			// This is the first load with instances - select the first one
+			m.selectedInstance = m.instances[0].Name
+			m.autoSelectedInstance = true
+			m.currentView = ViewClusters
+			// Load clusters for the auto-selected instance
+			if m.useMockData {
+				cmds = append(cmds, mock.LoadAllData(
+					m.selectedInstance,
+					m.selectedCluster,
+					m.selectedService,
+					m.selectedTask,
+				))
+			}
+		} else if len(m.instances) == 0 {
+			// No instances - show instances view
+			m.currentView = ViewInstances
+		}
+
 	case dataLoadedMsg:
+		// Store previous state to detect first load
+		wasEmpty := len(m.instances) == 0
+
 		// Handle API data
 		m.instances = msg.instances
 		m.clusters = msg.clusters
 		m.services = msg.services
 		m.tasks = msg.tasks
+
+		// Set ready flag when data is loaded (in addition to window size)
+		if !m.ready && m.width > 0 && m.height > 0 {
+			m.ready = true
+		}
+
+		// Handle instance selection and view switching
+		if wasEmpty && len(m.instances) > 0 {
+			// This is the first load with instances - select the first one
+			m.selectedInstance = m.instances[0].Name
+			m.autoSelectedInstance = true
+			m.currentView = ViewClusters
+			// Load clusters for the auto-selected instance
+			cmds = append(cmds, m.loadDataFromAPI())
+		} else if len(m.instances) == 0 {
+			// No instances - show instances view
+			m.currentView = ViewInstances
+		}
 
 	case logsLoadedMsg:
 		// Handle loaded logs
@@ -902,8 +978,8 @@ func (m Model) handleInstancesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 				m.clipboardMsgTime = time.Now()
 			}
 		}
-	case "n":
-		// Open instance creation form
+	case "i":
+		// Open instance creation form (i for "new instance")
 		if m.instanceForm == nil {
 			m.instanceForm = NewInstanceFormWithSuggestions(m.instances)
 		} else {
@@ -1061,8 +1137,16 @@ func (m Model) handleClustersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return m, m.loadDataFromAPI()
 		}
 	case "i":
-		m.currentView = ViewInstances
-		m.selectedInstance = ""
+		// Open instance creation form (i for "new instance")
+		if m.instanceForm == nil {
+			m.instanceForm = NewInstanceFormWithSuggestions(m.instances)
+		} else {
+			// Reset with new suggestions
+			m.instanceForm = NewInstanceFormWithSuggestions(m.instances)
+		}
+		m.previousView = m.currentView
+		m.currentView = ViewInstanceCreate
+		return m, nil
 	case "s":
 		if m.selectedCluster != "" {
 			m.currentView = ViewServices
