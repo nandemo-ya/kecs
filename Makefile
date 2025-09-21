@@ -68,6 +68,17 @@ generate:
 	cd $(CONTROLPLANE_DIR) && $(GO) build -o ../bin/codegen ./cmd/codegen
 	cd $(CONTROLPLANE_DIR) && ../bin/codegen -service ecs -input cmd/codegen/ecs.json -output internal/controlplane/api/generated_v2 -package api
 
+# Generate CREDITS file for dependencies
+.PHONY: credits
+credits:
+	@echo "Generating CREDITS file..."
+	@if ! command -v gocredits > /dev/null 2>&1; then \
+		echo "Installing gocredits..."; \
+		go install github.com/Songmu/gocredits/cmd/gocredits@latest; \
+	fi
+	@cd $(CONTROLPLANE_DIR) && gocredits -skip-missing . > ../CREDITS 2>/dev/null || true
+	@echo "CREDITS file generated successfully"
+
 
 # Run the CLI
 .PHONY: run
@@ -307,6 +318,7 @@ help:
 	@echo "  dev            - Build server and hot reload controlplane"
 	@echo "  dev-logs       - Same as 'dev' but also tail controlplane logs"
 	@echo "  generate       - Generate code from AWS API definitions"
+	@echo "  credits        - Generate CREDITS file for dependencies"
 	@echo "  help           - Show this help message"
 	@echo ""
 	@echo "Development workflow (Docker hot-reload):"
