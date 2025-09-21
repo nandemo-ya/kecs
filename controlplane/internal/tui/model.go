@@ -659,8 +659,21 @@ func (m Model) switchToNextInstance() (Model, tea.Cmd) {
 	// Reset view to clusters when switching instances
 	m.currentView = ViewClusters
 	m.clusterCursor = 0
+	m.selectedCluster = ""
+	m.serviceCursor = 0
+	m.selectedService = ""
+	m.taskCursor = 0
+	m.selectedTask = ""
 
 	// Load data for the new instance
+	if m.useMockData {
+		return m, mock.LoadAllData(
+			m.selectedInstance,
+			m.selectedCluster,
+			m.selectedService,
+			m.selectedTask,
+		)
+	}
 	return m, m.loadDataFromAPI()
 }
 
@@ -681,7 +694,20 @@ func (m Model) switchToPreviousInstance() (Model, tea.Cmd) {
 	// Reset view to clusters when switching instances
 	m.currentView = ViewClusters
 	m.clusterCursor = 0
+	m.selectedCluster = ""
+	m.serviceCursor = 0
+	m.selectedService = ""
+	m.taskCursor = 0
+	m.selectedTask = ""
 
 	// Load data for the new instance
+	if m.useMockData {
+		return m, mock.LoadAllData(
+			m.selectedInstance,
+			m.selectedCluster,
+			m.selectedService,
+			m.selectedTask,
+		)
+	}
 	return m, m.loadDataFromAPI()
 }
