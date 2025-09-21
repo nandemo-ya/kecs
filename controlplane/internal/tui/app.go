@@ -238,6 +238,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tasks = msg.Tasks
 		m.logs = msg.Logs
 
+		// Auto-select single instance for mock data too
+		if len(m.instances) == 1 && m.selectedInstance == "" && !m.autoSelectedInstance {
+			m.selectedInstance = m.instances[0].Name
+			m.autoSelectedInstance = true
+			m.currentView = ViewClusters
+			// Load clusters for the auto-selected instance
+			if m.useMockData {
+				cmds = append(cmds, mock.LoadAllData(
+					m.selectedInstance,
+					m.selectedCluster,
+					m.selectedService,
+					m.selectedTask,
+				))
+			}
+		} else if len(m.instances) > 0 && m.selectedInstance == "" && !m.autoSelectedInstance && m.currentView == ViewInstances {
+			// If we have instances but haven't selected one yet, and we're on the instances view,
+			// stay on the instances view so user can select
+			// This is the expected behavior when there are multiple instances
+		}
+
 	case dataLoadedMsg:
 		// Handle API data
 		m.instances = msg.instances
