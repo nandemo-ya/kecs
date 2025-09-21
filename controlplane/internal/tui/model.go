@@ -8,7 +8,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
-	"github.com/nandemo-ya/kecs/controlplane/internal/tui/mock"
 )
 
 // ViewType represents the current view in the TUI
@@ -303,8 +302,7 @@ type Model struct {
 	ready bool
 
 	// API client
-	apiClient   api.Client
-	useMockData bool
+	apiClient api.Client
 
 	// Clipboard notification
 	clipboardMsg     string
@@ -362,8 +360,7 @@ func NewModel() Model {
 		refreshInterval:  5 * time.Second,
 		ready:            false,
 		commandPalette:   NewCommandPalette(),
-		useMockData:      true, // Default to mock data for now
-		apiClient:        api.NewMockClient(),
+		apiClient:        api.NewHTTPClient("http://localhost:5373"),
 		taskDefJSONCache: make(map[int]string),
 		spinner:          s,
 		keyBindings:      NewKeyBindingsRegistry(),
@@ -381,7 +378,6 @@ func NewModelWithClient(client api.Client) Model {
 		refreshInterval:  5 * time.Second,
 		ready:            false,
 		commandPalette:   NewCommandPalette(),
-		useMockData:      false,
 		apiClient:        client,
 		taskDefJSONCache: make(map[int]string),
 		spinner:          s,
@@ -396,13 +392,8 @@ func (m Model) Init() tea.Cmd {
 		statusTickCmd(),
 	}
 
-	// Only load mock data if we're using mock mode
-	if m.useMockData {
-		cmds = append(cmds, mock.LoadAllData("", "", "", ""))
-	} else {
-		// Load real data from API
-		cmds = append(cmds, m.loadDataFromAPI())
-	}
+	// Load real data from API
+	cmds = append(cmds, m.loadDataFromAPI())
 
 	return tea.Batch(cmds...)
 }
@@ -666,14 +657,6 @@ func (m *Model) switchToNextInstance() tea.Cmd {
 	m.selectedTask = ""
 
 	// Load data for the new instance
-	if m.useMockData {
-		return mock.LoadAllData(
-			m.selectedInstance,
-			m.selectedCluster,
-			m.selectedService,
-			m.selectedTask,
-		)
-	}
 	return m.loadDataFromAPI()
 }
 
@@ -701,13 +684,5 @@ func (m *Model) switchToPreviousInstance() tea.Cmd {
 	m.selectedTask = ""
 
 	// Load data for the new instance
-	if m.useMockData {
-		return mock.LoadAllData(
-			m.selectedInstance,
-			m.selectedCluster,
-			m.selectedService,
-			m.selectedTask,
-		)
-	}
 	return m.loadDataFromAPI()
 }
