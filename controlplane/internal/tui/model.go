@@ -646,9 +646,9 @@ func (m *Model) updateCarouselOffset() {
 }
 
 // switchToNextInstance switches to the next instance in the carousel
-func (m Model) switchToNextInstance() (Model, tea.Cmd) {
+func (m *Model) switchToNextInstance() tea.Cmd {
 	if len(m.instances) <= 1 {
-		return m, nil
+		return nil
 	}
 
 	currentIdx := m.getSelectedInstanceIndex()
@@ -667,20 +667,20 @@ func (m Model) switchToNextInstance() (Model, tea.Cmd) {
 
 	// Load data for the new instance
 	if m.useMockData {
-		return m, mock.LoadAllData(
+		return mock.LoadAllData(
 			m.selectedInstance,
 			m.selectedCluster,
 			m.selectedService,
 			m.selectedTask,
 		)
 	}
-	return m, m.loadDataFromAPI()
+	return m.loadDataFromAPI()
 }
 
 // switchToPreviousInstance switches to the previous instance in the carousel
-func (m Model) switchToPreviousInstance() (Model, tea.Cmd) {
+func (m *Model) switchToPreviousInstance() tea.Cmd {
 	if len(m.instances) <= 1 {
-		return m, nil
+		return nil
 	}
 
 	currentIdx := m.getSelectedInstanceIndex()
@@ -702,12 +702,12 @@ func (m Model) switchToPreviousInstance() (Model, tea.Cmd) {
 
 	// Load data for the new instance
 	if m.useMockData {
-		return m, mock.LoadAllData(
+		return mock.LoadAllData(
 			m.selectedInstance,
 			m.selectedCluster,
 			m.selectedService,
 			m.selectedTask,
 		)
 	}
-	return m, m.loadDataFromAPI()
+	return m.loadDataFromAPI()
 }

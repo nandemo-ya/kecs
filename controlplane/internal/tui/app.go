@@ -126,10 +126,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if !dialogActive {
 			if keyStr == "tab" {
-				return m.switchToNextInstance()
+				cmd := m.switchToNextInstance()
+				return m, cmd
 			}
 			if keyStr == "shift+tab" {
-				return m.switchToPreviousInstance()
+				cmd := m.switchToPreviousInstance()
+				return m, cmd
 			}
 		}
 
@@ -174,6 +176,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
+		// Update carousel parameters when window size changes
+		m.calculateMaxVisibleInstances()
+		m.updateCarouselOffset()
 
 	case spinner.TickMsg:
 		// Update spinner if deleting

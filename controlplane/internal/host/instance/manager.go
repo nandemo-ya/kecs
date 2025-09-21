@@ -396,8 +396,6 @@ func (m *Manager) List(ctx context.Context) ([]InstanceInfo, error) {
 
 		// Load instance config to get ports
 		cfg, _ := LoadInstanceConfig(clusterInfo.Name)
-
-		// Default values if config couldn't be loaded
 		apiPort := 0
 		adminPort := 0
 		localStack := false
