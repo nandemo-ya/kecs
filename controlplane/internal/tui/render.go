@@ -1463,6 +1463,7 @@ func (m Model) renderGlobalShortcutsLine(width int) string {
 		ActionMoveUp,
 		ActionMoveDown,
 		ActionBack,
+		ActionToggleInstance,
 		ActionDeleteInstance,
 		ActionHelp,
 		ActionRefresh,
