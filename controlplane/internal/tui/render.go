@@ -492,7 +492,13 @@ func (m Model) renderResourcePanel() string {
 	// Render view-specific content
 	switch m.currentView {
 	case ViewInstances:
-		content = m.renderInstancesList(resourceHeight - 4) // Account for borders/padding
+		// Only show instances view when no instances exist (for creation prompt)
+		if len(m.instances) == 0 {
+			content = m.renderNoInstancesView()
+		} else {
+			// Should not normally reach here as we auto-select instances
+			content = m.renderClustersList(resourceHeight - 4)
+		}
 	case ViewClusters:
 		content = m.renderClustersList(resourceHeight - 4)
 	case ViewServices:
@@ -736,6 +742,43 @@ func (m Model) renderSummary() string {
 }
 
 // View-specific render methods
+
+// renderNoInstancesView renders a view when no instances exist
+func (m Model) renderNoInstancesView() string {
+	// Center the content
+	height := m.height - 10 // Account for header, footer, etc.
+	width := m.width - 4
+
+	// Create the welcome message
+	var lines []string
+	lines = append(lines, "")
+	lines = append(lines, "  🚀 Welcome to KECS")
+	lines = append(lines, "")
+	lines = append(lines, "  No KECS instances found.")
+	lines = append(lines, "")
+	lines = append(lines, "  Press 'i' to create your first instance")
+	lines = append(lines, "  Press '?' for help")
+	lines = append(lines, "")
+
+	// Center the content vertically
+	topPadding := (height - len(lines)) / 2
+	if topPadding > 0 {
+		padding := make([]string, topPadding)
+		lines = append(padding, lines...)
+	}
+
+	// Join all lines
+	content := strings.Join(lines, "\n")
+
+	// Apply styling
+	style := lipgloss.NewStyle().
+		Width(width).
+		Height(height).
+		Align(lipgloss.Center).
+		AlignVertical(lipgloss.Center)
+
+	return style.Render(content)
+}
 
 // renderInstancesList renders the instances list with the given height constraint
 func (m Model) renderInstancesList(maxHeight int) string {

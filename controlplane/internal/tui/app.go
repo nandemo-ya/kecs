@@ -248,24 +248,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Handle instance selection and view switching
 		if wasEmpty && len(m.instances) > 0 {
-			// This is the first load with instances
-			if len(m.instances) == 1 {
-				// Auto-select single instance
-				m.selectedInstance = m.instances[0].Name
-				m.autoSelectedInstance = true
-				m.currentView = ViewClusters
-				// Load clusters for the auto-selected instance
-				if m.useMockData {
-					cmds = append(cmds, mock.LoadAllData(
-						m.selectedInstance,
-						m.selectedCluster,
-						m.selectedService,
-						m.selectedTask,
-					))
-				}
-			} else {
-				// Multiple instances - stay on instances view for selection
-				m.currentView = ViewInstances
+			// This is the first load with instances - select the first one
+			m.selectedInstance = m.instances[0].Name
+			m.autoSelectedInstance = true
+			m.currentView = ViewClusters
+			// Load clusters for the auto-selected instance
+			if m.useMockData {
+				cmds = append(cmds, mock.LoadAllData(
+					m.selectedInstance,
+					m.selectedCluster,
+					m.selectedService,
+					m.selectedTask,
+				))
 			}
 		} else if len(m.instances) == 0 {
 			// No instances - show instances view
@@ -289,18 +283,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Handle instance selection and view switching
 		if wasEmpty && len(m.instances) > 0 {
-			// This is the first load with instances
-			if len(m.instances) == 1 {
-				// Auto-select single instance
-				m.selectedInstance = m.instances[0].Name
-				m.autoSelectedInstance = true
-				m.currentView = ViewClusters
-				// Load clusters for the auto-selected instance
-				cmds = append(cmds, m.loadDataFromAPI())
-			} else {
-				// Multiple instances - stay on instances view for selection
-				m.currentView = ViewInstances
-			}
+			// This is the first load with instances - select the first one
+			m.selectedInstance = m.instances[0].Name
+			m.autoSelectedInstance = true
+			m.currentView = ViewClusters
+			// Load clusters for the auto-selected instance
+			cmds = append(cmds, m.loadDataFromAPI())
 		} else if len(m.instances) == 0 {
 			// No instances - show instances view
 			m.currentView = ViewInstances
