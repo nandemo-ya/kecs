@@ -131,12 +131,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Skip global and view-specific key actions for dialog views
 		// to prevent conflicts with text input (e.g., 'h' for home vs typing 'h')
-		isDialogView := m.currentView == ViewClusterCreate ||
-			m.currentView == ViewInstanceCreate ||
-			m.currentView == ViewTaskDefinitionEditor ||
-			m.currentView == ViewConfirmDialog
-
-		if !isDialogView {
+		if !m.isInDialogView() {
 			// Check for global key action
 			if action, found := m.keyBindings.GetGlobalAction(keyStr); found {
 				if debugLogger := GetDebugLogger(); debugLogger != nil {
