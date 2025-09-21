@@ -283,6 +283,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.currentView = ViewClusters
 			// Load clusters for the auto-selected instance
 			cmds = append(cmds, m.loadDataFromAPI())
+		} else if len(m.instances) > 0 && m.selectedInstance == "" {
+			// Instances exist but none selected (e.g., after deletion) - select the first one
+			m.selectedInstance = m.instances[0].Name
+			m.instanceCursor = 0
+			// If we're in Clusters view or deeper, reload data for the new instance
+			if m.currentView != ViewInstances && m.currentView != ViewInstanceCreate && !m.isInDialogView() {
+				cmds = append(cmds, m.loadDataFromAPI())
+			}
 		} else if len(m.instances) == 0 {
 			// No instances - show instances view
 			// Don't change view if we're in a dialog view
