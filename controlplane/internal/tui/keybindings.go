@@ -126,7 +126,7 @@ func (r *KeyBindingsRegistry) registerGlobalBindings() {
 		{Keys: []string{"r"}, Description: "Refresh", Action: ActionRefresh, Global: true},
 		{Keys: []string{"h"}, Description: "Home", Action: ActionGoHome, Global: true},
 		{Keys: []string{"ctrl+i"}, Description: "Switch instance", Action: ActionSwitchInstance, Global: true},
-		{Keys: []string{"S"}, Description: "Stop instance", Action: ActionToggleInstance, Global: true},
+		{Keys: []string{"S"}, Description: "Start/Stop instance", Action: ActionToggleInstance, Global: true},
 		{Keys: []string{"D"}, Description: "Delete instance", Action: ActionDeleteInstance, Global: true},
 	}
 
