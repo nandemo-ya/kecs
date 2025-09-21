@@ -922,6 +922,26 @@ func (m Model) View() string {
 		return m.renderUpdatingProgress()
 	}
 
+	// Check if we should show the welcome screen (no instances)
+	if len(m.instances) == 0 && m.currentView == ViewInstances {
+		// Welcome screen - no navigation panel, use full screen for welcome message
+		welcomeContent := m.renderNoInstancesView()
+		footer := m.renderFooter()
+
+		// Use full height for welcome content
+		availableHeight := m.height - 1 // -1 for footer
+		welcomePanel := lipgloss.NewStyle().
+			Height(availableHeight).
+			Width(m.width).
+			Render(welcomeContent)
+
+		return lipgloss.JoinVertical(lipgloss.Top,
+			welcomePanel,
+			footer,
+		)
+	}
+
+	// Normal layout with navigation panel
 	// Calculate exact heights for panels
 	footerHeight := 1
 	availableHeight := m.height - footerHeight

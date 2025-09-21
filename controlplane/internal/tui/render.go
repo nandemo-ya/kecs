@@ -764,39 +764,48 @@ func (m Model) renderSummary() string {
 
 // renderNoInstancesView renders a view when no instances exist
 func (m Model) renderNoInstancesView() string {
-	// Center the content
-	height := m.height - 10 // Account for header, footer, etc.
-	width := m.width - 4
+	// Use the full available height
+	height := m.height - 1 // -1 for footer only
 
-	// Create the welcome message
-	var lines []string
-	lines = append(lines, "")
-	lines = append(lines, "  🚀 Welcome to KECS")
-	lines = append(lines, "")
-	lines = append(lines, "  No KECS instances found.")
-	lines = append(lines, "")
-	lines = append(lines, "  Press 'i' to create your first instance")
-	lines = append(lines, "  Press '?' for help")
-	lines = append(lines, "")
+	// Create styled welcome message components
+	emojiStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#f9e2af")).
+		Bold(true)
 
-	// Center the content vertically
-	topPadding := (height - len(lines)) / 2
-	if topPadding > 0 {
-		padding := make([]string, topPadding)
-		lines = append(padding, lines...)
+	titleStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#f5c2e7")).
+		Bold(true)
+
+	messageStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6adc8"))
+
+	keyStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6e3a1")).
+		Bold(true)
+
+	descStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#9399b2"))
+
+	// Build the welcome content
+	lines := []string{
+		emojiStyle.Render("🚀") + " " + titleStyle.Render("Welcome to KECS"),
+		"",
+		messageStyle.Render("No KECS instances found."),
+		"",
+		"Press " + keyStyle.Render("'i'") + " " + descStyle.Render("to create your first instance"),
+		"Press " + keyStyle.Render("'?'") + " " + descStyle.Render("for help"),
 	}
 
-	// Join all lines
-	content := strings.Join(lines, "\n")
+	content := lipgloss.JoinVertical(lipgloss.Center, lines...)
 
-	// Apply styling
-	style := lipgloss.NewStyle().
-		Width(width).
-		Height(height).
-		Align(lipgloss.Center).
-		AlignVertical(lipgloss.Center)
-
-	return style.Render(content)
+	// Center the content both horizontally and vertically
+	return lipgloss.Place(
+		m.width,
+		height,
+		lipgloss.Center,
+		lipgloss.Center,
+		content,
+	)
 }
 
 // renderInstancesList renders the instances list with the given height constraint
