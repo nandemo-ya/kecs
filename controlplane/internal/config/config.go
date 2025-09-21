@@ -49,7 +49,6 @@ type FeaturesConfig struct {
 	ContainerMode    bool `yaml:"containerMode" mapstructure:"containerMode"`
 	AutoRecoverState bool `yaml:"autoRecoverState" mapstructure:"autoRecoverState"`
 	IAMIntegration   bool `yaml:"iamIntegration" mapstructure:"iamIntegration"`
-	TUIMock          bool `yaml:"tuiMock" mapstructure:"tuiMock"`
 }
 
 // AWSConfig represents AWS-related configuration
@@ -109,7 +108,6 @@ func InitConfig() error {
 		v.SetDefault("features.containerMode", false)
 		v.SetDefault("features.autoRecoverState", true)
 		v.SetDefault("features.iamIntegration", false) // Disable IAM integration by default
-		v.SetDefault("features.tuiMock", true)         // Enable TUI mock mode by default
 
 		// Cleanup worker defaults
 		v.SetDefault("cleanup.enabled", true)
@@ -165,7 +163,6 @@ func bindLegacyEnvVars() {
 	v.BindEnv("localstack.enabled", "KECS_LOCALSTACK_ENABLED")
 	v.BindEnv("localstack.useTraefik", "KECS_LOCALSTACK_USE_TRAEFIK")
 	v.BindEnv("server.controlPlaneImage", "KECS_CONTROLPLANE_IMAGE")
-	v.BindEnv("features.tuiMock", "KECS_TUI_MOCK")
 }
 
 // DefaultConfig returns the default configuration

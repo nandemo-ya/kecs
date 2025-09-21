@@ -12,7 +12,6 @@ import (
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
-	"github.com/nandemo-ya/kecs/controlplane/internal/tui/mock"
 )
 
 // refreshInstancesMsg is sent to trigger instance list refresh
@@ -35,19 +34,14 @@ func Run() error {
 	cfg := LoadConfig()
 
 	if debugLogger != nil {
-		debugLogger.Log("TUI started with config: UseMockData=%v", cfg.UseMockData)
+		debugLogger.Log("TUI started with API endpoint: %s", cfg.APIEndpoint)
 	}
 
 	// Create API client
 	client := CreateAPIClient(cfg)
 
 	// Create model with client
-	var model Model
-	if cfg.UseMockData {
-		model = NewModel() // Uses mock client by default
-	} else {
-		model = NewModelWithClient(client)
-	}
+	model := NewModelWithClient(client)
 
 	p := tea.NewProgram(
 		model,
@@ -258,14 +252,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.autoSelectedInstance = true
 			m.currentView = ViewClusters
 			// Load clusters for the auto-selected instance
-			if m.useMockData {
-				cmds = append(cmds, mock.LoadAllData(
-					m.selectedInstance,
-					m.selectedCluster,
-					m.selectedService,
-					m.selectedTask,
-				))
-			}
+			cmds = append(cmds, m.loadDataFromAPI())
 		} else if len(m.instances) == 0 {
 			// No instances - show instances view
 			m.currentView = ViewInstances
@@ -608,69 +595,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.instanceForm.errorMsg = msg.err.Error()
 			m.instanceForm.successMsg = ""
 			m.instanceForm.isCreating = false
-		}
-
-	case mock.DataMsg:
-		// Convert mock data to model data
-		m.instances = make([]Instance, len(msg.Instances))
-		for i, inst := range msg.Instances {
-			m.instances[i] = Instance{
-				Name:     inst.Name,
-				Status:   inst.Status,
-				Clusters: inst.Clusters,
-				Services: inst.Services,
-				Tasks:    inst.Tasks,
-				APIPort:  inst.APIPort,
-				Age:      inst.Age,
-			}
-		}
-
-		m.clusters = make([]Cluster, len(msg.Clusters))
-		for i, cl := range msg.Clusters {
-			m.clusters[i] = Cluster{
-				Name:     cl.Name,
-				Status:   cl.Status,
-				Region:   cl.Region,
-				Services: cl.Services,
-				Tasks:    cl.Tasks,
-				Age:      cl.Age,
-			}
-		}
-
-		m.services = make([]Service, len(msg.Services))
-		for i, svc := range msg.Services {
-			m.services[i] = Service{
-				Name:    svc.Name,
-				Desired: svc.Desired,
-				Running: svc.Running,
-				Pending: svc.Pending,
-				Status:  svc.Status,
-				TaskDef: svc.TaskDef,
-				Age:     svc.Age,
-			}
-		}
-
-		m.tasks = make([]Task, len(msg.Tasks))
-		for i, task := range msg.Tasks {
-			m.tasks[i] = Task{
-				ID:      task.ID,
-				Service: task.Service,
-				Status:  task.Status,
-				Health:  task.Health,
-				CPU:     task.CPU,
-				Memory:  task.Memory,
-				IP:      task.IP,
-				Age:     task.Age,
-			}
-		}
-
-		m.logs = make([]LogEntry, len(msg.Logs))
-		for i, log := range msg.Logs {
-			m.logs[i] = LogEntry{
-				Timestamp: log.Timestamp,
-				Level:     log.Level,
-				Message:   log.Message,
-			}
 		}
 
 	}

@@ -24,15 +24,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
-	"github.com/nandemo-ya/kecs/controlplane/internal/tui/mock"
 )
 
-// loadMockDataCmd loads mock data based on current selections
+// loadMockDataCmd loads data from API based on current selections
 func (m Model) loadMockDataCmd() tea.Cmd {
-	if m.useMockData {
-		return mock.LoadAllData(m.selectedInstance, m.selectedCluster, m.selectedService, m.selectedTask)
-	}
-
 	// Use API client to load data
 	return m.loadDataFromAPI()
 }
@@ -273,24 +268,6 @@ func generateMockLogs(taskID string) []api.LogEntry {
 
 // createInstanceCmd creates a new instance via API
 func (m Model) createInstanceCmd(opts api.CreateInstanceOptions) tea.Cmd {
-	if m.useMockData {
-		// Mock creation with steps simulation
-		return func() tea.Msg {
-			// Simulate step-by-step creation
-			time.Sleep(500 * time.Millisecond)
-			return instanceCreatedMsg{
-				instance: Instance{
-					Name:     opts.Name,
-					Status:   "pending",
-					Clusters: 0,
-					Services: 0,
-					Tasks:    0,
-					APIPort:  opts.APIPort,
-					Age:      0,
-				},
-			}
-		}
-	}
 
 	return func() tea.Msg {
 		// Increase timeout to 3 minutes for LocalStack and other components to start
@@ -504,14 +481,6 @@ func extractTaskID(taskArn string) string {
 
 // updateInstanceStatusCmd updates the status of all instances
 func (m Model) updateInstanceStatusCmd() tea.Cmd {
-	if m.useMockData {
-		// For mock data, simulate status changes
-		return func() tea.Msg {
-			// No status changes in mock mode
-			return instanceStatusUpdateMsg{instances: m.instances}
-		}
-	}
-
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -715,23 +684,17 @@ func (m Model) loadTaskDefinitionJSONCmd(taskDefArn string) tea.Cmd {
 // viewTaskLogsCmd opens the log viewer for a specific task
 func (m Model) viewTaskLogsCmd(taskArn string, containerName string) tea.Cmd {
 	return func() tea.Msg {
-		// Create log API client
-		var apiClient LogAPIClient
-		if m.useMockData {
-			apiClient = NewMockLogAPIClient()
-		} else {
-			// Use real API client with the correct endpoint
-			// Logs API is on the admin port
-			var adminPort int = 5374 // default admin port
-			for _, inst := range m.instances {
-				if inst.Name == m.selectedInstance {
-					adminPort = inst.AdminPort
-					break
-				}
+		// Use real API client with the correct endpoint
+		// Logs API is on the admin port
+		var adminPort int = 5374 // default admin port
+		for _, inst := range m.instances {
+			if inst.Name == m.selectedInstance {
+				adminPort = inst.AdminPort
+				break
 			}
-			baseURL := fmt.Sprintf("http://localhost:%d", adminPort)
-			apiClient = NewLogAPIClient(baseURL)
 		}
+		baseURL := fmt.Sprintf("http://localhost:%d", adminPort)
+		apiClient := NewLogAPIClient(baseURL)
 
 		// Create log viewer
 		logViewer := NewLogViewer(taskArn, containerName, apiClient)

@@ -23,27 +23,12 @@ import (
 type Config struct {
 	// APIEndpoint is the base URL for the KECS API
 	APIEndpoint string
-
-	// UseMockData determines whether to use mock data or real API
-	UseMockData bool
 }
 
 // LoadConfig loads TUI configuration from environment variables
 func LoadConfig() Config {
-	// Get KECS configuration
-	kecsConfig := config.GetConfig()
-
 	cfg := Config{
 		APIEndpoint: config.GetString("server.endpoint"),
-		UseMockData: config.GetBool("features.tuiMock"),
-	}
-
-	// If endpoint is explicitly set, prefer real API
-	if cfg.APIEndpoint != "" && cfg.APIEndpoint != "http://localhost:5373" {
-		// Unless mock mode is explicitly enabled
-		if !kecsConfig.Features.TUIMock {
-			cfg.UseMockData = false
-		}
 	}
 
 	// Default endpoint if not set
@@ -56,8 +41,5 @@ func LoadConfig() Config {
 
 // CreateAPIClient creates an API client based on configuration
 func CreateAPIClient(cfg Config) api.Client {
-	if cfg.UseMockData {
-		return api.NewMockClient()
-	}
 	return api.NewHTTPClient(cfg.APIEndpoint)
 }
