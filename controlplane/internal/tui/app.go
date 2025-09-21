@@ -159,6 +159,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m, cmd = m.handleTaskDefinitionEditorKeys(msg)
 		case ViewClusterCreate:
 			m, cmd = m.handleClusterCreateKeys(msg)
+		case ViewClusters:
+			// Handle ViewClusters keys including the "i" key for instance creation
+			m, cmd = m.handleClustersKeys(msg)
+		case ViewInstances:
+			// Handle ViewInstances keys including the "i" key for instance creation
+			m, cmd = m.handleInstancesKeys(msg)
 		}
 		if cmd != nil {
 			cmds = append(cmds, cmd)
