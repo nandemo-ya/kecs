@@ -2051,7 +2051,7 @@ func (m Model) renderHelpContent(maxHeight int) string {
 				keyStr := FormatKeyString(binding.Keys)
 				// Pad key string for alignment
 				formattedKey := fmt.Sprintf("%-12s", keyStyle.Render(keyStr))
-				leftContent = append(leftContent, formattedKey+descStyle.Render(binding.Description))
+				leftContent = append(leftContent, formattedKey+"  "+descStyle.Render(binding.Description))
 			}
 			leftContent = append(leftContent, "")
 		}
@@ -2091,7 +2091,7 @@ func (m Model) renderHelpContent(maxHeight int) string {
 		for _, binding := range navigationBindings {
 			keyStr := FormatKeyString(binding.Keys)
 			formattedKey := fmt.Sprintf("%-12s", keyStyle.Render(keyStr))
-			rightContent = append(rightContent, formattedKey+descStyle.Render(binding.Description))
+			rightContent = append(rightContent, formattedKey+"  "+descStyle.Render(binding.Description))
 		}
 		rightContent = append(rightContent, "")
 	}
@@ -2102,7 +2102,7 @@ func (m Model) renderHelpContent(maxHeight int) string {
 		for _, binding := range instanceBindings {
 			keyStr := FormatKeyString(binding.Keys)
 			formattedKey := fmt.Sprintf("%-12s", keyStyle.Render(keyStr))
-			rightContent = append(rightContent, formattedKey+descStyle.Render(binding.Description))
+			rightContent = append(rightContent, formattedKey+"  "+descStyle.Render(binding.Description))
 		}
 		rightContent = append(rightContent, "")
 	}
@@ -2113,7 +2113,7 @@ func (m Model) renderHelpContent(maxHeight int) string {
 		for _, binding := range utilityBindings {
 			keyStr := FormatKeyString(binding.Keys)
 			formattedKey := fmt.Sprintf("%-12s", keyStyle.Render(keyStr))
-			rightContent = append(rightContent, formattedKey+descStyle.Render(binding.Description))
+			rightContent = append(rightContent, formattedKey+"  "+descStyle.Render(binding.Description))
 		}
 		rightContent = append(rightContent, "")
 	}
@@ -2124,15 +2124,15 @@ func (m Model) renderHelpContent(maxHeight int) string {
 		for _, binding := range applicationBindings {
 			keyStr := FormatKeyString(binding.Keys)
 			formattedKey := fmt.Sprintf("%-12s", keyStyle.Render(keyStr))
-			rightContent = append(rightContent, formattedKey+descStyle.Render(binding.Description))
+			rightContent = append(rightContent, formattedKey+"  "+descStyle.Render(binding.Description))
 		}
 		rightContent = append(rightContent, "")
 	}
 
 	// Add special shortcuts not in the registry
 	rightContent = append(rightContent, subsectionStyle.Render("Special Keys:"))
-	rightContent = append(rightContent, fmt.Sprintf("%-12s", keyStyle.Render("Tab"))+descStyle.Render("Switch to next instance"))
-	rightContent = append(rightContent, fmt.Sprintf("%-12s", keyStyle.Render("Shift+Tab"))+descStyle.Render("Switch to previous instance"))
+	rightContent = append(rightContent, fmt.Sprintf("%-12s", keyStyle.Render("Tab"))+"  "+descStyle.Render("Switch to next instance"))
+	rightContent = append(rightContent, fmt.Sprintf("%-12s", keyStyle.Render("Shift+Tab"))+"  "+descStyle.Render("Switch to previous instance"))
 
 	// Create styled columns
 	leftColumn := lipgloss.NewStyle().
