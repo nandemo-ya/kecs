@@ -255,8 +255,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.loadDataFromAPI())
 		} else if len(m.instances) == 0 {
 			// No instances - show instances view
-			// Don't change view if we're in the instance creation dialog or cluster creation dialog
-			if m.currentView != ViewInstanceCreate && m.currentView != ViewClusterCreate {
+			// Don't change view if we're in a dialog view
+			if !m.isInDialogView() {
 				m.currentView = ViewInstances
 			}
 		}
@@ -286,8 +286,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.loadDataFromAPI())
 		} else if len(m.instances) == 0 {
 			// No instances - show instances view
-			// Don't change view if we're in the instance creation dialog or cluster creation dialog
-			if m.currentView != ViewInstanceCreate && m.currentView != ViewClusterCreate {
+			// Don't change view if we're in a dialog view
+			if !m.isInDialogView() {
 				m.currentView = ViewInstances
 			}
 		}
