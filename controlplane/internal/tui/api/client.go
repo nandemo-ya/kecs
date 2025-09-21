@@ -909,6 +909,31 @@ func (c *HTTPClient) DescribeTaskDefinition(ctx context.Context, instanceName st
 // Health check
 
 func (c *HTTPClient) HealthCheck(ctx context.Context, instanceName string) error {
+	// Get instance info to find API port
+	if c.k3dProvider != nil {
+		inst, err := c.k3dProvider.GetInstance(ctx, instanceName)
+		if err != nil {
+			return fmt.Errorf("failed to get instance: %w", err)
+		}
+
+		// Call the instance's health endpoint directly
+		healthURL := fmt.Sprintf("http://localhost:%d/health", inst.AdminPort)
+		client := &http.Client{Timeout: 2 * time.Second}
+
+		resp, err := client.Get(healthURL)
+		if err != nil {
+			return fmt.Errorf("health check failed: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("health check returned status %d", resp.StatusCode)
+		}
+
+		return nil
+	}
+
+	// Fallback to admin API path
 	path := fmt.Sprintf("/api/instances/%s/health", url.PathEscape(instanceName))
 	return c.doRequest(ctx, "GET", path, nil, nil)
 }
