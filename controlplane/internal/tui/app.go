@@ -112,12 +112,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleELBv2Keys(msg)
 		}
 
-		// Handle Tab key for instance switching (global)
-		if keyStr == "tab" {
-			return m.switchToNextInstance()
-		}
-		if keyStr == "shift+tab" {
-			return m.switchToPreviousInstance()
+		// Handle Tab key for instance switching (only when no dialogs are open)
+		// Check if any dialog is active that needs Tab key
+		dialogActive := m.confirmDialog != nil ||
+			m.serviceScaleDialog != nil ||
+			m.serviceUpdateDialog != nil ||
+			m.instanceForm != nil ||
+			m.clusterForm != nil ||
+			m.currentView == ViewConfirmDialog ||
+			m.currentView == ViewClusterCreate ||
+			m.currentView == ViewInstanceCreate ||
+			m.currentView == ViewTaskDefinitionEditor
+
+		if !dialogActive {
+			if keyStr == "tab" {
+				return m.switchToNextInstance()
+			}
+			if keyStr == "shift+tab" {
+				return m.switchToPreviousInstance()
+			}
 		}
 
 		// Check for global key action
