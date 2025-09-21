@@ -42,6 +42,9 @@ var (
 	statusInactiveStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#ff0000"))
 
+	statusErrorStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#ff0000"))
+
 	// Carousel styles
 	selectedItemStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#89dceb")).
@@ -221,9 +224,12 @@ func (m Model) renderInstanceCarousel() string {
 
 		// Status indicator
 		var statusIcon string
-		if inst.Status == "running" {
+		switch inst.Status {
+		case "running":
 			statusIcon = statusActiveStyle.Render("●")
-		} else {
+		case "unhealthy":
+			statusIcon = statusErrorStyle.Render("●")
+		default:
 			statusIcon = statusInactiveStyle.Render("○")
 		}
 
