@@ -247,6 +247,11 @@ type Model struct {
 	taskCursor     int
 	logCursor      int
 
+	// Instance carousel state
+	instanceCarouselOffset int  // First visible instance in carousel
+	maxVisibleInstances    int  // Maximum instances visible based on width
+	autoSelectedInstance   bool // Flag for auto-selected single instance
+
 	// Data
 	instances []Instance
 	clusters  []Cluster
@@ -598,4 +603,85 @@ func (m *Model) IsHelpShown() bool {
 // GetCommandPalette returns the command palette
 func (m *Model) GetCommandPalette() *CommandPalette {
 	return m.commandPalette
+}
+
+// Carousel helper methods
+
+// getSelectedInstanceIndex returns the index of the currently selected instance
+func (m *Model) getSelectedInstanceIndex() int {
+	for i, inst := range m.instances {
+		if inst.Name == m.selectedInstance {
+			return i
+		}
+	}
+	return 0
+}
+
+// calculateMaxVisibleInstances calculates how many instances can fit in the carousel
+func (m *Model) calculateMaxVisibleInstances() {
+	avgInstanceWidth := 20 // Average width per instance name + spacing
+	indicatorWidth := 4    // Space for "◀ " and " ▶"
+	padding := 4           // General padding
+
+	availableWidth := m.width - indicatorWidth - padding
+	m.maxVisibleInstances = availableWidth / avgInstanceWidth
+
+	if m.maxVisibleInstances < 1 {
+		m.maxVisibleInstances = 1
+	}
+}
+
+// updateCarouselOffset adjusts the carousel offset to ensure selected instance is visible
+func (m *Model) updateCarouselOffset() {
+	selectedIdx := m.getSelectedInstanceIndex()
+
+	// If selected instance is before the visible window, scroll left
+	if selectedIdx < m.instanceCarouselOffset {
+		m.instanceCarouselOffset = selectedIdx
+	}
+	// If selected instance is after the visible window, scroll right
+	if selectedIdx >= m.instanceCarouselOffset+m.maxVisibleInstances {
+		m.instanceCarouselOffset = selectedIdx - m.maxVisibleInstances + 1
+	}
+}
+
+// switchToNextInstance switches to the next instance in the carousel
+func (m Model) switchToNextInstance() (Model, tea.Cmd) {
+	if len(m.instances) <= 1 {
+		return m, nil
+	}
+
+	currentIdx := m.getSelectedInstanceIndex()
+	nextIdx := (currentIdx + 1) % len(m.instances)
+	m.selectedInstance = m.instances[nextIdx].Name
+	m.updateCarouselOffset()
+
+	// Reset view to clusters when switching instances
+	m.currentView = ViewClusters
+	m.clusterCursor = 0
+
+	// Load data for the new instance
+	return m, m.loadDataFromAPI()
+}
+
+// switchToPreviousInstance switches to the previous instance in the carousel
+func (m Model) switchToPreviousInstance() (Model, tea.Cmd) {
+	if len(m.instances) <= 1 {
+		return m, nil
+	}
+
+	currentIdx := m.getSelectedInstanceIndex()
+	prevIdx := currentIdx - 1
+	if prevIdx < 0 {
+		prevIdx = len(m.instances) - 1
+	}
+	m.selectedInstance = m.instances[prevIdx].Name
+	m.updateCarouselOffset()
+
+	// Reset view to clusters when switching instances
+	m.currentView = ViewClusters
+	m.clusterCursor = 0
+
+	// Load data for the new instance
+	return m, m.loadDataFromAPI()
 }

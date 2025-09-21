@@ -112,6 +112,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleELBv2Keys(msg)
 		}
 
+		// Handle Tab key for instance switching (global)
+		if keyStr == "tab" {
+			return m.switchToNextInstance()
+		}
+		if keyStr == "shift+tab" {
+			return m.switchToPreviousInstance()
+		}
+
 		// Check for global key action
 		if action, found := m.keyBindings.GetGlobalAction(keyStr); found {
 			if debugLogger := GetDebugLogger(); debugLogger != nil {
@@ -217,6 +225,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clusters = msg.clusters
 		m.services = msg.services
 		m.tasks = msg.tasks
+
+		// Auto-select single instance
+		if len(m.instances) == 1 && m.selectedInstance == "" && !m.autoSelectedInstance {
+			m.selectedInstance = m.instances[0].Name
+			m.autoSelectedInstance = true
+			m.currentView = ViewClusters
+			// Load clusters for the auto-selected instance
+			cmds = append(cmds, m.loadDataFromAPI())
+		}
 
 	case logsLoadedMsg:
 		// Handle loaded logs
