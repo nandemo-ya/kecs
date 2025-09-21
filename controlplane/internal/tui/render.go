@@ -2021,24 +2021,30 @@ func (m Model) renderHelpContent(maxHeight int) string {
 		"Logs":             []KeyBinding{},
 	}
 
-	// Collect bindings for each view
-	for view, viewName := range map[ViewType]string{
-		ViewInstances:               "Instances",
-		ViewClusters:                "Clusters",
-		ViewServices:                "Services",
-		ViewTasks:                   "Tasks",
-		ViewTaskDefinitionFamilies:  "Task Definitions",
-		ViewTaskDefinitionRevisions: "Task Definitions",
-		ViewLogs:                    "Logs",
-	} {
-		bindings := m.keyBindings.GetViewBindings(view)
+	// Define view mappings in a stable order
+	viewMappings := []struct {
+		view     ViewType
+		viewName string
+	}{
+		{ViewInstances, "Instances"},
+		{ViewClusters, "Clusters"},
+		{ViewServices, "Services"},
+		{ViewTasks, "Tasks"},
+		{ViewTaskDefinitionFamilies, "Task Definitions"},
+		{ViewTaskDefinitionRevisions, "Task Definitions"},
+		{ViewLogs, "Logs"},
+	}
+
+	// Collect bindings for each view in stable order
+	for _, mapping := range viewMappings {
+		bindings := m.keyBindings.GetViewBindings(mapping.view)
 		for _, binding := range bindings {
 			// Filter out navigation bindings that will be shown in global
 			if binding.Action == ActionMoveUp || binding.Action == ActionMoveDown ||
 				binding.Action == ActionBack || binding.Action == ActionQuit {
 				continue
 			}
-			viewGroups[viewName] = append(viewGroups[viewName], binding)
+			viewGroups[mapping.viewName] = append(viewGroups[mapping.viewName], binding)
 		}
 	}
 
