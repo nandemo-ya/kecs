@@ -1,0 +1,31 @@
+# octocov configuration
+coverage:
+  paths:
+    - ./controlplane/coverage.txt
+  badge:
+    path: docs/coverage.svg
+comment:
+  if: is_pull_request
+report:
+  if: is_default_branch
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+diff:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+  if: is_pull_request
+threshold:
+  coverage: 60%
+  diff:
+    coverage: -5%
+codeToTestRatio:
+  code:
+    - '**/*.go'
+    - '!**/*_test.go'
+    - '!**/internal/controlplane/api/generated/**'
+    - '!**/internal/controlplane/api/generated_*/**'
+    - '!**/cmd/codegen/**'
+    - '!**/cmd/example-*/**'
+    - '!**/mocks/**'
+  test:
+    - '**/*_test.go'
