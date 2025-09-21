@@ -30,10 +30,10 @@ func (m Model) executeAction(action KeyAction) (Model, tea.Cmd) {
 	}
 
 	// Check if it's a global action first
-	// Global actions are: Quit, Back, Help, Search, Command, MoveUp, MoveDown, Refresh, GoHome, SwitchInstance, DeleteInstance
+	// Global actions are: Quit, Back, Help, Search, Command, MoveUp, MoveDown, Refresh, GoHome, SwitchInstance, ToggleInstance, DeleteInstance
 	switch action {
 	case ActionQuit, ActionBack, ActionHelp, ActionSearch, ActionCommand,
-		ActionMoveUp, ActionMoveDown, ActionRefresh, ActionGoHome, ActionSwitchInstance, ActionDeleteInstance:
+		ActionMoveUp, ActionMoveDown, ActionRefresh, ActionGoHome, ActionSwitchInstance, ActionToggleInstance, ActionDeleteInstance:
 		return m.executeGlobalAction(action)
 	}
 
@@ -160,6 +160,56 @@ func (m Model) executeGlobalAction(action KeyAction) (Model, tea.Cmd) {
 			m.pendingCommand = m.deleteInstanceCmd(m.selectedInstance)
 			m.previousView = m.currentView
 			m.currentView = ViewConfirmDialog
+		}
+
+	case ActionToggleInstance:
+		// Toggle start/stop for the selected instance
+		if m.selectedInstance != "" {
+			// Find the selected instance
+			var instanceIdx int = -1
+			var instance *Instance
+			for i, inst := range m.instances {
+				if inst.Name == m.selectedInstance {
+					instanceIdx = i
+					instance = &m.instances[i]
+					break
+				}
+			}
+
+			if instance != nil {
+				instanceStatus := strings.ToLower(instance.Status)
+
+				if instanceStatus == "stopped" {
+					m.confirmDialog = StartInstanceDialog(
+						m.selectedInstance,
+						func() error {
+							if instanceIdx >= 0 {
+								m.instances[instanceIdx].Status = "Starting"
+							}
+							return nil
+						},
+						func() {},
+					)
+					m.pendingCommand = m.startInstanceCmd(m.selectedInstance)
+				} else if instanceStatus == "running" {
+					m.confirmDialog = StopInstanceDialog(
+						m.selectedInstance,
+						func() error {
+							if instanceIdx >= 0 {
+								m.instances[instanceIdx].Status = "Stopping"
+							}
+							return nil
+						},
+						func() {},
+					)
+					m.pendingCommand = m.stopInstanceCmd(m.selectedInstance)
+				} else {
+					m.err = fmt.Errorf("Cannot start/stop instance in %s state", instanceStatus)
+					return m, nil
+				}
+				m.previousView = m.currentView
+				m.currentView = ViewConfirmDialog
+			}
 		}
 	}
 
