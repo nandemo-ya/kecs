@@ -178,20 +178,39 @@ func (m Model) renderInstanceCarousel() string {
 		return emptyStateStyle.Render("No KECS instances | Press i to create instance")
 	}
 
-	// Calculate visible instances
-	m.calculateMaxVisibleInstances()
-	m.updateCarouselOffset()
+	// Calculate visible instances (read-only in render)
+	avgInstanceWidth := 20 // Average width per instance name + spacing
+	indicatorWidth := 4    // Space for "◀ " and " ▶"
+	padding := 4           // General padding
+
+	availableWidth := m.width - indicatorWidth - padding
+	maxVisibleInstances := availableWidth / avgInstanceWidth
+	if maxVisibleInstances < 1 {
+		maxVisibleInstances = 1
+	}
+
+	// Calculate carousel offset for current selection
+	selectedIdx := m.getSelectedInstanceIndex()
+	carouselOffset := m.instanceCarouselOffset
+
+	// Adjust offset if needed (but don't modify state)
+	if selectedIdx < carouselOffset {
+		carouselOffset = selectedIdx
+	}
+	if selectedIdx >= carouselOffset+maxVisibleInstances {
+		carouselOffset = selectedIdx - maxVisibleInstances + 1
+	}
 
 	var items []string
 
 	// Add left navigation indicator if needed
-	if m.instanceCarouselOffset > 0 {
+	if carouselOffset > 0 {
 		items = append(items, dimStyle.Render("◀"))
 	}
 
 	// Determine the range of instances to display
-	startIdx := m.instanceCarouselOffset
-	endIdx := startIdx + m.maxVisibleInstances
+	startIdx := carouselOffset
+	endIdx := startIdx + maxVisibleInstances
 	if endIdx > len(m.instances) {
 		endIdx = len(m.instances)
 	}
