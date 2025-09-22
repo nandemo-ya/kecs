@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="./assets/logo.svg" alt="KECS Logo" width="200" />
-  
+  <img src="./assets/kecs-banner.png" alt="KECS Logo" width="600" />
+
   # KECS
   
   **Kubernetes-based ECS Compatible Service**
@@ -8,13 +8,16 @@
 
 <div align="center">
 
-[![CI/CD Pipeline](https://github.com/nandemo-ya/kecs/actions/workflows/ci.yml/badge.svg)](https://github.com/nandemo-ya/kecs/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/nandemo-ya/kecs/branch/main/graph/badge.svg)](https://codecov.io/gh/nandemo-ya/kecs)
-[![Go Version](https://img.shields.io/badge/Go-1.24.3-blue.svg)](https://golang.org/)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Build and Release](https://github.com/nandemo-ya/kecs/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/nandemo-ya/kecs/actions/workflows/build-and-release.yml)
 [![Release](https://img.shields.io/github/release/nandemo-ya/kecs.svg)](https://github.com/nandemo-ya/kecs/releases/latest)
+[![Go Version](https://img.shields.io/badge/Go-1.25-blue.svg)](https://golang.org/)
+[![Docker Image](https://img.shields.io/badge/Docker-ghcr.io%2Fnandemo--ya%2Fkecs-blue.svg)](https://github.com/nandemo-ya/kecs/pkgs/container/kecs)
+[![Homebrew](https://img.shields.io/badge/Homebrew-nandemo--ya%2Fkecs-orange.svg)](https://github.com/nandemo-ya/homebrew-kecs)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Report Card](https://goreportcard.com/badge/github.com/nandemo-ya/kecs)](https://goreportcard.com/report/github.com/nandemo-ya/kecs)
 [![GoDoc](https://pkg.go.dev/badge/github.com/nandemo-ya/kecs)](https://pkg.go.dev/github.com/nandemo-ya/kecs)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/nandemo-ya/kecs)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/nandemo-ya/kecs/pulls)
 
 </div>
 
