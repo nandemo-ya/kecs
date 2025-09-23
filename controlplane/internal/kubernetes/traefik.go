@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes/resources"
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // TraefikManager manages the global Traefik deployment

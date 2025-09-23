@@ -321,23 +321,9 @@ func (sm *ServiceManager) CreateService(
 		"clientNil", kubeClient == nil,
 		"endpoint", endpoint)
 
-	// Ensure namespace exists
-	if err := sm.ensureNamespace(ctx, kubeClient, deployment.Namespace); err != nil {
-		return fmt.Errorf("failed to ensure namespace: %w", err)
-	}
-
-	// Create Deployment
-	if err := sm.createDeployment(ctx, kubeClient, deployment); err != nil {
-		return fmt.Errorf("failed to create deployment: %w", err)
-	}
-
-	// Create Service (if provided)
-	if kubeService != nil {
-		if err := sm.createKubernetesService(ctx, kubeClient, kubeService); err != nil {
-			// Don't fail the entire operation if service creation fails
-			logging.Warn("Failed to create kubernetes service",
-				"error", err)
-		}
+	// Ensure all Kubernetes resources exist
+	if err := sm.ensureKubernetesResources(ctx, kubeClient, deployment, kubeService); err != nil {
+		return fmt.Errorf("failed to ensure kubernetes resources: %w", err)
 	}
 
 	// Start watching pods for this deployment to create ECS tasks
@@ -467,8 +453,39 @@ func (sm *ServiceManager) UpdateService(
 	// Use the service manager's client
 	kubeClient := sm.clientset
 
-	// Update Deployment
-	_, err := kubeClient.AppsV1().Deployments(deployment.Namespace).Update(
+	// Check if deployment exists
+	existingDeployment, err := kubeClient.AppsV1().Deployments(deployment.Namespace).Get(
+		ctx, deployment.Name, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Deployment doesn't exist (was deleted), recreate all resources
+			logging.Warn("Deployment not found, recreating kubernetes resources",
+				"deployment", deployment.Name,
+				"namespace", deployment.Namespace)
+
+			// Ensure all Kubernetes resources exist
+			if err := sm.ensureKubernetesResources(ctx, kubeClient, deployment, kubeService); err != nil {
+				return fmt.Errorf("failed to recreate kubernetes resources: %w", err)
+			}
+
+			// Start watching pods for this deployment to create ECS tasks
+			if sm.taskManager != nil {
+				go sm.watchServicePods(context.Background(), deployment, cluster, storageService)
+			}
+
+			logging.Info("Successfully recreated kubernetes resources",
+				"serviceName", storageService.ServiceName,
+				"deploymentName", deployment.Name,
+				"namespace", deployment.Namespace)
+
+			return nil
+		}
+		return fmt.Errorf("failed to get deployment: %w", err)
+	}
+
+	// Deployment exists, update it
+	deployment.ResourceVersion = existingDeployment.ResourceVersion
+	_, err = kubeClient.AppsV1().Deployments(deployment.Namespace).Update(
 		ctx, deployment, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update deployment: %w", err)
@@ -479,7 +496,16 @@ func (sm *ServiceManager) UpdateService(
 		existingService, err := kubeClient.CoreV1().Services(kubeService.Namespace).Get(
 			ctx, kubeService.Name, metav1.GetOptions{})
 		if err != nil {
-			if !errors.IsNotFound(err) {
+			if errors.IsNotFound(err) {
+				// Service doesn't exist, create it
+				logging.Warn("Kubernetes service not found, creating it",
+					"service", kubeService.Name,
+					"namespace", kubeService.Namespace)
+				if err := sm.createKubernetesService(ctx, kubeClient, kubeService); err != nil {
+					logging.Warn("Failed to create kubernetes service",
+						"error", err)
+				}
+			} else {
 				logging.Warn("Failed to get existing kubernetes service",
 					"error", err)
 			}
@@ -731,6 +757,38 @@ func (sm *ServiceManager) ensureNamespace(ctx context.Context, kubeClient kubern
 			}
 		}
 	}
+	return nil
+}
+
+// ensureKubernetesResources ensures all Kubernetes resources (namespace, deployment, service) exist for an ECS service
+// This is used by both CreateService and UpdateService
+func (sm *ServiceManager) ensureKubernetesResources(
+	ctx context.Context,
+	kubeClient kubernetes.Interface,
+	deployment *appsv1.Deployment,
+	kubeService *corev1.Service,
+) error {
+	// Ensure namespace exists
+	if err := sm.ensureNamespace(ctx, kubeClient, deployment.Namespace); err != nil {
+		return fmt.Errorf("failed to ensure namespace: %w", err)
+	}
+
+	// Create or update Deployment
+	if err := sm.createDeployment(ctx, kubeClient, deployment); err != nil {
+		return fmt.Errorf("failed to create/update deployment: %w", err)
+	}
+
+	// Create or update Service (if provided)
+	if kubeService != nil {
+		if err := sm.createKubernetesService(ctx, kubeClient, kubeService); err != nil {
+			// Don't fail the entire operation if service creation fails
+			logging.Warn("Failed to create/update kubernetes service",
+				"service", kubeService.Name,
+				"namespace", kubeService.Namespace,
+				"error", err)
+		}
+	}
+
 	return nil
 }
 

@@ -10,9 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui"
 	"github.com/nandemo-ya/kecs/controlplane/internal/tui/api"
-	"github.com/spf13/cobra"
 )
 
 var (
