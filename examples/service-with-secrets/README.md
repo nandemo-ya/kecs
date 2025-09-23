@@ -26,7 +26,7 @@ This example demonstrates how to securely inject secrets from AWS Secrets Manage
 │ • /myapp/prod/features  │     │ • myapp/prod/encryption │
 └───────────┬─────────────┘     └───────────┬─────────────┘
             │                                 │
-            │         ECS Task Role          │
+            │      ECS Execution Role        │
             └─────────────┬──────────────────┘
                           │
                     ┌─────▼─────┐
@@ -141,71 +141,9 @@ aws secretsmanager list-secrets \
   --output table
 ```
 
-### 5. Create IAM Roles with Proper Permissions
+### 5. Note about IAM Roles
 
-Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts LocalStack.
-
-```bash
-# Create policy for accessing secrets
-aws iam create-policy \
-  --policy-name ECSSecretsPolicy \
-  --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Action": [
-          "ssm:GetParameter",
-          "ssm:GetParameters",
-          "ssm:GetParameterHistory"
-        ],
-        "Resource": [
-          "arn:aws:ssm:us-east-1:000000000000:parameter/myapp/prod/*"
-        ]
-      },
-      {
-        "Effect": "Allow",
-        "Action": [
-          "secretsmanager:GetSecretValue"
-        ],
-        "Resource": [
-          "arn:aws:secretsmanager:us-east-1:000000000000:secret:myapp/prod/*"
-        ]
-      },
-      {
-        "Effect": "Allow",
-        "Action": [
-          "kms:Decrypt"
-        ],
-        "Resource": "*"
-      }
-    ]
-  }' \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373
-
-# Attach policies to execution role
-# Note: ecsTaskExecutionRole is auto-created by KECS, we just need to attach additional policies
-aws iam attach-role-policy \
-  --role-name ecsTaskExecutionRole \
-  --policy-arn arn:aws:iam::000000000000:policy/ECSSecretsPolicy \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373
-
-# Create Task Role
-aws iam create-role \
-  --role-name ecsTaskRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "ecs-tasks.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }' \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373
-```
+**Note**: The `ecsTaskExecutionRole` is automatically created by KECS when it starts LocalStack, and it already has the necessary permissions to access secrets from Secrets Manager and SSM Parameter Store. No additional IAM configuration is required for this example.
 
 ### 6. Create CloudWatch Log Group
 
@@ -337,13 +275,13 @@ aws ecs wait services-stable \
 
 1. **Secret Injection**: All secrets from SSM and Secrets Manager are available as environment variables
 2. **No Hardcoded Secrets**: Task definition contains only references, not actual secret values
-3. **Proper Permissions**: IAM roles have necessary permissions to retrieve secrets
+3. **Proper Permissions**: Execution role has necessary permissions to retrieve secrets
 4. **Secret Isolation**: Each environment (dev, staging, prod) uses different secret paths
 5. **Audit Trail**: Secret access is logged in CloudTrail (in production AWS)
 
 ## Security Best Practices Demonstrated
 
-1. **Least Privilege**: IAM roles only have access to specific secret paths
+1. **Least Privilege**: Execution role has controlled access to secrets
 2. **Encryption at Rest**: Secrets are encrypted in both SSM and Secrets Manager
 3. **Encryption in Transit**: Secrets are retrieved over TLS
 4. **No Secret Logging**: Application doesn't log actual secret values
@@ -360,18 +298,11 @@ aws logs tail /ecs/service-with-secrets \
   --follow
 ```
 
-### Verify IAM Permissions
+### Verify Execution Role
 
 ```bash
-# Test if execution role can access secrets
-aws sts assume-role \
-  --role-arn arn:aws:iam::000000000000:role/ecsTaskExecutionRole \
-  --role-session-name test-session \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373
-
-# List attached policies
-aws iam list-attached-role-policies \
+# Verify execution role exists (auto-created by KECS)
+aws iam get-role \
   --role-name ecsTaskExecutionRole \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
@@ -440,23 +371,8 @@ aws ssm delete-parameter \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 
-# Delete IAM resources
-# Note: Only detach the policy from ecsTaskExecutionRole, don't delete the role itself as it's managed by KECS
-aws iam detach-role-policy \
-  --role-name ecsTaskExecutionRole \
-  --policy-arn arn:aws:iam::000000000000:policy/ECSSecretsPolicy \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373
-
-aws iam delete-policy \
-  --policy-arn arn:aws:iam::000000000000:policy/ECSSecretsPolicy \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373
-
-aws iam delete-role \
-  --role-name ecsTaskRole \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373
+# Note: No need to delete IAM resources as ecsTaskExecutionRole is managed by KECS
+# and will be cleaned up when KECS stops
 
 # Delete log group
 aws logs delete-log-group \
