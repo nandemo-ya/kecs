@@ -132,6 +132,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		// Handle ViewLogs first to allow log viewer to process keys directly
+		if m.currentView == ViewLogs {
+			m, cmd = m.handleLogsKeys(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			// Don't process global actions if log viewer handled the key
+			return m, tea.Batch(cmds...)
+		}
+
 		// Skip global and view-specific key actions for dialog views
 		// to prevent conflicts with text input (e.g., 'h' for home vs typing 'h')
 		if !m.isInDialogView() {
@@ -1419,11 +1429,13 @@ func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			// Handle keys specific to split-view mode
 			switch msg.String() {
 			case "esc":
-				// Exit log viewer (ESC only)
-				m.logViewer = nil
-				m.currentView = m.previousView
-				m.logSplitView = false // Reset to fullscreen for next time
-				return m, m.loadDataFromAPI()
+				// Exit log viewer (ESC only, and only if search bar is not focused)
+				if !m.logViewer.IsSearchFocused() {
+					m.logViewer = nil
+					m.currentView = m.previousView
+					m.logSplitView = false // Reset to fullscreen for next time
+					return m, m.loadDataFromAPI()
+				}
 			case "tab":
 				// Switch focus between main view and log view (future enhancement)
 				// For now, just delegate to log viewer
@@ -1433,8 +1445,8 @@ func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		updatedViewer, cmd := m.logViewer.Update(msg)
 		m.logViewer = &updatedViewer
 
-		// Check if user wants to exit log viewer (ESC only)
-		if msg.String() == "esc" {
+		// Check if user wants to exit log viewer (ESC only, and only if search bar is not focused)
+		if msg.String() == "esc" && !m.logViewer.IsSearchFocused() {
 			m.logViewer = nil
 			m.currentView = m.previousView
 			m.logSplitView = false // Reset to fullscreen for next time

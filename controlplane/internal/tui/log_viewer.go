@@ -481,3 +481,8 @@ func (m LogViewerModel) View() string {
 		footer,
 	)
 }
+
+// IsSearchFocused returns whether the search bar is currently focused
+func (m LogViewerModel) IsSearchFocused() bool {
+	return m.searchBar.Focused()
+}
