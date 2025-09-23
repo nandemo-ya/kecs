@@ -321,23 +321,9 @@ func (sm *ServiceManager) CreateService(
 		"clientNil", kubeClient == nil,
 		"endpoint", endpoint)
 
-	// Ensure namespace exists
-	if err := sm.ensureNamespace(ctx, kubeClient, deployment.Namespace); err != nil {
-		return fmt.Errorf("failed to ensure namespace: %w", err)
-	}
-
-	// Create Deployment
-	if err := sm.createDeployment(ctx, kubeClient, deployment); err != nil {
-		return fmt.Errorf("failed to create deployment: %w", err)
-	}
-
-	// Create Service (if provided)
-	if kubeService != nil {
-		if err := sm.createKubernetesService(ctx, kubeClient, kubeService); err != nil {
-			// Don't fail the entire operation if service creation fails
-			logging.Warn("Failed to create kubernetes service",
-				"error", err)
-		}
+	// Ensure all Kubernetes resources exist
+	if err := sm.ensureKubernetesResources(ctx, kubeClient, deployment, kubeService); err != nil {
+		return fmt.Errorf("failed to ensure kubernetes resources: %w", err)
 	}
 
 	// Start watching pods for this deployment to create ECS tasks
@@ -472,28 +458,14 @@ func (sm *ServiceManager) UpdateService(
 		ctx, deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Deployment doesn't exist (was deleted), recreate it
-			logging.Warn("Deployment not found, recreating it",
+			// Deployment doesn't exist (was deleted), recreate all resources
+			logging.Warn("Deployment not found, recreating kubernetes resources",
 				"deployment", deployment.Name,
 				"namespace", deployment.Namespace)
 
-			// Ensure namespace exists
-			if err := sm.ensureNamespace(ctx, kubeClient, deployment.Namespace); err != nil {
-				return fmt.Errorf("failed to ensure namespace: %w", err)
-			}
-
-			// Create the deployment
-			if err := sm.createDeployment(ctx, kubeClient, deployment); err != nil {
-				return fmt.Errorf("failed to recreate deployment: %w", err)
-			}
-
-			// Create Service (if provided)
-			if kubeService != nil {
-				if err := sm.createKubernetesService(ctx, kubeClient, kubeService); err != nil {
-					// Don't fail the entire operation if service creation fails
-					logging.Warn("Failed to recreate kubernetes service",
-						"error", err)
-				}
+			// Ensure all Kubernetes resources exist
+			if err := sm.ensureKubernetesResources(ctx, kubeClient, deployment, kubeService); err != nil {
+				return fmt.Errorf("failed to recreate kubernetes resources: %w", err)
 			}
 
 			// Start watching pods for this deployment to create ECS tasks
@@ -501,7 +473,7 @@ func (sm *ServiceManager) UpdateService(
 				go sm.watchServicePods(context.Background(), deployment, cluster, storageService)
 			}
 
-			logging.Info("Successfully recreated deployment and service",
+			logging.Info("Successfully recreated kubernetes resources",
 				"serviceName", storageService.ServiceName,
 				"deploymentName", deployment.Name,
 				"namespace", deployment.Namespace)
@@ -785,6 +757,38 @@ func (sm *ServiceManager) ensureNamespace(ctx context.Context, kubeClient kubern
 			}
 		}
 	}
+	return nil
+}
+
+// ensureKubernetesResources ensures all Kubernetes resources (namespace, deployment, service) exist for an ECS service
+// This is used by both CreateService and UpdateService
+func (sm *ServiceManager) ensureKubernetesResources(
+	ctx context.Context,
+	kubeClient kubernetes.Interface,
+	deployment *appsv1.Deployment,
+	kubeService *corev1.Service,
+) error {
+	// Ensure namespace exists
+	if err := sm.ensureNamespace(ctx, kubeClient, deployment.Namespace); err != nil {
+		return fmt.Errorf("failed to ensure namespace: %w", err)
+	}
+
+	// Create or update Deployment
+	if err := sm.createDeployment(ctx, kubeClient, deployment); err != nil {
+		return fmt.Errorf("failed to create/update deployment: %w", err)
+	}
+
+	// Create or update Service (if provided)
+	if kubeService != nil {
+		if err := sm.createKubernetesService(ctx, kubeClient, kubeService); err != nil {
+			// Don't fail the entire operation if service creation fails
+			logging.Warn("Failed to create/update kubernetes service",
+				"service", kubeService.Name,
+				"namespace", kubeService.Namespace,
+				"error", err)
+		}
+	}
+
 	return nil
 }
 
