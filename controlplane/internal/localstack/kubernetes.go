@@ -58,6 +58,29 @@ func (km *kubernetesManager) CreateNamespace(ctx context.Context) error {
 
 // DeployLocalStack creates all necessary Kubernetes resources for LocalStack
 func (km *kubernetesManager) DeployLocalStack(ctx context.Context, config *Config) error {
+	// Check if LocalStack deployment already exists and is healthy
+	deployment, err := km.client.AppsV1().Deployments(km.namespace).Get(ctx, "localstack", metav1.GetOptions{})
+	if err == nil {
+		// Deployment exists, check if it's ready
+		if deployment.Status.ReadyReplicas > 0 {
+			logging.Info("LocalStack deployment already exists and is ready, skipping deployment",
+				"namespace", km.namespace,
+				"readyReplicas", deployment.Status.ReadyReplicas)
+
+			// Ensure service exists (in case it was deleted)
+			if err := km.createService(ctx, config); err != nil {
+				logging.Warn("Failed to ensure service exists", "error", err)
+			}
+
+			return nil
+		}
+		logging.Info("LocalStack deployment exists but not ready, will proceed with deployment",
+			"namespace", km.namespace,
+			"readyReplicas", deployment.Status.ReadyReplicas)
+	} else if !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to check existing deployment: %w", err)
+	}
+
 	// Create PVC
 	if err := km.createPVC(ctx, config); err != nil {
 		return fmt.Errorf("failed to create PVC: %w", err)
