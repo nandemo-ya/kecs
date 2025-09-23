@@ -448,9 +448,6 @@ func (m *Model) isInDialogView() bool {
 
 func (m *Model) goBack() {
 	switch m.currentView {
-	case ViewClusters:
-		m.currentView = ViewInstances
-		m.selectedInstance = ""
 	case ViewServices:
 		m.currentView = ViewClusters
 		m.selectedCluster = ""

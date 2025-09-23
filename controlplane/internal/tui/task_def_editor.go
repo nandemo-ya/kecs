@@ -495,12 +495,14 @@ func (e *TaskDefinitionEditor) saveTaskDefinition() tea.Cmd {
 		return nil
 	}
 
+	// Store the JSON content to pass to the API
+	jsonContent := e.content
+
 	return func() tea.Msg {
-		// In a real implementation, this would call the API
-		// For now, just return a success message
-		return editorSaveMsg{
-			family:   e.family,
-			revision: 1, // Would be determined by API
+		// Return a message with the JSON content to be saved
+		return editorSaveRequestMsg{
+			family:      e.family,
+			jsonContent: jsonContent,
 		}
 	}
 }
@@ -785,6 +787,11 @@ func (e *TaskDefinitionEditor) moveToPrevWord(lines []string) {
 type editorSaveMsg struct {
 	family   string
 	revision int
+}
+
+type editorSaveRequestMsg struct {
+	family      string
+	jsonContent string
 }
 
 type editorQuitMsg struct{}

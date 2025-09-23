@@ -85,7 +85,8 @@ func (m Model) executeGlobalAction(action KeyAction) (Model, tea.Cmd) {
 			m.currentView = m.previousView
 		} else if m.currentView == ViewTaskDefinitionRevisions && m.showTaskDefJSON {
 			m.showTaskDefJSON = false
-		} else if m.currentView != ViewInstances {
+		} else if m.currentView != ViewClusters {
+			// Don't allow going back from Clusters view (it's the home view now)
 			m.goBack()
 			return m, m.loadDataFromAPI()
 		}
@@ -123,14 +124,10 @@ func (m Model) executeGlobalAction(action KeyAction) (Model, tea.Cmd) {
 		return m, m.loadDataFromAPI()
 
 	case ActionGoHome:
-		// Navigate to home (Instances view)
-		if m.currentView != ViewInstances {
-			m.currentView = ViewInstances
-			m.selectedInstance = ""
-			m.selectedCluster = ""
-			m.selectedService = ""
-			m.selectedTask = ""
-			m.instanceCursor = 0
+		// Navigate to home (Clusters view now)
+		if m.currentView != ViewClusters {
+			m.currentView = ViewClusters
+			m.clusterCursor = 0
 			return m, m.loadDataFromAPI()
 		}
 
@@ -604,6 +601,23 @@ func (m Model) executeTaskDefRevisionsAction(action KeyAction) (Model, tea.Cmd) 
 			m.taskDefEditor = NewTaskDefinitionEditor(rev.Family, revision)
 			m.previousView = m.currentView
 			m.currentView = ViewTaskDefinitionEditor
+
+			// Load the task definition JSON for the editor
+			// Check if already cached
+			if jsonContent, cached := m.taskDefJSONCache[rev.Revision]; cached {
+				// Use cached content - send it to the editor
+				return m, func() tea.Msg {
+					return taskDefJSONLoadedMsg{
+						revision: rev.Revision,
+						json:     jsonContent,
+					}
+				}
+			} else {
+				// Load from API
+				taskDefArn := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:task-definition/%s:%d",
+					rev.Family, rev.Revision)
+				return m, m.loadTaskDefinitionJSONCmd(taskDefArn)
+			}
 		}
 
 	case ActionCopyJSON:
