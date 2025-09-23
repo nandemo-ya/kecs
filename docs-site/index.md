@@ -159,7 +159,6 @@ kecs cluster list
 ## Getting Help
 
 - 📖 [Documentation](/guides/getting-started) - Comprehensive guides and tutorials
-- 💬 [GitHub Discussions](https://github.com/nandemo-ya/kecs/discussions) - Ask questions and share ideas
 - 🐛 [Issue Tracker](https://github.com/nandemo-ya/kecs/issues) - Report bugs or request features
 - 📝 [Examples](https://github.com/nandemo-ya/kecs/tree/main/examples) - Sample applications and configurations
 

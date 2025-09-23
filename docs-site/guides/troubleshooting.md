@@ -522,7 +522,6 @@ When reporting issues, include:
 ### Community Support
 
 - GitHub Issues: [github.com/nandemo-ya/kecs/issues](https://github.com/nandemo-ya/kecs/issues)
-- Discussions: [github.com/nandemo-ya/kecs/discussions](https://github.com/nandemo-ya/kecs/discussions)
 - Slack: [kecs-community.slack.com](https://kecs-community.slack.com)
 
 ## Prevention Tips

@@ -292,5 +292,3 @@ Now that you have KECS running:
 
 - Check the [Troubleshooting Guide](/guides/troubleshooting)
 - Browse [GitHub Issues](https://github.com/nandemo-ya/kecs/issues)
-- Ask in [Discussions](https://github.com/nandemo-ya/kecs/discussions)
-- Review [API Documentation](/api/)
