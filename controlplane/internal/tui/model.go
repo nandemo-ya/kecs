@@ -356,7 +356,7 @@ func NewModel() Model {
 
 	return Model{
 		currentView:      ViewInstances,
-		refreshInterval:  5 * time.Second,
+		refreshInterval:  2 * time.Second,
 		ready:            false,
 		commandPalette:   NewCommandPalette(),
 		apiClient:        api.NewHTTPClient("http://localhost:5373"),
@@ -374,7 +374,7 @@ func NewModelWithClient(client api.Client) Model {
 
 	return Model{
 		currentView:      ViewInstances,
-		refreshInterval:  5 * time.Second,
+		refreshInterval:  2 * time.Second,
 		ready:            false,
 		commandPalette:   NewCommandPalette(),
 		apiClient:        client,

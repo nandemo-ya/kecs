@@ -39,6 +39,12 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
 
+		// Add cache control headers to prevent caching of API responses
+		// This ensures AWS CLI always gets fresh data
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+
 		// For API endpoints, set strict CSP
 		if !strings.HasPrefix(r.URL.Path, "/ui") && !strings.HasPrefix(r.URL.Path, "/ws") {
 			w.Header().Set("Content-Security-Policy", "default-src 'none'")

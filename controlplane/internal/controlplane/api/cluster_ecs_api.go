@@ -134,11 +134,8 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 		return nil, toECSError(err, "CreateCluster")
 	}
 
-	// Create k8s namespace synchronously to ensure it exists before returning
-	api.createNamespaceForCluster(cluster)
-
-	// Deploy LocalStack asynchronously (not critical for cluster creation)
-	go api.deployLocalStackIfEnabled(cluster)
+	// Create k8s namespace asynchronously (won't block cluster visibility)
+	go api.createNamespaceForCluster(cluster)
 
 	// Build response
 	response := &generated.CreateClusterResponse{
@@ -157,9 +154,6 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 
 // ListClusters implements the ListClusters operation
 func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListClustersRequest) (*generated.ListClustersResponse, error) {
-	// Debug log the request
-	reqJSON, _ := json.Marshal(req)
-	logging.Debug("ListClusters request", "request", string(reqJSON))
 
 	// Set default limit if not specified
 	limit := 100
@@ -169,9 +163,6 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 		if limit > 100 {
 			limit = 100
 		}
-		logging.Debug("ListClusters pagination", "maxResults", *req.MaxResults, "effectiveLimit", limit)
-	} else {
-		logging.Debug("ListClusters pagination", "defaultLimit", limit)
 	}
 
 	// Extract next token
@@ -187,8 +178,6 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 		return nil, fmt.Errorf("failed to list clusters: %w", err)
 	}
 
-	logging.Debug("ListClusters results", "count", len(clusters))
-
 	// Build cluster ARNs list
 	clusterArns := make([]string, 0, len(clusters))
 	for _, cluster := range clusters {
@@ -202,14 +191,7 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 	// Set next token if there are more results
 	if newNextToken != "" {
 		response.NextToken = ptr.String(newNextToken)
-		logging.Debug("ListClusters response", "count", len(clusterArns), "nextToken", newNextToken)
-	} else {
-		logging.Debug("ListClusters response", "count", len(clusterArns), "hasNextToken", false)
 	}
-
-	// Debug log the response
-	respJSON, _ := json.Marshal(response)
-	logging.Debug("ListClusters response", "response", string(respJSON))
 
 	return response, nil
 }
@@ -747,23 +729,6 @@ func extractClusterNameFromARN(identifier string) string {
 		}
 	}
 	return identifier
-}
-
-// deployLocalStackIfEnabled deploys LocalStack to the k3d cluster if enabled
-func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
-	logging.Debug("deployLocalStackIfEnabled called", "cluster", cluster.Name)
-
-	// Skip in CI/test mode
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
-		logging.Info("CI/TEST MODE: Skipping LocalStack deployment", "cluster", cluster.Name)
-		return
-	}
-
-	// LocalStack deployment is currently disabled after ClusterManager removal
-	// TODO: Implement LocalStack deployment using in-cluster operations
-	// This will be addressed in a future PR to properly handle LocalStack deployment
-	// from within the cluster without requiring host-side cluster management
-	logging.Warn("LocalStack deployment temporarily disabled - pending reimplementation", "cluster", cluster.Name)
 }
 
 // updateLocalStackState updates the LocalStack deployment state in storage
