@@ -129,16 +129,13 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 		cluster.Tags = string(tagsJSON)
 	}
 
-	// Save to storage
+	// Save to storage (highest priority for immediate visibility)
 	if err := api.storage.ClusterStore().Create(ctx, cluster); err != nil {
 		return nil, toECSError(err, "CreateCluster")
 	}
 
-	// Create k8s namespace synchronously to ensure it exists before returning
-	api.createNamespaceForCluster(cluster)
-
-	// Deploy LocalStack asynchronously (not critical for cluster creation)
-	go api.deployLocalStackIfEnabled(cluster)
+	// Create k8s namespace asynchronously (won't block cluster visibility)
+	go api.createNamespaceForCluster(cluster)
 
 	// Build response
 	response := &generated.CreateClusterResponse{
@@ -747,23 +744,6 @@ func extractClusterNameFromARN(identifier string) string {
 		}
 	}
 	return identifier
-}
-
-// deployLocalStackIfEnabled deploys LocalStack to the k3d cluster if enabled
-func (api *DefaultECSAPI) deployLocalStackIfEnabled(cluster *storage.Cluster) {
-	logging.Debug("deployLocalStackIfEnabled called", "cluster", cluster.Name)
-
-	// Skip in CI/test mode
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
-		logging.Info("CI/TEST MODE: Skipping LocalStack deployment", "cluster", cluster.Name)
-		return
-	}
-
-	// LocalStack deployment is currently disabled after ClusterManager removal
-	// TODO: Implement LocalStack deployment using in-cluster operations
-	// This will be addressed in a future PR to properly handle LocalStack deployment
-	// from within the cluster without requiring host-side cluster management
-	logging.Warn("LocalStack deployment temporarily disabled - pending reimplementation", "cluster", cluster.Name)
 }
 
 // updateLocalStackState updates the LocalStack deployment state in storage
