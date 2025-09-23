@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	"github.com/sirupsen/logrus"
 )
 
 // Handler implements the Service Discovery API

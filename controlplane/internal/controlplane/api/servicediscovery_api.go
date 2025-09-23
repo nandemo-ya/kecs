@@ -3,10 +3,11 @@ package api
 import (
 	"net/http"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
 	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	"github.com/sirupsen/logrus"
 )
 
 // ServiceDiscoveryAPI handles Cloud Map API operations

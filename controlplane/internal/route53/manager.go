@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
+
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 

@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 )
 
 // WebhookRegistrar handles webhook registration with Kubernetes

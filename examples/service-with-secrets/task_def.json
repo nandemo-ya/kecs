@@ -32,15 +32,15 @@
       "secrets": [
         {
           "name": "DATABASE_URL",
-          "valueFrom": "arn:aws:ssm:us-east-1:000000000000:parameter/myapp/prod/database-url"
+          "valueFrom": "arn:aws:ssm:us-east-1:000000000000:parameter/myapp/prod/database_url"
         },
         {
           "name": "API_KEY",
-          "valueFrom": "arn:aws:ssm:us-east-1:000000000000:parameter/myapp/prod/api-key"
+          "valueFrom": "arn:aws:ssm:us-east-1:000000000000:parameter/myapp/prod/api_key"
         },
         {
           "name": "FEATURE_FLAGS",
-          "valueFrom": "arn:aws:ssm:us-east-1:000000000000:parameter/myapp/prod/feature-flags"
+          "valueFrom": "arn:aws:ssm:us-east-1:000000000000:parameter/myapp/prod/feature_flags"
         },
         {
           "name": "DB_PASSWORD",

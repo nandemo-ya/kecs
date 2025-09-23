@@ -1997,12 +1997,12 @@ func (m Model) renderHelpContent(maxHeight int) string {
 
 	// Group view-specific bindings by view
 	viewGroups := map[string][]KeyBinding{
-		"Instances":        []KeyBinding{},
-		"Clusters":         []KeyBinding{},
-		"Services":         []KeyBinding{},
-		"Tasks":            []KeyBinding{},
-		"Task Definitions": []KeyBinding{},
-		"Logs":             []KeyBinding{},
+		"Instances":        {},
+		"Clusters":         {},
+		"Services":         {},
+		"Tasks":            {},
+		"Task Definitions": {},
+		"Logs":             {},
 	}
 
 	// Define view mappings in a stable order

@@ -1927,11 +1927,13 @@ func (c *TaskConverter) getK8sSecretName(source, secretName string) string {
 		cleanName := re.ReplaceAllString(secretName, "")
 		cleanName = strings.ToLower(cleanName)
 		cleanName = strings.ReplaceAll(cleanName, "/", "-")
+		cleanName = strings.ReplaceAll(cleanName, "_", "-") // Replace underscores with hyphens
 		cleanName = strings.Trim(cleanName, "-")
 		return "sm-" + cleanName
 	case "ssm":
 		cleanName := strings.Trim(secretName, "/")
 		cleanName = strings.ReplaceAll(cleanName, "/", "-")
+		cleanName = strings.ReplaceAll(cleanName, "_", "-") // Replace underscores with hyphens for K8s compatibility
 		cleanName = strings.ToLower(cleanName)
 		return "ssm-" + cleanName
 	default:
