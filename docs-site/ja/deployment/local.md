@@ -162,11 +162,8 @@ KECS は便利なコンテナコマンドを提供しています：
 # カスタム名とポートで起動
 ./bin/kecs start --name myinstance --api-port 9090
 
-# インスタンスのステータスを表示
-./bin/kecs status
-
-# ログを表示
-./bin/kecs logs -f
+# コントロールプレーンのログを表示
+kubectl logs -n kecs-system deployment/kecs-controlplane -f
 
 # インスタンスを停止
 ./bin/kecs stop
@@ -279,5 +276,4 @@ rm -rf ~/.kecs/data/kecs.db
 ## 次のステップ
 
 - [Kind デプロイメント](./kind) - Kind クラスターへのデプロイ
-- [テストガイド](/ja/guides/integration-testing) - テストの作成と実行
 - [コントリビューション](/ja/development/contributing) - KECS への貢献

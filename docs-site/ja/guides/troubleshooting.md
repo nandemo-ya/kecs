@@ -522,8 +522,6 @@ kubectl debug -it <pod-name> -n <cluster-name> --image=busybox
 ### コミュニティサポート
 
 - GitHub Issues: [github.com/nandemo-ya/kecs/issues](https://github.com/nandemo-ya/kecs/issues)
-- ディスカッション: [github.com/nandemo-ya/kecs/discussions](https://github.com/nandemo-ya/kecs/discussions)
-- Slack: [kecs-community.slack.com](https://kecs-community.slack.com)
 
 ## 予防のヒント
 

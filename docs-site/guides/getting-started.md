@@ -4,41 +4,36 @@ Welcome to KECS! This guide will help you get up and running with a local ECS-co
 
 ## Prerequisites
 
-Before you begin, ensure you have the following installed:
+KECS requires a Docker-compatible environment to manage k3d clusters:
+- **Docker Desktop** (macOS, Windows, Linux)
+- **Rancher Desktop** (macOS, Windows, Linux)
+- **OrbStack** (macOS)
+- **Colima** (macOS, Linux)
+- Or any other Docker-compatible runtime
 
-- **Docker**: Required for running containers and k3d
-- **kubectl** (optional): For direct Kubernetes cluster interaction
-- **AWS CLI** (recommended): For interacting with KECS APIs
+Optional but recommended:
+- **kubectl**: For direct Kubernetes cluster interaction
+- **AWS CLI**: For interacting with KECS APIs
 
 ## Installation
 
-### macOS (Homebrew)
+### Using Homebrew (macOS/Linux)
 
 ```bash
-brew install nandemo-ya/tap/kecs
-```
+# Install KECS
+brew tap nandemo-ya/kecs
+brew install kecs
 
-### Linux/macOS (Direct Download)
-
-```bash
-# Download the latest release
-curl -L https://github.com/nandemo-ya/kecs/releases/latest/download/kecs-$(uname -s)-$(uname -m) -o kecs
-chmod +x kecs
-sudo mv kecs /usr/local/bin/
+# Verify installation
+kecs version
 ```
 
 ### From Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/nandemo-ya/kecs.git
 cd kecs
-
-# Build the binary
 make build
-
-# Install to system path
-sudo mv bin/kecs /usr/local/bin/
 ```
 
 ## Starting KECS
@@ -60,27 +55,23 @@ kecs start
 ### Custom Instance
 
 ```bash
-# Start with a specific instance name
+# Start with a specific instance name (uses default ports 5373/5374)
 kecs start --instance dev
 
-# Start with custom ports  
-kecs start --instance staging --api-port 8080 --admin-port 8081
+# Start with custom ports
+kecs start --instance staging --api-port 5383 --admin-port 5384
 ```
 
 ### Check Status
 
 ```bash
-# Get cluster information
-kecs cluster info
+# Check if KECS is running
+kubectl get pods -n kecs-system
 
 # Example output:
-# KECS Cluster Information:
-# ========================
-# Instance: kecs-brave-wilson
-# Status: Running
-# API Endpoint: http://localhost:5373
-# Admin Endpoint: http://localhost:8081
-# Kubernetes Context: k3d-kecs-brave-wilson
+# NAME                                   READY   STATUS    RESTARTS   AGE
+# kecs-controlplane-7f8b9c5d4-x2klm     1/1     Running   0          5m
+# localstack-6d7f8c9b5-p3qrs            1/1     Running   0          5m
 ```
 
 ## Using KECS
@@ -146,24 +137,12 @@ aws ecs run-task \
 
 ```bash
 # Show all KECS instances
-kecs cluster list
+kecs list
 
 # Example output:
-# KECS Instances:
-# ===============
-# • kecs-dev (Running)
-# • kecs-staging (Running)
-# • kecs-prod-test (Stopped)
-```
-
-### View Logs
-
-```bash
-# Stream logs from control plane
-kecs logs -f
-
-# Show last 100 lines
-kecs logs --tail 100
+# INSTANCE           STATUS    API PORT    ADMIN PORT
+# kecs-dev           Running   5373        5374
+# kecs-staging       Running   5383        5384
 ```
 
 ### Stop KECS
@@ -231,7 +210,7 @@ KECS includes an interactive Terminal User Interface:
 
 ```bash
 # Launch TUI
-kecs tui
+kecs
 
 # Features:
 # - Browse clusters, services, and tasks
@@ -285,8 +264,7 @@ Now that you have KECS running:
 1. [Deploy a Multi-Container Application](/guides/services)
 2. [Work with Load Balancers](/guides/elbv2-integration)
 3. [Use the Interactive TUI](/guides/tui-interface)
-4. [Set up Hot Reload Development](/development/hot-reload)
-5. [Explore Examples](https://github.com/nandemo-ya/kecs/tree/main/examples)
+4. [Explore Examples](https://github.com/nandemo-ya/kecs/tree/main/examples)
 
 ## Getting Help
 

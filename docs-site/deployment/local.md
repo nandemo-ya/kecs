@@ -36,7 +36,7 @@ make build
 
 ```bash
 # Run KECS with default settings
-./bin/kecs server
+kecs server
 
 # KECS will start on:
 # - API Server: http://localhost:8080
@@ -47,13 +47,13 @@ make build
 
 ```bash
 # Run with custom ports
-./bin/kecs server --api-port 9080 --admin-port 9081
+kecs server --api-port 9080 --admin-port 9081
 
 # Run with debug logging
-./bin/kecs server --log-level debug
+kecs server --log-level debug
 
 # Run with custom data directory
-./bin/kecs server --data-dir ./data
+kecs server --data-dir ./data
 ```
 
 ### Environment Variables
@@ -157,19 +157,16 @@ KECS provides convenient container commands for running instances:
 
 ```bash
 # Start a KECS instance with k3d cluster
-./bin/kecs start
+kecs start
 
 # Start with custom name and port
-./bin/kecs start --name myinstance --api-port 9090
+kecs start --name myinstance --api-port 9090
 
-# View instance status
-./bin/kecs status
-
-# View logs
-./bin/kecs logs -f
+# View logs from control plane
+kubectl logs -n kecs-system deployment/kecs-controlplane -f
 
 # Stop the instance
-./bin/kecs stop
+kecs stop
 ```
 
 For more details, see [Container Commands documentation](../guides/container-commands.md).
@@ -289,5 +286,4 @@ rm -rf ~/.kecs/data/kecs.db
 
 ## Next Steps
 
-- [Testing Guide](/guides/integration-testing) - Write and run tests
 - [Contributing](/development/contributing) - Contribute to KECS

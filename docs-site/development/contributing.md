@@ -356,14 +356,13 @@ We follow [Semantic Versioning](https://semver.org/):
 ### Resources
 
 - [Documentation](https://kecs.dev)
-- [Slack Community](https://kecs-community.slack.com)
 
 ### Communication
 
 - **Questions**: Open an issue
 - **Bugs**: Open an issue
 - **Features**: Open an issue to discuss first
-- **Security**: Email security@kecs.dev
+- **Security**: Open an issue with the security label
 
 ## Recognition
 

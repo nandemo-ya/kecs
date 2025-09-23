@@ -11,74 +11,6 @@ LocalStack integration enables:
 - Secrets Manager and SSM Parameter Store
 - Service discovery with Route 53
 
-## Setup
-
-### Starting KECS with LocalStack
-
-```bash
-# Start KECS with LocalStack enabled
-./bin/kecs server --localstack-enabled
-
-# Or with custom LocalStack configuration
-./bin/kecs server \
-  --localstack-enabled \
-  --localstack-endpoint http://localhost:4566 \
-  --localstack-region us-east-1
-```
-
-### Configuration File
-
-Create `kecs-config.yaml`:
-
-```yaml
-server:
-  port: 8080
-  adminPort: 8081
-
-localstack:
-  enabled: true
-  endpoint: http://localhost:4566
-  region: us-east-1
-  services:
-    - s3
-    - dynamodb
-    - sqs
-    - sns
-    - secretsmanager
-    - ssm
-    - iam
-    - logs
-    - cloudwatch
-```
-
-### Docker Compose Setup
-
-```yaml
-version: '3.8'
-services:
-  kecs:
-    image: ghcr.io/nandemo-ya/kecs:latest
-    ports:
-      - "8080:8080"
-      - "8081:8081"
-    environment:
-      - KECS_LOCALSTACK_ENABLED=true
-      - KECS_LOCALSTACK_ENDPOINT=http://localstack:4566
-    depends_on:
-      - localstack
-
-  localstack:
-    image: localstack/localstack:latest
-    ports:
-      - "4566:4566"
-    environment:
-      - SERVICES=s3,dynamodb,sqs,sns,secretsmanager,ssm,iam,logs,cloudwatch
-      - DEBUG=1
-    volumes:
-      - ./localstack:/var/lib/localstack
-      - /var/run/docker.sock:/var/run/docker.sock
-```
-
 ## Using AWS Services
 
 ### IAM Integration
@@ -124,7 +56,7 @@ buckets = s3.list_buckets()
 s3.upload_file('local.txt', 'my-bucket', 'remote.txt')
 
 # Compare with typical LocalStack usage (NOT needed with KECS):
-# s3 = boto3.client('s3', endpoint_url='http://localhost:4566')  # Not required!
+# s3 = boto3.client('s3', endpoint_url='http://localhost:5373')  # Not required!
 ```
 
 ### DynamoDB Integration
@@ -149,7 +81,7 @@ table.put_item(Item={
 response = table.get_item(Key={'userId': '123'})
 
 # Without KECS transparent proxy, you would need:
-# dynamodb = boto3.resource('dynamodb', endpoint_url='http://localhost:4566')
+# dynamodb = boto3.resource('dynamodb', endpoint_url='http://localhost:5373')
 ```
 
 ### Secrets Manager
@@ -161,7 +93,7 @@ Store and retrieve secrets:
 aws secretsmanager create-secret \
   --name prod/db/password \
   --secret-string "mysecretpassword" \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Use in task definition
 {
@@ -189,7 +121,7 @@ aws ssm put-parameter \
   --name /myapp/database/host \
   --value "db.example.com" \
   --type String \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 
 # Use in task definition
 {
@@ -233,7 +165,7 @@ View logs:
 ```bash
 aws logs tail /ecs/myapp \
   --follow \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ## Automatic Sidecar Injection (Transparent Proxy)
@@ -285,7 +217,7 @@ If you prefer to disable automatic injection and configure endpoints manually:
         },
         {
           "name": "AWS_ENDPOINT_URL",
-          "value": "http://localhost:4566"
+          "value": "http://localhost:5373"
         }
       ]
     }
@@ -303,7 +235,7 @@ Create a Route 53 private hosted zone:
 aws servicediscovery create-private-dns-namespace \
   --name prod.local \
   --vpc vpc-12345 \
-  --endpoint-url http://localhost:4566
+  --endpoint-url http://localhost:5373
 ```
 
 ### Register Service
@@ -342,7 +274,7 @@ class TestS3Integration(unittest.TestCase):
     @mock_s3
     def test_upload_file(self):
         # Create bucket
-        s3 = boto3.client('s3', endpoint_url='http://localhost:4566')
+        s3 = boto3.client('s3', endpoint_url='http://localhost:5373')
         s3.create_bucket(Bucket='test-bucket')
         
         # Upload file
@@ -411,7 +343,7 @@ Create resources on startup:
 import boto3
 
 def initialize():
-    s3 = boto3.client('s3', endpoint_url='http://localhost:4566')
+    s3 = boto3.client('s3', endpoint_url='http://localhost:5373')
     
     # Create buckets
     buckets = ['uploads', 'processed', 'archive']
@@ -422,7 +354,7 @@ def initialize():
             pass
     
     # Create DynamoDB tables
-    dynamodb = boto3.client('dynamodb', endpoint_url='http://localhost:4566')
+    dynamodb = boto3.client('dynamodb', endpoint_url='http://localhost:5373')
     # ... create tables
 
 if __name__ == '__main__':
@@ -436,120 +368,3 @@ Keep local and production similar:
 - Match IAM policies
 - Replicate bucket structures
 - Use consistent parameter paths
-
-### 3. CI/CD Integration
-
-```yaml
-# .github/workflows/test.yml
-name: Tests
-on: [push]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    services:
-      localstack:
-        image: localstack/localstack
-        ports:
-          - 4566:4566
-    
-    steps:
-      - uses: actions/checkout@v2
-      - name: Start KECS
-        run: |
-          docker run -d \
-            -p 8080:8080 \
-            -e KECS_LOCALSTACK_ENDPOINT=http://localstack:4566 \
-            ghcr.io/nandemo-ya/kecs:latest
-      
-      - name: Run tests
-        run: make test
-```
-
-### 4. Cost Optimization
-
-LocalStack Pro features:
-- Use free tier for development
-- Pro for advanced services (RDS, EKS, etc.)
-- Share LocalStack instance across team
-
-## Troubleshooting
-
-### Connection Issues
-
-If containers can't reach LocalStack:
-
-1. Check LocalStack is running:
-   ```bash
-   curl http://localhost:4566/_localstack/health
-   ```
-
-2. Verify network connectivity:
-   ```bash
-   kubectl exec <pod> -- nslookup localstack-proxy
-   ```
-
-3. Check proxy injection:
-   ```bash
-   kubectl describe pod <pod> -n <namespace>
-   ```
-
-### Authentication Errors
-
-For IAM-related issues:
-
-1. Verify task role ARN
-2. Check ServiceAccount creation
-3. Review IAM policies in LocalStack
-4. Enable IAM debug logging
-
-### Service Discovery Issues
-
-If services can't find each other:
-
-1. Check DNS namespace creation
-2. Verify service registration
-3. Test DNS resolution:
-   ```bash
-   kubectl exec <pod> -- nslookup api.prod.local
-   ```
-
-## Advanced Configuration
-
-### Custom Endpoints
-
-Override specific service endpoints:
-
-```yaml
-localstack:
-  services:
-    s3:
-      endpoint: http://custom-s3:4566
-    dynamodb:
-      endpoint: http://custom-dynamodb:4566
-```
-
-### Persistence
-
-Enable LocalStack persistence:
-
-```yaml
-services:
-  localstack:
-    environment:
-      - PERSISTENCE=1
-    volumes:
-      - ./localstack-data:/var/lib/localstack
-```
-
-### Multi-Region Support
-
-```yaml
-localstack:
-  regions:
-    - us-east-1
-    - eu-west-1
-    - ap-northeast-1
-```
-
-For more details, see the [LocalStack documentation](https://docs.localstack.cloud/).

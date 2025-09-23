@@ -25,7 +25,7 @@ View KECS logs:
 
 ```bash
 # If running directly
-./bin/kecs server 2>&1 | tee kecs.log
+kecs server 2>&1 | tee kecs.log
 
 # If running in Docker
 docker logs kecs-container
@@ -40,11 +40,11 @@ Enable debug logging:
 
 ```bash
 # Via command line
-./bin/kecs server --log-level debug
+kecs server --log-level debug
 
 # Via environment variable
 export KECS_LOG_LEVEL=debug
-./bin/kecs server
+kecs server
 ```
 
 ## Common Issues
@@ -104,7 +104,7 @@ lsof -i :8080
 kill -9 <PID>
 
 # Or use different port
-./bin/kecs server --api-port 9080
+kecs server --api-port 9080
 ```
 
 #### Problem: Cannot Connect to Kubernetes
@@ -120,7 +120,7 @@ failed to get kubernetes config: stat /home/user/.kube/config: no such file or d
 ls ~/.kube/config
 
 # Set kubeconfig explicitly
-./bin/kecs server --kubeconfig /path/to/kubeconfig
+kecs server --kubeconfig /path/to/kubeconfig
 
 # Or use in-cluster config
 kubectl apply -f deploy/kubernetes/rbac.yaml
@@ -522,7 +522,6 @@ When reporting issues, include:
 ### Community Support
 
 - GitHub Issues: [github.com/nandemo-ya/kecs/issues](https://github.com/nandemo-ya/kecs/issues)
-- Slack: [kecs-community.slack.com](https://kecs-community.slack.com)
 
 ## Prevention Tips
 

@@ -21,7 +21,7 @@ features:
     title: ECS & ELBv2 Compatible
     details: Full compatibility with Amazon ECS and ELBv2 APIs, enabling seamless local development and testing
   - icon: 🌐
-    title: Complete AWS Environment
+    title: Powerful AWS Integration
     details: Includes LocalStack for IAM, S3, Secrets Manager, SSM, CloudWatch Logs, and more AWS services
   - icon: 🎯
     title: Single Endpoint
@@ -71,69 +71,6 @@ KECS (Kubernetes-based ECS Compatible Service) provides a complete local Amazon 
 - Graceful shutdown and cleanup
 - Resource monitoring and health checks
 - Comprehensive logging and debugging
-
-## Architecture Overview
-
-KECS runs its control plane inside a k3d cluster, providing:
-
-```
-┌─────────────────────────────────────┐
-│         Your Application            │
-│         (AWS CLI/SDK)                │
-└────────────┬────────────────────────┘
-             │
-             ▼ Port 5373
-┌─────────────────────────────────────┐
-│       Traefik Gateway               │
-│   (Unified AWS API Endpoint)        │
-├─────────────┬───────────────────────┤
-│    KECS     │     LocalStack        │
-│  ECS APIs   │   Other AWS APIs      │
-│  ELBv2 APIs │  (IAM, S3, SSM, etc)  │
-└─────────────┴───────────────────────┘
-             │
-             ▼
-┌─────────────────────────────────────┐
-│         k3d Cluster                 │
-│    (Kubernetes Workloads)           │
-└─────────────────────────────────────┘
-```
-
-## Use Cases
-
-### Local Development
-```bash
-# Start development environment
-kecs start --instance dev
-
-# Deploy your application
-aws ecs create-service \
-  --cluster my-cluster \
-  --service-name my-app \
-  --task-definition my-app:1
-```
-
-### CI/CD Testing
-```yaml
-# GitHub Actions example
-- name: Start KECS
-  run: kecs start
-  
-- name: Run integration tests
-  run: |
-    export AWS_ENDPOINT_URL=http://localhost:5373
-    npm run test:integration
-```
-
-### Multiple Projects
-```bash
-# Run multiple isolated environments
-kecs start --instance project-a --api-port 8080
-kecs start --instance project-b --api-port 8090
-
-# List all instances
-kecs cluster list
-```
 
 ## Getting Help
 
