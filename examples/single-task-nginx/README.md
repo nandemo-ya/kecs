@@ -28,6 +28,7 @@ kecs start
 
 ```bash
 aws ecs create-cluster --cluster-name default \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -36,6 +37,7 @@ aws ecs create-cluster --cluster-name default \
 ```bash
 aws logs create-log-group \
   --log-group-name /ecs/single-task-nginx \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -49,11 +51,13 @@ Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts
 # Register task definition
 aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Create service
 aws ecs create-service \
   --cli-input-json file://service_def.json \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -65,6 +69,7 @@ aws ecs create-service \
 aws ecs describe-services \
   --cluster default \
   --services single-task-nginx \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -74,6 +79,7 @@ aws ecs describe-services \
 aws ecs list-tasks \
   --cluster default \
   --service-name single-task-nginx \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -84,6 +90,7 @@ aws ecs list-tasks \
 TASK_ARN=$(aws ecs list-tasks \
   --cluster default \
   --service-name single-task-nginx \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'taskArns[0]' --output text)
 
@@ -91,6 +98,7 @@ TASK_ARN=$(aws ecs list-tasks \
 aws ecs describe-tasks \
   --cluster default \
   --tasks $TASK_ARN \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'tasks[0].{Status:lastStatus,DesiredStatus:desiredStatus,TaskArn:taskArn}'
 ```
@@ -100,10 +108,12 @@ aws ecs describe-tasks \
 ```bash
 # View recent logs
 aws logs tail /ecs/single-task-nginx \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Follow logs in real-time
 aws logs tail /ecs/single-task-nginx \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --follow
 ```
@@ -121,6 +131,7 @@ aws logs tail /ecs/single-task-nginx \
 
 ```bash
 aws logs tail /ecs/single-task-nginx \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --follow
 ```
@@ -131,6 +142,7 @@ aws logs tail /ecs/single-task-nginx \
 aws ecs describe-services \
   --cluster default \
   --services single-task-nginx \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'services[0].events[0:5]'
 ```
@@ -143,15 +155,18 @@ aws ecs delete-service \
   --cluster default \
   --service single-task-nginx \
   --force \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Deregister task definition
 aws ecs deregister-task-definition \
   --task-definition single-task-nginx:1 \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Delete log group
 aws logs delete-log-group \
   --log-group-name /ecs/single-task-nginx \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```

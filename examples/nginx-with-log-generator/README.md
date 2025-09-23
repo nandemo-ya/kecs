@@ -15,12 +15,12 @@ This setup ensures continuous log generation without needing port forwarding or 
 1. Register the task definition:
 ```bash
 export AWS_ENDPOINT_URL=http://localhost:5373
-aws ecs register-task-definition --cli-input-json file://task_def.json
+aws ecs register-task-definition --cli-input-json file://task_def.json --region us-east-1
 ```
 
 2. Create the service:
 ```bash
-aws ecs create-service --cli-input-json file://service_def.json
+aws ecs create-service --cli-input-json file://service_def.json --region us-east-1
 ```
 
 ## Viewing Logs
@@ -57,5 +57,5 @@ The nginx container will log access logs for each request:
 
 Delete the service:
 ```bash
-aws ecs delete-service --cluster default --service nginx-with-log-generator --force
+aws ecs delete-service --cluster default --service nginx-with-log-generator --force --region us-east-1
 ```
