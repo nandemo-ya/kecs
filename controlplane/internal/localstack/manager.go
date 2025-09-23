@@ -75,7 +75,8 @@ func (m *localStackManager) Start(ctx context.Context) error {
 	defer m.mu.Unlock()
 
 	if m.status.Running {
-		return fmt.Errorf("LocalStack is already running")
+		logging.Info("LocalStack manager already marked as running")
+		return nil
 	}
 
 	logging.Info("Starting LocalStack...")
@@ -85,14 +86,22 @@ func (m *localStackManager) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to create namespace: %w", err)
 	}
 
-	// Deploy LocalStack
+	// Deploy LocalStack (will skip if already exists and healthy)
 	if err := m.kubeManager.DeployLocalStack(ctx, m.config); err != nil {
 		return fmt.Errorf("failed to deploy LocalStack: %w", err)
 	}
 
 	// Wait for pod to be ready
 	if err := m.waitForPodReady(ctx); err != nil {
-		return fmt.Errorf("failed to wait for pod ready: %w", err)
+		// If LocalStack is already running, this might fail but it's not critical
+		logging.Warn("Failed to wait for pod ready, checking if LocalStack is already running", "error", err)
+
+		// Try to get pod info anyway
+		podName, getPodErr := m.kubeManager.GetLocalStackPod()
+		if getPodErr != nil {
+			return fmt.Errorf("failed to wait for pod ready and couldn't find running pod: %w", err)
+		}
+		logging.Info("Found existing LocalStack pod", "pod", podName)
 	}
 
 	// Get pod information

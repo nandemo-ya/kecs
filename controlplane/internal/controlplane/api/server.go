@@ -764,13 +764,8 @@ func (s *Server) Stop(ctx context.Context) error {
 		}
 	}
 
-	// Stop LocalStack manager if running
-	if s.localStackManager != nil {
-		if err := s.localStackManager.Stop(ctx); err != nil {
-			logging.Error("Error stopping LocalStack manager",
-				"error", err)
-		}
-	}
+	// LocalStack is not stopped on controlplane shutdown
+	// It persists across controlplane restarts and is managed at the KECS instance level
 
 	// In the new architecture, the KECS instance (k3d cluster) is managed by the CLI,
 	// not by the API server. We don't clean up k3d clusters here anymore.

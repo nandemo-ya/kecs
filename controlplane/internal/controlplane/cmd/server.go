@@ -464,7 +464,7 @@ func runServer(cmd *cobra.Command) {
 			}
 		}
 
-		// LocalStack will be stopped by the API server during shutdown
+		// LocalStack persists across controlplane restarts
 		logging.Info("Shutdown complete")
 	}()
 
