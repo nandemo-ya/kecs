@@ -312,7 +312,6 @@ type Model struct {
 	logViewer          *LogViewerModel
 	logViewerTaskArn   string
 	logViewerContainer string
-	logSplitView       bool // true for split-view, false for fullscreen
 
 	// Spinner for long-running operations
 	spinner         spinner.Model

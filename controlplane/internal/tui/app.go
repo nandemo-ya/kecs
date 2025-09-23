@@ -395,9 +395,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logViewerContainer = msg.container
 		m.currentView = ViewLogs
 
-		// Start with split-view mode by default (more natural UX)
-		m.logSplitView = true
-
 		// Initialize the log viewer to start loading logs
 		cmd := m.logViewer.Init()
 		if cmd != nil {
@@ -886,15 +883,9 @@ func (m Model) View() string {
 		return m.renderELBv2View()
 	}
 
-	// For logs view with active log viewer, use full screen or split view
+	// For logs view with active log viewer, always use fullscreen
 	if m.currentView == ViewLogs && m.logViewer != nil {
-		if m.logSplitView {
-			// Split-view mode: show main view in upper portion and logs in lower portion
-			return m.renderSplitViewWithLogs()
-		} else {
-			// Fullscreen mode
-			return m.logViewer.View()
-		}
+		return m.logViewer.View()
 	}
 
 	// If deleting, show spinner overlay
@@ -1415,33 +1406,8 @@ func (m Model) handleTasksKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
-	// Handle split-view toggle first (available in both split and fullscreen modes)
-	if msg.String() == "f" {
-		// Toggle between split-view and fullscreen
-		m.logSplitView = !m.logSplitView
-		return m, nil
-	}
-
 	// If we have an active log viewer, delegate to it
 	if m.logViewer != nil {
-		// In split-view mode, we might want to handle some keys differently
-		if m.logSplitView {
-			// Handle keys specific to split-view mode
-			switch msg.String() {
-			case "esc":
-				// Exit log viewer (ESC only, and only if search bar is not focused)
-				if !m.logViewer.IsSearchFocused() {
-					m.logViewer = nil
-					m.currentView = m.previousView
-					m.logSplitView = false // Reset to fullscreen for next time
-					return m, m.loadDataFromAPI()
-				}
-			case "tab":
-				// Switch focus between main view and log view (future enhancement)
-				// For now, just delegate to log viewer
-			}
-		}
-
 		updatedViewer, cmd := m.logViewer.Update(msg)
 		m.logViewer = &updatedViewer
 
@@ -1449,7 +1415,6 @@ func (m Model) handleLogsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if msg.String() == "esc" && !m.logViewer.IsSearchFocused() {
 			m.logViewer = nil
 			m.currentView = m.previousView
-			m.logSplitView = false // Reset to fullscreen for next time
 			return m, m.loadDataFromAPI()
 		}
 

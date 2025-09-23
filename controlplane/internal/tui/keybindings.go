@@ -67,9 +67,8 @@ const (
 	ActionToggleJSON        KeyAction = "toggle_json"
 
 	// Log actions
-	ActionViewLogs        KeyAction = "view_logs"
-	ActionToggleSplitView KeyAction = "toggle_split_view"
-	ActionSaveLogs        KeyAction = "save_logs"
+	ActionViewLogs KeyAction = "view_logs"
+	ActionSaveLogs KeyAction = "save_logs"
 
 	// Utility actions
 	ActionYank       KeyAction = "yank"
@@ -192,7 +191,6 @@ func (r *KeyBindingsRegistry) registerViewBindings() {
 
 	// Logs view
 	r.registerViewKeys(ViewLogs, []KeyBinding{
-		{Keys: []string{"f"}, Description: "Toggle split-view", Action: ActionToggleSplitView},
 		{Keys: []string{"s"}, Description: "Save", Action: ActionSaveLogs},
 	})
 
@@ -372,7 +370,6 @@ func (r *KeyBindingsRegistry) GetViewBindings(view ViewType) []KeyBinding {
 		ActionScaleService,
 		ActionUpdateService,
 		ActionViewLogs,
-		ActionToggleSplitView,
 		ActionToggleJSON,
 		ActionYank,
 		ActionCopyJSON,

@@ -535,9 +535,6 @@ func (m Model) executeTaskDescribeAction(action KeyAction) (Model, tea.Cmd) {
 // executeLogAction handles actions specific to the Logs view
 func (m Model) executeLogAction(action KeyAction) (Model, tea.Cmd) {
 	switch action {
-	case ActionToggleSplitView:
-		m.logSplitView = !m.logSplitView
-
 	case ActionSaveLogs:
 		// TODO: Implement save logs functionality
 	}
