@@ -64,6 +64,7 @@ kecs status
 
 ```bash
 aws ecs create-cluster --cluster-name default \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -76,6 +77,7 @@ aws ssm put-parameter \
   --value "postgresql://app_user:password@db.example.com:5432/myapp" \
   --type "SecureString" \
   --description "Production database connection string" \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # API Key
@@ -84,6 +86,7 @@ aws ssm put-parameter \
   --value "sk_live_abcdef123456789" \
   --type "SecureString" \
   --description "Production API key" \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Feature Flags
@@ -92,10 +95,12 @@ aws ssm put-parameter \
   --value '{"new_ui": true, "beta_features": false, "maintenance_mode": false}' \
   --type "String" \
   --description "Feature flags configuration" \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Verify parameters
 aws ssm describe-parameters \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query "Parameters[*].[Name,Type,Description]" \
   --output table
@@ -109,6 +114,7 @@ aws secretsmanager create-secret \
   --name "myapp/prod/db" \
   --description "Production database password" \
   --secret-string '{"password": "super-secret-db-password"}' \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # JWT signing secret
@@ -116,6 +122,7 @@ aws secretsmanager create-secret \
   --name "myapp/prod/jwt" \
   --description "JWT signing secret" \
   --secret-string '{"secret": "jwt-signing-secret-key-here"}' \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Encryption key
@@ -123,10 +130,12 @@ aws secretsmanager create-secret \
   --name "myapp/prod/encryption" \
   --description "Data encryption key" \
   --secret-string '{"key": "AES256-encryption-key-32-bytes!!"}' \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # List secrets
 aws secretsmanager list-secrets \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query "SecretList[*].[Name,Description]" \
   --output table
@@ -172,6 +181,7 @@ aws iam create-policy \
       }
     ]
   }' \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Attach policies to execution role
@@ -179,6 +189,7 @@ aws iam create-policy \
 aws iam attach-role-policy \
   --role-name ecsTaskExecutionRole \
   --policy-arn arn:aws:iam::000000000000:policy/ECSSecretsPolicy \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Create Task Role
@@ -192,6 +203,7 @@ aws iam create-role \
       "Action": "sts:AssumeRole"
     }]
   }' \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -200,6 +212,7 @@ aws iam create-role \
 ```bash
 aws logs create-log-group \
   --log-group-name /ecs/service-with-secrets \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -211,11 +224,13 @@ aws logs create-log-group \
 # Register task definition
 aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Create service
 aws ecs create-service \
   --cli-input-json file://service_def.json \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -228,6 +243,7 @@ aws ecs create-service \
 aws ecs describe-services \
   --cluster default \
   --services service-with-secrets \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'services[0].{Status:status,Desired:desiredCount,Running:runningCount}'
 ```
@@ -291,12 +307,14 @@ aws ssm put-parameter \
   --value "sk_live_new_key_987654321" \
   --type "SecureString" \
   --overwrite \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Update a secret in Secrets Manager
 aws secretsmanager update-secret \
   --secret-id "myapp/prod/jwt" \
   --secret-string '{"secret": "new-jwt-signing-secret-key"}' \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Force service update to pick up new secrets
@@ -304,12 +322,14 @@ aws ecs update-service \
   --cluster default \
   --service service-with-secrets \
   --force-new-deployment \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Wait for deployment to complete
 aws ecs wait services-stable \
   --cluster default \
   --services service-with-secrets \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -335,6 +355,7 @@ aws ecs wait services-stable \
 
 ```bash
 aws logs tail /ecs/service-with-secrets \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --follow
 ```
@@ -346,11 +367,13 @@ aws logs tail /ecs/service-with-secrets \
 aws sts assume-role \
   --role-arn arn:aws:iam::000000000000:role/ecsTaskExecutionRole \
   --role-session-name test-session \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # List attached policies
 aws iam list-attached-role-policies \
   --role-name ecsTaskExecutionRole \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -360,12 +383,14 @@ aws iam list-attached-role-policies \
 # Check if secrets exist
 aws secretsmanager describe-secret \
   --secret-id "myapp/prod/db" \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Check if parameters exist
 aws ssm get-parameter \
   --name "/myapp/prod/database_url" \
   --with-decryption \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -377,35 +402,42 @@ aws ecs delete-service \
   --cluster default \
   --service service-with-secrets \
   --force \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Delete secrets
 aws secretsmanager delete-secret \
   --secret-id "myapp/prod/db" \
   --force-delete-without-recovery \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 aws secretsmanager delete-secret \
   --secret-id "myapp/prod/jwt" \
   --force-delete-without-recovery \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 aws secretsmanager delete-secret \
   --secret-id "myapp/prod/encryption" \
   --force-delete-without-recovery \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Delete SSM parameters
 aws ssm delete-parameter \
   --name "/myapp/prod/database_url" \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 aws ssm delete-parameter \
   --name "/myapp/prod/api_key" \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 aws ssm delete-parameter \
   --name "/myapp/prod/feature_flags" \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Delete IAM resources
@@ -413,19 +445,23 @@ aws ssm delete-parameter \
 aws iam detach-role-policy \
   --role-name ecsTaskExecutionRole \
   --policy-arn arn:aws:iam::000000000000:policy/ECSSecretsPolicy \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 aws iam delete-policy \
   --policy-arn arn:aws:iam::000000000000:policy/ECSSecretsPolicy \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 aws iam delete-role \
   --role-name ecsTaskRole \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Delete log group
 aws logs delete-log-group \
   --log-group-name /ecs/service-with-secrets \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Stop LocalStack

@@ -27,6 +27,7 @@ kecs start --name discovery-demo
 aws servicediscovery create-private-dns-namespace \
   --name production.local \
   --vpc vpc-default \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -38,6 +39,7 @@ aws servicediscovery create-service \
   --name backend \
   --namespace-id <namespace-id> \
   --dns-config "NamespaceId=<namespace-id>,DnsRecords=[{Type=A,TTL=60}]" \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Create ECS service with service registry
@@ -46,6 +48,7 @@ aws ecs create-service \
   --service-name backend-service \
   --task-definition backend:1 \
   --service-registries "registryArn=arn:aws:servicediscovery:us-east-1:000000000000:service/<service-id>" \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -56,6 +59,7 @@ aws ecs create-service \
 aws servicediscovery discover-instances \
   --namespace-name production.local \
   --service-name backend \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -69,7 +73,7 @@ kecs start --name cluster1 --api-port 5373
 export AWS_ENDPOINT_URL=http://localhost:5373
 
 # Create namespace and service
-aws servicediscovery create-private-dns-namespace --name shared.local --vpc vpc-default
+aws servicediscovery create-private-dns-namespace --name shared.local --vpc vpc-default --region us-east-1
 # ... create services ...
 ```
 
@@ -81,7 +85,8 @@ export AWS_ENDPOINT_URL=http://localhost:8090
 # Services can discover cluster1 services via Route53
 aws servicediscovery discover-instances \
   --namespace-name shared.local \
-  --service-name backend
+  --service-name backend \
+  --region us-east-1
 ```
 
 ## DNS Resolution
@@ -152,5 +157,5 @@ dig SRV _http._tcp.backend.production.local
 2. Verify namespaces are created in both clusters
 3. Check Route53 hosted zones:
    ```bash
-   aws route53 list-hosted-zones --endpoint-url http://localhost:5373
+   aws route53 list-hosted-zones --region us-east-1 --endpoint-url http://localhost:5373
    ```

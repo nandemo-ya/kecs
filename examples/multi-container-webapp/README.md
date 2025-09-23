@@ -77,6 +77,8 @@ kecs start
 
 ```bash
 aws ecs create-cluster --cluster-name default \
+  --region us-east-1 \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -85,6 +87,8 @@ aws ecs create-cluster --cluster-name default \
 ```bash
 aws logs create-log-group \
   --log-group-name /ecs/multi-container-webapp \
+  --region us-east-1 \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -98,11 +102,15 @@ Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts
 # Register task definition
 aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
+  --region us-east-1 \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Create service
 aws ecs create-service \
   --cli-input-json file://service_def.json \
+  --region us-east-1 \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -203,6 +211,8 @@ For development and testing, you can use `assignPublicIp` to access tasks direct
 # Register task definition
 aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
+  --region us-east-1 \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Run task with assignPublicIp
@@ -214,17 +224,23 @@ aws ecs run-task \
       "assignPublicIp": "ENABLED"
     }
   }' \
+  --region us-east-1 \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Get allocated ports from task details
 TASK_ARN=$(aws ecs list-tasks \
   --cluster multi-container-cluster \
+  --region us-east-1 \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'taskArns[0]' --output text)
 
 aws ecs describe-tasks \
   --cluster multi-container-cluster \
   --tasks $TASK_ARN \
+  --region us-east-1 \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'tasks[0].containers[*].networkBindings'
 
@@ -246,6 +262,7 @@ curl http://localhost:32001/api/health  # backend API
 aws ecs describe-services \
   --cluster default \
   --services multi-container-webapp \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'services[0].{Status:status,Desired:desiredCount,Running:runningCount}'
 
@@ -253,6 +270,7 @@ aws ecs describe-services \
 TASK_ARNS=$(aws ecs list-tasks \
   --cluster default \
   --service-name multi-container-webapp \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'taskArns' --output json)
 
@@ -260,6 +278,7 @@ TASK_ARNS=$(aws ecs list-tasks \
 aws ecs describe-tasks \
   --cluster default \
   --tasks $TASK_ARNS \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'tasks[*].{TaskArn:taskArn,Status:lastStatus,Containers:containers[*].{Name:name,Status:lastStatus}}'
 ```
@@ -327,11 +346,13 @@ kubectl get pod -n default $POD_NAME -o json | jq '.status.containerStatuses[] |
 # Get ALB details
 ALB_ARN=$(aws elbv2 describe-load-balancers \
   --names multi-container-webapp-alb \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'LoadBalancers[0].LoadBalancerArn' --output text)
 
 ALB_DNS=$(aws elbv2 describe-load-balancers \
   --load-balancer-arns $ALB_ARN \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'LoadBalancers[0].DNSName' --output text)
 
@@ -340,11 +361,13 @@ echo "ALB DNS: $ALB_DNS"
 # Check target health
 TG_ARN=$(aws elbv2 describe-target-groups \
   --names multi-container-webapp-tg \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'TargetGroups[0].TargetGroupArn' --output text)
 
 aws elbv2 describe-target-health \
   --target-group-arn $TG_ARN \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'TargetHealthDescriptions[*].{Target:Target.Id,Health:TargetHealth.State}' \
   --output table
@@ -378,6 +401,7 @@ done
 # Monitor target group health
 watch -n 5 "aws elbv2 describe-target-health \
   --target-group-arn $TG_ARN \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'TargetHealthDescriptions[*].{Target:Target.Id,Health:TargetHealth.State}' \
   --output table"
@@ -393,6 +417,7 @@ kill $PF_ALB
 TASK_ARN=$(aws ecs list-tasks \
   --cluster multi-container-cluster \
   --service-name multi-container-webapp-elb \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'taskArns[0]' --output text)
 
@@ -401,18 +426,21 @@ aws ecs stop-task \
   --cluster multi-container-cluster \
   --task $TASK_ARN \
   --reason "Testing failover" \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Monitor service recovery (ECS should launch a new task automatically)
 watch "aws ecs describe-services \
   --cluster multi-container-cluster \
   --services multi-container-webapp-elb \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'services[0].{Desired:desiredCount,Running:runningCount,Pending:pendingCount}'"
 
 # Verify new task is registered with target group
 aws elbv2 describe-target-health \
   --target-group-arn $TG_ARN \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'TargetHealthDescriptions[*].{Target:Target.Id,Health:TargetHealth.State,Description:TargetHealth.Description}' \
   --output table
@@ -442,6 +470,7 @@ kubectl logs -n default $POD_NAME -c sidecar-logger
 
 # View CloudWatch logs
 aws logs tail /ecs/multi-container-webapp \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --follow
 
@@ -449,6 +478,7 @@ aws logs tail /ecs/multi-container-webapp \
 aws logs filter-log-events \
   --log-group-name /ecs/multi-container-webapp \
   --log-stream-name-prefix "frontend-nginx" \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -476,27 +506,32 @@ aws ecs delete-service \
   --cluster default \
   --service multi-container-webapp \
   --force \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Wait for service deletion
 aws ecs wait services-inactive \
   --cluster default \
   --services multi-container-webapp \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Deregister task definition
 aws ecs deregister-task-definition \
   --task-definition multi-container-webapp:1 \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Delete log group
 aws logs delete-log-group \
   --log-group-name /ecs/multi-container-webapp \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Delete cluster (if created for this example)
 aws ecs delete-cluster \
   --cluster default \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -530,6 +565,7 @@ aws ecs update-service \
   --cluster default \
   --service multi-container-webapp \
   --desired-count 3 \
+  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Verify all pods are running

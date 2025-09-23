@@ -41,10 +41,10 @@ port-forward: ## Port forward frontend service to localhost:3000
 
 status: ## Check status of deployed services
 	@echo "Checking ECS services..."
-	@aws ecs list-services --cluster $(CLUSTER_NAME) --endpoint-url $(KECS_ENDPOINT)
+	@aws ecs list-services --cluster $(CLUSTER_NAME) --region us-east-1 --endpoint-url $(KECS_ENDPOINT)
 	@echo ""
 	@echo "Checking Service Discovery..."
-	@aws servicediscovery list-namespaces --endpoint-url $(KECS_ENDPOINT)
+	@aws servicediscovery list-namespaces --region us-east-1 --endpoint-url $(KECS_ENDPOINT)
 
 clean: ## Remove all deployed resources
 	@echo "Cleaning up..."

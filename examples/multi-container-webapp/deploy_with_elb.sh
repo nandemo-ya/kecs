@@ -20,6 +20,7 @@ echo "Endpoint: $ENDPOINT_URL"
 echo ""
 echo "Step 1: Creating ECS cluster..."
 aws ecs create-cluster --cluster-name $CLUSTER_NAME \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "Cluster already exists"
 
 # Step 2: Create CloudWatch Log Group
@@ -27,6 +28,7 @@ echo ""
 echo "Step 2: Creating CloudWatch Log Group..."
 aws logs create-log-group \
   --log-group-name /ecs/$TASK_DEF_NAME \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "Log group already exists"
 
 # Step 3: Register task definition
@@ -34,6 +36,7 @@ echo ""
 echo "Step 3: Registering task definition..."
 TASK_DEF_ARN=$(aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
   --query 'taskDefinition.taskDefinitionArn' --output text)
 echo "Task Definition ARN: $TASK_DEF_ARN"
@@ -58,10 +61,12 @@ ALB_ARN=$(aws elbv2 create-load-balancer \
   --type application \
   --ip-address-type ipv4 \
   --tags Key=Application,Value=$TASK_DEF_NAME Key=Environment,Value=development \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
   --query 'LoadBalancers[0].LoadBalancerArn' --output text 2>/dev/null) || \
 ALB_ARN=$(aws elbv2 describe-load-balancers \
   --names $ALB_NAME \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
   --query 'LoadBalancers[0].LoadBalancerArn' --output text)
 
@@ -70,6 +75,7 @@ echo "ALB ARN: $ALB_ARN"
 # Get ALB DNS
 ALB_DNS=$(aws elbv2 describe-load-balancers \
   --load-balancer-arns $ALB_ARN \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
   --query 'LoadBalancers[0].DNSName' --output text)
 echo "ALB DNS: $ALB_DNS"
@@ -91,10 +97,12 @@ TG_ARN=$(aws elbv2 create-target-group \
   --unhealthy-threshold-count 3 \
   --matcher 'HttpCode="200,301,302,404"' \
   --tags Key=Application,Value=$TASK_DEF_NAME Key=Environment,Value=development \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
   --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null) || \
 TG_ARN=$(aws elbv2 describe-target-groups \
   --names $TG_NAME \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
   --query 'TargetGroups[0].TargetGroupArn' --output text)
 
@@ -108,10 +116,12 @@ LISTENER_ARN=$(aws elbv2 create-listener \
   --protocol HTTP \
   --port 80 \
   --default-actions Type=forward,TargetGroupArn=$TG_ARN \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
   --query 'Listeners[0].ListenerArn' --output text 2>/dev/null) || \
 LISTENER_ARN=$(aws elbv2 describe-listeners \
   --load-balancer-arn $ALB_ARN \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
   --query 'Listeners[?Port==`80`].ListenerArn' --output text | head -n1)
 
@@ -124,6 +134,7 @@ echo "Step 7: Creating routing rules..."
 # Check if rules already exist before creating
 EXISTING_RULES=$(aws elbv2 describe-rules \
   --listener-arn $LISTENER_ARN \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
   --query 'Rules[?Priority!=`default`].Priority' --output text 2>/dev/null || echo "")
 
@@ -134,7 +145,8 @@ if [ -z "$EXISTING_RULES" ]; then
     --priority 1 \
     --conditions Field=path-pattern,Values="/api/*" \
     --actions Type=forward,TargetGroupArn=$TG_ARN \
-    --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "API rule already exists"
+    --region us-east-1 \
+  --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "API rule already exists"
 
   # Rule for static assets
   aws elbv2 create-rule \
@@ -142,7 +154,8 @@ if [ -z "$EXISTING_RULES" ]; then
     --priority 2 \
     --conditions Field=path-pattern,Values="/static/*" \
     --actions Type=forward,TargetGroupArn=$TG_ARN \
-    --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "Static rule already exists"
+    --region us-east-1 \
+  --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "Static rule already exists"
 
   # Rule for health checks
   aws elbv2 create-rule \
@@ -150,7 +163,8 @@ if [ -z "$EXISTING_RULES" ]; then
     --priority 3 \
     --conditions Field=path-pattern,Values="/health" \
     --actions Type=forward,TargetGroupArn=$TG_ARN \
-    --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "Health rule already exists"
+    --region us-east-1 \
+  --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "Health rule already exists"
 else
   echo "Routing rules already configured"
 fi
@@ -227,6 +241,7 @@ echo "Step 9: Creating/Updating ECS service..."
 SERVICE_STATUS=$(aws ecs describe-services \
   --cluster $CLUSTER_NAME \
   --services $SERVICE_NAME \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
   --query 'services[0].status' --output text 2>/dev/null || echo "")
 
@@ -237,13 +252,15 @@ if [ "$SERVICE_STATUS" == "ACTIVE" ]; then
     --service $SERVICE_NAME \
     --desired-count 3 \
     --task-definition $TASK_DEF_NAME:$TASK_DEF_REVISION \
-    --endpoint-url $ENDPOINT_URL \
+    --region us-east-1 \
+  --endpoint-url $ENDPOINT_URL \
     --output table
 else
   echo "Creating new service..."
   aws ecs create-service \
     --cli-input-json file://service_def_generated.json \
-    --endpoint-url $ENDPOINT_URL \
+    --region us-east-1 \
+  --endpoint-url $ENDPOINT_URL \
     --output table
 fi
 
@@ -257,7 +274,8 @@ check_service_status() {
   aws ecs describe-services \
     --cluster $CLUSTER_NAME \
     --services $SERVICE_NAME \
-    --endpoint-url $ENDPOINT_URL \
+    --region us-east-1 \
+  --endpoint-url $ENDPOINT_URL \
     --query 'services[0].{Desired:desiredCount,Running:runningCount,Pending:pendingCount}' \
     --output json
 }
@@ -289,6 +307,7 @@ echo "Step 11: Verifying deployment..."
 echo "Checking target health..."
 aws elbv2 describe-target-health \
   --target-group-arn $TG_ARN \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
   --query 'TargetHealthDescriptions[*].{Target:Target.Id,Health:TargetHealth.State}' \
   --output table
@@ -299,6 +318,7 @@ echo "Running tasks:"
 aws ecs list-tasks \
   --cluster $CLUSTER_NAME \
   --service-name $SERVICE_NAME \
+  --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
   --query 'taskArns' --output json | jq -r '.[]'
 

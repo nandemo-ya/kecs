@@ -167,7 +167,7 @@ docker build -t frontend-web:latest ./frontend
 aws servicediscovery create-private-dns-namespace \
   --name production.local \
   --vpc vpc-default \
-  --endpoint-url $KECS_ENDPOINT
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT
 ```
 
 ### 3. Create Service Discovery Services
@@ -177,21 +177,21 @@ aws servicediscovery create-private-dns-namespace \
 NAMESPACE_ID=$(aws servicediscovery list-namespaces \
   --query "Namespaces[?Name=='production.local'].Id" \
   --output text \
-  --endpoint-url $KECS_ENDPOINT)
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT)
 
 # Create backend discovery service
 aws servicediscovery create-service \
   --name backend-api \
   --namespace-id $NAMESPACE_ID \
   --dns-config "NamespaceId=$NAMESPACE_ID,DnsRecords=[{Type=A,TTL=60}]" \
-  --endpoint-url $KECS_ENDPOINT
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT
 
 # Create frontend discovery service
 aws servicediscovery create-service \
   --name frontend-web \
   --namespace-id $NAMESPACE_ID \
   --dns-config "NamespaceId=$NAMESPACE_ID,DnsRecords=[{Type=A,TTL=60}]" \
-  --endpoint-url $KECS_ENDPOINT
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT
 ```
 
 ### 4. Register Task Definitions
@@ -199,11 +199,11 @@ aws servicediscovery create-service \
 ```bash
 aws ecs register-task-definition \
   --cli-input-json file://backend-task-def.json \
-  --endpoint-url $KECS_ENDPOINT
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT
 
 aws ecs register-task-definition \
   --cli-input-json file://frontend-task-def.json \
-  --endpoint-url $KECS_ENDPOINT
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT
 ```
 
 ### 5. Create ECS Services
@@ -217,7 +217,7 @@ aws ecs create-service \
   --desired-count 2 \
   --launch-type FARGATE \
   --service-registries "registryArn=<backend-service-arn>" \
-  --endpoint-url $KECS_ENDPOINT
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT
 
 # Create frontend service
 aws ecs create-service \
@@ -227,7 +227,7 @@ aws ecs create-service \
   --desired-count 1 \
   --launch-type FARGATE \
   --service-registries "registryArn=<frontend-service-arn>" \
-  --endpoint-url $KECS_ENDPOINT
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT
 ```
 
 ## Testing Service Discovery
@@ -239,13 +239,13 @@ aws ecs create-service \
 aws servicediscovery discover-instances \
   --namespace-name production.local \
   --service-name backend-api \
-  --endpoint-url $KECS_ENDPOINT
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT
 
 # Discover frontend instances
 aws servicediscovery discover-instances \
   --namespace-name production.local \
   --service-name frontend-web \
-  --endpoint-url $KECS_ENDPOINT
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT
 ```
 
 ### Test DNS Resolution (from within cluster)
@@ -295,12 +295,12 @@ Remove all resources:
 
 1. Check namespace exists:
    ```bash
-   aws servicediscovery list-namespaces --endpoint-url $KECS_ENDPOINT
+   aws servicediscovery list-namespaces --region us-east-1 --endpoint-url $KECS_ENDPOINT
    ```
 
 2. Check services are registered:
    ```bash
-   aws servicediscovery list-services --endpoint-url $KECS_ENDPOINT
+   aws servicediscovery list-services --region us-east-1 --endpoint-url $KECS_ENDPOINT
    ```
 
 3. Check instances are healthy:
@@ -308,19 +308,19 @@ Remove all resources:
    aws servicediscovery discover-instances \
      --namespace-name production.local \
      --service-name backend-api \
-     --endpoint-url $KECS_ENDPOINT
+     --region us-east-1 --endpoint-url $KECS_ENDPOINT
    ```
 
 ### Connection Refused
 
 1. Verify services are running:
    ```bash
-   aws ecs list-services --cluster default --endpoint-url $KECS_ENDPOINT
+   aws ecs list-services --cluster default --region us-east-1 --endpoint-url $KECS_ENDPOINT
    ```
 
 2. Check task status:
    ```bash
-   aws ecs list-tasks --cluster default --endpoint-url $KECS_ENDPOINT
+   aws ecs list-tasks --cluster default --region us-east-1 --endpoint-url $KECS_ENDPOINT
    ```
 
 3. Verify health checks are passing
@@ -347,7 +347,7 @@ aws ecs update-service \
   --cluster default \
   --service backend-api-service \
   --desired-count 3 \
-  --endpoint-url $KECS_ENDPOINT
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT
 ```
 
 ### Cross-Cluster Communication
