@@ -18,7 +18,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/k3d-io/k3d/v5 v5.8.3
-	github.com/marcboeker/go-duckdb/v2 v2.4.0
+	github.com/marcboeker/go-duckdb/v2 v2.1.0
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/opencontainers/runtime-spec v1.2.1
@@ -90,12 +90,12 @@ require (
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/duckdb/duckdb-go-bindings v0.1.19 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.19 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.19 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.19 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.19 // indirect
-	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.19 // indirect
+	github.com/duckdb/duckdb-go-bindings v0.1.13 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.8 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.8 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.8 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.8 // indirect
+	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.8 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -131,8 +131,8 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magefile/mage v1.15.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/marcboeker/go-duckdb/arrowmapping v0.0.19 // indirect
-	github.com/marcboeker/go-duckdb/mapping v0.0.19 // indirect
+	github.com/marcboeker/go-duckdb/arrowmapping v0.0.6 // indirect
+	github.com/marcboeker/go-duckdb/mapping v0.0.6 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
