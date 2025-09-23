@@ -67,6 +67,7 @@ type Server struct {
 	informerFactory           informers.SharedInformerFactory
 	proxyHandler              *ProxyHandler // New unified proxy handler
 	kubeClient                k8s.Interface // Kubernetes client
+	restorationComplete       chan bool     // Channel to wait for restoration completion
 }
 
 // NewServer creates a new API server instance
@@ -658,6 +659,20 @@ func (s *Server) Start() error {
 		s.informerFactory.Start(syncCtx.Done())
 
 		go func() {
+			// Wait for restoration to complete before starting sync
+			if s.restorationComplete != nil {
+				logging.Info("Waiting for restoration to complete before starting sync controller...")
+				select {
+				case <-s.restorationComplete:
+					logging.Info("Restoration complete, starting sync controller")
+				case <-time.After(30 * time.Second):
+					logging.Warn("Timeout waiting for restoration, starting sync controller anyway")
+				case <-syncCtx.Done():
+					logging.Info("Context cancelled before sync controller could start")
+					return
+				}
+			}
+
 			if err := s.syncController.Run(syncCtx); err != nil {
 				logging.Error("Sync controller stopped with error",
 					"error", err)
@@ -1281,6 +1296,11 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 // GetKubeClient returns the Kubernetes client
 func (s *Server) GetKubeClient() k8s.Interface {
 	return s.kubeClient
+}
+
+// SetRestorationCompleteChannel sets the channel to wait for restoration completion
+func (s *Server) SetRestorationCompleteChannel(ch chan bool) {
+	s.restorationComplete = ch
 }
 
 // GetTaskManager returns the task manager

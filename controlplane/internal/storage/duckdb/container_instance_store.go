@@ -13,7 +13,8 @@ import (
 
 // containerInstanceStore implements storage.ContainerInstanceStore
 type containerInstanceStore struct {
-	db *sql.DB
+	db      *sql.DB
+	storage *DuckDBStorage
 }
 
 // Register creates a new container instance
@@ -42,7 +43,7 @@ func (s *containerInstanceStore) Register(ctx context.Context, instance *storage
 		)
 	`
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		instance.ID, instance.ARN, instance.ClusterARN, instance.EC2InstanceID,
 		instance.Status, instance.StatusReason, instance.AgentConnected,
 		instance.AgentUpdateStatus, instance.RunningTasksCount, instance.PendingTasksCount,
@@ -77,7 +78,7 @@ func (s *containerInstanceStore) Get(ctx context.Context, arn string) (*storage.
 	var attributes, attachments, tags, capacityProviderName, healthStatus sql.NullString
 	var deregisteredAt sql.NullTime
 
-	err := s.db.QueryRowContext(ctx, query, arn).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, arn).Scan(
 		&instance.ID, &instance.ARN, &instance.ClusterARN, &instance.EC2InstanceID,
 		&instance.Status, &statusReason, &instance.AgentConnected,
 		&agentUpdateStatus, &instance.RunningTasksCount, &instance.PendingTasksCount,
@@ -151,7 +152,7 @@ func (s *containerInstanceStore) ListWithPagination(ctx context.Context, cluster
 	query += fmt.Sprintf(" LIMIT $%d", argCount)
 	args = append(args, limit+1)
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, args...)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to list container instances: %w", err)
 	}
@@ -225,7 +226,7 @@ func (s *containerInstanceStore) Update(ctx context.Context, instance *storage.C
 		WHERE arn = $1
 	`
 
-	result, err := s.db.ExecContext(ctx, query,
+	result, err := s.storage.ExecContextWithRecovery(ctx, query,
 		instance.ARN, instance.Status, instance.StatusReason,
 		instance.AgentConnected, instance.AgentUpdateStatus,
 		instance.RunningTasksCount, instance.PendingTasksCount,
@@ -263,7 +264,7 @@ func (s *containerInstanceStore) Deregister(ctx context.Context, arn string) err
 		WHERE arn = $1
 	`
 
-	result, err := s.db.ExecContext(ctx, query, arn, now, now)
+	result, err := s.storage.ExecContextWithRecovery(ctx, query, arn, now, now)
 	if err != nil {
 		return fmt.Errorf("failed to deregister container instance: %w", err)
 	}
@@ -307,7 +308,7 @@ func (s *containerInstanceStore) GetByARNs(ctx context.Context, arns []string) (
 	}
 	query += ")"
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container instances by ARNs: %w", err)
 	}
@@ -365,7 +366,7 @@ func (s *containerInstanceStore) DeleteStale(ctx context.Context, clusterARN str
 	// Use parameterized query to avoid any quote issues
 	query := "DELETE FROM container_instances WHERE cluster_arn = ? AND status = ? AND updated_at < ?"
 
-	result, err := s.db.ExecContext(ctx, query, clusterARN, "INACTIVE", before)
+	result, err := s.storage.ExecContextWithRecovery(ctx, query, clusterARN, "INACTIVE", before)
 	if err != nil {
 		return 0, err
 	}

@@ -13,7 +13,8 @@ import (
 
 // attributeStore implements storage.AttributeStore
 type attributeStore struct {
-	db *sql.DB
+	db      *sql.DB
+	storage *DuckDBStorage
 }
 
 // Put creates or updates attributes
@@ -160,7 +161,7 @@ func (s *attributeStore) ListWithPagination(ctx context.Context, targetType, clu
 	query += fmt.Sprintf(" LIMIT $%d", argCount)
 	args = append(args, limit+1)
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, args...)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to list attributes: %w", err)
 	}

@@ -15,7 +15,8 @@ import (
 )
 
 type taskDefinitionStore struct {
-	db *sql.DB
+	db      *sql.DB
+	storage *DuckDBStorage
 }
 
 // NewTaskDefinitionStore creates a new TaskDefinitionStore instance
@@ -32,7 +33,7 @@ func (s *taskDefinitionStore) Register(ctx context.Context, taskDef *storage.Tas
 
 	// Get the next revision number for this family
 	var nextRevision int
-	err := s.db.QueryRowContext(ctx, `
+	err := s.storage.QueryRowContextWithRecovery(ctx, `
 		SELECT COALESCE(MAX(revision), 0) + 1 
 		FROM task_definitions 
 		WHERE family = ?
@@ -48,7 +49,7 @@ func (s *taskDefinitionStore) Register(ctx context.Context, taskDef *storage.Tas
 	taskDef.RegisteredAt = time.Now()
 
 	// Insert the new task definition
-	_, err = s.db.ExecContext(ctx, `
+	_, err = s.storage.ExecContextWithRecovery(ctx, `
 		INSERT INTO task_definitions (
 			id, arn, family, revision, task_role_arn, execution_role_arn,
 			network_mode, container_definitions, volumes, placement_constraints,
@@ -77,7 +78,7 @@ func (s *taskDefinitionStore) Get(ctx context.Context, family string, revision i
 	var taskDef storage.TaskDefinition
 	var deregisteredAt sql.NullTime
 
-	err := s.db.QueryRowContext(ctx, `
+	err := s.storage.QueryRowContextWithRecovery(ctx, `
 		SELECT 
 			id, arn, family, revision, task_role_arn, execution_role_arn,
 			network_mode, container_definitions, volumes, placement_constraints,
@@ -114,7 +115,7 @@ func (s *taskDefinitionStore) GetLatest(ctx context.Context, family string) (*st
 	logging.Debug("GetLatest called", "family", family)
 
 	var revision sql.NullInt64
-	err := s.db.QueryRowContext(ctx, `
+	err := s.storage.QueryRowContextWithRecovery(ctx, `
 		SELECT MAX(revision) 
 		FROM task_definitions 
 		WHERE family = ? AND status = 'ACTIVE'
@@ -169,7 +170,7 @@ func (s *taskDefinitionStore) ListFamilies(ctx context.Context, familyPrefix str
 		args = append(args, limit+1) // Get one extra to determine if there are more results
 	}
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, args...)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to list task definition families: %w", err)
 	}
@@ -203,6 +204,7 @@ func (s *taskDefinitionStore) ListRevisions(ctx context.Context, family string, 
 	`
 	args := []interface{}{family}
 
+	// Only add status filter if explicitly provided and not empty
 	if status != "" {
 		query += " AND status = ?"
 		args = append(args, status)
@@ -225,7 +227,8 @@ func (s *taskDefinitionStore) ListRevisions(ctx context.Context, family string, 
 		args = append(args, limit+1)
 	}
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	logging.Info("ListRevisions query", "query", query, "args", args)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, args...)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to list task definition revisions: %w", err)
 	}
@@ -258,7 +261,7 @@ func (s *taskDefinitionStore) Deregister(ctx context.Context, family string, rev
 
 	// First check if it exists and is active
 	var currentStatus string
-	err := s.db.QueryRowContext(ctx, `
+	err := s.storage.QueryRowContextWithRecovery(ctx, `
 		SELECT status FROM task_definitions 
 		WHERE family = ? AND revision = ?
 	`, family, revision).Scan(&currentStatus)
@@ -276,7 +279,7 @@ func (s *taskDefinitionStore) Deregister(ctx context.Context, family string, rev
 	}
 
 	// Try the UPDATE
-	result, err := s.db.ExecContext(ctx, `
+	result, err := s.storage.ExecContextWithRecovery(ctx, `
 		UPDATE task_definitions 
 		SET status = 'INACTIVE', deregistered_at = ?
 		WHERE family = ? AND revision = ? AND status = 'ACTIVE'
@@ -289,7 +292,7 @@ func (s *taskDefinitionStore) Deregister(ctx context.Context, family string, rev
 			// but DuckDB incorrectly reports a constraint violation
 			// We'll verify the update worked
 			var updatedStatus string
-			err2 := s.db.QueryRowContext(ctx, `
+			err2 := s.storage.QueryRowContextWithRecovery(ctx, `
 				SELECT status FROM task_definitions 
 				WHERE family = ? AND revision = ?
 			`, family, revision).Scan(&updatedStatus)

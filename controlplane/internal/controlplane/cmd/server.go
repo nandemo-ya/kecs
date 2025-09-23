@@ -277,6 +277,9 @@ func runServer(cmd *cobra.Command) {
 		}
 	}
 
+	// Channel to signal when restoration is complete
+	restorationComplete := make(chan bool, 1)
+
 	// Perform state restoration from DuckDB if available
 	if apiServer != nil && !apiconfig.GetBool("features.testMode") {
 		logging.Info("Checking for state restoration from DuckDB...")
@@ -291,6 +294,10 @@ func runServer(cmd *cobra.Command) {
 
 		// Perform restoration (non-blocking, best effort)
 		go func() {
+			defer func() {
+				// Signal that restoration is complete
+				restorationComplete <- true
+			}()
 			// Wait for webhook to be fully registered if it's enabled
 			if webhookServer != nil && webhookRegistrar != nil {
 				logging.Info("Waiting for webhook registration to complete before restoration...")
@@ -360,6 +367,14 @@ func runServer(cmd *cobra.Command) {
 				logging.Info("State restoration from DuckDB completed successfully")
 			}
 		}()
+	} else {
+		// If no restoration needed, signal immediately
+		restorationComplete <- true
+	}
+
+	// Pass the restoration complete channel to API server for sync controller
+	if apiServer != nil {
+		apiServer.SetRestorationCompleteChannel(restorationComplete)
 	}
 
 	// Set up graceful shutdown

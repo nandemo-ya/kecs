@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 
 	_ "github.com/marcboeker/go-duckdb/v2" // DuckDB driver
 
@@ -28,6 +30,8 @@ type DuckDBStorage struct {
 	attributeStore         *attributeStore
 	elbv2Store             *elbv2Store
 	taskLogStore           *TaskLogStore
+	mu                     sync.RWMutex // Protects database reconnection
+	isInitialized          bool
 }
 
 // NewDuckDBStorage creates a new DuckDB storage instance
@@ -59,22 +63,24 @@ func NewDuckDBStorage(dbPath string) (*DuckDBStorage, error) {
 	var pool *ConnectionPool
 
 	s := &DuckDBStorage{
-		db:     db,
-		pool:   pool,
-		dbPath: dbPath,
+		db:            db,
+		pool:          pool,
+		dbPath:        dbPath,
+		isInitialized: false,
 	}
 
 	// Create stores with the pooled connection
-	s.clusterStore = &clusterStore{db: db, pool: pool}
-	s.taskDefinitionStore = &taskDefinitionStore{db: db}
-	s.serviceStore = &serviceStore{db: db}
-	s.taskStore = &taskStore{db: db}
-	s.accountSettingStore = &accountSettingStore{db: db}
-	s.taskSetStore = &taskSetStore{db: db}
-	s.containerInstanceStore = &containerInstanceStore{db: db}
-	s.attributeStore = &attributeStore{db: db}
-	s.elbv2Store = &elbv2Store{db: db}
-	s.taskLogStore = NewTaskLogStore(db)
+	// All stores now have access to storage for recovery mechanism
+	s.clusterStore = &clusterStore{db: db, pool: pool, storage: s}
+	s.taskDefinitionStore = &taskDefinitionStore{db: db, storage: s}
+	s.serviceStore = &serviceStore{db: db, storage: s}
+	s.taskStore = &taskStore{db: db, storage: s}
+	s.accountSettingStore = &accountSettingStore{db: db, storage: s}
+	s.taskSetStore = &taskSetStore{db: db, storage: s}
+	s.containerInstanceStore = &containerInstanceStore{db: db, storage: s}
+	s.attributeStore = &attributeStore{db: db, storage: s}
+	s.elbv2Store = &elbv2Store{db: db, storage: s}
+	s.taskLogStore = NewTaskLogStore(db, s)
 
 	return s, nil
 }
@@ -148,7 +154,155 @@ func (s *DuckDBStorage) Initialize(ctx context.Context) error {
 	}
 
 	logging.Info("DuckDB storage initialized successfully")
+	s.isInitialized = true
 	return nil
+}
+
+// isFatalError checks if an error is a DuckDB fatal error that requires reconnection
+func isFatalError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "database has been invalidated") ||
+		strings.Contains(errStr, "FATAL Error")
+}
+
+// reconnect attempts to reconnect to the database after a fatal error
+func (s *DuckDBStorage) reconnect(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	logging.Warn("Attempting to reconnect to DuckDB after fatal error", "dbPath", s.dbPath)
+
+	// Close the old connection if it exists
+	if s.db != nil {
+		_ = s.db.Close() // Ignore error as database is already in bad state
+	}
+
+	// Open new connection
+	db, err := sql.Open("duckdb", s.dbPath)
+	if err != nil {
+		return fmt.Errorf("failed to reconnect to database: %w", err)
+	}
+
+	// Configure connection
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(0)
+
+	// Update the db reference
+	s.db = db
+
+	// Update all stores with the new connection
+	s.clusterStore.db = db
+	s.taskDefinitionStore.db = db
+	s.serviceStore.db = db
+	s.taskStore.db = db
+	s.taskStore.storage = s
+	s.accountSettingStore.db = db
+	s.taskSetStore.db = db
+	s.containerInstanceStore.db = db
+	s.attributeStore.db = db
+	s.elbv2Store.db = db
+	s.taskLogStore = NewTaskLogStore(db, s)
+
+	// Reinitialize if was previously initialized
+	if s.isInitialized {
+		if err := s.Initialize(ctx); err != nil {
+			return fmt.Errorf("failed to reinitialize after reconnection: %w", err)
+		}
+	}
+
+	logging.Info("Successfully reconnected to DuckDB")
+	return nil
+}
+
+// ExecuteWithRecovery executes a function with automatic recovery from fatal errors
+func (s *DuckDBStorage) ExecuteWithRecovery(ctx context.Context, fn func() error) error {
+	err := fn()
+	if err != nil {
+		logging.Info("ExecuteWithRecovery: error occurred", "error", err, "isFatal", isFatalError(err))
+		if isFatalError(err) {
+			logging.Error("Fatal database error detected, attempting recovery", "error", err)
+
+			// Attempt to reconnect
+			if reconnectErr := s.reconnect(ctx); reconnectErr != nil {
+				return fmt.Errorf("failed to recover from fatal error: %w (original error: %v)", reconnectErr, err)
+			}
+
+			// Retry the operation once after reconnection
+			logging.Info("Retrying operation after database recovery")
+			err = fn()
+			if err != nil {
+				return fmt.Errorf("operation failed after recovery: %w", err)
+			}
+			logging.Info("Operation succeeded after database recovery")
+		}
+	}
+	return err
+}
+
+// QueryContextWithRecovery executes a query with automatic recovery from fatal errors
+func (s *DuckDBStorage) QueryContextWithRecovery(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	var rows *sql.Rows
+	var queryErr error
+
+	err := s.ExecuteWithRecovery(ctx, func() error {
+		var err error
+		rows, err = s.db.QueryContext(ctx, query, args...)
+		queryErr = err
+		return err
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return rows, queryErr
+}
+
+// ExecContextWithRecovery executes a statement with automatic recovery from fatal errors
+func (s *DuckDBStorage) ExecContextWithRecovery(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	var result sql.Result
+	var execErr error
+
+	err := s.ExecuteWithRecovery(ctx, func() error {
+		var err error
+		result, err = s.db.ExecContext(ctx, query, args...)
+		execErr = err
+		return err
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result, execErr
+}
+
+// QueryRowContextWithRecovery executes a query that returns a single row with automatic recovery
+func (s *DuckDBStorage) QueryRowContextWithRecovery(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	// For QueryRow, we can't directly wrap it because it returns *sql.Row which doesn't expose errors
+	// until Scan is called. So we'll return the row directly but log any recovery attempts
+	var row *sql.Row
+
+	_ = s.ExecuteWithRecovery(ctx, func() error {
+		row = s.db.QueryRowContext(ctx, query, args...)
+		// QueryRow doesn't return an error, so we can't check here
+		return nil
+	})
+
+	// If row is nil (shouldn't happen), return a dummy row
+	if row == nil {
+		row = s.db.QueryRowContext(ctx, query, args...)
+	}
+
+	return row
+}
+
+// GetDB returns the underlying database connection
+// This should only be used in special cases where direct access is needed
+func (s *DuckDBStorage) GetDB() *sql.DB {
+	return s.db
 }
 
 // Close closes the database connection
@@ -419,7 +573,7 @@ func (t *duckDBTransaction) Rollback() error {
 func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 	// Check if clusters table exists
 	var tableExists bool
-	err := s.db.QueryRowContext(ctx, `
+	err := s.QueryRowContextWithRecovery(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM information_schema.tables 
 			WHERE table_name = 'clusters'
@@ -432,9 +586,9 @@ func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 
 	// Check if tags column is JSON type (old schema)
 	var dataType string
-	err = s.db.QueryRowContext(ctx, `
-		SELECT data_type 
-		FROM information_schema.columns 
+	err = s.QueryRowContextWithRecovery(ctx, `
+		SELECT data_type
+		FROM information_schema.columns
 		WHERE table_name = 'clusters' AND column_name = 'tags'
 	`).Scan(&dataType)
 	if err != nil {
@@ -552,7 +706,7 @@ func (s *DuckDBStorage) migrateSchema(ctx context.Context) error {
 func (s *DuckDBStorage) migrateTasksTable(ctx context.Context) error {
 	// Check if tasks table exists
 	var tableExists bool
-	err := s.db.QueryRowContext(ctx, `
+	err := s.QueryRowContextWithRecovery(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM information_schema.tables 
 			WHERE table_name = 'tasks'
@@ -565,9 +719,9 @@ func (s *DuckDBStorage) migrateTasksTable(ctx context.Context) error {
 
 	// Check if service_registries column exists
 	var columnExists bool
-	err = s.db.QueryRowContext(ctx, `
+	err = s.QueryRowContextWithRecovery(ctx, `
 		SELECT EXISTS (
-			SELECT 1 FROM information_schema.columns 
+			SELECT 1 FROM information_schema.columns
 			WHERE table_name = 'tasks' AND column_name = 'service_registries'
 		)
 	`).Scan(&columnExists)

@@ -15,7 +15,8 @@ import (
 
 // serviceStore implements storage.ServiceStore using DuckDB
 type serviceStore struct {
-	db *sql.DB
+	db      *sql.DB
+	storage *DuckDBStorage
 }
 
 // Create creates a new service
@@ -50,7 +51,7 @@ func (s *serviceStore) Create(ctx context.Context, service *storage.Service) err
 		?, ?, ?
 	)`
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		service.ID, service.ARN, service.ServiceName, service.ClusterARN, service.TaskDefinitionARN,
 		service.DesiredCount, service.RunningCount, service.PendingCount, service.LaunchType, service.PlatformVersion,
 		service.Status, service.RoleARN, service.LoadBalancers, service.ServiceRegistries, service.NetworkConfiguration,
@@ -90,7 +91,7 @@ func (s *serviceStore) Get(ctx context.Context, cluster, serviceName string) (*s
 	var propagateTags, deploymentName, namespace sql.NullString
 	var healthCheckGracePeriodSeconds sql.NullInt32
 
-	err := s.db.QueryRowContext(ctx, query, cluster, serviceName).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, cluster, serviceName).Scan(
 		&service.ID, &service.ARN, &service.ServiceName, &service.ClusterARN, &service.TaskDefinitionARN,
 		&service.DesiredCount, &service.RunningCount, &service.PendingCount, &service.LaunchType, &platformVersion,
 		&service.Status, &roleARN, &loadBalancers, &serviceRegistries, &networkConfiguration,
@@ -208,7 +209,7 @@ func (s *serviceStore) List(ctx context.Context, cluster string, serviceName str
 		args = append(args, limit+1) // Get one extra to determine if there are more results
 	}
 
-	rows, err := s.db.QueryContext(ctx, baseQuery, args...)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, baseQuery, args...)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to list services: %w", err)
 	}
@@ -307,7 +308,7 @@ func (s *serviceStore) Update(ctx context.Context, service *storage.Service) err
 	// First, let's check if the record exists
 	var count int
 	checkQuery := `SELECT COUNT(*) FROM services WHERE id = ?`
-	err := s.db.QueryRowContext(ctx, checkQuery, service.ID).Scan(&count)
+	err := s.storage.QueryRowContextWithRecovery(ctx, checkQuery, service.ID).Scan(&count)
 	if err != nil {
 		return fmt.Errorf("failed to check service existence: %w", err)
 	}
@@ -338,7 +339,7 @@ func (s *serviceStore) Update(ctx context.Context, service *storage.Service) err
 		updated_at = ?
 		WHERE arn = ? AND id = ?`
 
-	result, err := s.db.ExecContext(ctx, query,
+	result, err := s.storage.ExecContextWithRecovery(ctx, query,
 		service.TaskDefinitionARN,
 		service.DesiredCount,
 		service.RunningCount,
@@ -384,7 +385,7 @@ func (s *serviceStore) Update(ctx context.Context, service *storage.Service) err
 func (s *serviceStore) Delete(ctx context.Context, cluster, serviceName string) error {
 	query := `DELETE FROM services WHERE cluster_arn = ? AND service_name = ?`
 
-	result, err := s.db.ExecContext(ctx, query, cluster, serviceName)
+	result, err := s.storage.ExecContextWithRecovery(ctx, query, cluster, serviceName)
 	if err != nil {
 		return fmt.Errorf("failed to delete service: %w", err)
 	}
@@ -423,7 +424,7 @@ func (s *serviceStore) GetByARN(ctx context.Context, arn string) (*storage.Servi
 	var propagateTags, deploymentName, namespace sql.NullString
 	var healthCheckGracePeriodSeconds sql.NullInt32
 
-	err := s.db.QueryRowContext(ctx, query, arn).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, arn).Scan(
 		&service.ID, &service.ARN, &service.ServiceName, &service.ClusterARN, &service.TaskDefinitionARN,
 		&service.DesiredCount, &service.RunningCount, &service.PendingCount, &service.LaunchType, &platformVersion,
 		&service.Status, &roleARN, &loadBalancers, &serviceRegistries, &networkConfiguration,
@@ -505,7 +506,7 @@ func (s *serviceStore) DeleteMarkedForDeletion(ctx context.Context, clusterARN s
 		AND updated_at < ?
 	`
 
-	result, err := s.db.ExecContext(ctx, query, clusterARN, before)
+	result, err := s.storage.ExecContextWithRecovery(ctx, query, clusterARN, before)
 	if err != nil {
 		return 0, err
 	}

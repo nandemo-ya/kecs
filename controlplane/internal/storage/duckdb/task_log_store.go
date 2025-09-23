@@ -13,13 +13,15 @@ import (
 
 // TaskLogStore implements storage.TaskLogStore for DuckDB
 type TaskLogStore struct {
-	db *sql.DB
+	db      *sql.DB
+	storage *DuckDBStorage
 }
 
 // NewTaskLogStore creates a new TaskLogStore
-func NewTaskLogStore(db *sql.DB) *TaskLogStore {
+func NewTaskLogStore(db *sql.DB, storage *DuckDBStorage) *TaskLogStore {
 	return &TaskLogStore{
-		db: db,
+		db:      db,
+		storage: storage,
 	}
 }
 
@@ -128,7 +130,7 @@ func (s *TaskLogStore) GetLogs(ctx context.Context, filter storage.TaskLogFilter
 		args = append(args, filter.Offset)
 	}
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logs: %w", err)
 	}
@@ -207,7 +209,7 @@ func (s *TaskLogStore) GetLogCount(ctx context.Context, filter storage.TaskLogFi
 	}
 
 	var count int64
-	err := s.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, args...).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count logs: %w", err)
 	}
@@ -217,7 +219,7 @@ func (s *TaskLogStore) GetLogCount(ctx context.Context, filter storage.TaskLogFi
 
 // DeleteOldLogs removes logs older than the specified retention period
 func (s *TaskLogStore) DeleteOldLogs(ctx context.Context, olderThan time.Time) (int64, error) {
-	result, err := s.db.ExecContext(ctx,
+	result, err := s.storage.ExecContextWithRecovery(ctx,
 		"DELETE FROM task_logs WHERE created_at < ?",
 		olderThan,
 	)
@@ -242,7 +244,7 @@ func (s *TaskLogStore) DeleteOldLogs(ctx context.Context, olderThan time.Time) (
 
 // DeleteTaskLogs removes all logs for a specific task
 func (s *TaskLogStore) DeleteTaskLogs(ctx context.Context, taskArn string) error {
-	_, err := s.db.ExecContext(ctx,
+	_, err := s.storage.ExecContextWithRecovery(ctx,
 		"DELETE FROM task_logs WHERE task_arn = ?",
 		taskArn,
 	)
@@ -273,7 +275,7 @@ func (s *TaskLogStore) StreamLogs(ctx context.Context, filter storage.TaskLogFil
 
 	query += " ORDER BY timestamp ASC"
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to query logs: %w", err)
 	}
