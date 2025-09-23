@@ -23,23 +23,28 @@ after:
         - APPLE_TEAM_ID={{ .Env.APPLE_TEAM_ID }}
       # Script to notarize all macOS archives
       stdin: |
-        set -e
+        #!/bin/sh
         if [ -z "$APPLE_ID" ] || [ -z "$APPLE_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
           echo "Skipping notarization: credentials not configured"
           exit 0
         fi
 
         # Find all macOS archives
+        # Note: We continue on notarization failures to not block releases
         for file in *_Darwin_*.tar.gz; do
           if [ -f "$file" ]; then
             echo "Notarizing $file..."
 
             # Submit for notarization
-            xcrun notarytool submit "$file" \
+            if xcrun notarytool submit "$file" \
               --apple-id "$APPLE_ID" \
               --password "$APPLE_PASSWORD" \
               --team-id "$APPLE_TEAM_ID" \
-              --wait || echo "Notarization failed for $file, continuing..."
+              --wait; then
+              echo "Successfully notarized $file"
+            else
+              echo "Warning: Notarization failed for $file, continuing with release..."
+            fi
           fi
         done
 

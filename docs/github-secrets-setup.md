@@ -50,8 +50,13 @@ After setting up the secrets, you can verify they're configured by:
 You can test the setup by creating a test tag:
 
 ```bash
+# Create and push test tag
 git tag v0.0.1-test
 git push origin v0.0.1-test
+
+# After verification, clean up the test tag
+git push --delete origin v0.0.1-test
+git tag -d v0.0.1-test
 ```
 
 Then monitor the GoReleaser workflow in the Actions tab.
