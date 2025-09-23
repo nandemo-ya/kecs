@@ -88,7 +88,7 @@ Each example is self-contained with:
    export AWS_ENDPOINT_URL=http://localhost:5373
    
    # Or use --endpoint-url flag with each command
-   aws ecs list-clusters --endpoint-url http://localhost:5373
+   aws ecs list-clusters --region us-east-1 --endpoint-url http://localhost:5373
    ```
 
 
@@ -103,8 +103,8 @@ Each example is self-contained with:
 
 3. Deploy using AWS CLI:
    ```bash
-   aws ecs register-task-definition --cli-input-json file://task_def.json --endpoint-url http://localhost:5373
-   aws ecs create-service --cli-input-json file://service_def.json --endpoint-url http://localhost:5373
+   aws ecs register-task-definition --cli-input-json file://task_def.json --region us-east-1 --endpoint-url http://localhost:5373
+   aws ecs create-service --cli-input-json file://service_def.json --region us-east-1 --endpoint-url http://localhost:5373
    ```
 
 ## Common Patterns
@@ -115,20 +115,20 @@ Deploy and manage services using AWS CLI commands:
 
 ```bash
 # Deploy service
-aws ecs register-task-definition --cli-input-json file://task_def.json --endpoint-url http://localhost:5373
-aws ecs create-service --cli-input-json file://service_def.json --endpoint-url http://localhost:5373
+aws ecs register-task-definition --cli-input-json file://task_def.json --region us-east-1 --endpoint-url http://localhost:5373
+aws ecs create-service --cli-input-json file://service_def.json --region us-east-1 --endpoint-url http://localhost:5373
 
 # Check service status
-aws ecs describe-services --cluster default --services <service-name> --endpoint-url http://localhost:5373
+aws ecs describe-services --cluster default --services <service-name> --region us-east-1 --endpoint-url http://localhost:5373
 
 # View task logs (via kubectl)
 kubectl logs -n default <pod-name> -c <container-name>
 
 # Scale service
-aws ecs update-service --cluster default --service <service-name> --desired-count 5 --endpoint-url http://localhost:5373
+aws ecs update-service --cluster default --service <service-name> --desired-count 5 --region us-east-1 --endpoint-url http://localhost:5373
 
 # Run one-off task
-aws ecs run-task --cluster default --task-definition <task-def> --endpoint-url http://localhost:5373
+aws ecs run-task --cluster default --task-definition <task-def> --region us-east-1 --endpoint-url http://localhost:5373
 ```
 
 ### Testing with Kubernetes
@@ -158,7 +158,7 @@ KECS automatically includes LocalStack support when you create an instance, prov
 
 ```bash
 # All AWS services are available through KECS endpoint
-aws ecs create-cluster --endpoint-url http://localhost:5373
+aws ecs create-cluster --region us-east-1 --endpoint-url http://localhost:5373
 aws secretsmanager create-secret --endpoint-url http://localhost:5373
 aws ssm put-parameter --endpoint-url http://localhost:5373
 ```
@@ -170,10 +170,10 @@ aws ssm put-parameter --endpoint-url http://localhost:5373
 Use environment variables with your deployment scripts:
 ```bash
 # Development
-ENV=dev aws ecs update-service --cluster default --service my-service --task-definition my-task:dev --endpoint-url http://localhost:5373
+ENV=dev aws ecs update-service --cluster default --service my-service --task-definition my-task:dev --region us-east-1 --endpoint-url http://localhost:5373
 
 # Production
-ENV=prod aws ecs update-service --cluster default --service my-service --task-definition my-task:prod --endpoint-url http://localhost:5373
+ENV=prod aws ecs update-service --cluster default --service my-service --task-definition my-task:prod --region us-east-1 --endpoint-url http://localhost:5373
 ```
 
 ### CI/CD Integration
@@ -218,9 +218,9 @@ kecs status
 kecs logs -f
 
 # List all resources
-aws ecs list-clusters --endpoint-url http://localhost:5373
-aws ecs list-services --cluster default --endpoint-url http://localhost:5373
-aws ecs list-tasks --cluster default --endpoint-url http://localhost:5373
+aws ecs list-clusters --region us-east-1 --endpoint-url http://localhost:5373
+aws ecs list-services --cluster default --region us-east-1 --endpoint-url http://localhost:5373
+aws ecs list-tasks --cluster default --region us-east-1 --endpoint-url http://localhost:5373
 
 # Check Kubernetes resources
 kubectl get all -n default
