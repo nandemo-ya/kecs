@@ -1,8 +1,11 @@
 package tui
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -411,9 +414,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskDefEditor, _ = m.taskDefEditor.Update(msg)
 		}
 
+	case editorSaveRequestMsg:
+		// Handle editor save request - actually register the task definition
+		if m.apiClient != nil && m.selectedInstance != "" {
+			// Parse the JSON to get a proper task definition object
+			var taskDef map[string]interface{}
+			if err := json.Unmarshal([]byte(msg.jsonContent), &taskDef); err == nil {
+				// Call the API to register the task definition
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+
+				taskDefArn, err := m.apiClient.RegisterTaskDefinition(ctx, m.selectedInstance, taskDef)
+				if err == nil {
+					// Extract revision number from ARN if possible
+					revision := 1
+					parts := strings.Split(taskDefArn, ":")
+					if len(parts) > 0 {
+						if r, err := strconv.Atoi(parts[len(parts)-1]); err == nil {
+							revision = r
+						}
+					}
+
+					// Send success message
+					return m, func() tea.Msg {
+						return editorSaveMsg{
+							family:   msg.family,
+							revision: revision,
+						}
+					}
+				} else {
+					// Handle error
+					m.err = fmt.Errorf("Failed to save task definition: %v", err)
+				}
+			} else {
+				m.err = fmt.Errorf("Failed to parse task definition JSON: %v", err)
+			}
+		}
+
 	case editorSaveMsg:
-		// Handle editor save
-		// In a real implementation, this would create a new revision
+		// Handle successful save
 		m.commandPalette.lastResult = fmt.Sprintf("Task definition %s saved as revision %d", msg.family, msg.revision)
 		m.commandPalette.showResult = true
 		// Go back to revisions view
@@ -892,9 +931,13 @@ func (m Model) View() string {
 	// Calculate exact heights for panels to fill entire screen
 	totalHeight := m.height
 
-	// Calculate base heights (30/70 split)
-	navPanelHeight := int(float64(totalHeight) * 0.3)
-	resourcePanelHeight := totalHeight - navPanelHeight
+	// Reserve 1 line for footer
+	footerHeight := 1
+	availableHeight := totalHeight - footerHeight
+
+	// Calculate base heights (30/70 split of available height)
+	navPanelHeight := int(float64(availableHeight) * 0.3)
+	resourcePanelHeight := availableHeight - navPanelHeight
 
 	// Ensure minimum heights
 	if navPanelHeight < 10 {
@@ -904,10 +947,10 @@ func (m Model) View() string {
 		resourcePanelHeight = 10
 	}
 
-	// Adjust to ensure they exactly fill the screen
-	if navPanelHeight+resourcePanelHeight < totalHeight {
+	// Adjust to ensure they exactly fill the available height
+	if navPanelHeight+resourcePanelHeight < availableHeight {
 		// Add any remaining height to the resource panel
-		resourcePanelHeight = totalHeight - navPanelHeight
+		resourcePanelHeight = availableHeight - navPanelHeight
 	}
 
 	// Render navigation panel (30% height)
@@ -916,11 +959,15 @@ func (m Model) View() string {
 	// Render resource panel (70% height)
 	resourcePanel := m.renderResourcePanelWithHeight(resourcePanelHeight)
 
-	// Combine panels - they should exactly fill the terminal height
+	// Render footer
+	footer := m.renderFooter()
+
+	// Combine panels with footer - they should exactly fill the terminal height
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
 		navigationPanel,
 		resourcePanel,
+		footer,
 	)
 }
 
@@ -2056,6 +2103,9 @@ func (m Model) handleTaskDefinitionEditorKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Remember the mode before processing the key
+	previousMode := m.taskDefEditor.mode
+
 	// Pass the key to the editor
 	var cmd tea.Cmd
 	m.taskDefEditor, cmd = m.taskDefEditor.Update(msg)
@@ -2066,8 +2116,9 @@ func (m Model) handleTaskDefinitionEditorKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// Handle ESC to exit editor (if not handled by editor)
-	if msg.String() == "esc" && m.taskDefEditor.mode == EditorModeNormal {
+	// Only exit editor on ESC if we were already in Normal mode
+	// (not if we just switched from Insert/Command to Normal)
+	if msg.String() == "esc" && previousMode == EditorModeNormal && m.taskDefEditor.mode == EditorModeNormal {
 		m.currentView = m.previousView
 		m.taskDefEditor = nil
 	}

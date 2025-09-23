@@ -2667,7 +2667,13 @@ func (m Model) renderResourcePanelWithHeight(panelHeight int) string {
 	case ViewTaskDefinitionFamilies:
 		content = m.renderTaskDefFamiliesList(contentHeight)
 	case ViewTaskDefinitionRevisions:
-		content = m.renderTaskDefRevisionsList(contentHeight, m.width-8)
+		if m.showTaskDefJSON {
+			// Show two-column view with JSON
+			content = m.renderTaskDefRevisionsTwoColumn(contentHeight)
+		} else {
+			// Show only the revisions list
+			content = m.renderTaskDefRevisionsList(contentHeight, m.width-8)
+		}
 	default:
 		content = "View not implemented"
 	}
