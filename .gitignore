@@ -68,3 +68,4 @@ qa-results/
 .serena/memory/
 # Serena cache files
 .serena/
+kecs-for-notarization.zip
