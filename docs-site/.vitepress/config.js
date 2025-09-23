@@ -45,7 +45,6 @@ export default defineConfig({
         nav: [
           { text: 'Home', link: '/' },
           { text: 'Guide', link: '/guides/getting-started' },
-          { text: 'API Reference', link: '/api/' },
           { text: 'Architecture', link: '/architecture/' }
         ],
         sidebar: {
@@ -96,20 +95,6 @@ export default defineConfig({
               ]
             }
           ],
-          '/api/': [
-            {
-              text: 'API Reference',
-              items: [
-                { text: 'Overview', link: '/api/' },
-                { text: 'Authentication', link: '/api/authentication' },
-                { text: 'Cluster APIs', link: '/api/clusters' },
-                { text: 'Service APIs', link: '/api/services' },
-                { text: 'Task APIs', link: '/api/tasks' },
-                { text: 'Task Definition APIs', link: '/api/task-definitions' },
-                { text: 'WebSocket API', link: '/api/websocket' }
-              ]
-            }
-          ],
           '/deployment/': [
             {
               text: 'Deployment',
@@ -156,7 +141,6 @@ export default defineConfig({
         nav: [
           { text: 'ホーム', link: '/ja/' },
           { text: 'ガイド', link: '/ja/guides/getting-started' },
-          { text: 'API リファレンス', link: '/ja/api/' },
           { text: 'アーキテクチャ', link: '/ja/architecture/' }
         ],
         sidebar: {
@@ -198,20 +182,6 @@ export default defineConfig({
               text: 'リファレンス',
               items: [
                 { text: 'トラブルシューティング', link: '/ja/guides/troubleshooting' }
-              ]
-            }
-          ],
-          '/ja/api/': [
-            {
-              text: 'API リファレンス',
-              items: [
-                { text: '概要', link: '/ja/api/' },
-                { text: '認証', link: '/ja/api/authentication' },
-                { text: 'クラスター API', link: '/ja/api/clusters' },
-                { text: 'サービス API', link: '/ja/api/services' },
-                { text: 'タスク API', link: '/ja/api/tasks' },
-                { text: 'タスク定義 API', link: '/ja/api/task-definitions' },
-                { text: 'WebSocket API', link: '/ja/api/websocket' }
               ]
             }
           ],
