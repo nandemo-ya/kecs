@@ -37,27 +37,6 @@ features:
     details: Run isolated KECS environments for different projects simultaneously without conflicts
 ---
 
-## Quick Start
-
-Get KECS running in under a minute:
-
-```bash
-# Install KECS
-brew install nandemo-ya/tap/kecs
-# Or download from GitHub releases
-
-# Start KECS (creates k3d cluster automatically)
-kecs start
-
-# Check status
-kecs cluster info
-
-# Use with AWS CLI
-export AWS_ENDPOINT_URL=http://localhost:5373
-aws ecs create-cluster --cluster-name my-cluster
-aws ecs list-clusters
-```
-
 ## What is KECS?
 
 KECS (Kubernetes-based ECS Compatible Service) provides a complete local Amazon ECS environment that runs entirely on your machine. It's designed for developers who want to:
