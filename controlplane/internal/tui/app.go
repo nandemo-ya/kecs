@@ -428,14 +428,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.taskDefEditor = nil
 
 	case closeFormMsg:
-		// Close the instance creation form and go back to instances view
+		// Close the instance creation form
 		if m.currentView == ViewInstanceCreate {
-			m.currentView = ViewInstances
 			if m.instanceForm != nil {
 				m.instanceForm.Reset()
 			}
-			// Reload instances list
-			cmds = append(cmds, m.loadMockDataCmd())
+
+			// If an instance was created and selected, go to Clusters view
+			// Otherwise, go back to Instances view
+			if m.selectedInstance != "" {
+				m.currentView = ViewClusters
+				m.clusterCursor = 0
+				// Load data for the selected instance
+				cmds = append(cmds, m.loadDataFromAPI())
+			} else {
+				m.currentView = ViewInstances
+				// Reload instances list
+				cmds = append(cmds, m.loadMockDataCmd())
+			}
 		}
 
 	case instanceCreationStatusMsg:
