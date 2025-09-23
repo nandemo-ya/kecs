@@ -142,7 +142,6 @@ func (r *KeyBindingsRegistry) registerViewBindings() {
 	// Instances view
 	r.registerViewKeys(ViewInstances, []KeyBinding{
 		{Keys: []string{"enter"}, Description: "Select", Action: ActionSelect},
-		{Keys: []string{"n"}, Description: "New instance", Action: ActionNewInstance},
 		{Keys: []string{"s"}, Description: "Start/Stop", Action: ActionToggleInstance},
 		{Keys: []string{"d"}, Description: "Delete", Action: ActionDeleteInstance},
 		{Keys: []string{"t"}, Description: "Task defs", Action: ActionNavigateTaskDefs,
