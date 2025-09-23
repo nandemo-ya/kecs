@@ -259,8 +259,8 @@ aws elbv2 describe-target-group-attributes \
 ### Access Logs
 
 ```bash
-# View KECS logs for ELBv2 operations
-kecs logs --component elbv2 -f
+# View KECS control plane logs
+kubectl logs -n kecs-system deployment/kecs-controlplane -f
 
 # View Traefik access logs
 kubectl logs -n kecs-system deployment/traefik -f
@@ -381,7 +381,7 @@ kubectl get endpoints -n kecs-services
 
 1. **Use meaningful names**: Name your ALBs and target groups descriptively
 2. **Configure health checks**: Always set appropriate health check paths
-3. **Monitor logs**: Use `kecs logs` to troubleshoot issues
+3. **Monitor logs**: Check control plane logs to troubleshoot issues
 4. **Test locally**: Use host headers or /etc/hosts for local testing
 5. **Clean up resources**: Delete unused load balancers to free resources
 
@@ -397,5 +397,3 @@ Current limitations in KECS ELBv2 implementation:
 ## Next Steps
 
 - [Services Guide](/guides/services) - Create ECS services with load balancers
-- [Networking Guide](/guides/networking) - Understand KECS networking
-- [API Reference](/api/elbv2) - Complete ELBv2 API documentation

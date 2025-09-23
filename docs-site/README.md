@@ -21,11 +21,9 @@ npm run docs:preview
 ## Structure
 
 - `.vitepress/` - VitePress configuration and theme
-- `api/` - API reference documentation
 - `guides/` - User guides and tutorials
 - `deployment/` - Deployment documentation
 - `development/` - Developer documentation
-- `architecture/` - Architecture documentation
 
 ## Building
 

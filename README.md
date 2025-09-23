@@ -129,7 +129,7 @@ KECS provides an interactive Terminal User Interface for managing your ECS resou
 
 ```bash
 # Launch the TUI
-kecs tui
+kecs
 
 # The TUI provides:
 # - Visual overview of clusters, services, and tasks

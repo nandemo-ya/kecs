@@ -491,14 +491,14 @@ export KECS_ACCOUNT_ID=000000000000   # AWS account ID for KECS (default: 000000
 
 ```bash
 # Server flags
-./bin/kecs server \
+kecs server \
   --api-port 8080 \
   --admin-port 8081 \
   --log-level debug \
   --config /etc/kecs/config.yaml
 
 # All available flags
-./bin/kecs server --help
+kecs server --help
 ```
 
 ### Common Flags
@@ -561,7 +561,7 @@ storage:
 Use the validate command before deploying:
 
 ```bash
-./bin/kecs validate --config /etc/kecs/config.yaml
+kecs validate --config /etc/kecs/config.yaml
 ```
 
 ### 4. Configuration Templates
@@ -708,17 +708,17 @@ rateLimiting:
 
 ```bash
 # Validate configuration file
-./bin/kecs validate --config config.yaml
+kecs validate --config config.yaml
 
 # Test configuration loading
-./bin/kecs server --config config.yaml --dry-run
+kecs server --config config.yaml --dry-run
 ```
 
 ### Debug Configuration Loading
 
 ```bash
 # Enable debug logging for configuration
-KECS_LOG_LEVEL=debug ./bin/kecs server --config config.yaml 2>&1 | grep config
+KECS_LOG_LEVEL=debug kecs server --config config.yaml 2>&1 | grep config
 ```
 
 ### Common Issues
