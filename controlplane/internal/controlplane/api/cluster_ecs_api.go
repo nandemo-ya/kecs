@@ -130,8 +130,18 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 	}
 
 	// Save to storage (highest priority for immediate visibility)
+	logging.Info("Creating cluster in storage", "clusterName", cluster.Name, "clusterARN", cluster.ARN)
 	if err := api.storage.ClusterStore().Create(ctx, cluster); err != nil {
 		return nil, toECSError(err, "CreateCluster")
+	}
+	logging.Info("Cluster created in storage", "clusterName", cluster.Name)
+
+	// Immediately verify it's readable
+	verifyCluster, err := api.storage.ClusterStore().Get(ctx, cluster.Name)
+	if err != nil {
+		logging.Error("Failed to immediately read created cluster", "clusterName", cluster.Name, "error", err)
+	} else {
+		logging.Info("Verified cluster is immediately readable", "clusterName", verifyCluster.Name, "clusterARN", verifyCluster.ARN)
 	}
 
 	// Create k8s namespace asynchronously (won't block cluster visibility)
@@ -178,13 +188,20 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 	}
 
 	// Get clusters with pagination
+	logging.Info("ListClusters: Fetching clusters from storage", "limit", limit, "nextToken", nextToken)
 	clusters, newNextToken, err := api.storage.ClusterStore().ListWithPagination(ctx, limit, nextToken)
 	if err != nil {
 		logging.Error("ListClusters storage error", "error", err)
 		return nil, fmt.Errorf("failed to list clusters: %w", err)
 	}
 
-	logging.Debug("ListClusters results", "count", len(clusters))
+	logging.Info("ListClusters results", "count", len(clusters), "clusters", func() []string {
+		names := make([]string, len(clusters))
+		for i, c := range clusters {
+			names[i] = c.Name
+		}
+		return names
+	}())
 
 	// Build cluster ARNs list
 	clusterArns := make([]string, 0, len(clusters))
