@@ -78,7 +78,6 @@ kecs start
 ```bash
 aws ecs create-cluster --cluster-name default \
   --region us-east-1 \
-  --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
@@ -87,7 +86,6 @@ aws ecs create-cluster --cluster-name default \
 ```bash
 aws logs create-log-group \
   --log-group-name /ecs/multi-container-webapp \
-  --region us-east-1 \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
@@ -103,13 +101,11 @@ Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts
 aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
   --region us-east-1 \
-  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Create service
 aws ecs create-service \
   --cli-input-json file://service_def.json \
-  --region us-east-1 \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
@@ -212,7 +208,6 @@ For development and testing, you can use `assignPublicIp` to access tasks direct
 aws ecs register-task-definition \
   --cli-input-json file://task_def.json \
   --region us-east-1 \
-  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Run task with assignPublicIp
@@ -225,13 +220,11 @@ aws ecs run-task \
     }
   }' \
   --region us-east-1 \
-  --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Get allocated ports from task details
 TASK_ARN=$(aws ecs list-tasks \
   --cluster multi-container-cluster \
-  --region us-east-1 \
   --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'taskArns[0]' --output text)
@@ -239,7 +232,6 @@ TASK_ARN=$(aws ecs list-tasks \
 aws ecs describe-tasks \
   --cluster multi-container-cluster \
   --tasks $TASK_ARN \
-  --region us-east-1 \
   --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'tasks[0].containers[*].networkBindings'
