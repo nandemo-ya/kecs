@@ -21,25 +21,11 @@
 
 </div>
 
-## Development Tool Notice
-
-**KECS is designed exclusively for local development and CI environments.**
-
-KECS runs its control plane inside a k3d cluster, providing a clean and isolated environment for ECS workloads. The CLI manages k3d cluster lifecycle using the Docker API.
-
-### ✅ Supported Environments
-- Local development machines  
-- CI/CD pipelines (GitHub Actions, GitLab CI, Jenkins, etc.)  
-- Isolated test environments  
-
-### ❌ NOT Supported
-- Production environments  
-- Public-facing deployments  
-- Multi-tenant systems
-
 ## Overview
 
 KECS (Kubernetes-based ECS Compatible Service) is a standalone service that provides Amazon ECS compatible APIs running on Kubernetes. It enables a fully local ECS-compatible environment that operates independently of AWS environments.
+
+> **Note:** KECS is designed for local development and CI environments only. Not for production use.
 
 ### Key Features
 
@@ -51,7 +37,56 @@ KECS (Kubernetes-based ECS Compatible Service) is a standalone service that prov
 - **Multiple Instance Support**: Run multiple KECS instances with different configurations
 - **CI/CD Integration**: Easily integrates with CI/CD pipelines
 - **Built-in LocalStack Integration**: Automatically provides local AWS services (IAM, SSM, Secrets Manager, etc.) for ECS workloads
-- **Automatic IAM Role**: Creates `ecsTaskExecutionRole` on startup for pulling images and writing logs
+
+### AWS Integration Support Status
+
+KECS provides strong AWS service integration while remaining completely standalone. Here's the current support status for AWS services that ECS typically integrates with:
+
+| AWS Service | Status | Description |
+|-------------|--------|-------------|
+| **ELBv2** (Application Load Balancer) | 🟡 Experimental | Target group and load balancer management |
+| **Secrets Manager** | 🟡 Experimental | Secret injection into containers |
+| **Parameter Store** | 🟡 Experimental | Parameter injection into containers |
+| **CloudWatch Logs** | 🟡 Experimental | Container log streaming |
+| **Cloud Map** (Service Discovery) | 🟡 Experimental | Service registry and discovery |
+| **IAM** | ⚪ Pending | Task roles and execution roles |
+| **VPC** | ⚪ Pending | Network isolation and security groups |
+| **EFS** | ⚪ Pending | Elastic File System mounting |
+
+**Legend:**
+- 🟢 **Stable**: Production-ready with comprehensive testing
+- 🟡 **Experimental**: Basic functionality available, under active development
+- ⚪ **Pending**: Planned for future releases
+
+## Installation
+
+### Prerequisites
+
+KECS requires a Docker-compatible environment to manage k3d clusters:
+- **Docker Desktop** (macOS, Windows, Linux)
+- **Rancher Desktop** (macOS, Windows, Linux)
+- **OrbStack** (macOS)
+- **Colima** (macOS, Linux)
+- Or any other Docker-compatible runtime
+
+### Using Homebrew (macOS/Linux)
+
+```bash
+# Install KECS
+brew tap nandemo-ya/kecs
+brew install kecs
+
+# Verify installation
+kecs version
+```
+
+### From Source
+
+```bash
+git clone https://github.com/nandemo-ya/kecs.git
+cd kecs
+make build
+```
 
 ## Quick Start
 
@@ -67,198 +102,94 @@ kecs start
 # - KECS control plane (ECS/ELBv2 APIs)
 # - LocalStack (other AWS services)
 # - Traefik gateway (unified routing)
+```
 
-# Check status
-kecs cluster info
+All AWS APIs are accessible through the unified endpoint:
+```bash
+export AWS_ENDPOINT_URL=http://localhost:5373
+aws ecs list-clusters              # → KECS
+aws elbv2 describe-load-balancers  # → KECS
+aws s3 ls                          # → LocalStack
+```
 
-# Stop KECS
+To stop or destroy KECS:
+```bash
+# Stop KECS (preserves data)
 kecs stop
+
+# Destroy KECS (removes all data and resources)
+kecs destroy
 ```
 
-All AWS APIs are accessible through port 4566:
-```bash
-export AWS_ENDPOINT_URL=http://localhost:4566
-aws ecs list-clusters         # → KECS
-aws elbv2 describe-load-balancers  # → KECS  
-aws s3 ls                     # → LocalStack
-```
+### Terminal User Interface (TUI)
 
-### Running Multiple Instances
+KECS provides an interactive Terminal User Interface for managing your ECS resources visually:
 
-KECS supports running multiple instances with different configurations:
+<img src="./assets/kecs-tui.png" alt="KECS TUI Screenshot" width="800" />
 
 ```bash
-# Start with custom instance name and ports
-kecs start --instance dev --api-port 8080 --admin-port 8081
-kecs start --instance staging --api-port 8090 --admin-port 8091
+# Launch the TUI
+kecs tui
 
-# Or use auto-generated instance name
-kecs start  # Generates a random instance name
-
-# Stop a specific instance
-kecs stop --instance dev
-
-# Stop instance with interactive selection
-kecs stop  # Shows a list to select from
-```
-
-## Installation
-
-### From Source
-
-```bash
-git clone https://github.com/nandemo-ya/kecs.git
-cd kecs
-make build          # Build both CLI and server binaries
-# or
-make build-cli      # Build CLI only (cross-platform compatible)
-make build-server   # Build server with DuckDB support
-```
-
-#### Binary Architecture
-KECS uses a dual-binary architecture:
-- **kecs** (CLI): Command-line interface for managing KECS instances (no CGO dependencies)
-- **kecs-server**: Server binary with DuckDB support for data persistence (runs in containers)
-
-### Development Setup
-
-For contributors, we use [Lefthook](https://github.com/evilmartians/lefthook) to ensure code quality with git hooks:
-
-```bash
-# Run the setup script (installs Lefthook and configures git hooks)
-./scripts/setup-lefthook.sh
-
-# Or install manually
-brew install lefthook  # macOS
-# or
-curl -sSfL https://raw.githubusercontent.com/evilmartians/lefthook/master/install.sh | sh -s -- -b /usr/local/bin  # Linux
-
-# Install git hooks
-lefthook install
-```
-
-The git hooks will:
-- **Pre-commit**: Run unit tests, go fmt, and go vet for changed files
-- **Pre-push**: Run the full test suite with race detection
-
-To skip hooks temporarily: `git commit --no-verify` or `git push --no-verify`
-
-### Using Docker
-
-```bash
-docker pull ghcr.io/nandemo-ya/kecs:latest
+# The TUI provides:
+# - Visual overview of clusters, services, and tasks
+# - Real-time status updates
+# - Keyboard navigation and shortcuts
+# - Resource details and logs viewing
 ```
 
 ## Usage
 
-### Requirements
+For detailed usage instructions, API documentation, and examples, visit our documentation site:
 
-KECS requires the following to function properly:
-
-- **Docker**: For managing k3d clusters (the CLI uses Docker API)
-- **Network Ports**: Port 4566 for unified AWS API endpoint
-- **Local Storage**: For data persistence (default: `~/.kecs/data`)
-
-```bash
-# Start KECS (creates and manages k3d cluster)
-kecs start
-
-# Access AWS APIs through the unified endpoint
-export AWS_ENDPOINT_URL=http://localhost:4566
-aws ecs list-clusters
-```
-
-
-### Configuration
-
-#### Default Configuration Changes
-
-As of the latest version, KECS has updated its default configuration:
-
-- **LocalStack**: Now **enabled by default** to provide AWS service emulation
-- **Traefik**: Now **enabled by default** for advanced routing capabilities
-
-To disable these features (e.g., for testing or lightweight deployments):
-
-```bash
-# Via environment variables
-export KECS_LOCALSTACK_ENABLED=false
-export KECS_FEATURES_TRAEFIK=false
-
-# Or via configuration file
-localstack:
-  enabled: false
-features:
-  traefik: false
-```
-
-For more details, see the [Configuration Guide](docs/configuration.md).
-
-
-### Server Mode
-
-You can also run KECS server directly (useful for development):
-
-```bash
-# Run the server
-kecs server
-
-# Or with custom configuration
-kecs server --port 8080 --admin-port 8081
-```
-
-### Docker Deployment
-
-#### Using Docker Compose
-
-```bash
-# Run KECS
-docker compose up
-```
-
-
-#### Building Docker Images
-
-```bash
-# Build main Docker image (with kecs-server binary)
-make docker-build
-
-# Build API-only image
-make docker-build-api
-
-# Build for local k3d registry (development)
-make docker-build-dev
-```
-
-## API Endpoints
-
-KECS provides ECS-compatible API endpoints:
-
-- **API Server** (default port 8080): ECS API endpoints at `/v1/<action>`
-- **Admin Server** (default port 8081): Health checks at `/health`
-
-## Documentation
-
-- Architectural Decision Records (ADRs) are stored in the `docs/adr/records` directory
-- API documentation is available in the `docs/api` directory
-- For more detailed documentation, visit our [documentation site](https://nandemo-ya.github.io/kecs/)
+📚 **[https://kecs.dev](https://kecs.dev)**
 
 ## Architecture
 
 KECS uses a modern architecture where the control plane runs inside a k3d cluster:
 
+```mermaid
+graph TB
+    subgraph Client["Client"]
+        CLI[KECS CLI]
+        AWSCLI[aws-cli etc]
+    end
+
+    subgraph DockerEngine["Container Runtime (Docker/Rancher/OrbStack)"]
+        subgraph K3dCluster["k3d Cluster Container"]
+            subgraph KECSNamespace["kecs-system Namespace"]
+                CP[KECS Control Plane<br/>ECS-compatible APIs]
+                DB[(DuckDB<br/>State Storage)]
+                LS[LocalStack<br/>AWS Services]
+            end
+
+            subgraph IngressLayer["Ingress"]
+                Traefik[Traefik Gateway<br/>:5373]
+            end
+
+            subgraph Workloads["User Workloads"]
+                Tasks[ECS Tasks<br/>as Pods]
+            end
+        end
+    end
+
+    CLI --> K3dCluster
+    AWSCLI --> Traefik
+    Traefik --> CP
+    Traefik --> LS
+    CP --> Tasks
+    CP --> DB
+    CP -.-> LS
+    Tasks -.-> LS
+```
+
+Key Components:
+
 1. **CLI Tool**: Manages k3d cluster lifecycle (start, stop, status)
 2. **Control Plane**: Runs as pods inside the k3d cluster, providing ECS and ELBv2 APIs
 3. **Unified Gateway**: Traefik routes AWS API calls to appropriate services (KECS or LocalStack)
-
-### Comparison with Similar Tools
-
-| Tool | Purpose | Architecture |
-|------|---------|--------------|
-| Docker Desktop | Container runtime | System daemon |
-| k3d | Local k3s clusters | CLI + OCI containers |
-| LocalStack | AWS service emulation | Standalone container |
-| **KECS** | ECS emulation | Control plane in k3d cluster |
+4. **State Storage**: DuckDB provides persistent storage for ECS resources
+5. **Workload Execution**: ECS tasks run as Kubernetes pods
 
 ## License
 
