@@ -73,7 +73,7 @@ aws ecs create-cluster --cluster-name default \
 ```bash
 # Database URL
 aws ssm put-parameter \
-  --name "/myapp/prod/database_url" \
+  --name "/myapp/prod/database-url" \
   --value "postgresql://app_user:password@db.example.com:5432/myapp" \
   --type "SecureString" \
   --description "Production database connection string" \
@@ -82,7 +82,7 @@ aws ssm put-parameter \
 
 # API Key
 aws ssm put-parameter \
-  --name "/myapp/prod/api_key" \
+  --name "/myapp/prod/api-key" \
   --value "sk_live_abcdef123456789" \
   --type "SecureString" \
   --description "Production API key" \
@@ -91,7 +91,7 @@ aws ssm put-parameter \
 
 # Feature Flags
 aws ssm put-parameter \
-  --name "/myapp/prod/feature_flags" \
+  --name "/myapp/prod/feature-flags" \
   --value '{"new_ui": true, "beta_features": false, "maintenance_mode": false}' \
   --type "String" \
   --description "Feature flags configuration" \
@@ -241,7 +241,7 @@ kubectl exec -n default $POD_NAME -- sh -c 'if [ -n "$DB_PASSWORD" ]; then echo 
 ```bash
 # Update a parameter in SSM
 aws ssm put-parameter \
-  --name "/myapp/prod/api_key" \
+  --name "/myapp/prod/api-key" \
   --value "sk_live_new_key_987654321" \
   --type "SecureString" \
   --overwrite \
@@ -319,7 +319,7 @@ aws secretsmanager describe-secret \
 
 # Check if parameters exist
 aws ssm get-parameter \
-  --name "/myapp/prod/database_url" \
+  --name "/myapp/prod/database-url" \
   --with-decryption \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
@@ -357,17 +357,17 @@ aws secretsmanager delete-secret \
 
 # Delete SSM parameters
 aws ssm delete-parameter \
-  --name "/myapp/prod/database_url" \
+  --name "/myapp/prod/database-url" \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 aws ssm delete-parameter \
-  --name "/myapp/prod/api_key" \
+  --name "/myapp/prod/api-key" \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 aws ssm delete-parameter \
-  --name "/myapp/prod/feature_flags" \
+  --name "/myapp/prod/feature-flags" \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 
