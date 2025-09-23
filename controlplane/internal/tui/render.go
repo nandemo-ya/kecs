@@ -482,24 +482,8 @@ func (m Model) renderResourcePanel() string {
 	case ViewTaskDescribe:
 		content = m.renderTaskDescribe()
 	case ViewLogs:
-		// In split-view mode, the resource panel should show the previous view's content
-		// not the log viewer itself (which is shown in the bottom portion)
-		if m.logSplitView && m.previousView != ViewLogs {
-			// Render the content from the previous view
-			switch m.previousView {
-			case ViewTasks:
-				content = m.renderTasksList(resourceHeight - 4)
-			case ViewServices:
-				content = m.renderServicesList(resourceHeight - 4)
-			case ViewClusters:
-				content = m.renderClustersList(resourceHeight - 4)
-			case ViewTaskDescribe:
-				content = m.renderTaskDescribe()
-			default:
-				content = "Previous view content"
-			}
-		} else if m.logViewer != nil {
-			// If not in split view or no previous view, show log viewer
+		// Always show log viewer in fullscreen if active
+		if m.logViewer != nil {
 			return m.logViewer.View()
 		} else {
 			content = m.renderLogsContent(resourceHeight - 4)
@@ -2643,22 +2627,8 @@ func (m Model) renderResourcePanelWithHeight(panelHeight int) string {
 	case ViewTaskDescribe:
 		content = m.renderTaskDescribe()
 	case ViewLogs:
-		// In split-view mode, the resource panel should show the previous view's content
-		// not the log viewer itself (which is shown in the bottom portion)
-		if m.logSplitView && m.previousView != ViewLogs {
-			// Render the content from the previous view
-			switch m.previousView {
-			case ViewTasks:
-				content = m.renderTasksList(contentHeight)
-			case ViewServices:
-				content = m.renderServicesList(contentHeight)
-			case ViewClusters:
-				content = m.renderClustersList(contentHeight)
-			default:
-				content = "No content available"
-			}
-		} else if m.logViewer != nil {
-			// In fullscreen mode or if there's no split-view, show log viewer
+		// Always show log viewer in fullscreen
+		if m.logViewer != nil {
 			content = m.logViewer.View()
 		} else {
 			// Log viewer not initialized yet

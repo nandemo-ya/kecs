@@ -465,7 +465,6 @@ func (m LogViewerModel) View() string {
 		"[/] Search",
 		"[F] Toggle Auto-refresh",
 		"[g/G] Top/Bottom",
-		"[f] Toggle View",
 		"[Esc] Back",
 	}
 
