@@ -129,19 +129,9 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 		cluster.Tags = string(tagsJSON)
 	}
 
-	// Save to storage (highest priority for immediate visibility)
-	logging.Info("Creating cluster in storage", "clusterName", cluster.Name, "clusterARN", cluster.ARN)
+	// Save to storage
 	if err := api.storage.ClusterStore().Create(ctx, cluster); err != nil {
 		return nil, toECSError(err, "CreateCluster")
-	}
-	logging.Info("Cluster created in storage", "clusterName", cluster.Name)
-
-	// Immediately verify it's readable
-	verifyCluster, err := api.storage.ClusterStore().Get(ctx, cluster.Name)
-	if err != nil {
-		logging.Error("Failed to immediately read created cluster", "clusterName", cluster.Name, "error", err)
-	} else {
-		logging.Info("Verified cluster is immediately readable", "clusterName", verifyCluster.Name, "clusterARN", verifyCluster.ARN)
 	}
 
 	// Create k8s namespace asynchronously (won't block cluster visibility)
@@ -164,9 +154,6 @@ func (api *DefaultECSAPI) CreateCluster(ctx context.Context, req *generated.Crea
 
 // ListClusters implements the ListClusters operation
 func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListClustersRequest) (*generated.ListClustersResponse, error) {
-	// Debug log the request
-	reqJSON, _ := json.Marshal(req)
-	logging.Debug("ListClusters request", "request", string(reqJSON))
 
 	// Set default limit if not specified
 	limit := 100
@@ -176,9 +163,6 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 		if limit > 100 {
 			limit = 100
 		}
-		logging.Debug("ListClusters pagination", "maxResults", *req.MaxResults, "effectiveLimit", limit)
-	} else {
-		logging.Debug("ListClusters pagination", "defaultLimit", limit)
 	}
 
 	// Extract next token
@@ -188,20 +172,11 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 	}
 
 	// Get clusters with pagination
-	logging.Info("ListClusters: Fetching clusters from storage", "limit", limit, "nextToken", nextToken)
 	clusters, newNextToken, err := api.storage.ClusterStore().ListWithPagination(ctx, limit, nextToken)
 	if err != nil {
 		logging.Error("ListClusters storage error", "error", err)
 		return nil, fmt.Errorf("failed to list clusters: %w", err)
 	}
-
-	logging.Info("ListClusters results", "count", len(clusters), "clusters", func() []string {
-		names := make([]string, len(clusters))
-		for i, c := range clusters {
-			names[i] = c.Name
-		}
-		return names
-	}())
 
 	// Build cluster ARNs list
 	clusterArns := make([]string, 0, len(clusters))
@@ -216,14 +191,7 @@ func (api *DefaultECSAPI) ListClusters(ctx context.Context, req *generated.ListC
 	// Set next token if there are more results
 	if newNextToken != "" {
 		response.NextToken = ptr.String(newNextToken)
-		logging.Debug("ListClusters response", "count", len(clusterArns), "nextToken", newNextToken)
-	} else {
-		logging.Debug("ListClusters response", "count", len(clusterArns), "hasNextToken", false)
 	}
-
-	// Debug log the response
-	respJSON, _ := json.Marshal(response)
-	logging.Debug("ListClusters response", "response", string(respJSON))
 
 	return response, nil
 }

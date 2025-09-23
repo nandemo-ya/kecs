@@ -640,6 +640,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
+			// Reload data immediately after successful cluster creation
+			if msg.err == nil {
+				cmds = append(cmds, m.loadDataFromAPI())
+			}
 		}
 
 	case clusterFormCloseMsg:
