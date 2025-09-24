@@ -17,6 +17,11 @@ jobs:
     runs-on: ubuntu-24.04
     # Skip tests on tag pushes
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+      actions: read
     defaults:
       run:
         working-directory: ./controlplane
@@ -32,37 +37,20 @@ jobs:
           cache: true
       - name: Verify dependencies
         run: go mod verify
-      - name: Run tests
-        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
-      - name: Calculate coverage
-        id: coverage
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.txt | grep total | awk '{print $3}' | sed 's/%//')
-          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
-          echo "Coverage: $COVERAGE%"
-      - name: Comment PR with coverage
+      - name: Run tests with coverage
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      # Install and run Octocov for PR coverage reporting
+      - name: Install Octocov
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            const coverage = '${{ steps.coverage.outputs.coverage }}';
-            const body = `## 📊 Test Coverage Report
+        uses: k1LoW/octocov-action@v1
 
-            **Coverage:** ${coverage}%
-
-            | Status | Coverage |
-            |--------|----------|
-            | ${coverage >= 60 ? '✅' : '⚠️'} | ${coverage}% |
-
-            ${coverage < 60 ? '⚠️ Coverage is below 60% threshold' : '✅ Coverage meets minimum threshold'}`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body
-            })
+      - name: Generate coverage report
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd .. && octocov
 
       # Run Trivy vulnerability scanner for filesystem
       - name: Run Trivy vulnerability scanner (filesystem)
