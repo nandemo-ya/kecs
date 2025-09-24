@@ -51,9 +51,10 @@ builds:
           - CGO_ENABLED=0
     ldflags:
       - -s -w
-      - -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Version={{.Version}}
-      - -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.Commit={{.Commit}}
-      - -X github.com/nandemo-ya/kecs/controlplane/internal/controlplane/cmd.BuildDate={{.Date}}
+      - -X github.com/nandemo-ya/kecs/controlplane/internal/version.Version={{.Version}}
+      - -X github.com/nandemo-ya/kecs/controlplane/internal/version.GitCommit={{.Commit}}
+      - -X github.com/nandemo-ya/kecs/controlplane/internal/version.BuildDate={{.Date}}
+      - -X github.com/nandemo-ya/kecs/controlplane/internal/version.GoVersion={{.Runtime.Goversion}}
 
 archives:
   - id: kecs
