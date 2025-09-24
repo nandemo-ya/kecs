@@ -9,7 +9,7 @@ set -e
 ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://localhost:5373}
 ALB_NAME="multi-container-webapp-alb"
 TG_NAME="multi-container-webapp-tg"
-CLUSTER_NAME="multi-container-cluster"
+CLUSTER_NAME="default"
 SERVICE_NAME="multi-container-webapp"
 TASK_DEF_NAME="multi-container-webapp"
 LOG_GROUP_NAME="/ecs/multi-container-webapp"
@@ -207,9 +207,9 @@ if [ -f "service_def_generated.json" ]; then
   rm -f service_def_generated.json
 fi
 
-if [ -f "service_def_with_elb.json.bak" ]; then
-  echo "Removing backup file"
-  rm -f service_def_with_elb.json.bak
+if [ -f "service_def_with_elb.json" ]; then
+  echo "Removing service_def_with_elb.json"
+  rm -f service_def_with_elb.json
 fi
 
 echo ""

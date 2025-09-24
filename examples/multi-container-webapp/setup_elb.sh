@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Automated deployment script for Multi-Container WebApp with ELBv2
-# This script sets up the complete infrastructure and deploys the service
+# ELB setup script for Multi-Container WebApp
+# This script configures Application Load Balancer for an existing ECS service
 
 set -e
 
@@ -9,44 +9,42 @@ set -e
 ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://localhost:5373}
 ALB_NAME="multi-container-webapp-alb"
 TG_NAME="multi-container-webapp-tg"
-CLUSTER_NAME="multi-container-cluster"
+CLUSTER_NAME="default"
 SERVICE_NAME="multi-container-webapp"
 TASK_DEF_NAME="multi-container-webapp"
 
-echo "=== Deploying Multi-Container WebApp with ELBv2 ==="
+echo "=== Setting up Application Load Balancer for Multi-Container WebApp ==="
 echo "Endpoint: $ENDPOINT_URL"
 
-# Step 1: Create ECS cluster
+# Check if service exists
 echo ""
-echo "Step 1: Creating ECS cluster..."
-aws ecs create-cluster --cluster-name $CLUSTER_NAME \
-  --region us-east-1 \
-  --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "Cluster already exists"
-
-# Step 2: Create CloudWatch Log Group
-echo ""
-echo "Step 2: Creating CloudWatch Log Group..."
-aws logs create-log-group \
-  --log-group-name /ecs/$TASK_DEF_NAME \
-  --region us-east-1 \
-  --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "Log group already exists"
-
-# Step 3: Register task definition
-echo ""
-echo "Step 3: Registering task definition..."
-TASK_DEF_ARN=$(aws ecs register-task-definition \
-  --cli-input-json file://task_def.json \
+echo "Checking if service exists..."
+SERVICE_STATUS=$(aws ecs describe-services \
+  --cluster $CLUSTER_NAME \
+  --services $SERVICE_NAME \
   --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
-  --query 'taskDefinition.taskDefinitionArn' --output text)
-echo "Task Definition ARN: $TASK_DEF_ARN"
+  --query 'services[0].status' --output text 2>/dev/null || echo "")
 
-# Extract revision number from ARN
+if [ "$SERVICE_STATUS" != "ACTIVE" ]; then
+  echo "Error: Service $SERVICE_NAME not found in cluster $CLUSTER_NAME"
+  echo "Please run ./deploy.sh first to create the service"
+  exit 1
+fi
+
+# Get latest task definition revision
+TASK_DEF_ARN=$(aws ecs describe-services \
+  --cluster $CLUSTER_NAME \
+  --services $SERVICE_NAME \
+  --region us-east-1 \
+  --endpoint-url $ENDPOINT_URL \
+  --query 'services[0].taskDefinition' --output text)
 TASK_DEF_REVISION=$(echo $TASK_DEF_ARN | sed 's/.*://')
+echo "Using Task Definition: $TASK_DEF_NAME:$TASK_DEF_REVISION"
 
-# Step 4: Setup ELB resources
+# Step 1: Setup ELB resources
 echo ""
-echo "Step 4: Setting up Application Load Balancer..."
+echo "Step 1: Creating Application Load Balancer..."
 
 # KECS doesn't require VPC - use dummy VPC ID
 VPC_ID="vpc-12345678"
@@ -80,9 +78,9 @@ ALB_DNS=$(aws elbv2 describe-load-balancers \
   --query 'LoadBalancers[0].DNSName' --output text)
 echo "ALB DNS: $ALB_DNS"
 
-# Step 5: Create Target Group
+# Step 2: Create Target Group
 echo ""
-echo "Step 5: Creating Target Group..."
+echo "Step 2: Creating Target Group..."
 TG_ARN=$(aws elbv2 create-target-group \
   --name $TG_NAME \
   --protocol HTTP \
@@ -108,9 +106,9 @@ TG_ARN=$(aws elbv2 describe-target-groups \
 
 echo "Target Group ARN: $TG_ARN"
 
-# Step 6: Create Listener
+# Step 3: Create Listener
 echo ""
-echo "Step 6: Creating HTTP Listener..."
+echo "Step 3: Creating HTTP Listener..."
 LISTENER_ARN=$(aws elbv2 create-listener \
   --load-balancer-arn $ALB_ARN \
   --protocol HTTP \
@@ -127,9 +125,9 @@ LISTENER_ARN=$(aws elbv2 describe-listeners \
 
 echo "Listener ARN: $LISTENER_ARN"
 
-# Step 7: Create path-based routing rules
+# Step 4: Create path-based routing rules
 echo ""
-echo "Step 7: Creating routing rules..."
+echo "Step 4: Creating routing rules..."
 
 # Check if rules already exist before creating
 EXISTING_RULES=$(aws elbv2 describe-rules \
@@ -169,10 +167,31 @@ else
   echo "Routing rules already configured"
 fi
 
-# Step 8: Generate service definition with actual Target Group ARN
+# Step 5: Update ECS service with load balancer
 echo ""
-echo "Step 8: Generating service definition with Target Group ARN..."
-cat > service_def_generated.json <<EOF
+echo "Step 5: Updating ECS service to use load balancer..."
+
+# Note: AWS ECS doesn't allow adding load balancer to existing service via update-service
+# We need to recreate the service with load balancer configuration
+echo "Note: To attach a load balancer, the service needs to be recreated."
+echo "This will cause a brief downtime."
+
+# Delete existing service
+echo "Deleting existing service..."
+aws ecs delete-service \
+  --cluster $CLUSTER_NAME \
+  --service $SERVICE_NAME \
+  --force \
+  --region us-east-1 \
+  --endpoint-url $ENDPOINT_URL > /dev/null 2>&1
+
+# Wait for service deletion
+echo "Waiting for service deletion..."
+sleep 10
+
+# Create new service with load balancer
+echo "Creating service with load balancer configuration..."
+cat > service_def_with_elb.json <<EOF
 {
   "serviceName": "$SERVICE_NAME",
   "cluster": "$CLUSTER_NAME",
@@ -231,42 +250,16 @@ cat > service_def_generated.json <<EOF
   ]
 }
 EOF
-echo "Service definition generated: service_def_generated.json"
 
-# Step 9: Create or update ECS service
-echo ""
-echo "Step 9: Creating/Updating ECS service..."
-
-# Check if service exists
-SERVICE_STATUS=$(aws ecs describe-services \
-  --cluster $CLUSTER_NAME \
-  --services $SERVICE_NAME \
+aws ecs create-service \
+  --cli-input-json file://service_def_with_elb.json \
   --region us-east-1 \
   --endpoint-url $ENDPOINT_URL \
-  --query 'services[0].status' --output text 2>/dev/null || echo "")
+  --output table
 
-if [ "$SERVICE_STATUS" == "ACTIVE" ]; then
-  echo "Service exists, updating..."
-  aws ecs update-service \
-    --cluster $CLUSTER_NAME \
-    --service $SERVICE_NAME \
-    --desired-count 3 \
-    --task-definition $TASK_DEF_NAME:$TASK_DEF_REVISION \
-    --region us-east-1 \
-  --endpoint-url $ENDPOINT_URL \
-    --output table
-else
-  echo "Creating new service..."
-  aws ecs create-service \
-    --cli-input-json file://service_def_generated.json \
-    --region us-east-1 \
-  --endpoint-url $ENDPOINT_URL \
-    --output table
-fi
-
-# Step 10: Wait for service to stabilize
+# Step 6: Wait for service to stabilize
 echo ""
-echo "Step 10: Waiting for service to stabilize..."
+echo "Step 6: Waiting for service to stabilize..."
 echo "This may take a few minutes..."
 
 # Function to check service status
@@ -299,9 +292,9 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
   WAIT_COUNT=$((WAIT_COUNT + 1))
 done
 
-# Step 11: Verify deployment
+# Step 7: Verify deployment
 echo ""
-echo "Step 11: Verifying deployment..."
+echo "Step 7: Verifying deployment..."
 
 # Check target health
 echo "Checking target health..."
@@ -323,7 +316,7 @@ aws ecs list-tasks \
   --query 'taskArns' --output json | jq -r '.[]'
 
 echo ""
-echo "=== Deployment Complete ==="
+echo "=== ELB Setup Complete ==="
 echo ""
 echo "Service Details:"
 echo "  Cluster: $CLUSTER_NAME"

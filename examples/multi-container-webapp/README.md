@@ -47,21 +47,16 @@ This example demonstrates a multi-container web application with frontend, backe
 
 ## Quick Start
 
-### Fastest Deployment (Recommended)
-
 ```bash
 # 1. Start KECS
 kecs start
 
-# 2. Deploy everything with ELBv2
-./deploy_with_elb.sh
+# 2. Deploy the service
+./deploy.sh
 
-# 3. Test the application
-kubectl port-forward -n kecs-system svc/traefik 8888:80
-curl -H "Host: multi-container-webapp-alb" http://localhost:8888/
+# 3. (Optional) Setup Application Load Balancer
+./setup_elb.sh
 ```
-
-That's it! The script handles all setup automatically.
 
 ## Manual Setup Instructions
 
@@ -110,26 +105,24 @@ aws ecs create-service \
   --endpoint-url http://localhost:5373
 ```
 
-### Option 2: Automated Deployment with Application Load Balancer (ELBv2)
+### Option 2: Deployment with Application Load Balancer (ELBv2)
 
-The recommended approach for production-like deployment with load balancing.
-
-#### One-Command Deployment
+For production-like deployment with load balancing.
 
 ```bash
-# Deploy everything with a single script
-./deploy_with_elb.sh
+# First deploy the service
+./deploy.sh
 
-# This automatically:
-# - Creates ECS cluster
-# - Registers task definition
-# - Sets up Application Load Balancer (ALB)
-# - Creates Target Group with health checks
-# - Configures HTTP Listener with routing rules
-# - Generates service definition with actual Target Group ARN
-# - Creates and starts the ECS service
-# - Waits for deployment to stabilize
-# - Verifies target health
+# Then add load balancer configuration
+./setup_elb.sh
+
+# This will:
+# - Set up Application Load Balancer (ALB)
+# - Create Target Group with health checks
+# - Configure HTTP Listener with routing rules
+# - Recreate the service with load balancer attached
+# - Wait for deployment to stabilize
+# - Verify target health
 ```
 
 
@@ -212,7 +205,7 @@ aws ecs register-task-definition \
 
 # Run task with assignPublicIp
 aws ecs run-task \
-  --cluster multi-container-cluster \
+  --cluster default \
   --task-definition multi-container-webapp:1 \
   --network-configuration '{
     "awsvpcConfiguration": {
@@ -224,13 +217,13 @@ aws ecs run-task \
 
 # Get allocated ports from task details
 TASK_ARN=$(aws ecs list-tasks \
-  --cluster multi-container-cluster \
+  --cluster default \
   --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'taskArns[0]' --output text)
 
 aws ecs describe-tasks \
-  --cluster multi-container-cluster \
+  --cluster default \
   --tasks $TASK_ARN \
   --region us-east-1 \
   --endpoint-url http://localhost:5373 \

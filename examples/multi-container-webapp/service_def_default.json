@@ -7,8 +7,13 @@
   "platformVersion": "LATEST",
   "networkConfiguration": {
     "awsvpcConfiguration": {
-      "subnets": ["subnet-12345678", "subnet-87654321"],
-      "securityGroups": ["sg-webapp"],
+      "subnets": [
+        "subnet-12345678",
+        "subnet-87654321"
+      ],
+      "securityGroups": [
+        "sg-webapp"
+      ],
       "assignPublicIp": "ENABLED"
     }
   },
