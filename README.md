@@ -195,6 +195,8 @@ Key Components:
 
 KECS integrates with [LocalStack](https://localstack.cloud/) to provide comprehensive AWS service emulation. We deeply appreciate the LocalStack team's work in making local AWS development accessible to everyone. Their excellent AWS emulation capabilities enable KECS to offer a complete local ECS development experience.
 
+Special thanks to all contributors who have helped make KECS better!
+
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
