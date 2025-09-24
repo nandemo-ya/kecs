@@ -8,6 +8,11 @@ jobs:
   check-all:
     name: Check All Components
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+      actions: read
 
     steps:
       - name: Checkout code
@@ -34,6 +39,8 @@ jobs:
 
       # Generate coverage report
       - name: Generate coverage report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: octocov
 
       - name: Summary

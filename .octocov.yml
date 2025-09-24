@@ -5,8 +5,6 @@ coverage:
   paths:
     - controlplane/coverage.out
   # acceptable: 60  # Coverage threshold - disabled for now until we improve coverage
-  badge:
-    path: docs/coverage.svg
 
 report:
   if: is_pull_request
