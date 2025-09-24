@@ -14,7 +14,7 @@ env:
 jobs:
   test:
     name: Test
-    runs-on: [self-hosted, linux, medium]
+    runs-on: [self-hosted, medium]
     # Skip tests on tag pushes
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     defaults:
@@ -88,7 +88,7 @@ jobs:
   build-and-push:
     name: Build and Push Docker image
     needs: [test]
-    runs-on: [self-hosted, linux, medium]
+    runs-on: [self-hosted, medium]
     # Run on main branch pushes and tags, not on PRs
     # For tags, test job is skipped so we use always() to ensure this runs
     if: |
