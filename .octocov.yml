@@ -4,6 +4,7 @@
 coverage:
   paths:
     - controlplane/coverage.out
+  acceptable: 60  # Coverage threshold
   badge:
     path: docs/coverage.svg
 
@@ -37,11 +38,3 @@ codeToTestRatio:
 
 testExecutionTime:
   if: true
-
-# Coverage thresholds
-coverage:
-  acceptable: 60
-
-# Badge settings
-badge:
-  if: is_default_branch
