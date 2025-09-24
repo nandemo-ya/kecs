@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   test-phases:
-    runs-on: [self-hosted, aws-testable, large]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 

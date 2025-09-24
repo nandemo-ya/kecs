@@ -12,7 +12,7 @@ permissions:
 jobs:
   # Single job using GoReleaser for all platforms
   goreleaser:
-    runs-on: [self-hosted, linux, medium]  # Use self-hosted runner for better performance
+    runs-on: ubuntu-24.04  # Use GitHub-hosted runner for public repo
     steps:
       - name: Checkout
         uses: actions/checkout@v4
