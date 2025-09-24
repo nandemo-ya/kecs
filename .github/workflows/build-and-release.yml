@@ -41,14 +41,22 @@ jobs:
         run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
       # Install and run Octocov for PR coverage reporting
-      - name: Install Octocov
+      - name: Setup Octocov
         if: github.event_name == 'pull_request'
         uses: k1LoW/octocov-action@v1
+        with:
+          version: latest
 
-      - name: Generate coverage report
+      - name: Generate coverage report with Octocov
         if: github.event_name == 'pull_request'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OCTOCOV_GITHUB_REF: ${{ github.ref }}
+          OCTOCOV_GITHUB_REPOSITORY: ${{ github.repository }}
+          OCTOCOV_GITHUB_SHA: ${{ github.sha }}
+          OCTOCOV_GITHUB_OWNER: ${{ github.repository_owner }}
+          OCTOCOV_GITHUB_REPO: ${{ github.event.repository.name }}
+          OCTOCOV_CUSTOM_METRICS_BENCHMARK: ""
         run: |
           cd .. && octocov
 
