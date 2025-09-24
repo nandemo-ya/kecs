@@ -1,19 +1,22 @@
-# Multi-Container Web Application Example
+# Multi-Container Application with ALB Example
 
-This example demonstrates a multi-container web application with frontend, backend API, and sidecar logging containers.
+This example demonstrates a multi-container application with Application Load Balancer integration, featuring frontend, backend API, and sidecar logging containers.
 
 ## Overview
 
-- **Purpose**: Show multi-container task with dependencies and shared volumes
-- **Components**: 
+- **Purpose**: Demonstrate multi-container task with ELBv2 integration
+- **Components**:
   - Frontend: Nginx web server
   - Backend: Node.js API server
   - Sidecar: Logging utility
+  - Application Load Balancer with Target Group
 - **Features**:
   - Container dependencies (frontend waits for backend)
   - Shared volumes between containers
-  - Health checks
+  - Health checks via ALB Target Group
   - Multiple container logging
+  - Load balancing across multiple tasks
+  - Public IP assignment for direct task access
 
 ## Architecture
 
@@ -47,21 +50,16 @@ This example demonstrates a multi-container web application with frontend, backe
 
 ## Quick Start
 
-### Fastest Deployment (Recommended)
-
 ```bash
 # 1. Start KECS
 kecs start
 
-# 2. Deploy everything with ELBv2
-./deploy_with_elb.sh
+# 2. Setup Application Load Balancer
+./setup_elb.sh
 
-# 3. Test the application
-kubectl port-forward -n kecs-system svc/traefik 8888:80
-curl -H "Host: multi-container-webapp-alb" http://localhost:8888/
+# 3. Deploy the service with ELB
+./deploy.sh
 ```
-
-That's it! The script handles all setup automatically.
 
 ## Manual Setup Instructions
 
@@ -85,7 +83,7 @@ aws ecs create-cluster --cluster-name default \
 
 ```bash
 aws logs create-log-group \
-  --log-group-name /ecs/multi-container-webapp \
+  --log-group-name /ecs/multi-container-alb \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
@@ -94,46 +92,30 @@ Note: The `ecsTaskExecutionRole` is automatically created by KECS when it starts
 
 ## Deployment
 
-### Option 1: Simple Deployment (Without Load Balancer)
+### Deployment with Application Load Balancer
+
+This example uses ELBv2 for production-like deployment with load balancing and automatic public IP assignment.
 
 ```bash
-# Register task definition
-aws ecs register-task-definition \
-  --cli-input-json file://task_def.json \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373
+# First set up the load balancer infrastructure
+./setup_elb.sh
 
-# Create service
-aws ecs create-service \
-  --cli-input-json file://service_def.json \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373
-```
+# This will:
+# - Create Application Load Balancer (ALB)
+# - Create Target Group with health checks
+# - Configure HTTP Listener with routing rules
 
-### Option 2: Automated Deployment with Application Load Balancer (ELBv2)
+# Then deploy the service
+./deploy.sh
 
-The recommended approach for production-like deployment with load balancing.
-
-#### One-Command Deployment
-
-```bash
-# Deploy everything with a single script
-./deploy_with_elb.sh
-
-# This automatically:
-# - Creates ECS cluster
-# - Registers task definition
-# - Sets up Application Load Balancer (ALB)
-# - Creates Target Group with health checks
-# - Configures HTTP Listener with routing rules
-# - Generates service definition with actual Target Group ARN
-# - Creates and starts the ECS service
-# - Waits for deployment to stabilize
-# - Verifies target health
+# The deploy script will:
+# - Detect the existing Target Group
+# - Create the service with load balancer configuration
+# - Wait for deployment to stabilize
 ```
 
 
-#### Architecture with ELBv2
+#### Architecture
 
 ```
                          Internet
@@ -157,92 +139,6 @@ The recommended approach for production-like deployment with load balancing.
    └───────────┘    └───────────┘    └───────────┘
 ```
 
-### Option 3: Direct Access with assignPublicIp
-
-For development and testing, you can use `assignPublicIp` to access tasks directly without load balancer or port-forwarding.
-
-#### Architecture with assignPublicIp
-
-```
-                     Host Machine
-                           │
-        ┌──────────────────┼──────────────────┐
-        ▼                  ▼                  ▼
-  localhost:32000    localhost:32001    (more ports...)
-        │                  │
-        ▼                  ▼
-┌──────────────────────────────────────────────┐
-│     k3d-<cluster>-serverlb (Docker)          │
-│                                              │
-│  32000→30000   32001→30001   (port mapping) │
-└──────────────────────────────────────────────┘
-        │                  │
-        ▼                  ▼
-┌──────────────────────────────────────────────┐
-│    Kubernetes NodePort Service               │
-│                                              │
-│  NodePort:30000    NodePort:30001           │
-│    (nginx:80)      (backend:3000)           │
-└──────────────────────────────────────────────┘
-                      │
-                      ▼
-              ┌───────────────┐
-              │   ECS Task    │
-              │               │
-              │ ┌───────────┐ │
-              │ │  nginx    │ │
-              │ │  :80      │ │
-              │ └───────────┘ │
-              │               │
-              │ ┌───────────┐ │
-              │ │  backend  │ │
-              │ │  :3000    │ │
-              │ └───────────┘ │
-              └───────────────┘
-```
-
-#### Deployment with assignPublicIp
-
-```bash
-# Register task definition
-aws ecs register-task-definition \
-  --cli-input-json file://task_def.json \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373
-
-# Run task with assignPublicIp
-aws ecs run-task \
-  --cluster multi-container-cluster \
-  --task-definition multi-container-webapp:1 \
-  --network-configuration '{
-    "awsvpcConfiguration": {
-      "assignPublicIp": "ENABLED"
-    }
-  }' \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373
-
-# Get allocated ports from task details
-TASK_ARN=$(aws ecs list-tasks \
-  --cluster multi-container-cluster \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373 \
-  --query 'taskArns[0]' --output text)
-
-aws ecs describe-tasks \
-  --cluster multi-container-cluster \
-  --tasks $TASK_ARN \
-  --region us-east-1 \
-  --endpoint-url http://localhost:5373 \
-  --query 'tasks[0].containers[*].networkBindings'
-
-# Access the application directly (example ports)
-curl http://localhost:32000/  # nginx frontend
-curl http://localhost:32001/api/health  # backend API
-```
-
-**Note**: The k3d cluster must be started with port range mapping `32000-32999:30000-30999` for this to work. See [assignPublicIp documentation](/docs/assign-public-ip.md) for details.
-
 ## Verification
 
 ### For Standard Deployment
@@ -253,7 +149,7 @@ curl http://localhost:32001/api/health  # backend API
 # Check service status
 aws ecs describe-services \
   --cluster default \
-  --services multi-container-webapp \
+  --services multi-container-alb \
   --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'services[0].{Status:status,Desired:desiredCount,Running:runningCount}'
@@ -261,7 +157,7 @@ aws ecs describe-services \
 # List tasks
 TASK_ARNS=$(aws ecs list-tasks \
   --cluster default \
-  --service-name multi-container-webapp \
+  --service-name multi-container-alb \
   --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'taskArns' --output json)
@@ -279,7 +175,7 @@ aws ecs describe-tasks \
 
 ```bash
 # Get a task's pod name
-POD_NAME=$(kubectl get pods -n default -l app=multi-container-webapp -o jsonpath='{.items[0].metadata.name}')
+POD_NAME=$(kubectl get pods -n default -l app=multi-container-alb -o jsonpath='{.items[0].metadata.name}')
 
 # Port forward to access the frontend
 kubectl port-forward -n default $POD_NAME 8080:80 &
@@ -337,7 +233,7 @@ kubectl get pod -n default $POD_NAME -o json | jq '.status.containerStatuses[] |
 ```bash
 # Get ALB details
 ALB_ARN=$(aws elbv2 describe-load-balancers \
-  --names multi-container-webapp-alb \
+  --names multi-container-alb-alb \
   --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'LoadBalancers[0].LoadBalancerArn' --output text)
@@ -352,7 +248,7 @@ echo "ALB DNS: $ALB_DNS"
 
 # Check target health
 TG_ARN=$(aws elbv2 describe-target-groups \
-  --names multi-container-webapp-tg \
+  --names multi-container-alb-tg \
   --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'TargetGroups[0].TargetGroupArn' --output text)
@@ -375,18 +271,18 @@ kubectl port-forward -n kecs-system svc/traefik 8888:80 &
 PF_ALB=$!
 
 # Test through load balancer
-curl -H "Host: multi-container-webapp-alb" http://localhost:8888/
+curl -H "Host: multi-container-alb-alb" http://localhost:8888/
 
 # Test API endpoint through ALB
-curl -H "Host: multi-container-webapp-alb" http://localhost:8888/api/status
+curl -H "Host: multi-container-alb-alb" http://localhost:8888/api/status
 
 # Test health check endpoint
-curl -H "Host: multi-container-webapp-alb" http://localhost:8888/health
+curl -H "Host: multi-container-alb-alb" http://localhost:8888/health
 
 # Test load balancing across multiple tasks
 for i in {1..10}; do
   echo "Request $i:"
-  curl -s -H "Host: multi-container-webapp-alb" http://localhost:8888/ | head -n 1
+  curl -s -H "Host: multi-container-alb-alb" http://localhost:8888/ | head -n 1
   sleep 0.5
 done
 
@@ -408,7 +304,7 @@ kill $PF_ALB
 # Get a task ARN
 TASK_ARN=$(aws ecs list-tasks \
   --cluster multi-container-cluster \
-  --service-name multi-container-webapp-elb \
+  --service-name multi-container-alb-elb \
   --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'taskArns[0]' --output text)
@@ -424,7 +320,7 @@ aws ecs stop-task \
 # Monitor service recovery (ECS should launch a new task automatically)
 watch "aws ecs describe-services \
   --cluster multi-container-cluster \
-  --services multi-container-webapp-elb \
+  --services multi-container-alb-elb \
   --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --query 'services[0].{Desired:desiredCount,Running:runningCount,Pending:pendingCount}'"
@@ -461,14 +357,14 @@ kubectl logs -n default $POD_NAME -c backend-api
 kubectl logs -n default $POD_NAME -c sidecar-logger
 
 # View CloudWatch logs
-aws logs tail /ecs/multi-container-webapp \
+aws logs tail /ecs/multi-container-alb \
   --region us-east-1 \
   --endpoint-url http://localhost:5373 \
   --follow
 
 # Filter logs by container
 aws logs filter-log-events \
-  --log-group-name /ecs/multi-container-webapp \
+  --log-group-name /ecs/multi-container-alb \
   --log-stream-name-prefix "frontend-nginx" \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
@@ -496,7 +392,7 @@ kubectl describe pod -n default $POD_NAME | grep -A 5 "Mounts:"
 # Delete service
 aws ecs delete-service \
   --cluster default \
-  --service multi-container-webapp \
+  --service multi-container-alb \
   --force \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
@@ -504,19 +400,19 @@ aws ecs delete-service \
 # Wait for service deletion
 aws ecs wait services-inactive \
   --cluster default \
-  --services multi-container-webapp \
+  --services multi-container-alb \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Deregister task definition
 aws ecs deregister-task-definition \
-  --task-definition multi-container-webapp:1 \
+  --task-definition multi-container-alb:1 \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Delete log group
 aws logs delete-log-group \
-  --log-group-name /ecs/multi-container-webapp \
+  --log-group-name /ecs/multi-container-alb \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 
@@ -555,17 +451,17 @@ aws ecs delete-cluster \
 # Scale the service
 aws ecs update-service \
   --cluster default \
-  --service multi-container-webapp \
+  --service multi-container-alb \
   --desired-count 3 \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 
 # Verify all pods are running
-kubectl get pods -n default -l app=multi-container-webapp
+kubectl get pods -n default -l app=multi-container-alb
 
 # Test load distribution
 for i in {1..10}; do
-  POD=$(kubectl get pods -n default -l app=multi-container-webapp -o jsonpath="{.items[$((i%3))].metadata.name}")
+  POD=$(kubectl get pods -n default -l app=multi-container-alb -o jsonpath="{.items[$((i%3))].metadata.name}")
   echo "Testing pod: $POD"
   kubectl exec -n default $POD -c backend-api -- wget -q -O - http://localhost:3000
 done

@@ -1,20 +1,20 @@
 #!/bin/bash
 
-# Complete cleanup script for Multi-Container WebApp with ELBv2
+# Complete cleanup script for Multi-Container ALB example
 # This script removes ALL resources created by the deployment
 
 set -e
 
 # Configuration
 ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://localhost:5373}
-ALB_NAME="multi-container-webapp-alb"
-TG_NAME="multi-container-webapp-tg"
-CLUSTER_NAME="multi-container-cluster"
-SERVICE_NAME="multi-container-webapp"
-TASK_DEF_NAME="multi-container-webapp"
-LOG_GROUP_NAME="/ecs/multi-container-webapp"
+ALB_NAME="multi-container-alb-alb"
+TG_NAME="multi-container-alb-tg"
+CLUSTER_NAME="default"
+SERVICE_NAME="multi-container-alb"
+TASK_DEF_NAME="multi-container-alb"
+LOG_GROUP_NAME="/ecs/multi-container-alb"
 
-echo "=== Cleaning up ALL Multi-Container WebApp Resources ==="
+echo "=== Cleaning up ALL Multi-Container ALB Resources ==="
 echo "Endpoint: $ENDPOINT_URL"
 
 # Step 1: Delete ECS Service
@@ -202,14 +202,9 @@ fi
 # Step 8: Clean up generated files
 echo ""
 echo "Step 8: Cleaning up generated files..."
-if [ -f "service_def_generated.json" ]; then
-  echo "Removing service_def_generated.json"
-  rm -f service_def_generated.json
-fi
-
-if [ -f "service_def_with_elb.json.bak" ]; then
-  echo "Removing backup file"
-  rm -f service_def_with_elb.json.bak
+if [ -f "service_def_with_elb.json" ]; then
+  echo "Removing service_def_with_elb.json"
+  rm -f service_def_with_elb.json
 fi
 
 echo ""

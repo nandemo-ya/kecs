@@ -1,5 +1,5 @@
 {
-  "family": "multi-container-webapp",
+  "family": "multi-container-alb",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
@@ -43,7 +43,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/multi-container-webapp",
+          "awslogs-group": "/ecs/multi-container-alb",
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "frontend"
         }
@@ -76,7 +76,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/multi-container-webapp",
+          "awslogs-group": "/ecs/multi-container-alb",
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "backend"
         }
@@ -96,7 +96,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/multi-container-webapp",
+          "awslogs-group": "/ecs/multi-container-alb",
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "sidecar"
         }
