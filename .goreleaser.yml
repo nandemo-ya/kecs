@@ -9,44 +9,9 @@ before:
     - go mod tidy -C ./controlplane
     - go mod download -C ./controlplane
 
-# After all artifacts are built, notarize macOS archives
-# This runs after archives are created but before release
-after:
-  hooks:
-    # Notarize macOS archives (tar.gz files)
-    - cmd: sh
-      dir: ./dist
-      # Only run on macOS runners and when credentials are available
-      env:
-        - APPLE_ID={{ .Env.APPLE_ID }}
-        - APPLE_PASSWORD={{ .Env.NOTARIZATION_PASSWORD }}
-        - APPLE_TEAM_ID={{ .Env.APPLE_TEAM_ID }}
-      # Script to notarize all macOS archives
-      stdin: |
-        #!/bin/sh
-        if [ -z "$APPLE_ID" ] || [ -z "$APPLE_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
-          echo "Skipping notarization: credentials not configured"
-          exit 0
-        fi
-
-        # Find all macOS archives
-        # Note: We continue on notarization failures to not block releases
-        for file in *_Darwin_*.tar.gz; do
-          if [ -f "$file" ]; then
-            echo "Notarizing $file..."
-
-            # Submit for notarization
-            if xcrun notarytool submit "$file" \
-              --apple-id "$APPLE_ID" \
-              --password "$APPLE_PASSWORD" \
-              --team-id "$APPLE_TEAM_ID" \
-              --wait; then
-              echo "Successfully notarized $file"
-            else
-              echo "Warning: Notarization failed for $file, continuing with release..."
-            fi
-          fi
-        done
+# Notarization will be handled as a post-archive hook
+# Note: GoReleaser v2 doesn't support 'after' hooks anymore
+# We'll need to handle notarization differently if needed
 
 builds:
   - id: kecs
