@@ -105,6 +105,45 @@ forwards:
     autoReconnect: false
 ```
 
+### Port Forward Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI
+    participant Agent
+    participant k3d
+    participant K8s
+    participant Pod
+
+    User->>CLI: kecs port-forward start service webapp
+    CLI->>Agent: Check if running
+    alt Agent not running
+        CLI->>Agent: Start agent daemon
+        Agent-->>CLI: Agent started
+    end
+
+    CLI->>Agent: Request port forward (via Unix Socket)
+    Agent->>K8s: Get service info
+    K8s-->>Agent: NodePort details
+
+    Agent->>k3d: k3d node edit --port-add
+    k3d-->>Agent: Port mapped
+
+    Agent->>Agent: Create goroutine for connection
+    Agent->>K8s: Start monitoring
+    Agent-->>CLI: Port forward active
+    CLI-->>User: Forwarding localhost:8080 -> webapp
+
+    loop Health Monitoring
+        Agent->>K8s: Check pod status
+        alt Pod restarted
+            K8s-->>Agent: New pod info
+            Agent->>Agent: Reconnect to new pod
+        end
+    end
+```
+
 ### Auto-Reconnection and Discovery
 
 1. **Service Discovery**:
@@ -157,6 +196,46 @@ forwards:
 ```
 
 ### Agent Architecture
+
+```mermaid
+graph TB
+    subgraph "Host Machine"
+        CLI[kecs CLI]
+        Agent[Port Forward Agent]
+        Socket[Unix Socket]
+
+        CLI -->|Commands| Socket
+        Socket -->|IPC| Agent
+    end
+
+    subgraph "KECS Instance"
+        subgraph "k3d Cluster"
+            CP[Control Plane]
+            subgraph "Kubernetes"
+                SVC[NodePort Service]
+                POD[ECS Task Pod]
+                SVC --> POD
+            end
+        end
+    end
+
+    subgraph "Port Mappings"
+        HP1[Host Port 8080]
+        HP2[Host Port 3000]
+        NP1[NodePort 30080]
+        NP2[NodePort 30300]
+    end
+
+    Agent -->|k3d node edit| HP1
+    Agent -->|k3d node edit| HP2
+    HP1 --> NP1
+    HP2 --> NP2
+    NP1 --> SVC
+    NP2 --> SVC
+
+    Agent -->|Monitor| CP
+    CP -->|Status| Agent
+```
 
 1. **Agent Lifecycle**:
    - Automatically started when first port-forward command is issued
