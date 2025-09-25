@@ -142,8 +142,8 @@ forwards:
 ```
 ~/.kecs/instances/{instance-name}/
 ├── port-forwards/
-│   ├── config.json         # Active port forward configurations
-│   ├── processes.json      # Process tracking information
+│   ├── config.yaml         # Active port forward configurations
+│   ├── processes.yaml      # Process tracking information
 │   └── logs/              # Port forward logs
 │       ├── web-service.log
 │       └── api-service.log
