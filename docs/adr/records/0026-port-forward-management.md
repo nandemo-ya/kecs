@@ -34,10 +34,12 @@ We will implement a comprehensive `kecs port-forward` command that provides back
    - Map host ports to NodePort services dynamically
    - Handle serverlb container recreation (~10 seconds)
 
-3. **Process Management**:
-   - Background execution by default (unlike kubectl port-forward)
-   - Process tracking and lifecycle management
-   - Automatic cleanup on instance stop
+3. **Port Forward Agent**:
+   - Single daemon process per KECS instance
+   - Manages all port forwards through goroutines (not separate processes)
+   - Provides gRPC/Unix socket API for CLI communication
+   - Efficient resource usage with connection multiplexing
+   - Automatic lifecycle management with instance start/stop
 
 ### Command Structure
 
@@ -144,12 +146,34 @@ forwards:
 ```
 ~/.kecs/instances/{instance-name}/
 ├── port-forwards/
+│   ├── agent.sock          # Unix socket for agent communication
+│   ├── agent.pid           # Agent process ID
 │   ├── config.yaml         # Active port forward configurations
-│   ├── processes.yaml      # Process tracking information
+│   ├── state.yaml          # Agent state and connection tracking
 │   └── logs/              # Port forward logs
+│       ├── agent.log       # Agent daemon logs
 │       ├── web-service.log
 │       └── api-service.log
 ```
+
+### Agent Architecture
+
+1. **Agent Lifecycle**:
+   - Automatically started when first port-forward command is issued
+   - Runs as daemon process bound to KECS instance
+   - Gracefully shuts down when instance stops
+   - Survives individual port-forward connection failures
+
+2. **Communication Protocol**:
+   - Unix socket for low-latency local communication
+   - Optional gRPC for future remote management
+   - JSON-RPC over socket for simple CLI integration
+
+3. **Resource Management**:
+   - Single process with goroutine pool
+   - Connection multiplexing for efficient port usage
+   - Automatic cleanup of stale connections
+   - Memory-efficient streaming for large transfers
 
 ### Integration Points
 
@@ -191,19 +215,26 @@ forwards:
    - Handles task restarts gracefully by selecting newest task
    - Reduces brittleness when tasks are recreated
 
+6. **Resource Efficiency**:
+   - Single agent process instead of multiple port-forward processes
+   - Goroutine-based connection management
+   - Reduced system overhead with connection pooling
+
 ### Negative
 
 1. **Complexity**:
-   - Adds process management complexity
-   - Requires Docker API access on host
+   - Adds agent daemon management complexity
+   - Requires Unix socket/IPC communication
+   - More complex than simple process spawning
 
 2. **Performance**:
    - k3d node edit causes brief serverlb restart (~10 seconds)
-   - Additional overhead for monitoring and reconnection
+   - Agent process consumes memory even when idle
 
 3. **Platform Dependencies**:
    - Requires Docker Desktop or compatible Docker environment
    - k3d version compatibility requirements
+   - Unix socket support required (may affect Windows compatibility)
 
 ### Alternatives Considered
 
@@ -211,6 +242,8 @@ forwards:
 2. **Docker socket mount to controlplane**: Security concerns with container accessing Docker API
 3. **LoadBalancer with MetalLB**: Overly complex for local development use case
 4. **SSH tunneling**: Additional complexity and security considerations
+5. **Multiple process approach**: Less efficient resource usage, harder to manage state
+6. **Direct TCP proxy in controlplane**: Would require exposing controlplane ports to host
 
 ## Implementation Plan
 
