@@ -111,9 +111,11 @@ forwards:
 
 2. **Task Discovery**:
    - Tasks identified by ID or tags
-   - Tag-based selection must resolve to exactly one task
-   - Error if multiple tasks match the tag criteria
+   - When multiple tasks match tag criteria, automatically select the most recent one
+   - Sort by task creation timestamp (newest first)
+   - Provide option `--all` to error if multiple matches (strict mode)
    - Example: `tags: {Environment: dev, Component: api}`
+   - Display selected task information for transparency
 
 3. **Auto-Reconnection**:
    - Monitor target service/task health
@@ -179,10 +181,15 @@ forwards:
 3. **Flexibility**:
    - Supports both imperative and declarative approaches
    - Tag-based task discovery for dynamic environments
+   - Automatic selection of newest task improves resilience
 
 4. **Production-like Testing**:
    - Can simulate public IP assignment locally
    - Compatible with ELBv2 for advanced scenarios
+
+5. **Resilience**:
+   - Handles task restarts gracefully by selecting newest task
+   - Reduces brittleness when tasks are recreated
 
 ### Negative
 
