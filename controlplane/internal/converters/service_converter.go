@@ -516,21 +516,37 @@ func (c *ServiceConverter) createKubernetesService(
 		"loadBalancers", service.LoadBalancers,
 		"loadBalancersLen", len(service.LoadBalancers))
 
-	// Check if service has load balancers configured
-	if service.LoadBalancers == "" || service.LoadBalancers == "null" || service.LoadBalancers == "[]" {
-		// No load balancer configured, no need for Kubernetes Service
-		logging.Info("No load balancer configured, skipping Kubernetes Service creation",
+	// Check if assignPublicIp is enabled in network configuration
+	hasAssignPublicIp := false
+	if networkConfig != nil && networkConfig.AwsvpcConfiguration != nil {
+		if networkConfig.AwsvpcConfiguration.AssignPublicIp != nil {
+			assignPublicIpStr := string(*networkConfig.AwsvpcConfiguration.AssignPublicIp)
+			hasAssignPublicIp = assignPublicIpStr == "ENABLED"
+			if hasAssignPublicIp {
+				logging.Info("Service has assignPublicIp ENABLED, will create NodePort service",
+					"serviceName", service.ServiceName)
+			}
+		}
+	}
+
+	// Check if service has load balancers configured OR assignPublicIp is enabled
+	if !hasAssignPublicIp && (service.LoadBalancers == "" || service.LoadBalancers == "null" || service.LoadBalancers == "[]") {
+		// No load balancer configured and no assignPublicIp, no need for Kubernetes Service
+		logging.Info("No load balancer configured and assignPublicIp not enabled, skipping Kubernetes Service creation",
 			"serviceName", service.ServiceName)
 		return nil, nil
 	}
 
-	// Parse load balancers
+	// Parse load balancers if present
 	var loadBalancers []map[string]interface{}
-	if err := json.Unmarshal([]byte(service.LoadBalancers), &loadBalancers); err != nil {
-		return nil, fmt.Errorf("failed to parse load balancers: %w", err)
+	if service.LoadBalancers != "" && service.LoadBalancers != "null" && service.LoadBalancers != "[]" {
+		if err := json.Unmarshal([]byte(service.LoadBalancers), &loadBalancers); err != nil {
+			return nil, fmt.Errorf("failed to parse load balancers: %w", err)
+		}
 	}
 
-	if len(loadBalancers) == 0 {
+	// If no load balancers and no assignPublicIp, return nil
+	if len(loadBalancers) == 0 && !hasAssignPublicIp {
 		return nil, nil
 	}
 
@@ -585,6 +601,16 @@ func (c *ServiceConverter) createKubernetesService(
 		}
 	}
 
+	// Determine initial service type based on assignPublicIp
+	serviceType := corev1.ServiceTypeClusterIP // Default to ClusterIP
+	if hasAssignPublicIp {
+		serviceType = corev1.ServiceTypeNodePort
+		// Add annotation to indicate this is for port-forward support
+		serviceAnnotations["kecs.dev/assign-public-ip"] = "ENABLED"
+		logging.Info("Creating NodePort service for assignPublicIp",
+			"serviceName", service.ServiceName)
+	}
+
 	// Create Kubernetes Service
 	kubeService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -604,7 +630,7 @@ func (c *ServiceConverter) createKubernetesService(
 				"kecs.dev/service": service.ServiceName,
 			},
 			Ports: servicePorts,
-			Type:  corev1.ServiceTypeClusterIP, // Default to ClusterIP
+			Type:  serviceType,
 		},
 	}
 
@@ -636,8 +662,14 @@ func (c *ServiceConverter) createKubernetesService(
 	}
 
 	// If we have target group but no explicit type, default to LoadBalancer
+	// But don't override NodePort if it was set for assignPublicIp
 	if hasTargetGroup && kubeService.Spec.Type == corev1.ServiceTypeClusterIP {
 		logging.Info("Target group found, defaulting to LoadBalancer type",
+			"serviceName", service.ServiceName)
+		kubeService.Spec.Type = corev1.ServiceTypeLoadBalancer
+	} else if hasTargetGroup && kubeService.Spec.Type == corev1.ServiceTypeNodePort {
+		// If both assignPublicIp and target group are present, LoadBalancer takes precedence
+		logging.Info("Both assignPublicIp and target group found, using LoadBalancer type",
 			"serviceName", service.ServiceName)
 		kubeService.Spec.Type = corev1.ServiceTypeLoadBalancer
 	}
