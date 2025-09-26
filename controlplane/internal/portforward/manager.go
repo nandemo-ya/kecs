@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	corev1 "k8s.io/api/core/v1"
@@ -79,7 +80,9 @@ func NewManager(instanceName string, k8sClient *kubernetes.Client) *Manager {
 	}
 
 	// Ensure state directory exists
-	os.MkdirAll(stateDir, 0755)
+	if err := os.MkdirAll(stateDir, 0755); err != nil {
+		logging.Warn("Failed to create state directory", "path", stateDir, "error", err)
+	}
 
 	// Load existing state
 	m.loadState()
@@ -119,7 +122,12 @@ func (m *Manager) StartServiceForward(ctx context.Context, cluster, serviceName 
 	}
 
 	// Get the namespace for the cluster
-	namespace := fmt.Sprintf("%s-%s", cluster, "us-east-1") // Default region
+	cfg := config.GetConfig()
+	region := cfg.AWS.DefaultRegion
+	if region == "" {
+		region = "us-east-1" // Fallback to default
+	}
+	namespace := fmt.Sprintf("%s-%s", cluster, region)
 
 	// Get the service to find NodePort
 	service, err := m.k8sClient.Clientset.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
@@ -173,8 +181,8 @@ func (m *Manager) StartTaskForward(ctx context.Context, cluster, taskID string, 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Generate forward ID
-	forwardID := fmt.Sprintf("task-%s-%s-%d", cluster, taskID[:8], time.Now().Unix())
+	// Generate forward ID - use full task ID to avoid collisions
+	forwardID := fmt.Sprintf("task-%s-%s-%d", cluster, taskID, time.Now().Unix())
 
 	// Auto-assign local port if not specified
 	if localPort == 0 {
@@ -200,7 +208,12 @@ func (m *Manager) StartTaskForward(ctx context.Context, cluster, taskID string, 
 	}
 
 	// Get the namespace for the cluster
-	namespace := fmt.Sprintf("%s-%s", cluster, "us-east-1") // Default region
+	cfg := config.GetConfig()
+	region := cfg.AWS.DefaultRegion
+	if region == "" {
+		region = "us-east-1" // Fallback to default
+	}
+	namespace := fmt.Sprintf("%s-%s", cluster, region)
 
 	// Find the pod for this task
 	pods, err := m.k8sClient.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{

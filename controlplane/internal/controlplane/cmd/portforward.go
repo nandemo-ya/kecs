@@ -27,6 +27,20 @@ var portForwardCmd = &cobra.Command{
 This command provides background port forwarding with automatic management and configuration file support.`,
 }
 
+// getKubeconfigPath returns the kubeconfig path for the given instance
+func getKubeconfigPath(instanceName string) string {
+	return fmt.Sprintf("/tmp/kecs-%s.config", instanceName)
+}
+
+// getInstanceName returns the instance name from environment or default
+func getInstanceName() string {
+	instanceName := os.Getenv("KECS_INSTANCE")
+	if instanceName == "" {
+		instanceName = "default"
+	}
+	return instanceName
+}
+
 var portForwardStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start port forwarding",
@@ -45,14 +59,9 @@ var portForwardStartServiceCmd = &cobra.Command{
 		cluster := parts[0]
 		serviceName := parts[1]
 
-		// Get instance name from environment or flag
-		instanceName := os.Getenv("KECS_INSTANCE")
-		if instanceName == "" {
-			instanceName = "default"
-		}
-
-		// Get kubeconfig for the instance
-		kubeconfigPath := fmt.Sprintf("/tmp/kecs-%s.config", instanceName)
+		// Get instance name and kubeconfig path
+		instanceName := getInstanceName()
+		kubeconfigPath := getKubeconfigPath(instanceName)
 		if _, err := os.Stat(kubeconfigPath); os.IsNotExist(err) {
 			return fmt.Errorf("kubeconfig not found for instance %s. Is KECS running?", instanceName)
 		}
@@ -98,14 +107,9 @@ var portForwardStartTaskCmd = &cobra.Command{
 		cluster := parts[0]
 		taskID := parts[1]
 
-		// Get instance name from environment or flag
-		instanceName := os.Getenv("KECS_INSTANCE")
-		if instanceName == "" {
-			instanceName = "default"
-		}
-
-		// Get kubeconfig for the instance
-		kubeconfigPath := fmt.Sprintf("/tmp/kecs-%s.config", instanceName)
+		// Get instance name and kubeconfig path
+		instanceName := getInstanceName()
+		kubeconfigPath := getKubeconfigPath(instanceName)
 		if _, err := os.Stat(kubeconfigPath); os.IsNotExist(err) {
 			return fmt.Errorf("kubeconfig not found for instance %s. Is KECS running?", instanceName)
 		}
