@@ -299,6 +299,9 @@ func (s *DuckDBStorage) createServicesTable(ctx context.Context) error {
 		account_id VARCHAR NOT NULL,
 		deployment_name VARCHAR,
 		namespace VARCHAR,
+		node_ports VARCHAR,
+		has_node_port BOOLEAN NOT NULL DEFAULT false,
+		assign_public_ip BOOLEAN NOT NULL DEFAULT false,
 		created_at TIMESTAMP NOT NULL,
 		updated_at TIMESTAMP NOT NULL
 	)`

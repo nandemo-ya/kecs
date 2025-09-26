@@ -356,6 +356,11 @@ type Service struct {
 	DeploymentName string `json:"deploymentName,omitempty"`
 	Namespace      string `json:"namespace,omitempty"`
 
+	// NodePort information (for port-forward support)
+	NodePorts      string `json:"nodePorts,omitempty"`      // JSON array of allocated NodePort numbers
+	HasNodePort    bool   `json:"hasNodePort"`              // Whether service uses NodePort
+	AssignPublicIp bool   `json:"assignPublicIp,omitempty"` // Whether assignPublicIp was enabled
+
 	// Service registry metadata for service discovery
 	ServiceRegistryMetadata map[string]string `json:"serviceRegistryMetadata,omitempty"`
 
