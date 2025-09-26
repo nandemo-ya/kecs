@@ -296,14 +296,32 @@ func (m *Manager) StopForward(forwardID string) error {
 
 	// Stop the forwarder if it exists
 	if forwarder, ok := m.forwarders[forwardID]; ok {
-		if forwarder.cmd != nil {
-			// Kill the kubectl process
-			if err := forwarder.cmd.Process.Kill(); err != nil {
-				logging.Warn("Failed to kill port-forward process", "error", err)
+		if forwarder.cmd != nil && forwarder.cmd.Process != nil {
+			// First try graceful termination
+			if err := forwarder.cmd.Process.Signal(os.Interrupt); err != nil {
+				logging.Debug("Failed to send interrupt signal", "error", err)
+				// If interrupt fails, force kill
+				if err := forwarder.cmd.Process.Kill(); err != nil {
+					logging.Warn("Failed to kill port-forward process", "error", err)
+				}
+			} else {
+				// Wait briefly for graceful shutdown
+				time.Sleep(500 * time.Millisecond)
+				// Ensure process is terminated
+				if forwarder.cmd.ProcessState == nil {
+					if err := forwarder.cmd.Process.Kill(); err != nil {
+						logging.Debug("Process already terminated", "error", err)
+					}
+				}
 			}
 		}
 		if forwarder.stopCh != nil {
-			close(forwarder.stopCh)
+			select {
+			case <-forwarder.stopCh:
+				// Already closed
+			default:
+				close(forwarder.stopCh)
+			}
 		}
 		delete(m.forwarders, forwardID)
 	}
@@ -334,16 +352,50 @@ func (m *Manager) StopAllForwards() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	var wg sync.WaitGroup
 	for forwardID, forwarder := range m.forwarders {
-		if forwarder.cmd != nil {
-			// Kill the kubectl process
-			if err := forwarder.cmd.Process.Kill(); err != nil {
-				logging.Warn("Failed to kill port-forward process", "error", err)
+		wg.Add(1)
+		go func(id string, fwd *portForwarder) {
+			defer wg.Done()
+			if fwd.cmd != nil && fwd.cmd.Process != nil {
+				// Try graceful termination first
+				if err := fwd.cmd.Process.Signal(os.Interrupt); err == nil {
+					time.Sleep(500 * time.Millisecond)
+				}
+				// Force kill if still running
+				if fwd.cmd.ProcessState == nil {
+					if err := fwd.cmd.Process.Kill(); err != nil {
+						logging.Debug("Failed to kill port-forward process", "id", id, "error", err)
+					}
+				}
 			}
-		}
-		if forwarder.stopCh != nil {
-			close(forwarder.stopCh)
-		}
+			if fwd.stopCh != nil {
+				select {
+				case <-fwd.stopCh:
+					// Already closed
+				default:
+					close(fwd.stopCh)
+				}
+			}
+		}(forwardID, forwarder)
+	}
+
+	// Wait for all forwarders to stop with timeout
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// All forwarders stopped
+	case <-time.After(5 * time.Second):
+		logging.Warn("Timeout waiting for all port-forwards to stop")
+	}
+
+	// Clear the forwarders map
+	for forwardID := range m.forwarders {
 		delete(m.forwarders, forwardID)
 	}
 
@@ -458,15 +510,19 @@ func (m *Manager) mapPortWithK3d(ctx context.Context, localPort int, nodePort in
 	// But we need to use k3d node edit to add the port mapping
 
 	// Using k3d CLI directly as the Go API is complex
+	// Format: [HOST:][HOSTPORT:]CONTAINERPORT[/PROTOCOL][@NODEFILTER]
+	// We map localPort on host to nodePort in the container
 	cmd := exec.Command("k3d", "node", "edit",
 		fmt.Sprintf("k3d-%s-serverlb", clusterName),
-		"--port-add", fmt.Sprintf("%d:%d@loadbalancer", localPort, nodePort))
+		"--port-add", fmt.Sprintf("%d:%d", localPort, nodePort))
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Check if error is due to port already being mapped
 		outputStr := string(output)
-		if strings.Contains(outputStr, "already exists") || strings.Contains(outputStr, "port is already allocated") {
+		if strings.Contains(outputStr, "already exists") ||
+			strings.Contains(outputStr, "port is already allocated") ||
+			strings.Contains(outputStr, "already in use") {
 			logging.Warn("k3d port mapping already exists",
 				"localPort", localPort,
 				"nodePort", nodePort)
@@ -545,6 +601,14 @@ func (m *Manager) startKubectlPortForward(ctx context.Context, namespace, target
 	go func() {
 		err := cmd.Wait()
 		if err != nil {
+			// Only log error if it wasn't a deliberate termination
+			if !strings.Contains(err.Error(), "signal: interrupt") &&
+				!strings.Contains(err.Error(), "signal: killed") {
+				logging.Error("kubectl port-forward exited with error",
+					"namespace", namespace,
+					"target", target,
+					"error", err)
+			}
 			select {
 			case forwarder.errCh <- err:
 			default:
@@ -576,10 +640,12 @@ func (m *Manager) waitForPortMapping(ctx context.Context, port int, timeout time
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
+	logging.Debug("Waiting for port mapping to become available", "port", port, "timeout", timeout)
+
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("context cancelled while waiting for port mapping: %w", ctx.Err())
 		case <-ticker.C:
 			// Try to connect to the port to check if it's available
 			conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 1*time.Second)
@@ -589,8 +655,9 @@ func (m *Manager) waitForPortMapping(ctx context.Context, port int, timeout time
 				return nil
 			}
 			if time.Now().After(deadline) {
-				return fmt.Errorf("timeout waiting for port %d to become available", port)
+				return fmt.Errorf("timeout waiting for port %d to become available after %v: %w", port, timeout, err)
 			}
+			logging.Debug("Port not yet available, retrying", "port", port, "error", err)
 		}
 	}
 }
