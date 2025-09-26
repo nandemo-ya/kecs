@@ -13,6 +13,12 @@
       "rollback": true
     }
   },
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": ["subnet-12345678"],
+      "assignPublicIp": "ENABLED"
+    }
+  },
   "enableECSManagedTags": true,
   "propagateTags": "SERVICE",
   "tags": [
