@@ -1,0 +1,38 @@
+# Octocov Configuration for KECS
+# This configuration provides code coverage reporting for pull requests
+
+coverage:
+  paths:
+    - controlplane/coverage.out
+  # acceptable: 60  # Coverage threshold - disabled for now until we improve coverage
+
+report:
+  if: is_pull_request
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+
+comment:
+  if: is_pull_request
+  hideFooter: true
+
+diff:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+
+push:
+  if: is_default_branch
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+
+codeToTestRatio:
+  code:
+    - '**/*.go'
+    - '!**/*_test.go'
+    - '!**/mock*.go'
+    - '!**/generated/**'
+    - '!**/mocks/**'
+  test:
+    - '**/*_test.go'
+
+testExecutionTime:
+  if: true
