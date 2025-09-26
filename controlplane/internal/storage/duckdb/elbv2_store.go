@@ -14,7 +14,8 @@ import (
 
 // elbv2Store implements storage.ELBv2Store using DuckDB
 type elbv2Store struct {
-	db *sql.DB
+	db      *sql.DB
+	storage *DuckDBStorage
 }
 
 // NewELBv2Store creates a new ELBv2 store
@@ -37,7 +38,7 @@ func (s *elbv2Store) CreateLoadBalancer(ctx context.Context, lb *storage.ELBv2Lo
 	securityGroupsJSON, _ := json.Marshal(lb.SecurityGroups)
 	tagsJSON, _ := json.Marshal(lb.Tags)
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		lb.ARN, lb.Name, lb.DNSName, lb.CanonicalHostedZoneID, lb.State, lb.Type, lb.Scheme,
 		lb.VpcID, string(subnetsJSON), string(azsJSON), string(securityGroupsJSON), lb.IpAddressType,
 		string(tagsJSON), lb.Region, lb.AccountID, lb.CreatedAt, lb.UpdatedAt,
@@ -58,7 +59,7 @@ func (s *elbv2Store) GetLoadBalancer(ctx context.Context, arn string) (*storage.
 	var lb storage.ELBv2LoadBalancer
 	var subnetsJSON, azsJSON, securityGroupsJSON, tagsJSON string
 
-	err := s.db.QueryRowContext(ctx, query, arn).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, arn).Scan(
 		&lb.ARN, &lb.Name, &lb.DNSName, &lb.CanonicalHostedZoneID, &lb.State, &lb.Type, &lb.Scheme,
 		&lb.VpcID, &subnetsJSON, &azsJSON, &securityGroupsJSON, &lb.IpAddressType,
 		&tagsJSON, &lb.Region, &lb.AccountID, &lb.CreatedAt, &lb.UpdatedAt,
@@ -91,7 +92,7 @@ func (s *elbv2Store) GetLoadBalancerByName(ctx context.Context, name string) (*s
 	var lb storage.ELBv2LoadBalancer
 	var subnetsJSON, azsJSON, securityGroupsJSON, tagsJSON string
 
-	err := s.db.QueryRowContext(ctx, query, name).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, name).Scan(
 		&lb.ARN, &lb.Name, &lb.DNSName, &lb.CanonicalHostedZoneID, &lb.State, &lb.Type, &lb.Scheme,
 		&lb.VpcID, &subnetsJSON, &azsJSON, &securityGroupsJSON, &lb.IpAddressType,
 		&tagsJSON, &lb.Region, &lb.AccountID, &lb.CreatedAt, &lb.UpdatedAt,
@@ -122,7 +123,7 @@ func (s *elbv2Store) ListLoadBalancers(ctx context.Context, region string) ([]*s
 		ORDER BY created_at DESC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, region)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, region)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +167,7 @@ func (s *elbv2Store) UpdateLoadBalancer(ctx context.Context, lb *storage.ELBv2Lo
 	tagsJSON, _ := json.Marshal(lb.Tags)
 	lb.UpdatedAt = time.Now()
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		lb.State, string(securityGroupsJSON), string(tagsJSON), lb.UpdatedAt, lb.ARN,
 	)
 	return err
@@ -175,7 +176,7 @@ func (s *elbv2Store) UpdateLoadBalancer(ctx context.Context, lb *storage.ELBv2Lo
 // DeleteLoadBalancer deletes a load balancer
 func (s *elbv2Store) DeleteLoadBalancer(ctx context.Context, arn string) error {
 	query := `DELETE FROM elbv2_load_balancers WHERE arn = ?`
-	_, err := s.db.ExecContext(ctx, query, arn)
+	_, err := s.storage.ExecContextWithRecovery(ctx, query, arn)
 	return err
 }
 
@@ -194,7 +195,7 @@ func (s *elbv2Store) CreateTargetGroup(ctx context.Context, tg *storage.ELBv2Tar
 	lbArnsJSON, _ := json.Marshal(tg.LoadBalancerArns)
 	tagsJSON, _ := json.Marshal(tg.Tags)
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		tg.ARN, tg.Name, tg.Protocol, tg.Port, tg.VpcID, tg.TargetType,
 		tg.HealthCheckEnabled, tg.HealthCheckProtocol, tg.HealthCheckPort,
 		tg.HealthCheckPath, tg.HealthCheckIntervalSeconds, tg.HealthCheckTimeoutSeconds,
@@ -219,7 +220,7 @@ func (s *elbv2Store) GetTargetGroup(ctx context.Context, arn string) (*storage.E
 	var tg storage.ELBv2TargetGroup
 	var lbArnsJSON, tagsJSON string
 
-	err := s.db.QueryRowContext(ctx, query, arn).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, arn).Scan(
 		&tg.ARN, &tg.Name, &tg.Protocol, &tg.Port, &tg.VpcID, &tg.TargetType,
 		&tg.HealthCheckEnabled, &tg.HealthCheckProtocol, &tg.HealthCheckPort,
 		&tg.HealthCheckPath, &tg.HealthCheckIntervalSeconds, &tg.HealthCheckTimeoutSeconds,
@@ -254,7 +255,7 @@ func (s *elbv2Store) GetTargetGroupByName(ctx context.Context, name string) (*st
 	var tg storage.ELBv2TargetGroup
 	var lbArnsJSON, tagsJSON string
 
-	err := s.db.QueryRowContext(ctx, query, name).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, name).Scan(
 		&tg.ARN, &tg.Name, &tg.Protocol, &tg.Port, &tg.VpcID, &tg.TargetType,
 		&tg.HealthCheckEnabled, &tg.HealthCheckProtocol, &tg.HealthCheckPort,
 		&tg.HealthCheckPath, &tg.HealthCheckIntervalSeconds, &tg.HealthCheckTimeoutSeconds,
@@ -287,7 +288,7 @@ func (s *elbv2Store) ListTargetGroups(ctx context.Context, region string) ([]*st
 		ORDER BY created_at DESC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, region)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, region)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +335,7 @@ func (s *elbv2Store) UpdateTargetGroup(ctx context.Context, tg *storage.ELBv2Tar
 	tagsJSON, _ := json.Marshal(tg.Tags)
 	tg.UpdatedAt = time.Now()
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		tg.HealthCheckEnabled, tg.HealthCheckProtocol, tg.HealthCheckPort,
 		tg.HealthCheckPath, tg.HealthCheckIntervalSeconds, tg.HealthCheckTimeoutSeconds,
 		tg.HealthyThresholdCount, tg.UnhealthyThresholdCount, tg.Matcher,
@@ -346,13 +347,13 @@ func (s *elbv2Store) UpdateTargetGroup(ctx context.Context, tg *storage.ELBv2Tar
 // DeleteTargetGroup deletes a target group
 func (s *elbv2Store) DeleteTargetGroup(ctx context.Context, arn string) error {
 	// Delete associated targets first
-	_, err := s.db.ExecContext(ctx, `DELETE FROM elbv2_targets WHERE target_group_arn = ?`, arn)
+	_, err := s.storage.ExecContextWithRecovery(ctx, `DELETE FROM elbv2_targets WHERE target_group_arn = ?`, arn)
 	if err != nil {
 		return err
 	}
 
 	// Delete the target group
-	_, err = s.db.ExecContext(ctx, `DELETE FROM elbv2_target_groups WHERE arn = ?`, arn)
+	_, err = s.storage.ExecContextWithRecovery(ctx, `DELETE FROM elbv2_target_groups WHERE arn = ?`, arn)
 	return err
 }
 
@@ -369,7 +370,7 @@ func (s *elbv2Store) CreateListener(ctx context.Context, listener *storage.ELBv2
 	alpnPolicyJSON, _ := json.Marshal(listener.AlpnPolicy)
 	tagsJSON, _ := json.Marshal(listener.Tags)
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		listener.ARN, listener.LoadBalancerArn, listener.Port, listener.Protocol, listener.DefaultActions,
 		listener.SslPolicy, listener.Certificates, string(alpnPolicyJSON), string(tagsJSON),
 		listener.Region, listener.AccountID, listener.CreatedAt, listener.UpdatedAt,
@@ -390,7 +391,7 @@ func (s *elbv2Store) GetListener(ctx context.Context, arn string) (*storage.ELBv
 	var listener storage.ELBv2Listener
 	var alpnPolicyJSON, tagsJSON string
 
-	err := s.db.QueryRowContext(ctx, query, arn).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, arn).Scan(
 		&listener.ARN, &listener.LoadBalancerArn, &listener.Port, &listener.Protocol, &listener.DefaultActions,
 		&listener.SslPolicy, &listener.Certificates, &alpnPolicyJSON, &tagsJSON,
 		&listener.Region, &listener.AccountID, &listener.CreatedAt, &listener.UpdatedAt,
@@ -419,7 +420,7 @@ func (s *elbv2Store) ListListeners(ctx context.Context, loadBalancerArn string) 
 		ORDER BY port ASC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, loadBalancerArn)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, loadBalancerArn)
 	if err != nil {
 		return nil, err
 	}
@@ -462,7 +463,7 @@ func (s *elbv2Store) UpdateListener(ctx context.Context, listener *storage.ELBv2
 	tagsJSON, _ := json.Marshal(listener.Tags)
 	listener.UpdatedAt = time.Now()
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		listener.DefaultActions, listener.SslPolicy, listener.Certificates,
 		string(alpnPolicyJSON), string(tagsJSON), listener.UpdatedAt, listener.ARN,
 	)
@@ -472,7 +473,7 @@ func (s *elbv2Store) UpdateListener(ctx context.Context, listener *storage.ELBv2
 // DeleteListener deletes a listener
 func (s *elbv2Store) DeleteListener(ctx context.Context, arn string) error {
 	query := `DELETE FROM elbv2_listeners WHERE arn = ?`
-	_, err := s.db.ExecContext(ctx, query, arn)
+	_, err := s.storage.ExecContextWithRecovery(ctx, query, arn)
 	return err
 }
 
@@ -503,7 +504,7 @@ func (s *elbv2Store) RegisterTargets(ctx context.Context, targetGroupArn string,
 		) VALUES %s
 	`, strings.Join(valueStrings, ","))
 
-	_, err := s.db.ExecContext(ctx, query, valueArgs...)
+	_, err := s.storage.ExecContextWithRecovery(ctx, query, valueArgs...)
 	return err
 }
 
@@ -527,7 +528,7 @@ func (s *elbv2Store) DeregisterTargets(ctx context.Context, targetGroupArn strin
 		WHERE target_group_arn = ? AND id IN (%s)
 	`, strings.Join(placeholders, ","))
 
-	_, err := s.db.ExecContext(ctx, query, args...)
+	_, err := s.storage.ExecContextWithRecovery(ctx, query, args...)
 	return err
 }
 
@@ -542,7 +543,7 @@ func (s *elbv2Store) ListTargets(ctx context.Context, targetGroupArn string) ([]
 		ORDER BY registered_at DESC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, targetGroupArn)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, targetGroupArn)
 	if err != nil {
 		return nil, err
 	}
@@ -573,7 +574,7 @@ func (s *elbv2Store) UpdateTargetHealth(ctx context.Context, targetGroupArn, tar
 		WHERE target_group_arn = ? AND id = ?
 	`
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		health.State, health.Reason, health.Description, time.Now(),
 		targetGroupArn, targetID,
 	)
@@ -596,7 +597,7 @@ func (s *elbv2Store) CreateRule(ctx context.Context, rule *storage.ELBv2Rule) er
 
 	tagsJSON, _ := json.Marshal(rule.Tags)
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		rule.ARN, rule.ListenerArn, rule.Priority, rule.Conditions, rule.Actions,
 		rule.IsDefault, string(tagsJSON), rule.Region, rule.AccountID, rule.CreatedAt, rule.UpdatedAt,
 	)
@@ -615,7 +616,7 @@ func (s *elbv2Store) GetRule(ctx context.Context, ruleArn string) (*storage.ELBv
 	var rule storage.ELBv2Rule
 	var tagsJSON string
 
-	err := s.db.QueryRowContext(ctx, query, ruleArn).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, ruleArn).Scan(
 		&rule.ARN, &rule.ListenerArn, &rule.Priority, &rule.Conditions, &rule.Actions,
 		&rule.IsDefault, &tagsJSON, &rule.Region, &rule.AccountID, &rule.CreatedAt, &rule.UpdatedAt,
 	)
@@ -641,7 +642,7 @@ func (s *elbv2Store) ListRules(ctx context.Context, listenerArn string) ([]*stor
 		ORDER BY priority ASC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, listenerArn)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, listenerArn)
 	if err != nil {
 		return nil, err
 	}
@@ -680,7 +681,7 @@ func (s *elbv2Store) UpdateRule(ctx context.Context, rule *storage.ELBv2Rule) er
 	tagsJSON, _ := json.Marshal(rule.Tags)
 	rule.UpdatedAt = time.Now()
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		rule.Conditions, rule.Actions, string(tagsJSON), rule.UpdatedAt, rule.ARN,
 	)
 	return err
@@ -689,6 +690,6 @@ func (s *elbv2Store) UpdateRule(ctx context.Context, rule *storage.ELBv2Rule) er
 // DeleteRule deletes a rule
 func (s *elbv2Store) DeleteRule(ctx context.Context, ruleArn string) error {
 	query := `DELETE FROM elbv2_rules WHERE arn = ?`
-	_, err := s.db.ExecContext(ctx, query, ruleArn)
+	_, err := s.storage.ExecContextWithRecovery(ctx, query, ruleArn)
 	return err
 }

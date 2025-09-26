@@ -14,7 +14,8 @@ import (
 
 // taskSetStore implements storage.TaskSetStore using DuckDB
 type taskSetStore struct {
-	db *sql.DB
+	db      *sql.DB
+	storage *DuckDBStorage
 }
 
 // Create creates a new task set
@@ -39,7 +40,7 @@ func (s *taskSetStore) Create(ctx context.Context, taskSet *storage.TaskSet) err
 	taskSet.CreatedAt = now
 	taskSet.UpdatedAt = now
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		taskSet.ID, taskSet.ARN, taskSet.ServiceARN, taskSet.ClusterARN, taskSet.ExternalID,
 		taskSet.TaskDefinition, taskSet.LaunchType, taskSet.PlatformVersion, taskSet.PlatformFamily,
 		taskSet.NetworkConfiguration, taskSet.LoadBalancers, taskSet.ServiceRegistries,
@@ -72,7 +73,7 @@ func (s *taskSetStore) Get(ctx context.Context, serviceARN, taskSetID string) (*
 	`
 
 	taskSet := &storage.TaskSet{}
-	err := s.db.QueryRowContext(ctx, query, serviceARN, taskSetID).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, serviceARN, taskSetID).Scan(
 		&taskSet.ID, &taskSet.ARN, &taskSet.ServiceARN, &taskSet.ClusterARN, &taskSet.ExternalID,
 		&taskSet.TaskDefinition, &taskSet.LaunchType, &taskSet.PlatformVersion, &taskSet.PlatformFamily,
 		&taskSet.NetworkConfiguration, &taskSet.LoadBalancers, &taskSet.ServiceRegistries,
@@ -138,7 +139,7 @@ func (s *taskSetStore) List(ctx context.Context, serviceARN string, taskSetIDs [
 		args = []interface{}{serviceARN}
 	}
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list task sets: %w", err)
 	}
@@ -198,7 +199,7 @@ func (s *taskSetStore) Update(ctx context.Context, taskSet *storage.TaskSet) err
 
 	taskSet.UpdatedAt = time.Now()
 
-	result, err := s.db.ExecContext(ctx, query,
+	result, err := s.storage.ExecContextWithRecovery(ctx, query,
 		taskSet.ExternalID, taskSet.TaskDefinition, taskSet.LaunchType,
 		taskSet.PlatformVersion, taskSet.PlatformFamily, taskSet.NetworkConfiguration,
 		taskSet.LoadBalancers, taskSet.ServiceRegistries, taskSet.CapacityProviderStrategy,
@@ -229,7 +230,7 @@ func (s *taskSetStore) Update(ctx context.Context, taskSet *storage.TaskSet) err
 func (s *taskSetStore) Delete(ctx context.Context, serviceARN, taskSetID string) error {
 	query := `DELETE FROM task_sets WHERE service_arn = ? AND id = ?`
 
-	result, err := s.db.ExecContext(ctx, query, serviceARN, taskSetID)
+	result, err := s.storage.ExecContextWithRecovery(ctx, query, serviceARN, taskSetID)
 	if err != nil {
 		return fmt.Errorf("failed to delete task set: %w", err)
 	}
@@ -262,7 +263,7 @@ func (s *taskSetStore) GetByARN(ctx context.Context, arn string) (*storage.TaskS
 	`
 
 	taskSet := &storage.TaskSet{}
-	err := s.db.QueryRowContext(ctx, query, arn).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, arn).Scan(
 		&taskSet.ID, &taskSet.ARN, &taskSet.ServiceARN, &taskSet.ClusterARN, &taskSet.ExternalID,
 		&taskSet.TaskDefinition, &taskSet.LaunchType, &taskSet.PlatformVersion, &taskSet.PlatformFamily,
 		&taskSet.NetworkConfiguration, &taskSet.LoadBalancers, &taskSet.ServiceRegistries,
@@ -307,7 +308,7 @@ func (s *taskSetStore) DeleteOrphaned(ctx context.Context, clusterARN string) (i
 		)
 	`
 
-	result, err := s.db.ExecContext(ctx, query, clusterARN, clusterARN)
+	result, err := s.storage.ExecContextWithRecovery(ctx, query, clusterARN, clusterARN)
 	if err != nil {
 		return 0, err
 	}

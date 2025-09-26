@@ -57,6 +57,19 @@ func (c *SyncController) syncTask(ctx context.Context, key string) error {
 		logging.Warn("Failed to check existing task", "error", err)
 	}
 
+	// Skip syncing if task was recently created (within restoration grace period)
+	// This prevents conflicts when restoration creates pods and sync controller tries to update them
+	if existingTask != nil {
+		gracePeriod := 10 * time.Second // Grace period for restoration
+		if time.Since(existingTask.CreatedAt) < gracePeriod {
+			logging.Debug("Skipping sync for recently created task",
+				"taskArn", task.ARN,
+				"createdAt", existingTask.CreatedAt,
+				"age", time.Since(existingTask.CreatedAt))
+			return nil
+		}
+	}
+
 	// Track state transitions for cluster count updates
 	var wasRunning, isRunning bool
 	if existingTask != nil {

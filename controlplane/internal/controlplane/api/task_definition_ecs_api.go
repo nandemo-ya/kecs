@@ -456,15 +456,20 @@ func (api *DefaultECSAPI) ListTaskDefinitions(ctx context.Context, req *generate
 		return nil, fmt.Errorf("failed to list task definition families: %w", err)
 	}
 
+	logging.Info("ListTaskDefinitions: found families", "count", len(families), "familyPrefix", familyPrefix, "status", status)
+
 	// Collect all revisions for matching families
 	var allRevisions []string
 	for _, family := range families {
+		// When listing all task definitions, we should include all statuses if not specified
 		revisions, _, err := api.storage.TaskDefinitionStore().ListRevisions(ctx, family.Family, status, 0, "")
 		if err != nil {
 			logging.Error("Failed to list revisions for family", "family", family.Family, "error", err)
 			continue
 		}
+		logging.Info("ListTaskDefinitions: found revisions", "family", family.Family, "count", len(revisions))
 		for _, rev := range revisions {
+			logging.Debug("ListTaskDefinitions: adding revision", "arn", rev.ARN)
 			allRevisions = append(allRevisions, rev.ARN)
 		}
 	}

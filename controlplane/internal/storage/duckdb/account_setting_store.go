@@ -15,7 +15,8 @@ import (
 
 // accountSettingStore implements storage.AccountSettingStore using DuckDB
 type accountSettingStore struct {
-	db *sql.DB
+	db      *sql.DB
+	storage *DuckDBStorage
 }
 
 // NewAccountSettingStore creates a new DuckDB-based account setting store
@@ -39,7 +40,7 @@ func (s *accountSettingStore) CreateSchema(ctx context.Context) error {
 		UNIQUE(name, principal_arn, account_id, region)
 	)`
 
-	_, err := s.db.ExecContext(ctx, query)
+	_, err := s.storage.ExecContextWithRecovery(ctx, query)
 	return err
 }
 
@@ -64,7 +65,7 @@ func (s *accountSettingStore) Upsert(ctx context.Context, setting *storage.Accou
 		is_default = EXCLUDED.is_default,
 		updated_at = EXCLUDED.updated_at`
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		setting.ID,
 		setting.Name,
 		setting.Value,
@@ -88,7 +89,7 @@ func (s *accountSettingStore) Get(ctx context.Context, principalARN, name string
 	LIMIT 1`
 
 	var setting storage.AccountSetting
-	err := s.db.QueryRowContext(ctx, query, principalARN, name).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, principalARN, name).Scan(
 		&setting.ID,
 		&setting.Name,
 		&setting.Value,
@@ -119,7 +120,7 @@ func (s *accountSettingStore) GetDefault(ctx context.Context, name string) (*sto
 	LIMIT 1`
 
 	var setting storage.AccountSetting
-	err := s.db.QueryRowContext(ctx, query, name).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, name).Scan(
 		&setting.ID,
 		&setting.Name,
 		&setting.Value,
@@ -200,7 +201,7 @@ func (s *accountSettingStore) List(ctx context.Context, filters storage.AccountS
 	}
 
 	// Execute the query
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, args...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -251,7 +252,7 @@ func (s *accountSettingStore) List(ctx context.Context, filters storage.AccountS
 // Delete removes an account setting
 func (s *accountSettingStore) Delete(ctx context.Context, principalARN, name string) error {
 	query := `DELETE FROM account_settings WHERE principal_arn = ? AND name = ?`
-	_, err := s.db.ExecContext(ctx, query, principalARN, name)
+	_, err := s.storage.ExecContextWithRecovery(ctx, query, principalARN, name)
 	return err
 }
 
@@ -300,7 +301,7 @@ func (s *accountSettingStore) getEffectiveSettings(ctx context.Context, principa
 
 	query += " ORDER BY name"
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

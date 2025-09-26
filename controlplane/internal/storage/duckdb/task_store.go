@@ -4,18 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
 
 type taskStore struct {
-	db *sql.DB
+	db      *sql.DB
+	storage *DuckDBStorage // Reference to parent storage for recovery
 }
 
-func NewTaskStore(db *sql.DB) storage.TaskStore {
-	return &taskStore{db: db}
+func NewTaskStore(db *sql.DB, storage *DuckDBStorage) storage.TaskStore {
+	return &taskStore{db: db, storage: storage}
 }
 
 func (s *taskStore) Create(ctx context.Context, task *storage.Task) error {
@@ -35,7 +38,7 @@ func (s *taskStore) Create(ctx context.Context, task *storage.Task) error {
 			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 		)`
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.storage.ExecContextWithRecovery(ctx, query,
 		task.ID, task.ARN, task.ClusterARN, task.TaskDefinitionARN,
 		nullString(task.ContainerInstanceARN), nullString(task.Overrides),
 		task.LastStatus, task.DesiredStatus, nullString(task.CPU),
@@ -82,7 +85,7 @@ func (s *taskStore) Get(ctx context.Context, cluster, taskID string) (*storage.T
 	var attributes, capacityProviderName, ephemeralStorage sql.NullString
 	var podName, namespace, serviceRegistries sql.NullString
 
-	err := s.db.QueryRowContext(ctx, query, args...).Scan(
+	err := s.storage.QueryRowContextWithRecovery(ctx, query, args...).Scan(
 		&task.ID, &task.ARN, &task.ClusterARN, &task.TaskDefinitionARN,
 		&containerInstanceARN, &overrides, &task.LastStatus,
 		&task.DesiredStatus, &cpu, &memory, &task.Containers,
@@ -197,7 +200,7 @@ func (s *taskStore) List(ctx context.Context, cluster string, filters storage.Ta
 		query += fmt.Sprintf(" LIMIT %d", filters.MaxResults)
 	}
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -216,6 +219,18 @@ func (s *taskStore) List(ctx context.Context, cluster string, filters storage.Ta
 }
 
 func (s *taskStore) Update(ctx context.Context, task *storage.Task) error {
+	// If we have a reference to storage, use recovery mechanism
+	if s.storage != nil {
+		return s.storage.ExecuteWithRecovery(ctx, func() error {
+			return s.updateInternal(ctx, task)
+		})
+	}
+	// Fallback to direct execution if no storage reference
+	return s.updateInternal(ctx, task)
+}
+
+// updateInternal is the actual implementation of Update
+func (s *taskStore) updateInternal(ctx context.Context, task *storage.Task) error {
 	query := `
 		UPDATE tasks SET
 			last_status = ?, desired_status = ?, containers = ?,
@@ -226,18 +241,63 @@ func (s *taskStore) Update(ctx context.Context, task *storage.Task) error {
 			pod_name = ?, namespace = ?, service_registries = ?
 		WHERE arn = ?`
 
-	_, err := s.db.ExecContext(ctx, query,
-		task.LastStatus, task.DesiredStatus, task.Containers,
-		task.Version, nullString(task.StopCode), nullString(task.StoppedReason),
-		nullTime(task.StoppingAt), nullTime(task.StoppedAt),
-		nullString(task.Connectivity), nullTime(task.ConnectivityAt),
-		nullTime(task.PullStartedAt), nullTime(task.PullStoppedAt),
-		nullTime(task.ExecutionStoppedAt), nullTime(task.StartedAt),
-		nullString(task.HealthStatus), nullString(task.PodName),
-		nullString(task.Namespace), nullString(task.ServiceRegistries), task.ARN,
-	)
+	// Retry logic for write-write conflicts
+	const maxRetries = 3
+	var err error
 
-	return err
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		_, err = s.db.ExecContext(ctx, query,
+			task.LastStatus, task.DesiredStatus, task.Containers,
+			task.Version, nullString(task.StopCode), nullString(task.StoppedReason),
+			nullTime(task.StoppingAt), nullTime(task.StoppedAt),
+			nullString(task.Connectivity), nullTime(task.ConnectivityAt),
+			nullTime(task.PullStartedAt), nullTime(task.PullStoppedAt),
+			nullTime(task.ExecutionStoppedAt), nullTime(task.StartedAt),
+			nullString(task.HealthStatus), nullString(task.PodName),
+			nullString(task.Namespace), nullString(task.ServiceRegistries), task.ARN,
+		)
+
+		if err == nil {
+			// Success
+			return nil
+		}
+
+		// Check if it's a write-write conflict error
+		errStr := err.Error()
+		if !strings.Contains(errStr, "write-write conflict") &&
+			!strings.Contains(errStr, "TransactionContext Error") {
+			// Not a conflict error, return immediately
+			return err
+		}
+
+		if attempt < maxRetries-1 {
+			// Calculate exponential backoff with jitter
+			baseDelay := time.Duration(50*(1<<attempt)) * time.Millisecond
+			jitter := time.Duration(rand.Intn(50)) * time.Millisecond
+			delay := baseDelay + jitter
+
+			logging.Warn("Write-write conflict detected in Update, retrying",
+				"attempt", attempt+1,
+				"taskARN", task.ARN,
+				"delay", delay,
+				"error", err)
+
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+				// Continue to next attempt
+			}
+		}
+	}
+
+	// All retries exhausted
+	logging.Error("Failed to update task after retries",
+		"taskARN", task.ARN,
+		"attempts", maxRetries,
+		"error", err)
+
+	return fmt.Errorf("failed after %d retries: %w", maxRetries, err)
 }
 
 func (s *taskStore) Delete(ctx context.Context, cluster, taskID string) error {
@@ -253,7 +313,7 @@ func (s *taskStore) Delete(ctx context.Context, cluster, taskID string) error {
 		args = []interface{}{cluster, taskID, fmt.Sprintf("%%/%s", taskID)}
 	}
 
-	_, err := s.db.ExecContext(ctx, query, args...)
+	_, err := s.storage.ExecContextWithRecovery(ctx, query, args...)
 	return err
 }
 
@@ -273,7 +333,7 @@ func (s *taskStore) GetByARNs(ctx context.Context, arns []string) ([]*storage.Ta
 	query := fmt.Sprintf("SELECT * FROM tasks WHERE arn IN (%s)",
 		strings.Join(placeholders, ","))
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.storage.QueryContextWithRecovery(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -383,7 +443,21 @@ func nullTime(t *time.Time) sql.NullTime {
 }
 
 // CreateOrUpdate creates a new task or updates if it already exists
+// Implements retry logic with exponential backoff for write-write conflicts
+// and automatic recovery from fatal database errors
 func (s *taskStore) CreateOrUpdate(ctx context.Context, task *storage.Task) error {
+	// If we have a reference to storage, use recovery mechanism
+	if s.storage != nil {
+		return s.storage.ExecuteWithRecovery(ctx, func() error {
+			return s.createOrUpdateInternal(ctx, task)
+		})
+	}
+	// Fallback to direct execution if no storage reference
+	return s.createOrUpdateInternal(ctx, task)
+}
+
+// createOrUpdateInternal is the actual implementation of CreateOrUpdate
+func (s *taskStore) createOrUpdateInternal(ctx context.Context, task *storage.Task) error {
 	query := `
 		INSERT INTO tasks (
 			id, arn, cluster_arn, task_definition_arn, container_instance_arn,
@@ -418,27 +492,72 @@ func (s *taskStore) CreateOrUpdate(ctx context.Context, task *storage.Task) erro
 			namespace = EXCLUDED.namespace,
 			service_registries = EXCLUDED.service_registries`
 
-	_, err := s.db.ExecContext(ctx, query,
-		task.ID, task.ARN, task.ClusterARN, task.TaskDefinitionARN,
-		nullString(task.ContainerInstanceARN), nullString(task.Overrides),
-		task.LastStatus, task.DesiredStatus, nullString(task.CPU),
-		nullString(task.Memory), task.Containers, nullString(task.StartedBy),
-		task.Version, nullString(task.StopCode), nullString(task.StoppedReason),
-		nullTime(task.StoppingAt), nullTime(task.StoppedAt),
-		nullString(task.Connectivity), nullTime(task.ConnectivityAt),
-		nullTime(task.PullStartedAt), nullTime(task.PullStoppedAt),
-		nullTime(task.ExecutionStoppedAt), task.CreatedAt,
-		nullTime(task.StartedAt), task.LaunchType,
-		nullString(task.PlatformVersion), nullString(task.PlatformFamily),
-		nullString(task.Group), nullString(task.Attachments),
-		nullString(task.HealthStatus), nullString(task.Tags),
-		nullString(task.Attributes), task.EnableExecuteCommand,
-		nullString(task.CapacityProviderName), nullString(task.EphemeralStorage),
-		task.Region, task.AccountID, nullString(task.PodName),
-		nullString(task.Namespace), nullString(task.ServiceRegistries),
-	)
+	// Retry logic for write-write conflicts
+	const maxRetries = 3
+	var err error
 
-	return err
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		_, err = s.db.ExecContext(ctx, query,
+			task.ID, task.ARN, task.ClusterARN, task.TaskDefinitionARN,
+			nullString(task.ContainerInstanceARN), nullString(task.Overrides),
+			task.LastStatus, task.DesiredStatus, nullString(task.CPU),
+			nullString(task.Memory), task.Containers, nullString(task.StartedBy),
+			task.Version, nullString(task.StopCode), nullString(task.StoppedReason),
+			nullTime(task.StoppingAt), nullTime(task.StoppedAt),
+			nullString(task.Connectivity), nullTime(task.ConnectivityAt),
+			nullTime(task.PullStartedAt), nullTime(task.PullStoppedAt),
+			nullTime(task.ExecutionStoppedAt), task.CreatedAt,
+			nullTime(task.StartedAt), task.LaunchType,
+			nullString(task.PlatformVersion), nullString(task.PlatformFamily),
+			nullString(task.Group), nullString(task.Attachments),
+			nullString(task.HealthStatus), nullString(task.Tags),
+			nullString(task.Attributes), task.EnableExecuteCommand,
+			nullString(task.CapacityProviderName), nullString(task.EphemeralStorage),
+			task.Region, task.AccountID, nullString(task.PodName),
+			nullString(task.Namespace), nullString(task.ServiceRegistries),
+		)
+
+		if err == nil {
+			// Success
+			return nil
+		}
+
+		// Check if it's a write-write conflict error
+		errStr := err.Error()
+		if !strings.Contains(errStr, "write-write conflict") &&
+			!strings.Contains(errStr, "TransactionContext Error") {
+			// Not a conflict error, return immediately
+			return err
+		}
+
+		if attempt < maxRetries-1 {
+			// Calculate exponential backoff with jitter
+			baseDelay := time.Duration(50*(1<<attempt)) * time.Millisecond
+			jitter := time.Duration(rand.Intn(50)) * time.Millisecond
+			delay := baseDelay + jitter
+
+			logging.Warn("Write-write conflict detected, retrying",
+				"attempt", attempt+1,
+				"taskARN", task.ARN,
+				"delay", delay,
+				"error", err)
+
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+				// Continue to next attempt
+			}
+		}
+	}
+
+	// All retries exhausted
+	logging.Error("Failed to create or update task after retries",
+		"taskARN", task.ARN,
+		"attempts", maxRetries,
+		"error", err)
+
+	return fmt.Errorf("failed after %d retries: %w", maxRetries, err)
 }
 
 // DeleteOlderThan deletes tasks older than the specified time with the given status
@@ -450,7 +569,7 @@ func (s *taskStore) DeleteOlderThan(ctx context.Context, clusterARN string, befo
 		AND (stopped_at IS NOT NULL AND stopped_at < ?)
 	`
 
-	result, err := s.db.ExecContext(ctx, query, clusterARN, status, before)
+	result, err := s.storage.ExecContextWithRecovery(ctx, query, clusterARN, status, before)
 	if err != nil {
 		return 0, err
 	}
