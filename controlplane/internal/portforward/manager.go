@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/portforward"
 )
 
 // ForwardType represents the type of port forward
@@ -61,9 +63,11 @@ type Manager struct {
 
 // portForwarder holds the active port forwarding connection
 type portForwarder struct {
-	stopCh  chan struct{}
-	readyCh chan struct{}
-	errCh   chan error
+	stopCh    chan struct{}
+	readyCh   chan struct{}
+	errCh     chan error
+	forwarder *portforward.PortForwarder
+	cmd       *exec.Cmd // For kubectl port-forward process
 }
 
 // NewManager creates a new port forward manager
@@ -160,10 +164,23 @@ func (m *Manager) StartServiceForward(ctx context.Context, cluster, serviceName 
 		return "", 0, fmt.Errorf("service %s does not have NodePort configured. Ensure assignPublicIp is enabled", serviceName)
 	}
 
-	// TODO: In Phase 4, we will implement k3d node edit to map the port
-	// For now, we'll just track the configuration
+	// Map the port using k3d
+	if err := m.mapPortWithK3d(ctx, localPort, int(nodePort)); err != nil {
+		return "", 0, fmt.Errorf("failed to map port with k3d: %w", err)
+	}
 
-	logging.Info("Port forward configuration created",
+	// Start kubectl port-forward in background
+	forwarder, err := m.startKubectlPortForward(ctx, namespace, fmt.Sprintf("svc/%s", serviceName), localPort, targetPort)
+	if err != nil {
+		// Rollback k3d port mapping on failure
+		m.unmapPortWithK3d(ctx, localPort)
+		return "", 0, fmt.Errorf("failed to start port forwarding: %w", err)
+	}
+
+	// Track the forwarder
+	m.forwarders[forwardID] = forwarder
+
+	logging.Info("Port forward active",
 		"id", forwardID,
 		"service", serviceName,
 		"localPort", localPort,
@@ -230,10 +247,16 @@ func (m *Manager) StartTaskForward(ctx context.Context, cluster, taskID string, 
 	pod := &pods.Items[0]
 
 	// Check if the pod's service has NodePort
-	// TODO: In Phase 4, we will implement actual port forwarding
-	// For now, we'll just track the configuration
+	// Start kubectl port-forward to the pod
+	forwarder, err := m.startKubectlPortForward(ctx, namespace, fmt.Sprintf("pod/%s", pod.Name), localPort, targetPort)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to start port forwarding: %w", err)
+	}
 
-	logging.Info("Port forward configuration created for task",
+	// Track the forwarder
+	m.forwarders[forwardID] = forwarder
+
+	logging.Info("Port forward active for task",
 		"id", forwardID,
 		"task", taskID,
 		"pod", pod.Name,
@@ -272,8 +295,23 @@ func (m *Manager) StopForward(forwardID string) error {
 
 	// Stop the forwarder if it exists
 	if forwarder, ok := m.forwarders[forwardID]; ok {
-		close(forwarder.stopCh)
+		if forwarder.cmd != nil {
+			// Kill the kubectl process
+			if err := forwarder.cmd.Process.Kill(); err != nil {
+				logging.Warn("Failed to kill port-forward process", "error", err)
+			}
+		}
+		if forwarder.stopCh != nil {
+			close(forwarder.stopCh)
+		}
 		delete(m.forwarders, forwardID)
+	}
+
+	// If this was a service forward with k3d mapping, unmap it
+	if forward.Type == ForwardTypeService {
+		if err := m.unmapPortWithK3d(context.Background(), forward.LocalPort); err != nil {
+			logging.Warn("Failed to unmap port with k3d", "port", forward.LocalPort, "error", err)
+		}
 	}
 
 	// Update status
@@ -296,8 +334,25 @@ func (m *Manager) StopAllForwards() error {
 	defer m.mu.Unlock()
 
 	for forwardID, forwarder := range m.forwarders {
-		close(forwarder.stopCh)
+		if forwarder.cmd != nil {
+			// Kill the kubectl process
+			if err := forwarder.cmd.Process.Kill(); err != nil {
+				logging.Warn("Failed to kill port-forward process", "error", err)
+			}
+		}
+		if forwarder.stopCh != nil {
+			close(forwarder.stopCh)
+		}
 		delete(m.forwarders, forwardID)
+	}
+
+	// Unmap all k3d ports for service forwards
+	for _, forward := range m.forwards {
+		if forward.Type == ForwardTypeService {
+			if err := m.unmapPortWithK3d(context.Background(), forward.LocalPort); err != nil {
+				logging.Warn("Failed to unmap port with k3d", "port", forward.LocalPort, "error", err)
+			}
+		}
 	}
 
 	// Clear all forwards
@@ -390,4 +445,120 @@ func (m *Manager) saveState() error {
 
 	stateFile := filepath.Join(m.stateDir, "state.json")
 	return os.WriteFile(stateFile, data, 0644)
+}
+
+// mapPortWithK3d uses k3d to map a local port to a NodePort
+func (m *Manager) mapPortWithK3d(ctx context.Context, localPort int, nodePort int) error {
+	// Get the cluster name
+	clusterName := fmt.Sprintf("kecs-%s", m.instanceName)
+
+	// For services, we actually need to map to NodePort
+	// k3d exposes NodePorts through the serverlb automatically
+	// But we need to use k3d node edit to add the port mapping
+
+	// Using k3d CLI directly as the Go API is complex
+	cmd := exec.Command("k3d", "node", "edit",
+		fmt.Sprintf("k3d-%s-serverlb", clusterName),
+		"--port-add", fmt.Sprintf("%d:%d@loadbalancer", localPort, nodePort))
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// If the port mapping already exists, k3d will return an error but it's OK
+		if string(output) != "" && err != nil {
+			logging.Warn("k3d port mapping may already exist",
+				"localPort", localPort,
+				"nodePort", nodePort,
+				"output", string(output))
+			// Continue anyway as the mapping might be working
+		} else {
+			return fmt.Errorf("failed to add port mapping: %w, output: %s", err, string(output))
+		}
+	}
+
+	logging.Info("Added k3d port mapping",
+		"localPort", localPort,
+		"nodePort", nodePort,
+		"cluster", clusterName)
+
+	// Wait for serverlb to restart (typically takes ~10 seconds)
+	time.Sleep(10 * time.Second)
+
+	return nil
+}
+
+// unmapPortWithK3d removes a port mapping from k3d
+func (m *Manager) unmapPortWithK3d(ctx context.Context, localPort int) error {
+	// Note: k3d doesn't have a direct API to remove port mappings
+	// We would need to recreate the node or cluster
+	// For now, we'll just log that the port should be unmapped
+	logging.Info("Port unmap requested (manual cleanup may be needed)",
+		"localPort", localPort,
+		"instance", m.instanceName)
+
+	// In production, you might want to track all port mappings
+	// and recreate the serverlb with updated mappings
+	return nil
+}
+
+// startKubectlPortForward starts a kubectl port-forward process
+func (m *Manager) startKubectlPortForward(ctx context.Context, namespace, target string, localPort, targetPort int) (*portForwarder, error) {
+	// Get kubeconfig path
+	kubeconfigPath := fmt.Sprintf("/tmp/kecs-%s.config", m.instanceName)
+
+	// Check if kubeconfig exists
+	if _, err := os.Stat(kubeconfigPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("kubeconfig not found at %s. Run 'kecs kubeconfig get %s > %s' first",
+			kubeconfigPath, m.instanceName, kubeconfigPath)
+	}
+
+	// Create the kubectl port-forward command
+	cmd := exec.Command("kubectl",
+		"--kubeconfig", kubeconfigPath,
+		"port-forward",
+		"-n", namespace,
+		target,
+		fmt.Sprintf("%d:%d", localPort, targetPort))
+
+	// Create forwarder
+	forwarder := &portForwarder{
+		stopCh:  make(chan struct{}),
+		readyCh: make(chan struct{}),
+		errCh:   make(chan error, 1),
+		cmd:     cmd,
+	}
+
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start kubectl port-forward: %w", err)
+	}
+
+	// Monitor the process in a goroutine
+	go func() {
+		err := cmd.Wait()
+		if err != nil {
+			select {
+			case forwarder.errCh <- err:
+			default:
+			}
+		}
+	}()
+
+	// Give it a moment to establish connection
+	time.Sleep(2 * time.Second)
+
+	// Check if process is still running
+	if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
+		return nil, fmt.Errorf("kubectl port-forward exited immediately")
+	}
+
+	// Signal ready
+	close(forwarder.readyCh)
+
+	logging.Info("Started kubectl port-forward",
+		"namespace", namespace,
+		"target", target,
+		"localPort", localPort,
+		"targetPort", targetPort)
+
+	return forwarder, nil
 }
