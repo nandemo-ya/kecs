@@ -217,7 +217,7 @@ func (m *Manager) StartTaskForward(ctx context.Context, cluster, taskID string, 
 
 	// Find the pod for this task
 	pods, err := m.k8sClient.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("ecs.task.id=%s", taskID),
+		LabelSelector: fmt.Sprintf("kecs.dev/task-id=%s", taskID),
 	})
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to find pod for task: %w", err)
