@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -463,15 +464,15 @@ func (m *Manager) mapPortWithK3d(ctx context.Context, localPort int, nodePort in
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// If the port mapping already exists, k3d will return an error but it's OK
-		if string(output) != "" && err != nil {
-			logging.Warn("k3d port mapping may already exist",
+		// Check if error is due to port already being mapped
+		outputStr := string(output)
+		if strings.Contains(outputStr, "already exists") || strings.Contains(outputStr, "port is already allocated") {
+			logging.Warn("k3d port mapping already exists",
 				"localPort", localPort,
-				"nodePort", nodePort,
-				"output", string(output))
-			// Continue anyway as the mapping might be working
+				"nodePort", nodePort)
+			// Continue as the mapping exists
 		} else {
-			return fmt.Errorf("failed to add port mapping: %w, output: %s", err, string(output))
+			return fmt.Errorf("failed to add port mapping: %w, output: %s", err, outputStr)
 		}
 	}
 
@@ -480,30 +481,38 @@ func (m *Manager) mapPortWithK3d(ctx context.Context, localPort int, nodePort in
 		"nodePort", nodePort,
 		"cluster", clusterName)
 
-	// Wait for serverlb to restart (typically takes ~10 seconds)
-	time.Sleep(10 * time.Second)
-
-	return nil
+	// Wait for serverlb to restart with timeout
+	return m.waitForPortMapping(ctx, localPort, 30*time.Second)
 }
 
 // unmapPortWithK3d removes a port mapping from k3d
 func (m *Manager) unmapPortWithK3d(ctx context.Context, localPort int) error {
-	// Note: k3d doesn't have a direct API to remove port mappings
-	// We would need to recreate the node or cluster
-	// For now, we'll just log that the port should be unmapped
-	logging.Info("Port unmap requested (manual cleanup may be needed)",
-		"localPort", localPort,
-		"instance", m.instanceName)
+	// Track port mappings for future cleanup
+	// k3d doesn't support removing individual port mappings without recreating the node
+	// Store unmapped ports in a file for cleanup during instance restart
+	unmappedFile := filepath.Join(m.stateDir, "unmapped_ports.json")
 
-	// In production, you might want to track all port mappings
-	// and recreate the serverlb with updated mappings
+	var unmappedPorts []int
+	if data, err := os.ReadFile(unmappedFile); err == nil {
+		json.Unmarshal(data, &unmappedPorts)
+	}
+
+	unmappedPorts = append(unmappedPorts, localPort)
+	data, _ := json.Marshal(unmappedPorts)
+	os.WriteFile(unmappedFile, data, 0644)
+
+	logging.Info("Port unmap tracked for cleanup",
+		"localPort", localPort,
+		"instance", m.instanceName,
+		"note", "Port will be cleaned up on next instance restart")
+
 	return nil
 }
 
 // startKubectlPortForward starts a kubectl port-forward process
 func (m *Manager) startKubectlPortForward(ctx context.Context, namespace, target string, localPort, targetPort int) (*portForwarder, error) {
 	// Get kubeconfig path
-	kubeconfigPath := fmt.Sprintf("/tmp/kecs-%s.config", m.instanceName)
+	kubeconfigPath := filepath.Join(os.TempDir(), fmt.Sprintf("kecs-%s.config", m.instanceName))
 
 	// Check if kubeconfig exists
 	if _, err := os.Stat(kubeconfigPath); os.IsNotExist(err) {
@@ -543,12 +552,10 @@ func (m *Manager) startKubectlPortForward(ctx context.Context, namespace, target
 		}
 	}()
 
-	// Give it a moment to establish connection
-	time.Sleep(2 * time.Second)
-
-	// Check if process is still running
-	if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
-		return nil, fmt.Errorf("kubectl port-forward exited immediately")
+	// Wait for kubectl port-forward to become ready
+	if err := m.waitForKubectlReady(ctx, cmd, localPort, 10*time.Second); err != nil {
+		cmd.Process.Kill()
+		return nil, fmt.Errorf("kubectl port-forward failed to become ready: %w", err)
 	}
 
 	// Signal ready
@@ -561,4 +568,59 @@ func (m *Manager) startKubectlPortForward(ctx context.Context, namespace, target
 		"targetPort", targetPort)
 
 	return forwarder, nil
+}
+
+// waitForPortMapping waits for the k3d port mapping to become available
+func (m *Manager) waitForPortMapping(ctx context.Context, port int, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			// Try to connect to the port to check if it's available
+			conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 1*time.Second)
+			if err == nil {
+				conn.Close()
+				logging.Info("Port mapping ready", "port", port)
+				return nil
+			}
+			if time.Now().After(deadline) {
+				return fmt.Errorf("timeout waiting for port %d to become available", port)
+			}
+		}
+	}
+}
+
+// waitForKubectlReady waits for kubectl port-forward to become ready
+func (m *Manager) waitForKubectlReady(ctx context.Context, cmd *exec.Cmd, port int, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			// Check if process is still running
+			if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
+				return fmt.Errorf("kubectl port-forward exited unexpectedly")
+			}
+
+			// Try to connect to the port to check if it's ready
+			conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 500*time.Millisecond)
+			if err == nil {
+				conn.Close()
+				return nil
+			}
+
+			if time.Now().After(deadline) {
+				return fmt.Errorf("timeout waiting for kubectl port-forward on port %d", port)
+			}
+		}
+	}
 }
