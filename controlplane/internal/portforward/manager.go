@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
@@ -341,7 +340,7 @@ func (m *Manager) findAvailablePort() int {
 func (m *Manager) loadState() error {
 	stateFile := filepath.Join(m.stateDir, "state.json")
 
-	data, err := ioutil.ReadFile(stateFile)
+	data, err := os.ReadFile(stateFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil // No state file yet
@@ -377,5 +376,5 @@ func (m *Manager) saveState() error {
 	}
 
 	stateFile := filepath.Join(m.stateDir, "state.json")
-	return ioutil.WriteFile(stateFile, data, 0644)
+	return os.WriteFile(stateFile, data, 0644)
 }
