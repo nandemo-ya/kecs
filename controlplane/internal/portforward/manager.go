@@ -70,13 +70,12 @@ type Manager struct {
 
 // portForwarder holds the active port forwarding connection
 type portForwarder struct {
-	stopCh     chan struct{}
-	readyCh    chan struct{}
-	errCh      chan error
-	forwarder  *portforward.PortForwarder
-	cmd        *exec.Cmd    // For kubectl port-forward process
-	forward    *Forward     // Reference to the forward configuration
-	healthTick *time.Ticker // Health check ticker
+	stopCh    chan struct{}
+	readyCh   chan struct{}
+	errCh     chan error
+	forwarder *portforward.PortForwarder
+	cmd       *exec.Cmd // For kubectl port-forward process
+	forward   *Forward  // Reference to the forward configuration
 }
 
 // NewManager creates a new port forward manager
@@ -847,7 +846,9 @@ func (m *Manager) reconnectionMonitor() {
 // attemptReconnections attempts to reconnect failed port forwards
 func (m *Manager) attemptReconnections() {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+
+	// Create a copy of forwards to reconnect to avoid holding lock during reconnection
+	toReconnect := make([]*Forward, 0)
 
 	for id, forward := range m.forwards {
 		// Skip if not auto-reconnect enabled or already active
@@ -874,9 +875,30 @@ func (m *Manager) attemptReconnections() {
 			continue
 		}
 
-		// Attempt to reconnect
+		// Create a copy of the forward to avoid race conditions
+		forwardCopy := &Forward{
+			ID:            forward.ID,
+			Type:          forward.Type,
+			Cluster:       forward.Cluster,
+			TargetName:    forward.TargetName,
+			LocalPort:     forward.LocalPort,
+			TargetPort:    forward.TargetPort,
+			Status:        forward.Status,
+			CreatedAt:     forward.CreatedAt,
+			UpdatedAt:     forward.UpdatedAt,
+			Error:         forward.Error,
+			AutoReconnect: forward.AutoReconnect,
+			RetryCount:    forward.RetryCount,
+		}
+		toReconnect = append(toReconnect, forwardCopy)
+	}
+
+	m.mu.Unlock()
+
+	// Start reconnection goroutines without holding the lock
+	for _, forward := range toReconnect {
 		logging.Info("Attempting to reconnect port forward",
-			"id", id,
+			"id", forward.ID,
 			"type", forward.Type,
 			"target", forward.TargetName,
 			"retryCount", forward.RetryCount)
@@ -886,45 +908,64 @@ func (m *Manager) attemptReconnections() {
 }
 
 // reconnectForward attempts to reconnect a single port forward
-func (m *Manager) reconnectForward(forward *Forward) {
-	// Increment retry count
+func (m *Manager) reconnectForward(forwardCopy *Forward) {
+	// Check if context is still valid
+	select {
+	case <-m.ctx.Done():
+		return
+	default:
+	}
+
+	// Update retry count on the actual forward object
 	m.mu.Lock()
-	forward.RetryCount++
-	forward.UpdatedAt = time.Now()
+	originalForward, exists := m.forwards[forwardCopy.ID]
+	if !exists {
+		m.mu.Unlock()
+		return // Forward was removed
+	}
+	originalForward.RetryCount++
+	originalForward.UpdatedAt = time.Now()
 	m.saveState()
 	m.mu.Unlock()
 
-	// Recreate the port forward based on type
+	// Recreate the port forward based on type - this will lock/unlock internally
 	var err error
-	switch forward.Type {
+	switch forwardCopy.Type {
 	case ForwardTypeService:
-		_, _, err = m.StartServiceForward(context.Background(),
-			forward.Cluster, forward.TargetName,
-			forward.LocalPort, forward.TargetPort)
+		_, _, err = m.StartServiceForward(m.ctx,
+			forwardCopy.Cluster, forwardCopy.TargetName,
+			forwardCopy.LocalPort, forwardCopy.TargetPort)
 	case ForwardTypeTask:
-		_, _, err = m.StartTaskForward(context.Background(),
-			forward.Cluster, forward.TargetName,
-			forward.LocalPort, forward.TargetPort)
+		_, _, err = m.StartTaskForward(m.ctx,
+			forwardCopy.Cluster, forwardCopy.TargetName,
+			forwardCopy.LocalPort, forwardCopy.TargetPort)
 	}
 
+	// Update the status based on reconnection result
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if err != nil {
-		logging.Error("Failed to reconnect port forward",
-			"id", forward.ID,
-			"error", err)
-		forward.Status = StatusError
-		forward.Error = fmt.Sprintf("Reconnection failed: %v", err)
-	} else {
-		logging.Info("Successfully reconnected port forward",
-			"id", forward.ID,
-			"localPort", forward.LocalPort)
-		forward.Status = StatusActive
-		forward.Error = ""
-		forward.RetryCount = 0 // Reset retry count on success
+	// Get the original forward again as it may have been modified
+	originalForward, exists = m.forwards[forwardCopy.ID]
+	if !exists {
+		return // Forward was removed while reconnecting
 	}
 
-	forward.UpdatedAt = time.Now()
+	if err != nil {
+		logging.Error("Failed to reconnect port forward",
+			"id", forwardCopy.ID,
+			"error", err)
+		originalForward.Status = StatusError
+		originalForward.Error = fmt.Sprintf("Reconnection failed: %v", err)
+	} else {
+		logging.Info("Successfully reconnected port forward",
+			"id", forwardCopy.ID,
+			"localPort", forwardCopy.LocalPort)
+		originalForward.Status = StatusActive
+		originalForward.Error = ""
+		originalForward.RetryCount = 0 // Reset retry count on success
+	}
+
+	originalForward.UpdatedAt = time.Now()
 	m.saveState()
 }
