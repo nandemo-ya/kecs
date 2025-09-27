@@ -197,7 +197,7 @@ Error: connection refused on port 8080
 Solution:
 - Check if the target service/task is running
 - Verify the target port is correct
-- Check KECS logs: `kecs logs -f`
+- Check KECS controlplane logs: `kubectl logs -n kecs-system deployment/kecs-controlplane -f`
 
 ### Debug Mode
 

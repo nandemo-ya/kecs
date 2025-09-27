@@ -295,9 +295,9 @@ kecs port-forward delete -f development-ports.yaml
 **Problem**: Forward keeps disconnecting
 
 **Solution**:
-1. Check KECS logs:
+1. Check KECS controlplane logs:
    ```bash
-   kecs logs -f
+   kubectl logs -n kecs-system deployment/kecs-controlplane -f
    ```
 2. Ensure stable network connection
 3. Verify task isn't being frequently restarted:
