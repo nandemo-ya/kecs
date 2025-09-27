@@ -63,6 +63,7 @@ export default defineConfig({
           items: [
             { text: 'Services', link: '/guides/services' },
             { text: 'Task Definitions', link: '/guides/task-definitions' },
+            { text: 'Port Forwarding', link: '/guides/port-forward' },
             { text: 'ELBv2 Integration', link: '/guides/elbv2-integration' },
             { text: 'TUI Interface', link: '/guides/tui-interface' }
           ]

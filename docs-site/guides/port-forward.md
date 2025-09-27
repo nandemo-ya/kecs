@@ -1,0 +1,406 @@
+# Port Forwarding Guide
+
+KECS provides a powerful port forwarding system that enables local access to services and tasks running in your KECS clusters. This feature is equivalent to AWS ECS's `assignPublicIp` functionality, making it seamless to develop and test locally.
+
+## Overview
+
+The port-forward feature allows you to:
+- 🌐 Access ECS services running in KECS clusters from your local machine
+- 🔄 Automatically reconnect when connections are lost
+- 📦 Forward ports for both services and individual tasks
+- 🏷️ Use tags to dynamically select tasks
+- 💾 Persist configurations across KECS restarts
+
+## Quick Start
+
+Let's forward a simple nginx service to your local machine:
+
+```bash
+# 1. Deploy a service with public IP enabled
+cat > nginx-service.json <<EOF
+{
+  "serviceName": "nginx",
+  "taskDefinition": "nginx:1",
+  "desiredCount": 1,
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": ["subnet-12345678"],
+      "assignPublicIp": "ENABLED"
+    }
+  }
+}
+EOF
+
+aws ecs create-service --cli-input-json file://nginx-service.json
+
+# 2. Forward the service to local port 8080
+kecs port-forward start service default/nginx --local-port 8080
+
+# 3. Access your service
+curl http://localhost:8080
+```
+
+That's it! Your nginx service is now accessible locally.
+
+## Basic Usage
+
+### Starting Port Forwards
+
+#### For Services
+
+Forward a service with automatic port assignment:
+```bash
+kecs port-forward start service <cluster>/<service-name>
+```
+
+Forward with specific ports:
+```bash
+kecs port-forward start service default/web --local-port 3000 --target-port 80
+```
+
+#### For Tasks
+
+Forward a specific task:
+```bash
+kecs port-forward start task <cluster>/<task-id> --local-port 9000
+```
+
+Forward using tags (automatically selects the newest matching task):
+```bash
+kecs port-forward start task production --tags app=api,version=v2
+```
+
+### Managing Port Forwards
+
+List all active forwards:
+```bash
+kecs port-forward list
+```
+
+Example output:
+```
+ID                           TYPE     CLUSTER     TARGET        LOCAL   TARGET   STATUS
+svc-default-nginx-1234       service  default     nginx         8080    80       active
+task-production-api-5678     task     production  api-task      9000    8080     active
+```
+
+Stop a specific forward:
+```bash
+kecs port-forward stop svc-default-nginx-1234
+```
+
+Stop all forwards:
+```bash
+kecs port-forward stop --all
+```
+
+## Tutorial: Web Application Development
+
+Let's walk through a typical development workflow with a multi-tier application.
+
+### Step 1: Deploy Your Application Stack
+
+```bash
+# Deploy frontend service
+aws ecs create-service \
+  --service-name frontend \
+  --task-definition frontend:1 \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-12345678],assignPublicIp=ENABLED}"
+
+# Deploy API service
+aws ecs create-service \
+  --service-name api \
+  --task-definition api:1 \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-12345678],assignPublicIp=ENABLED}"
+
+# Deploy database (without public IP for security)
+aws ecs create-service \
+  --service-name database \
+  --task-definition postgres:1
+```
+
+### Step 2: Set Up Port Forwarding
+
+Create a configuration file for consistent port mappings:
+
+```yaml
+# port-forwards.yaml
+forwards:
+  - type: service
+    cluster: default
+    target: frontend
+    localPort: 3000
+    targetPort: 3000
+
+  - type: service
+    cluster: default
+    target: api
+    localPort: 8080
+    targetPort: 8080
+```
+
+Apply the configuration:
+```bash
+kecs port-forward apply -f port-forwards.yaml
+```
+
+### Step 3: Develop with Live Services
+
+Now you can:
+- Access frontend at `http://localhost:3000`
+- Make API calls to `http://localhost:8080`
+- Changes to your services are immediately accessible
+
+### Step 4: Debug a Specific Task
+
+If you need to debug a specific task instance:
+
+```bash
+# Find the problematic task
+aws ecs list-tasks --cluster default --service-name api
+
+# Forward debug port
+kecs port-forward start task default/arn:aws:ecs:task:abc123 \
+  --local-port 5005 --target-port 5005
+
+# Connect your debugger to localhost:5005
+```
+
+## Advanced Features
+
+### Tag-Based Task Selection
+
+Tags are powerful for dynamic environments:
+
+```bash
+# Always forward to the latest canary deployment
+kecs port-forward start task production \
+  --tags deployment=canary,service=api \
+  --local-port 8081
+```
+
+When tasks are replaced (e.g., during deployments), the forward automatically switches to the new task.
+
+### Auto-Reconnection
+
+Port forwards automatically reconnect when:
+- Network connectivity is lost
+- The target pod restarts
+- The task is replaced
+
+Monitor reconnection status:
+```bash
+kecs port-forward list --watch
+```
+
+### Multiple Instances
+
+Run multiple KECS instances with different port mappings:
+
+```bash
+# Development instance
+kecs start --instance dev
+kecs port-forward start service default/web --local-port 3000
+
+# Staging instance
+kecs start --instance staging
+KECS_INSTANCE=staging kecs port-forward start service default/web --local-port 4000
+```
+
+## Configuration Files
+
+Define your port forwarding setup in a YAML file:
+
+```yaml
+# development-ports.yaml
+forwards:
+  # Frontend with hot-reload
+  - type: service
+    cluster: default
+    target: frontend
+    localPort: 3000
+    targetPort: 3000
+    autoReconnect: true
+
+  # API server
+  - type: service
+    cluster: default
+    target: api
+    localPort: 8080
+    targetPort: 8080
+
+  # Admin panel
+  - type: service
+    cluster: default
+    target: admin
+    localPort: 9090
+    targetPort: 80
+
+  # Debug port for specific task
+  - type: task
+    cluster: default
+    tags:
+      service: api
+      debug: enabled
+    localPort: 5005
+    targetPort: 5005
+```
+
+Apply and manage configurations:
+
+```bash
+# Apply configuration
+kecs port-forward apply -f development-ports.yaml
+
+# Update configuration (adds/updates forwards, removes outdated ones)
+kecs port-forward apply -f development-ports.yaml --update
+
+# Remove all forwards from configuration
+kecs port-forward delete -f development-ports.yaml
+```
+
+## Troubleshooting
+
+### Service Not Accessible
+
+**Problem**: Can't connect to forwarded port
+
+**Solution**:
+1. Check service has `assignPublicIp: ENABLED`
+2. Verify the service is running:
+   ```bash
+   aws ecs describe-services --cluster default --services nginx
+   ```
+3. Check forward status:
+   ```bash
+   kecs port-forward list
+   ```
+
+### Port Already in Use
+
+**Problem**: Error "port 8080 is already in use"
+
+**Solution**:
+1. Check what's using the port:
+   ```bash
+   lsof -i :8080
+   ```
+2. Either stop the conflicting process or use a different port:
+   ```bash
+   kecs port-forward start service default/nginx --local-port 8081
+   ```
+
+### Connection Drops Frequently
+
+**Problem**: Forward keeps disconnecting
+
+**Solution**:
+1. Check KECS logs:
+   ```bash
+   kecs logs -f
+   ```
+2. Ensure stable network connection
+3. Verify task isn't being frequently restarted:
+   ```bash
+   aws ecs describe-tasks --cluster default --tasks <task-id>
+   ```
+
+### Forward Not Reconnecting
+
+**Problem**: Auto-reconnect not working
+
+**Solution**:
+1. Check if auto-reconnect is enabled:
+   ```bash
+   kecs port-forward list --format json | jq '.[] | select(.id=="<forward-id>")'
+   ```
+2. Manually restart the forward:
+   ```bash
+   kecs port-forward stop <forward-id>
+   kecs port-forward start service <cluster>/<service>
+   ```
+
+## Best Practices
+
+1. **Use Configuration Files**: Define port mappings in YAML for consistency across team members
+
+2. **Reserve Port Ranges**: Establish conventions for port assignments:
+   - 3000-3999: Frontend applications
+   - 8000-8999: Backend APIs
+   - 9000-9999: Admin/monitoring tools
+   - 5000-5999: Debug ports
+
+3. **Label Services Clearly**: Use descriptive service names to make port management easier
+
+4. **Monitor Forward Health**: Regularly check `kecs port-forward list` to ensure connections are healthy
+
+5. **Clean Up Unused Forwards**: Stop forwards when not needed to free resources:
+   ```bash
+   kecs port-forward stop --all
+   ```
+
+## Integration with Development Tools
+
+### VS Code Remote Development
+
+Configure VS Code to use forwarded ports:
+
+```json
+// .vscode/settings.json
+{
+  "remote.localPortHost": "localhost",
+  "remote.portsAttributes": {
+    "8080": {
+      "label": "API Server",
+      "onAutoForward": "notify"
+    },
+    "3000": {
+      "label": "Frontend",
+      "onAutoForward": "openBrowser"
+    }
+  }
+}
+```
+
+### Docker Compose Integration
+
+Use KECS port forwards with docker-compose:
+
+```yaml
+# docker-compose.override.yml
+version: '3.8'
+services:
+  frontend:
+    environment:
+      - API_URL=http://localhost:8080
+    network_mode: host  # Access forwarded ports
+```
+
+### Continuous Integration
+
+Include port forwarding in CI scripts:
+
+```bash
+#!/bin/bash
+# ci-test.sh
+
+# Start KECS and services
+kecs start --instance ci
+aws ecs create-service --cli-input-json file://service.json
+
+# Set up port forwarding
+kecs port-forward apply -f ci-ports.yaml
+
+# Run integration tests
+npm run test:integration
+
+# Cleanup
+kecs stop --instance ci
+```
+
+## Related Documentation
+
+- [Getting Started](./getting-started.md) - Initial KECS setup
+- [Services Guide](./services.md) - Managing ECS services
+- [CLI Commands](./cli-commands.md) - Complete CLI reference
+- [Troubleshooting](./troubleshooting.md) - Common issues and solutions

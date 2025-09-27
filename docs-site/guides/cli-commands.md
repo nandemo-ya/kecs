@@ -216,6 +216,106 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
+## Port Forwarding Commands
+
+### kecs port-forward start
+
+Creates a port forward to access services or tasks locally.
+
+```bash
+kecs port-forward start <type> <target> [flags]
+```
+
+**Types:**
+- `service` - Forward to an ECS service
+- `task` - Forward to a specific task
+
+**Flags:**
+- `--local-port int`: Local port to bind (default: auto-assign)
+- `--target-port int`: Target container port (default: 80 for services, 8080 for tasks)
+- `--tags stringToString`: Tags for task selection (task type only)
+- `--no-auto-reconnect`: Disable automatic reconnection on failure
+
+**Examples:**
+```bash
+# Forward a service
+kecs port-forward start service default/nginx --local-port 8080
+
+# Forward to newest task with tags
+kecs port-forward start task production --tags app=api,version=v2 --local-port 3000
+
+# Auto-assign local port
+kecs port-forward start service staging/web
+```
+
+### kecs port-forward list
+
+Lists all active port forwards.
+
+```bash
+kecs port-forward list [flags]
+```
+
+**Flags:**
+- `--format string`: Output format (table, json, yaml)
+- `--watch`: Watch for changes in real-time
+
+**Example output:**
+```
+ID                          TYPE     CLUSTER    TARGET      LOCAL   TARGET   STATUS
+svc-default-nginx-1234      service  default    nginx       8080    80       active
+task-prod-api-5678          task     production api-task    3000    8080     active
+```
+
+### kecs port-forward stop
+
+Stops one or more port forwards.
+
+```bash
+kecs port-forward stop <forward-id|--all> [flags]
+```
+
+**Flags:**
+- `--all`: Stop all active port forwards
+
+**Examples:**
+```bash
+# Stop specific forward
+kecs port-forward stop svc-default-nginx-1234
+
+# Stop all forwards
+kecs port-forward stop --all
+```
+
+### kecs port-forward apply
+
+Apply port forwards from a configuration file.
+
+```bash
+kecs port-forward apply -f <config-file> [flags]
+```
+
+**Flags:**
+- `-f, --file string`: Configuration file path
+- `--update`: Update existing configuration (add/update/remove)
+
+**Configuration file example:**
+```yaml
+forwards:
+  - type: service
+    cluster: default
+    target: web
+    localPort: 3000
+    targetPort: 80
+
+  - type: task
+    cluster: production
+    tags:
+      app: api
+    localPort: 8080
+    targetPort: 8080
+```
+
 ### Debug Mode
 
 Enable debug logging for troubleshooting:
@@ -231,6 +331,7 @@ kecs start
 
 ## Next Steps
 
+- [Port Forwarding Guide](/guides/port-forward) - Access services locally
 - [Services Guide](/guides/services) - Deploy ECS services
 - [ELBv2 Integration](/guides/elbv2-integration) - Configure load balancers
 - [TUI Interface](/guides/tui-interface) - Interactive management
