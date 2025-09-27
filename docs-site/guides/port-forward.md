@@ -180,16 +180,16 @@ kecs port-forward list --watch
 
 ### Multiple Instances
 
-Run multiple KECS instances with different port mappings:
+Run multiple KECS instances for different projects or features:
 
 ```bash
-# Development instance
-kecs start --instance dev
+# Project A instance
+kecs start --instance project-a
 kecs port-forward start service default/web --local-port 3000
 
-# Staging instance
-kecs start --instance staging
-KECS_INSTANCE=staging kecs port-forward start service default/web --local-port 4000
+# Project B instance
+kecs start --instance project-b
+KECS_INSTANCE=project-b kecs port-forward start service default/web --local-port 4000
 ```
 
 
