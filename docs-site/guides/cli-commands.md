@@ -287,34 +287,6 @@ kecs port-forward stop svc-default-nginx-1234
 kecs port-forward stop --all
 ```
 
-### kecs port-forward apply
-
-Apply port forwards from a configuration file.
-
-```bash
-kecs port-forward apply -f <config-file> [flags]
-```
-
-**Flags:**
-- `-f, --file string`: Configuration file path
-- `--update`: Update existing configuration (add/update/remove)
-
-**Configuration file example:**
-```yaml
-forwards:
-  - type: service
-    cluster: default
-    target: web
-    localPort: 3000
-    targetPort: 80
-
-  - type: task
-    cluster: production
-    tags:
-      app: api
-    localPort: 8080
-    targetPort: 8080
-```
 
 ### Debug Mode
 

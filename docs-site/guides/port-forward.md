@@ -121,27 +121,12 @@ aws ecs create-service \
 
 ### Step 2: Set Up Port Forwarding
 
-Create a configuration file for consistent port mappings:
-
-```yaml
-# port-forwards.yaml
-forwards:
-  - type: service
-    cluster: default
-    target: frontend
-    localPort: 3000
-    targetPort: 3000
-
-  - type: service
-    cluster: default
-    target: api
-    localPort: 8080
-    targetPort: 8080
-```
-
-Apply the configuration:
 ```bash
-kecs port-forward apply -f port-forwards.yaml
+# Forward frontend service
+kecs port-forward start service default/frontend --local-port 3000 --target-port 3000
+
+# Forward API service
+kecs port-forward start service default/api --local-port 8080 --target-port 8080
 ```
 
 ### Step 3: Develop with Live Services
@@ -207,57 +192,6 @@ kecs start --instance staging
 KECS_INSTANCE=staging kecs port-forward start service default/web --local-port 4000
 ```
 
-## Configuration Files
-
-Define your port forwarding setup in a YAML file:
-
-```yaml
-# development-ports.yaml
-forwards:
-  # Frontend with hot-reload
-  - type: service
-    cluster: default
-    target: frontend
-    localPort: 3000
-    targetPort: 3000
-    autoReconnect: true
-
-  # API server
-  - type: service
-    cluster: default
-    target: api
-    localPort: 8080
-    targetPort: 8080
-
-  # Admin panel
-  - type: service
-    cluster: default
-    target: admin
-    localPort: 9090
-    targetPort: 80
-
-  # Debug port for specific task
-  - type: task
-    cluster: default
-    tags:
-      service: api
-      debug: enabled
-    localPort: 5005
-    targetPort: 5005
-```
-
-Apply and manage configurations:
-
-```bash
-# Apply configuration
-kecs port-forward apply -f development-ports.yaml
-
-# Update configuration (adds/updates forwards, removes outdated ones)
-kecs port-forward apply -f development-ports.yaml --update
-
-# Remove all forwards from configuration
-kecs port-forward delete -f development-ports.yaml
-```
 
 ## Troubleshooting
 
@@ -322,7 +256,7 @@ kecs port-forward delete -f development-ports.yaml
 
 ## Best Practices
 
-1. **Use Configuration Files**: Define port mappings in YAML for consistency across team members
+1. **Use Consistent Port Mappings**: Document your port assignments for team consistency
 
 2. **Reserve Port Ranges**: Establish conventions for port assignments:
    - 3000-3999: Frontend applications

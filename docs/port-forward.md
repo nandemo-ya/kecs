@@ -66,34 +66,6 @@ kecs port-forward stop <forward-id>
 kecs port-forward stop --all
 ```
 
-## Configuration File
-
-You can define port forwards in a configuration file for reproducible setups:
-
-```yaml
-# port-forwards.yaml
-forwards:
-  - type: service
-    cluster: production
-    target: web-service
-    localPort: 8080
-    targetPort: 80
-    autoReconnect: true
-
-  - type: task
-    cluster: staging
-    tags:
-      app: api
-      version: v2
-    localPort: 3000
-    targetPort: 3000
-    autoReconnect: true
-```
-
-Apply the configuration:
-```bash
-kecs port-forward apply -f port-forwards.yaml
-```
 
 ## How It Works
 
@@ -215,7 +187,7 @@ kecs port-forward list --format json | jq '.[] | select(.id=="<forward-id>")'
 
 ## Best Practices
 
-1. **Use Configuration Files**: For production environments, define port forwards in configuration files for consistency.
+1. **Document Port Mappings**: Keep a record of standard port assignments for consistency across teams.
 
 2. **Monitor Health**: Regularly check `kecs port-forward list` to ensure connections are healthy.
 
@@ -248,31 +220,11 @@ kecs port-forward stop --all
 
 ### Multi-Service Setup
 
-```yaml
-# services-port-forward.yaml
-forwards:
-  - type: service
-    cluster: default
-    target: frontend
-    localPort: 3000
-    targetPort: 80
-
-  - type: service
-    cluster: default
-    target: api
-    localPort: 8080
-    targetPort: 8080
-
-  - type: service
-    cluster: default
-    target: admin
-    localPort: 9090
-    targetPort: 3000
-```
-
 ```bash
-# Apply all forwards at once
-kecs port-forward apply -f services-port-forward.yaml
+# Start multiple port forwards
+kecs port-forward start service default/frontend --local-port 3000 --target-port 80
+kecs port-forward start service default/api --local-port 8080 --target-port 8080
+kecs port-forward start service default/admin --local-port 9090 --target-port 3000
 
 # Access services
 curl http://localhost:3000  # Frontend
