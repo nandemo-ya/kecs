@@ -67,7 +67,7 @@ kecs port-forward start task <cluster>/<task-id> --local-port 9000
 
 Forward using tags (automatically selects the newest matching task):
 ```bash
-kecs port-forward start task production --tags app=api,version=v2
+kecs port-forward start task default --tags app=api,version=v2
 ```
 
 ### Managing Port Forwards
@@ -81,7 +81,7 @@ Example output:
 ```
 ID                           TYPE     CLUSTER     TARGET        LOCAL   TARGET   STATUS
 svc-default-nginx-1234       service  default     nginx         8080    80       active
-task-production-api-5678     task     production  api-task      9000    8080     active
+task-default-api-5678        task     default     api-task      9000    8080     active
 ```
 
 Stop a specific forward:
@@ -159,7 +159,7 @@ Tags are powerful for dynamic environments:
 
 ```bash
 # Always forward to the latest canary deployment
-kecs port-forward start task production \
+kecs port-forward start task default \
   --tags deployment=canary,service=api \
   --local-port 8081
 ```

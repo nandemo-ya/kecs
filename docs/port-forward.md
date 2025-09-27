@@ -117,7 +117,7 @@ When using tags to select tasks:
 Example:
 ```bash
 # This will always forward to the newest task with these tags
-kecs port-forward start task production --tags app=api,version=stable --local-port 8080
+kecs port-forward start task default --tags app=api,version=stable --local-port 8080
 ```
 
 ## Integration with ECS Services
@@ -193,7 +193,7 @@ kecs port-forward list --format json | jq '.[] | select(.id=="<forward-id>")'
 
 3. **Resource Management**: Stop unused port forwards to free up ports and system resources.
 
-4. **Security**: Only forward ports that need local access. Use firewall rules for production access.
+4. **Security**: Only forward ports that need local access. Keep sensitive services protected.
 
 5. **Naming Conventions**: Use descriptive service names to make port forward management easier.
 
@@ -236,10 +236,10 @@ curl http://localhost:9090  # Admin panel
 
 ```bash
 # Find a problematic task
-aws ecs list-tasks --cluster production
+aws ecs list-tasks --cluster default
 
 # Forward to the specific task for debugging
-kecs port-forward start task production/arn:aws:ecs:task:abc123 --local-port 5005 --target-port 5005
+kecs port-forward start task default/arn:aws:ecs:task:abc123 --local-port 5005 --target-port 5005
 
 # Connect debugger to localhost:5005
 ```
