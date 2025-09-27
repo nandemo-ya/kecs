@@ -40,16 +40,19 @@ const (
 
 // Forward represents a port forward configuration
 type Forward struct {
-	ID         string        `json:"id"`
-	Type       ForwardType   `json:"type"`
-	Cluster    string        `json:"cluster"`
-	TargetName string        `json:"targetName"`
-	LocalPort  int           `json:"localPort"`
-	TargetPort int           `json:"targetPort"`
-	Status     ForwardStatus `json:"status"`
-	CreatedAt  time.Time     `json:"createdAt"`
-	UpdatedAt  time.Time     `json:"updatedAt"`
-	Error      string        `json:"error,omitempty"`
+	ID              string        `json:"id"`
+	Type            ForwardType   `json:"type"`
+	Cluster         string        `json:"cluster"`
+	TargetName      string        `json:"targetName"`
+	LocalPort       int           `json:"localPort"`
+	TargetPort      int           `json:"targetPort"`
+	Status          ForwardStatus `json:"status"`
+	CreatedAt       time.Time     `json:"createdAt"`
+	UpdatedAt       time.Time     `json:"updatedAt"`
+	Error           string        `json:"error,omitempty"`
+	AutoReconnect   bool          `json:"autoReconnect"`
+	RetryCount      int           `json:"retryCount"`
+	LastHealthCheck time.Time     `json:"lastHealthCheck,omitempty"`
 }
 
 // Manager manages port forwards for a KECS instance
@@ -60,6 +63,9 @@ type Manager struct {
 	forwards     map[string]*Forward
 	forwarders   map[string]*portForwarder
 	mu           sync.RWMutex
+	ctx          context.Context
+	cancel       context.CancelFunc
+	wg           sync.WaitGroup
 }
 
 // portForwarder holds the active port forwarding connection
@@ -69,6 +75,7 @@ type portForwarder struct {
 	errCh     chan error
 	forwarder *portforward.PortForwarder
 	cmd       *exec.Cmd // For kubectl port-forward process
+	forward   *Forward  // Reference to the forward configuration
 }
 
 // NewManager creates a new port forward manager
@@ -76,12 +83,15 @@ func NewManager(instanceName string, k8sClient *kubernetes.Client) *Manager {
 	homeDir, _ := os.UserHomeDir()
 	stateDir := filepath.Join(homeDir, ".kecs", "instances", instanceName, "port-forwards")
 
+	ctx, cancel := context.WithCancel(context.Background())
 	m := &Manager{
 		instanceName: instanceName,
 		k8sClient:    k8sClient,
 		stateDir:     stateDir,
 		forwards:     make(map[string]*Forward),
 		forwarders:   make(map[string]*portForwarder),
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 
 	// Ensure state directory exists
@@ -91,6 +101,9 @@ func NewManager(instanceName string, k8sClient *kubernetes.Client) *Manager {
 
 	// Load existing state
 	m.loadState()
+
+	// Start background monitoring
+	m.startBackgroundTasks()
 
 	return m
 }
@@ -115,15 +128,17 @@ func (m *Manager) StartServiceForward(ctx context.Context, cluster, serviceName 
 
 	// Create forward configuration
 	forward := &Forward{
-		ID:         forwardID,
-		Type:       ForwardTypeService,
-		Cluster:    cluster,
-		TargetName: serviceName,
-		LocalPort:  localPort,
-		TargetPort: targetPort,
-		Status:     StatusActive,
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
+		ID:            forwardID,
+		Type:          ForwardTypeService,
+		Cluster:       cluster,
+		TargetName:    serviceName,
+		LocalPort:     localPort,
+		TargetPort:    targetPort,
+		Status:        StatusActive,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+		AutoReconnect: true, // Enable auto-reconnect by default
+		RetryCount:    0,
 	}
 
 	// Get the namespace for the cluster
@@ -171,7 +186,7 @@ func (m *Manager) StartServiceForward(ctx context.Context, cluster, serviceName 
 	}
 
 	// Start kubectl port-forward in background
-	forwarder, err := m.startKubectlPortForward(ctx, namespace, fmt.Sprintf("svc/%s", serviceName), localPort, targetPort)
+	forwarder, err := m.startKubectlPortForward(ctx, namespace, fmt.Sprintf("svc/%s", serviceName), localPort, targetPort, forward)
 	if err != nil {
 		// Rollback k3d port mapping on failure
 		m.unmapPortWithK3d(ctx, localPort)
@@ -214,15 +229,17 @@ func (m *Manager) StartTaskForward(ctx context.Context, cluster, taskID string, 
 
 	// Create forward configuration
 	forward := &Forward{
-		ID:         forwardID,
-		Type:       ForwardTypeTask,
-		Cluster:    cluster,
-		TargetName: taskID,
-		LocalPort:  localPort,
-		TargetPort: targetPort,
-		Status:     StatusActive,
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
+		ID:            forwardID,
+		Type:          ForwardTypeTask,
+		Cluster:       cluster,
+		TargetName:    taskID,
+		LocalPort:     localPort,
+		TargetPort:    targetPort,
+		Status:        StatusActive,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+		AutoReconnect: true, // Enable auto-reconnect by default
+		RetryCount:    0,
 	}
 
 	// Get the namespace for the cluster
@@ -249,7 +266,7 @@ func (m *Manager) StartTaskForward(ctx context.Context, cluster, taskID string, 
 
 	// Check if the pod's service has NodePort
 	// Start kubectl port-forward to the pod
-	forwarder, err := m.startKubectlPortForward(ctx, namespace, fmt.Sprintf("pod/%s", pod.Name), localPort, targetPort)
+	forwarder, err := m.startKubectlPortForward(ctx, namespace, fmt.Sprintf("pod/%s", pod.Name), localPort, targetPort, forward)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to start port forwarding: %w", err)
 	}
@@ -566,7 +583,7 @@ func (m *Manager) unmapPortWithK3d(ctx context.Context, localPort int) error {
 }
 
 // startKubectlPortForward starts a kubectl port-forward process
-func (m *Manager) startKubectlPortForward(ctx context.Context, namespace, target string, localPort, targetPort int) (*portForwarder, error) {
+func (m *Manager) startKubectlPortForward(ctx context.Context, namespace, target string, localPort, targetPort int, forward *Forward) (*portForwarder, error) {
 	// Get kubeconfig path
 	kubeconfigPath := filepath.Join(os.TempDir(), fmt.Sprintf("kecs-%s.config", m.instanceName))
 
@@ -590,6 +607,7 @@ func (m *Manager) startKubectlPortForward(ctx context.Context, namespace, target
 		readyCh: make(chan struct{}),
 		errCh:   make(chan error, 1),
 		cmd:     cmd,
+		forward: forward,
 	}
 
 	// Start the command
@@ -690,4 +708,264 @@ func (m *Manager) waitForKubectlReady(ctx context.Context, cmd *exec.Cmd, port i
 			}
 		}
 	}
+}
+
+// startBackgroundTasks starts background monitoring and management tasks
+func (m *Manager) startBackgroundTasks() {
+	// Start health monitoring
+	m.wg.Add(1)
+	go m.healthMonitor()
+
+	// Start auto-reconnection monitor
+	m.wg.Add(1)
+	go m.reconnectionMonitor()
+}
+
+// Stop gracefully shuts down the manager
+func (m *Manager) Stop() {
+	logging.Info("Shutting down port forward manager")
+
+	// Cancel context to stop all background tasks
+	m.cancel()
+
+	// Stop all active port forwards
+	m.StopAllForwards()
+
+	// Wait for all background tasks to complete
+	m.wg.Wait()
+}
+
+// healthMonitor periodically checks the health of active port forwards
+func (m *Manager) healthMonitor() {
+	defer m.wg.Done()
+
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-m.ctx.Done():
+			return
+		case <-ticker.C:
+			m.checkHealthAll()
+		}
+	}
+}
+
+// checkHealthAll checks health of all active port forwards
+func (m *Manager) checkHealthAll() {
+	m.mu.RLock()
+	forwardIDs := make([]string, 0, len(m.forwarders))
+	for id := range m.forwarders {
+		forwardIDs = append(forwardIDs, id)
+	}
+	m.mu.RUnlock()
+
+	for _, id := range forwardIDs {
+		m.checkHealth(id)
+	}
+}
+
+// checkHealth checks health of a single port forward
+func (m *Manager) checkHealth(forwardID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	forward, exists := m.forwards[forwardID]
+	if !exists {
+		return
+	}
+
+	forwarder, active := m.forwarders[forwardID]
+	if !active {
+		if forward.Status == StatusActive && forward.AutoReconnect {
+			// Port forward should be active but isn't, mark for reconnection
+			forward.Status = StatusError
+			forward.Error = "Port forward process not found"
+			forward.UpdatedAt = time.Now()
+			m.saveState()
+		}
+		return
+	}
+
+	// Check if process is still alive
+	if forwarder.cmd != nil && forwarder.cmd.Process != nil {
+		// Check if process has exited
+		if forwarder.cmd.ProcessState != nil && forwarder.cmd.ProcessState.Exited() {
+			forward.Status = StatusError
+			forward.Error = "Port forward process exited"
+			forward.UpdatedAt = time.Now()
+			delete(m.forwarders, forwardID)
+			m.saveState()
+			return
+		}
+	}
+
+	// Try to connect to the port to verify it's still working
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", forward.LocalPort), 2*time.Second)
+	if err != nil {
+		logging.Warn("Port forward health check failed",
+			"id", forwardID,
+			"port", forward.LocalPort,
+			"error", err)
+		forward.Status = StatusError
+		forward.Error = fmt.Sprintf("Health check failed: %v", err)
+	} else {
+		conn.Close()
+		// Update last health check time
+		forward.LastHealthCheck = time.Now()
+		if forward.Status == StatusError {
+			// Recovered from error state
+			forward.Status = StatusActive
+			forward.Error = ""
+			logging.Info("Port forward recovered", "id", forwardID)
+		}
+	}
+
+	forward.UpdatedAt = time.Now()
+	m.saveState()
+}
+
+// reconnectionMonitor monitors for failed port forwards and attempts to reconnect
+func (m *Manager) reconnectionMonitor() {
+	defer m.wg.Done()
+
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-m.ctx.Done():
+			return
+		case <-ticker.C:
+			m.attemptReconnections()
+		}
+	}
+}
+
+// attemptReconnections attempts to reconnect failed port forwards
+func (m *Manager) attemptReconnections() {
+	m.mu.Lock()
+
+	// Create a copy of forwards to reconnect to avoid holding lock during reconnection
+	toReconnect := make([]*Forward, 0)
+
+	for id, forward := range m.forwards {
+		// Skip if not auto-reconnect enabled or already active
+		if !forward.AutoReconnect || forward.Status == StatusActive {
+			continue
+		}
+
+		// Skip if forwarder already exists
+		if _, exists := m.forwarders[id]; exists {
+			continue
+		}
+
+		// Limit retry attempts
+		if forward.RetryCount >= 5 {
+			if forward.Status != StatusStopped {
+				logging.Warn("Max retries reached for port forward",
+					"id", id,
+					"retryCount", forward.RetryCount)
+				forward.Status = StatusStopped
+				forward.Error = "Max retry attempts reached"
+				forward.UpdatedAt = time.Now()
+				m.saveState()
+			}
+			continue
+		}
+
+		// Create a copy of the forward to avoid race conditions
+		forwardCopy := &Forward{
+			ID:            forward.ID,
+			Type:          forward.Type,
+			Cluster:       forward.Cluster,
+			TargetName:    forward.TargetName,
+			LocalPort:     forward.LocalPort,
+			TargetPort:    forward.TargetPort,
+			Status:        forward.Status,
+			CreatedAt:     forward.CreatedAt,
+			UpdatedAt:     forward.UpdatedAt,
+			Error:         forward.Error,
+			AutoReconnect: forward.AutoReconnect,
+			RetryCount:    forward.RetryCount,
+		}
+		toReconnect = append(toReconnect, forwardCopy)
+	}
+
+	m.mu.Unlock()
+
+	// Start reconnection goroutines without holding the lock
+	for _, forward := range toReconnect {
+		logging.Info("Attempting to reconnect port forward",
+			"id", forward.ID,
+			"type", forward.Type,
+			"target", forward.TargetName,
+			"retryCount", forward.RetryCount)
+
+		go m.reconnectForward(forward)
+	}
+}
+
+// reconnectForward attempts to reconnect a single port forward
+func (m *Manager) reconnectForward(forwardCopy *Forward) {
+	// Check if context is still valid
+	select {
+	case <-m.ctx.Done():
+		return
+	default:
+	}
+
+	// Update retry count on the actual forward object
+	m.mu.Lock()
+	originalForward, exists := m.forwards[forwardCopy.ID]
+	if !exists {
+		m.mu.Unlock()
+		return // Forward was removed
+	}
+	originalForward.RetryCount++
+	originalForward.UpdatedAt = time.Now()
+	m.saveState()
+	m.mu.Unlock()
+
+	// Recreate the port forward based on type - this will lock/unlock internally
+	var err error
+	switch forwardCopy.Type {
+	case ForwardTypeService:
+		_, _, err = m.StartServiceForward(m.ctx,
+			forwardCopy.Cluster, forwardCopy.TargetName,
+			forwardCopy.LocalPort, forwardCopy.TargetPort)
+	case ForwardTypeTask:
+		_, _, err = m.StartTaskForward(m.ctx,
+			forwardCopy.Cluster, forwardCopy.TargetName,
+			forwardCopy.LocalPort, forwardCopy.TargetPort)
+	}
+
+	// Update the status based on reconnection result
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Get the original forward again as it may have been modified
+	originalForward, exists = m.forwards[forwardCopy.ID]
+	if !exists {
+		return // Forward was removed while reconnecting
+	}
+
+	if err != nil {
+		logging.Error("Failed to reconnect port forward",
+			"id", forwardCopy.ID,
+			"error", err)
+		originalForward.Status = StatusError
+		originalForward.Error = fmt.Sprintf("Reconnection failed: %v", err)
+	} else {
+		logging.Info("Successfully reconnected port forward",
+			"id", forwardCopy.ID,
+			"localPort", forwardCopy.LocalPort)
+		originalForward.Status = StatusActive
+		originalForward.Error = ""
+		originalForward.RetryCount = 0 // Reset retry count on success
+	}
+
+	originalForward.UpdatedAt = time.Now()
+	m.saveState()
 }
