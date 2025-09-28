@@ -73,10 +73,12 @@ kecs port-forward stop --all
 
 For services with `assignPublicIp: ENABLED`:
 
-1. KECS creates a NodePort service in Kubernetes
+1. KECS creates a service in Kubernetes (NodePort or LoadBalancer type)
 2. The port-forward manager uses `k3d node edit` to map the NodePort to a host port
 3. kubectl establishes a port-forward connection from the host port to the service
 4. The connection is monitored and automatically reconnected if it fails
+
+**Note**: Port forwarding works with both NodePort and LoadBalancer service types. Services with ELB/ALB integration (LoadBalancer type) are fully supported.
 
 ### Task Port Forwarding
 
@@ -230,6 +232,23 @@ kecs port-forward start service default/admin --local-port 9090 --target-port 30
 curl http://localhost:3000  # Frontend
 curl http://localhost:8080  # API
 curl http://localhost:9090  # Admin panel
+```
+
+### ALB/ELB Service Setup
+
+```bash
+# Deploy service with ALB integration
+aws ecs create-service \
+  --service-name webapp-alb \
+  --task-definition webapp:1 \
+  --network-configuration "awsvpcConfiguration={assignPublicIp=ENABLED}" \
+  --load-balancers targetGroupArn=arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/webapp-tg/xxx
+
+# Forward the LoadBalancer service
+kecs port-forward start service default/webapp-alb --local-port 8080 --target-port 80
+
+# Access the service locally
+curl http://localhost:8080
 ```
 
 ### Task Debugging

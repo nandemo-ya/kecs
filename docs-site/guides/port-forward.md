@@ -10,6 +10,7 @@ The port-forward feature allows you to:
 - 📦 Forward ports for both services and individual tasks
 - 🏷️ Use tags to dynamically select tasks
 - 💾 Persist configurations across KECS restarts
+- 🔀 Support for both NodePort and LoadBalancer service types
 
 ## Quick Start
 
@@ -113,6 +114,13 @@ aws ecs create-service \
   --task-definition api:1 \
   --network-configuration "awsvpcConfiguration={subnets=[subnet-12345678],assignPublicIp=ENABLED}"
 
+# Deploy service with ALB (LoadBalancer type)
+aws ecs create-service \
+  --service-name webapp-alb \
+  --task-definition webapp:1 \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-12345678],assignPublicIp=ENABLED}" \
+  --load-balancers targetGroupArn=arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/webapp-tg/xxx
+
 # Deploy database (without public IP for security)
 aws ecs create-service \
   --service-name database \
@@ -127,6 +135,9 @@ kecs port-forward start service default/frontend --local-port 3000 --target-port
 
 # Forward API service
 kecs port-forward start service default/api --local-port 8080 --target-port 8080
+
+# Forward ALB service (LoadBalancer type)
+kecs port-forward start service default/webapp-alb --local-port 8090 --target-port 80
 ```
 
 ### Step 3: Develop with Live Services
@@ -134,6 +145,7 @@ kecs port-forward start service default/api --local-port 8080 --target-port 8080
 Now you can:
 - Access frontend at `http://localhost:3000`
 - Make API calls to `http://localhost:8080`
+- Access ALB-integrated service at `http://localhost:8090`
 - Changes to your services are immediately accessible
 
 ### Step 4: Debug a Specific Task
