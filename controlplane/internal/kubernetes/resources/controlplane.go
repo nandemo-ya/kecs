@@ -89,6 +89,9 @@ type ControlPlaneConfig struct {
 
 	// Additional environment variables
 	ExtraEnvVars []corev1.EnvVar
+
+	// PostgreSQL configuration (always enabled)
+	PostgresPassword string // Will be stored in secret
 }
 
 // DefaultControlPlaneConfig returns default configuration
@@ -305,9 +308,12 @@ features:
   traefik: true
 
 database:
-  type: duckdb
-  path: /data/kecs.db
-  inMemory: false
+  type: postgres
+  postgres:
+    host: localhost
+    port: 5432
+    database: kecs
+    user: kecs
 
 localstack:
   enabled: true
@@ -465,6 +471,173 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 	}
 }
 
+// createContainers creates the containers for the deployment based on configuration
+func createContainers(config *ControlPlaneConfig, envVars []corev1.EnvVar) []corev1.Container {
+	containers := []corev1.Container{
+		{
+			Name:            "controlplane",
+			Image:           config.Image,
+			ImagePullPolicy: config.ImagePullPolicy,
+			Command:         []string{"/kecs-server"},
+			Args:            []string{"server"},
+			Env:             envVars,
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "api",
+					ContainerPort: ControlPlaneInternalAPIPort,
+					Protocol:      corev1.ProtocolTCP,
+				},
+				{
+					Name:          "admin",
+					ContainerPort: ControlPlaneInternalAdminPort,
+					Protocol:      corev1.ProtocolTCP,
+				},
+				{
+					Name:          "webhook",
+					ContainerPort: 9443,
+					Protocol:      corev1.ProtocolTCP,
+				},
+			},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse(config.CPURequest),
+					corev1.ResourceMemory: resource.MustParse(config.MemoryRequest),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse(config.CPULimit),
+					corev1.ResourceMemory: resource.MustParse(config.MemoryLimit),
+				},
+			},
+			StartupProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/ready",
+						Port: intstr.FromString("admin"),
+					},
+				},
+				InitialDelaySeconds: 5,  // Start checking early
+				PeriodSeconds:       2,  // Check frequently during startup
+				FailureThreshold:    60, // Allow up to 2 minutes for startup (60 * 2s)
+				SuccessThreshold:    1,
+			},
+			LivenessProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/health",
+						Port: intstr.FromString("admin"),
+					},
+				},
+				InitialDelaySeconds: 0, // No delay needed with startup probe
+				PeriodSeconds:       30,
+				FailureThreshold:    3,
+			},
+			ReadinessProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/ready",
+						Port: intstr.FromString("admin"),
+					},
+				},
+				InitialDelaySeconds: 0, // No delay needed with startup probe
+				PeriodSeconds:       5, // Check more frequently for faster detection
+				FailureThreshold:    3, // Reduced since startup probe handles initial startup
+				SuccessThreshold:    1,
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "config",
+					MountPath: "/etc/kecs",
+					ReadOnly:  true,
+				},
+				{
+					Name:      "data",
+					MountPath: "/data",
+				},
+			},
+		},
+	}
+
+	// Add PostgreSQL sidecar (always enabled)
+	containers = append(containers, createPostgresSidecar(config))
+
+	return containers
+}
+
+// createPostgresSidecar creates the PostgreSQL sidecar container
+func createPostgresSidecar(config *ControlPlaneConfig) corev1.Container {
+	password := config.PostgresPassword
+	if password == "" {
+		password = "kecs-postgres-2024" // Default password for development
+	}
+
+	return corev1.Container{
+		Name:  "postgres",
+		Image: "postgres:16-alpine",
+		Ports: []corev1.ContainerPort{
+			{
+				ContainerPort: 5432,
+				Name:          "postgres",
+				Protocol:      corev1.ProtocolTCP,
+			},
+		},
+		Env: []corev1.EnvVar{
+			{
+				Name:  "POSTGRES_DB",
+				Value: "kecs",
+			},
+			{
+				Name:  "POSTGRES_USER",
+				Value: "kecs",
+			},
+			{
+				Name:  "POSTGRES_PASSWORD",
+				Value: password,
+			},
+			{
+				Name:  "PGDATA",
+				Value: "/var/lib/postgresql/data/pgdata",
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "data",
+				MountPath: "/var/lib/postgresql/data",
+				SubPath:   "postgres", // Separate from DuckDB data
+			},
+		},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("128Mi"),
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+			},
+		},
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{"pg_isready", "-U", "kecs"},
+				},
+			},
+			InitialDelaySeconds: 5,
+			PeriodSeconds:       10,
+			FailureThreshold:    3,
+		},
+		LivenessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{"pg_isready", "-U", "kecs"},
+				},
+			},
+			InitialDelaySeconds: 30,
+			PeriodSeconds:       30,
+			FailureThreshold:    3,
+		},
+	}
+}
+
 // createDeployment creates the control plane deployment
 func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 	replicas := int32(1)
@@ -554,90 +727,8 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 							Args:    []string{"echo 'Checking network connectivity...'; nslookup kubernetes.default.svc.cluster.local || true; echo 'Network check complete'"},
 						},
 					},
-					Containers: []corev1.Container{
-						{
-							Name:            "controlplane",
-							Image:           config.Image,
-							ImagePullPolicy: config.ImagePullPolicy,
-							Command:         []string{"/kecs-server"},
-							Args:            []string{"server"},
-							Env:             envVars,
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "api",
-									ContainerPort: ControlPlaneInternalAPIPort,
-									Protocol:      corev1.ProtocolTCP,
-								},
-								{
-									Name:          "admin",
-									ContainerPort: ControlPlaneInternalAdminPort,
-									Protocol:      corev1.ProtocolTCP,
-								},
-								{
-									Name:          "webhook",
-									ContainerPort: 9443,
-									Protocol:      corev1.ProtocolTCP,
-								},
-							},
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse(config.CPURequest),
-									corev1.ResourceMemory: resource.MustParse(config.MemoryRequest),
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse(config.CPULimit),
-									corev1.ResourceMemory: resource.MustParse(config.MemoryLimit),
-								},
-							},
-							StartupProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/ready",
-										Port: intstr.FromString("admin"),
-									},
-								},
-								InitialDelaySeconds: 5,  // Start checking early
-								PeriodSeconds:       2,  // Check frequently during startup
-								FailureThreshold:    60, // Allow up to 2 minutes for startup (60 * 2s)
-								SuccessThreshold:    1,
-							},
-							LivenessProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/health",
-										Port: intstr.FromString("admin"),
-									},
-								},
-								InitialDelaySeconds: 0, // No delay needed with startup probe
-								PeriodSeconds:       30,
-								FailureThreshold:    3,
-							},
-							ReadinessProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/ready",
-										Port: intstr.FromString("admin"),
-									},
-								},
-								InitialDelaySeconds: 0, // No delay needed with startup probe
-								PeriodSeconds:       5, // Check more frequently for faster detection
-								FailureThreshold:    3, // Reduced since startup probe handles initial startup
-								SuccessThreshold:    1,
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "config",
-									MountPath: "/etc/kecs",
-									ReadOnly:  true,
-								},
-								{
-									Name:      "data",
-									MountPath: "/data",
-								},
-							},
-						},
-					},
-					Volumes: createVolumes(config),
+					Containers: createContainers(config, envVars),
+					Volumes:    createVolumes(config),
 				},
 			},
 		},
