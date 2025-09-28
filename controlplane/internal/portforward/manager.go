@@ -155,9 +155,9 @@ func (m *Manager) StartServiceForward(ctx context.Context, cluster, serviceName 
 		return "", 0, fmt.Errorf("failed to get service: %w", err)
 	}
 
-	// Check if service has NodePort
+	// Check if service has NodePort (both NodePort and LoadBalancer types have NodePorts)
 	var nodePort int32
-	if service.Spec.Type == corev1.ServiceTypeNodePort && len(service.Spec.Ports) > 0 {
+	if (service.Spec.Type == corev1.ServiceTypeNodePort || service.Spec.Type == corev1.ServiceTypeLoadBalancer) && len(service.Spec.Ports) > 0 {
 		// Find the NodePort that matches our target port
 		for _, port := range service.Spec.Ports {
 			if port.Port == int32(targetPort) || targetPort == 0 {
