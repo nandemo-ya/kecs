@@ -12,10 +12,12 @@ import (
 
 // PostgresStorage implements the Storage interface for PostgreSQL
 type PostgresStorage struct {
-	db           *sql.DB
-	connString   string
-	clusterStore *clusterStore
-	serviceStore *serviceStore
+	db                  *sql.DB
+	connString          string
+	clusterStore        *clusterStore
+	serviceStore        *serviceStore
+	taskStore           *taskStore
+	taskDefinitionStore *taskDefinitionStore
 	// TODO: Add other stores once implemented
 }
 
@@ -49,6 +51,8 @@ func (s *PostgresStorage) Initialize(ctx context.Context) error {
 	// Initialize stores
 	s.clusterStore = &clusterStore{db: db}
 	s.serviceStore = &serviceStore{db: db}
+	s.taskStore = &taskStore{db: db}
+	s.taskDefinitionStore = &taskDefinitionStore{db: db}
 	// TODO: Initialize other stores once implemented
 
 	// Create tables
@@ -74,8 +78,7 @@ func (s *PostgresStorage) ClusterStore() storage.ClusterStore {
 
 // TaskDefinitionStore returns the task definition store
 func (s *PostgresStorage) TaskDefinitionStore() storage.TaskDefinitionStore {
-	// TODO: Implement task definition store
-	return nil
+	return s.taskDefinitionStore
 }
 
 // ServiceStore returns the service store
@@ -85,8 +88,7 @@ func (s *PostgresStorage) ServiceStore() storage.ServiceStore {
 
 // TaskStore returns the task store
 func (s *PostgresStorage) TaskStore() storage.TaskStore {
-	// TODO: Implement task store
-	return nil
+	return s.taskStore
 }
 
 // AccountSettingStore returns the account setting store
@@ -232,8 +234,53 @@ func (s *PostgresStorage) createClustersTable(ctx context.Context) error {
 
 // createTaskDefinitionsTable creates the task_definitions table
 func (s *PostgresStorage) createTaskDefinitionsTable(ctx context.Context) error {
-	// Implementation will follow DuckDB schema
-	// TODO: Implement
+	query := `
+	CREATE TABLE IF NOT EXISTS task_definitions (
+		id TEXT PRIMARY KEY,
+		arn TEXT NOT NULL UNIQUE,
+		family TEXT NOT NULL,
+		revision INTEGER NOT NULL,
+		task_role_arn TEXT,
+		execution_role_arn TEXT,
+		network_mode TEXT NOT NULL DEFAULT 'bridge',
+		container_definitions TEXT NOT NULL,
+		volumes TEXT,
+		placement_constraints TEXT,
+		requires_compatibilities TEXT,
+		cpu TEXT,
+		memory TEXT,
+		tags TEXT,
+		pid_mode TEXT,
+		ipc_mode TEXT,
+		proxy_configuration TEXT,
+		inference_accelerators TEXT,
+		runtime_platform TEXT,
+		status TEXT NOT NULL DEFAULT 'ACTIVE',
+		region TEXT,
+		account_id TEXT,
+		registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		deregistered_at TIMESTAMP,
+		UNIQUE(family, revision)
+	)`
+
+	_, err := s.db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to create task_definitions table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_task_definitions_family ON task_definitions(family)",
+		"CREATE INDEX IF NOT EXISTS idx_task_definitions_status ON task_definitions(status)",
+		"CREATE INDEX IF NOT EXISTS idx_task_definitions_registered_at ON task_definitions(registered_at)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -302,8 +349,72 @@ func (s *PostgresStorage) createServicesTable(ctx context.Context) error {
 
 // createTasksTable creates the tasks table
 func (s *PostgresStorage) createTasksTable(ctx context.Context) error {
-	// Implementation will follow DuckDB schema
-	// TODO: Implement
+	query := `
+	CREATE TABLE IF NOT EXISTS tasks (
+		id TEXT PRIMARY KEY,
+		arn TEXT NOT NULL UNIQUE,
+		cluster_arn TEXT NOT NULL,
+		task_definition_arn TEXT NOT NULL,
+		container_instance_arn TEXT,
+		overrides TEXT,
+		last_status TEXT NOT NULL,
+		desired_status TEXT NOT NULL,
+		cpu TEXT,
+		memory TEXT,
+		containers TEXT NOT NULL,
+		started_by TEXT,
+		version BIGINT DEFAULT 0,
+		stop_code TEXT,
+		stopped_reason TEXT,
+		stopping_at TIMESTAMP,
+		stopped_at TIMESTAMP,
+		connectivity TEXT,
+		connectivity_at TIMESTAMP,
+		pull_started_at TIMESTAMP,
+		pull_stopped_at TIMESTAMP,
+		execution_stopped_at TIMESTAMP,
+		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		started_at TIMESTAMP,
+		launch_type TEXT NOT NULL,
+		platform_version TEXT,
+		platform_family TEXT,
+		task_group TEXT,
+		attachments TEXT,
+		health_status TEXT,
+		tags TEXT,
+		attributes TEXT,
+		enable_execute_command BOOLEAN DEFAULT FALSE,
+		capacity_provider_name TEXT,
+		ephemeral_storage TEXT,
+		region TEXT,
+		account_id TEXT,
+		pod_name TEXT,
+		namespace TEXT,
+		service_registries TEXT
+	)`
+
+	_, err := s.db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to create tasks table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_tasks_cluster_arn ON tasks(cluster_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_task_definition_arn ON tasks(task_definition_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_last_status ON tasks(last_status)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_desired_status ON tasks(desired_status)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_started_by ON tasks(started_by)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at)",
+		"CREATE INDEX IF NOT EXISTS idx_tasks_cluster_status ON tasks(cluster_arn, last_status)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
 	return nil
 }
 
