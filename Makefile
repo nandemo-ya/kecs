@@ -123,6 +123,13 @@ test-coverage:
 	@echo "Running tests with coverage..."
 	cd $(CONTROLPLANE_DIR) && $(GOTEST) -v -race -coverprofile=../coverage.txt -covermode=atomic ./...
 
+# Run PostgreSQL tests with Testcontainers
+.PHONY: test-postgres
+test-postgres:
+	@echo "Running PostgreSQL tests with Testcontainers..."
+	@echo "Testcontainers will automatically start a PostgreSQL container for testing"
+	cd $(CONTROLPLANE_DIR) && $(GOTEST) -v -race -timeout 60s ./internal/storage/postgres/...
+
 # Vet code
 .PHONY: vet
 vet:
