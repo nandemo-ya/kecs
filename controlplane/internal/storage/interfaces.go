@@ -2,7 +2,14 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"time"
+)
+
+// Common storage errors
+var (
+	ErrResourceNotFound      = errors.New("resource not found")
+	ErrResourceAlreadyExists = errors.New("resource already exists")
 )
 
 // Storage defines the interface for all storage operations
