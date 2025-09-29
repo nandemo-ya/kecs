@@ -12,18 +12,11 @@ import (
 
 // PostgresStorage implements the Storage interface for PostgreSQL
 type PostgresStorage struct {
-	db                     *sql.DB
-	connString             string
-	clusterStore           *clusterStore
-	taskDefinitionStore    *taskDefinitionStore
-	serviceStore           *serviceStore
-	taskStore              *taskStore
-	accountSettingStore    *accountSettingStore
-	taskSetStore           *taskSetStore
-	containerInstanceStore *containerInstanceStore
-	attributeStore         *attributeStore
-	elbv2Store             *elbv2Store
-	taskLogStore           *taskLogStore
+	db           *sql.DB
+	connString   string
+	clusterStore *clusterStore
+	serviceStore *serviceStore
+	// TODO: Add other stores once implemented
 }
 
 // NewPostgresStorage creates a new PostgreSQL storage instance
@@ -55,15 +48,8 @@ func (s *PostgresStorage) Initialize(ctx context.Context) error {
 
 	// Initialize stores
 	s.clusterStore = &clusterStore{db: db}
-	s.taskDefinitionStore = &taskDefinitionStore{db: db}
 	s.serviceStore = &serviceStore{db: db}
-	s.taskStore = &taskStore{db: db}
-	s.accountSettingStore = &accountSettingStore{db: db}
-	s.taskSetStore = &taskSetStore{db: db}
-	s.containerInstanceStore = &containerInstanceStore{db: db}
-	s.attributeStore = &attributeStore{db: db}
-	s.elbv2Store = &elbv2Store{db: db}
-	s.taskLogStore = &taskLogStore{db: db}
+	// TODO: Initialize other stores once implemented
 
 	// Create tables
 	if err := s.createTables(ctx); err != nil {
@@ -88,7 +74,8 @@ func (s *PostgresStorage) ClusterStore() storage.ClusterStore {
 
 // TaskDefinitionStore returns the task definition store
 func (s *PostgresStorage) TaskDefinitionStore() storage.TaskDefinitionStore {
-	return s.taskDefinitionStore
+	// TODO: Implement task definition store
+	return nil
 }
 
 // ServiceStore returns the service store
@@ -98,37 +85,44 @@ func (s *PostgresStorage) ServiceStore() storage.ServiceStore {
 
 // TaskStore returns the task store
 func (s *PostgresStorage) TaskStore() storage.TaskStore {
-	return s.taskStore
+	// TODO: Implement task store
+	return nil
 }
 
 // AccountSettingStore returns the account setting store
 func (s *PostgresStorage) AccountSettingStore() storage.AccountSettingStore {
-	return s.accountSettingStore
+	// TODO: Implement account setting store
+	return nil
 }
 
 // TaskSetStore returns the task set store
 func (s *PostgresStorage) TaskSetStore() storage.TaskSetStore {
-	return s.taskSetStore
+	// TODO: Implement task set store
+	return nil
 }
 
 // ContainerInstanceStore returns the container instance store
 func (s *PostgresStorage) ContainerInstanceStore() storage.ContainerInstanceStore {
-	return s.containerInstanceStore
+	// TODO: Implement container instance store
+	return nil
 }
 
 // AttributeStore returns the attribute store
 func (s *PostgresStorage) AttributeStore() storage.AttributeStore {
-	return s.attributeStore
+	// TODO: Implement attribute store
+	return nil
 }
 
 // ELBv2Store returns the ELBv2 store
 func (s *PostgresStorage) ELBv2Store() storage.ELBv2Store {
-	return s.elbv2Store
+	// TODO: Implement ELBv2 store
+	return nil
 }
 
 // TaskLogStore returns the task log store
 func (s *PostgresStorage) TaskLogStore() storage.TaskLogStore {
-	return s.taskLogStore
+	// TODO: Implement task log store
+	return nil
 }
 
 // BeginTx starts a new transaction

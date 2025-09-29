@@ -338,13 +338,18 @@ func (s *serviceStore) Delete(ctx context.Context, clusterARN, serviceNameOrARN 
 }
 
 // DeleteMarkedForDeletion deletes services marked for deletion
-func (s *serviceStore) DeleteMarkedForDeletion(ctx context.Context, before time.Time) error {
-	query := `DELETE FROM services WHERE status = 'DELETE_IN_PROGRESS' AND updated_at < $1`
+func (s *serviceStore) DeleteMarkedForDeletion(ctx context.Context, clusterARN string, before time.Time) (int, error) {
+	query := `DELETE FROM services WHERE cluster_arn = $1 AND status = 'DELETE_IN_PROGRESS' AND updated_at < $2`
 
-	_, err := s.db.ExecContext(ctx, query, before)
+	result, err := s.db.ExecContext(ctx, query, clusterARN, before)
 	if err != nil {
-		return fmt.Errorf("failed to delete marked services: %w", err)
+		return 0, fmt.Errorf("failed to delete marked services: %w", err)
 	}
 
-	return nil
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return int(rowsAffected), nil
 }
