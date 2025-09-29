@@ -129,9 +129,9 @@ func runServer(cmd *cobra.Command) {
 	// Use fixed connection string for sidecar pattern
 	databaseURL := "postgres://kecs:kecs-postgres-2024@localhost:5432/kecs?sslmode=disable"
 
-	// Allow override from environment variable for backwards compatibility
-	if envURL := os.Getenv("KECS_DATABASE_URL"); envURL != "" {
-		databaseURL = envURL
+	// Allow override from configuration for backwards compatibility
+	if configURL := config.GetString("database.url"); configURL != "" {
+		databaseURL = configURL
 	}
 
 	// Mask password in logs using proper URL parsing
