@@ -198,8 +198,17 @@ func (s *serviceStore) GetByARN(ctx context.Context, serviceARN string) (*storag
 	return &service, nil
 }
 
-// List retrieves all services in a cluster
-func (s *serviceStore) List(ctx context.Context, clusterARN string) ([]*storage.Service, error) {
+// List retrieves services with filtering
+func (s *serviceStore) List(ctx context.Context, clusterARN string, serviceName string, launchType string, limit int, nextToken string) ([]*storage.Service, string, error) {
+	// Parse the next token to get offset
+	offset := 0
+	if nextToken != "" {
+		if _, err := fmt.Sscanf(nextToken, "%d", &offset); err != nil {
+			return nil, "", fmt.Errorf("invalid next token: %w", err)
+		}
+	}
+
+	// Build query with filters
 	query := `
 	SELECT
 		id, arn, service_name, cluster_arn, task_definition_arn,
@@ -211,12 +220,33 @@ func (s *serviceStore) List(ctx context.Context, clusterARN string) ([]*storage.
 		health_check_grace_period_seconds, region, account_id, deployment_name, namespace,
 		created_at, updated_at
 	FROM services
-	WHERE cluster_arn = $1
-	ORDER BY created_at DESC`
+	WHERE cluster_arn = $1`
 
-	rows, err := s.db.QueryContext(ctx, query, clusterARN)
+	args := []interface{}{clusterARN}
+	argNum := 2
+
+	if serviceName != "" {
+		query += fmt.Sprintf(" AND service_name = $%d", argNum)
+		args = append(args, serviceName)
+		argNum++
+	}
+
+	if launchType != "" {
+		query += fmt.Sprintf(" AND launch_type = $%d", argNum)
+		args = append(args, launchType)
+		argNum++
+	}
+
+	query += " ORDER BY created_at DESC"
+
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argNum, argNum+1)
+		args = append(args, limit, offset)
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list services: %w", err)
+		return nil, "", fmt.Errorf("failed to list services: %w", err)
 	}
 	defer rows.Close()
 
@@ -240,7 +270,7 @@ func (s *serviceStore) List(ctx context.Context, clusterARN string) ([]*storage.
 			&service.CreatedAt, &service.UpdatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan service row: %w", err)
+			return nil, "", fmt.Errorf("failed to scan service row: %w", err)
 		}
 
 		// Convert null strings back to regular strings
@@ -265,7 +295,13 @@ func (s *serviceStore) List(ctx context.Context, clusterARN string) ([]*storage.
 		services = append(services, &service)
 	}
 
-	return services, nil
+	// Generate next token if there are more results
+	newNextToken := ""
+	if limit > 0 && len(services) == limit {
+		newNextToken = fmt.Sprintf("%d", offset+limit)
+	}
+
+	return services, newNextToken, nil
 }
 
 // Update updates an existing service
