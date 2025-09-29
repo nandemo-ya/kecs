@@ -33,6 +33,11 @@ func NewPostgresStorage(connString string) *PostgresStorage {
 	}
 }
 
+// NewPostgreSQLStorage is an alias for NewPostgresStorage for consistency
+func NewPostgreSQLStorage(connString string) storage.Storage {
+	return NewPostgresStorage(connString)
+}
+
 // Initialize initializes the PostgreSQL connection and creates tables
 func (s *PostgresStorage) Initialize(ctx context.Context) error {
 	// Open database connection
