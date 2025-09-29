@@ -23,24 +23,15 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w" -o kecs-server ./cmd/controlplane
 
-# Stage 3: Final image (can use scratch or alpine since no CGO)
-FROM alpine:3.19
+# Stage 3: Final image (distroless for minimal attack surface)
+FROM gcr.io/distroless/static:nonroot
 
-# Install required runtime
-RUN apk add --no-cache ca-certificates
-
-# Create non-root user
-RUN addgroup -g 1000 kecs && \
-    adduser -u 1000 -G kecs -h /home/kecs -D kecs && \
-    mkdir -p /data && \
-    chown -R kecs:kecs /data
-
-# Copy the binary
-COPY --from=builder /app/kecs-server /kecs-server
-RUN chmod +x /kecs-server
-
-USER kecs
+# Create data directory (distroless images have nonroot user with UID 65532)
+USER 65532
 WORKDIR /data
+
+# Copy the binary (already executable from builder stage)
+COPY --from=builder --chown=65532:65532 /app/kecs-server /kecs-server
 
 ENV PORT=8080
 ENV ADMIN_PORT=8081
