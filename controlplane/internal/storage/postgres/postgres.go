@@ -12,13 +12,18 @@ import (
 
 // PostgresStorage implements the Storage interface for PostgreSQL
 type PostgresStorage struct {
-	db                  *sql.DB
-	connString          string
-	clusterStore        *clusterStore
-	serviceStore        *serviceStore
-	taskStore           *taskStore
-	taskDefinitionStore *taskDefinitionStore
-	// TODO: Add other stores once implemented
+	db                     *sql.DB
+	connString             string
+	clusterStore           *clusterStore
+	serviceStore           *serviceStore
+	taskStore              *taskStore
+	taskDefinitionStore    *taskDefinitionStore
+	accountSettingStore    *accountSettingStore
+	taskSetStore           *taskSetStore
+	containerInstanceStore *containerInstanceStore
+	attributeStore         *attributeStore
+	elbv2Store             *elbv2Store
+	taskLogStore           *taskLogStore
 }
 
 // NewPostgresStorage creates a new PostgreSQL storage instance
@@ -53,7 +58,12 @@ func (s *PostgresStorage) Initialize(ctx context.Context) error {
 	s.serviceStore = &serviceStore{db: db}
 	s.taskStore = &taskStore{db: db}
 	s.taskDefinitionStore = &taskDefinitionStore{db: db}
-	// TODO: Initialize other stores once implemented
+	s.accountSettingStore = &accountSettingStore{db: db}
+	s.taskSetStore = &taskSetStore{db: db}
+	s.containerInstanceStore = &containerInstanceStore{db: db}
+	s.attributeStore = &attributeStore{db: db}
+	s.elbv2Store = &elbv2Store{db: db}
+	s.taskLogStore = &taskLogStore{db: db}
 
 	// Create tables
 	if err := s.createTables(ctx); err != nil {
@@ -93,38 +103,32 @@ func (s *PostgresStorage) TaskStore() storage.TaskStore {
 
 // AccountSettingStore returns the account setting store
 func (s *PostgresStorage) AccountSettingStore() storage.AccountSettingStore {
-	// TODO: Implement account setting store
-	return nil
+	return s.accountSettingStore
 }
 
 // TaskSetStore returns the task set store
 func (s *PostgresStorage) TaskSetStore() storage.TaskSetStore {
-	// TODO: Implement task set store
-	return nil
+	return s.taskSetStore
 }
 
 // ContainerInstanceStore returns the container instance store
 func (s *PostgresStorage) ContainerInstanceStore() storage.ContainerInstanceStore {
-	// TODO: Implement container instance store
-	return nil
+	return s.containerInstanceStore
 }
 
 // AttributeStore returns the attribute store
 func (s *PostgresStorage) AttributeStore() storage.AttributeStore {
-	// TODO: Implement attribute store
-	return nil
+	return s.attributeStore
 }
 
 // ELBv2Store returns the ELBv2 store
 func (s *PostgresStorage) ELBv2Store() storage.ELBv2Store {
-	// TODO: Implement ELBv2 store
-	return nil
+	return s.elbv2Store
 }
 
 // TaskLogStore returns the task log store
 func (s *PostgresStorage) TaskLogStore() storage.TaskLogStore {
-	// TODO: Implement task log store
-	return nil
+	return s.taskLogStore
 }
 
 // BeginTx starts a new transaction
@@ -420,42 +424,293 @@ func (s *PostgresStorage) createTasksTable(ctx context.Context) error {
 
 // createAccountSettingsTable creates the account_settings table
 func (s *PostgresStorage) createAccountSettingsTable(ctx context.Context) error {
-	// Implementation will follow DuckDB schema
-	// TODO: Implement
+	query := `
+	CREATE TABLE IF NOT EXISTS account_settings (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		value TEXT NOT NULL,
+		principal_arn TEXT NOT NULL,
+		is_default BOOLEAN DEFAULT FALSE,
+		region TEXT,
+		account_id TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(principal_arn, name)
+	)`
+
+	_, err := s.db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to create account_settings table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_account_settings_name ON account_settings(name)",
+		"CREATE INDEX IF NOT EXISTS idx_account_settings_principal_arn ON account_settings(principal_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_account_settings_is_default ON account_settings(is_default)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
 	return nil
 }
 
 // createTaskSetsTable creates the task_sets table
 func (s *PostgresStorage) createTaskSetsTable(ctx context.Context) error {
-	// Implementation will follow DuckDB schema
-	// TODO: Implement
+	query := `
+	CREATE TABLE IF NOT EXISTS task_sets (
+		id TEXT PRIMARY KEY,
+		arn TEXT NOT NULL UNIQUE,
+		service_arn TEXT NOT NULL,
+		cluster_arn TEXT NOT NULL,
+		external_id TEXT,
+		task_definition TEXT NOT NULL,
+		launch_type TEXT,
+		platform_version TEXT,
+		platform_family TEXT,
+		network_configuration TEXT,
+		load_balancers TEXT,
+		service_registries TEXT,
+		capacity_provider_strategy TEXT,
+		scale TEXT,
+		computed_desired_count INTEGER DEFAULT 0,
+		pending_count INTEGER DEFAULT 0,
+		running_count INTEGER DEFAULT 0,
+		status TEXT NOT NULL,
+		stability_status TEXT,
+		stability_status_at TIMESTAMP,
+		started_by TEXT,
+		tags TEXT,
+		fargate_ephemeral_storage TEXT,
+		region TEXT,
+		account_id TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(service_arn, id)
+	)`
+
+	_, err := s.db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to create task_sets table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_task_sets_service_arn ON task_sets(service_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_task_sets_cluster_arn ON task_sets(cluster_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_task_sets_status ON task_sets(status)",
+		"CREATE INDEX IF NOT EXISTS idx_task_sets_created_at ON task_sets(created_at)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
 	return nil
 }
 
 // createContainerInstancesTable creates the container_instances table
 func (s *PostgresStorage) createContainerInstancesTable(ctx context.Context) error {
-	// Implementation will follow DuckDB schema
-	// TODO: Implement
+	query := `
+	CREATE TABLE IF NOT EXISTS container_instances (
+		id TEXT PRIMARY KEY,
+		arn TEXT NOT NULL UNIQUE,
+		cluster_arn TEXT NOT NULL,
+		ec2_instance_id TEXT,
+		status TEXT NOT NULL,
+		status_reason TEXT,
+		agent_connected BOOLEAN DEFAULT FALSE,
+		agent_update_status TEXT,
+		running_tasks_count INTEGER DEFAULT 0,
+		pending_tasks_count INTEGER DEFAULT 0,
+		version BIGINT DEFAULT 0,
+		version_info TEXT,
+		registered_resources TEXT,
+		remaining_resources TEXT,
+		attributes TEXT,
+		attachments TEXT,
+		tags TEXT,
+		capacity_provider_name TEXT,
+		health_status TEXT,
+		region TEXT,
+		account_id TEXT,
+		registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		deregistered_at TIMESTAMP
+	)`
+
+	_, err := s.db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to create container_instances table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_container_instances_cluster_arn ON container_instances(cluster_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_container_instances_status ON container_instances(status)",
+		"CREATE INDEX IF NOT EXISTS idx_container_instances_ec2_instance_id ON container_instances(ec2_instance_id)",
+		"CREATE INDEX IF NOT EXISTS idx_container_instances_registered_at ON container_instances(registered_at)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
 	return nil
 }
 
 // createAttributesTable creates the attributes table
 func (s *PostgresStorage) createAttributesTable(ctx context.Context) error {
-	// Implementation will follow DuckDB schema
-	// TODO: Implement
+	query := `
+	CREATE TABLE IF NOT EXISTS attributes (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		value TEXT,
+		target_type TEXT NOT NULL,
+		target_id TEXT NOT NULL,
+		cluster TEXT NOT NULL,
+		region TEXT,
+		account_id TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(name, target_type, target_id, cluster)
+	)`
+
+	_, err := s.db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to create attributes table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_attributes_cluster ON attributes(cluster)",
+		"CREATE INDEX IF NOT EXISTS idx_attributes_target_type ON attributes(target_type)",
+		"CREATE INDEX IF NOT EXISTS idx_attributes_target_id ON attributes(target_id)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
 	return nil
 }
 
 // createELBv2Tables creates the ELBv2 related tables
 func (s *PostgresStorage) createELBv2Tables(ctx context.Context) error {
-	// Implementation will follow DuckDB schema
-	// TODO: Implement
+	// Create load balancers table
+	lbQuery := `
+	CREATE TABLE IF NOT EXISTS elbv2_load_balancers (
+		arn TEXT PRIMARY KEY,
+		name TEXT NOT NULL UNIQUE,
+		dns_name TEXT,
+		canonical_hosted_zone_id TEXT,
+		state TEXT,
+		type TEXT,
+		scheme TEXT,
+		vpc_id TEXT,
+		subnets TEXT,
+		availability_zones TEXT,
+		security_groups TEXT,
+		ip_address_type TEXT,
+		tags TEXT,
+		region TEXT,
+		account_id TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`
+
+	if _, err := s.db.ExecContext(ctx, lbQuery); err != nil {
+		return fmt.Errorf("failed to create elbv2_load_balancers table: %w", err)
+	}
+
+	// Create target groups table
+	tgQuery := `
+	CREATE TABLE IF NOT EXISTS elbv2_target_groups (
+		arn TEXT PRIMARY KEY,
+		name TEXT NOT NULL UNIQUE,
+		protocol TEXT,
+		port INTEGER,
+		vpc_id TEXT,
+		target_type TEXT,
+		health_check_enabled BOOLEAN DEFAULT TRUE,
+		health_check_protocol TEXT,
+		health_check_port TEXT,
+		health_check_path TEXT,
+		health_check_interval_seconds INTEGER,
+		health_check_timeout_seconds INTEGER,
+		healthy_threshold_count INTEGER,
+		unhealthy_threshold_count INTEGER,
+		matcher TEXT,
+		load_balancer_arns TEXT,
+		tags TEXT,
+		region TEXT,
+		account_id TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`
+
+	if _, err := s.db.ExecContext(ctx, tgQuery); err != nil {
+		return fmt.Errorf("failed to create elbv2_target_groups table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_load_balancers_region ON elbv2_load_balancers(region)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_load_balancers_vpc_id ON elbv2_load_balancers(vpc_id)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_target_groups_region ON elbv2_target_groups(region)",
+		"CREATE INDEX IF NOT EXISTS idx_elbv2_target_groups_vpc_id ON elbv2_target_groups(vpc_id)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
 	return nil
 }
 
 // createTaskLogsTable creates the task_logs table
 func (s *PostgresStorage) createTaskLogsTable(ctx context.Context) error {
-	// Implementation will follow DuckDB schema
-	// TODO: Implement
+	query := `
+	CREATE TABLE IF NOT EXISTS task_logs (
+		id TEXT PRIMARY KEY,
+		task_arn TEXT NOT NULL,
+		container_name TEXT NOT NULL,
+		timestamp TIMESTAMP NOT NULL,
+		log_line TEXT NOT NULL,
+		log_level TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`
+
+	_, err := s.db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to create task_logs table: %w", err)
+	}
+
+	// Create indexes
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_task_logs_task_arn ON task_logs(task_arn)",
+		"CREATE INDEX IF NOT EXISTS idx_task_logs_container_name ON task_logs(container_name)",
+		"CREATE INDEX IF NOT EXISTS idx_task_logs_timestamp ON task_logs(timestamp)",
+		"CREATE INDEX IF NOT EXISTS idx_task_logs_created_at ON task_logs(created_at)",
+	}
+
+	for _, idx := range indexes {
+		if _, err := s.db.ExecContext(ctx, idx); err != nil {
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+	}
+
 	return nil
 }
