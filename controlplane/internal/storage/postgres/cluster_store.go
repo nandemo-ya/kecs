@@ -349,18 +349,6 @@ func (s *clusterStore) Delete(ctx context.Context, identifier string) error {
 	return nil
 }
 
-// Helper functions for handling NULL values
-func toNullString(s string) sql.NullString {
-	return sql.NullString{String: s, Valid: s != ""}
-}
-
-func fromNullString(ns sql.NullString) string {
-	if ns.Valid {
-		return ns.String
-	}
-	return ""
-}
-
 // marshalJSON converts an interface to JSON string
 func marshalJSON(v interface{}) string {
 	if v == nil {
