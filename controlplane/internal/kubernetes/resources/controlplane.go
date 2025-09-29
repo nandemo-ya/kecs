@@ -671,41 +671,6 @@ func createDeployment(config *ControlPlaneConfig) *appsv1.Deployment {
 				},
 			},
 		},
-		// PostgreSQL connection configuration
-		{
-			Name:  "KECS_POSTGRES_HOST",
-			Value: "localhost", // Sidecar container
-		},
-		{
-			Name:  "KECS_POSTGRES_PORT",
-			Value: "5432",
-		},
-		{
-			Name:  "KECS_POSTGRES_USER",
-			Value: "kecs",
-		},
-		{
-			Name:  "KECS_POSTGRES_PASSWORD",
-			Value: config.PostgresPassword,
-		},
-		{
-			Name:  "KECS_POSTGRES_DATABASE",
-			Value: "kecs",
-		},
-		{
-			Name:  "KECS_POSTGRES_SSLMODE",
-			Value: "disable",
-		},
-	}
-
-	// Use default password if not set
-	if config.PostgresPassword == "" {
-		for i := range envVars {
-			if envVars[i].Name == "KECS_POSTGRES_PASSWORD" {
-				envVars[i].Value = "kecs-postgres-2024"
-				break
-			}
-		}
 	}
 
 	// Add debug environment variable if enabled
