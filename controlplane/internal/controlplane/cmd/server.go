@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -125,13 +126,36 @@ func runServer(cmd *cobra.Command) {
 	var dbStorage storageTypes.Storage
 	ctx := context.Background()
 
-	// PostgreSQL storage (default) - runs as sidecar at localhost:5432
-	// Use fixed connection string for sidecar pattern
-	databaseURL := "postgres://kecs:kecs-postgres-2024@localhost:5432/kecs?sslmode=disable"
-
-	// Allow override from environment variable for backwards compatibility
-	if envURL := os.Getenv("KECS_DATABASE_URL"); envURL != "" {
-		databaseURL = envURL
+	// PostgreSQL storage (default)
+	databaseURL := os.Getenv("KECS_DATABASE_URL")
+	if databaseURL == "" {
+		// Build database URL from individual environment variables
+		host := os.Getenv("KECS_POSTGRES_HOST")
+		if host == "" {
+			host = "localhost"
+		}
+		port := os.Getenv("KECS_POSTGRES_PORT")
+		if port == "" {
+			port = "5432"
+		}
+		user := os.Getenv("KECS_POSTGRES_USER")
+		if user == "" {
+			user = "kecs"
+		}
+		password := os.Getenv("KECS_POSTGRES_PASSWORD")
+		if password == "" {
+			password = "kecs"
+		}
+		database := os.Getenv("KECS_POSTGRES_DATABASE")
+		if database == "" {
+			database = "kecs"
+		}
+		sslMode := os.Getenv("KECS_POSTGRES_SSLMODE")
+		if sslMode == "" {
+			sslMode = "disable"
+		}
+		databaseURL = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+			user, password, host, port, database, sslMode)
 	}
 
 	// Mask password in logs using proper URL parsing
