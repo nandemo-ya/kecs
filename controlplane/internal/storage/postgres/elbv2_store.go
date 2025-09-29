@@ -87,11 +87,19 @@ func (s *elbv2Store) GetLoadBalancer(ctx context.Context, arn string) (*storage.
 		return nil, fmt.Errorf("failed to get load balancer: %w", err)
 	}
 
-	// Parse JSON fields
-	json.Unmarshal([]byte(subnetsJSON), &lb.Subnets)
-	json.Unmarshal([]byte(azsJSON), &lb.AvailabilityZones)
-	json.Unmarshal([]byte(sgJSON), &lb.SecurityGroups)
-	json.Unmarshal([]byte(tagsJSON), &lb.Tags)
+	// Parse JSON fields with error handling
+	if err := json.Unmarshal([]byte(subnetsJSON), &lb.Subnets); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal subnets: %w", err)
+	}
+	if err := json.Unmarshal([]byte(azsJSON), &lb.AvailabilityZones); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal availability zones: %w", err)
+	}
+	if err := json.Unmarshal([]byte(sgJSON), &lb.SecurityGroups); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal security groups: %w", err)
+	}
+	if err := json.Unmarshal([]byte(tagsJSON), &lb.Tags); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal tags: %w", err)
+	}
 
 	return &lb, nil
 }
@@ -124,11 +132,19 @@ func (s *elbv2Store) GetLoadBalancerByName(ctx context.Context, name string) (*s
 		return nil, fmt.Errorf("failed to get load balancer by name: %w", err)
 	}
 
-	// Parse JSON fields
-	json.Unmarshal([]byte(subnetsJSON), &lb.Subnets)
-	json.Unmarshal([]byte(azsJSON), &lb.AvailabilityZones)
-	json.Unmarshal([]byte(sgJSON), &lb.SecurityGroups)
-	json.Unmarshal([]byte(tagsJSON), &lb.Tags)
+	// Parse JSON fields with error handling
+	if err := json.Unmarshal([]byte(subnetsJSON), &lb.Subnets); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal subnets: %w", err)
+	}
+	if err := json.Unmarshal([]byte(azsJSON), &lb.AvailabilityZones); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal availability zones: %w", err)
+	}
+	if err := json.Unmarshal([]byte(sgJSON), &lb.SecurityGroups); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal security groups: %w", err)
+	}
+	if err := json.Unmarshal([]byte(tagsJSON), &lb.Tags); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal tags: %w", err)
+	}
 
 	return &lb, nil
 }
@@ -166,11 +182,19 @@ func (s *elbv2Store) ListLoadBalancers(ctx context.Context, region string) ([]*s
 			return nil, fmt.Errorf("failed to scan load balancer: %w", err)
 		}
 
-		// Parse JSON fields
-		json.Unmarshal([]byte(subnetsJSON), &lb.Subnets)
-		json.Unmarshal([]byte(azsJSON), &lb.AvailabilityZones)
-		json.Unmarshal([]byte(sgJSON), &lb.SecurityGroups)
-		json.Unmarshal([]byte(tagsJSON), &lb.Tags)
+		// Parse JSON fields with error handling
+		if err := json.Unmarshal([]byte(subnetsJSON), &lb.Subnets); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal subnets: %w", err)
+		}
+		if err := json.Unmarshal([]byte(azsJSON), &lb.AvailabilityZones); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal availability zones: %w", err)
+		}
+		if err := json.Unmarshal([]byte(sgJSON), &lb.SecurityGroups); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal security groups: %w", err)
+		}
+		if err := json.Unmarshal([]byte(tagsJSON), &lb.Tags); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal tags: %w", err)
+		}
 
 		lbs = append(lbs, &lb)
 	}

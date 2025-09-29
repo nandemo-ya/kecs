@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -244,47 +243,4 @@ func (s *taskLogStore) DeleteTaskLogs(ctx context.Context, taskArn string) error
 	}
 
 	return nil
-}
-
-// Helper function to build WHERE clause from filter
-func buildWhereClause(filter storage.TaskLogFilter) (string, []interface{}) {
-	conditions := []string{}
-	args := []interface{}{}
-
-	if filter.TaskArn != "" {
-		conditions = append(conditions, fmt.Sprintf("task_arn = $%d", len(args)+1))
-		args = append(args, filter.TaskArn)
-	}
-
-	if filter.ContainerName != "" {
-		conditions = append(conditions, fmt.Sprintf("container_name = $%d", len(args)+1))
-		args = append(args, filter.ContainerName)
-	}
-
-	if filter.From != nil {
-		conditions = append(conditions, fmt.Sprintf("timestamp >= $%d", len(args)+1))
-		args = append(args, *filter.From)
-	}
-
-	if filter.To != nil {
-		conditions = append(conditions, fmt.Sprintf("timestamp <= $%d", len(args)+1))
-		args = append(args, *filter.To)
-	}
-
-	if filter.LogLevel != "" {
-		conditions = append(conditions, fmt.Sprintf("log_level = $%d", len(args)+1))
-		args = append(args, filter.LogLevel)
-	}
-
-	if filter.SearchText != "" {
-		conditions = append(conditions, fmt.Sprintf("log_line ILIKE $%d", len(args)+1))
-		args = append(args, "%"+filter.SearchText+"%")
-	}
-
-	whereClause := ""
-	if len(conditions) > 0 {
-		whereClause = " WHERE " + strings.Join(conditions, " AND ")
-	}
-
-	return whereClause, args
 }

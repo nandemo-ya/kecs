@@ -427,18 +427,3 @@ func scanTaskFromRows(rows *sql.Rows) (*storage.Task, error) {
 
 	return &task, nil
 }
-
-// Helper functions for handling NULL values
-func toNullTime(t *time.Time) sql.NullTime {
-	if t == nil {
-		return sql.NullTime{Valid: false}
-	}
-	return sql.NullTime{Time: *t, Valid: true}
-}
-
-func fromNullTime(nt sql.NullTime) *time.Time {
-	if !nt.Valid {
-		return nil
-	}
-	return &nt.Time
-}

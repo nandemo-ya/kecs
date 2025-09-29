@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -149,9 +150,11 @@ func (s *containerInstanceStore) ListWithPagination(ctx context.Context, cluster
 
 	// Handle filter string (could be instance ID, ARN, or attribute)
 	if filters.Filter != "" {
-		query += fmt.Sprintf(" AND (ec2_instance_id = $%d OR arn LIKE $%d OR attributes LIKE $%d)", argNum, argNum, argNum)
-		args = append(args, filters.Filter)
-		argNum++
+		query += fmt.Sprintf(" AND (ec2_instance_id = $%d OR arn LIKE $%d OR attributes LIKE $%d)", argNum, argNum+1, argNum+2)
+		// Escape LIKE pattern special characters to prevent SQL injection
+		escapedFilter := strings.ReplaceAll(strings.ReplaceAll(filters.Filter, "%", "\\%"), "_", "\\_")
+		args = append(args, filters.Filter, "%"+escapedFilter+"%", "%"+escapedFilter+"%")
+		argNum += 3
 	}
 
 	query += " ORDER BY registered_at DESC"
