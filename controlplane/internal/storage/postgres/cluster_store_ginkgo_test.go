@@ -23,9 +23,8 @@ var _ = Describe("ClusterStore", func() {
 	})
 
 	AfterEach(func() {
-		if store != nil {
-			store.Close()
-		}
+		// Don't close the shared connection, just clean data
+		cleanupDatabase()
 	})
 
 	Describe("Create", func() {

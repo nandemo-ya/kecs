@@ -123,17 +123,12 @@ test-coverage:
 	@echo "Running tests with coverage..."
 	cd $(CONTROLPLANE_DIR) && $(GOTEST) -v -race -coverprofile=../coverage.txt -covermode=atomic ./...
 
-# Run PostgreSQL tests
+# Run PostgreSQL tests with Testcontainers
 .PHONY: test-postgres
 test-postgres:
-	@echo "Starting PostgreSQL test database..."
-	docker-compose -f controlplane/docker-compose.test.yml up -d
-	@echo "Waiting for PostgreSQL to be ready..."
-	@sleep 5
-	@echo "Running PostgreSQL tests..."
-	cd $(CONTROLPLANE_DIR) && TEST_POSTGRES=true $(GOTEST) -v -race ./internal/storage/postgres/...
-	@echo "Stopping PostgreSQL test database..."
-	docker-compose -f controlplane/docker-compose.test.yml down
+	@echo "Running PostgreSQL tests with Testcontainers..."
+	@echo "Testcontainers will automatically start a PostgreSQL container for testing"
+	cd $(CONTROLPLANE_DIR) && $(GOTEST) -v -race -timeout 60s ./internal/storage/postgres/...
 
 # Vet code
 .PHONY: vet

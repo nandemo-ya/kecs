@@ -4,76 +4,108 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
+	"log"
 	"time"
 
+	"github.com/docker/go-connections/nat"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage/postgres"
+	postgresStorage "github.com/nandemo-ya/kecs/controlplane/internal/storage/postgres"
 )
 
-// setupTestDB creates a test database connection
+var (
+	postgresContainer *postgres.PostgresContainer
+	testDB            storage.Storage
+)
+
+// setupPostgresContainer starts a PostgreSQL container for testing
+func setupPostgresContainer() {
+	ctx := context.Background()
+
+	// Start PostgreSQL container
+	container, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage("postgres:15-alpine"),
+		postgres.WithDatabase("kecs_test"),
+		postgres.WithUsername("kecs_test"),
+		postgres.WithPassword("kecs_test"),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(30*time.Second)),
+	)
+	if err != nil {
+		log.Fatalf("Failed to start PostgreSQL container: %v", err)
+	}
+
+	postgresContainer = container
+
+	// Get connection string
+	connStr, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		log.Fatalf("Failed to get connection string: %v", err)
+	}
+
+	GinkgoWriter.Printf("PostgreSQL container started with connection string: %s\n", connStr)
+
+	// Create storage instance and initialize
+	store := postgresStorage.NewPostgresStorage(connStr)
+	err = store.Initialize(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to initialize storage: %v", err)
+	}
+
+	testDB = store
+}
+
+// teardownPostgresContainer stops and removes the PostgreSQL container
+func teardownPostgresContainer() {
+	if postgresContainer != nil {
+		ctx := context.Background()
+		if err := postgresContainer.Terminate(ctx); err != nil {
+			GinkgoWriter.Printf("Failed to terminate PostgreSQL container: %v\n", err)
+		}
+	}
+	if testDB != nil {
+		testDB.Close()
+	}
+}
+
+// setupTestDB returns the shared test database connection
 func setupTestDB() storage.Storage {
-	if os.Getenv("TEST_POSTGRES") != "true" {
-		Skip("Skipping PostgreSQL tests. Set TEST_POSTGRES=true to run")
+	if testDB == nil {
+		Fail("PostgreSQL container not initialized. Make sure BeforeSuite is called.")
 	}
 
-	// Get database configuration from environment
-	host := os.Getenv("POSTGRES_HOST")
-	if host == "" {
-		host = "localhost"
-	}
+	// Clean up any existing data before each test
+	cleanupDatabase()
 
-	port := os.Getenv("POSTGRES_PORT")
-	if port == "" {
-		port = "5432"
-	}
-
-	user := os.Getenv("POSTGRES_USER")
-	if user == "" {
-		user = "kecs_test"
-	}
-
-	password := os.Getenv("POSTGRES_PASSWORD")
-	if password == "" {
-		password = "kecs_test"
-	}
-
-	dbName := os.Getenv("POSTGRES_DB")
-	if dbName == "" {
-		dbName = "kecs_test"
-	}
-
-	// Create connection string
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		user, password, host, port, dbName)
-
-	// Create storage instance
-	store := postgres.NewPostgresStorage(connStr)
-
-	// Initialize storage (opens connection and creates tables)
-	err := store.Initialize(context.Background())
-	Expect(err).NotTo(HaveOccurred())
-
-	// Get database connection for cleanup
-	// Note: We need to add a getter for this in the actual implementation
-	// For now, we'll open a separate connection for cleanup
-	db, err := sql.Open("postgres", connStr)
-	Expect(err).NotTo(HaveOccurred())
-	defer db.Close()
-
-	// Clean up any existing data
-	cleanupDatabase(db)
-
-	return store
+	return testDB
 }
 
 // cleanupDatabase removes all test data
-func cleanupDatabase(db *sql.DB) {
+func cleanupDatabase() {
 	ctx := context.Background()
+
+	// Get host and port from container
+	host, err := postgresContainer.Host(ctx)
+	Expect(err).NotTo(HaveOccurred())
+
+	mappedPort, err := postgresContainer.MappedPort(ctx, nat.Port("5432/tcp"))
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create direct connection for cleanup
+	connStr := fmt.Sprintf("postgres://kecs_test:kecs_test@%s:%s/kecs_test?sslmode=disable",
+		host, mappedPort.Port())
+
+	db, err := sql.Open("postgres", connStr)
+	Expect(err).NotTo(HaveOccurred())
+	defer db.Close()
 
 	// Tables to clean in order (respecting foreign key constraints)
 	tables := []string{

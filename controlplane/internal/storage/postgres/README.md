@@ -13,56 +13,44 @@ This package provides a PostgreSQL-based implementation of the KECS storage inte
 
 ## Testing
 
+The tests use [Testcontainers](https://www.testcontainers.org/) to automatically spin up a PostgreSQL container for testing. This ensures tests run against a real PostgreSQL instance without requiring any manual setup.
+
 ### Prerequisites
 
-- Docker and Docker Compose
+- Docker must be installed and running
 - Go 1.21+
 
 ### Running Tests
 
-1. **Using Make (recommended)**:
-   ```bash
-   # From project root
-   make test-postgres
-   ```
+```bash
+# From project root
+make test-postgres
 
-2. **Manual setup**:
-   ```bash
-   # Start PostgreSQL container
-   docker-compose -f controlplane/docker-compose.test.yml up -d
+# Or directly with go test
+cd controlplane
+go test -v ./internal/storage/postgres/...
 
-   # Run tests
-   cd controlplane
-   TEST_POSTGRES=true go test -v ./internal/storage/postgres/...
+# Run with specific timeout
+go test -v -timeout 60s ./internal/storage/postgres/...
+```
 
-   # Stop PostgreSQL container
-   docker-compose -f ../controlplane/docker-compose.test.yml down
-   ```
+The tests will automatically:
+1. Start a PostgreSQL container using Testcontainers
+2. Initialize the database schema
+3. Run all tests against the real PostgreSQL instance
+4. Clean up the container after tests complete
 
-3. **Using existing PostgreSQL**:
-   ```bash
-   # Set environment variables
-   export TEST_POSTGRES=true
-   export POSTGRES_HOST=localhost
-   export POSTGRES_PORT=5432
-   export POSTGRES_USER=kecs_test
-   export POSTGRES_PASSWORD=kecs_test
-   export POSTGRES_DB=kecs_test
+### Test Architecture
 
-   # Run tests
-   go test -v ./internal/storage/postgres/...
-   ```
+- **BeforeSuite**: Starts a single PostgreSQL container shared across all tests
+- **BeforeEach**: Cleans up test data before each test
+- **AfterSuite**: Terminates the PostgreSQL container
 
-## Environment Variables
-
-The following environment variables can be used to configure the test database connection:
-
-- `TEST_POSTGRES`: Set to "true" to enable PostgreSQL tests
-- `POSTGRES_HOST`: Database host (default: localhost)
-- `POSTGRES_PORT`: Database port (default: 5432)
-- `POSTGRES_USER`: Database user (default: kecs_test)
-- `POSTGRES_PASSWORD`: Database password (default: kecs_test)
-- `POSTGRES_DB`: Database name (default: kecs_test)
+This approach ensures:
+- Fast test execution (single container for all tests)
+- Test isolation (data cleaned between tests)
+- Real PostgreSQL compatibility testing
+- No manual database setup required
 
 ## Implementation Status
 
@@ -82,7 +70,6 @@ The following environment variables can be used to configure the test database c
 ### Pending
 
 - ⏳ ELBv2Store (listeners, rules, targets)
-- ⏳ Complete test coverage for all stores
 - ⏳ Integration with storage factory
 - ⏳ PostgreSQL connection configuration in CLI
 
@@ -103,3 +90,17 @@ The PostgreSQL storage uses the following tables:
 - `task_logs` - Task execution logs
 
 Each table includes appropriate indexes for query optimization and foreign key constraints where applicable.
+
+## Using with KECS
+
+To use PostgreSQL storage with KECS (when implemented):
+
+```bash
+# Start KECS with PostgreSQL storage
+kecs start --storage postgres --postgres-url "postgres://user:pass@localhost:5432/kecs"
+
+# Or use environment variable
+export KECS_STORAGE=postgres
+export KECS_POSTGRES_URL="postgres://user:pass@localhost:5432/kecs"
+kecs start
+```

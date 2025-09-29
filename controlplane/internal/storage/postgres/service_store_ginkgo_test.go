@@ -26,9 +26,8 @@ var _ = Describe("ServiceStore", func() {
 	})
 
 	AfterEach(func() {
-		if store != nil {
-			store.Close()
-		}
+		// Don't close the shared connection, just clean data
+		cleanupDatabase()
 	})
 
 	Describe("Create", func() {
@@ -130,8 +129,8 @@ var _ = Describe("ServiceStore", func() {
 				// Verify update
 				retrieved, err := store.ServiceStore().Get(ctx, cluster.ARN, service.ServiceName)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(retrieved.DesiredCount).To(Equal(int32(5)))
-				Expect(retrieved.RunningCount).To(Equal(int32(4)))
+				Expect(int(retrieved.DesiredCount)).To(Equal(5))
+				Expect(int(retrieved.RunningCount)).To(Equal(4))
 				Expect(retrieved.Status).To(Equal("UPDATING"))
 			})
 		})
