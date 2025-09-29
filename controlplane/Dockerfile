@@ -6,14 +6,7 @@ WORKDIR /app
 ARG TARGETOS=linux
 ARG TARGETARCH
 
-# Install cross-compilers with cache
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && \
-    case "$TARGETARCH" in \
-        arm64) apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu ;; \
-        amd64) apt-get install -y gcc-x86-64-linux-gnu g++-x86-64-linux-gnu ;; \
-    esac
+# No longer need cross-compilers since we don't use CGO
 
 # Copy go mod files for better caching
 COPY go.mod go.sum ./
@@ -24,29 +17,21 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 
-# Build with cache mount
+# Build with cache mount (no CGO required)
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    case "$TARGETARCH" in \
-        arm64) export CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ ;; \
-        amd64) export CC=x86_64-linux-gnu-gcc CXX=x86_64-linux-gnu-g++ ;; \
-    esac && \
-    CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w" -o kecs-server ./cmd/controlplane
 
-# Stage 3: Final image
-FROM debian:stable-slim
+# Stage 3: Final image (can use scratch or alpine since no CGO)
+FROM alpine:3.19
 
-# Install required runtime libraries
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    libstdc++6 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Install required runtime
+RUN apk add --no-cache ca-certificates
 
 # Create non-root user
-RUN groupadd -g 1000 kecs && \
-    useradd -u 1000 -g kecs -m -s /bin/bash kecs && \
+RUN addgroup -g 1000 kecs && \
+    adduser -u 1000 -G kecs -h /home/kecs -D kecs && \
     mkdir -p /data && \
     chown -R kecs:kecs /data
 

@@ -33,21 +33,19 @@ CONTROLPLANE_DIR=./controlplane
 .PHONY: all
 all: clean fmt vet test build
 
-# Build both CLI and server
+# Build binary (no CGO required anymore)
 .PHONY: build
-build: build-cli build-server
+build:
+	@echo "Building $(CLI_BINARY_NAME)..."
+	cd $(CONTROLPLANE_DIR) && CGO_ENABLED=0 $(GO) build $(LDFLAGS) -o ../bin/$(CLI_BINARY_NAME) ./cmd/controlplane
 
-# Build CLI (without DuckDB/CGO)
+# Build CLI (alias for build)
 .PHONY: build-cli
-build-cli:
-	@echo "Building $(CLI_BINARY_NAME) (CLI only, no DuckDB)..."
-	cd $(CONTROLPLANE_DIR) && CGO_ENABLED=0 $(GO) build -tags nocli $(LDFLAGS) -o ../bin/$(CLI_BINARY_NAME) ./cmd/controlplane
+build-cli: build
 
-# Build server (with DuckDB/CGO)
+# Build server (alias for build, no longer needs separate binary)
 .PHONY: build-server
-build-server:
-	@echo "Building $(SERVER_BINARY_NAME) (with DuckDB support)..."
-	cd $(CONTROLPLANE_DIR) && CGO_ENABLED=1 $(GO) build $(LDFLAGS) -o ../bin/$(SERVER_BINARY_NAME) ./cmd/controlplane
+build-server: build
 
 # Build TUI v2 mock application
 .PHONY: build-tui2
@@ -88,9 +86,9 @@ run: build-cli
 
 # Run the server
 .PHONY: run-server
-run-server: build-server
-	@echo "Running $(SERVER_BINARY_NAME) (Server with DuckDB)..."
-	./bin/$(SERVER_BINARY_NAME) server
+run-server: build
+	@echo "Running $(CLI_BINARY_NAME) server..."
+	./bin/$(CLI_BINARY_NAME) server
 
 # Clean build artifacts
 .PHONY: clean
@@ -219,9 +217,9 @@ hot-reload: docker-push-dev
 	kubectl rollout status deployment/kecs-controlplane -n kecs-system && \
 	echo "✅ Controlplane updated successfully!"
 
-# Dev workflow: Build server and hot reload in one command
+# Dev workflow: Build and hot reload in one command
 .PHONY: dev
-dev: build-server hot-reload
+dev: build hot-reload
 	@echo "✅ Development build and deploy completed!"
 
 # Dev workflow with logs: Build, reload and tail logs
@@ -292,14 +290,14 @@ help:
 	@echo ""
 	@echo "Building:"
 	@echo "  all            - Run clean, fmt, vet, test, and build"
-	@echo "  build          - Build both CLI and server binaries"
-	@echo "  build-cli      - Build CLI binary (no DuckDB/CGO)"
-	@echo "  build-server   - Build server binary (with DuckDB/CGO)"
+	@echo "  build          - Build KECS binary"
+	@echo "  build-cli      - Build KECS binary (alias for build)"
+	@echo "  build-server   - Build KECS binary (alias for build)"
 	@echo "  build-tui2     - Build TUI v2 mock application"
 	@echo ""
 	@echo "Running:"
 	@echo "  run            - Build and run CLI"
-	@echo "  run-server     - Build and run server with DuckDB"
+	@echo "  run-server     - Build and run server"
 	@echo "  run-tui2       - Build and run TUI v2 mock"
 	@echo ""
 	@echo "Code Quality:"
@@ -322,7 +320,7 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  hot-reload     - Build and replace controlplane in running KECS instance"
-	@echo "  dev            - Build server and hot reload controlplane"
+	@echo "  dev            - Build and hot reload controlplane"
 	@echo "  dev-logs       - Same as 'dev' but also tail controlplane logs"
 	@echo "  generate       - Generate code from AWS API definitions"
 	@echo "  credits        - Generate CREDITS file for dependencies"
