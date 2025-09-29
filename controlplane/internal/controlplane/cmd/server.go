@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -167,14 +168,14 @@ func runServer(cmd *cobra.Command) {
 				user, password, host, port, database, sslMode)
 		}
 
-		// Mask password in logs
+		// Mask password in logs using proper URL parsing
 		maskedURL := databaseURL
-		if idx := strings.Index(databaseURL, "://"); idx != -1 {
-			if atIdx := strings.Index(databaseURL[idx+3:], "@"); atIdx != -1 {
-				userPassSection := databaseURL[idx+3 : idx+3+atIdx]
-				if colonIdx := strings.Index(userPassSection, ":"); colonIdx != -1 {
-					maskedURL = databaseURL[:idx+3+colonIdx+1] + "***" + databaseURL[idx+3+atIdx:]
-				}
+		if parsed, err := url.Parse(databaseURL); err == nil && parsed.User != nil {
+			if _, hasPassword := parsed.User.Password(); hasPassword {
+				// Create a copy with masked password
+				userInfo := url.UserPassword(parsed.User.Username(), "***")
+				parsed.User = userInfo
+				maskedURL = parsed.String()
 			}
 		}
 		logging.Info("Using PostgreSQL storage", "url", maskedURL)
