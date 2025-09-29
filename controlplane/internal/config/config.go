@@ -163,6 +163,7 @@ func bindLegacyEnvVars() {
 	v.BindEnv("localstack.enabled", "KECS_LOCALSTACK_ENABLED")
 	v.BindEnv("localstack.useTraefik", "KECS_LOCALSTACK_USE_TRAEFIK")
 	v.BindEnv("server.controlPlaneImage", "KECS_CONTROLPLANE_IMAGE")
+	v.BindEnv("database.url", "KECS_DATABASE_URL")
 }
 
 // DefaultConfig returns the default configuration

@@ -5,14 +5,11 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -30,7 +27,6 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/restoration"
 	storageTypes "github.com/nandemo-ya/kecs/controlplane/internal/storage"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/cache"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage/postgres"
 	"github.com/nandemo-ya/kecs/controlplane/internal/webhook"
 )
@@ -125,87 +121,34 @@ func runServer(cmd *cobra.Command) {
 		logging.Info("Using in-cluster configuration or default kubeconfig")
 	}
 
-	// Initialize storage backend based on environment configuration
+	// Initialize storage backend - PostgreSQL as default
 	var dbStorage storageTypes.Storage
 	ctx := context.Background()
 
-	storageType := os.Getenv("KECS_STORAGE_TYPE")
-	if storageType == "" {
-		storageType = "duckdb" // Default to DuckDB
+	// PostgreSQL storage (default) - runs as sidecar at localhost:5432
+	// Use fixed connection string for sidecar pattern
+	databaseURL := "postgres://kecs:kecs-postgres-2024@localhost:5432/kecs?sslmode=disable"
+
+	// Allow override from configuration for backwards compatibility
+	if configURL := config.GetString("database.url"); configURL != "" {
+		databaseURL = configURL
 	}
 
-	switch strings.ToLower(storageType) {
-	case "postgresql", "postgres", "pg":
-		// PostgreSQL storage
-		databaseURL := os.Getenv("KECS_DATABASE_URL")
-		if databaseURL == "" {
-			// Build database URL from individual environment variables
-			host := os.Getenv("KECS_POSTGRES_HOST")
-			if host == "" {
-				host = "localhost"
-			}
-			port := os.Getenv("KECS_POSTGRES_PORT")
-			if port == "" {
-				port = "5432"
-			}
-			user := os.Getenv("KECS_POSTGRES_USER")
-			if user == "" {
-				user = "kecs"
-			}
-			password := os.Getenv("KECS_POSTGRES_PASSWORD")
-			if password == "" {
-				password = "kecs"
-			}
-			database := os.Getenv("KECS_POSTGRES_DATABASE")
-			if database == "" {
-				database = "kecs"
-			}
-			sslMode := os.Getenv("KECS_POSTGRES_SSLMODE")
-			if sslMode == "" {
-				sslMode = "disable"
-			}
-			databaseURL = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-				user, password, host, port, database, sslMode)
+	// Mask password in logs using proper URL parsing
+	maskedURL := databaseURL
+	if parsed, err := url.Parse(databaseURL); err == nil && parsed.User != nil {
+		if _, hasPassword := parsed.User.Password(); hasPassword {
+			// Create a copy with masked password
+			userInfo := url.UserPassword(parsed.User.Username(), "***")
+			parsed.User = userInfo
+			maskedURL = parsed.String()
 		}
+	}
+	logging.Info("Using PostgreSQL storage", "url", maskedURL)
 
-		// Mask password in logs using proper URL parsing
-		maskedURL := databaseURL
-		if parsed, err := url.Parse(databaseURL); err == nil && parsed.User != nil {
-			if _, hasPassword := parsed.User.Password(); hasPassword {
-				// Create a copy with masked password
-				userInfo := url.UserPassword(parsed.User.Username(), "***")
-				parsed.User = userInfo
-				maskedURL = parsed.String()
-			}
-		}
-		logging.Info("Using PostgreSQL storage", "url", maskedURL)
-
-		dbStorage = postgres.NewPostgreSQLStorage(databaseURL)
-		if err := dbStorage.Initialize(ctx); err != nil {
-			log.Fatalf("Failed to initialize PostgreSQL storage: %v", err)
-		}
-
-	default:
-		// DuckDB storage (default)
-		dbPath := filepath.Join(cfg.Server.DataDir, "kecs.db")
-		logging.Info("Using DuckDB storage",
-			"path", dbPath)
-
-		// Create data directory if it doesn't exist
-		if err := os.MkdirAll(cfg.Server.DataDir, 0o755); err != nil {
-			log.Fatalf("Failed to create data directory: %v", err)
-		}
-
-		duckdbStorage, err := duckdb.NewDuckDBStorage(dbPath)
-		if err != nil {
-			log.Fatalf("Failed to initialize DuckDB storage: %v", err)
-		}
-
-		if err := duckdbStorage.Initialize(ctx); err != nil {
-			log.Fatalf("Failed to initialize DuckDB storage tables: %v", err)
-		}
-
-		dbStorage = duckdbStorage
+	dbStorage = postgres.NewPostgreSQLStorage(databaseURL)
+	if err := dbStorage.Initialize(ctx); err != nil {
+		log.Fatalf("Failed to initialize PostgreSQL storage: %v", err)
 	}
 
 	// Wrap storage with cache layer

@@ -473,7 +473,9 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 
 // createContainers creates the containers for the deployment based on configuration
 func createContainers(config *ControlPlaneConfig, envVars []corev1.EnvVar) []corev1.Container {
+	// Add PostgreSQL sidecar first so it starts before controlplane
 	containers := []corev1.Container{
+		createPostgresSidecar(config),
 		{
 			Name:            "controlplane",
 			Image:           config.Image,
@@ -515,9 +517,9 @@ func createContainers(config *ControlPlaneConfig, envVars []corev1.EnvVar) []cor
 						Port: intstr.FromString("admin"),
 					},
 				},
-				InitialDelaySeconds: 5,  // Start checking early
-				PeriodSeconds:       2,  // Check frequently during startup
-				FailureThreshold:    60, // Allow up to 2 minutes for startup (60 * 2s)
+				InitialDelaySeconds: 10, // Give PostgreSQL time to start
+				PeriodSeconds:       3,  // Check frequently during startup
+				FailureThreshold:    40, // Allow up to 2 minutes for startup (40 * 3s)
 				SuccessThreshold:    1,
 			},
 			LivenessProbe: &corev1.Probe{
@@ -556,9 +558,6 @@ func createContainers(config *ControlPlaneConfig, envVars []corev1.EnvVar) []cor
 			},
 		},
 	}
-
-	// Add PostgreSQL sidecar (always enabled)
-	containers = append(containers, createPostgresSidecar(config))
 
 	return containers
 }
