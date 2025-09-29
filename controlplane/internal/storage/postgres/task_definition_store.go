@@ -25,7 +25,30 @@ func (s *taskDefinitionStore) Register(ctx context.Context, td *storage.TaskDefi
 		td.RegisteredAt = time.Now()
 	}
 
-	query := `
+	// Get the next revision number for this family
+	var maxRevision int
+	query := `SELECT COALESCE(MAX(revision), 0) FROM task_definitions WHERE family = $1`
+	err := s.db.QueryRowContext(ctx, query, td.Family).Scan(&maxRevision)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get max revision: %w", err)
+	}
+
+	// Set revision and ARN
+	td.Revision = maxRevision + 1
+	if td.Region == "" {
+		td.Region = "us-east-1"
+	}
+	if td.AccountID == "" {
+		td.AccountID = "000000000000"
+	}
+	td.ARN = fmt.Sprintf("arn:aws:ecs:%s:%s:task-definition/%s:%d",
+		td.Region, td.AccountID, td.Family, td.Revision)
+
+	if td.Status == "" {
+		td.Status = "ACTIVE"
+	}
+
+	insertQuery := `
 	INSERT INTO task_definitions (
 		id, arn, family, revision, task_role_arn, execution_role_arn,
 		network_mode, container_definitions, volumes, placement_constraints,
@@ -38,7 +61,7 @@ func (s *taskDefinitionStore) Register(ctx context.Context, td *storage.TaskDefi
 		$20, $21, $22, $23
 	)`
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err = s.db.ExecContext(ctx, insertQuery,
 		td.ID, td.ARN, td.Family, td.Revision,
 		toNullString(td.TaskRoleARN), toNullString(td.ExecutionRoleARN),
 		td.NetworkMode, td.ContainerDefinitions,
@@ -245,7 +268,7 @@ func (s *taskDefinitionStore) ListRevisions(ctx context.Context, family string, 
 	}
 
 	query := `
-	SELECT revision, arn, status, registered_at, deregistered_at
+	SELECT family, revision, arn, status, registered_at, deregistered_at
 	FROM task_definitions
 	WHERE family = $1`
 
@@ -277,7 +300,7 @@ func (s *taskDefinitionStore) ListRevisions(ctx context.Context, family string, 
 		var deregisteredAt sql.NullTime
 
 		err := rows.Scan(
-			&rev.Revision, &rev.ARN, &rev.Status,
+			&rev.Family, &rev.Revision, &rev.ARN, &rev.Status,
 			&rev.RegisteredAt, &deregisteredAt,
 		)
 		if err != nil {

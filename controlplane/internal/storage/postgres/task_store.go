@@ -118,9 +118,21 @@ func (s *taskStore) List(ctx context.Context, clusterARN string, filters storage
 	args := []interface{}{clusterARN}
 	argNum := 2
 
+	if filters.Family != "" {
+		// Filter by task definition family (extract family from task_definition_arn)
+		query += fmt.Sprintf(" AND task_definition_arn LIKE $%d", argNum)
+		args = append(args, "%:task-definition/"+filters.Family+":%")
+		argNum++
+	}
 	if filters.ServiceName != "" {
-		query += fmt.Sprintf(" AND started_by = $%d", argNum)
-		args = append(args, filters.ServiceName)
+		// Filter by service name (stored in task_group as "service:servicename")
+		query += fmt.Sprintf(" AND task_group = $%d", argNum)
+		args = append(args, "service:"+filters.ServiceName)
+		argNum++
+	}
+	if filters.ContainerInstance != "" {
+		query += fmt.Sprintf(" AND container_instance_arn = $%d", argNum)
+		args = append(args, filters.ContainerInstance)
 		argNum++
 	}
 	if filters.DesiredStatus != "" {
@@ -131,6 +143,11 @@ func (s *taskStore) List(ctx context.Context, clusterARN string, filters storage
 	if filters.LaunchType != "" {
 		query += fmt.Sprintf(" AND launch_type = $%d", argNum)
 		args = append(args, filters.LaunchType)
+		argNum++
+	}
+	if filters.StartedBy != "" {
+		query += fmt.Sprintf(" AND started_by = $%d", argNum)
+		args = append(args, filters.StartedBy)
 		argNum++
 	}
 
