@@ -28,7 +28,7 @@ make docker-push-dev
 
 This will:
 - Build the control plane Docker image
-- Tag it as `localhost:5000/nandemo-ya/kecs-controlplane:latest`
+- Tag it as `localhost:5000/nandemo-ya/kecs-server:latest`
 - Push it to the local k3d registry
 
 ### 3. Start KECS in dev mode
@@ -39,7 +39,7 @@ kecs start --dev
 
 This will:
 - Connect to the existing k3d registry
-- Configure the control plane to use `registry.kecs.local:5000/nandemo-ya/kecs-controlplane:latest` (cluster-internal name)
+- Configure the control plane to use `registry.kecs.local:5000/nandemo-ya/kecs-server:latest` (cluster-internal name)
 - Deploy KECS using the locally built image
 
 ## How it works
@@ -97,7 +97,7 @@ If pods fail with `ErrImagePull`:
 
 2. Check the image tags:
    ```bash
-   curl http://localhost:5000/v2/nandemo-ya/kecs-controlplane/tags/list
+   curl http://localhost:5000/v2/nandemo-ya/kecs-server/tags/list
    ```
 
 3. Check that the registry container is connected to the cluster network

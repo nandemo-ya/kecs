@@ -155,7 +155,7 @@ docker run -d \
 scrape_configs:
   - job_name: 'kecs'
     static_configs:
-    - targets: ['kecs-controlplane:8081']
+    - targets: ['kecs-server:8081']
     metrics_path: '/metrics/prometheus'
 ```
 
@@ -265,7 +265,7 @@ Access pprof endpoints (admin port):
 1. Update image tag in deployment
 2. Apply rolling update:
 ```bash
-kubectl set image -n kecs-system deployment/kecs-controlplane \
+kubectl set image -n kecs-system deployment/kecs-server \
   controlplane=ghcr.io/nandemo-ya/kecs:v1.1.0
 ```
 

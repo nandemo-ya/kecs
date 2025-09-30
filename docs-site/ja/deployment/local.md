@@ -163,7 +163,7 @@ KECS は便利なコンテナコマンドを提供しています：
 ./bin/kecs start --name myinstance --api-port 9090
 
 # コントロールプレーンのログを表示
-kubectl logs -n kecs-system deployment/kecs-controlplane -f
+kubectl logs -n kecs-system deployment/kecs-server -f
 
 # インスタンスを停止
 ./bin/kecs stop

@@ -26,13 +26,13 @@ func int64Ptr(i int64) *int64 {
 const (
 	// ControlPlane constants
 	ControlPlaneNamespace      = "kecs-system"
-	ControlPlaneName           = "kecs-controlplane"
-	ControlPlaneServiceAccount = "kecs-controlplane"
+	ControlPlaneName           = "kecs-server"
+	ControlPlaneServiceAccount = "kecs-server"
 	ControlPlaneConfigMap      = "kecs-config"
 	ControlPlanePVC            = "kecs-data"
 	ControlPlaneAPIService     = "kecs-api"
 	ControlPlaneAdminService   = "kecs-admin"
-	ControlPlaneService        = "kecs-controlplane" // Deprecated, kept for backward compatibility
+	ControlPlaneService        = "kecs-server" // Deprecated, kept for backward compatibility
 
 	// Labels
 	LabelManagedBy = "kecs.dev/managed"
