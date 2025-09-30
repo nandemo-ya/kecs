@@ -258,6 +258,7 @@ func LoadConfig(configPath string) (*Config, error) {
 		}
 
 		v.SetConfigFile(configPath)
+		v.SetConfigType("yaml") // Explicitly set config type for ConfigMap mounted files
 		if err := v.ReadInConfig(); err != nil {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
