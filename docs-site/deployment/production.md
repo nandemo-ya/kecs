@@ -15,10 +15,11 @@ This guide covers deploying KECS in production environments with high availabili
     ┌───────────▼───────────┐     ┌──────────▼────────────┐
     │   KECS Control Plane  │     │  KECS Control Plane   │
     │     (Primary)         │     │    (Secondary)        │
+    │   + PostgreSQL        │     │   + PostgreSQL        │
     └───────────┬───────────┘     └──────────┬────────────┘
                 │                             │
     ┌───────────▼─────────────────────────────▼───────────┐
-    │              Shared Storage (DuckDB)                 │
+    │            Persistent Storage (PVC/PV)               │
     │            (NFS / EFS / Cloud Storage)              │
     └─────────────────────────────────────────────────────┘
                 │                             │
@@ -61,12 +62,7 @@ data:
       logLevel: info
     
     storage:
-      type: duckdb
-      duckdb:
-        path: /data/kecs.db
-        backupEnabled: true
-        backupSchedule: "0 2 * * *"
-        backupRetention: 7
+      dataDir: /data
     
     kubernetes:
       inCluster: true
@@ -588,19 +584,20 @@ spec:
 ### Database Optimization
 
 ```sql
--- Optimize DuckDB for production
-PRAGMA memory_limit='8GB';
-PRAGMA threads=8;
-PRAGMA checkpoint_threshold='2GB';
+-- PostgreSQL optimization for production
+-- Note: PostgreSQL runs as a sidecar and is automatically configured
+-- These are example queries for monitoring and analysis
 
--- Create indexes for common queries
-CREATE INDEX idx_tasks_cluster_status ON tasks(cluster_arn, status);
-CREATE INDEX idx_services_cluster_active ON services(cluster_arn) WHERE status = 'ACTIVE';
+-- Create indexes for common queries (already created by schema)
+-- These indexes are created automatically on startup
 
--- Analyze tables periodically
+-- Analyze tables periodically for query optimization
 ANALYZE tasks;
 ANALYZE services;
 ANALYZE clusters;
+
+-- Vacuum for maintenance (run during low-traffic periods)
+VACUUM ANALYZE;
 ```
 
 ### Kubernetes Resource Tuning
@@ -664,17 +661,15 @@ BACKUP_DIR="/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 S3_BUCKET="kecs-backups"
 
-# Create backup
-duckdb /data/kecs.db "EXPORT DATABASE '${BACKUP_DIR}/kecs_${TIMESTAMP}'"
-
-# Compress backup
-tar -czf "${BACKUP_DIR}/kecs_${TIMESTAMP}.tar.gz" "${BACKUP_DIR}/kecs_${TIMESTAMP}"
+# Create PostgreSQL backup
+kubectl exec -n kecs-system deployment/kecs-control-plane -c postgres -- \
+  pg_dump -U kecs kecs | gzip > "${BACKUP_DIR}/kecs_${TIMESTAMP}.sql.gz"
 
 # Upload to S3
-aws s3 cp "${BACKUP_DIR}/kecs_${TIMESTAMP}.tar.gz" "s3://${S3_BUCKET}/backups/"
+aws s3 cp "${BACKUP_DIR}/kecs_${TIMESTAMP}.sql.gz" "s3://${S3_BUCKET}/backups/"
 
 # Clean up old backups
-find ${BACKUP_DIR} -name "kecs_*.tar.gz" -mtime +7 -delete
+find ${BACKUP_DIR} -name "kecs_*.sql.gz" -mtime +7 -delete
 ```
 
 ## Maintenance
@@ -694,13 +689,17 @@ kubectl rollout status deployment/kecs-control-plane -n kecs-system
 ### Database Maintenance
 
 ```bash
-# Vacuum database
-kubectl exec -n kecs-system deployment/kecs-control-plane -- \
-  duckdb /data/kecs.db "VACUUM; ANALYZE;"
+# Vacuum and analyze PostgreSQL database
+kubectl exec -n kecs-system deployment/kecs-control-plane -c postgres -- \
+  psql -U kecs -d kecs -c "VACUUM ANALYZE;"
 
-# Check database integrity
-kubectl exec -n kecs-system deployment/kecs-control-plane -- \
-  duckdb /data/kecs.db "PRAGMA integrity_check;"
+# Check database connections
+kubectl exec -n kecs-system deployment/kecs-control-plane -c postgres -- \
+  psql -U kecs -d kecs -c "SELECT count(*) FROM pg_stat_activity;"
+
+# Check database size
+kubectl exec -n kecs-system deployment/kecs-control-plane -c postgres -- \
+  psql -U kecs -d kecs -c "SELECT pg_size_pretty(pg_database_size('kecs'));"
 ```
 
 ## Security Hardening

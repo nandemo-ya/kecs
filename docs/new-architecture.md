@@ -98,7 +98,7 @@ spec:
 ### 1. KECS Control Plane
 - Provides ECS and ELBv2 APIs
 - Deployed as a Deployment in kecs-system namespace
-- Uses DuckDB for persistence
+- Uses PostgreSQL for persistence (runs as sidecar container)
 - Health checks on `/health` and `/ready`
 
 ### 2. Traefik Gateway

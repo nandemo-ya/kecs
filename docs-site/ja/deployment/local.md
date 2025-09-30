@@ -221,8 +221,8 @@ kubectl logs -n kecs-system deployment/kecs-controlplane -f
 
 ### データベーススキーマの変更
 
-1. `internal/storage/duckdb/schema.sql` でスキーマを更新
-2. `internal/storage/duckdb/migrations/` でマイグレーションを追加
+1. `internal/storage/postgres/schema.sql` でスキーマを更新
+2. `internal/storage/postgres/migrations/` でマイグレーションを追加
 3. 必要に応じてストレージインターフェイスを更新
 4. テストを実行して変更を確認
 

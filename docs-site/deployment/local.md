@@ -4,6 +4,17 @@
 
 This guide covers setting up KECS for local development, including building from source and running locally.
 
+## Architecture
+
+KECS uses PostgreSQL for persistent storage, which runs as a sidecar container alongside the control plane. This architecture provides:
+
+- **Automatic Configuration**: PostgreSQL is automatically deployed and configured - no manual setup required
+- **Data Persistence**: All ECS state (clusters, services, tasks, etc.) is stored in PostgreSQL
+- **Reliability**: PostgreSQL provides ACID transactions and data integrity
+- **Simplified Operations**: The sidecar pattern ensures the database lifecycle is managed automatically
+
+When you run KECS in Kubernetes (via `kecs start`), both the control plane and PostgreSQL sidecar are deployed together. For local development using `kecs server`, you'll need to provide access to a PostgreSQL instance.
+
 ## Prerequisites
 
 - Go 1.21 or later
@@ -232,8 +243,8 @@ For detailed information, see the [Container Mode Persistence Guide](/guides/con
 
 ### Modifying the Database Schema
 
-1. Update schema in `internal/storage/duckdb/schema.sql`
-2. Add migration in `internal/storage/duckdb/migrations/`
+1. Update schema in `internal/storage/postgres/schema.sql`
+2. Add migration in `internal/storage/postgres/migrations/`
 3. Update storage interface if needed
 4. Run tests to verify changes
 
