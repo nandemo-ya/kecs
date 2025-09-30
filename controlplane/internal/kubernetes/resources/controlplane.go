@@ -32,7 +32,6 @@ const (
 	ControlPlanePVC            = "kecs-data"
 	ControlPlaneAPIService     = "kecs-api"
 	ControlPlaneAdminService   = "kecs-admin"
-	ControlPlaneService        = "kecs-server" // Deprecated, kept for backward compatibility
 
 	// Labels
 	LabelManagedBy = "kecs.dev/managed"
@@ -435,32 +434,6 @@ func createServices(config *ControlPlaneConfig) []*corev1.Service {
 						Name:       "webhook",
 						Port:       443,
 						TargetPort: intstr.FromInt(9443),
-						Protocol:   corev1.ProtocolTCP,
-					},
-				},
-				Type: corev1.ServiceTypeClusterIP,
-			},
-		},
-		// Legacy Admin Service (ClusterIP for backward compatibility)
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ControlPlaneService,
-				Namespace: ControlPlaneNamespace,
-				Labels: map[string]string{
-					LabelManagedBy: "true",
-					LabelComponent: "controlplane",
-					LabelType:      "admin-legacy",
-				},
-			},
-			Spec: corev1.ServiceSpec{
-				Selector: map[string]string{
-					LabelApp: ControlPlaneName,
-				},
-				Ports: []corev1.ServicePort{
-					{
-						Name:       "admin",
-						Port:       config.AdminPort,
-						TargetPort: intstr.FromInt(ControlPlaneInternalAdminPort),
 						Protocol:   corev1.ProtocolTCP,
 					},
 				},
