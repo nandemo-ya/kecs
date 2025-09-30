@@ -25,7 +25,7 @@ features:
     details: Kind による簡単なセットアップ、WebSocket によるリアルタイム更新
   - icon: 📦
     title: 本番環境対応
-    details: DuckDB による永続化、グレースフルシャットダウン、包括的なモニタリング
+    details: PostgreSQL による永続化、グレースフルシャットダウン、包括的なモニタリング
 ---
 
 ## クイックスタート
@@ -56,7 +56,7 @@ KECS は AWS から独立して動作する、完全にローカルな ECS 互�
 KECS は Kubernetes 上に ECS API 仕様を実装しています：
 
 - **コントロールプレーン**: ECS API リクエストの処理と状態管理
-- **ストレージレイヤー**: DuckDB による永続的なストレージ
+- **ストレージレイヤー**: PostgreSQL による永続的なストレージ
 - **Kubernetes バックエンド**: ECS の概念を Kubernetes リソースに変換
 
 ## コミュニティ

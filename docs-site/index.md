@@ -67,7 +67,7 @@ KECS (Kubernetes-based ECS Compatible Service) provides a complete local Amazon 
 - Hot reload for rapid development
 
 ### 🔧 Production-Ready Features
-- DuckDB for reliable state persistence
+- PostgreSQL for reliable state persistence
 - Graceful shutdown and cleanup
 - Resource monitoring and health checks
 - Comprehensive logging and debugging

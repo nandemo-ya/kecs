@@ -178,7 +178,7 @@ export KECS_LOG_LEVEL=debug
 KECS stores instance data in `~/.kecs/instances/`. Each instance has:
 - Configuration file
 - k3d kubeconfig
-- DuckDB database for ECS resources
+- PostgreSQL database for ECS resources (runs as sidecar)
 
 ### Using with LocalStack
 

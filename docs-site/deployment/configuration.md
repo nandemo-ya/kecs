@@ -28,7 +28,6 @@ server:
   logFormat: json
 
 storage:
-  type: duckdb
   dataDir: /var/lib/kecs/data
 
 kubernetes:
@@ -98,50 +97,9 @@ tls:
 
 # Storage Configuration
 storage:
-  # Storage type: duckdb, postgres (default: duckdb)
-  type: duckdb
-  
-  # Data directory (default: ~/.kecs/data)
+  # Data directory for PostgreSQL persistent storage (default: ~/.kecs/data)
+  # PostgreSQL runs as a sidecar container and is automatically configured
   dataDir: /var/lib/kecs/data
-  
-  # DuckDB specific settings
-  duckdb:
-    # Database file path
-    path: /var/lib/kecs/data/kecs.db
-    
-    # Memory limit for DuckDB
-    memoryLimit: 4GB
-    
-    # Number of threads
-    threads: 4
-    
-    # Enable WAL mode
-    walEnabled: true
-    
-    # Checkpoint threshold
-    checkpointThreshold: 1GB
-    
-    # Connection pool settings
-    pool:
-      maxConnections: 10
-      maxIdleTime: 30m
-      maxLifetime: 1h
-  
-  # PostgreSQL settings (if type: postgres)
-  postgres:
-    host: localhost
-    port: 5432
-    database: kecs
-    username: kecs
-    password: "${POSTGRES_PASSWORD}"
-    sslMode: require
-    
-    # Connection pool settings
-    pool:
-      maxConnections: 25
-      minConnections: 5
-      maxIdleTime: 30m
-      maxLifetime: 1h
 
 # Kubernetes Configuration
 kubernetes:
@@ -452,7 +410,7 @@ export KECS_SERVER_ADMINPORT=8081
 export KECS_SERVER_LOGLEVEL=debug
 
 # Storage configuration
-export KECS_STORAGE_TYPE=duckdb
+# PostgreSQL runs as a sidecar and is automatically configured
 export KECS_STORAGE_DATADIR=/var/lib/kecs/data
 
 # Kubernetes configuration
@@ -483,7 +441,7 @@ export KECS_ACCOUNT_ID=000000000000   # AWS account ID for KECS (default: 000000
 | Configuration Path | Environment Variable |
 |-------------------|---------------------|
 | server.apiPort | KECS_SERVER_APIPORT |
-| storage.type | KECS_STORAGE_TYPE |
+| storage.dataDir | KECS_STORAGE_DATADIR |
 | kubernetes.inCluster | KECS_KUBERNETES_INCLUSTER |
 | auth.jwt.secret | KECS_AUTH_JWT_SECRET |
 
@@ -588,7 +546,6 @@ server:
   prettyLog: true
 
 storage:
-  type: duckdb
   dataDir: ./data
 
 kubernetes:
@@ -618,16 +575,7 @@ tls:
   minVersion: "1.2"
 
 storage:
-  type: postgres
-  postgres:
-    host: postgres.kecs.svc.cluster.local
-    port: 5432
-    database: kecs
-    username: kecs
-    password: "${POSTGRES_PASSWORD}"
-    sslMode: require
-    pool:
-      maxConnections: 50
+  dataDir: /var/lib/kecs/data
 
 kubernetes:
   inCluster: true
