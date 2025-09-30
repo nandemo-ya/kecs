@@ -359,7 +359,7 @@ func (m *Manager) waitForReady(ctx context.Context, instanceName string, cfg *co
 	}
 
 	// Wait for control plane
-	if err := waitForDeployment(ctx, client, "kecs-system", "kecs-controlplane"); err != nil {
+	if err := waitForDeployment(ctx, client, "kecs-system", "kecs-server"); err != nil {
 		return fmt.Errorf("control plane failed to become ready: %w", err)
 	}
 

@@ -163,7 +163,7 @@ kecs start
 kecs start --name myinstance --api-port 9090
 
 # View logs from control plane
-kubectl logs -n kecs-system deployment/kecs-controlplane -f
+kubectl logs -n kecs-system deployment/kecs-server -f
 
 # Stop the instance
 kecs stop

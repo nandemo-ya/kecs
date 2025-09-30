@@ -180,7 +180,7 @@ curl http://localhost:8081/health/detailed
 ### Check component status
 ```bash
 kubectl get all -n kecs-system
-kubectl logs -n kecs-system -l app=kecs-controlplane
+kubectl logs -n kecs-system -l app=kecs-server
 kubectl logs -n kecs-system -l app=traefik
 kubectl logs -n kecs-system -l app=localstack
 ```

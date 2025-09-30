@@ -70,7 +70,7 @@ kubectl get pods -n kecs-system
 
 # Example output:
 # NAME                                   READY   STATUS    RESTARTS   AGE
-# kecs-controlplane-7f8b9c5d4-x2klm     1/1     Running   0          5m
+# kecs-server-7f8b9c5d4-x2klm     1/1     Running   0          5m
 # localstack-6d7f8c9b5-p3qrs            1/1     Running   0          5m
 ```
 

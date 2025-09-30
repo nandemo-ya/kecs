@@ -243,7 +243,7 @@ KECS_INSTANCE=project-b kecs port-forward start service default/web --local-port
 **Solution**:
 1. Check KECS controlplane logs:
    ```bash
-   kubectl logs -n kecs-system deployment/kecs-controlplane -f
+   kubectl logs -n kecs-system deployment/kecs-server -f
    ```
 2. Ensure stable network connection
 3. Verify task isn't being frequently restarted:

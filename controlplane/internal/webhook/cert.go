@@ -40,10 +40,10 @@ func GenerateSelfSignedCert(certPath, keyPath, hostname string) error {
 		"kecs-webhook.kecs-system",
 		"kecs-webhook.kecs-system.svc",
 		"kecs-webhook.kecs-system.svc.cluster.local",
-		"kecs-controlplane",
-		"kecs-controlplane.kecs-system",
-		"kecs-controlplane.kecs-system.svc",
-		"kecs-controlplane.kecs-system.svc.cluster.local",
+		"kecs-server",
+		"kecs-server.kecs-system",
+		"kecs-server.kecs-system.svc",
+		"kecs-server.kecs-system.svc.cluster.local",
 		"localhost",
 	}
 	template.IPAddresses = []net.IP{

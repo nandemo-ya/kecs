@@ -37,7 +37,7 @@ func (n *NamespaceManager) CreateNamespace(ctx context.Context, clusterName, reg
 				"kecs.dev/type":    "ecs-cluster",
 			},
 			Annotations: map[string]string{
-				"kecs.dev/created-by": "kecs-controlplane",
+				"kecs.dev/created-by": "kecs-server",
 			},
 		},
 	}

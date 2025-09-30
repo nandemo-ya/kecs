@@ -260,7 +260,7 @@ aws elbv2 describe-target-group-attributes \
 
 ```bash
 # View KECS control plane logs
-kubectl logs -n kecs-system deployment/kecs-controlplane -f
+kubectl logs -n kecs-system deployment/kecs-server -f
 
 # View Traefik access logs
 kubectl logs -n kecs-system deployment/traefik -f
