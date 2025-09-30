@@ -3,6 +3,7 @@ package cache
 import (
 	"container/list"
 	"context"
+	"strings"
 	"sync"
 	"time"
 )
@@ -130,7 +131,7 @@ func (c *MemoryCache) DeleteWithPrefix(ctx context.Context, prefix string) {
 
 	var toRemove []*cacheItem
 	for key, item := range c.items {
-		if len(key) >= len(prefix) && key[:len(prefix)] == prefix {
+		if strings.HasPrefix(key, prefix) {
 			toRemove = append(toRemove, item)
 		}
 	}
