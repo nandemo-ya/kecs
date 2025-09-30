@@ -79,6 +79,12 @@ func runServer(cmd *cobra.Command) {
 	}
 
 	// Load configuration
+	// Check environment variable if configFile is not set via flag
+	if configFile == "" {
+		if envConfig := os.Getenv("KECS_CONFIG_PATH"); envConfig != "" {
+			configFile = envConfig
+		}
+	}
 	cfg, err := config.LoadConfig(configFile)
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
