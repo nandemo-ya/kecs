@@ -123,6 +123,23 @@ func (c *MemoryCache) Delete(ctx context.Context, key string) {
 	}
 }
 
+// DeleteWithPrefix removes all items whose keys start with the given prefix
+func (c *MemoryCache) DeleteWithPrefix(ctx context.Context, prefix string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var toRemove []*cacheItem
+	for key, item := range c.items {
+		if len(key) >= len(prefix) && key[:len(prefix)] == prefix {
+			toRemove = append(toRemove, item)
+		}
+	}
+
+	for _, item := range toRemove {
+		c.removeItem(item)
+	}
+}
+
 // Clear removes all items from the cache
 func (c *MemoryCache) Clear() {
 	c.mu.Lock()
