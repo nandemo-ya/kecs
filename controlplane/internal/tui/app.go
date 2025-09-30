@@ -787,16 +787,21 @@ func (m Model) View() string {
 	footerHeight := 1
 	availableHeight := totalHeight - footerHeight
 
+	// Each panel has borders (2 lines) and padding (2 lines) = 4 lines overhead
+	// So if we want a panel to take N lines total, we pass N as panelHeight
+	// and renderXxxPanelWithHeight will calculate contentHeight = N - 4
+
 	// Calculate base heights (30/70 split of available height)
 	navPanelHeight := int(float64(availableHeight) * 0.3)
 	resourcePanelHeight := availableHeight - navPanelHeight
 
-	// Ensure minimum heights
-	if navPanelHeight < 10 {
-		navPanelHeight = 10
+	// Ensure minimum heights (accounting for 4 line overhead)
+	minPanelHeight := 10
+	if navPanelHeight < minPanelHeight {
+		navPanelHeight = minPanelHeight
 	}
-	if resourcePanelHeight < 10 {
-		resourcePanelHeight = 10
+	if resourcePanelHeight < minPanelHeight {
+		resourcePanelHeight = minPanelHeight
 	}
 
 	// Adjust to ensure they exactly fill the available height

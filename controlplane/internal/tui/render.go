@@ -2589,8 +2589,11 @@ func (m Model) renderNavigationPanelWithHeight(panelHeight int) string {
 
 	navContent := lipgloss.JoinVertical(lipgloss.Top, components...)
 
-	// Use the exact height provided, accounting for borders (2) and padding (2)
-	contentHeight := panelHeight - 4
+	// lipgloss.Height() includes padding but NOT borders
+	// So if we want total height of panelHeight:
+	// - Borders add 2 lines (top + bottom)
+	// - Height() should be panelHeight - 2
+	contentHeight := panelHeight - 2
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
@@ -2605,8 +2608,13 @@ func (m Model) renderNavigationPanelWithHeight(panelHeight int) string {
 func (m Model) renderResourcePanelWithHeight(panelHeight int) string {
 	var content string
 
-	// Use the provided height for content calculation
-	contentHeight := panelHeight - 4 // Account for borders and padding
+	// lipgloss.Height() includes padding but NOT borders
+	// So if we want total height of panelHeight:
+	// - Borders add 2 lines (top + bottom)
+	// - Height() should be panelHeight - 2
+	// - contentHeight for rendering lists should be panelHeight - 2 - 2(padding) = panelHeight - 4
+	styleHeight := panelHeight - 2
+	contentHeight := panelHeight - 4 // For rendering lists (excludes borders and padding)
 
 	// Render view-specific content
 	switch m.currentView {
@@ -2649,7 +2657,7 @@ func (m Model) renderResourcePanelWithHeight(panelHeight int) string {
 	}
 
 	return resourcePanelStyle.
-		Width(m.width - 4).    // Account for borders and padding
-		Height(contentHeight). // Use exact height provided
+		Width(m.width - 4).  // Account for borders and padding
+		Height(styleHeight). // Height including padding (borders added automatically)
 		Render(content)
 }
