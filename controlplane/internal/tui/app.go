@@ -791,8 +791,8 @@ func (m Model) View() string {
 	// So if we want a panel to take N lines total, we pass N as panelHeight
 	// and renderXxxPanelWithHeight will calculate contentHeight = N - 4
 
-	// Calculate base heights (30/70 split of available height)
-	navPanelHeight := int(float64(availableHeight) * 0.3)
+	// Calculate base heights (25/75 split of available height)
+	navPanelHeight := int(float64(availableHeight) * 0.25)
 	resourcePanelHeight := availableHeight - navPanelHeight
 
 	// Ensure minimum heights (accounting for 4 line overhead)

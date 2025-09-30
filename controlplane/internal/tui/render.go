@@ -543,15 +543,9 @@ func (m Model) renderSummary() string {
 				}
 			}
 
-			// Build vertical layout with proper alignment
-			line1 := fmt.Sprintf("Clusters: %-4d  API:   %d", len(m.clusters), apiPort)
-			line2 := fmt.Sprintf("Services: %-4d  Admin: %d", totalServices, adminPort)
-			line3 := fmt.Sprintf("Tasks:    %-4d", totalTasks)
-
-			// Create multi-line summary with consistent styling
-			summary = summaryStyle.Render(line1) + "\n" +
-				summaryStyle.Render(line2) + "\n" +
-				summaryStyle.Render(line3)
+			// Build horizontal layout with stats and ports
+			summary = fmt.Sprintf("Clusters: %d    Services: %d    Tasks: %d        API: %d    Admin: %d",
+				len(m.clusters), totalServices, totalTasks, apiPort, adminPort)
 		}
 
 	case ViewServices:
