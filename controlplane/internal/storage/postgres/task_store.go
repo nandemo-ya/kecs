@@ -80,22 +80,45 @@ func (s *taskStore) Create(ctx context.Context, task *storage.Task) error {
 
 // Get retrieves a task by cluster and task ID/ARN
 func (s *taskStore) Get(ctx context.Context, clusterARN, taskID string) (*storage.Task, error) {
-	query := `
-	SELECT
-		id, arn, cluster_arn, task_definition_arn, container_instance_arn,
-		overrides, last_status, desired_status, cpu, memory,
-		containers, started_by, version, stop_code, stopped_reason,
-		stopping_at, stopped_at, connectivity, connectivity_at,
-		pull_started_at, pull_stopped_at, execution_stopped_at,
-		created_at, started_at, launch_type, platform_version,
-		platform_family, task_group, attachments, health_status,
-		tags, attributes, enable_execute_command, capacity_provider_name,
-		ephemeral_storage, region, account_id, pod_name, namespace,
-		service_registries
-	FROM tasks
-	WHERE cluster_arn = $1 AND (arn = $2 OR id = $2)`
+	var query string
+	var args []interface{}
 
-	return scanTask(s.db.QueryRowContext(ctx, query, clusterARN, taskID))
+	// If clusterARN is empty and taskID looks like a full ARN, search by ARN only
+	if clusterARN == "" && strings.Contains(taskID, "arn:aws:ecs:") {
+		query = `
+		SELECT
+			id, arn, cluster_arn, task_definition_arn, container_instance_arn,
+			overrides, last_status, desired_status, cpu, memory,
+			containers, started_by, version, stop_code, stopped_reason,
+			stopping_at, stopped_at, connectivity, connectivity_at,
+			pull_started_at, pull_stopped_at, execution_stopped_at,
+			created_at, started_at, launch_type, platform_version,
+			platform_family, task_group, attachments, health_status,
+			tags, attributes, enable_execute_command, capacity_provider_name,
+			ephemeral_storage, region, account_id, pod_name, namespace,
+			service_registries
+		FROM tasks
+		WHERE arn = $1`
+		args = []interface{}{taskID}
+	} else {
+		query = `
+		SELECT
+			id, arn, cluster_arn, task_definition_arn, container_instance_arn,
+			overrides, last_status, desired_status, cpu, memory,
+			containers, started_by, version, stop_code, stopped_reason,
+			stopping_at, stopped_at, connectivity, connectivity_at,
+			pull_started_at, pull_stopped_at, execution_stopped_at,
+			created_at, started_at, launch_type, platform_version,
+			platform_family, task_group, attachments, health_status,
+			tags, attributes, enable_execute_command, capacity_provider_name,
+			ephemeral_storage, region, account_id, pod_name, namespace,
+			service_registries
+		FROM tasks
+		WHERE cluster_arn = $1 AND (arn = $2 OR id = $2)`
+		args = []interface{}{clusterARN, taskID}
+	}
+
+	return scanTask(s.db.QueryRowContext(ctx, query, args...))
 }
 
 // List lists tasks with filtering

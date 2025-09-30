@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,17 +15,43 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
+
+	postgresStorage "github.com/nandemo-ya/kecs/controlplane/internal/storage/postgres"
 )
 
 // TestGeneratedTypesIntegration tests that generated types work correctly with the API
 func TestGeneratedTypesIntegration(t *testing.T) {
-	// Create storage
-	storage, err := duckdb.NewDuckDBStorage(":memory:")
+	// Start PostgreSQL container for testing
+	ctx := context.Background()
+	pgContainer, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage("postgres:15-alpine"),
+		postgres.WithDatabase("kecs_test"),
+		postgres.WithUsername("kecs_test"),
+		postgres.WithPassword("kecs_test"),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(30*time.Second)),
+	)
 	require.NoError(t, err)
+	defer func() {
+		if err := pgContainer.Terminate(ctx); err != nil {
+			t.Logf("Failed to terminate container: %v", err)
+		}
+	}()
+
+	// Get connection string
+	connStr, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
+	require.NoError(t, err)
+
+	// Create storage
+	storage := postgresStorage.NewPostgreSQLStorage(connStr)
 	defer storage.Close()
 
-	err = storage.Initialize(context.Background())
+	err = storage.Initialize(ctx)
 	require.NoError(t, err)
 
 	// Create ECS API with generated types

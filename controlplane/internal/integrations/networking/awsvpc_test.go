@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -12,16 +13,20 @@ import (
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
-	"github.com/nandemo-ya/kecs/controlplane/internal/storage/duckdb"
+	postgresStorage "github.com/nandemo-ya/kecs/controlplane/internal/storage/postgres"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 var _ = Describe("AWSVPC Network Mode Integration", func() {
 	var (
-		ctx       context.Context
-		ecsAPI    *api.DefaultECSAPI
-		store     storage.Storage
-		region    = "us-east-1"
-		accountID = "000000000000"
+		ctx         context.Context
+		ecsAPI      *api.DefaultECSAPI
+		store       storage.Storage
+		region      = "us-east-1"
+		accountID   = "000000000000"
+		pgContainer *postgres.PostgresContainer
 	)
 
 	BeforeEach(func() {
@@ -30,10 +35,26 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 		// Set test mode to avoid requiring actual Kubernetes cluster
 		os.Setenv("KECS_TEST_MODE", "true")
 
-		// Initialize storage
+		// Start PostgreSQL container for testing
 		var err error
-		store, err = duckdb.NewDuckDBStorage(":memory:")
+		pgContainer, err = postgres.RunContainer(ctx,
+			testcontainers.WithImage("postgres:15-alpine"),
+			postgres.WithDatabase("kecs_test"),
+			postgres.WithUsername("kecs_test"),
+			postgres.WithPassword("kecs_test"),
+			testcontainers.WithWaitStrategy(
+				wait.ForLog("database system is ready to accept connections").
+					WithOccurrence(2).
+					WithStartupTimeout(30*time.Second)),
+		)
 		Expect(err).NotTo(HaveOccurred())
+
+		// Get connection string
+		connStr, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
+		Expect(err).NotTo(HaveOccurred())
+
+		// Initialize storage
+		store = postgresStorage.NewPostgreSQLStorage(connStr)
 
 		// Initialize the database schema
 		err = store.Initialize(ctx)
@@ -52,6 +73,11 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 	AfterEach(func() {
 		if store != nil {
 			store.Close()
+		}
+		if pgContainer != nil {
+			if err := pgContainer.Terminate(ctx); err != nil {
+				GinkgoWriter.Printf("Failed to terminate container: %v\n", err)
+			}
 		}
 	})
 
@@ -124,6 +150,29 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 		})
 
 		It("should describe task with network details", func() {
+			// Register task definition first (required for this test)
+			regResp, err := ecsAPI.RegisterTaskDefinition(ctx, &generated.RegisterTaskDefinitionRequest{
+				Family:      "test-awsvpc-task-describe",
+				NetworkMode: (*generated.NetworkMode)(ptr.String("awsvpc")),
+				ContainerDefinitions: []generated.ContainerDefinition{
+					{
+						Name:  ptr.String("web"),
+						Image: ptr.String("nginx:latest"),
+						PortMappings: []generated.PortMapping{
+							{
+								ContainerPort: ptr.Int32(80),
+								Protocol:      (*generated.TransportProtocol)(ptr.String("tcp")),
+							},
+						},
+						Memory: ptr.Int32(256),
+					},
+				},
+				Cpu:    ptr.String("256"),
+				Memory: ptr.String("512"),
+			})
+			Expect(err).NotTo(HaveOccurred())
+			taskDefArn := *regResp.TaskDefinition.TaskDefinitionArn
+
 			// Run task first
 			runTaskResp, err := ecsAPI.RunTask(ctx, &generated.RunTaskRequest{
 				TaskDefinition: taskDefArn,

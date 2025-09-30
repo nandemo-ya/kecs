@@ -7,7 +7,9 @@ before:
   hooks:
     # Working directory is handled by builds.dir, so we can use simple commands
     - go mod tidy -C ./controlplane
-    - go mod download -C ./controlplane
+    # Skip go mod download due to kubelet dependency issue from rancher/wharfie
+    # The build will download what it needs
+    # - go mod download -C ./controlplane
 
 # Notarization will be handled as a post-archive hook
 # Note: GoReleaser v2 doesn't support 'after' hooks anymore
@@ -19,9 +21,7 @@ builds:
     binary: kecs
     dir: ./controlplane  # Set working directory to controlplane where go.mod exists
     env:
-      - CGO_ENABLED=0  # kecs CLI doesn't need DuckDB (only controlplane in container needs it)
-    tags:
-      - nocli  # Build without server command to avoid DuckDB dependency
+      - CGO_ENABLED=0  # Ensure static binary for cross-platform compatibility
     goos:
       - darwin
       - linux
@@ -34,13 +34,12 @@ builds:
       - goos: darwin
         goarch: amd64
         env:
-          - CGO_ENABLED=0  # kecs CLI doesn't need DuckDB
+          - CGO_ENABLED=0  # Ensure static binary
       - goos: darwin
         goarch: arm64
         env:
-          - CGO_ENABLED=0  # kecs CLI doesn't need DuckDB
+          - CGO_ENABLED=0  # Ensure static binary
       # Linux specific build settings
-      # CGO_ENABLED=0 for cross-compilation from macOS
       - goos: linux
         goarch: amd64
         env:
