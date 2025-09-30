@@ -318,13 +318,12 @@ database:
 localstack:
   enabled: true
   services:
-    - s3
     - iam
-    - secretsmanager
-    - ssm
     - logs
-    - lambda
-    - sts
+    - ssm
+    - secretsmanager
+    - elbv2
+    - s3
   image: localstack/localstack
   version: latest
 
