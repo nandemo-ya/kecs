@@ -150,6 +150,29 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 		})
 
 		It("should describe task with network details", func() {
+			// Register task definition first (required for this test)
+			regResp, err := ecsAPI.RegisterTaskDefinition(ctx, &generated.RegisterTaskDefinitionRequest{
+				Family:      "test-awsvpc-task-describe",
+				NetworkMode: (*generated.NetworkMode)(ptr.String("awsvpc")),
+				ContainerDefinitions: []generated.ContainerDefinition{
+					{
+						Name:  ptr.String("web"),
+						Image: ptr.String("nginx:latest"),
+						PortMappings: []generated.PortMapping{
+							{
+								ContainerPort: ptr.Int32(80),
+								Protocol:      (*generated.TransportProtocol)(ptr.String("tcp")),
+							},
+						},
+						Memory: ptr.Int32(256),
+					},
+				},
+				Cpu:    ptr.String("256"),
+				Memory: ptr.String("512"),
+			})
+			Expect(err).NotTo(HaveOccurred())
+			taskDefArn := *regResp.TaskDefinition.TaskDefinitionArn
+
 			// Run task first
 			runTaskResp, err := ecsAPI.RunTask(ctx, &generated.RunTaskRequest{
 				TaskDefinition: taskDefArn,
