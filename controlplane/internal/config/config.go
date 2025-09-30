@@ -155,10 +155,10 @@ func InitConfig() error {
 		v.SetDefault("localstack.image", "localstack/localstack")
 		v.SetDefault("localstack.version", "latest")
 
-		// Enable environment variable support
+		// Enable environment variable support with KECS prefix only
 		v.SetEnvPrefix("KECS")
 		v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-		v.AutomaticEnv()
+		// REMOVED: v.AutomaticEnv() - this was causing Kubernetes service env vars to override config
 
 		// Map legacy environment variables to new structure
 		bindLegacyEnvVars()
@@ -281,13 +281,6 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	config := &Config{
 		LocalStack: *localstack.DefaultConfig(),
-	}
-
-	// Debug: print all settings before unmarshal
-	if os.Getenv("KECS_DEBUG_CONFIG") == "true" {
-		allSettings := v.AllSettings()
-		fmt.Printf("DEBUG: All viper settings: %+v\n", allSettings)
-		fmt.Printf("DEBUG: server.port type: %T, value: %v\n", v.Get("server.port"), v.Get("server.port"))
 	}
 
 	if err := v.Unmarshal(config); err != nil {
