@@ -282,6 +282,14 @@ func LoadConfig(configPath string) (*Config, error) {
 	config := &Config{
 		LocalStack: *localstack.DefaultConfig(),
 	}
+
+	// Debug: print all settings before unmarshal
+	if os.Getenv("KECS_DEBUG_CONFIG") == "true" {
+		allSettings := v.AllSettings()
+		fmt.Printf("DEBUG: All viper settings: %+v\n", allSettings)
+		fmt.Printf("DEBUG: server.port type: %T, value: %v\n", v.Get("server.port"), v.Get("server.port"))
+	}
+
 	if err := v.Unmarshal(config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
