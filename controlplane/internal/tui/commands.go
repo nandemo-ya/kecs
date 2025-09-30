@@ -306,6 +306,7 @@ func (m Model) monitorInstanceCreation(instanceName string, hasLocalStack bool) 
 			{Name: "Creating k3d cluster", Status: "running"},
 			{Name: "Creating namespace", Status: "pending"},
 			{Name: "Deploying control plane", Status: "pending"},
+			{Name: "Deploying Traefik", Status: "pending"},
 		}
 
 		if hasLocalStack {

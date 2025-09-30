@@ -359,17 +359,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Reset instance form and close it
 		if m.instanceForm != nil {
-			m.instanceForm.successMsg = fmt.Sprintf("Instance '%s' created successfully!", msg.instance.Name)
-			m.instanceForm.isCreating = false
-			m.instanceForm.errorMsg = ""
-			m.instanceForm.creationSteps = nil
-
-			// Show success message briefly then close
-			cmds = append(cmds, tea.Sequence(
-				tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
-					return closeFormMsg{}
-				}),
-			))
+			// Don't close immediately - let the progress checker handle completion
+			// Just mark that creation API has completed
+			m.instanceForm.successMsg = fmt.Sprintf("Instance '%s' is being finalized...", msg.instance.Name)
+			// Keep isCreating = true to allow progress updates to continue
+			// The creationStatusTickMsg handler will close the form when all steps are done
 		} else {
 			// Navigate directly if no form
 			m.currentView = ViewInstances
@@ -506,20 +500,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case actualCreationStatusMsg:
 		// Update creation steps based on actual status from API
 		if m.instanceForm != nil && m.instanceForm.isCreating && msg.status != nil {
-			// Find the step that matches the current status
-			for i := range m.instanceForm.creationSteps {
-				step := &m.instanceForm.creationSteps[i]
+			// Special case: "Completed" means all steps are done
+			if msg.status.Step == "Completed" && msg.status.Status == "done" {
+				// Mark all steps as done
+				for i := range m.instanceForm.creationSteps {
+					m.instanceForm.creationSteps[i].Status = "done"
+				}
+			} else {
+				// Find the step that matches the current status
+				for i := range m.instanceForm.creationSteps {
+					step := &m.instanceForm.creationSteps[i]
 
-				// Update matching step
-				if step.Name == msg.status.Step {
-					step.Status = msg.status.Status
-					if msg.status.Status == "failed" && msg.status.Message != "" {
-						// Show error message
-						m.instanceForm.errorMsg = msg.status.Message
+					// Update matching step
+					if step.Name == msg.status.Step {
+						step.Status = msg.status.Status
+						if msg.status.Status == "failed" && msg.status.Message != "" {
+							// Show error message
+							m.instanceForm.errorMsg = msg.status.Message
+						}
+					} else if step.Status == "running" && msg.status.Step != step.Name {
+						// Previous running step is now done
+						step.Status = "done"
 					}
-				} else if step.Status == "running" && msg.status.Step != step.Name {
-					// Previous running step is now done
-					step.Status = "done"
 				}
 			}
 		}
