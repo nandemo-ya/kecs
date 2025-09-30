@@ -16,12 +16,12 @@ import (
 
 // Config represents the KECS configuration
 type Config struct {
-	Server     ServerConfig      `yaml:"server"`
-	Database   DatabaseConfig    `yaml:"database"`
-	LocalStack localstack.Config `yaml:"localstack"`
-	Kubernetes KubernetesConfig  `yaml:"kubernetes"`
-	Features   FeaturesConfig    `yaml:"features"`
-	AWS        AWSConfig         `yaml:"aws"`
+	Server     ServerConfig      `yaml:"server" mapstructure:"server"`
+	Database   DatabaseConfig    `yaml:"database" mapstructure:"database"`
+	LocalStack localstack.Config `yaml:"localstack" mapstructure:"localstack"`
+	Kubernetes KubernetesConfig  `yaml:"kubernetes" mapstructure:"kubernetes"`
+	Features   FeaturesConfig    `yaml:"features" mapstructure:"features"`
+	AWS        AWSConfig         `yaml:"aws" mapstructure:"aws"`
 }
 
 // ServerConfig represents server-specific configuration
