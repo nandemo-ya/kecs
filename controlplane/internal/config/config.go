@@ -17,6 +17,7 @@ import (
 // Config represents the KECS configuration
 type Config struct {
 	Server     ServerConfig      `yaml:"server"`
+	Database   DatabaseConfig    `yaml:"database"`
 	LocalStack localstack.Config `yaml:"localstack"`
 	Kubernetes KubernetesConfig  `yaml:"kubernetes"`
 	Features   FeaturesConfig    `yaml:"features"`
@@ -32,6 +33,22 @@ type ServerConfig struct {
 	AllowedOrigins    []string `yaml:"allowedOrigins" mapstructure:"allowedOrigins"`
 	Endpoint          string   `yaml:"endpoint" mapstructure:"endpoint"`
 	ControlPlaneImage string   `yaml:"controlPlaneImage" mapstructure:"controlPlaneImage"`
+}
+
+// DatabaseConfig represents database configuration
+type DatabaseConfig struct {
+	Type     string         `yaml:"type" mapstructure:"type"`
+	Postgres PostgresConfig `yaml:"postgres" mapstructure:"postgres"`
+}
+
+// PostgresConfig represents PostgreSQL-specific configuration
+type PostgresConfig struct {
+	Host     string `yaml:"host" mapstructure:"host"`
+	Port     int    `yaml:"port" mapstructure:"port"`
+	Database string `yaml:"database" mapstructure:"database"`
+	User     string `yaml:"user" mapstructure:"user"`
+	Password string `yaml:"password" mapstructure:"password"`
+	SSLMode  string `yaml:"sslMode" mapstructure:"sslMode"`
 }
 
 // KubernetesConfig represents Kubernetes-related configuration
@@ -95,6 +112,15 @@ func InitConfig() error {
 		v.SetDefault("server.allowedOrigins", []string{})
 		v.SetDefault("server.endpoint", "")
 		v.SetDefault("server.controlPlaneImage", computeControlPlaneImage())
+
+		// Database defaults
+		v.SetDefault("database.type", "postgres")
+		v.SetDefault("database.postgres.host", "localhost")
+		v.SetDefault("database.postgres.port", 5432)
+		v.SetDefault("database.postgres.database", "kecs")
+		v.SetDefault("database.postgres.user", "kecs")
+		v.SetDefault("database.postgres.password", "")
+		v.SetDefault("database.postgres.sslMode", "disable")
 
 		// Kubernetes defaults
 		v.SetDefault("kubernetes.kubeconfigPath", "")
@@ -163,7 +189,13 @@ func bindLegacyEnvVars() {
 	v.BindEnv("localstack.enabled", "KECS_LOCALSTACK_ENABLED")
 	v.BindEnv("localstack.useTraefik", "KECS_LOCALSTACK_USE_TRAEFIK")
 	v.BindEnv("server.controlPlaneImage", "KECS_CONTROLPLANE_IMAGE")
-	v.BindEnv("database.url", "KECS_DATABASE_URL")
+	v.BindEnv("database.type", "KECS_DATABASE_TYPE")
+	v.BindEnv("database.postgres.host", "KECS_POSTGRES_HOST")
+	v.BindEnv("database.postgres.port", "KECS_POSTGRES_PORT")
+	v.BindEnv("database.postgres.database", "KECS_POSTGRES_DATABASE")
+	v.BindEnv("database.postgres.user", "KECS_POSTGRES_USER")
+	v.BindEnv("database.postgres.password", "KECS_POSTGRES_PASSWORD")
+	v.BindEnv("database.postgres.sslMode", "KECS_POSTGRES_SSLMODE")
 }
 
 // DefaultConfig returns the default configuration
