@@ -159,7 +159,7 @@ graph TB
         subgraph K3dCluster["k3d Cluster Container"]
             subgraph KECSNamespace["kecs-system Namespace"]
                 CP[KECS Control Plane<br/>ECS-compatible APIs]
-                DB[(DuckDB<br/>State Storage)]
+                DB[(PostgreSQL<br/>State Storage)]
                 LS[LocalStack<br/>AWS Services]
             end
 
@@ -188,7 +188,7 @@ Key Components:
 1. **CLI Tool**: Manages k3d cluster lifecycle (start, stop, status)
 2. **Control Plane**: Runs as pods inside the k3d cluster, providing ECS and ELBv2 APIs
 3. **Unified Gateway**: Traefik routes AWS API calls to appropriate services (KECS or LocalStack)
-4. **State Storage**: DuckDB provides persistent storage for ECS resources
+4. **State Storage**: PostgreSQL provides persistent storage for ECS resources
 5. **Workload Execution**: ECS tasks run as Kubernetes pods
 
 ## Acknowledgments
