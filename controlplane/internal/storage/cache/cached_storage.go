@@ -119,8 +119,9 @@ func (s *cachedClusterStore) Create(ctx context.Context, cluster *storage.Cluste
 	s.cache.Set(ctx, clusterKey(cluster.Name), cluster)
 	s.cache.Set(ctx, clusterKeyByArn(cluster.ARN), cluster)
 
-	// Invalidate list cache
+	// Invalidate list caches (both simple list and paginated lists)
 	s.cache.Delete(ctx, "clusters:list")
+	s.cache.DeleteWithPrefix(ctx, "clusters:list:page:")
 
 	return nil
 }
@@ -211,8 +212,9 @@ func (s *cachedClusterStore) Update(ctx context.Context, cluster *storage.Cluste
 	s.cache.Set(ctx, clusterKey(cluster.Name), cluster)
 	s.cache.Set(ctx, clusterKeyByArn(cluster.ARN), cluster)
 
-	// Invalidate list cache
+	// Invalidate list caches (both simple list and paginated lists)
 	s.cache.Delete(ctx, "clusters:list")
+	s.cache.DeleteWithPrefix(ctx, "clusters:list:page:")
 
 	return nil
 }
@@ -231,8 +233,9 @@ func (s *cachedClusterStore) Delete(ctx context.Context, name string) error {
 		s.cache.Delete(ctx, clusterKeyByArn(cluster.ARN))
 	}
 
-	// Invalidate list cache
+	// Invalidate list caches (both simple list and paginated lists)
 	s.cache.Delete(ctx, "clusters:list")
+	s.cache.DeleteWithPrefix(ctx, "clusters:list:page:")
 
 	return nil
 }
