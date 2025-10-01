@@ -1,0 +1,29 @@
+{
+  "family": "localstack-s3-job",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "s3-worker",
+      "image": "amazon/aws-cli:latest",
+      "essential": true,
+      "command": [
+        "sh",
+        "-c",
+        "echo 'Starting S3 job...'; aws s3 mb s3://test-bucket || true; echo 'Hello from KECS task!' > /tmp/test-file.txt; aws s3 cp /tmp/test-file.txt s3://test-bucket/output.txt; aws s3 ls s3://test-bucket/; echo 'S3 job completed successfully!'"
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/localstack-s3-job",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "executionRoleArn": "arn:aws:iam::000000000000:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::000000000000:role/ecsTaskRole"
+}
