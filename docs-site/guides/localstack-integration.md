@@ -40,34 +40,47 @@ The container can now access AWS services using the task role.
 
 ### S3 Integration
 
-Access S3 buckets from your containers:
+Access S3 buckets from your containers without any endpoint configuration:
 
+**Your Application Code** (same as production):
 ```python
 import boto3
 
-# No endpoint_url parameter needed! 
-# KECS's transparent proxy automatically routes to LocalStack
-s3 = boto3.client('s3')  # Works as-is, no AWS_ENDPOINT_URL required!
+# No endpoint_url parameter needed!
+# KECS automatically injects AWS_ENDPOINT_URL environment variable
+s3 = boto3.client('s3')
 
 # List buckets
 buckets = s3.list_buckets()
 
 # Upload file
 s3.upload_file('local.txt', 'my-bucket', 'remote.txt')
+```
 
-# Compare with typical LocalStack usage (NOT needed with KECS):
-# s3 = boto3.client('s3', endpoint_url='http://localhost:5373')  # Not required!
+**Task Definition** (no environment variables needed):
+```json
+{
+  "family": "s3-app",
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "myapp:latest"
+      // KECS automatically injects AWS_ENDPOINT_URL and credentials!
+    }
+  ]
+}
 ```
 
 ### DynamoDB Integration
 
-Use DynamoDB tables:
+Use DynamoDB tables without any configuration:
 
+**Your Application Code**:
 ```python
 import boto3
 
-# Again, no endpoint configuration needed!
-dynamodb = boto3.resource('dynamodb')  # Automatically uses LocalStack
+# No endpoint configuration needed in code!
+dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table('users')
 
 # Put item
@@ -79,9 +92,20 @@ table.put_item(Item={
 
 # Query
 response = table.get_item(Key={'userId': '123'})
+```
 
-# Without KECS transparent proxy, you would need:
-# dynamodb = boto3.resource('dynamodb', endpoint_url='http://localhost:5373')
+**Task Definition** (clean and production-ready):
+```json
+{
+  "family": "dynamodb-app",
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "myapp:latest"
+      // No AWS_ENDPOINT_URL needed - KECS handles it automatically!
+    }
+  ]
+}
 ```
 
 ### Secrets Manager
@@ -168,43 +192,59 @@ aws logs tail /ecs/myapp \
   --endpoint-url http://localhost:5373
 ```
 
-## Automatic Sidecar Injection (Transparent Proxy)
+## Automatic AWS Endpoint Configuration
 
-KECS provides a powerful transparent proxy feature that automatically routes AWS API calls to LocalStack **without requiring AWS_ENDPOINT configuration**. This is a significant advantage over typical LocalStack setups.
+KECS automatically configures AWS SDK environment variables for all ECS tasks, enabling seamless LocalStack integration **without requiring any endpoint configuration in your task definitions**. This mirrors the real AWS ECS experience where applications naturally access AWS services.
 
 ### How It Works
 
-1. KECS detects AWS SDK usage in your container
-2. Automatically injects a transparent proxy sidecar
-3. Routes all AWS API calls to LocalStack transparently
-4. **No code changes or AWS_ENDPOINT settings required**
+When you run an ECS task, KECS automatically:
+
+1. **Detects ECS Tasks**: Identifies pods created from ECS task definitions
+2. **Injects Environment Variables**: Adds AWS SDK configuration automatically:
+   - `AWS_ENDPOINT_URL`: Points to LocalStack endpoint
+   - `AWS_ACCESS_KEY_ID`: LocalStack test credentials
+   - `AWS_SECRET_ACCESS_KEY`: LocalStack test credentials
+   - `AWS_DEFAULT_REGION`: Configured region
+   - `AWS_REGION`: Configured region
+
+3. **SDK Auto-Configuration**: AWS SDK v2 automatically uses these environment variables
 
 ### Key Benefits
 
-- **Zero Configuration**: Your existing AWS applications work without any modifications
-- **No AWS_ENDPOINT Required**: Unlike standard LocalStack usage, you don't need to set `endpoint_url` or `AWS_ENDPOINT_URL`
-- **Production-Ready Code**: The same code works in both local (with LocalStack) and production (with real AWS) environments
-- **Automatic Detection**: KECS intelligently detects when proxy injection is needed
+- **Zero Configuration**: No need to set AWS_ENDPOINT_URL in task definitions
+- **Production-Ready Code**: Same task definitions work in both KECS and real AWS ECS
+- **Automatic Detection**: Works for all ECS tasks without any annotations
+- **No Code Changes**: Existing applications work without modifications
 
-### How the Transparent Proxy Works
+### Example: S3 Access Without Endpoint Configuration
 
-The transparent proxy mechanism works by:
+**Task Definition** (no AWS_ENDPOINT_URL needed):
+```json
+{
+  "family": "s3-processor",
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "amazon/aws-cli:latest",
+      "command": [
+        "sh", "-c",
+        "aws s3 mb s3://my-bucket && aws s3 ls"
+      ]
+    }
+  ]
+}
+```
 
-1. **iptables Rules**: KECS configures iptables rules in the pod to intercept outbound HTTPS traffic to AWS domains
-2. **DNS Resolution**: AWS service domains (e.g., `s3.amazonaws.com`) are resolved normally
-3. **Traffic Interception**: The proxy sidecar intercepts connections to AWS endpoints
-4. **Request Routing**: Requests are transparently forwarded to LocalStack while preserving all headers and authentication
-5. **Response Handling**: LocalStack responses are returned to the application as if they came from AWS
+**What Happens:**
+1. KECS webhook intercepts pod creation
+2. Automatically injects AWS environment variables
+3. AWS CLI uses `AWS_ENDPOINT_URL` to connect to LocalStack
+4. S3 operations work seamlessly
 
-This approach is superior to environment variable injection because:
-- Works with any AWS SDK or tool (not just those that respect `AWS_ENDPOINT_URL`)
-- No risk of environment variables being ignored or overridden
-- Supports dynamic endpoint discovery (e.g., S3 virtual-hosted-style URLs)
-- Zero application awareness required
+### Comparison with Standard LocalStack Usage
 
-### Manual Configuration
-
-If you prefer to disable automatic injection and configure endpoints manually:
+**Without KECS** (requires manual configuration):
 ```json
 {
   "containerDefinitions": [
@@ -212,18 +252,51 @@ If you prefer to disable automatic injection and configure endpoints manually:
       "name": "app",
       "environment": [
         {
-          "name": "KECS_DISABLE_PROXY",
-          "value": "true"
+          "name": "AWS_ENDPOINT_URL",
+          "value": "http://localstack:4566"
         },
         {
-          "name": "AWS_ENDPOINT_URL",
-          "value": "http://localhost:5373"
+          "name": "AWS_ACCESS_KEY_ID",
+          "value": "test"
+        },
+        {
+          "name": "AWS_SECRET_ACCESS_KEY",
+          "value": "test"
         }
       ]
     }
   ]
 }
 ```
+
+**With KECS** (completely automatic):
+```json
+{
+  "containerDefinitions": [
+    {
+      "name": "app"
+      // No environment variables needed!
+    }
+  ]
+}
+```
+
+### How to Verify Auto-Configuration
+
+Check that environment variables are injected:
+
+```bash
+# Get task ARN
+TASK_ARN=$(aws ecs list-tasks --cluster default --endpoint-url http://localhost:5373 --query 'taskArns[0]' --output text)
+
+# Extract task ID
+TASK_ID=$(basename $TASK_ARN)
+
+# Check environment variables in the pod
+kubectl get pod $TASK_ID -n default-us-east-1 -o jsonpath='{.spec.containers[0].env[?(@.name=="AWS_ENDPOINT_URL")].value}'
+```
+
+You should see the LocalStack internal endpoint: `http://localstack.kecs-system.svc.cluster.local:4566`
 
 ## Service Discovery
 
