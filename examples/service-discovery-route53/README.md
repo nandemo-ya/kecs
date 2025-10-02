@@ -17,7 +17,7 @@ export AWS_SECRET_ACCESS_KEY=test
 export AWS_REGION=us-east-1
 
 # Start KECS (includes Route53 support)
-kecs start --name discovery-demo
+kecs start --instance discovery-demo
 ```
 
 ### 2. Create Service Discovery Namespace
@@ -69,7 +69,7 @@ With Route53 integration, services in different KECS instances can discover each
 
 ### Instance 1 (Port 5373)
 ```bash
-kecs start --name cluster1 --api-port 5373
+kecs start --instance cluster1 --api-port 5373
 export AWS_ENDPOINT_URL=http://localhost:5373
 
 # Create namespace and service
@@ -79,7 +79,7 @@ aws servicediscovery create-private-dns-namespace --name shared.local --vpc vpc-
 
 ### Instance 2 (Port 8090)
 ```bash
-kecs start --name cluster2 --api-port 8090
+kecs start --instance cluster2 --api-port 8090
 export AWS_ENDPOINT_URL=http://localhost:8090
 
 # Services can discover cluster1 services via Route53

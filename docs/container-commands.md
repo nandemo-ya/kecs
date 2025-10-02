@@ -99,13 +99,13 @@ Run multiple KECS instances with different names:
 
 ```bash
 # Development instance
-kecs start --name kecs-dev --api-port 8080 --admin-port 8081
+kecs start --instance kecs-dev --api-port 8080 --admin-port 8081
 
 # Staging instance
-kecs start --name kecs-staging --api-port 8090 --admin-port 8091
+kecs start --instance kecs-staging --api-port 8090 --admin-port 8091
 
 # Test instance with auto-port assignment
-kecs start --name kecs-test --auto-port
+kecs start --instance kecs-test --auto-port
 ```
 
 ### Local Build
@@ -235,7 +235,7 @@ kecs instances stop-all
 Use `--auto-port` to automatically find available ports:
 
 ```bash
-kecs start --name test --auto-port
+kecs start --instance test --auto-port
 ```
 
 This will:
@@ -310,7 +310,7 @@ jobs:
       
       - name: Start KECS
         run: |
-          kecs start --name ci-test --auto-port
+          kecs start --instance ci-test --auto-port
           kecs status
       
       - name: Run Tests

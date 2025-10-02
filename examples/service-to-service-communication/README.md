@@ -64,7 +64,7 @@ This demo demonstrates service-to-service communication where:
 
 ```bash
 # Start KECS instance
-kecs start --name service-demo
+kecs start --instance service-demo
 
 # Set environment variable
 export KECS_ENDPOINT=http://localhost:5373
