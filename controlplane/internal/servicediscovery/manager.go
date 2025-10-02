@@ -79,12 +79,9 @@ func NewManager(kubeClient kubernetes.Interface, region, accountID string) Manag
 		if err != nil {
 			logging.Warn("Failed to initialize Route53 client", "error", err)
 		} else {
-			// Default VPC configuration for LocalStack
-			defaultVPC := &route53.VPCConfig{
-				VPCID:  "vpc-default",
-				Region: region,
-			}
-			mgr.route53Manager = route53.NewManager(r53Client, defaultVPC)
+			// For LocalStack, don't pass VPC config to avoid EC2 dependency
+			// LocalStack doesn't validate VPCs like real AWS does
+			mgr.route53Manager = route53.NewManager(r53Client, nil)
 			logging.Info("Route53 integration enabled", "endpoint", localstackEndpoint)
 		}
 	}
