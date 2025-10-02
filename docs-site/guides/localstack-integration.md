@@ -49,11 +49,11 @@ kecs start --instance full-stack \
 
 **Via TUI (Interactive Mode):**
 
-When using `kecs tui`, you can configure LocalStack services through the instance creation dialog:
+When using the TUI, you can configure LocalStack services through the instance creation dialog:
 
 ![TUI LocalStack Services Configuration](../images/tui-localstack-services.png)
 
-1. Launch the TUI: `kecs tui`
+1. Launch the TUI: `tui`
 2. Navigate to "Create New Instance" and press Enter
 3. Fill in the instance name
 4. In "Additional LocalStack Services" field, enter comma-separated service names
