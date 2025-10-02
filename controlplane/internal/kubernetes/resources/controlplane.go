@@ -317,12 +317,12 @@ database:
 localstack:
   enabled: true
   services:
+    - s3
     - iam
     - logs
     - ssm
     - secretsmanager
-    - elbv2
-    - s3
+    - route53
   image: localstack/localstack
   version: latest
 
