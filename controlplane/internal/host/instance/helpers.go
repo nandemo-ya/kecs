@@ -207,6 +207,19 @@ func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, c
 		adminNodePort = 30081 // fallback to default
 	}
 
+	// Prepare LocalStack endpoint environment variables
+	localstackEndpoint := "http://localstack.kecs-system.svc.cluster.local:4566"
+	extraEnvVars := []corev1.EnvVar{
+		{
+			Name:  "LOCALSTACK_ENDPOINT",
+			Value: localstackEndpoint,
+		},
+		{
+			Name:  "AWS_ENDPOINT_URL",
+			Value: localstackEndpoint,
+		},
+	}
+
 	// Create control plane config
 	logging.Info("Using control plane image", "image", cfg.Server.ControlPlaneImage)
 	controlPlaneConfig := &resources.ControlPlaneConfig{
@@ -223,6 +236,7 @@ func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, c
 		APINodePort:     apiNodePort,                             // NodePort for API access
 		AdminNodePort:   adminNodePort,                           // NodePort for Admin access
 		LogLevel:        cfg.Server.LogLevel,
+		ExtraEnvVars:    extraEnvVars, // Add LocalStack endpoint
 	}
 
 	// Create control plane resources
