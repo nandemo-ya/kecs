@@ -51,12 +51,6 @@ Each example is self-contained with:
 - Cross-service API calls using DNS names
 - Load balancing across multiple instances
 
-### 6. [service-discovery-route53](./service-discovery-route53/)
-**Service Discovery with Route53 Integration**
-- LocalStack Route53 integration (OSS compatible)
-- Cross-cluster service communication
-- Private DNS namespaces
-- A and SRV record management
 
 ## Getting Started
 

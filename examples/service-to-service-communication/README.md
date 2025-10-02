@@ -376,4 +376,3 @@ Modify the health check configuration in task definitions:
 
 - [ECS Service Discovery Documentation](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-discovery.html)
 - [KECS Service Discovery Implementation](../../controlplane/internal/servicediscovery/README.md)
-- [Route53 Integration](../service-discovery-route53/README.md)
