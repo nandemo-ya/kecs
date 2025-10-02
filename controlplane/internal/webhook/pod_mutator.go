@@ -169,12 +169,6 @@ func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.Admi
 		// AWS environment variables to inject
 		awsEnvVars := []corev1.EnvVar{
 			{Name: "AWS_ENDPOINT_URL", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
-			{Name: "AWS_ENDPOINT_URL_S3", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
-			{Name: "AWS_ENDPOINT_URL_IAM", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
-			{Name: "AWS_ENDPOINT_URL_LOGS", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
-			{Name: "AWS_ENDPOINT_URL_SSM", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
-			{Name: "AWS_ENDPOINT_URL_SECRETSMANAGER", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
-			{Name: "AWS_ENDPOINT_URL_ELB", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
 			{Name: "AWS_ACCESS_KEY_ID", Value: "test"},
 			{Name: "AWS_SECRET_ACCESS_KEY", Value: "test"},
 			{Name: "AWS_DEFAULT_REGION", Value: "us-east-1"},
@@ -216,7 +210,7 @@ func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.Admi
 			}
 		}
 
-		logging.Info("Added AWS environment variable patches", "patchCount", len(patches))
+		logging.Info("Added AWS environment variable patches (AWS_ENDPOINT_URL + credentials)", "patchCount", len(patches))
 	}
 
 	// Check if task ID already exists (only skip for non-service pods)
