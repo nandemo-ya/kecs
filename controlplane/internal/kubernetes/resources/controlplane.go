@@ -326,6 +326,11 @@ localstack:
   image: localstack/localstack
   version: latest
 
+aws:
+  defaultRegion: us-east-1
+  accountID: "000000000000"
+  endpointURL: http://localstack.kecs-system.svc.cluster.local:4566
+
 kubernetes:
   watchNamespaces: []
 `, config.AdminPort, config.LogLevel),
