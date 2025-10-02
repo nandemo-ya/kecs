@@ -25,7 +25,7 @@ KECS instances are created with the following default port mappings:
 
 ```bash
 # 1. Start KECS instance (port mappings are automatically configured)
-kecs start --name myapp
+kecs start --instance myapp
 
 # 2. Create an ECS cluster and deploy your service
 aws ecs create-cluster --cluster-name myapp-cluster
@@ -49,7 +49,7 @@ export KECS_ALB_PORT_RANGE_START=9000
 export KECS_ALB_PORT_RANGE_END=9099
 
 # Start KECS with custom port range
-kecs start --name myapp
+kecs start --instance myapp
 ```
 
 This allows you to:

@@ -15,8 +15,8 @@ kecs status         # Show container status
 kecs logs -f        # Follow container logs
 
 # Multiple instances
-kecs start --name dev --api-port 8080
-kecs start --name staging --api-port 8090 --auto-port
+kecs start --instance dev --api-port 8080
+kecs start --instance staging --api-port 8090 --auto-port
 kecs instances list # List all instances
 ```
 

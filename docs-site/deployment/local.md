@@ -171,7 +171,7 @@ KECS provides convenient container commands for running instances:
 kecs start
 
 # Start with custom name and port
-kecs start --name myinstance --api-port 9090
+kecs start --instance myinstance --api-port 9090
 
 # View logs from control plane
 kubectl logs -n kecs-system deployment/kecs-server -f
