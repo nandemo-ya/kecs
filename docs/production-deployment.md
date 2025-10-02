@@ -78,7 +78,7 @@ chmod +x kecs
 ./kecs start
 
 # Or use the TUI for interactive management
-./kecs tui
+./kecs
 ```
 
 The `kecs` command automatically:

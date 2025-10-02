@@ -25,16 +25,16 @@ The KECS TUI provides a powerful, interactive terminal-based interface for manag
 
 ```bash
 # Start the TUI with default settings (auto-detects running instances)
-kecs tui
+kecs
 
 # Connect to a specific endpoint
-kecs tui --endpoint http://localhost:8080
+kecs --endpoint http://localhost:8080
 
 # Connect to a specific instance by name
-kecs tui --instance dev-cluster
+kecs --instance dev-cluster
 
 # Connect to remote KECS instance
-kecs tui --endpoint http://remote-kecs:8080
+kecs --endpoint http://remote-kecs:8080
 ```
 
 ## Key Features in Action

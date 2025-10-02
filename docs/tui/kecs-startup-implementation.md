@@ -73,7 +73,7 @@ Unit tests have been implemented for:
 
 ## Usage
 
-When users run `kecs tui` and KECS is not running:
+When users run `kecs` and KECS is not running:
 
 1. The TUI detects KECS is not running
 2. Shows a confirmation dialog
