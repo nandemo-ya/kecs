@@ -116,12 +116,13 @@ func (c *TaskConverter) ConvertTaskToPod(
 			Name:      taskID,
 			Namespace: c.getNamespace(cluster),
 			Labels: map[string]string{
-				"kecs.dev/cluster":       cluster.Name,
-				"kecs.dev/task-id":       taskID,
-				"kecs.dev/task-family":   taskDef.Family,
-				"kecs.dev/task-revision": fmt.Sprintf("%d", taskDef.Revision),
-				"kecs.dev/launch-type":   c.getLaunchTypeFromRequest(runTaskReq.LaunchType),
-				"kecs.dev/managed-by":    "kecs",
+				"kecs.dev/cluster":           cluster.Name,
+				"kecs.dev/task-id":           taskID,
+				"kecs.dev/task-family":       taskDef.Family,
+				"kecs.dev/task-revision":     fmt.Sprintf("%d", taskDef.Revision),
+				"kecs.dev/launch-type":       c.getLaunchTypeFromRequest(runTaskReq.LaunchType),
+				"kecs.dev/managed-by":        "kecs",
+				"ecs.task.definition.family": taskDef.Family, // For AWS env var injection
 			},
 			Annotations: map[string]string{
 				"kecs.dev/task-arn":            c.generateTaskARN(cluster.Name, taskID),

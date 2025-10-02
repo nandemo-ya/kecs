@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -122,13 +123,26 @@ func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.Admi
 		pod.Labels = make(map[string]string)
 	}
 
+	// Log pod labels for debugging
+	logging.Info("Pod labels in webhook (before isKECSManaged check)",
+		"pod", pod.Name,
+		"namespace", pod.Namespace,
+		"labels", pod.Labels)
+
 	// Check if this is a KECS-managed pod
 	// Either it has kecs.dev/managed-by label or it's a service pod with kecs.dev/service label
 	isKECSManaged := pod.Labels["kecs.dev/managed-by"] == "kecs" || pod.Labels["kecs.dev/service"] != ""
 
+	logging.Info("isKECSManaged check result",
+		"pod", pod.Name,
+		"namespace", pod.Namespace,
+		"isKECSManaged", isKECSManaged,
+		"managed-by", pod.Labels["kecs.dev/managed-by"],
+		"service", pod.Labels["kecs.dev/service"])
+
 	if !isKECSManaged {
 		// Not a KECS pod, allow without mutation
-		logging.Debug("Pod not managed by KECS, skipping mutation",
+		logging.Info("Pod not managed by KECS, skipping mutation",
 			"pod", pod.Name,
 			"namespace", pod.Namespace,
 			"managed-by", pod.Labels["kecs.dev/managed-by"],
@@ -138,20 +152,88 @@ func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.Admi
 		}
 	}
 
-	// Check if task ID already exists
-	if _, exists := pod.Labels["kecs.dev/task-id"]; exists {
-		// Task ID already set, allow without mutation
-		logging.Debug("Task ID already exists, skipping mutation",
-			"pod", pod.Name,
-			"namespace", pod.Namespace,
-			"taskId", pod.Labels["kecs.dev/task-id"])
-		return &admissionv1.AdmissionResponse{
-			Allowed: true,
-		}
-	}
-
 	// Generate patches for mutation
 	var patches []patchOperation
+
+	// Log pod labels for debugging
+	logging.Info("Pod labels in webhook (after isKECSManaged check)", "pod", pod.Name, "namespace", pod.Namespace, "labels", pod.Labels)
+
+	// Inject AWS environment variables for ECS tasks
+	// This must be done BEFORE the task ID check to ensure environment variables are injected
+	if _, isECSTask := pod.Labels["ecs.task.definition.family"]; isECSTask {
+		logging.Info("ECS task detected, adding AWS environment variables",
+			"pod", pod.Name,
+			"namespace", pod.Namespace,
+			"family", pod.Labels["ecs.task.definition.family"])
+
+		// AWS environment variables to inject
+		awsEnvVars := []corev1.EnvVar{
+			{Name: "AWS_ENDPOINT_URL", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
+			{Name: "AWS_ACCESS_KEY_ID", Value: "test"},
+			{Name: "AWS_SECRET_ACCESS_KEY", Value: "test"},
+			{Name: "AWS_DEFAULT_REGION", Value: "us-east-1"},
+			{Name: "AWS_REGION", Value: "us-east-1"},
+		}
+
+		// Add environment variables to all containers
+		for containerIdx := range pod.Spec.Containers {
+			containerPath := "/spec/containers/" + strconv.Itoa(containerIdx)
+
+			// Check if env array exists
+			if pod.Spec.Containers[containerIdx].Env == nil {
+				// Create env array with all AWS variables
+				patches = append(patches, patchOperation{
+					Op:    "add",
+					Path:  containerPath + "/env",
+					Value: awsEnvVars,
+				})
+			} else {
+				// Add to existing env array
+				for _, envVar := range awsEnvVars {
+					// Check if the env var already exists
+					exists := false
+					for _, existing := range pod.Spec.Containers[containerIdx].Env {
+						if existing.Name == envVar.Name {
+							exists = true
+							break
+						}
+					}
+
+					if !exists {
+						patches = append(patches, patchOperation{
+							Op:    "add",
+							Path:  containerPath + "/env/-",
+							Value: envVar,
+						})
+					}
+				}
+			}
+		}
+
+		logging.Info("Added AWS environment variable patches (AWS_ENDPOINT_URL + credentials)", "patchCount", len(patches))
+	}
+
+	// Check if task ID already exists (only skip for non-service pods)
+	if _, exists := pod.Labels["kecs.dev/task-id"]; exists {
+		_, isServicePod := pod.Labels["kecs.dev/service"]
+		if !isServicePod {
+			// Task ID already set for non-service pod, allow without further mutation
+			logging.Info("Task ID already exists for non-service pod, skipping task ID generation",
+				"pod", pod.Name,
+				"namespace", pod.Namespace,
+				"taskId", pod.Labels["kecs.dev/task-id"],
+				"patchCount", len(patches))
+
+			// Return with any patches we already created (e.g., env vars)
+			if len(patches) == 0 {
+				return &admissionv1.AdmissionResponse{
+					Allowed: true,
+				}
+			}
+			// Continue to apply patches
+			goto applyPatches
+		}
+	}
 
 	// For service-managed pods, generate and add task ID
 	if serviceName, ok := pod.Labels["kecs.dev/service"]; ok {
@@ -178,6 +260,7 @@ func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.Admi
 			"service", serviceName)
 	}
 
+applyPatches:
 	// If no patches needed, allow without mutation
 	if len(patches) == 0 {
 		return &admissionv1.AdmissionResponse{
