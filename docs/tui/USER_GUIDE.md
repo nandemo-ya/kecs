@@ -7,13 +7,13 @@ The KECS Terminal User Interface (TUI) provides an interactive, keyboard-driven 
 To launch the TUI, run:
 
 ```bash
-kecs tui
+kecs
 ```
 
 You can specify a custom endpoint:
 
 ```bash
-kecs tui --endpoint http://remote-kecs:8080
+kecs --endpoint http://remote-kecs:8080
 ```
 
 ## Navigation

@@ -100,7 +100,7 @@ The system automatically detects the appropriate port based on:
 ## Configuration
 
 No additional configuration is required. The feature works automatically when:
-- TUI is launched with `kecs tui`
+- TUI is launched with `kecs`
 - KECS is not running at the specified endpoint
 
 ## Future Enhancements

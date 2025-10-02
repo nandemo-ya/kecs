@@ -49,14 +49,14 @@ This document summarizes the completion of Phase 1 of the TUI backend integratio
 ### Running with Mock Data (Default)
 ```bash
 # Just run the TUI normally
-./bin/kecs tui
+./bin/kecs
 ```
 
 ### Running with Real API
 ```bash
 # Set the API endpoint
 export KECS_API_ENDPOINT=http://localhost:8080
-./bin/kecs tui
+./bin/kecs
 ```
 
 ### Forcing Mock Mode
@@ -64,7 +64,7 @@ export KECS_API_ENDPOINT=http://localhost:8080
 # Force mock mode even with API endpoint set
 export KECS_API_ENDPOINT=http://localhost:8080
 export KECS_TUI_MOCK=true
-./bin/kecs tui
+./bin/kecs
 ```
 
 ## Architecture Changes

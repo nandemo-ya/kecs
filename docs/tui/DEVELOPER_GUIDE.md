@@ -280,7 +280,7 @@ var _ = Describe("NewView", func() {
 ```bash
 cd controlplane
 go build -o bin/kecs ./cmd/controlplane
-./bin/kecs tui
+./bin/kecs
 ```
 
 2. Test all keyboard shortcuts

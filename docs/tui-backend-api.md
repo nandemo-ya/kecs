@@ -196,7 +196,7 @@ The TUI uses these endpoints through the API client:
 
 2. Run the TUI:
    ```bash
-   ./bin/kecs tui
+   ./bin/kecs
    ```
 
 The TUI will automatically use the real API instead of mock data.
