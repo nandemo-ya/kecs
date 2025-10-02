@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -507,7 +508,9 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 		}
 
 		if kubeClient != nil {
-			serviceDiscoveryManager := servicediscovery.NewManager(kubeClient, s.region, s.accountID)
+			// Get AWS endpoint from environment (for LocalStack integration)
+			endpoint := os.Getenv("AWS_ENDPOINT_URL")
+			serviceDiscoveryManager := servicediscovery.NewManager(kubeClient, s.region, s.accountID, endpoint)
 			defaultAPI.SetServiceDiscoveryManager(serviceDiscoveryManager)
 
 			// Create Service Discovery API handler

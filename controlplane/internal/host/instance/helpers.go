@@ -207,13 +207,9 @@ func (m *Manager) deployControlPlane(ctx context.Context, instanceName string, c
 		adminNodePort = 30081 // fallback to default
 	}
 
-	// Prepare LocalStack endpoint environment variables
+	// Prepare LocalStack endpoint environment variable
 	localstackEndpoint := "http://localstack.kecs-system.svc.cluster.local:4566"
 	extraEnvVars := []corev1.EnvVar{
-		{
-			Name:  "LOCALSTACK_ENDPOINT",
-			Value: localstackEndpoint,
-		},
 		{
 			Name:  "AWS_ENDPOINT_URL",
 			Value: localstackEndpoint,
