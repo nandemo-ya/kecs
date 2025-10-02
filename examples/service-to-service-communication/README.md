@@ -70,7 +70,7 @@ kecs start --instance service-demo
 export KECS_ENDPOINT=http://localhost:5373
 ```
 
-### 2. Build Docker Images
+### 2. Build and Push Docker Images
 
 ```bash
 # Navigate to example directory
@@ -79,6 +79,14 @@ cd examples/service-to-service-communication
 # Build both service images
 docker build -t backend-api:latest ./backend
 docker build -t frontend-web:latest ./frontend
+
+# Tag images for k3d registry
+docker tag backend-api:latest localhost:5000/kecs-example-backend:latest
+docker tag frontend-web:latest localhost:5000/kecs-example-frontend:latest
+
+# Push images to k3d registry
+docker push localhost:5000/kecs-example-backend:latest
+docker push localhost:5000/kecs-example-frontend:latest
 ```
 
 ### 3. Deploy Services with Service Discovery
@@ -151,14 +159,18 @@ Services are accessible via DNS names in the format:
 
 If you prefer to deploy manually:
 
-### 1. Build Docker Images
+### 1. Build and Push Docker Images
 
 ```bash
 # Build backend
 docker build -t backend-api:latest ./backend
+docker tag backend-api:latest localhost:5000/kecs-example-backend:latest
+docker push localhost:5000/kecs-example-backend:latest
 
-# Build frontend  
+# Build frontend
 docker build -t frontend-web:latest ./frontend
+docker tag frontend-web:latest localhost:5000/kecs-example-frontend:latest
+docker push localhost:5000/kecs-example-frontend:latest
 ```
 
 ### 2. Create Service Discovery Namespace
