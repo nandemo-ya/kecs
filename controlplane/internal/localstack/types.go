@@ -2,6 +2,7 @@ package localstack
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"k8s.io/client-go/kubernetes"
@@ -195,31 +196,43 @@ const (
 
 // Default services to enable
 var DefaultServices = []string{
+	"s3",
 	"iam",
 	"logs",
 	"ssm",
 	"secretsmanager",
-	"elbv2",
-	"s3",
+	"route53",
 }
 
-// ServicePortMap maps service names to their default ports
-var ServicePortMap = map[string]int{
-	"s3":             4566,
-	"iam":            4566,
-	"ecs":            4566,
-	"logs":           4566,
-	"ssm":            4566,
-	"secretsmanager": 4566,
-	"elbv2":          4566,
-	"rds":            4566,
-	"dynamodb":       4566,
+// ValidServices lists all services that can be enabled in LocalStack
+// Note: ecs and elbv2 are implemented by KECS itself and should not be enabled in LocalStack
+var ValidServices = []string{
+	// Default services (always enabled)
+	"s3",
+	"iam",
+	"logs",
+	"ssm",
+	"secretsmanager",
+	"route53",
+	// Additional available services
+	"dynamodb",
+	"rds",
+	"sqs",
+	"sns",
+	"kinesis",
+	"kafka",
+	"lambda",
+	"stepfunctions",
+	"eventbridge",
+	"ec2",
+	"ecr",
+	"apigateway",
+	"elasticache",
 }
 
 // IsValidService checks if a service name is valid
 func IsValidService(service string) bool {
-	_, exists := ServicePortMap[service]
-	return exists
+	return slices.Contains(ValidServices, service)
 }
 
 // GetServiceURL returns the URL for a specific service
