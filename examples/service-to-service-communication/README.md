@@ -173,7 +173,15 @@ docker tag frontend-web:latest localhost:5000/kecs-example-frontend:latest
 docker push localhost:5000/kecs-example-frontend:latest
 ```
 
-### 2. Create Service Discovery Namespace
+### 2. Create ECS Cluster
+
+```bash
+aws ecs create-cluster \
+  --cluster-name default \
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT
+```
+
+### 3. Create Service Discovery Namespace
 
 ```bash
 aws servicediscovery create-private-dns-namespace \
@@ -182,7 +190,7 @@ aws servicediscovery create-private-dns-namespace \
   --region us-east-1 --endpoint-url $KECS_ENDPOINT
 ```
 
-### 3. Create Service Discovery Services
+### 4. Create Service Discovery Services
 
 ```bash
 # Get namespace ID
@@ -191,22 +199,31 @@ NAMESPACE_ID=$(aws servicediscovery list-namespaces \
   --output text \
   --region us-east-1 --endpoint-url $KECS_ENDPOINT)
 
-# Create backend discovery service
-aws servicediscovery create-service \
+# Create backend discovery service and get ARN
+BACKEND_SERVICE_ARN=$(aws servicediscovery create-service \
   --name backend-api \
   --namespace-id $NAMESPACE_ID \
   --dns-config "NamespaceId=$NAMESPACE_ID,DnsRecords=[{Type=A,TTL=60}]" \
-  --region us-east-1 --endpoint-url $KECS_ENDPOINT
+  --health-check-config "Type=HTTP,ResourcePath=/health,FailureThreshold=3" \
+  --query 'Service.Arn' \
+  --output text \
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT)
 
-# Create frontend discovery service
-aws servicediscovery create-service \
+# Create frontend discovery service and get ARN
+FRONTEND_SERVICE_ARN=$(aws servicediscovery create-service \
   --name frontend-web \
   --namespace-id $NAMESPACE_ID \
   --dns-config "NamespaceId=$NAMESPACE_ID,DnsRecords=[{Type=A,TTL=60}]" \
-  --region us-east-1 --endpoint-url $KECS_ENDPOINT
+  --health-check-config "Type=HTTP,ResourcePath=/health,FailureThreshold=3" \
+  --query 'Service.Arn' \
+  --output text \
+  --region us-east-1 --endpoint-url $KECS_ENDPOINT)
+
+echo "Backend Service Discovery ARN: $BACKEND_SERVICE_ARN"
+echo "Frontend Service Discovery ARN: $FRONTEND_SERVICE_ARN"
 ```
 
-### 4. Register Task Definitions
+### 5. Register Task Definitions
 
 ```bash
 aws ecs register-task-definition \
@@ -218,7 +235,7 @@ aws ecs register-task-definition \
   --region us-east-1 --endpoint-url $KECS_ENDPOINT
 ```
 
-### 5. Create ECS Services
+### 6. Create ECS Services
 
 ```bash
 # Create backend service
@@ -228,7 +245,8 @@ aws ecs create-service \
   --task-definition backend-api:1 \
   --desired-count 2 \
   --launch-type FARGATE \
-  --service-registries "registryArn=<backend-service-arn>" \
+  --service-registries "registryArn=$BACKEND_SERVICE_ARN,containerName=backend,containerPort=8080" \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],securityGroups=[sg-12345],assignPublicIp=ENABLED}" \
   --region us-east-1 --endpoint-url $KECS_ENDPOINT
 
 # Create frontend service
@@ -238,7 +256,8 @@ aws ecs create-service \
   --task-definition frontend-web:1 \
   --desired-count 1 \
   --launch-type FARGATE \
-  --service-registries "registryArn=<frontend-service-arn>" \
+  --service-registries "registryArn=$FRONTEND_SERVICE_ARN,containerName=frontend,containerPort=3000" \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],securityGroups=[sg-12345],assignPublicIp=ENABLED}" \
   --region us-east-1 --endpoint-url $KECS_ENDPOINT
 ```
 
