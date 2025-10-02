@@ -53,7 +53,7 @@ When using the TUI, you can configure LocalStack services through the instance c
 
 ![TUI LocalStack Services Configuration](../images/tui-localstack-services.png)
 
-1. Launch the TUI: `tui`
+1. Launch the TUI: `kecs`
 2. Navigate to "Create New Instance" and press Enter
 3. Fill in the instance name
 4. In "Additional LocalStack Services" field, enter comma-separated service names

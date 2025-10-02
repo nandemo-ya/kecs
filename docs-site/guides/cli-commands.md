@@ -61,7 +61,7 @@ kecs start --instance staging --api-port 6373 --admin-port 6374 --additional-loc
 
 **Using the TUI (Interactive Mode):**
 
-When using the TUI (`tui`), you can configure additional LocalStack services through the instance creation dialog:
+When using the TUI (`kecs`), you can configure additional LocalStack services through the instance creation dialog:
 
 ![TUI LocalStack Services Configuration](../images/tui-localstack-services.png)
 
