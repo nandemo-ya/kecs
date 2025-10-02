@@ -18,23 +18,58 @@ kecs start [flags]
 - `--admin-port int`: Admin port for health/metrics (default: 5374)
 - `--data-dir string`: Data directory (default: ~/.kecs/data)
 - `--config string`: Configuration file path
-- `--additional-localstack-services string`: Additional LocalStack services (comma-separated)
+- `--additional-localstack-services string`: Additional LocalStack services to enable (comma-separated, e.g., `s3,dynamodb,sqs`)
 - `--timeout duration`: Timeout for cluster creation (default: 10m)
+
+**LocalStack Services:**
+
+KECS always enables these core AWS services by default:
+- `iam` - Identity and Access Management
+- `logs` - CloudWatch Logs
+- `ssm` - Systems Manager Parameter Store
+- `secretsmanager` - Secrets Manager
+- `elbv2` - Elastic Load Balancing v2
+- `s3` - Simple Storage Service (note: included in defaults)
+
+You can enable additional services using `--additional-localstack-services`:
+- `dynamodb` - DynamoDB
+- `sqs` - Simple Queue Service
+- `sns` - Simple Notification Service
+- `kinesis` - Kinesis Data Streams
+- `lambda` - Lambda
+- `rds` - Relational Database Service
+- `ec2` - Elastic Compute Cloud
+- And many more (see [LocalStack documentation](https://docs.localstack.cloud/user-guide/aws/feature-coverage/) for full list)
 
 **Examples:**
 ```bash
-# Start with default settings
+# Start with default settings (includes iam, logs, ssm, secretsmanager, elbv2, s3)
 kecs start
 
 # Start with custom instance name
 kecs start --instance dev
 
-# Start with custom ports
-kecs start --instance staging --api-port 6373 --admin-port 6374
+# Start with additional services (DynamoDB and SQS)
+kecs start --instance dev --additional-localstack-services dynamodb,sqs
 
-# Start without LocalStack
-kecs start --no-localstack
+# Start with S3 and DynamoDB for data processing workload
+kecs start --instance data-pipeline --additional-localstack-services s3,dynamodb
+
+# Start with custom ports and Lambda support
+kecs start --instance staging --api-port 6373 --admin-port 6374 --additional-localstack-services lambda,sns
 ```
+
+**Using the TUI (Interactive Mode):**
+
+When using the TUI (`kecs`), you can configure additional LocalStack services through the instance creation dialog:
+
+![TUI LocalStack Services Configuration](../images/tui-localstack-services.png)
+
+1. Navigate to "Create New Instance"
+2. Enter instance name
+3. In "Additional LocalStack Services" field, enter comma-separated service names
+4. The UI shows helper text with examples and indicates which services are always enabled
+5. Press Create to start the instance
 
 ### kecs stop
 

@@ -11,6 +11,139 @@ LocalStack integration enables:
 - Secrets Manager and SSM Parameter Store
 - Service discovery with Route 53
 
+## Configuring LocalStack Services
+
+KECS automatically enables core AWS services required for ECS operations. You can also enable additional services based on your application needs.
+
+### Default Services
+
+KECS always enables these essential AWS services:
+
+| Service | Purpose |
+|---------|---------|
+| **IAM** | Identity and Access Management for task roles |
+| **CloudWatch Logs** | Container log aggregation and streaming |
+| **SSM Parameter Store** | Configuration parameter storage |
+| **Secrets Manager** | Secure secrets storage |
+| **ELBv2** | Application and Network Load Balancers |
+| **S3** | Object storage (included in defaults) |
+
+These services are automatically available in every KECS instance without any configuration.
+
+### Enabling Additional Services
+
+For applications that need other AWS services, use the `--additional-localstack-services` flag when creating an instance:
+
+**Via CLI:**
+```bash
+# Enable S3 and DynamoDB for data processing
+kecs start --instance data-pipeline --additional-localstack-services s3,dynamodb
+
+# Enable Lambda and SNS for serverless applications
+kecs start --instance serverless --additional-localstack-services lambda,sns
+
+# Enable multiple services
+kecs start --instance full-stack \
+  --additional-localstack-services dynamodb,sqs,sns,kinesis
+```
+
+**Via TUI (Interactive Mode):**
+
+When using the TUI, you can configure LocalStack services through the instance creation dialog:
+
+![TUI LocalStack Services Configuration](../images/tui-localstack-services.png)
+
+1. Launch the TUI: `kecs`
+2. Navigate to "Create New Instance" and press Enter
+3. Fill in the instance name
+4. In "Additional LocalStack Services" field, enter comma-separated service names
+   - Example: `s3,dynamodb,sqs`
+5. The UI shows helper text indicating which services are always enabled
+6. Press Tab to navigate to "Create" button and press Enter
+
+### Available Services
+
+In addition to the default services, you can enable:
+
+**Data Storage:**
+- `dynamodb` - NoSQL database
+- `rds` - Relational databases (MySQL, PostgreSQL)
+- `elasticache` - In-memory caching (Redis, Memcached)
+
+**Messaging & Streaming:**
+- `sqs` - Simple Queue Service
+- `sns` - Simple Notification Service
+- `kinesis` - Real-time data streaming
+- `kafka` - Managed streaming for Apache Kafka
+
+**Serverless:**
+- `lambda` - Serverless compute
+- `stepfunctions` - Workflow orchestration
+- `eventbridge` - Event bus
+
+**Container & Compute:**
+- `ec2` - Virtual machines
+- `ecr` - Container registry
+
+**Networking:**
+- `apigateway` - API management
+- `route53` - DNS service
+
+For the complete list of supported services, see the [LocalStack Feature Coverage](https://docs.localstack.cloud/user-guide/aws/feature-coverage/) documentation.
+
+### Common Configuration Patterns
+
+**Microservices with Service Discovery:**
+```bash
+kecs start --instance microservices \
+  --additional-localstack-services route53,servicediscovery
+```
+
+**Data Processing Pipeline:**
+```bash
+kecs start --instance data-pipeline \
+  --additional-localstack-services s3,dynamodb,kinesis,lambda
+```
+
+**Event-Driven Architecture:**
+```bash
+kecs start --instance event-driven \
+  --additional-localstack-services sqs,sns,eventbridge,lambda
+```
+
+**Full-Stack Web Application:**
+```bash
+kecs start --instance webapp \
+  --additional-localstack-services dynamodb,s3,apigateway,lambda
+```
+
+### Verifying Enabled Services
+
+Check which services are running in your LocalStack instance:
+
+```bash
+# Get the KECS endpoint
+export AWS_ENDPOINT_URL=http://localhost:5373
+
+# Check LocalStack health (shows all enabled services)
+curl http://localhost:5373/_localstack/health | jq .
+```
+
+Expected output:
+```json
+{
+  "services": {
+    "iam": "running",
+    "logs": "running",
+    "ssm": "running",
+    "secretsmanager": "running",
+    "elbv2": "running",
+    "s3": "running",
+    "dynamodb": "running"  // if enabled via --additional-localstack-services
+  }
+}
+```
+
 ## Using AWS Services
 
 ### IAM Integration
