@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 
@@ -27,8 +28,13 @@ func NewClient(ctx context.Context, endpoint string) (*Client, error) {
 	var err error
 
 	if endpoint != "" {
-		// LocalStack mode
+		// LocalStack mode - use dummy credentials
 		cfg, err = config.LoadDefaultConfig(ctx,
+			config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+				"test", // Access Key ID
+				"test", // Secret Access Key
+				"",     // Session Token
+			)),
 			config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
 				func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 					if service == route53.ServiceID {
