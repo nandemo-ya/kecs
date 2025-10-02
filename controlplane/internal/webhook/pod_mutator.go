@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -122,13 +123,26 @@ func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.Admi
 		pod.Labels = make(map[string]string)
 	}
 
+	// Log pod labels for debugging
+	logging.Info("Pod labels in webhook (before isKECSManaged check)",
+		"pod", pod.Name,
+		"namespace", pod.Namespace,
+		"labels", pod.Labels)
+
 	// Check if this is a KECS-managed pod
 	// Either it has kecs.dev/managed-by label or it's a service pod with kecs.dev/service label
 	isKECSManaged := pod.Labels["kecs.dev/managed-by"] == "kecs" || pod.Labels["kecs.dev/service"] != ""
 
+	logging.Info("isKECSManaged check result",
+		"pod", pod.Name,
+		"namespace", pod.Namespace,
+		"isKECSManaged", isKECSManaged,
+		"managed-by", pod.Labels["kecs.dev/managed-by"],
+		"service", pod.Labels["kecs.dev/service"])
+
 	if !isKECSManaged {
 		// Not a KECS pod, allow without mutation
-		logging.Debug("Pod not managed by KECS, skipping mutation",
+		logging.Info("Pod not managed by KECS, skipping mutation",
 			"pod", pod.Name,
 			"namespace", pod.Namespace,
 			"managed-by", pod.Labels["kecs.dev/managed-by"],
@@ -152,6 +166,69 @@ func (m *PodMutator) mutate(req *admissionv1.AdmissionRequest) *admissionv1.Admi
 
 	// Generate patches for mutation
 	var patches []patchOperation
+
+	// Log pod labels for debugging
+	logging.Info("Pod labels in webhook", "pod", pod.Name, "namespace", pod.Namespace, "labels", pod.Labels)
+
+	// Inject AWS environment variables for ECS tasks
+	if _, isECSTask := pod.Labels["ecs.task.definition.family"]; isECSTask {
+		logging.Info("ECS task detected, adding AWS environment variables",
+			"pod", pod.Name,
+			"namespace", pod.Namespace,
+			"family", pod.Labels["ecs.task.definition.family"])
+
+		// AWS environment variables to inject
+		awsEnvVars := []corev1.EnvVar{
+			{Name: "AWS_ENDPOINT_URL", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
+			{Name: "AWS_ENDPOINT_URL_S3", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
+			{Name: "AWS_ENDPOINT_URL_IAM", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
+			{Name: "AWS_ENDPOINT_URL_LOGS", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
+			{Name: "AWS_ENDPOINT_URL_SSM", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
+			{Name: "AWS_ENDPOINT_URL_SECRETSMANAGER", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
+			{Name: "AWS_ENDPOINT_URL_ELB", Value: "http://localstack.kecs-system.svc.cluster.local:4566"},
+			{Name: "AWS_ACCESS_KEY_ID", Value: "test"},
+			{Name: "AWS_SECRET_ACCESS_KEY", Value: "test"},
+			{Name: "AWS_DEFAULT_REGION", Value: "us-east-1"},
+			{Name: "AWS_REGION", Value: "us-east-1"},
+		}
+
+		// Add environment variables to all containers
+		for containerIdx := range pod.Spec.Containers {
+			containerPath := "/spec/containers/" + strconv.Itoa(containerIdx)
+
+			// Check if env array exists
+			if pod.Spec.Containers[containerIdx].Env == nil {
+				// Create env array with all AWS variables
+				patches = append(patches, patchOperation{
+					Op:    "add",
+					Path:  containerPath + "/env",
+					Value: awsEnvVars,
+				})
+			} else {
+				// Add to existing env array
+				for _, envVar := range awsEnvVars {
+					// Check if the env var already exists
+					exists := false
+					for _, existing := range pod.Spec.Containers[containerIdx].Env {
+						if existing.Name == envVar.Name {
+							exists = true
+							break
+						}
+					}
+
+					if !exists {
+						patches = append(patches, patchOperation{
+							Op:    "add",
+							Path:  containerPath + "/env/-",
+							Value: envVar,
+						})
+					}
+				}
+			}
+		}
+
+		logging.Info("Added AWS environment variable patches", "patchCount", len(patches))
+	}
 
 	// For service-managed pods, generate and add task ID
 	if serviceName, ok := pod.Labels["kecs.dev/service"]; ok {
