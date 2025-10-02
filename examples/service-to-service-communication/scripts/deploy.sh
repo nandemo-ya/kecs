@@ -36,14 +36,20 @@ check_command docker
 # Set AWS endpoint for KECS
 export AWS_ENDPOINT_URL=$KECS_ENDPOINT
 
-# Step 1: Build Docker images
+# Step 1: Build and push Docker images
 echo -e "\n${YELLOW}📦 Building Docker images...${NC}"
 
 echo "Building backend image..."
 docker build -t backend-api:latest ./backend
+docker tag backend-api:latest localhost:5000/kecs-example-backend:latest
 
 echo "Building frontend image..."
 docker build -t frontend-web:latest ./frontend
+docker tag frontend-web:latest localhost:5000/kecs-example-frontend:latest
+
+echo -e "\n${YELLOW}📤 Pushing images to k3d registry...${NC}"
+docker push localhost:5000/kecs-example-backend:latest
+docker push localhost:5000/kecs-example-frontend:latest
 
 # Step 2: Create ECS cluster if not exists
 echo -e "\n${YELLOW}☁️  Creating ECS cluster...${NC}"
