@@ -143,9 +143,9 @@ func (m *manager) buildCoreDNSConfig(namespace *Namespace) string {
 	sb.WriteString("    ready\n")
 
 	// Use Kubernetes plugin to resolve services
-	// Note: The kubernetes plugin doesn't support restricting to specific namespaces via directive
-	// We'll use a broader configuration and rely on service naming conventions
-	sb.WriteString(fmt.Sprintf("    kubernetes %s in-addr.arpa ip6.arpa {\n", namespace.Name))
+	// Format: kubernetes <k8s-namespace> <zone> in-addr.arpa ip6.arpa
+	// This tells CoreDNS to resolve <zone> queries using services in <k8s-namespace>
+	sb.WriteString(fmt.Sprintf("    kubernetes %s %s in-addr.arpa ip6.arpa {\n", k8sNamespace, namespace.Name))
 	sb.WriteString("        pods insecure\n")
 	sb.WriteString("        fallthrough in-addr.arpa ip6.arpa\n")
 	sb.WriteString("    }\n")
@@ -256,6 +256,35 @@ func (m *manager) createServiceDNSAlias(ctx context.Context, namespace *Namespac
 		}
 		logging.Debug("Updated DNS alias service", "name", aliasServiceName, "namespace", k8sNamespace)
 	}
+
+	return nil
+}
+
+// updateServiceDNSAlias updates the ExternalName Service to point to the actual ECS service
+func (m *manager) updateServiceDNSAlias(ctx context.Context, namespace *Namespace, service *Service, ecsServiceFQDN string) error {
+	// Get the Kubernetes namespace for this Service Discovery namespace
+	k8sNamespace := "default" // Service Discovery services are in the default namespace
+
+	// Get the existing ExternalName service
+	aliasServiceName := service.Name
+	aliasService, err := m.kubeClient.CoreV1().Services(k8sNamespace).Get(ctx, aliasServiceName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get ExternalName service: %w", err)
+	}
+
+	// Update the ExternalName to point to the actual ECS service
+	aliasService.Spec.ExternalName = ecsServiceFQDN
+
+	// Update the service
+	_, err = m.kubeClient.CoreV1().Services(k8sNamespace).Update(ctx, aliasService, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update ExternalName service: %w", err)
+	}
+
+	logging.Info("Updated ExternalName Service",
+		"service", aliasServiceName,
+		"namespace", k8sNamespace,
+		"externalName", ecsServiceFQDN)
 
 	return nil
 }
