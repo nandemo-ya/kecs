@@ -1520,6 +1520,34 @@ func (api *DefaultECSAPI) registerServiceWithDiscovery(ctx context.Context, serv
 		}
 		service.ServiceRegistryMetadata[serviceID] = fmt.Sprintf("{\"containerName\":\"%s\",\"containerPort\":%d}",
 			containerName, containerPort)
+
+		// Update Service Discovery ExternalName to point to actual ECS service
+		// ECS service Kubernetes FQDN format: <service-name>.default-<region>.svc.cluster.local
+		cluster, err := api.storage.ClusterStore().Get(ctx, service.ClusterARN)
+		if err != nil {
+			logging.Warn("Failed to get cluster for service discovery update", "service", service.ServiceName, "error", err)
+			continue
+		}
+
+		// Construct the Kubernetes service FQDN for the ECS service
+		// Pattern: <ecs-service-name>.<cluster-name>-<region>.svc.cluster.local
+		k8sNamespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
+		ecsServiceFQDN := fmt.Sprintf("%s.%s.svc.cluster.local", service.ServiceName, k8sNamespace)
+
+		// Update the Service Discovery endpoint to point to the actual ECS service
+		if err := api.serviceDiscoveryManager.UpdateServiceEndpoint(ctx, serviceID, ecsServiceFQDN); err != nil {
+			logging.Warn("Failed to update service discovery endpoint",
+				"service", service.ServiceName,
+				"discoveryService", serviceID,
+				"endpoint", ecsServiceFQDN,
+				"error", err)
+			// Don't fail the registration if endpoint update fails
+		} else {
+			logging.Info("Updated service discovery endpoint",
+				"service", service.ServiceName,
+				"discoveryService", serviceID,
+				"endpoint", ecsServiceFQDN)
+		}
 	}
 
 	// Update service in storage with registry metadata

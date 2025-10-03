@@ -26,6 +26,7 @@ type Manager interface {
 	GetService(ctx context.Context, serviceID string) (*Service, error)
 	ListServices(ctx context.Context, namespaceID string) ([]*Service, error)
 	DeleteService(ctx context.Context, serviceID string) error
+	UpdateServiceEndpoint(ctx context.Context, serviceID string, ecsServiceFQDN string) error
 
 	// Instance operations
 	RegisterInstance(ctx context.Context, instance *Instance) error
@@ -645,6 +646,34 @@ func (m *manager) UpdateInstanceHealthStatus(ctx context.Context, serviceID, ins
 			}
 		}
 	}
+
+	return nil
+}
+
+// UpdateServiceEndpoint updates the ExternalName Service to point to the actual ECS service
+func (m *manager) UpdateServiceEndpoint(ctx context.Context, serviceID string, ecsServiceFQDN string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	service, exists := m.services[serviceID]
+	if !exists {
+		return fmt.Errorf("service not found: %s", serviceID)
+	}
+
+	namespace, exists := m.namespaces[service.NamespaceID]
+	if !exists {
+		return fmt.Errorf("namespace not found: %s", service.NamespaceID)
+	}
+
+	// Update the ExternalName Service to point to the actual ECS service
+	if err := m.updateServiceDNSAlias(ctx, namespace, service, ecsServiceFQDN); err != nil {
+		return fmt.Errorf("failed to update DNS alias: %w", err)
+	}
+
+	logging.Info("Updated service endpoint",
+		"service", service.Name,
+		"namespace", namespace.Name,
+		"endpoint", ecsServiceFQDN)
 
 	return nil
 }
