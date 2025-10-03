@@ -1530,8 +1530,8 @@ func (api *DefaultECSAPI) registerServiceWithDiscovery(ctx context.Context, serv
 		}
 
 		// Construct the Kubernetes service FQDN for the ECS service
-		// Pattern: <ecs-service-name>.default-<region>.svc.cluster.local
-		k8sNamespace := fmt.Sprintf("default-%s", cluster.Region)
+		// Pattern: <ecs-service-name>.<cluster-name>-<region>.svc.cluster.local
+		k8sNamespace := fmt.Sprintf("%s-%s", cluster.Name, cluster.Region)
 		ecsServiceFQDN := fmt.Sprintf("%s.%s.svc.cluster.local", service.ServiceName, k8sNamespace)
 
 		// Update the Service Discovery endpoint to point to the actual ECS service
