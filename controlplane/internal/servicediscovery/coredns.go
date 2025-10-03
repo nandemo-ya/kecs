@@ -141,11 +141,23 @@ func (m *manager) buildCoreDNSConfig(namespace *Namespace) string {
 	sb.WriteString("        lameduck 5s\n")
 	sb.WriteString("    }\n")
 	sb.WriteString("    ready\n")
+	sb.WriteString("\n")
+
+	// Use rewrite plugin to redirect custom domain queries to default namespace services
+	// This enables Service Discovery DNS names (e.g., backend-api.production.local)
+	// to resolve to ExternalName Services in the default namespace
+	sb.WriteString("    # Rewrite Service Discovery queries to default namespace\n")
+	sb.WriteString("    rewrite stop {\n")
+	sb.WriteString(fmt.Sprintf("        name regex (.*)\\.%s {1}.%s.svc.cluster.local\n",
+		escapeRegex(namespace.Name), k8sNamespace))
+	sb.WriteString(fmt.Sprintf("        answer name (.*)\\.%s\\.svc\\.cluster\\.local {1}.%s\n",
+		escapeRegex(k8sNamespace), escapeRegex(namespace.Name)))
+	sb.WriteString("    }\n")
+	sb.WriteString("\n")
 
 	// Use Kubernetes plugin to resolve services
-	// Format: kubernetes <k8s-namespace> <zone> in-addr.arpa ip6.arpa
-	// This tells CoreDNS to resolve <zone> queries using services in <k8s-namespace>
-	sb.WriteString(fmt.Sprintf("    kubernetes %s %s in-addr.arpa ip6.arpa {\n", k8sNamespace, namespace.Name))
+	// The kubernetes plugin resolves the rewritten queries to actual services
+	sb.WriteString("    kubernetes cluster.local in-addr.arpa ip6.arpa {\n")
 	sb.WriteString("        pods insecure\n")
 	sb.WriteString("        fallthrough in-addr.arpa ip6.arpa\n")
 	sb.WriteString("    }\n")
@@ -309,4 +321,10 @@ func (m *manager) removeServiceDNSAlias(ctx context.Context, namespace *Namespac
 
 	logging.Info("Removed DNS alias service", "name", service.Name, "namespace", k8sNamespace)
 	return nil
+}
+
+// escapeRegex escapes special regex characters in a string for use in CoreDNS rewrite rules
+func escapeRegex(s string) string {
+	// Escape dots which are special in regex
+	return strings.ReplaceAll(s, ".", "\\.")
 }
