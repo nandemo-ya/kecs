@@ -347,6 +347,23 @@ func (m *manager) removeServiceDNSAlias(ctx context.Context, namespace *Namespac
 
 // escapeRegex escapes special regex characters in a string for use in CoreDNS rewrite rules
 func escapeRegex(s string) string {
-	// Escape dots which are special in regex
-	return strings.ReplaceAll(s, ".", "\\.")
+	// Escape all regex special characters to prevent regex injection
+	// Note: backslash must be escaped first to avoid double-escaping
+	replacer := strings.NewReplacer(
+		"\\", "\\\\",
+		".", "\\.",
+		"+", "\\+",
+		"*", "\\*",
+		"?", "\\?",
+		"[", "\\[",
+		"]", "\\]",
+		"(", "\\(",
+		")", "\\)",
+		"{", "\\{",
+		"}", "\\}",
+		"^", "\\^",
+		"$", "\\$",
+		"|", "\\|",
+	)
+	return replacer.Replace(s)
 }
