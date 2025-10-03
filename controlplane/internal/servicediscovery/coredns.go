@@ -1,9 +1,11 @@
 package servicediscovery
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
+	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -16,6 +18,41 @@ const (
 	coreDNSNamespace       = "kube-system"
 	coreDNSConfigMap       = "coredns"
 	customCoreDNSConfigMap = "coredns-custom"
+)
+
+// coreDNSConfigTemplate is the template for CoreDNS configuration
+const coreDNSConfigTemplate = `{{.NamespaceName}}:53 {
+    errors
+    health {
+        lameduck 5s
+    }
+    ready
+
+    # Rewrite Service Discovery queries to default namespace
+    rewrite stop {
+        name regex (.*)\.{{.NamespaceNameEscaped}} {1}.{{.K8sNamespace}}.svc.cluster.local
+        answer name (.*)\.{{.K8sNamespaceEscaped}}\.svc\.cluster\.local {1}.{{.NamespaceNameEscaped}}
+    }
+
+    kubernetes cluster.local in-addr.arpa ip6.arpa {
+        pods insecure
+        fallthrough in-addr.arpa ip6.arpa
+    }
+{{if .LocalStackEndpoint}}
+    forward . {{.LocalStackEndpoint}} {
+        except kubernetes.default.svc.cluster.local
+    }
+{{end}}
+    cache 30
+    loop
+    reload
+    loadbalance
+}
+`
+
+var (
+	// coreDNSTemplate is the parsed template for CoreDNS configuration
+	coreDNSTemplate = template.Must(template.New("coredns").Parse(coreDNSConfigTemplate))
 )
 
 // updateCoreDNSConfig updates CoreDNS configuration to include service discovery domains
@@ -124,50 +161,47 @@ func (m *manager) removeCoreDNSConfig(ctx context.Context, namespaceID string) e
 	return nil
 }
 
+// coreDNSConfigData holds the data for CoreDNS configuration template
+type coreDNSConfigData struct {
+	NamespaceName        string
+	NamespaceNameEscaped string
+	K8sNamespace         string
+	K8sNamespaceEscaped  string
+	LocalStackEndpoint   string
+}
+
 // buildCoreDNSConfig builds CoreDNS configuration for a namespace
 func (m *manager) buildCoreDNSConfig(namespace *Namespace) string {
-	var sb strings.Builder
-
 	// Get Kubernetes namespace for this DNS namespace
 	k8sNamespace := m.dnsToK8sNamespace[namespace.Name]
 	if k8sNamespace == "" {
 		k8sNamespace = "default"
 	}
 
-	// Build CoreDNS server block for this domain
-	sb.WriteString(fmt.Sprintf("%s:53 {\n", namespace.Name))
-	sb.WriteString("    errors\n")
-	sb.WriteString("    health {\n")
-	sb.WriteString("        lameduck 5s\n")
-	sb.WriteString("    }\n")
-	sb.WriteString("    ready\n")
-
-	// Use Kubernetes plugin to resolve services
-	// Format: kubernetes <k8s-namespace> <zone> in-addr.arpa ip6.arpa
-	// This tells CoreDNS to resolve <zone> queries using services in <k8s-namespace>
-	sb.WriteString(fmt.Sprintf("    kubernetes %s %s in-addr.arpa ip6.arpa {\n", k8sNamespace, namespace.Name))
-	sb.WriteString("        pods insecure\n")
-	sb.WriteString("        fallthrough in-addr.arpa ip6.arpa\n")
-	sb.WriteString("    }\n")
-
-	// If Route53 integration is available, forward to Route53
+	// Get LocalStack endpoint if Route53 integration is available
+	localstackEndpoint := ""
 	if m.route53Manager != nil && namespace.HostedZoneID != "" {
-		// Get LocalStack endpoint from environment
-		localstackEndpoint := m.getLocalStackDNSEndpoint()
-		if localstackEndpoint != "" {
-			sb.WriteString(fmt.Sprintf("    forward . %s {\n", localstackEndpoint))
-			sb.WriteString("        except kubernetes.default.svc.cluster.local\n")
-			sb.WriteString("    }\n")
-		}
+		localstackEndpoint = m.getLocalStackDNSEndpoint()
 	}
 
-	sb.WriteString("    cache 30\n")
-	sb.WriteString("    loop\n")
-	sb.WriteString("    reload\n")
-	sb.WriteString("    loadbalance\n")
-	sb.WriteString("}\n")
+	// Prepare template data
+	data := coreDNSConfigData{
+		NamespaceName:        namespace.Name,
+		NamespaceNameEscaped: escapeRegex(namespace.Name),
+		K8sNamespace:         k8sNamespace,
+		K8sNamespaceEscaped:  escapeRegex(k8sNamespace),
+		LocalStackEndpoint:   localstackEndpoint,
+	}
 
-	return sb.String()
+	// Execute template
+	var buf bytes.Buffer
+	if err := coreDNSTemplate.Execute(&buf, data); err != nil {
+		// Fallback to error message if template execution fails
+		logging.Error("Failed to execute CoreDNS template", "error", err)
+		return fmt.Sprintf("# Error generating CoreDNS config: %v\n", err)
+	}
+
+	return buf.String()
 }
 
 // restartCoreDNS restarts CoreDNS pods to pick up configuration changes
@@ -309,4 +343,27 @@ func (m *manager) removeServiceDNSAlias(ctx context.Context, namespace *Namespac
 
 	logging.Info("Removed DNS alias service", "name", service.Name, "namespace", k8sNamespace)
 	return nil
+}
+
+// escapeRegex escapes special regex characters in a string for use in CoreDNS rewrite rules
+func escapeRegex(s string) string {
+	// Escape all regex special characters to prevent regex injection
+	// Note: backslash must be escaped first to avoid double-escaping
+	replacer := strings.NewReplacer(
+		"\\", "\\\\",
+		".", "\\.",
+		"+", "\\+",
+		"*", "\\*",
+		"?", "\\?",
+		"[", "\\[",
+		"]", "\\]",
+		"(", "\\(",
+		")", "\\)",
+		"{", "\\{",
+		"}", "\\}",
+		"^", "\\^",
+		"$", "\\$",
+		"|", "\\|",
+	)
+	return replacer.Replace(s)
 }
