@@ -73,6 +73,7 @@ type AWSConfig struct {
 	DefaultRegion string `yaml:"defaultRegion" mapstructure:"defaultRegion"`
 	AccountID     string `yaml:"accountID" mapstructure:"accountID"`
 	ProxyImage    string `yaml:"proxyImage" mapstructure:"proxyImage"`
+	EndpointURL   string `yaml:"endpointURL" mapstructure:"endpointURL"`
 }
 
 var (
@@ -148,6 +149,7 @@ func InitConfig() error {
 		v.SetDefault("aws.defaultRegion", "us-east-1")
 		v.SetDefault("aws.accountID", "000000000000")
 		v.SetDefault("aws.proxyImage", "")
+		v.SetDefault("aws.endpointURL", "http://localstack.kecs-system.svc.cluster.local:4566")
 
 		// LocalStack defaults
 		v.SetDefault("localstack.enabled", true)    // Enable LocalStack by default
@@ -185,6 +187,7 @@ func bindLegacyEnvVars() {
 	v.BindEnv("kubernetes.keepClustersOnShutdown", "KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
 	v.BindEnv("features.autoRecoverState", "KECS_AUTO_RECOVER_STATE")
 	v.BindEnv("aws.proxyImage", "KECS_AWS_PROXY_IMAGE")
+	v.BindEnv("aws.endpointURL", "AWS_ENDPOINT_URL")
 	v.BindEnv("features.iamIntegration", "KECS_IAM_INTEGRATION")
 	v.BindEnv("localstack.enabled", "KECS_LOCALSTACK_ENABLED")
 	v.BindEnv("localstack.useTraefik", "KECS_LOCALSTACK_USE_TRAEFIK")

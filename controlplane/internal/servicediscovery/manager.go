@@ -3,7 +3,6 @@ package servicediscovery
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -56,7 +55,7 @@ type manager struct {
 }
 
 // NewManager creates a new service discovery manager
-func NewManager(kubeClient kubernetes.Interface, region, accountID string) Manager {
+func NewManager(kubeClient kubernetes.Interface, region, accountID, endpoint string) Manager {
 	mgr := &manager{
 		kubeClient:        kubeClient,
 		region:            region,
@@ -67,25 +66,17 @@ func NewManager(kubeClient kubernetes.Interface, region, accountID string) Manag
 		dnsToK8sNamespace: make(map[string]string),
 	}
 
-	// Initialize Route53 integration if LocalStack endpoint is configured
-	localstackEndpoint := os.Getenv("LOCALSTACK_ENDPOINT")
-	if localstackEndpoint == "" {
-		localstackEndpoint = os.Getenv("AWS_ENDPOINT_URL")
-	}
-
-	if localstackEndpoint != "" {
+	// Initialize Route53 integration if endpoint is provided
+	if endpoint != "" {
 		ctx := context.Background()
-		r53Client, err := route53.NewClient(ctx, localstackEndpoint)
+		r53Client, err := route53.NewClient(ctx, endpoint)
 		if err != nil {
 			logging.Warn("Failed to initialize Route53 client", "error", err)
 		} else {
-			// Default VPC configuration for LocalStack
-			defaultVPC := &route53.VPCConfig{
-				VPCID:  "vpc-default",
-				Region: region,
-			}
-			mgr.route53Manager = route53.NewManager(r53Client, defaultVPC)
-			logging.Info("Route53 integration enabled", "endpoint", localstackEndpoint)
+			// For LocalStack, don't pass VPC config to avoid EC2 dependency
+			// LocalStack doesn't validate VPCs like real AWS does
+			mgr.route53Manager = route53.NewManager(r53Client, nil)
+			logging.Info("Route53 integration enabled", "endpoint", endpoint)
 		}
 	}
 

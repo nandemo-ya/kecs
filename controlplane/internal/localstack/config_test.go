@@ -18,7 +18,7 @@ var _ = Describe("LocalStack Configuration", func() {
 		It("should return valid default configuration", func() {
 			Expect(config).NotTo(BeNil())
 			Expect(config.Enabled).To(BeTrue())
-			Expect(config.Services).To(ConsistOf("iam", "logs", "ssm", "secretsmanager", "elbv2", "s3"))
+			Expect(config.Services).To(ConsistOf("s3", "iam", "logs", "ssm", "secretsmanager", "route53"))
 			Expect(config.Persistence).To(BeTrue())
 			Expect(config.Image).To(Equal("localstack/localstack"))
 			Expect(config.Version).To(Equal("latest"))
@@ -206,7 +206,7 @@ var _ = Describe("LocalStack Configuration", func() {
 			Expect(localstack.IsValidService("logs")).To(BeTrue())
 			Expect(localstack.IsValidService("ssm")).To(BeTrue())
 			Expect(localstack.IsValidService("secretsmanager")).To(BeTrue())
-			Expect(localstack.IsValidService("elbv2")).To(BeTrue())
+			Expect(localstack.IsValidService("route53")).To(BeTrue())
 			Expect(localstack.IsValidService("rds")).To(BeTrue())
 			Expect(localstack.IsValidService("dynamodb")).To(BeTrue())
 		})
