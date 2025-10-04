@@ -58,6 +58,22 @@ This demo demonstrates service-to-service communication where:
 3. AWS CLI configured
 4. (Optional) LocalStack for Route53 integration
 
+## Important Notes
+
+### Docker Images
+
+The example services use **Debian-based Docker images with Go 1.25 and CGO enabled**. This is important for proper DNS resolution with Go's HTTP client when using Service Discovery.
+
+**Why Debian + CGO?**
+- Alpine Linux (musl libc) has compatibility issues with Go's DNS resolver
+- CGO-enabled builds ensure proper DNS resolution for Service Discovery names
+- Health checks use `wget` which is included in the Debian image
+
+If you modify the Dockerfiles, ensure you:
+1. Use Debian or Ubuntu base images (not Alpine)
+2. Build with `CGO_ENABLED=1`
+3. Include `wget` for health checks
+
 ## Quick Start
 
 ### 1. Start KECS
