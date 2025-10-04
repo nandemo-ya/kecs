@@ -29,9 +29,10 @@ const coreDNSConfigTemplate = `{{.NamespaceName}}:53 {
     ready
 
     # Rewrite Service Discovery queries to default namespace
+    # Note: Only rewrite the query name, not the answer
+    # This prevents CNAME chain issues with Go's DNS resolver
     rewrite stop {
         name regex (.*)\.{{.NamespaceNameEscaped}} {1}.{{.K8sNamespace}}.svc.cluster.local
-        answer name (.*)\.{{.K8sNamespaceEscaped}}\.svc\.cluster\.local {1}.{{.NamespaceNameEscaped}}
     }
 
     kubernetes cluster.local in-addr.arpa ip6.arpa {
