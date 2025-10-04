@@ -1,13 +1,13 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25-bookworm AS builder
 
 WORKDIR /app
 COPY main.go .
 COPY go.mod .
 
-RUN go build -o backend main.go
+RUN CGO_ENABLED=1 go build -o backend main.go
 
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y ca-certificates wget && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /root/
 COPY --from=builder /app/backend .
