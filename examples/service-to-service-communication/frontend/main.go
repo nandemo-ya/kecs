@@ -156,10 +156,40 @@ func main() {
 		"json": jsonFilter,
 	}).Parse(htmlTemplate))
 
-	// Health check endpoint
+	// Health check endpoint - verifies both frontend and backend health
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"healthy"}`)
+
+		// Check backend health via service discovery (best effort, non-blocking)
+		client := &http.Client{
+			Timeout: 2 * time.Second,
+		}
+
+		backendStatus := "unknown"
+		backendError := ""
+
+		resp, err := client.Get(backendURL + "/health")
+		if err != nil {
+			backendStatus = "unreachable"
+			backendError = fmt.Sprintf("%v", err)
+		} else {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				backendStatus = "ok"
+			} else {
+				backendStatus = "unhealthy"
+				backendError = fmt.Sprintf("status %d", resp.StatusCode)
+			}
+		}
+
+		// Frontend is always healthy if it can respond
+		// Backend status is informational only
+		w.WriteHeader(http.StatusOK)
+		if backendError != "" {
+			fmt.Fprintf(w, `{"status":"healthy","frontend":"ok","backend":"%s","backend_error":"%s"}`, backendStatus, backendError)
+		} else {
+			fmt.Fprintf(w, `{"status":"healthy","frontend":"ok","backend":"%s"}`, backendStatus)
+		}
 	})
 
 	// Main page
@@ -175,7 +205,7 @@ func main() {
 	// Call backend endpoint
 	http.HandleFunc("/call-backend", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Calling backend service at %s", backendURL)
-		
+
 		data := PageData{
 			Title:        "Service-to-Service Communication Demo",
 			FrontendHost: hostname,
