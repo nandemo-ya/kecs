@@ -7,7 +7,7 @@ set -e
 
 # Configuration
 CLUSTER_NAME="default"
-NAMESPACE_NAME="production.local"
+NAMESPACE_NAME="demo.local"
 VPC_ID="vpc-default"
 KECS_ENDPOINT=${KECS_ENDPOINT:-"http://localhost:5373"}
 
@@ -170,7 +170,7 @@ aws servicediscovery discover-instances \
 echo -e "\n${GREEN}✅ Deployment complete!${NC}"
 echo -e "\nYou can access:"
 echo "  - Frontend: http://localhost:3000 (after port forwarding)"
-echo "  - Backend API: http://backend-api.production.local:8080"
+echo "  - Backend API: http://backend-api.demo.local:8080"
 echo ""
 echo "To test service communication:"
 echo "  1. Port forward the frontend service"

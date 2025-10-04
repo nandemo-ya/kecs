@@ -9,14 +9,14 @@ var _ = Describe("CoreDNS", func() {
 	Describe("escapeRegex", func() {
 		Context("when escaping basic domain names", func() {
 			It("should escape dots in domain names", func() {
-				input := "production.local"
-				expected := "production\\.local"
+				input := "demo.local"
+				expected := "demo\\.local"
 				Expect(escapeRegex(input)).To(Equal(expected))
 			})
 
 			It("should escape dots in subdomain names", func() {
-				input := "api.production.local"
-				expected := "api\\.production\\.local"
+				input := "api.demo.local"
+				expected := "api\\.demo\\.local"
 				Expect(escapeRegex(input)).To(Equal(expected))
 			})
 		})

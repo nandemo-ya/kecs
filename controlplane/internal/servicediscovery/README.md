@@ -19,7 +19,7 @@ The service discovery integration allows ECS services to discover and communicat
 
 ### How It Works
 
-1. **Namespace Creation**: Creates a DNS namespace (e.g., `production.local`)
+1. **Namespace Creation**: Creates a DNS namespace (e.g., `demo.local`)
 2. **Service Registration**: Registers services within a namespace
 3. **Instance Registration**: When tasks start, they register as instances
 4. **DNS Resolution**: Services can be accessed via `service-name.namespace-name`
@@ -30,7 +30,7 @@ The service discovery integration allows ECS services to discover and communicat
 
 ```bash
 aws servicediscovery create-private-dns-namespace \
-  --name production.local \
+  --name demo.local \
   --vpc vpc-12345678
 ```
 
@@ -57,7 +57,7 @@ aws ecs create-service \
 
 ```bash
 aws servicediscovery discover-instances \
-  --namespace-name production.local \
+  --namespace-name demo.local \
   --service-name backend
 ```
 
@@ -65,7 +65,7 @@ aws servicediscovery discover-instances \
 
 Services registered with service discovery can be accessed using DNS:
 
-- `backend.production.local` - Resolves to all healthy instances
+- `backend.demo.local` - Resolves to all healthy instances
 - Works with both A records (IPv4) and SRV records (with port information)
 
 ## Kubernetes Integration

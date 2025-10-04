@@ -35,7 +35,7 @@ var _ = Describe("DNS Resolver", func() {
 		It("should attempt Route53 resolution for external names", func() {
 			Skip("Requires Route53 integration")
 
-			// ips, err := resolver.ResolveExternal(ctx, "my-service.production.local")
+			// ips, err := resolver.ResolveExternal(ctx, "my-service.demo.local")
 			// Expect(err).NotTo(HaveOccurred())
 			// Expect(ips).NotTo(BeEmpty())
 		})
@@ -59,7 +59,7 @@ var _ = Describe("DNS Resolver", func() {
 			Skip("Requires complete setup")
 
 			// req := &servicediscovery.DiscoverInstancesRequest{
-			//     NamespaceName: "production.local",
+			//     NamespaceName: "demo.local",
 			//     ServiceName:   "my-service",
 			// }
 			//

@@ -20,7 +20,7 @@ func (m *manager) updateKubernetesEndpoints(ctx context.Context, service *Servic
 	}
 
 	// Get Kubernetes namespace - use namespace name directly for better DNS resolution
-	// This allows service.production.local to work directly
+	// This allows service.demo.local to work directly
 	k8sNamespace := sanitizeDNSLabel(namespace.Name)
 
 	// Ensure namespace exists (simple inline implementation)
@@ -53,7 +53,7 @@ func (m *manager) updateKubernetesEndpoints(ctx context.Context, service *Servic
 	}
 
 	// Use service name directly (not prefixed with sd-)
-	// This allows backend-api.production.local to resolve correctly
+	// This allows backend-api.demo.local to resolve correctly
 	k8sServiceName := service.Name
 
 	// Check if Kubernetes Service exists, create if not
