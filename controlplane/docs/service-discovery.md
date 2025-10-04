@@ -82,7 +82,7 @@ type CreatePrivateDnsNamespaceRequest struct {
     Properties  *NamespaceProperties `json:"Properties,omitempty"`
 }
 ```
-- Creates a private DNS namespace (e.g., `production.local`)
+- Creates a private DNS namespace (e.g., `demo.local`)
 - Validates namespace name format
 - Ensures unique namespace names
 - Returns namespace ID and ARN
@@ -156,7 +156,7 @@ type DiscoverInstancesRequest struct {
 
 ### DNS Name Format
 - Pattern: `<service-name>.<namespace-name>`
-- Example: `backend.production.local`
+- Example: `backend.demo.local`
 - Resolves to all healthy instance IPs
 
 ### Kubernetes Service Naming
@@ -167,8 +167,8 @@ type DiscoverInstancesRequest struct {
 
 ### CoreDNS Integration
 ```
-production.local:53 {
-    rewrite name backend.production.local sd-backend.default.svc.cluster.local
+demo.local:53 {
+    rewrite name backend.demo.local sd-backend.default.svc.cluster.local
     kubernetes cluster.local
     forward . /etc/resolv.conf
 }

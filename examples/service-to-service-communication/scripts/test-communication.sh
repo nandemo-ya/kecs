@@ -5,7 +5,7 @@
 set -e
 
 # Configuration
-NAMESPACE_NAME="production.local"
+NAMESPACE_NAME="demo.local"
 KECS_ENDPOINT=${KECS_ENDPOINT:-"http://localhost:5373"}
 
 # Colors for output

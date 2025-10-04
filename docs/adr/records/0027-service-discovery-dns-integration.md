@@ -11,7 +11,7 @@ ECS Service Discovery (AWS Cloud Map) allows services to discover each other usi
 ### Requirements
 
 1. Support ECS Service Discovery API (CreatePrivateDnsNamespace, CreateService, etc.)
-2. Enable DNS-based service discovery (e.g., `backend-api.production.local`)
+2. Enable DNS-based service discovery (e.g., `backend-api.demo.local`)
 3. Automatic instance registration when tasks start
 4. Health checking and automatic deregistration
 5. Work within Kubernetes clusters using existing resources
@@ -47,7 +47,7 @@ KECS Service Discovery Manager
   │   └─ ClusterIP/NodePort Service (in ECS namespace)
   │
   ├─ Update CoreDNS Configuration
-  │   └─ Add zone mapping for production.local → Kubernetes plugin
+  │   └─ Add zone mapping for demo.local → Kubernetes plugin
   │
   └─ (Optional) Register in Route53
       └─ For future multi-cluster scenarios
@@ -56,9 +56,9 @@ KECS Service Discovery Manager
 ### DNS Resolution Flow
 
 ```
-Application: nslookup backend-api.production.local
+Application: nslookup backend-api.demo.local
   ↓
-CoreDNS: production.local zone → Kubernetes plugin
+CoreDNS: demo.local zone → Kubernetes plugin
   ↓
 Kubernetes: Look up "backend-api" Service in "default" namespace
   ↓
@@ -83,7 +83,7 @@ metadata:
   namespace: default  # Service Discovery namespace
   labels:
     kecs.io/service-discovery: "true"
-    kecs.io/namespace: production.local
+    kecs.io/namespace: demo.local
     kecs.io/service: backend-api
 spec:
   type: ExternalName
@@ -111,11 +111,11 @@ spec:
 #### 4. CoreDNS Configuration
 ```
 # ConfigMap: coredns-custom in kube-system
-production.local:53 {
+demo.local:53 {
     errors
     health
     ready
-    kubernetes default production.local in-addr.arpa {
+    kubernetes default demo.local in-addr.arpa {
         pods insecure
         fallthrough
     }

@@ -120,7 +120,7 @@ const htmlTemplate = `
             <li><strong>Frontend Service</strong> (this page) runs as an ECS service</li>
             <li><strong>Backend Service</strong> runs as another ECS service</li>
             <li>Both services register with <strong>Service Discovery</strong></li>
-            <li>Frontend discovers backend using DNS name: <code>backend-api.production.local</code></li>
+            <li>Frontend discovers backend using DNS name: <code>backend-api.demo.local</code></li>
             <li>No hardcoded IPs - services find each other automatically!</li>
         </ol>
         <p><strong>Note:</strong> This is running on KECS (Kubernetes-based ECS), not AWS!</p>
@@ -144,7 +144,7 @@ func main() {
 	backendURL := os.Getenv("BACKEND_URL")
 	if backendURL == "" {
 		// Default to service discovery DNS name
-		backendURL = "http://backend-api.production.local:8080"
+		backendURL = "http://backend-api.demo.local:8080"
 	}
 
 	hostname, err := os.Hostname()

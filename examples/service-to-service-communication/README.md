@@ -19,7 +19,7 @@ This demo demonstrates service-to-service communication where:
 - **Frontend Web Service** (`frontend-web`): 
   - Web UI running on port 3000
   - Has a button to call the backend API
-  - Discovers backend via DNS: `backend-api.production.local:8080`
+  - Discovers backend via DNS: `backend-api.demo.local:8080`
   - Displays the backend response in the UI
 
 - **Service Discovery**: 
@@ -39,7 +39,7 @@ This demo demonstrates service-to-service communication where:
 │                    Frontend Service                      │
 │                  (frontend-web:3000)                     │
 │                                                          │
-│  Discovers backend via: backend-api.production.local    │
+│  Discovers backend via: backend-api.demo.local    │
 └────────────────────┬────────────────────────────────────┘
                      │
                      ▼ Service Discovery DNS
@@ -114,7 +114,7 @@ docker push localhost:5000/kecs-example-frontend:latest
 
 This script will:
 - Create ECS cluster (if not exists)
-- Create Service Discovery namespace `production.local`
+- Create Service Discovery namespace `demo.local`
 - Register both services in Service Discovery
 - Deploy ECS task definitions
 - Create ECS services with service registry configuration
@@ -146,9 +146,9 @@ Click the "Call Backend Service" button to test service-to-service communication
 ### What Happens When You Click "Call Backend Service"
 
 1. Frontend receives the button click
-2. Frontend resolves `backend-api.production.local` using Service Discovery
+2. Frontend resolves `backend-api.demo.local` using Service Discovery
 3. DNS returns IP addresses of healthy backend instances
-4. Frontend makes HTTP request to `http://backend-api.production.local:8080/api/data`
+4. Frontend makes HTTP request to `http://backend-api.demo.local:8080/api/data`
 5. Backend responds with JSON data
 6. Frontend displays the response in the UI
 
@@ -161,8 +161,8 @@ Services are accessible via DNS names in the format:
 <service-name>.<namespace>:<port>
 ```
 
-- Backend: `backend-api.production.local:8080`
-- Frontend: `frontend-web.production.local:3000`
+- Backend: `backend-api.demo.local:8080`
+- Frontend: `frontend-web.demo.local:3000`
 
 ### How It Works
 
@@ -201,7 +201,7 @@ aws ecs create-cluster \
 
 ```bash
 aws servicediscovery create-private-dns-namespace \
-  --name production.local \
+  --name demo.local \
   --vpc vpc-default \
   --region us-east-1 --endpoint-url $KECS_ENDPOINT
 ```
@@ -211,7 +211,7 @@ aws servicediscovery create-private-dns-namespace \
 ```bash
 # Get namespace ID
 NAMESPACE_ID=$(aws servicediscovery list-namespaces \
-  --query "Namespaces[?Name=='production.local'].Id" \
+  --query "Namespaces[?Name=='demo.local'].Id" \
   --output text \
   --region us-east-1 --endpoint-url $KECS_ENDPOINT)
 
@@ -284,13 +284,13 @@ aws ecs create-service \
 ```bash
 # Discover backend instances
 aws servicediscovery discover-instances \
-  --namespace-name production.local \
+  --namespace-name demo.local \
   --service-name backend-api \
   --region us-east-1 --endpoint-url $KECS_ENDPOINT
 
 # Discover frontend instances
 aws servicediscovery discover-instances \
-  --namespace-name production.local \
+  --namespace-name demo.local \
   --service-name frontend-web \
   --region us-east-1 --endpoint-url $KECS_ENDPOINT
 ```
@@ -302,8 +302,8 @@ aws servicediscovery discover-instances \
 kubectl exec -it <pod-name> -- sh
 
 # Test DNS resolution
-nslookup backend-api.production.local
-curl http://backend-api.production.local:8080/api/data
+nslookup backend-api.demo.local
+curl http://backend-api.demo.local:8080/api/data
 ```
 
 ## Monitoring
@@ -322,10 +322,10 @@ kubectl logs -l app=frontend-web -f
 
 ```bash
 # Backend health
-curl http://backend-api.production.local:8080/health
+curl http://backend-api.demo.local:8080/health
 
 # Frontend health
-curl http://frontend-web.production.local:3000/health
+curl http://frontend-web.demo.local:3000/health
 ```
 
 ## Cleanup
@@ -353,7 +353,7 @@ Remove all resources:
 3. Check instances are healthy:
    ```bash
    aws servicediscovery discover-instances \
-     --namespace-name production.local \
+     --namespace-name demo.local \
      --service-name backend-api \
      --region us-east-1 --endpoint-url $KECS_ENDPOINT
    ```

@@ -28,7 +28,7 @@
         },
         {
           "name": "BACKEND_URL",
-          "value": "http://backend-api.production.local:8080"
+          "value": "http://backend-api.demo.local:8080"
         }
       ],
       "healthCheck": {
