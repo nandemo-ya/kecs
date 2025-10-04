@@ -185,11 +185,19 @@ func main() {
 		// Frontend is always healthy if it can respond
 		// Backend status is informational only
 		w.WriteHeader(http.StatusOK)
-		if backendError != "" {
-			fmt.Fprintf(w, `{"status":"healthy","frontend":"ok","backend":"%s","backend_error":"%s"}`, backendStatus, backendError)
-		} else {
-			fmt.Fprintf(w, `{"status":"healthy","frontend":"ok","backend":"%s"}`, backendStatus)
+
+		// Use json.Marshal for safe JSON construction
+		response := map[string]string{
+			"status":   "healthy",
+			"frontend": "ok",
+			"backend":  backendStatus,
 		}
+		if backendError != "" {
+			response["backend_error"] = backendError
+		}
+
+		jsonResp, _ := json.Marshal(response)
+		w.Write(jsonResp)
 	})
 
 	// Main page
