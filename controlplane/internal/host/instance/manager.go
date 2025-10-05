@@ -36,7 +36,8 @@ type StartOptions struct {
 	AdditionalLocalStackServices string // Comma-separated list of additional LocalStack services
 	ApiPort                      int
 	AdminPort                    int
-	KubePort                     int // Kubernetes API server port (0 for auto-assign)
+	KubePort                     int  // Kubernetes API server port (0 for auto-assign)
+	TestMode                     bool // Enable test mode (uses mock cluster)
 }
 
 // CreationStatus represents the status of instance creation
@@ -109,6 +110,9 @@ func (m *Manager) GetCreationStatus(instanceName string) *CreationStatus {
 
 // Start starts a KECS instance with the given options
 func (m *Manager) Start(ctx context.Context, opts *StartOptions) error {
+	// Set test mode in k3d manager config
+	m.k3dManager.SetTestMode(opts.TestMode)
+
 	// Generate instance name if not provided
 	if opts.InstanceName == "" {
 		opts.InstanceName = generateInstanceName()

@@ -45,6 +45,7 @@ var (
 	startConfigFile              string
 	startAdditionalLocalServices string
 	startTimeout                 time.Duration
+	startTestMode                bool
 )
 
 var startCmd = &cobra.Command{
@@ -65,6 +66,7 @@ func init() {
 	startCmd.Flags().StringVar(&startConfigFile, "config", "", "Configuration file path")
 	startCmd.Flags().StringVar(&startAdditionalLocalServices, "additional-localstack-services", "", "Additional LocalStack services (comma-separated, e.g., s3,dynamodb,sqs)")
 	startCmd.Flags().DurationVar(&startTimeout, "timeout", 10*time.Minute, "Timeout for cluster creation")
+	startCmd.Flags().BoolVar(&startTestMode, "test-mode", false, "Enable test mode (uses mock cluster instead of real k3d cluster)")
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
@@ -102,6 +104,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		AdditionalLocalStackServices: startAdditionalLocalServices,
 		ApiPort:                      startApiPort,
 		AdminPort:                    startAdminPort,
+		TestMode:                     startTestMode,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), startTimeout)
