@@ -106,6 +106,11 @@ func (k *K3dClusterManager) SetEnableRegistry(enable bool) {
 	k.config.EnableRegistry = enable
 }
 
+// SetTestMode sets the test mode flag for the cluster manager
+func (k *K3dClusterManager) SetTestMode(testMode bool) {
+	k.config.TestMode = testMode
+}
+
 // SetVolumeMounts sets the volume mounts for the cluster
 func (k *K3dClusterManager) SetVolumeMounts(mounts []VolumeMount) {
 	k.config.VolumeMounts = mounts
@@ -119,7 +124,7 @@ func (k *K3dClusterManager) AddVolumeMount(mount VolumeMount) {
 // StartClusterWithPorts starts a previously stopped k3d cluster with port mappings
 func (k *K3dClusterManager) StartClusterWithPorts(ctx context.Context, clusterName string, portMappings map[int32]int32) error {
 	// Skip actual cluster start in CI/test mode
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+	if k.config.TestMode {
 		logging.Info("CI/TEST MODE: Simulating cluster start", "cluster", clusterName)
 		return nil
 	}
@@ -209,7 +214,7 @@ func (k *K3dClusterManager) startClusterWithWorkaroundAndPorts(ctx context.Conte
 // CreateCluster creates a new k3d cluster with optimizations based on environment
 func (k *K3dClusterManager) CreateCluster(ctx context.Context, clusterName string) error {
 	// Skip actual cluster creation in CI/test mode
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+	if k.config.TestMode {
 		logging.Info("CI/TEST MODE: Simulating cluster creation", "cluster", clusterName)
 		return nil
 	}
@@ -616,7 +621,7 @@ func (k *K3dClusterManager) createClusterStandardWithPorts(ctx context.Context, 
 // StopCluster stops a k3d cluster without deleting it
 func (k *K3dClusterManager) StopCluster(ctx context.Context, clusterName string) error {
 	// Skip actual cluster stop in CI/test mode
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+	if k.config.TestMode {
 		logging.Info("CI/TEST MODE: Simulating cluster stop", "cluster", clusterName)
 		return nil
 	}
@@ -664,7 +669,7 @@ func (k *K3dClusterManager) StopCluster(ctx context.Context, clusterName string)
 // StartCluster starts a previously stopped k3d cluster
 func (k *K3dClusterManager) StartCluster(ctx context.Context, clusterName string) error {
 	// Skip actual cluster start in CI/test mode
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+	if k.config.TestMode {
 		logging.Info("CI/TEST MODE: Simulating cluster start", "cluster", clusterName)
 		return nil
 	}
@@ -790,7 +795,7 @@ func (k *K3dClusterManager) startClusterWithWorkaround(ctx context.Context, norm
 
 func (k *K3dClusterManager) DeleteCluster(ctx context.Context, clusterName string) error {
 	// Skip actual cluster deletion in CI/test mode
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+	if k.config.TestMode {
 		logging.Info("CI/TEST MODE: Simulating cluster deletion", "cluster", clusterName)
 		return nil
 	}
@@ -883,7 +888,7 @@ func (k *K3dClusterManager) cleanupDockerNetwork(ctx context.Context, clusterNam
 // ClusterExists checks if a k3d cluster exists
 func (k *K3dClusterManager) ClusterExists(ctx context.Context, clusterName string) (bool, error) {
 	// In CI/test mode, always return false (clusters don't actually exist)
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+	if k.config.TestMode {
 		return false, nil
 	}
 
@@ -906,7 +911,7 @@ func (k *K3dClusterManager) ClusterExists(ctx context.Context, clusterName strin
 // ListClusters returns a list of all k3d clusters
 func (k *K3dClusterManager) ListClusters(ctx context.Context) ([]ClusterInfo, error) {
 	// In CI/test mode, return empty list
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+	if k.config.TestMode {
 		return []ClusterInfo{}, nil
 	}
 
@@ -935,7 +940,7 @@ func (k *K3dClusterManager) ListClusters(ctx context.Context) ([]ClusterInfo, er
 // IsClusterRunning checks if a cluster is running by examining container states
 func (k *K3dClusterManager) IsClusterRunning(ctx context.Context, clusterName string) (bool, error) {
 	// In CI/test mode, always return false (clusters don't actually run)
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+	if k.config.TestMode {
 		return false, nil
 	}
 
@@ -979,7 +984,7 @@ func (k *K3dClusterManager) IsClusterRunning(ctx context.Context, clusterName st
 // This method is used by host-side operations (TUI, kecs start command)
 func (k *K3dClusterManager) GetKubeClient(ctx context.Context, clusterName string) (kubernetes.Interface, error) {
 	// In CI/test mode, return a fake client
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+	if k.config.TestMode {
 		logging.Debug("CI/test mode detected, using fake client")
 		return fake.NewSimpleClientset(), nil
 	}
@@ -993,7 +998,7 @@ func (k *K3dClusterManager) GetKubeClient(ctx context.Context, clusterName strin
 // This method is used by host-side operations (TUI, kecs start command)
 func (k *K3dClusterManager) GetKubeConfig(ctx context.Context, clusterName string) (*rest.Config, error) {
 	// In CI/test mode, return a minimal config
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+	if k.config.TestMode {
 		return &rest.Config{
 			Host: "https://mock-cluster:6443",
 		}, nil
@@ -1007,7 +1012,7 @@ func (k *K3dClusterManager) GetKubeConfig(ctx context.Context, clusterName strin
 // WaitForClusterReady waits for a k3d cluster to be ready
 func (k *K3dClusterManager) WaitForClusterReady(ctx context.Context, clusterName string) error {
 	// In CI/test mode, immediately return success
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+	if k.config.TestMode {
 		logging.Info("CI/TEST MODE: Cluster ready", "cluster", clusterName)
 		return nil
 	}
@@ -1115,7 +1120,7 @@ func (k *K3dClusterManager) GetHostKubeconfigPath(clusterName string) string {
 // GetClusterInfo returns information about the cluster
 func (k *K3dClusterManager) GetClusterInfo(ctx context.Context, clusterName string) (*ClusterInfo, error) {
 	// In CI/test mode, return mock cluster info
-	if os.Getenv("GITHUB_ACTIONS") == "true" || os.Getenv("CI") == "true" {
+	if k.config.TestMode {
 		return &ClusterInfo{
 			Name:      clusterName,
 			Status:    "Running",
