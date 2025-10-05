@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -16,6 +18,7 @@ var (
 	kubeconfigOutputPath string
 	kubeconfigRaw        bool
 	kubeconfigHostAccess bool
+	kubeconfigListFormat string
 )
 
 // kubeconfigCmd represents the kubeconfig command
@@ -69,13 +72,17 @@ Examples:
 
 // listKubeconfigCmd returns the list subcommand
 func listKubeconfigCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List available KECS clusters",
 		Long:  `List all KECS clusters that have corresponding k3d clusters.`,
 		Args:  cobra.NoArgs,
 		RunE:  runListKubeconfig,
 	}
+
+	cmd.Flags().StringVarP(&kubeconfigListFormat, "format", "f", "table", "Output format: table, json, yaml")
+
+	return cmd
 }
 
 // runGetKubeconfig handles the get subcommand
@@ -191,13 +198,49 @@ func runListKubeconfig(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if len(kecsClusters) == 0 {
+	if len(kecsClusters) == 0 && kubeconfigListFormat == "table" {
 		fmt.Fprintln(cmd.OutOrStdout(), "No KECS clusters found")
 		return nil
 	}
 
+	// Output based on format
+	switch strings.ToLower(kubeconfigListFormat) {
+	case "json":
+		return outputKubeconfigListJSON(kecsClusters)
+	case "yaml":
+		return outputKubeconfigListYAML(kecsClusters)
+	case "table":
+		return outputKubeconfigListTable(cmd, kecsClusters)
+	default:
+		return fmt.Errorf("unsupported format: %s (supported: table, json, yaml)", kubeconfigListFormat)
+	}
+}
+
+func outputKubeconfigListJSON(clusters []string) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(clusters); err != nil {
+		return fmt.Errorf("failed to encode JSON: %w", err)
+	}
+	return nil
+}
+
+func outputKubeconfigListYAML(clusters []string) error {
+	encoder := yaml.NewEncoder(os.Stdout)
+	encoder.SetIndent(2)
+	if err := encoder.Encode(clusters); err != nil {
+		return fmt.Errorf("failed to encode YAML: %w", err)
+	}
+	return nil
+}
+
+func outputKubeconfigListTable(cmd *cobra.Command, clusters []string) error {
+	if len(clusters) == 0 {
+		return nil
+	}
+
 	fmt.Fprintln(cmd.OutOrStdout(), "Available KECS clusters:")
-	for _, cluster := range kecsClusters {
+	for _, cluster := range clusters {
 		fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", cluster)
 	}
 
