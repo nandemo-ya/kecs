@@ -62,6 +62,32 @@ jobs:
         kubectl cluster-info
         kubectl get pods -n kecs-system
 
+        # Wait for KECS controlplane to be fully ready
+        echo "Waiting for KECS controlplane to be ready..."
+        kubectl wait --for=condition=ready pod -l app=kecs-controlplane -n kecs-system --timeout=120s || true
+
+        # Additional wait for API to be fully initialized
+        echo "Waiting for KECS API to be ready..."
+        sleep 10
+
+        # Verify API is responding
+        for i in {1..30}; do
+          echo "Attempt $i: Testing ECS API endpoint..."
+          if aws ecs list-clusters --no-cli-pager 2>&1 | grep -q "clusterArns"; then
+            echo "✅ KECS API is ready"
+            break
+          else
+            if [ $i -eq 30 ]; then
+              echo "❌ KECS API did not become ready in time"
+              echo "Checking KECS logs..."
+              kubectl logs -n kecs-system -l app=kecs-controlplane --tail=50 || true
+              exit 1
+            fi
+            echo "Waiting for API to be ready..."
+            sleep 2
+          fi
+        done
+
     - name: Create ECS Cluster
       run: |
         # Create cluster
