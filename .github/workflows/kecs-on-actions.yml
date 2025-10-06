@@ -276,4 +276,4 @@ jobs:
       uses: nandemo-ya/kecs-action/cleanup@v1
       with:
         instance-name: ${{ steps.kecs.outputs.instance-name }}
-        collect-logs: ${{ failure() }}
+        collect-logs: ${{ failure() && 'true' || 'false' }}
