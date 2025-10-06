@@ -78,6 +78,7 @@ export default defineConfig({
         {
           text: 'Integration',
           items: [
+            { text: 'GitHub Actions', link: '/guides/github-actions' },
             { text: 'LocalStack Integration', link: '/guides/localstack-integration' }
           ]
         },
