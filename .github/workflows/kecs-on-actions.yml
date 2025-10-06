@@ -31,6 +31,39 @@ jobs:
         instance-name: actions-test
         debug: ${{ inputs.debug }}
 
+    - name: Debug KECS Setup
+      run: |
+        echo "=== KECS Setup Outputs ==="
+        echo "Instance: ${{ steps.kecs.outputs.instance-name }}"
+        echo "Endpoint: ${{ steps.kecs.outputs.endpoint }}"
+        echo "Admin: ${{ steps.kecs.outputs.admin-endpoint }}"
+        echo "Kubeconfig: ${{ steps.kecs.outputs.kubeconfig }}"
+
+        echo ""
+        echo "=== Environment Variables ==="
+        echo "AWS_ENDPOINT_URL: $AWS_ENDPOINT_URL"
+        echo "KUBECONFIG: $KUBECONFIG"
+
+        echo ""
+        echo "=== k3d Clusters ==="
+        k3d cluster list || echo "k3d not found or no clusters"
+
+        echo ""
+        echo "=== Docker Containers ==="
+        docker ps -a | grep -E "kecs|k3d" || echo "No KECS/k3d containers found"
+
+        echo ""
+        echo "=== Kubernetes Namespaces ==="
+        kubectl get namespaces || echo "kubectl failed"
+
+        echo ""
+        echo "=== Pods in kecs-system ==="
+        kubectl get pods -n kecs-system -o wide || echo "No kecs-system namespace or pods"
+
+        echo ""
+        echo "=== All Pods ==="
+        kubectl get pods --all-namespaces || echo "kubectl failed"
+
     - name: Configure AWS CLI
       run: |
         # Set dummy AWS credentials for KECS testing
