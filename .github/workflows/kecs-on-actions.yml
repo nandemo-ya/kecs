@@ -29,8 +29,6 @@ jobs:
       with:
         kecs-version: ${{ inputs.kecs_version }}
         instance-name: actions-test
-        api-port: 8080
-        admin-port: 8081
         debug: ${{ inputs.debug }}
 
     - name: Configure AWS CLI
