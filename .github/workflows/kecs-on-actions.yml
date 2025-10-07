@@ -79,10 +79,10 @@ jobs:
     - name: Create ECS Cluster
       run: |
         # Create cluster
-        aws ecs create-cluster --cluster-name default
+        aws ecs create-cluster --cluster-name default --region us-east-1
 
         # List clusters
-        aws ecs list-clusters
+        aws ecs list-clusters --region us-east-1
 
         # Wait for namespace creation
         echo "Waiting for namespace creation..."
@@ -97,10 +97,11 @@ jobs:
       run: |
         # Register nginx task definition
         aws ecs register-task-definition \
-          --cli-input-json file://examples/single-task-nginx/task_def.json
+          --cli-input-json file://examples/single-task-nginx/task_def.json \
+          --region us-east-1
 
         # List task definitions
-        aws ecs list-task-definitions
+        aws ecs list-task-definitions --region us-east-1
 
     - name: Run Task
       run: |
@@ -118,7 +119,7 @@ jobs:
         # Run the task with FARGATE (as originally designed)
         echo "=== Running ECS task ==="
         # First, check if the task definition exists
-        aws ecs describe-task-definition --task-definition single-task-nginx:1 || echo "Task definition not found"
+        aws ecs describe-task-definition --task-definition single-task-nginx:1 --region us-east-1 || echo "Task definition not found"
 
         # Try running task with FARGATE and minimal network config
         # Note: Connection close error is expected but tasks are still created
@@ -126,7 +127,8 @@ jobs:
           --cluster default \
           --task-definition single-task-nginx:1 \
           --launch-type FARGATE \
-          --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],assignPublicIp=ENABLED}" 2>&1) || {
+          --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],assignPublicIp=ENABLED}" \
+          --region us-east-1 2>&1) || {
             echo "RunTask API call failed (this is expected due to connection close)"
             echo "Output: $TASK_OUTPUT"
 
@@ -162,13 +164,13 @@ jobs:
 
         # List running tasks via ECS API
         echo "=== Listing tasks via ECS API ==="
-        aws ecs list-tasks --cluster default || echo "Failed to list tasks"
+        aws ecs list-tasks --cluster default --region us-east-1 || echo "Failed to list tasks"
 
         # Describe tasks to check status
-        TASK_ARNS=$(aws ecs list-tasks --cluster default --query 'taskArns' --output text 2>/dev/null || echo "")
+        TASK_ARNS=$(aws ecs list-tasks --cluster default --query 'taskArns' --output text --region us-east-1 2>/dev/null || echo "")
         if [ ! -z "$TASK_ARNS" ]; then
           echo "=== Describing tasks ==="
-          aws ecs describe-tasks --cluster default --tasks $TASK_ARNS
+          aws ecs describe-tasks --cluster default --tasks $TASK_ARNS --region us-east-1
         else
           echo "No tasks found via ECS API"
         fi
@@ -223,11 +225,11 @@ jobs:
 
         # List services
         echo "=== Listing services ==="
-        aws ecs list-services --cluster default || echo "Failed to list services"
+        aws ecs list-services --cluster default --region us-east-1 || echo "Failed to list services"
 
         # Describe service if it exists
         echo "=== Describing service ==="
-        aws ecs describe-services --cluster default --services single-task-nginx || echo "Failed to describe service"
+        aws ecs describe-services --cluster default --services single-task-nginx --region us-east-1 || echo "Failed to describe service"
 
         # Check for Kubernetes deployment/service resources
         echo "=== Checking Kubernetes resources ==="
@@ -256,10 +258,10 @@ jobs:
         # ECS Resources
         echo ""
         echo "ECS Resources:"
-        CLUSTER_COUNT=$(aws ecs list-clusters --query 'clusterArns | length(@)' --output text 2>/dev/null || echo "0")
-        TASKDEF_COUNT=$(aws ecs list-task-definitions --query 'taskDefinitionArns | length(@)' --output text 2>/dev/null || echo "0")
-        TASK_COUNT=$(aws ecs list-tasks --cluster default --query 'taskArns | length(@)' --output text 2>/dev/null || echo "0")
-        SERVICE_COUNT=$(aws ecs list-services --cluster default --query 'serviceArns | length(@)' --output text 2>/dev/null || echo "0")
+        CLUSTER_COUNT=$(aws ecs list-clusters --query 'clusterArns | length(@)' --output text --region us-east-1 2>/dev/null || echo "0")
+        TASKDEF_COUNT=$(aws ecs list-task-definitions --query 'taskDefinitionArns | length(@)' --output text --region us-east-1 2>/dev/null || echo "0")
+        TASK_COUNT=$(aws ecs list-tasks --cluster default --query 'taskArns | length(@)' --output text --region us-east-1 2>/dev/null || echo "0")
+        SERVICE_COUNT=$(aws ecs list-services --cluster default --query 'serviceArns | length(@)' --output text --region us-east-1 2>/dev/null || echo "0")
 
         echo "  - Clusters: $CLUSTER_COUNT"
         echo "  - Task Definitions: $TASKDEF_COUNT"
