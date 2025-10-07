@@ -31,95 +31,50 @@ jobs:
         instance-name: actions-test
         debug: ${{ inputs.debug }}
 
-    - name: Debug KECS Setup
+    - name: Verify outputs
       run: |
-        echo "=== KECS Setup Outputs ==="
-        echo "Instance: ${{ steps.kecs.outputs.instance-name }}"
-        echo "Endpoint: ${{ steps.kecs.outputs.endpoint }}"
-        echo "Admin: ${{ steps.kecs.outputs.admin-endpoint }}"
-        echo "Kubeconfig: ${{ steps.kecs.outputs.kubeconfig }}"
-
-        echo ""
-        echo "=== Environment Variables ==="
-        echo "AWS_ENDPOINT_URL: $AWS_ENDPOINT_URL"
-        echo "KUBECONFIG: $KUBECONFIG"
-
-        echo ""
-        echo "=== k3d Clusters ==="
-        k3d cluster list || echo "k3d not found or no clusters"
-
-        echo ""
-        echo "=== Docker Containers ==="
-        docker ps -a | grep -E "kecs|k3d" || echo "No KECS/k3d containers found"
-
-        echo ""
-        echo "=== Kubernetes Namespaces ==="
-        kubectl get namespaces || echo "kubectl failed"
-
-        echo ""
-        echo "=== Pods in kecs-system ==="
-        kubectl get pods -n kecs-system -o wide || echo "No kecs-system namespace or pods"
-
-        echo ""
-        echo "=== All Pods ==="
-        kubectl get pods --all-namespaces || echo "kubectl failed"
-
-    - name: Configure AWS CLI
-      run: |
-        # Set dummy AWS credentials for KECS testing
-        # KECS doesn't require real AWS credentials
-        mkdir -p ~/.aws
-        cat > ~/.aws/credentials <<EOF
-        [default]
-        aws_access_key_id = test
-        aws_secret_access_key = test
-        EOF
-        cat > ~/.aws/config <<EOF
-        [default]
-        region = us-east-1
-        output = json
-        EOF
-
-    - name: Verify KECS Setup
-      run: |
-        # Verify environment variables are set
-        echo "AWS_ENDPOINT_URL: $AWS_ENDPOINT_URL"
-        echo "KUBECONFIG: $KUBECONFIG"
-
-        # Verify outputs
         echo "Instance name: ${{ steps.kecs.outputs.instance-name }}"
         echo "Endpoint: ${{ steps.kecs.outputs.endpoint }}"
         echo "Admin endpoint: ${{ steps.kecs.outputs.admin-endpoint }}"
+        echo "Kubeconfig: ${{ steps.kecs.outputs.kubeconfig }}"
 
-        # Check kubectl connection
+        # Check outputs are not empty
+        test -n "${{ steps.kecs.outputs.instance-name }}"
+        test -n "${{ steps.kecs.outputs.endpoint }}"
+        test -n "${{ steps.kecs.outputs.admin-endpoint }}"
+        test -n "${{ steps.kecs.outputs.kubeconfig }}"
+
+    - name: Verify environment variables
+      run: |
+        echo "AWS_ENDPOINT_URL: $AWS_ENDPOINT_URL"
+        echo "KUBECONFIG: $KUBECONFIG"
+
+        # Check environment variables are set
+        test -n "$AWS_ENDPOINT_URL"
+        test -n "$KUBECONFIG"
+
+        # Verify they match outputs
+        test "$AWS_ENDPOINT_URL" = "${{ steps.kecs.outputs.endpoint }}"
+
+    - name: Configure AWS credentials
+      run: |
+        # Configure dummy AWS credentials for local endpoint
+        export AWS_ACCESS_KEY_ID=test
+        export AWS_SECRET_ACCESS_KEY=test
+        echo "AWS_ACCESS_KEY_ID=test" >> $GITHUB_ENV
+        echo "AWS_SECRET_ACCESS_KEY=test" >> $GITHUB_ENV
+
+    - name: Test ECS API
+      run: |
+        # Test ListClusters API
+        aws ecs list-clusters --region us-east-1
+
+    - name: Test kubectl access
+      run: |
+        # Verify kubeconfig works
         kubectl cluster-info
+        kubectl get nodes
         kubectl get pods -n kecs-system
-
-        # Wait for KECS controlplane to be fully ready
-        echo "Waiting for KECS controlplane to be ready..."
-        kubectl wait --for=condition=ready pod -l app=kecs-controlplane -n kecs-system --timeout=120s || true
-
-        # Additional wait for API to be fully initialized
-        echo "Waiting for KECS API to be ready..."
-        sleep 10
-
-        # Verify API is responding
-        for i in {1..30}; do
-          echo "Attempt $i: Testing ECS API endpoint..."
-          if aws ecs list-clusters --no-cli-pager 2>&1 | grep -q "clusterArns"; then
-            echo "✅ KECS API is ready"
-            break
-          else
-            if [ $i -eq 30 ]; then
-              echo "❌ KECS API did not become ready in time"
-              echo "Checking KECS logs..."
-              kubectl logs -n kecs-system -l app=kecs-controlplane --tail=50 || true
-              exit 1
-            fi
-            echo "Waiting for API to be ready..."
-            sleep 2
-          fi
-        done
 
     - name: Create ECS Cluster
       run: |
