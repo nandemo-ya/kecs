@@ -3,8 +3,8 @@ name: KECS on Actions
 on:
   workflow_dispatch:
     inputs:
-      kecs_image_tag:
-        description: 'KECS Docker image tag'
+      kecs_version:
+        description: 'KECS version to install'
         required: false
         default: 'latest'
         type: string
@@ -14,305 +14,124 @@ on:
         default: false
         type: boolean
 
-env:
-  KECS_IMAGE: ghcr.io/nandemo-ya/kecs
-  CLUSTER_NAME: actions-test
-
 jobs:
   e2e-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
-    - name: Install kubectl
+
+    - name: Setup KECS
+      uses: nandemo-ya/kecs-action@v1
+      id: kecs
+      with:
+        kecs-version: ${{ inputs.kecs_version }}
+        instance-name: actions-test
+        debug: ${{ inputs.debug }}
+
+    - name: Verify outputs
       run: |
-        # Detect architecture
-        ARCH=$(uname -m)
-        case $ARCH in
-          x86_64)
-            KUBECTL_ARCH="amd64"
-            ;;
-          aarch64|arm64)
-            KUBECTL_ARCH="arm64"
-            ;;
-          *)
-            echo "Unsupported architecture: $ARCH"
-            exit 1
-            ;;
-        esac
-        
-        # Download kubectl for the detected architecture
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${KUBECTL_ARCH}/kubectl"
-        chmod +x kubectl
-        sudo mv kubectl /usr/local/bin/
-        kubectl version --client
-    
-    - name: Install k3d
+        echo "Instance name: ${{ steps.kecs.outputs.instance-name }}"
+        echo "Endpoint: ${{ steps.kecs.outputs.endpoint }}"
+        echo "Admin endpoint: ${{ steps.kecs.outputs.admin-endpoint }}"
+        echo "Kubeconfig: ${{ steps.kecs.outputs.kubeconfig }}"
+
+        # Check outputs are not empty
+        test -n "${{ steps.kecs.outputs.instance-name }}"
+        test -n "${{ steps.kecs.outputs.endpoint }}"
+        test -n "${{ steps.kecs.outputs.admin-endpoint }}"
+        test -n "${{ steps.kecs.outputs.kubeconfig }}"
+
+    - name: Verify environment variables
       run: |
-        # Detect architecture and install k3d binary
-        ARCH=$(uname -m)
-        case $ARCH in
-          x86_64)
-            K3D_ARCH="amd64"
-            ;;
-          aarch64|arm64)
-            K3D_ARCH="arm64"
-            ;;
-          *)
-            echo "Unsupported architecture: $ARCH"
-            exit 1
-            ;;
-        esac
-        
-        # Download k3d for the detected architecture
-        curl -s -L https://github.com/k3d-io/k3d/releases/download/v5.4.6/k3d-linux-${K3D_ARCH} -o /tmp/k3d
-        chmod +x /tmp/k3d
-        sudo mv /tmp/k3d /usr/local/bin/k3d
-        k3d version
-    
-    
-    - name: Configure AWS CLI
+        echo "AWS_ENDPOINT_URL: $AWS_ENDPOINT_URL"
+        echo "KUBECONFIG: $KUBECONFIG"
+
+        # Check environment variables are set
+        test -n "$AWS_ENDPOINT_URL"
+        test -n "$KUBECONFIG"
+
+        # Verify they match outputs
+        test "$AWS_ENDPOINT_URL" = "${{ steps.kecs.outputs.endpoint }}"
+
+    - name: Configure AWS credentials
       run: |
-        # Set dummy AWS credentials for KECS testing
-        # KECS doesn't require real AWS credentials
-        mkdir -p ~/.aws
-        cat > ~/.aws/credentials <<EOF
-        [default]
-        aws_access_key_id = test
-        aws_secret_access_key = test
-        EOF
-        cat > ~/.aws/config <<EOF
-        [default]
-        region = us-east-1
-        output = json
-        EOF
-    
-    - name: Verify AWS CLI
+        # Configure dummy AWS credentials for local endpoint
+        export AWS_ACCESS_KEY_ID=test
+        export AWS_SECRET_ACCESS_KEY=test
+        echo "AWS_ACCESS_KEY_ID=test" >> $GITHUB_ENV
+        echo "AWS_SECRET_ACCESS_KEY=test" >> $GITHUB_ENV
+
+    - name: Test ECS API
       run: |
-        # AWS CLI is pre-installed on GitHub Actions Ubuntu runners
-        aws --version
-    
-    - name: Build KECS
+        # Test ListClusters API
+        aws ecs list-clusters --region us-east-1
+
+    - name: Test kubectl access
       run: |
-        # Build KECS binary
-        echo "Building KECS binary..."
-        cd controlplane
-        go build -o ../bin/kecs ./cmd/controlplane
-        cd ..
-        
-        # Verify binary was built
-        ls -la bin/kecs
-        ./bin/kecs version || true
-        
-        # TODO: In the future, download pre-built binary from GitHub Packages instead of building
-        # This will speed up the workflow and ensure consistency across runs
-        # Example: gh release download --repo nandemo-ya/kecs --pattern 'kecs-linux-amd64'
-    
-    - name: Start KECS
-      run: |
-        # Use kecs start command to create k3d cluster and deploy all components
-        echo "Starting KECS with k3d cluster..."
-        
-        # Temporarily clear CI environment variables only for kecs start
-        # to avoid mock-cluster mode
-        env -u GITHUB_ACTIONS -u CI ./bin/kecs start \
-          --instance ${{ env.CLUSTER_NAME }} \
-          --api-port 8080 \
-          --admin-port 8081
-        
-        # Wait for KECS to be ready
-        echo "Waiting for KECS to be ready..."
-        sleep 30
-        
-        # Check if cluster was created
-        echo "=== k3d clusters ==="
-        k3d cluster list
-        
-        # Get kubeconfig using kecs command
-        echo "=== Getting kubeconfig ==="
-        if ./bin/kecs kubeconfig get ${{ env.CLUSTER_NAME }} > /tmp/kubeconfig.tmp 2>/dev/null; then
-          mv /tmp/kubeconfig.tmp /tmp/kubeconfig
-          echo "Successfully got kubeconfig with kecs command"
-        else
-          echo "Failed to get kubeconfig with kecs, trying k3d directly..."
-          k3d kubeconfig get kecs-${{ env.CLUSTER_NAME }} > /tmp/kubeconfig
-        fi
-        export KUBECONFIG=/tmp/kubeconfig
-        
-        # Verify kubeconfig is valid
-        echo "=== Verifying kubeconfig ==="
-        cat /tmp/kubeconfig | head -20
-        
-        # Test kubectl connection
-        echo "=== Testing kubectl ==="
-        kubectl version --client || echo "kubectl client version check failed"
-        kubectl cluster-info || echo "kubectl connection failed"
-        
-        # Verify cluster is ready
-        echo "=== Cluster nodes ==="
-        kubectl get nodes
-        
-        # Check all pods
-        echo "=== All pods ==="
-        kubectl get pods --all-namespaces
-        
-        # Check ConfigMap for controlplane
-        echo "=== KECS ConfigMap ==="
-        kubectl get configmap -n kecs-system kecs-config -o yaml | head -50
-        
-        # Wait for KECS components to be ready
-        echo "Waiting for KECS components to be ready..."
-        kubectl wait --for=condition=ready pod -l app=kecs-controlplane -n kecs-system --timeout=120s || true
-        kubectl wait --for=condition=ready pod -l app=localstack -n kecs-system --timeout=120s || true
-        
-        # Get controlplane pod logs to check startup
-        echo "=== KECS Controlplane startup logs ==="
-        kubectl logs -n kecs-system -l app=kecs-controlplane --tail=30 || true
-        
-        # Check KECS services
-        echo "=== KECS services ==="
-        kubectl get services -n kecs-system
-        
-        # Wait a bit more for services to be fully ready
-        echo "Waiting for KECS services to be fully ready..."
-        sleep 10
-        
-        # Check if ports are listening
-        echo "=== Checking listening ports ==="
-        netstat -tln | grep -E "8080|8081" || echo "Ports not found with netstat"
-        ss -tln | grep -E "8080|8081" || echo "Ports not found with ss"
-        
-        # Health check with retry
-        echo "=== Testing health endpoint ==="
-        for i in {1..10}; do
-          if curl -s http://localhost:8081/health; then
-            echo "Health check successful"
-            break
-          else
-            echo "Health check attempt $i failed, retrying..."
-            sleep 3
-          fi
-        done
-        
-        # Show final status
-        echo "=== Final KECS status ==="
-        kubectl get pods -n kecs-system
-        kubectl get services -n kecs-system
-        
-        # Verify API endpoint is accessible
-        echo "Testing ECS API endpoint..."
-        # First test if port is open
-        nc -zv localhost 8080 || echo "Port 8080 not open"
-        
-        # Test with verbose curl to see what's happening
-        curl -v -X POST http://localhost:8080/ \
-          -H "Content-Type: application/x-amz-json-1.1" \
-          -H "X-Amz-Target: AmazonEC2ContainerServiceV20141113.ListClusters" \
-          -d '{}' 2>&1 | head -20
-        
-        # Alternative test using AWS CLI directly
-        echo "Testing with AWS CLI..."
-        export AWS_ENDPOINT_URL=http://localhost:8080
-        aws ecs list-clusters --no-cli-pager || echo "AWS CLI test failed"
-    
-    - name: Verify Kubernetes Resources
-      run: |
-        # Use the kubeconfig from the KECS cluster
-        export KUBECONFIG=/tmp/kubeconfig
-        
-        # Test connection to cluster
-        echo "=== Testing cluster connection ==="
+        # Verify kubeconfig works
         kubectl cluster-info
-        
-        # List all pods across all namespaces
-        echo ""
-        echo "=== All Pods in All Namespaces ==="
-        kubectl get pods --all-namespaces
-        
-        # Check KECS pods status
-        echo ""
-        echo "=== KECS Pods Status ==="
+        kubectl get nodes
         kubectl get pods -n kecs-system
-        
-        # Check LocalStack pod status
-        echo ""
-        echo "=== LocalStack Pod Status ==="
-        kubectl get pods -n kecs-system -l app=localstack
-        
-        # Show KECS controlplane logs
-        echo ""
-        echo "=== KECS Controlplane Logs ==="
-        kubectl logs -n kecs-system -l app=kecs-controlplane --tail=20 || echo "No controlplane logs found"
-    
+
     - name: Create ECS Cluster
       run: |
-        # Use the kubeconfig from the KECS cluster
-        export KUBECONFIG=/tmp/kubeconfig
-        export AWS_ENDPOINT_URL=http://localhost:8080
-        
         # Create cluster
-        aws ecs create-cluster --cluster-name default
-        
+        aws ecs create-cluster --cluster-name default --region us-east-1
+
         # List clusters
-        aws ecs list-clusters
-        
+        aws ecs list-clusters --region us-east-1
+
         # Wait for namespace creation
         echo "Waiting for namespace creation..."
         sleep 5
-        
+
         # Check if default-us-east-1 namespace was created
         echo ""
         echo "=== Checking for ECS cluster namespace ==="
         kubectl get namespace default-us-east-1 || echo "Warning: Namespace 'default-us-east-1' not found"
-    
+
     - name: Register Task Definition
       run: |
-        # Set kubeconfig from previous step
-        export KUBECONFIG=/tmp/kubeconfig
-        export AWS_ENDPOINT_URL=http://localhost:8080
-        
         # Register nginx task definition
         aws ecs register-task-definition \
-          --cli-input-json file://examples/single-task-nginx/task_def.json
-        
+          --cli-input-json file://examples/single-task-nginx/task_def.json \
+          --region us-east-1
+
         # List task definitions
-        aws ecs list-task-definitions
-    
+        aws ecs list-task-definitions --region us-east-1
+
     - name: Run Task
       run: |
-        # Set kubeconfig from previous step
-        export KUBECONFIG=/tmp/kubeconfig
-        export AWS_ENDPOINT_URL=http://localhost:8080
-        
-        # Check KECS logs before running task  
+        # Check KECS logs before running task
         echo "=== KECS logs before RunTask ==="
         kubectl logs -n kecs-system -l app=kecs-controlplane --tail=20 || {
           echo "Failed to get logs, checking pod status..."
           kubectl get pods -n kecs-system
         }
-        
+
         # Check if namespace was created
         echo "=== Checking namespaces ==="
         kubectl get namespaces | grep default || echo "Failed to list namespaces"
-        
+
         # Run the task with FARGATE (as originally designed)
         echo "=== Running ECS task ==="
         # First, check if the task definition exists
-        aws ecs describe-task-definition --task-definition single-task-nginx:1 || echo "Task definition not found"
-        
+        aws ecs describe-task-definition --task-definition single-task-nginx:1 --region us-east-1 || echo "Task definition not found"
+
         # Try running task with FARGATE and minimal network config
         # Note: Connection close error is expected but tasks are still created
         TASK_OUTPUT=$(aws ecs run-task \
           --cluster default \
           --task-definition single-task-nginx:1 \
           --launch-type FARGATE \
-          --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],assignPublicIp=ENABLED}" 2>&1) || {
+          --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],assignPublicIp=ENABLED}" \
+          --region us-east-1 2>&1) || {
             echo "RunTask API call failed (this is expected due to connection close)"
             echo "Output: $TASK_OUTPUT"
-            
+
             # Check if it's the connection closed error
             if echo "$TASK_OUTPUT" | grep -q "Connection was closed"; then
               echo "INFO: Connection closed error detected - this is a known issue but tasks are still created"
@@ -320,56 +139,52 @@ jobs:
               echo "WARNING: Unexpected error occurred"
             fi
         }
-        
+
         # Wait for task to be created despite the connection error
         echo "Waiting for task creation to complete..."
         sleep 15
-        
+
         # Verify that tasks were actually created
         echo "=== Verifying task creation ==="
-        
+
         # Check Kubernetes pods in the namespace (primary verification)
         POD_COUNT=$(kubectl get pods -n default-us-east-1 --no-headers 2>/dev/null | wc -l || echo "0")
         echo "Found $POD_COUNT pods in default-us-east-1 namespace"
-        
+
         if [ "$POD_COUNT" -gt 0 ]; then
           echo "✅ SUCCESS: Tasks were created successfully despite connection error"
           kubectl get pods -n default-us-east-1
         else
           echo "❌ ERROR: No pods found - tasks may not have been created"
-          
+
           # Additional debugging
           echo "=== KECS logs after RunTask attempt ==="
           kubectl logs -n kecs-system -l app=kecs-controlplane --tail=50 | grep -A5 -B5 "RunTask\|nginx" || true
         fi
-        
+
         # List running tasks via ECS API
         echo "=== Listing tasks via ECS API ==="
-        aws ecs list-tasks --cluster default || echo "Failed to list tasks"
-        
+        aws ecs list-tasks --cluster default --region us-east-1 || echo "Failed to list tasks"
+
         # Describe tasks to check status
-        TASK_ARNS=$(aws ecs list-tasks --cluster default --query 'taskArns' --output text 2>/dev/null || echo "")
+        TASK_ARNS=$(aws ecs list-tasks --cluster default --query 'taskArns' --output text --region us-east-1 2>/dev/null || echo "")
         if [ ! -z "$TASK_ARNS" ]; then
           echo "=== Describing tasks ==="
-          aws ecs describe-tasks --cluster default --tasks $TASK_ARNS
+          aws ecs describe-tasks --cluster default --tasks $TASK_ARNS --region us-east-1
         else
           echo "No tasks found via ECS API"
         fi
-        
+
         # Final status check
         if [ "$POD_COUNT" -eq 0 ]; then
           echo "ERROR: Task creation verification failed"
           exit 1
         fi
-    
+
     - name: Create Service
       run: |
-        # Set kubeconfig from previous step
-        export KUBECONFIG=/tmp/kubeconfig
-        export AWS_ENDPOINT_URL=http://localhost:8080
-        
         echo "=== Creating ECS Service ==="
-        
+
         # Create service with correct task definition reference
         cat > /tmp/service_def.json <<EOF
         {
@@ -387,15 +202,15 @@ jobs:
           }
         }
         EOF
-        
+
         echo "Service definition:"
         cat /tmp/service_def.json
-        
+
         # Create service (may also have connection issues)
         SERVICE_OUTPUT=$(aws ecs create-service --cli-input-json file:///tmp/service_def.json 2>&1) || {
           echo "CreateService API call failed"
           echo "Output: $SERVICE_OUTPUT"
-          
+
           # Check if it's the connection closed error
           if echo "$SERVICE_OUTPUT" | grep -q "Connection was closed"; then
             echo "INFO: Connection closed error detected - checking if service was created anyway"
@@ -403,55 +218,32 @@ jobs:
             echo "WARNING: Unexpected error occurred"
           fi
         }
-        
+
         # Wait for service processing
         echo "Waiting for service creation to complete..."
         sleep 10
-        
+
         # List services
         echo "=== Listing services ==="
-        aws ecs list-services --cluster default || echo "Failed to list services"
-        
+        aws ecs list-services --cluster default --region us-east-1 || echo "Failed to list services"
+
         # Describe service if it exists
         echo "=== Describing service ==="
-        aws ecs describe-services --cluster default --services single-task-nginx || echo "Failed to describe service"
-        
+        aws ecs describe-services --cluster default --services single-task-nginx --region us-east-1 || echo "Failed to describe service"
+
         # Check for Kubernetes deployment/service resources
         echo "=== Checking Kubernetes resources ==="
         kubectl get deployments -n default-us-east-1 || echo "No deployments found"
         kubectl get services -n default-us-east-1 || echo "No services found"
         kubectl get pods -n default-us-east-1 || echo "No pods found"
-    
-    - name: Collect Logs on Failure
-      if: failure()
-      run: |
-        echo "=== KECS Container Logs ==="
-        docker logs kecs-server || true
-        
-        echo "=== LocalStack Container Logs ==="
-        docker logs localstack 2>/dev/null || true
-        
-        echo "=== Kubernetes Pods ==="
-        kubectl get pods -n default 2>/dev/null || true
-        kubectl get pods -n kecs-system 2>/dev/null || true
-        
-        echo "=== Docker Containers ==="
-        docker ps -a
-        
-        echo "=== k3d Clusters ==="
-        k3d cluster list || true
-    
+
     - name: Test Summary
       if: success()
       run: |
-        # Set kubeconfig from previous step
-        export KUBECONFIG=/tmp/kubeconfig
-        export AWS_ENDPOINT_URL=http://localhost:8080
-        
         echo "================================================"
         echo "          KECS E2E TEST SUMMARY"
         echo "================================================"
-        
+
         echo ""
         echo "✅ Test Results:"
         echo "  - KECS cluster creation: SUCCESS"
@@ -459,23 +251,23 @@ jobs:
         echo "  - Task definition registration: SUCCESS"
         echo "  - Task execution: SUCCESS (with known connection issue)"
         echo "  - Service creation: CHECK RESULTS ABOVE"
-        
+
         echo ""
         echo "📊 Resource Status:"
-        
+
         # ECS Resources
         echo ""
         echo "ECS Resources:"
-        CLUSTER_COUNT=$(aws ecs list-clusters --query 'clusterArns | length(@)' --output text 2>/dev/null || echo "0")
-        TASKDEF_COUNT=$(aws ecs list-task-definitions --query 'taskDefinitionArns | length(@)' --output text 2>/dev/null || echo "0")
-        TASK_COUNT=$(aws ecs list-tasks --cluster default --query 'taskArns | length(@)' --output text 2>/dev/null || echo "0")
-        SERVICE_COUNT=$(aws ecs list-services --cluster default --query 'serviceArns | length(@)' --output text 2>/dev/null || echo "0")
-        
+        CLUSTER_COUNT=$(aws ecs list-clusters --query 'clusterArns | length(@)' --output text --region us-east-1 2>/dev/null || echo "0")
+        TASKDEF_COUNT=$(aws ecs list-task-definitions --query 'taskDefinitionArns | length(@)' --output text --region us-east-1 2>/dev/null || echo "0")
+        TASK_COUNT=$(aws ecs list-tasks --cluster default --query 'taskArns | length(@)' --output text --region us-east-1 2>/dev/null || echo "0")
+        SERVICE_COUNT=$(aws ecs list-services --cluster default --query 'serviceArns | length(@)' --output text --region us-east-1 2>/dev/null || echo "0")
+
         echo "  - Clusters: $CLUSTER_COUNT"
         echo "  - Task Definitions: $TASKDEF_COUNT"
         echo "  - Running Tasks: $TASK_COUNT"
         echo "  - Services: $SERVICE_COUNT"
-        
+
         # Kubernetes Resources
         echo ""
         echo "Kubernetes Resources:"
@@ -483,20 +275,28 @@ jobs:
         POD_COUNT=$(kubectl get pods -n default-us-east-1 --no-headers 2>/dev/null | wc -l || echo "0")
         DEPLOY_COUNT=$(kubectl get deployments -n default-us-east-1 --no-headers 2>/dev/null | wc -l || echo "0")
         SVC_COUNT=$(kubectl get services -n default-us-east-1 --no-headers 2>/dev/null | wc -l || echo "0")
-        
+
         echo "  - ECS Namespaces: $NS_COUNT"
         echo "  - Pods: $POD_COUNT"
         echo "  - Deployments: $DEPLOY_COUNT"
         echo "  - Services: $SVC_COUNT"
-        
+
         echo ""
         echo "================================================"
         echo "Note: Connection closed errors are a known issue"
         echo "but do not affect actual resource creation."
         echo "================================================"
-    
-    - name: Cleanup
-      if: always()
-      run: |
-        # Stop KECS (this will delete the k3d cluster)
-        ./bin/kecs stop --instance ${{ env.CLUSTER_NAME }} || true
+
+    - name: Cleanup KECS (with logs)
+      if: failure()
+      uses: nandemo-ya/kecs-action/cleanup@v1
+      with:
+        instance-name: ${{ steps.kecs.outputs.instance-name }}
+        collect-logs: 'true'
+
+    - name: Cleanup KECS (without logs)
+      if: success() || cancelled()
+      uses: nandemo-ya/kecs-action/cleanup@v1
+      with:
+        instance-name: ${{ steps.kecs.outputs.instance-name }}
+        collect-logs: 'false'
