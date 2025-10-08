@@ -66,7 +66,7 @@ KECS (Kubernetes-based ECS Compatible Service) provides a complete local Amazon 
 - Interactive TUI for resource management
 - Hot reload for rapid development
 
-### 🔧 Production-Ready Features
+### 🔧 Stable Features
 - PostgreSQL for reliable state persistence
 - Graceful shutdown and cleanup
 - Resource monitoring and health checks

@@ -45,8 +45,8 @@ KECS provides strong AWS service integration while remaining completely standalo
 | AWS Service | Status | Description |
 |-------------|--------|-------------|
 | **ELBv2** (Application Load Balancer) | 🟡 Experimental | Target group and load balancer management |
-| **Secrets Manager** | 🟡 Experimental | Secret injection into containers |
-| **Parameter Store** | 🟡 Experimental | Parameter injection into containers |
+| **Secrets Manager** | 🟢 Stable | Secret injection into containers |
+| **Parameter Store** | 🟢 Stable | Parameter injection into containers |
 | **CloudWatch Logs** | 🟡 Experimental | Container log streaming |
 | **Cloud Map** (Service Discovery) | 🟡 Experimental | Service registry and discovery |
 | **IAM** | ⚪ Pending | Task roles and execution roles |
@@ -54,7 +54,7 @@ KECS provides strong AWS service integration while remaining completely standalo
 | **EFS** | ⚪ Pending | Elastic File System mounting |
 
 **Legend:**
-- 🟢 **Stable**: Production-ready with comprehensive testing
+- 🟢 **Stable**: Feature-complete with comprehensive testing
 - 🟡 **Experimental**: Basic functionality available, under active development
 - ⚪ **Pending**: Planned for future releases
 
