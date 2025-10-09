@@ -1,3 +1,3 @@
 module frontend
 
-go 1.21
+go 1.25.2
