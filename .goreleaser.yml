@@ -53,7 +53,7 @@ builds:
       - -X github.com/nandemo-ya/kecs/controlplane/internal/version.Version={{.Tag}}
       - -X github.com/nandemo-ya/kecs/controlplane/internal/version.GitCommit={{.Commit}}
       - -X github.com/nandemo-ya/kecs/controlplane/internal/version.BuildDate={{.Date}}
-      - -X github.com/nandemo-ya/kecs/controlplane/internal/version.GoVersion=go1.25
+      - -X github.com/nandemo-ya/kecs/controlplane/internal/version.GoVersion=go1.25.2
 
 archives:
   - id: kecs
