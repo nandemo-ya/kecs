@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
@@ -48,19 +47,7 @@ type Client struct {
 func NewClient(config Config) *Client {
 	// Set defaults
 	if config.Region == "" {
-		config.Region = getEnvOrDefault("AWS_REGION", "us-east-1")
-	}
-
-	if config.Credentials.AccessKeyID == "" {
-		config.Credentials.AccessKeyID = os.Getenv("AWS_ACCESS_KEY_ID")
-	}
-
-	if config.Credentials.SecretAccessKey == "" {
-		config.Credentials.SecretAccessKey = os.Getenv("AWS_SECRET_ACCESS_KEY")
-	}
-
-	if config.Credentials.SessionToken == "" {
-		config.Credentials.SessionToken = os.Getenv("AWS_SESSION_TOKEN")
+		config.Region = "us-east-1"
 	}
 
 	if config.MaxRetries == 0 {
@@ -187,12 +174,4 @@ func shouldRetry(statusCode int) bool {
 // GetCredentials returns the client's credentials
 func (c *Client) GetCredentials() Credentials {
 	return c.config.Credentials
-}
-
-// getEnvOrDefault returns environment variable value or default
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
