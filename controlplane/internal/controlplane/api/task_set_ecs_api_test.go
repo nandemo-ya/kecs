@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/mocks"
@@ -45,7 +46,7 @@ var _ = Describe("TaskSetEcsApi", func() {
 		mockStorage.SetTaskSetStore(mockTaskSetStore)
 		mockStorage.SetServiceStore(mockServiceStore)
 
-		ecsAPI = NewDefaultECSAPI(mockStorage)
+		ecsAPI = NewDefaultECSAPI(config.DefaultConfig(), mockStorage)
 		// Set region and accountID on the underlying DefaultECSAPI
 		if defaultAPI, ok := ecsAPI.(*DefaultECSAPI); ok {
 			defaultAPI.region = region

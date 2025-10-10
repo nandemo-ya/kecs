@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
@@ -55,7 +56,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create ECS API with generated types
-	ecsAPI := api.NewDefaultECSAPI(storage)
+	ecsAPI := api.NewDefaultECSAPI(config.DefaultConfig(), storage)
 
 	// Create mux and register routes
 	mux := http.NewServeMux()

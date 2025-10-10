@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
@@ -61,7 +62,7 @@ var _ = Describe("AWSVPC Network Mode Integration", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// Initialize ECS API for test mode
-		ecsAPI = api.NewDefaultECSAPIWithConfig(store, region, accountID).(*api.DefaultECSAPI)
+		ecsAPI = api.NewDefaultECSAPIWithConfig(config.DefaultConfig(), store, region, accountID).(*api.DefaultECSAPI)
 
 		// Create default cluster
 		_, err = ecsAPI.CreateCluster(ctx, &generated.CreateClusterRequest{

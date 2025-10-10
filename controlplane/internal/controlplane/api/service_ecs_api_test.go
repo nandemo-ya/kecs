@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/mocks"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
@@ -32,7 +33,7 @@ var _ = Describe("Service ECS API", func() {
 
 		server = &Server{
 			storage: mockStorage,
-			ecsAPI:  NewDefaultECSAPI(mockStorage),
+			ecsAPI:  NewDefaultECSAPI(config.DefaultConfig(), mockStorage),
 		}
 		ctx = context.Background()
 
