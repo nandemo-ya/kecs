@@ -10,6 +10,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 )
 
 // Program wraps the Bubble Tea program for progress tracking
@@ -310,7 +312,7 @@ func (lc *logCapture) Write(p []byte) (n int, err error) {
 	}
 
 	// Also write to original output for debugging
-	if lc.originalOut != nil && os.Getenv("KECS_DEBUG") != "" {
+	if lc.originalOut != nil && config.GetBool("features.debug") {
 		lc.originalOut.Write(p)
 	}
 

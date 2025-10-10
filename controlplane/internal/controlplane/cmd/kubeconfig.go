@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 	"k8s.io/client-go/tools/clientcmd"
@@ -93,7 +94,7 @@ func runGetKubeconfig(cmd *cobra.Command, args []string) error {
 	// If host-access is requested, try to read the pre-generated host kubeconfig
 	if kubeconfigHostAccess {
 		// Check if running in container mode by looking for KECS_DATA_DIR
-		dataDir := os.Getenv("KECS_DATA_DIR")
+		dataDir := config.GetString("server.dataDir")
 		if dataDir != "" {
 			hostKubeconfigPath := filepath.Join(dataDir, "kubeconfig", fmt.Sprintf("%s.host.config", k3dClusterName))
 			if content, err := os.ReadFile(hostKubeconfigPath); err == nil {

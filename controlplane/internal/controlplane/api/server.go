@@ -432,7 +432,8 @@ func NewServer(port int, kubeconfig string, storage storage.Storage, localStackC
 	}
 
 	// Create ECS API with integrations
-	ecsAPI := NewDefaultECSAPIWithConfig(storage, s.region, s.accountID)
+	cfg := apiconfig.GetConfig()
+	ecsAPI := NewDefaultECSAPIWithConfig(cfg, storage, s.region, s.accountID)
 	if defaultAPI, ok := ecsAPI.(*DefaultECSAPI); ok {
 		if s.serviceManager != nil {
 			defaultAPI.SetServiceManager(s.serviceManager)

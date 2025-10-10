@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -22,6 +21,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
@@ -1571,7 +1571,7 @@ func (i *K8sIntegration) SyncRulesToListener(ctx context.Context, storageInstanc
 // addK3dPortMapping adds a port mapping to the k3d cluster's load balancer
 func (i *K8sIntegration) addK3dPortMapping(ctx context.Context, clusterName string, hostPort, nodePort int32) error {
 	// Skip if running in container mode (k3d command not available)
-	if os.Getenv("KECS_CONTAINER_MODE") == "true" {
+	if config.GetBool("features.containerMode") {
 		logging.Info("Running in container mode, k3d port mapping should be pre-configured",
 			"hostPort", hostPort,
 			"nodePort", nodePort,
@@ -1654,7 +1654,7 @@ func getTraefikNodePort(listenerPort int32) int32 {
 // getClusterNameFromEnvironment gets the k3d cluster name
 func getClusterNameFromEnvironment() string {
 	// Try to get from environment variable
-	if clusterName := os.Getenv("KECS_CLUSTER_NAME"); clusterName != "" {
+	if clusterName := config.GetString("kubernetes.clusterName"); clusterName != "" {
 		return clusterName
 	}
 	// Default to "kecs-cluster"

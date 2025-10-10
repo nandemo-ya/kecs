@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/kubernetes"
 	"github.com/nandemo-ya/kecs/controlplane/internal/portforward"
 	"github.com/spf13/cobra"
@@ -34,7 +35,7 @@ func getKubeconfigPath(instanceName string) string {
 
 // getInstanceName returns the instance name from environment or default
 func getInstanceName() string {
-	instanceName := os.Getenv("KECS_INSTANCE")
+	instanceName := config.GetString("kubernetes.instanceName")
 	if instanceName == "" {
 		instanceName = "default"
 	}
@@ -147,7 +148,7 @@ var portForwardListCmd = &cobra.Command{
 	Short: "List all active port forwards",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get instance name from environment or flag
-		instanceName := os.Getenv("KECS_INSTANCE")
+		instanceName := config.GetString("kubernetes.instanceName")
 		if instanceName == "" {
 			instanceName = "default"
 		}
@@ -188,7 +189,7 @@ var portForwardStopCmd = &cobra.Command{
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get instance name from environment or flag
-		instanceName := os.Getenv("KECS_INSTANCE")
+		instanceName := config.GetString("kubernetes.instanceName")
 		if instanceName == "" {
 			instanceName = "default"
 		}

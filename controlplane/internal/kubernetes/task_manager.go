@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	"github.com/nandemo-ya/kecs/controlplane/internal/config"
+	appconfig "github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/converters"
 	"github.com/nandemo-ya/kecs/controlplane/internal/logging"
 	"github.com/nandemo-ya/kecs/controlplane/internal/servicediscovery"
@@ -48,7 +47,7 @@ func NewTaskManagerWithServiceDiscovery(storage storage.Storage, sdManager servi
 	}
 
 	// In container mode or test mode, defer kubernetes client creation
-	if config.GetBool("features.containerMode") || os.Getenv("KECS_TEST_MODE") == "true" {
+	if appconfig.GetBool("features.containerMode") || appconfig.GetBool("features.testMode") {
 		logging.Debug("Container/test mode enabled - deferring kubernetes client initialization")
 		return &TaskManager{
 			Clientset:               nil, // Will be initialized later
@@ -89,8 +88,8 @@ func NewTaskManagerWithServiceDiscovery(storage storage.Storage, sdManager servi
 	}
 
 	// Initialize K3dPortManager
-	// Get cluster name from environment or use default
-	clusterName := os.Getenv("KECS_INSTANCE_NAME")
+	// Get cluster name from config or use default
+	clusterName := appconfig.GetString("kubernetes.instanceName")
 	if clusterName == "" {
 		clusterName = "default"
 	}
@@ -107,7 +106,7 @@ func (tm *TaskManager) InitializeClient() error {
 	}
 
 	// Skip initialization in test mode
-	if os.Getenv("KECS_TEST_MODE") == "true" {
+	if appconfig.GetBool("features.testMode") {
 		logging.Debug("Test mode enabled - skipping kubernetes client initialization")
 		return nil
 	}

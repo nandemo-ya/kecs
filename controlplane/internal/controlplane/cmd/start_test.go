@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"os/exec"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 )
 
 var _ = Describe("Start Command Unit Tests", func() {
@@ -118,7 +119,7 @@ var _ = Describe("Start V2 Command Integration Tests", func() {
 
 	Describe("New Architecture Deployment", func() {
 		It("should successfully deploy all components", func() {
-			if os.Getenv("KECS_INTEGRATION_TEST") != "true" {
+			if !config.GetBool("features.integrationTest") {
 				Skip("Skipping integration test (set KECS_INTEGRATION_TEST=true to run)")
 			}
 
@@ -160,7 +161,7 @@ var _ = Describe("Start V2 Command Integration Tests", func() {
 
 	Describe("Component Health Checks", func() {
 		It("should report all components as healthy", func() {
-			if os.Getenv("KECS_INTEGRATION_TEST") != "true" {
+			if !config.GetBool("features.integrationTest") {
 				Skip("Skipping integration test (set KECS_INTEGRATION_TEST=true to run)")
 			}
 

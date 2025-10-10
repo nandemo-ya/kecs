@@ -140,11 +140,11 @@ func GetAvailableRuntimes() []string {
 	return runtimes
 }
 
-// GetPreferredRuntime returns the preferred runtime based on environment
-func GetPreferredRuntime() string {
-	// Check environment variable
-	if runtime := os.Getenv("KECS_CONTAINER_RUNTIME"); runtime != "" {
-		return runtime
+// GetPreferredRuntime returns the preferred runtime based on configuration
+func GetPreferredRuntime(containerRuntime string) string {
+	// Use configured runtime if specified
+	if containerRuntime != "" {
+		return containerRuntime
 	}
 
 	// Check if running in k3s/k3d (prefer containerd)

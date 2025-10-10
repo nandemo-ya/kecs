@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/mocks"
@@ -26,7 +27,7 @@ var _ = Describe("Cluster ECS API", func() {
 		mockStorage.SetClusterStore(mockClusterStore)
 		server = &Server{
 			storage: mockStorage,
-			ecsAPI:  NewDefaultECSAPI(mockStorage),
+			ecsAPI:  NewDefaultECSAPI(config.DefaultConfig(), mockStorage),
 		}
 		ctx = context.Background()
 	})

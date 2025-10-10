@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/cloudwatch"
 	"github.com/nandemo-ya/kecs/controlplane/internal/integrations/elbv2"
@@ -16,6 +17,7 @@ import (
 
 // DefaultECSAPI provides the default implementation of ECS API operations
 type DefaultECSAPI struct {
+	config                    *config.Config
 	storage                   storage.Storage
 	serviceManager            *kubernetes.ServiceManager
 	taskManagerInstance       *kubernetes.TaskManager
@@ -35,8 +37,9 @@ type DefaultECSAPI struct {
 }
 
 // NewDefaultECSAPI creates a new default ECS API implementation with storage
-func NewDefaultECSAPI(storage storage.Storage) generated.ECSAPIInterface {
+func NewDefaultECSAPI(cfg *config.Config, storage storage.Storage) generated.ECSAPIInterface {
 	return &DefaultECSAPI{
+		config:    cfg,
 		storage:   storage,
 		region:    "us-east-1",    // Default region
 		accountID: "000000000000", // Default account ID (LocalStack standard)
@@ -105,8 +108,9 @@ func (api *DefaultECSAPI) SetLocalStackUpdateCallback(callback func(localstack.M
 
 // NewDefaultECSAPIWithConfig creates a new default ECS API implementation with custom region and accountID
 // Deprecated: Use NewDefaultECSAPIWithClusterManager instead
-func NewDefaultECSAPIWithConfig(storage storage.Storage, region, accountID string) generated.ECSAPIInterface {
+func NewDefaultECSAPIWithConfig(cfg *config.Config, storage storage.Storage, region, accountID string) generated.ECSAPIInterface {
 	return &DefaultECSAPI{
+		config:    cfg,
 		storage:   storage,
 		region:    region,
 		accountID: accountID,

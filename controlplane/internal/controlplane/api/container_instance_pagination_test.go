@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/config"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated/ptr"
@@ -76,7 +77,7 @@ var _ = Describe("ContainerInstance Pagination", func() {
 		}
 
 		// Create ECS API instance
-		ecsAPI = api.NewDefaultECSAPIWithConfig(mockStorage, "us-east-1", "000000000000")
+		ecsAPI = api.NewDefaultECSAPIWithConfig(config.DefaultConfig(), mockStorage, "us-east-1", "000000000000")
 	})
 
 	Describe("ListContainerInstances", func() {

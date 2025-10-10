@@ -771,9 +771,11 @@ func (api *DefaultECSAPI) getKecsInstanceName() string {
 	// In the container-based deployment model, there should be a single k3d cluster
 	// that hosts the KECS control plane and all ECS clusters as namespaces
 
-	// For now, we'll use the environment variable if set
-	if instanceName := os.Getenv("KECS_INSTANCE_NAME"); instanceName != "" {
-		return instanceName
+	// For now, we'll use the configuration if set
+	if api.config != nil {
+		if instanceName := api.config.Kubernetes.InstanceName; instanceName != "" {
+			return instanceName
+		}
 	}
 
 	// Otherwise, try to detect from the current environment
