@@ -76,18 +76,10 @@ type FeaturesConfig struct {
 
 // AWSConfig represents AWS-related configuration
 type AWSConfig struct {
-	DefaultRegion string         `yaml:"defaultRegion" mapstructure:"defaultRegion"`
-	AccountID     string         `yaml:"accountID" mapstructure:"accountID"`
-	ProxyImage    string         `yaml:"proxyImage" mapstructure:"proxyImage"`
-	EndpointURL   string         `yaml:"endpointURL" mapstructure:"endpointURL"`
-	Credentials   AWSCredentials `yaml:"credentials" mapstructure:"credentials"`
-}
-
-// AWSCredentials represents AWS credentials
-type AWSCredentials struct {
-	AccessKeyID     string `yaml:"accessKeyID" mapstructure:"accessKeyID"`
-	SecretAccessKey string `yaml:"secretAccessKey" mapstructure:"secretAccessKey"`
-	SessionToken    string `yaml:"sessionToken" mapstructure:"sessionToken"`
+	DefaultRegion string `yaml:"defaultRegion" mapstructure:"defaultRegion"`
+	AccountID     string `yaml:"accountID" mapstructure:"accountID"`
+	ProxyImage    string `yaml:"proxyImage" mapstructure:"proxyImage"`
+	EndpointURL   string `yaml:"endpointURL" mapstructure:"endpointURL"`
 }
 
 var (
@@ -169,9 +161,6 @@ func InitConfig() error {
 		v.SetDefault("aws.accountID", "000000000000")
 		v.SetDefault("aws.proxyImage", "")
 		v.SetDefault("aws.endpointURL", "http://localstack.kecs-system.svc.cluster.local:4566")
-		v.SetDefault("aws.credentials.accessKeyID", "")
-		v.SetDefault("aws.credentials.secretAccessKey", "")
-		v.SetDefault("aws.credentials.sessionToken", "")
 
 		// LocalStack defaults
 		v.SetDefault("localstack.enabled", true)    // Enable LocalStack by default
@@ -203,9 +192,6 @@ func bindLegacyEnvVars() {
 	v.BindEnv("server.configPath", "KECS_CONFIG_PATH")
 	v.BindEnv("aws.defaultRegion", "KECS_DEFAULT_REGION")
 	v.BindEnv("aws.accountID", "KECS_ACCOUNT_ID")
-	v.BindEnv("aws.credentials.accessKeyID", "AWS_ACCESS_KEY_ID")
-	v.BindEnv("aws.credentials.secretAccessKey", "AWS_SECRET_ACCESS_KEY")
-	v.BindEnv("aws.credentials.sessionToken", "AWS_SESSION_TOKEN")
 	v.BindEnv("server.allowedOrigins", "KECS_ALLOWED_ORIGINS")
 	v.BindEnv("server.endpoint", "KECS_ENDPOINT")
 	v.BindEnv("kubernetes.kubeconfigPath", "KECS_KUBECONFIG_PATH")
