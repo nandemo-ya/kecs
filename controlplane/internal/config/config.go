@@ -33,6 +33,7 @@ type ServerConfig struct {
 	AllowedOrigins    []string `yaml:"allowedOrigins" mapstructure:"allowedOrigins"`
 	Endpoint          string   `yaml:"endpoint" mapstructure:"endpoint"`
 	ControlPlaneImage string   `yaml:"controlPlaneImage" mapstructure:"controlPlaneImage"`
+	ConfigPath        string   `yaml:"configPath" mapstructure:"configPath"`
 }
 
 // DatabaseConfig represents database configuration
@@ -58,6 +59,9 @@ type KubernetesConfig struct {
 	K3DAsync               bool   `yaml:"k3dAsync" mapstructure:"k3dAsync"`
 	DisableCoreDNS         bool   `yaml:"disableCoreDNS" mapstructure:"disableCoreDNS"`
 	KeepClustersOnShutdown bool   `yaml:"keepClustersOnShutdown" mapstructure:"keepClustersOnShutdown"`
+	InstanceName           string `yaml:"instanceName" mapstructure:"instanceName"`
+	ClusterName            string `yaml:"clusterName" mapstructure:"clusterName"`
+	ContainerRuntime       string `yaml:"containerRuntime" mapstructure:"containerRuntime"`
 }
 
 // FeaturesConfig represents feature toggles
@@ -66,6 +70,8 @@ type FeaturesConfig struct {
 	ContainerMode    bool `yaml:"containerMode" mapstructure:"containerMode"`
 	AutoRecoverState bool `yaml:"autoRecoverState" mapstructure:"autoRecoverState"`
 	IAMIntegration   bool `yaml:"iamIntegration" mapstructure:"iamIntegration"`
+	Debug            bool `yaml:"debug" mapstructure:"debug"`
+	IntegrationTest  bool `yaml:"integrationTest" mapstructure:"integrationTest"`
 }
 
 // AWSConfig represents AWS-related configuration
@@ -129,12 +135,17 @@ func InitConfig() error {
 		v.SetDefault("kubernetes.k3dAsync", false)
 		v.SetDefault("kubernetes.disableCoreDNS", false)
 		v.SetDefault("kubernetes.keepClustersOnShutdown", false)
+		v.SetDefault("kubernetes.instanceName", "")
+		v.SetDefault("kubernetes.clusterName", "")
+		v.SetDefault("kubernetes.containerRuntime", "")
 
 		// Features defaults
 		v.SetDefault("features.testMode", false)
 		v.SetDefault("features.containerMode", false)
 		v.SetDefault("features.autoRecoverState", true)
 		v.SetDefault("features.iamIntegration", false) // Disable IAM integration by default
+		v.SetDefault("features.debug", false)
+		v.SetDefault("features.integrationTest", false)
 
 		// Cleanup worker defaults
 		v.SetDefault("cleanup.enabled", true)
@@ -174,8 +185,11 @@ func bindLegacyEnvVars() {
 	// Direct mappings
 	v.BindEnv("features.testMode", "KECS_TEST_MODE")
 	v.BindEnv("features.containerMode", "KECS_CONTAINER_MODE")
+	v.BindEnv("features.debug", "KECS_DEBUG")
+	v.BindEnv("features.integrationTest", "KECS_INTEGRATION_TEST")
 	v.BindEnv("server.dataDir", "KECS_DATA_DIR")
 	v.BindEnv("server.logLevel", "KECS_LOG_LEVEL")
+	v.BindEnv("server.configPath", "KECS_CONFIG_PATH")
 	v.BindEnv("aws.defaultRegion", "KECS_DEFAULT_REGION")
 	v.BindEnv("aws.accountID", "KECS_ACCOUNT_ID")
 	v.BindEnv("server.allowedOrigins", "KECS_ALLOWED_ORIGINS")
@@ -185,6 +199,10 @@ func bindLegacyEnvVars() {
 	v.BindEnv("kubernetes.k3dAsync", "KECS_K3D_ASYNC")
 	v.BindEnv("kubernetes.disableCoreDNS", "KECS_DISABLE_COREDNS")
 	v.BindEnv("kubernetes.keepClustersOnShutdown", "KECS_KEEP_CLUSTERS_ON_SHUTDOWN")
+	v.BindEnv("kubernetes.instanceName", "KECS_INSTANCE")
+	v.BindEnv("kubernetes.instanceName", "KECS_INSTANCE_NAME") // Alternative name
+	v.BindEnv("kubernetes.clusterName", "KECS_CLUSTER_NAME")
+	v.BindEnv("kubernetes.containerRuntime", "KECS_CONTAINER_RUNTIME")
 	v.BindEnv("features.autoRecoverState", "KECS_AUTO_RECOVER_STATE")
 	v.BindEnv("aws.proxyImage", "KECS_AWS_PROXY_IMAGE")
 	v.BindEnv("aws.endpointURL", "AWS_ENDPOINT_URL")

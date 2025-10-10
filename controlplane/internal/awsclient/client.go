@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
@@ -44,45 +43,30 @@ type Client struct {
 	signer     *Signer
 }
 
+// NewDefaultConfig creates a new Config with sensible defaults
+func NewDefaultConfig() Config {
+	return Config{
+		Region:     "us-east-1",
+		MaxRetries: 3,
+		RetryDelay: 100 * time.Millisecond,
+		Timeout:    30 * time.Second,
+	}
+}
+
 // NewClient creates a new AWS client
 func NewClient(config Config) *Client {
-	// Set defaults
-	if config.Region == "" {
-		config.Region = getEnvOrDefault("AWS_REGION", "us-east-1")
-	}
-
-	if config.Credentials.AccessKeyID == "" {
-		config.Credentials.AccessKeyID = os.Getenv("AWS_ACCESS_KEY_ID")
-	}
-
-	if config.Credentials.SecretAccessKey == "" {
-		config.Credentials.SecretAccessKey = os.Getenv("AWS_SECRET_ACCESS_KEY")
-	}
-
-	if config.Credentials.SessionToken == "" {
-		config.Credentials.SessionToken = os.Getenv("AWS_SESSION_TOKEN")
-	}
-
-	if config.MaxRetries == 0 {
-		config.MaxRetries = 3
-	}
-
-	if config.RetryDelay == 0 {
-		config.RetryDelay = 100 * time.Millisecond
-	}
-
 	// Create HTTP client if not provided
 	httpClient := config.HTTPClient
 	if httpClient == nil {
+		timeout := config.Timeout
+		if timeout == 0 {
+			timeout = 30 * time.Second
+		}
+
 		transport := &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: config.InsecureSkipVerify,
 			},
-		}
-
-		timeout := config.Timeout
-		if timeout == 0 {
-			timeout = 30 * time.Second
 		}
 
 		httpClient = &http.Client{
@@ -187,12 +171,4 @@ func shouldRetry(statusCode int) bool {
 // GetCredentials returns the client's credentials
 func (c *Client) GetCredentials() Credentials {
 	return c.config.Credentials
-}
-
-// getEnvOrDefault returns environment variable value or default
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
