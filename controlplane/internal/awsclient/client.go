@@ -43,33 +43,30 @@ type Client struct {
 	signer     *Signer
 }
 
+// NewDefaultConfig creates a new Config with sensible defaults
+func NewDefaultConfig() Config {
+	return Config{
+		Region:     "us-east-1",
+		MaxRetries: 3,
+		RetryDelay: 100 * time.Millisecond,
+		Timeout:    30 * time.Second,
+	}
+}
+
 // NewClient creates a new AWS client
 func NewClient(config Config) *Client {
-	// Set defaults
-	if config.Region == "" {
-		config.Region = "us-east-1"
-	}
-
-	if config.MaxRetries == 0 {
-		config.MaxRetries = 3
-	}
-
-	if config.RetryDelay == 0 {
-		config.RetryDelay = 100 * time.Millisecond
-	}
-
 	// Create HTTP client if not provided
 	httpClient := config.HTTPClient
 	if httpClient == nil {
+		timeout := config.Timeout
+		if timeout == 0 {
+			timeout = 30 * time.Second
+		}
+
 		transport := &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: config.InsecureSkipVerify,
 			},
-		}
-
-		timeout := config.Timeout
-		if timeout == 0 {
-			timeout = 30 * time.Second
 		}
 
 		httpClient = &http.Client{
