@@ -130,8 +130,8 @@ docker run -d \
   -p 8080:8080 \
   -p 8081:8081 \
   -v /path/to/data:/data \
-  -v /path/to/config.yaml:/config/production.yaml \
-  -e KECS_CONFIG=/config/production.yaml \
+  -v /path/to/config.yaml:/config/kecs.yaml \
+  -e KECS_CONFIG=/config/kecs.yaml \
   ghcr.io/nandemo-ya/kecs:latest
 ```
 

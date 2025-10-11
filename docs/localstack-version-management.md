@@ -6,7 +6,7 @@ KECS allows flexible version management for LocalStack deployment, enabling user
 
 ### Via Configuration File
 
-In your `production.yaml` or cluster configuration:
+In your custom KECS configuration file:
 
 ```yaml
 localstack:

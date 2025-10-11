@@ -2,7 +2,11 @@
 
 ## Status
 
-Proposed
+Rejected
+
+**Rejection Date**: 2025-10-11
+
+**Reason**: After further consideration, the team decided not to implement Velero-based state persistence due to increased complexity and resource overhead. KECS will focus on simpler state management approaches that align better with its development-focused use case.
 
 ## Context
 

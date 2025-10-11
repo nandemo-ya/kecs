@@ -268,20 +268,6 @@ docker-push-separated: docker-build-separated
 	$(DOCKER) push $(DOCKER_IMAGE)-api:$(VERSION)
 	$(DOCKER) push $(DOCKER_IMAGE)-api:latest
 
-# Build AWS Proxy Docker image
-.PHONY: docker-build-awsproxy
-docker-build-awsproxy:
-	@echo "Building AWS Proxy Docker image..."
-	$(DOCKER) build -t $(DOCKER_IMAGE)-awsproxy:$(VERSION) -f $(CONTROLPLANE_DIR)/awsproxy/Dockerfile $(CONTROLPLANE_DIR)
-	$(DOCKER) tag $(DOCKER_IMAGE)-awsproxy:$(VERSION) $(DOCKER_IMAGE)-awsproxy:latest
-
-# Push AWS Proxy Docker image
-.PHONY: docker-push-awsproxy
-docker-push-awsproxy: docker-build-awsproxy
-	@echo "Pushing AWS Proxy Docker image..."
-	$(DOCKER) push $(DOCKER_IMAGE)-awsproxy:$(VERSION)
-	$(DOCKER) push $(DOCKER_IMAGE)-awsproxy:latest
-
 
 # Help target
 .PHONY: help
@@ -315,8 +301,6 @@ help:
 	@echo "  docker-push    - Push Docker image"
 	@echo "  docker-build-dev - Build Docker image for k3d registry (dev mode)"
 	@echo "  docker-push-dev - Push Docker image to k3d registry (dev mode)"
-	@echo "  docker-build-awsproxy - Build AWS Proxy Docker image"
-	@echo "  docker-push-awsproxy  - Push AWS Proxy Docker image"
 	@echo ""
 	@echo "Development:"
 	@echo "  hot-reload     - Build and replace controlplane in running KECS instance"
