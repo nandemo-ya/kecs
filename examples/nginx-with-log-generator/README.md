@@ -27,9 +27,54 @@ aws ecs create-service --cli-input-json file://service_def.json --region us-east
 
 ### Using KECS TUI
 ```bash
-kecs tui --instance <instance-name>
+kecs
 ```
 Navigate to the task and press 'l' to view logs.
+
+### Using AWS CLI (CloudWatch Logs)
+```bash
+export AWS_ENDPOINT_URL=http://localhost:5373
+export AWS_REGION=us-east-1
+
+# List log streams to find the stream name
+aws logs describe-log-streams \
+  --log-group-name "/ecs/nginx-with-log-generator" \
+  --region us-east-1
+
+# Get the log stream name (example output: nginx/nginx-with-log-generator-78cc97f7c-pgrg5)
+LOG_STREAM=$(aws logs describe-log-streams \
+  --log-group-name "/ecs/nginx-with-log-generator" \
+  --region us-east-1 \
+  --query 'logStreams[?contains(logStreamName, `nginx/`)].logStreamName' \
+  --output text)
+
+# View nginx logs
+aws logs get-log-events \
+  --log-group-name "/ecs/nginx-with-log-generator" \
+  --log-stream-name "$LOG_STREAM" \
+  --region us-east-1 \
+  --limit 20
+
+# View log-generator logs
+LOG_STREAM=$(aws logs describe-log-streams \
+  --log-group-name "/ecs/nginx-with-log-generator" \
+  --region us-east-1 \
+  --query 'logStreams[?contains(logStreamName, `log-generator/`)].logStreamName' \
+  --output text)
+
+aws logs get-log-events \
+  --log-group-name "/ecs/nginx-with-log-generator" \
+  --log-stream-name "$LOG_STREAM" \
+  --region us-east-1 \
+  --limit 20
+
+# Tail logs (using --start-time with recent timestamp)
+aws logs get-log-events \
+  --log-group-name "/ecs/nginx-with-log-generator" \
+  --log-stream-name "$LOG_STREAM" \
+  --region us-east-1 \
+  --start-time $(date -u -v-5M +%s)000
+```
 
 ### Using kubectl
 ```bash
