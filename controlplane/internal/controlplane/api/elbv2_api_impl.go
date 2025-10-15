@@ -57,7 +57,7 @@ func (api *ELBv2APIImpl) CreateLoadBalancer(ctx context.Context, input *generate
 
 	// Check if load balancer already exists
 	existingLB, err := api.storage.ELBv2Store().GetLoadBalancerByName(ctx, input.Name)
-	if err != nil {
+	if err != nil && err != storage.ErrResourceNotFound {
 		return nil, err
 	}
 	if existingLB != nil {
@@ -239,7 +239,7 @@ func (api *ELBv2APIImpl) CreateTargetGroup(ctx context.Context, input *generated
 
 	// Check if target group already exists
 	existingTG, err := api.storage.ELBv2Store().GetTargetGroupByName(ctx, input.Name)
-	if err != nil {
+	if err != nil && err != storage.ErrResourceNotFound {
 		return nil, err
 	}
 	if existingTG != nil {
