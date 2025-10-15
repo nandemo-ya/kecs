@@ -208,7 +208,7 @@ func (api *ELBv2APIImpl) DescribeLoadBalancers(ctx context.Context, input *gener
 		// Get specific load balancers by name
 		for _, name := range input.Names {
 			lb, err := api.storage.ELBv2Store().GetLoadBalancerByName(ctx, name)
-			if err != nil {
+			if err != nil && err != storage.ErrResourceNotFound {
 				return nil, err
 			}
 			if lb != nil {
@@ -1247,7 +1247,7 @@ func (api *ELBv2APIImpl) DescribeTargetGroups(ctx context.Context, input *genera
 		// Get target groups by names
 		for _, name := range input.Names {
 			tg, getErr := api.storage.ELBv2Store().GetTargetGroupByName(ctx, name)
-			if getErr != nil {
+			if getErr != nil && getErr != storage.ErrResourceNotFound {
 				return nil, getErr
 			}
 			if tg != nil {
