@@ -1,6 +1,6 @@
 {
   "serviceName": "service-with-secrets",
-  "cluster": "default",
+  "cluster": "service-with-secrets",
   "taskDefinition": "service-with-secrets:latest",
   "desiredCount": 2,
   "launchType": "FARGATE",
