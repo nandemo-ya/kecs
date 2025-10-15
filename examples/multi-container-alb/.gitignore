@@ -1,6 +1,5 @@
 # Generated files
 *_generated.json
-service_def_with_elb.json
 *.bak
 
 # Temporary files
