@@ -1,6 +1,6 @@
 {
   "serviceName": "nginx-with-log-generator",
-  "cluster": "default",
+  "cluster": "nginx-with-log-generator",
   "taskDefinition": "nginx-with-log-generator:1",
   "desiredCount": 1,
   "launchType": "FARGATE",
