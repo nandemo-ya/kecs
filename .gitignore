@@ -69,3 +69,17 @@ qa-results/
 # Serena cache files
 .serena/
 kecs-for-notarization.zip
+
+# Terraform files
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/.terraform.lock.hcl
+**/terraform.tfvars
+**/*.auto.tfvars
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
+**/.terraformrc
+**/terraform.rc

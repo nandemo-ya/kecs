@@ -43,32 +43,169 @@ This example demonstrates how to securely inject secrets from AWS Secrets Manage
 ## Prerequisites
 
 1. KECS running locally
-2. AWS CLI configured
+2. Terraform installed (>= 1.0)
+3. AWS CLI configured
 
-## Setup Instructions
+## Quick Start with Terraform (Recommended)
 
-### 1. Start KECS and LocalStack
+### 1. Start KECS
 
 ```bash
-# Start KECS (LocalStack is automatically started with KECS)
+# Start KECS instance
 kecs start
 
-# Wait for KECS and LocalStack to be ready
-kecs status
-
-# LocalStack is automatically available at port 4566
-# No need to manually start LocalStack
+# Wait for KECS to be ready
+# Check that it's running (look for a running instance)
+kecs list
 ```
 
-### 2. Create the ECS Cluster
+### 2. Deploy Infrastructure with Terraform
 
 ```bash
-aws ecs create-cluster --cluster-name default \
+# Initialize Terraform
+terraform init
+
+# Review the planned changes
+terraform plan
+
+# Apply the configuration
+terraform apply
+
+# Type 'yes' when prompted
+```
+
+This will create:
+- ECS Cluster: `service-with-secrets`
+- CloudWatch Logs Log Group: `/ecs/service-with-secrets` (7 days retention)
+- SSM Parameters (3):
+  - `/myapp/prod/database-url` - Database connection string
+  - `/myapp/prod/api-key` - API key
+  - `/myapp/prod/feature-flags` - Feature flags configuration
+- Secrets Manager Secrets (3):
+  - `myapp/prod/db` - Database credentials
+  - `myapp/prod/jwt` - JWT signing key
+  - `myapp/prod/encryption` - Encryption keys
+
+### 3. Verify Resources
+
+```bash
+# Verify ECS cluster
+aws ecs describe-clusters \
+  --cluster service-with-secrets \
+  --endpoint-url http://localhost:5373 \
+  --region us-east-1
+
+# Verify SSM parameters
+aws ssm describe-parameters \
+  --endpoint-url http://localhost:5373 \
+  --region us-east-1 \
+  --query "Parameters[*].[Name,Type]" \
+  --output table
+
+# Verify Secrets Manager secrets
+aws secretsmanager list-secrets \
+  --endpoint-url http://localhost:5373 \
+  --region us-east-1 \
+  --query "SecretList[*].[Name,Description]" \
+  --output table
+
+```
+
+### 4. View Terraform Outputs
+
+```bash
+# Show all outputs
+terraform output
+
+# Show specific output
+terraform output cluster_name
+terraform output secret_arns_for_task_definition
+```
+
+After applying, Terraform provides several outputs:
+
+- `cluster_name`: ECS cluster name
+- `cluster_arn`: ECS cluster ARN
+- `log_group_name`: CloudWatch Logs log group name
+- `ssm_parameters`: Map of SSM parameter names
+- `secrets_manager_secrets`: Map of Secrets Manager secret ARNs (sensitive)
+- `secret_arns_for_task_definition`: Secret ARNs formatted for ECS task definitions
+- `ssm_parameter_arns_for_task_definition`: SSM parameter ARNs formatted for ECS task definitions
+
+### 5. Terraform Configuration
+
+You can customize the configuration by creating a `terraform.tfvars` file:
+
+```hcl
+aws_region     = "us-east-1"
+kecs_endpoint  = "http://localhost:5373"
+cluster_name   = "service-with-secrets"
+service_name   = "service-with-secrets"
+environment    = "prod"
+app_name       = "myapp"
+```
+
+Or override via command line:
+
+```bash
+terraform apply -var="cluster_name=my-cluster" -var="environment=dev"
+```
+
+### 6. Advanced Usage
+
+#### Using with Different Environments
+
+```bash
+# Development environment
+terraform apply -var="environment=dev" -var="app_name=myapp-dev"
+
+# Staging environment
+terraform apply -var="environment=staging" -var="app_name=myapp-staging"
+```
+
+#### Importing Existing Resources
+
+If you already have resources created by `setup.sh`, you can import them:
+
+```bash
+# Import ECS cluster
+terraform import aws_ecs_cluster.main service-with-secrets
+
+# Import SSM parameter
+terraform import aws_ssm_parameter.database_url /myapp/prod/database-url
+
+# Import Secrets Manager secret
+terraform import aws_secretsmanager_secret.db myapp/prod/db
+```
+
+#### Remote State (Optional)
+
+For team collaboration, configure remote state in `provider.tf`:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket = "my-terraform-state"
+    key    = "kecs/service-with-secrets/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+```
+
+## Manual Setup (Alternative)
+
+<details>
+<summary>Click to expand manual setup instructions using AWS CLI</summary>
+
+### 1. Create the ECS Cluster
+
+```bash
+aws ecs create-cluster --cluster-name service-with-secrets \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 ```
 
-### 3. Create SSM Parameters
+### 2. Create SSM Parameters
 
 ```bash
 # Database URL
@@ -154,6 +291,8 @@ aws logs create-log-group \
   --endpoint-url http://localhost:5373
 ```
 
+</details>
+
 ## Deployment
 
 ### Using AWS CLI
@@ -179,7 +318,7 @@ aws ecs create-service \
 ```bash
 # Verify service is running
 aws ecs describe-services \
-  --cluster default \
+  --cluster service-with-secrets \
   --services service-with-secrets \
   --region us-east-1 \
   --endpoint-url http://localhost:5373 \
@@ -257,7 +396,7 @@ aws secretsmanager update-secret \
 
 # Force service update to pick up new secrets
 aws ecs update-service \
-  --cluster default \
+  --cluster service-with-secrets \
   --service service-with-secrets \
   --force-new-deployment \
   --region us-east-1 \
@@ -265,7 +404,7 @@ aws ecs update-service \
 
 # Wait for deployment to complete
 aws ecs wait services-stable \
-  --cluster default \
+  --cluster service-with-secrets \
   --services service-with-secrets \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
@@ -289,7 +428,47 @@ aws ecs wait services-stable \
 
 ## Troubleshooting
 
-### Check Task Logs for Secret Loading Issues
+### Terraform Issues
+
+#### Connection Refused
+
+If Terraform can't connect to KECS:
+
+```bash
+# Check KECS is running
+kecs status
+
+# Verify endpoint is accessible
+curl http://localhost:5373/health
+```
+
+#### Resource Already Exists
+
+If resources were created by `setup.sh`:
+
+```bash
+# Option 1: Destroy existing resources first using terraform
+terraform destroy
+
+# Option 2: Import existing resources
+terraform import aws_ecs_cluster.main service-with-secrets
+terraform import aws_ssm_parameter.database_url /myapp/prod/database-url
+terraform import aws_secretsmanager_secret.db myapp/prod/db
+```
+
+#### Invalid Credentials
+
+Terraform uses fake credentials for KECS. Make sure `provider.tf` includes:
+
+```hcl
+skip_credentials_validation = true
+skip_requesting_account_id  = true
+skip_metadata_api_check     = true
+```
+
+### Task and Service Issues
+
+#### Check Task Logs for Secret Loading Issues
 
 ```bash
 aws logs tail /ecs/service-with-secrets \
@@ -298,7 +477,7 @@ aws logs tail /ecs/service-with-secrets \
   --follow
 ```
 
-### Verify Execution Role
+#### Verify Execution Role
 
 ```bash
 # Verify execution role exists (auto-created by KECS)
@@ -308,7 +487,7 @@ aws iam get-role \
   --endpoint-url http://localhost:5373
 ```
 
-### Debug Secret Access
+#### Debug Secret Access
 
 ```bash
 # Check if secrets exist
@@ -327,10 +506,26 @@ aws ssm get-parameter \
 
 ## Cleanup
 
+### Using Terraform (Recommended)
+
+```bash
+# Destroy all infrastructure
+terraform destroy
+
+# Type 'yes' when prompted
+```
+
+This will remove all resources created by Terraform.
+
+### Manual Cleanup (Alternative)
+
+<details>
+<summary>Click to expand manual cleanup instructions</summary>
+
 ```bash
 # Delete service
 aws ecs delete-service \
-  --cluster default \
+  --cluster service-with-secrets \
   --service service-with-secrets \
   --force \
   --region us-east-1 \
@@ -371,16 +566,17 @@ aws ssm delete-parameter \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 
-# Note: No need to delete IAM resources as ecsTaskExecutionRole is managed by KECS
-# and will be cleaned up when KECS stops
-
 # Delete log group
 aws logs delete-log-group \
   --log-group-name /ecs/service-with-secrets \
   --region us-east-1 \
   --endpoint-url http://localhost:5373
 
-# Stop LocalStack
-docker stop localstack
-docker rm localstack
+# Delete ECS cluster
+aws ecs delete-cluster \
+  --cluster service-with-secrets \
+  --region us-east-1 \
+  --endpoint-url http://localhost:5373
 ```
+
+</details>
