@@ -1002,11 +1002,66 @@ func (api *ELBv2APIImpl) DescribeCapacityReservation(ctx context.Context, input 
 }
 
 func (api *ELBv2APIImpl) DescribeListenerAttributes(ctx context.Context, input *generated_elbv2.DescribeListenerAttributesInput) (*generated_elbv2.DescribeListenerAttributesOutput, error) {
-	return &generated_elbv2.DescribeListenerAttributesOutput{}, nil
+	if input.ListenerArn == "" {
+		return nil, fmt.Errorf("ListenerArn is required")
+	}
+
+	// Verify listener exists
+	listener, err := api.storage.ELBv2Store().GetListener(ctx, input.ListenerArn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get listener: %w", err)
+	}
+	if listener == nil {
+		return nil, fmt.Errorf("listener not found: %s", input.ListenerArn)
+	}
+
+	// Return default listener attributes
+	// In the future, we can store these in the ELBv2Listener struct or a separate attributes table
+	attributes := []generated_elbv2.ListenerAttribute{
+		{Key: utils.Ptr("routing.http.desync_mitigation_mode"), Value: utils.Ptr("defensive")},
+		{Key: utils.Ptr("routing.http.drop_invalid_header_fields.enabled"), Value: utils.Ptr("false")},
+		{Key: utils.Ptr("routing.http.preserve_host_header.enabled"), Value: utils.Ptr("false")},
+		{Key: utils.Ptr("routing.http.x_amzn_tls_version_and_cipher_suite.enabled"), Value: utils.Ptr("false")},
+		{Key: utils.Ptr("routing.http.xff_client_port.enabled"), Value: utils.Ptr("false")},
+		{Key: utils.Ptr("routing.http.xff_header_processing.mode"), Value: utils.Ptr("append")},
+		{Key: utils.Ptr("routing.http2.enabled"), Value: utils.Ptr("true")},
+	}
+
+	return &generated_elbv2.DescribeListenerAttributesOutput{
+		Attributes: attributes,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) DescribeListenerCertificates(ctx context.Context, input *generated_elbv2.DescribeListenerCertificatesInput) (*generated_elbv2.DescribeListenerCertificatesOutput, error) {
-	return &generated_elbv2.DescribeListenerCertificatesOutput{}, nil
+	if input.ListenerArn == "" {
+		return nil, fmt.Errorf("ListenerArn is required")
+	}
+
+	// Verify listener exists
+	listener, err := api.storage.ELBv2Store().GetListener(ctx, input.ListenerArn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get listener: %w", err)
+	}
+	if listener == nil {
+		return nil, fmt.Errorf("listener not found: %s", input.ListenerArn)
+	}
+
+	// Unmarshal certificates from JSON
+	var certificates []generated_elbv2.Certificate
+	if listener.Certificates != "" && listener.Certificates != "[]" {
+		if err := json.Unmarshal([]byte(listener.Certificates), &certificates); err != nil {
+			logging.Debug("Failed to unmarshal listener certificates", "listenerArn", input.ListenerArn, "error", err)
+			certificates = make([]generated_elbv2.Certificate, 0)
+		}
+	} else {
+		certificates = make([]generated_elbv2.Certificate, 0)
+	}
+
+	// Note: Pagination parameters (Marker, PageSize) are ignored for now
+	// since certificate lists are typically small
+	return &generated_elbv2.DescribeListenerCertificatesOutput{
+		Certificates: certificates,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) DescribeListeners(ctx context.Context, input *generated_elbv2.DescribeListenersInput) (*generated_elbv2.DescribeListenersOutput, error) {
@@ -1050,7 +1105,39 @@ func (api *ELBv2APIImpl) DescribeLoadBalancerAttributes(ctx context.Context, inp
 }
 
 func (api *ELBv2APIImpl) DescribeRules(ctx context.Context, input *generated_elbv2.DescribeRulesInput) (*generated_elbv2.DescribeRulesOutput, error) {
-	return &generated_elbv2.DescribeRulesOutput{}, nil
+	var rules []*storage.ELBv2Rule
+	var err error
+
+	// If specific rule ARNs are provided
+	if input.RuleArns != nil && len(input.RuleArns) > 0 {
+		for _, arn := range input.RuleArns {
+			rule, getErr := api.storage.ELBv2Store().GetRule(ctx, arn)
+			if getErr != nil {
+				return nil, getErr
+			}
+			if rule != nil {
+				rules = append(rules, rule)
+			}
+		}
+	} else if input.ListenerArn != nil {
+		// Get rules for a specific listener
+		rules, err = api.storage.ELBv2Store().ListRules(ctx, *input.ListenerArn)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("ListenerArn or RuleArns must be specified")
+	}
+
+	// Convert to response format
+	var responseRules []generated_elbv2.Rule
+	for _, rule := range rules {
+		responseRules = append(responseRules, api.convertToRule(rule))
+	}
+
+	return &generated_elbv2.DescribeRulesOutput{
+		Rules: responseRules,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) DescribeSSLPolicies(ctx context.Context, input *generated_elbv2.DescribeSSLPoliciesInput) (*generated_elbv2.DescribeSSLPoliciesOutput, error) {
@@ -1289,7 +1376,52 @@ func (api *ELBv2APIImpl) ModifyListener(ctx context.Context, input *generated_el
 }
 
 func (api *ELBv2APIImpl) ModifyListenerAttributes(ctx context.Context, input *generated_elbv2.ModifyListenerAttributesInput) (*generated_elbv2.ModifyListenerAttributesOutput, error) {
-	return &generated_elbv2.ModifyListenerAttributesOutput{}, nil
+	if input.ListenerArn == "" {
+		return nil, fmt.Errorf("ListenerArn is required")
+	}
+	if len(input.Attributes) == 0 {
+		return nil, fmt.Errorf("Attributes is required")
+	}
+
+	// Verify listener exists
+	listener, err := api.storage.ELBv2Store().GetListener(ctx, input.ListenerArn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get listener: %w", err)
+	}
+	if listener == nil {
+		return nil, fmt.Errorf("listener not found: %s", input.ListenerArn)
+	}
+
+	// Note: Currently we don't persist listener attributes in storage
+	// This implementation validates the input and returns success
+	// TODO: Add attributes field to ELBv2Listener and persist them
+
+	// Validate attribute keys (basic validation)
+	validPrefixes := []string{
+		"routing.http.",
+		"routing.http2.",
+	}
+	for _, attr := range input.Attributes {
+		if attr.Key == nil {
+			return nil, fmt.Errorf("attribute key is required")
+		}
+		// Check if key starts with a valid prefix
+		valid := false
+		for _, prefix := range validPrefixes {
+			if strings.HasPrefix(*attr.Key, prefix) {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			logging.Debug("Unknown listener attribute key", "key", *attr.Key)
+		}
+	}
+
+	// Return the same attributes as confirmation
+	return &generated_elbv2.ModifyListenerAttributesOutput{
+		Attributes: input.Attributes,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) ModifyLoadBalancerAttributes(ctx context.Context, input *generated_elbv2.ModifyLoadBalancerAttributesInput) (*generated_elbv2.ModifyLoadBalancerAttributesOutput, error) {
@@ -1829,5 +1961,38 @@ func (api *ELBv2APIImpl) convertToListener(listener *storage.ELBv2Listener) gene
 		Port:            &listener.Port,
 		Protocol:        (*generated_elbv2.ProtocolEnum)(&listener.Protocol),
 		DefaultActions:  defaultActions,
+	}
+}
+
+// convertToRule converts storage rule to API response format
+func (api *ELBv2APIImpl) convertToRule(rule *storage.ELBv2Rule) generated_elbv2.Rule {
+	// Unmarshal conditions from JSON
+	var conditions []generated_elbv2.RuleCondition
+	if rule.Conditions != "" {
+		if err := json.Unmarshal([]byte(rule.Conditions), &conditions); err != nil {
+			logging.Debug("Failed to unmarshal rule conditions", "ruleArn", rule.ARN, "error", err)
+			conditions = make([]generated_elbv2.RuleCondition, 0)
+		}
+	} else {
+		conditions = make([]generated_elbv2.RuleCondition, 0)
+	}
+
+	// Unmarshal actions from JSON
+	var actions []generated_elbv2.Action
+	if rule.Actions != "" {
+		if err := json.Unmarshal([]byte(rule.Actions), &actions); err != nil {
+			logging.Debug("Failed to unmarshal rule actions", "ruleArn", rule.ARN, "error", err)
+			actions = make([]generated_elbv2.Action, 0)
+		}
+	} else {
+		actions = make([]generated_elbv2.Action, 0)
+	}
+
+	return generated_elbv2.Rule{
+		RuleArn:    &rule.ARN,
+		Priority:   utils.Ptr(fmt.Sprintf("%d", rule.Priority)),
+		Conditions: conditions,
+		Actions:    actions,
+		IsDefault:  utils.Ptr(rule.IsDefault),
 	}
 }
