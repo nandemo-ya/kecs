@@ -200,9 +200,26 @@ type ModifyTargetGroupResult struct {
 
 // DeleteTargetGroup response structures
 type DeleteTargetGroupResponse struct {
-	XMLName          xml.Name         `xml:"DeleteTargetGroupResponse"`
-	XMLNS            string           `xml:"xmlns,attr"`
-	ResponseMetadata ResponseMetadata `xml:"ResponseMetadata"`
+	XMLName          xml.Name                `xml:"DeleteTargetGroupResponse"`
+	XMLNS            string                  `xml:"xmlns,attr"`
+	Result           DeleteTargetGroupResult `xml:"DeleteTargetGroupResult"`
+	ResponseMetadata ResponseMetadata        `xml:"ResponseMetadata"`
+}
+
+type DeleteTargetGroupResult struct {
+	// Empty result
+}
+
+// DeleteLoadBalancer response structures
+type DeleteLoadBalancerResponse struct {
+	XMLName          xml.Name                 `xml:"DeleteLoadBalancerResponse"`
+	XMLNS            string                   `xml:"xmlns,attr"`
+	Result           DeleteLoadBalancerResult `xml:"DeleteLoadBalancerResult"`
+	ResponseMetadata ResponseMetadata         `xml:"ResponseMetadata"`
+}
+
+type DeleteLoadBalancerResult struct {
+	// Empty result
 }
 
 // CreateRule response structures
@@ -276,6 +293,82 @@ type DescribeRulesResponse struct {
 type DescribeRulesResult struct {
 	Rules      []Rule  `xml:"Rules>member"`
 	NextMarker *string `xml:"NextMarker,omitempty"`
+}
+
+// DescribeLoadBalancerAttributes response structures
+type DescribeLoadBalancerAttributesResponse struct {
+	XMLName          xml.Name                             `xml:"DescribeLoadBalancerAttributesResponse"`
+	XMLNS            string                               `xml:"xmlns,attr"`
+	Result           DescribeLoadBalancerAttributesResult `xml:"DescribeLoadBalancerAttributesResult"`
+	ResponseMetadata ResponseMetadata                     `xml:"ResponseMetadata"`
+}
+
+type DescribeLoadBalancerAttributesResult struct {
+	Attributes []Attribute `xml:"Attributes>member"`
+}
+
+// DescribeTargetGroupAttributes response structures
+type DescribeTargetGroupAttributesResponse struct {
+	XMLName          xml.Name                            `xml:"DescribeTargetGroupAttributesResponse"`
+	XMLNS            string                              `xml:"xmlns,attr"`
+	Result           DescribeTargetGroupAttributesResult `xml:"DescribeTargetGroupAttributesResult"`
+	ResponseMetadata ResponseMetadata                    `xml:"ResponseMetadata"`
+}
+
+type DescribeTargetGroupAttributesResult struct {
+	Attributes []Attribute `xml:"Attributes>member"`
+}
+
+// ModifyTargetGroupAttributes response structures
+type ModifyTargetGroupAttributesResponse struct {
+	XMLName          xml.Name                          `xml:"ModifyTargetGroupAttributesResponse"`
+	XMLNS            string                            `xml:"xmlns,attr"`
+	Result           ModifyTargetGroupAttributesResult `xml:"ModifyTargetGroupAttributesResult"`
+	ResponseMetadata ResponseMetadata                  `xml:"ResponseMetadata"`
+}
+
+type ModifyTargetGroupAttributesResult struct {
+	Attributes []Attribute `xml:"Attributes>member"`
+}
+
+// Attribute represents a load balancer or target group attribute
+type Attribute struct {
+	Key   string `xml:"Key"`
+	Value string `xml:"Value"`
+}
+
+// DescribeCapacityReservation response structures
+type DescribeCapacityReservationResponse struct {
+	XMLName          xml.Name                          `xml:"DescribeCapacityReservationResponse"`
+	XMLNS            string                            `xml:"xmlns,attr"`
+	Result           DescribeCapacityReservationResult `xml:"DescribeCapacityReservationResult"`
+	ResponseMetadata ResponseMetadata                  `xml:"ResponseMetadata"`
+}
+
+type DescribeCapacityReservationResult struct {
+	// Empty result for now - Terraform may not require specific fields
+}
+
+// DescribeTags response structures
+type DescribeTagsResponse struct {
+	XMLName          xml.Name           `xml:"DescribeTagsResponse"`
+	XMLNS            string             `xml:"xmlns,attr"`
+	Result           DescribeTagsResult `xml:"DescribeTagsResult"`
+	ResponseMetadata ResponseMetadata   `xml:"ResponseMetadata"`
+}
+
+type DescribeTagsResult struct {
+	TagDescriptions []TagDescription `xml:"TagDescriptions>member"`
+}
+
+type TagDescription struct {
+	ResourceArn string     `xml:"ResourceArn"`
+	Tags        []ELBv2Tag `xml:"Tags>member"`
+}
+
+type ELBv2Tag struct {
+	Key   string `xml:"Key"`
+	Value string `xml:"Value"`
 }
 
 // NewELBv2RouterWrapper creates a new wrapper for the ELBv2 router
@@ -443,6 +536,25 @@ func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) 
 
 			// Convert to XML response
 			xmlResp := w.convertCreateLoadBalancerToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
+		case "DeleteLoadBalancer":
+			// Convert form data to DeleteLoadBalancerInput
+			input := &generated_elbv2.DeleteLoadBalancerInput{}
+
+			// Parse LoadBalancerArn (required)
+			input.LoadBalancerArn = values.Get("LoadBalancerArn")
+
+			// Call the API
+			output, err := w.api.DeleteLoadBalancer(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertDeleteLoadBalancerToXML(output)
 			w.writeXML(resp, xmlResp)
 			return
 
@@ -988,6 +1100,125 @@ func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) 
 			w.writeXML(resp, xmlResp)
 			return
 
+		case "DescribeLoadBalancerAttributes":
+			// Convert form data to DescribeLoadBalancerAttributesInput
+			input := &generated_elbv2.DescribeLoadBalancerAttributesInput{}
+
+			// Parse LoadBalancerArn (required)
+			input.LoadBalancerArn = values.Get("LoadBalancerArn")
+
+			// Call the API
+			output, err := w.api.DescribeLoadBalancerAttributes(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertDescribeLoadBalancerAttributesToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
+		case "DescribeTargetGroupAttributes":
+			// Convert form data to DescribeTargetGroupAttributesInput
+			input := &generated_elbv2.DescribeTargetGroupAttributesInput{}
+
+			// Parse TargetGroupArn (required)
+			input.TargetGroupArn = values.Get("TargetGroupArn")
+
+			// Call the API
+			output, err := w.api.DescribeTargetGroupAttributes(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertDescribeTargetGroupAttributesToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
+		case "ModifyTargetGroupAttributes":
+			// Convert form data to ModifyTargetGroupAttributesInput
+			input := &generated_elbv2.ModifyTargetGroupAttributesInput{}
+
+			// Parse TargetGroupArn (required)
+			input.TargetGroupArn = values.Get("TargetGroupArn")
+
+			// Parse Attributes
+			attributes := []generated_elbv2.TargetGroupAttribute{}
+			for i := 1; ; i++ {
+				keyParam := fmt.Sprintf("Attributes.member.%d.Key", i)
+				valueParam := fmt.Sprintf("Attributes.member.%d.Value", i)
+				key := values.Get(keyParam)
+				value := values.Get(valueParam)
+				if key == "" {
+					break
+				}
+				attributes = append(attributes, generated_elbv2.TargetGroupAttribute{
+					Key:   &key,
+					Value: &value,
+				})
+			}
+			input.Attributes = attributes
+
+			// Call the API
+			output, err := w.api.ModifyTargetGroupAttributes(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertModifyTargetGroupAttributesToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
+		case "DescribeCapacityReservation":
+			// DescribeCapacityReservation - returns empty result
+			input := &generated_elbv2.DescribeCapacityReservationInput{}
+
+			// Call the API
+			output, err := w.api.DescribeCapacityReservation(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertDescribeCapacityReservationToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
+		case "DescribeTags":
+			// Convert form data to DescribeTagsInput
+			input := &generated_elbv2.DescribeTagsInput{}
+
+			// Parse ResourceArns
+			if arns := values["ResourceArns.member.1"]; len(arns) > 0 {
+				input.ResourceArns = []string{}
+				for i := 1; ; i++ {
+					key := fmt.Sprintf("ResourceArns.member.%d", i)
+					if val := values.Get(key); val != "" {
+						input.ResourceArns = append(input.ResourceArns, val)
+					} else {
+						break
+					}
+				}
+			}
+
+			// Call the API
+			output, err := w.api.DescribeTags(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertDescribeTagsToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
 		default:
 			logging.Info("Handling default case for action", "action", action)
 			// For other actions, return an error for now
@@ -1167,6 +1398,17 @@ func (w *ELBv2RouterWrapper) convertCreateLoadBalancerToXML(output *generated_el
 		}
 	}
 
+	return resp
+}
+
+// convertDeleteLoadBalancerToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertDeleteLoadBalancerToXML(output *generated_elbv2.DeleteLoadBalancerOutput) *DeleteLoadBalancerResponse {
+	resp := &DeleteLoadBalancerResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
 	return resp
 }
 
@@ -1657,6 +1899,128 @@ func (w *ELBv2RouterWrapper) convertDescribeRulesToXML(output *generated_elbv2.D
 
 				resp.Result.Rules = append(resp.Result.Rules, xmlRule)
 			}
+		}
+	}
+
+	return resp
+}
+
+// convertDescribeLoadBalancerAttributesToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertDescribeLoadBalancerAttributesToXML(output *generated_elbv2.DescribeLoadBalancerAttributesOutput) *DescribeLoadBalancerAttributesResponse {
+	resp := &DescribeLoadBalancerAttributesResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil && output.Attributes != nil {
+		for _, attr := range output.Attributes {
+			xmlAttr := Attribute{}
+			if attr.Key != nil {
+				xmlAttr.Key = *attr.Key
+			}
+			if attr.Value != nil {
+				xmlAttr.Value = *attr.Value
+			}
+			resp.Result.Attributes = append(resp.Result.Attributes, xmlAttr)
+		}
+	}
+
+	return resp
+}
+
+// convertDescribeTargetGroupAttributesToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertDescribeTargetGroupAttributesToXML(output *generated_elbv2.DescribeTargetGroupAttributesOutput) *DescribeTargetGroupAttributesResponse {
+	resp := &DescribeTargetGroupAttributesResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil && output.Attributes != nil {
+		for _, attr := range output.Attributes {
+			xmlAttr := Attribute{}
+			if attr.Key != nil {
+				xmlAttr.Key = *attr.Key
+			}
+			if attr.Value != nil {
+				xmlAttr.Value = *attr.Value
+			}
+			resp.Result.Attributes = append(resp.Result.Attributes, xmlAttr)
+		}
+	}
+
+	return resp
+}
+
+// convertModifyTargetGroupAttributesToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertModifyTargetGroupAttributesToXML(output *generated_elbv2.ModifyTargetGroupAttributesOutput) *ModifyTargetGroupAttributesResponse {
+	resp := &ModifyTargetGroupAttributesResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil && output.Attributes != nil {
+		for _, attr := range output.Attributes {
+			xmlAttr := Attribute{}
+			if attr.Key != nil {
+				xmlAttr.Key = *attr.Key
+			}
+			if attr.Value != nil {
+				xmlAttr.Value = *attr.Value
+			}
+			resp.Result.Attributes = append(resp.Result.Attributes, xmlAttr)
+		}
+	}
+
+	return resp
+}
+
+// convertDescribeCapacityReservationToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertDescribeCapacityReservationToXML(output *generated_elbv2.DescribeCapacityReservationOutput) *DescribeCapacityReservationResponse {
+	resp := &DescribeCapacityReservationResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	// Empty result - Terraform doesn't require specific fields
+	return resp
+}
+
+// convertDescribeTagsToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertDescribeTagsToXML(output *generated_elbv2.DescribeTagsOutput) *DescribeTagsResponse {
+	resp := &DescribeTagsResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil && output.TagDescriptions != nil {
+		for _, tagDesc := range output.TagDescriptions {
+			xmlTagDesc := TagDescription{}
+			if tagDesc.ResourceArn != nil {
+				xmlTagDesc.ResourceArn = *tagDesc.ResourceArn
+			}
+			if tagDesc.Tags != nil {
+				for _, tag := range tagDesc.Tags {
+					xmlTag := ELBv2Tag{}
+					if tag.Key != "" {
+						xmlTag.Key = tag.Key
+					}
+					if tag.Value != nil {
+						xmlTag.Value = *tag.Value
+					}
+					xmlTagDesc.Tags = append(xmlTagDesc.Tags, xmlTag)
+				}
+			}
+			resp.Result.TagDescriptions = append(resp.Result.TagDescriptions, xmlTagDesc)
 		}
 	}
 

@@ -142,8 +142,13 @@ func (api *ELBv2APIImpl) CreateLoadBalancer(ctx context.Context, input *generate
 		return nil, fmt.Errorf("failed to deploy Traefik for load balancer: %w", err)
 	}
 
-	// Create response
-	state := generated_elbv2.LoadBalancerStateEnumPROVISIONING
+	// Transition load balancer to active state after successful deployment
+	if err := api.updateLoadBalancerToActive(ctx, arn); err != nil {
+		return nil, fmt.Errorf("failed to update load balancer state to active: %w", err)
+	}
+
+	// Create response with active state
+	state := generated_elbv2.LoadBalancerStateEnumACTIVE
 	output := &generated_elbv2.CreateLoadBalancerOutput{
 		LoadBalancers: []generated_elbv2.LoadBalancer{
 			{
@@ -1574,7 +1579,57 @@ func (api *ELBv2APIImpl) ModifyTargetGroup(ctx context.Context, input *generated
 }
 
 func (api *ELBv2APIImpl) ModifyTargetGroupAttributes(ctx context.Context, input *generated_elbv2.ModifyTargetGroupAttributesInput) (*generated_elbv2.ModifyTargetGroupAttributesOutput, error) {
-	return &generated_elbv2.ModifyTargetGroupAttributesOutput{}, nil
+	if input.TargetGroupArn == "" {
+		return nil, fmt.Errorf("TargetGroupArn is required")
+	}
+	if len(input.Attributes) == 0 {
+		return nil, fmt.Errorf("Attributes is required")
+	}
+
+	// Verify target group exists
+	targetGroup, err := api.storage.ELBv2Store().GetTargetGroup(ctx, input.TargetGroupArn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get target group: %w", err)
+	}
+	if targetGroup == nil {
+		return nil, fmt.Errorf("target group not found: %s", input.TargetGroupArn)
+	}
+
+	// Note: Currently we don't persist target group attributes in storage
+	// This implementation validates the input and returns success
+	// TODO: Add attributes field to ELBv2TargetGroup and persist them
+
+	// Validate attribute keys (basic validation)
+	validPrefixes := []string{
+		"deregistration_delay.",
+		"stickiness.",
+		"slow_start.",
+		"load_balancing.",
+		"preserve_client_ip.",
+		"proxy_protocol_v2.",
+		"target_health_state.",
+	}
+	for _, attr := range input.Attributes {
+		if attr.Key == nil {
+			return nil, fmt.Errorf("attribute key is required")
+		}
+		// Check if key starts with a valid prefix
+		valid := false
+		for _, prefix := range validPrefixes {
+			if strings.HasPrefix(*attr.Key, prefix) {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			logging.Debug("Unknown target group attribute key", "key", *attr.Key)
+		}
+	}
+
+	// Return the same attributes as confirmation
+	return &generated_elbv2.ModifyTargetGroupAttributesOutput{
+		Attributes: input.Attributes,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) ModifyTrustStore(ctx context.Context, input *generated_elbv2.ModifyTrustStoreInput) (*generated_elbv2.ModifyTrustStoreOutput, error) {
