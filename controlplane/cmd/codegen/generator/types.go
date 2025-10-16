@@ -11,17 +11,24 @@ import (
 
 // TypeInfo holds information about a generated type
 type TypeInfo struct {
-	Name       string
-	GoType     string
-	JSONName   string
-	IsPointer  bool
-	IsRequired bool
-	IsEnum     bool
-	IsError    bool
-	ErrorType  string // "client" or "server"
-	HTTPStatus int
-	EnumValues []string
-	Fields     []FieldInfo
+	Name        string
+	GoType      string
+	JSONName    string
+	IsPointer   bool
+	IsRequired  bool
+	IsEnum      bool
+	IsError     bool
+	ErrorType   string // "client" or "server"
+	HTTPStatus  int
+	EnumValues  []string
+	EnumMembers []EnumMember // New: name-value pairs for enums
+	Fields      []FieldInfo
+}
+
+// EnumMember represents an enum member with its name and value
+type EnumMember struct {
+	Name  string // Go constant name (e.g., "ACTIVE")
+	Value string // Actual value (e.g., "active")
 }
 
 // FieldInfo holds information about a struct field
@@ -294,11 +301,25 @@ func (g *Generator) generateMapType(name string, shape *parser.SmithyShape, api 
 
 // generateEnumType generates type info for an enum
 func (g *Generator) generateEnumType(name string, shape *parser.SmithyShape) *TypeInfo {
+	enumMembers := shape.GetEnumMembers()
+
+	// Convert parser.EnumMember to generator.EnumMember
+	genMembers := make([]EnumMember, len(enumMembers))
+	enumValues := make([]string, len(enumMembers))
+	for i, member := range enumMembers {
+		genMembers[i] = EnumMember{
+			Name:  member.Name,
+			Value: member.Value,
+		}
+		enumValues[i] = member.Value
+	}
+
 	return &TypeInfo{
-		Name:       name,
-		GoType:     "string",
-		IsEnum:     true,
-		EnumValues: shape.GetEnumValues(),
+		Name:        name,
+		GoType:      "string",
+		IsEnum:      true,
+		EnumValues:  enumValues,
+		EnumMembers: genMembers,
 	}
 }
 
@@ -606,8 +627,8 @@ package {{.Package}}
 type {{$type.Name}} string
 
 const (
-{{range $value := $type.EnumValues}}
-	{{$type.Name}}{{$value}} {{$type.Name}} = "{{$value}}"
+{{range $member := $type.EnumMembers}}
+	{{$type.Name}}{{$member.Name}} {{$type.Name}} = "{{$member.Value}}"
 {{end}}
 )
 

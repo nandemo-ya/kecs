@@ -186,12 +186,69 @@ func (s *SmithyShape) GetEnumValues() []string {
 
 	// For member-based enums
 	if len(values) == 0 && s.Type == "enum" && s.Members != nil {
-		for name := range s.Members {
+		for name, member := range s.Members {
+			// Check if member has enumValue trait
+			if member.Traits != nil {
+				if enumValue, ok := member.Traits["smithy.api#enumValue"].(string); ok {
+					values = append(values, enumValue)
+					continue
+				}
+			}
+			// Fallback to member name if no enumValue trait
 			values = append(values, name)
 		}
 	}
 
 	return values
+}
+
+// EnumMember represents an enum member with its name and value
+type EnumMember struct {
+	Name  string
+	Value string
+}
+
+// GetEnumMembers returns enum members with their names and values
+func (s *SmithyShape) GetEnumMembers() []EnumMember {
+	var members []EnumMember
+
+	if s.Traits != nil {
+		if enumTrait, ok := s.Traits["smithy.api#enum"]; ok {
+			if enumList, ok := enumTrait.([]interface{}); ok {
+				for _, item := range enumList {
+					if enumItem, ok := item.(map[string]interface{}); ok {
+						name, _ := enumItem["name"].(string)
+						value, _ := enumItem["value"].(string)
+						if name != "" && value != "" {
+							members = append(members, EnumMember{
+								Name:  name,
+								Value: value,
+							})
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// For member-based enums
+	if len(members) == 0 && s.Type == "enum" && s.Members != nil {
+		for name, member := range s.Members {
+			value := name // Default to member name
+			// Check if member has enumValue trait
+			if member.Traits != nil {
+				if enumValue, ok := member.Traits["smithy.api#enumValue"].(string); ok {
+					value = enumValue
+				}
+			}
+			members = append(members, EnumMember{
+				Name:  name,
+				Value: value,
+			})
+		}
+	}
+
+	return members
 }
 
 // IsPrimitive checks if a shape is a primitive type
