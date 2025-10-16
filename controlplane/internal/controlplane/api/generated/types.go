@@ -3,6 +3,7 @@
 package generated
 
 import (
+	"github.com/nandemo-ya/kecs/controlplane/internal/common"
 	"time"
 )
 
@@ -27,6 +28,17 @@ func (e AccessDeniedException) ErrorCode() string {
 // ErrorFault indicates whether this is a client or server error
 func (e AccessDeniedException) ErrorFault() string {
 	return "client"
+}
+
+// AdvancedConfiguration represents the AdvancedConfiguration structure
+type AdvancedConfiguration struct {
+	AlternateTargetGroupArn *string `json:"alternateTargetGroupArn,omitempty"`
+
+	ProductionListenerRule *string `json:"productionListenerRule,omitempty"`
+
+	RoleArn *string `json:"roleArn,omitempty"`
+
+	TestListenerRule *string `json:"testListenerRule,omitempty"`
 }
 
 // Attachment represents the Attachment structure
@@ -551,7 +563,7 @@ type ContainerInstance struct {
 
 	PendingTasksCount *int32 `json:"pendingTasksCount,omitempty"`
 
-	RegisteredAt *time.Time `json:"registeredAt,omitempty"`
+	RegisteredAt *common.UnixTime `json:"registeredAt,omitempty"`
 
 	RegisteredResources []Resource `json:"registeredResources,omitempty"`
 
@@ -864,7 +876,7 @@ type DeleteTaskSetResponse struct {
 type Deployment struct {
 	CapacityProviderStrategy []CapacityProviderStrategyItem `json:"capacityProviderStrategy,omitempty"`
 
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	CreatedAt *common.UnixTime `json:"createdAt,omitempty"`
 
 	DesiredCount *int32 `json:"desiredCount,omitempty"`
 
@@ -898,7 +910,7 @@ type Deployment struct {
 
 	TaskDefinition *string `json:"taskDefinition,omitempty"`
 
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	UpdatedAt *common.UnixTime `json:"updatedAt,omitempty"`
 
 	VolumeConfigurations []ServiceVolumeConfiguration `json:"volumeConfigurations,omitempty"`
 
@@ -925,11 +937,17 @@ type DeploymentCircuitBreaker struct {
 type DeploymentConfiguration struct {
 	Alarms *DeploymentAlarms `json:"alarms,omitempty"`
 
+	BakeTimeInMinutes *int32 `json:"bakeTimeInMinutes,omitempty"`
+
 	DeploymentCircuitBreaker *DeploymentCircuitBreaker `json:"deploymentCircuitBreaker,omitempty"`
+
+	LifecycleHooks []DeploymentLifecycleHook `json:"lifecycleHooks,omitempty"`
 
 	MaximumPercent *int32 `json:"maximumPercent,omitempty"`
 
 	MinimumHealthyPercent *int32 `json:"minimumHealthyPercent,omitempty"`
+
+	Strategy *DeploymentStrategy `json:"strategy,omitempty"`
 }
 
 // DeploymentController represents the DeploymentController structure
@@ -941,6 +959,21 @@ type DeploymentController struct {
 type DeploymentEphemeralStorage struct {
 	KmsKeyId *string `json:"kmsKeyId,omitempty"`
 }
+
+// DeploymentLifecycleHook represents the DeploymentLifecycleHook structure
+type DeploymentLifecycleHook struct {
+	HookTargetArn *string `json:"hookTargetArn,omitempty"`
+
+	LifecycleStages []DeploymentLifecycleHookStage `json:"lifecycleStages,omitempty"`
+
+	RoleArn *string `json:"roleArn,omitempty"`
+}
+
+// DeploymentLifecycleHookList represents the DeploymentLifecycleHookList type
+type DeploymentLifecycleHookList []DeploymentLifecycleHook
+
+// DeploymentLifecycleHookStageList represents the DeploymentLifecycleHookStageList type
+type DeploymentLifecycleHookStageList []DeploymentLifecycleHookStage
 
 // Deployments represents the Deployments type
 type Deployments []Deployment
@@ -1380,9 +1413,9 @@ type InferenceAccelerators []InferenceAccelerator
 
 // InstanceHealthCheckResult represents the InstanceHealthCheckResult structure
 type InstanceHealthCheckResult struct {
-	LastStatusChange *time.Time `json:"lastStatusChange,omitempty"`
+	LastStatusChange *common.UnixTime `json:"lastStatusChange,omitempty"`
 
-	LastUpdated *time.Time `json:"lastUpdated,omitempty"`
+	LastUpdated *common.UnixTime `json:"lastUpdated,omitempty"`
 
 	Status *InstanceHealthCheckState `json:"status,omitempty"`
 
@@ -1683,6 +1716,8 @@ type ListTasksResponse struct {
 
 // LoadBalancer represents the LoadBalancer structure
 type LoadBalancer struct {
+	AdvancedConfiguration *AdvancedConfiguration `json:"advancedConfiguration,omitempty"`
+
 	ContainerName *string `json:"containerName,omitempty"`
 
 	ContainerPort *int32 `json:"containerPort,omitempty"`
@@ -1712,7 +1747,7 @@ type Long int64
 
 // ManagedAgent represents the ManagedAgent structure
 type ManagedAgent struct {
-	LastStartedAt *time.Time `json:"lastStartedAt,omitempty"`
+	LastStartedAt *common.UnixTime `json:"lastStartedAt,omitempty"`
 
 	LastStatus *string `json:"lastStatus,omitempty"`
 
@@ -1967,7 +2002,7 @@ type PortNumber int32
 
 // ProtectedTask represents the ProtectedTask structure
 type ProtectedTask struct {
-	ExpirationDate *time.Time `json:"expirationDate,omitempty"`
+	ExpirationDate *common.UnixTime `json:"expirationDate,omitempty"`
 
 	ProtectionEnabled *bool `json:"protectionEnabled,omitempty"`
 
@@ -2121,6 +2156,11 @@ type RepositoryCredentials struct {
 // RequiresAttributes represents the RequiresAttributes type
 type RequiresAttributes []Attribute
 
+// ResolvedConfiguration represents the ResolvedConfiguration structure
+type ResolvedConfiguration struct {
+	LoadBalancers []ServiceRevisionLoadBalancer `json:"loadBalancers,omitempty"`
+}
+
 // Resource represents the Resource structure
 type Resource struct {
 	DoubleValue *float64 `json:"doubleValue,omitempty"`
@@ -2198,7 +2238,7 @@ type Rollback struct {
 
 	ServiceRevisionArn *string `json:"serviceRevisionArn,omitempty"`
 
-	StartedAt *time.Time `json:"startedAt,omitempty"`
+	StartedAt *common.UnixTime `json:"startedAt,omitempty"`
 }
 
 // RunTaskRequest represents the RunTaskRequest structure
@@ -2304,7 +2344,7 @@ type Service struct {
 
 	ClusterArn *string `json:"clusterArn,omitempty"`
 
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	CreatedAt *common.UnixTime `json:"createdAt,omitempty"`
 
 	CreatedBy *string `json:"createdBy,omitempty"`
 
@@ -2368,6 +2408,8 @@ type ServiceConnectClientAlias struct {
 	DnsName *string `json:"dnsName,omitempty"`
 
 	Port int32 `json:"port"`
+
+	TestTrafficRules *ServiceConnectTestTrafficRules `json:"testTrafficRules,omitempty"`
 }
 
 // ServiceConnectClientAliasList represents the ServiceConnectClientAliasList type
@@ -2412,6 +2454,23 @@ type ServiceConnectServiceResource struct {
 // ServiceConnectServiceResourceList represents the ServiceConnectServiceResourceList type
 type ServiceConnectServiceResourceList []ServiceConnectServiceResource
 
+// ServiceConnectTestTrafficHeaderMatchRules represents the ServiceConnectTestTrafficHeaderMatchRules structure
+type ServiceConnectTestTrafficHeaderMatchRules struct {
+	Exact string `json:"exact"`
+}
+
+// ServiceConnectTestTrafficHeaderRules represents the ServiceConnectTestTrafficHeaderRules structure
+type ServiceConnectTestTrafficHeaderRules struct {
+	Name string `json:"name"`
+
+	Value *ServiceConnectTestTrafficHeaderMatchRules `json:"value,omitempty"`
+}
+
+// ServiceConnectTestTrafficRules represents the ServiceConnectTestTrafficRules structure
+type ServiceConnectTestTrafficRules struct {
+	Header ServiceConnectTestTrafficHeaderRules `json:"header"`
+}
+
 // ServiceConnectTlsCertificateAuthority represents the ServiceConnectTlsCertificateAuthority structure
 type ServiceConnectTlsCertificateAuthority struct {
 	AwsPcaAuthorityArn *string `json:"awsPcaAuthorityArn,omitempty"`
@@ -2432,13 +2491,15 @@ type ServiceDeployment struct {
 
 	ClusterArn *string `json:"clusterArn,omitempty"`
 
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	CreatedAt *common.UnixTime `json:"createdAt,omitempty"`
 
 	DeploymentCircuitBreaker *ServiceDeploymentCircuitBreaker `json:"deploymentCircuitBreaker,omitempty"`
 
 	DeploymentConfiguration *DeploymentConfiguration `json:"deploymentConfiguration,omitempty"`
 
-	FinishedAt *time.Time `json:"finishedAt,omitempty"`
+	FinishedAt *common.UnixTime `json:"finishedAt,omitempty"`
+
+	LifecycleStage *ServiceDeploymentLifecycleStage `json:"lifecycleStage,omitempty"`
 
 	Rollback *Rollback `json:"rollback,omitempty"`
 
@@ -2448,17 +2509,17 @@ type ServiceDeployment struct {
 
 	SourceServiceRevisions []ServiceRevisionSummary `json:"sourceServiceRevisions,omitempty"`
 
-	StartedAt *time.Time `json:"startedAt,omitempty"`
+	StartedAt *common.UnixTime `json:"startedAt,omitempty"`
 
 	Status *ServiceDeploymentStatus `json:"status,omitempty"`
 
 	StatusReason *string `json:"statusReason,omitempty"`
 
-	StoppedAt *time.Time `json:"stoppedAt,omitempty"`
+	StoppedAt *common.UnixTime `json:"stoppedAt,omitempty"`
 
 	TargetServiceRevision *ServiceRevisionSummary `json:"targetServiceRevision,omitempty"`
 
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	UpdatedAt *common.UnixTime `json:"updatedAt,omitempty"`
 }
 
 // ServiceDeploymentAlarms represents the ServiceDeploymentAlarms structure
@@ -2474,15 +2535,15 @@ type ServiceDeploymentAlarms struct {
 type ServiceDeploymentBrief struct {
 	ClusterArn *string `json:"clusterArn,omitempty"`
 
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	CreatedAt *common.UnixTime `json:"createdAt,omitempty"`
 
-	FinishedAt *time.Time `json:"finishedAt,omitempty"`
+	FinishedAt *common.UnixTime `json:"finishedAt,omitempty"`
 
 	ServiceArn *string `json:"serviceArn,omitempty"`
 
 	ServiceDeploymentArn *string `json:"serviceDeploymentArn,omitempty"`
 
-	StartedAt *time.Time `json:"startedAt,omitempty"`
+	StartedAt *common.UnixTime `json:"startedAt,omitempty"`
 
 	Status *ServiceDeploymentStatus `json:"status,omitempty"`
 
@@ -2531,7 +2592,7 @@ type ServiceDeploymentsBrief []ServiceDeploymentBrief
 
 // ServiceEvent represents the ServiceEvent structure
 type ServiceEvent struct {
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	CreatedAt *common.UnixTime `json:"createdAt,omitempty"`
 
 	Id *string `json:"id,omitempty"`
 
@@ -2631,7 +2692,7 @@ type ServiceRevision struct {
 
 	ContainerImages []ContainerImage `json:"containerImages,omitempty"`
 
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	CreatedAt *common.UnixTime `json:"createdAt,omitempty"`
 
 	FargateEphemeralStorage *DeploymentEphemeralStorage `json:"fargateEphemeralStorage,omitempty"`
 
@@ -2647,6 +2708,8 @@ type ServiceRevision struct {
 
 	PlatformVersion *string `json:"platformVersion,omitempty"`
 
+	ResolvedConfiguration *ResolvedConfiguration `json:"resolvedConfiguration,omitempty"`
+
 	ServiceArn *string `json:"serviceArn,omitempty"`
 
 	ServiceConnectConfiguration *ServiceConnectConfiguration `json:"serviceConnectConfiguration,omitempty"`
@@ -2661,6 +2724,16 @@ type ServiceRevision struct {
 
 	VpcLatticeConfigurations []VpcLatticeConfiguration `json:"vpcLatticeConfigurations,omitempty"`
 }
+
+// ServiceRevisionLoadBalancer represents the ServiceRevisionLoadBalancer structure
+type ServiceRevisionLoadBalancer struct {
+	ProductionListenerRule *string `json:"productionListenerRule,omitempty"`
+
+	TargetGroupArn *string `json:"targetGroupArn,omitempty"`
+}
+
+// ServiceRevisionLoadBalancers represents the ServiceRevisionLoadBalancers type
+type ServiceRevisionLoadBalancers []ServiceRevisionLoadBalancer
 
 // ServiceRevisionSummary represents the ServiceRevisionSummary structure
 type ServiceRevisionSummary struct {
@@ -2833,13 +2906,13 @@ type SubmitTaskStateChangeRequest struct {
 
 	Containers []ContainerStateChange `json:"containers,omitempty"`
 
-	ExecutionStoppedAt *time.Time `json:"executionStoppedAt,omitempty"`
+	ExecutionStoppedAt *common.UnixTime `json:"executionStoppedAt,omitempty"`
 
 	ManagedAgents []ManagedAgentStateChange `json:"managedAgents,omitempty"`
 
-	PullStartedAt *time.Time `json:"pullStartedAt,omitempty"`
+	PullStartedAt *common.UnixTime `json:"pullStartedAt,omitempty"`
 
-	PullStoppedAt *time.Time `json:"pullStoppedAt,omitempty"`
+	PullStoppedAt *common.UnixTime `json:"pullStoppedAt,omitempty"`
 
 	Reason *string `json:"reason,omitempty"`
 
@@ -2947,7 +3020,7 @@ type Task struct {
 
 	Connectivity *Connectivity `json:"connectivity,omitempty"`
 
-	ConnectivityAt *time.Time `json:"connectivityAt,omitempty"`
+	ConnectivityAt *common.UnixTime `json:"connectivityAt,omitempty"`
 
 	ContainerInstanceArn *string `json:"containerInstanceArn,omitempty"`
 
@@ -2955,7 +3028,7 @@ type Task struct {
 
 	Cpu *string `json:"cpu,omitempty"`
 
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	CreatedAt *common.UnixTime `json:"createdAt,omitempty"`
 
 	DesiredStatus *string `json:"desiredStatus,omitempty"`
 
@@ -2963,7 +3036,7 @@ type Task struct {
 
 	EphemeralStorage *EphemeralStorage `json:"ephemeralStorage,omitempty"`
 
-	ExecutionStoppedAt *time.Time `json:"executionStoppedAt,omitempty"`
+	ExecutionStoppedAt *common.UnixTime `json:"executionStoppedAt,omitempty"`
 
 	FargateEphemeralStorage *TaskEphemeralStorage `json:"fargateEphemeralStorage,omitempty"`
 
@@ -2985,21 +3058,21 @@ type Task struct {
 
 	PlatformVersion *string `json:"platformVersion,omitempty"`
 
-	PullStartedAt *time.Time `json:"pullStartedAt,omitempty"`
+	PullStartedAt *common.UnixTime `json:"pullStartedAt,omitempty"`
 
-	PullStoppedAt *time.Time `json:"pullStoppedAt,omitempty"`
+	PullStoppedAt *common.UnixTime `json:"pullStoppedAt,omitempty"`
 
-	StartedAt *time.Time `json:"startedAt,omitempty"`
+	StartedAt *common.UnixTime `json:"startedAt,omitempty"`
 
 	StartedBy *string `json:"startedBy,omitempty"`
 
 	StopCode *TaskStopCode `json:"stopCode,omitempty"`
 
-	StoppedAt *time.Time `json:"stoppedAt,omitempty"`
+	StoppedAt *common.UnixTime `json:"stoppedAt,omitempty"`
 
 	StoppedReason *string `json:"stoppedReason,omitempty"`
 
-	StoppingAt *time.Time `json:"stoppingAt,omitempty"`
+	StoppingAt *common.UnixTime `json:"stoppingAt,omitempty"`
 
 	Tags []Tag `json:"tags,omitempty"`
 
@@ -3018,7 +3091,7 @@ type TaskDefinition struct {
 
 	Cpu *string `json:"cpu,omitempty"`
 
-	DeregisteredAt *time.Time `json:"deregisteredAt,omitempty"`
+	DeregisteredAt *common.UnixTime `json:"deregisteredAt,omitempty"`
 
 	EnableFaultInjection *bool `json:"enableFaultInjection,omitempty"`
 
@@ -3042,7 +3115,7 @@ type TaskDefinition struct {
 
 	ProxyConfiguration *ProxyConfiguration `json:"proxyConfiguration,omitempty"`
 
-	RegisteredAt *time.Time `json:"registeredAt,omitempty"`
+	RegisteredAt *common.UnixTime `json:"registeredAt,omitempty"`
 
 	RegisteredBy *string `json:"registeredBy,omitempty"`
 
@@ -3146,7 +3219,7 @@ type TaskSet struct {
 
 	ComputedDesiredCount *int32 `json:"computedDesiredCount,omitempty"`
 
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	CreatedAt *common.UnixTime `json:"createdAt,omitempty"`
 
 	ExternalId *string `json:"externalId,omitempty"`
 
@@ -3176,7 +3249,7 @@ type TaskSet struct {
 
 	StabilityStatus *StabilityStatus `json:"stabilityStatus,omitempty"`
 
-	StabilityStatusAt *time.Time `json:"stabilityStatusAt,omitempty"`
+	StabilityStatusAt *common.UnixTime `json:"stabilityStatusAt,omitempty"`
 
 	StartedBy *string `json:"startedBy,omitempty"`
 
@@ -3188,7 +3261,7 @@ type TaskSet struct {
 
 	TaskSetArn *string `json:"taskSetArn,omitempty"`
 
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	UpdatedAt *common.UnixTime `json:"updatedAt,omitempty"`
 }
 
 // TaskSetFieldList represents the TaskSetFieldList type
@@ -3406,6 +3479,8 @@ type UpdateServiceRequest struct {
 	Cluster *string `json:"cluster,omitempty"`
 
 	DeploymentConfiguration *DeploymentConfiguration `json:"deploymentConfiguration,omitempty"`
+
+	DeploymentController *DeploymentController `json:"deploymentController,omitempty"`
 
 	DesiredCount *int32 `json:"desiredCount,omitempty"`
 

@@ -8,6 +8,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/nandemo-ya/kecs/controlplane/internal/common"
 	"github.com/nandemo-ya/kecs/controlplane/internal/controlplane/api/generated"
 	"github.com/nandemo-ya/kecs/controlplane/internal/storage"
 )
@@ -173,8 +174,8 @@ func (m *ServiceStateMapper) MapDeploymentToService(deployment *appsv1.Deploymen
 		DesiredCount:    int32Ptr(int32(service.DesiredCount)),
 		RunningCount:    int32Ptr(int32(service.RunningCount)),
 		PendingCount:    int32Ptr(int32(service.PendingCount)),
-		CreatedAt:       timePtr(deployment.CreationTimestamp.Time),
-		UpdatedAt:       timePtr(time.Now()),
+		CreatedAt:       unixTimePtr(deployment.CreationTimestamp.Time),
+		UpdatedAt:       unixTimePtr(time.Now()),
 		LaunchType:      (*generated.LaunchType)(stringPtr(service.LaunchType)),
 		PlatformVersion: stringPtr(service.PlatformVersion),
 	}
@@ -212,6 +213,10 @@ func int32Ptr(i int32) *int32 {
 
 func timePtr(t time.Time) *time.Time {
 	return &t
+}
+
+func unixTimePtr(t time.Time) *common.UnixTime {
+	return &common.UnixTime{Time: t}
 }
 
 // generateClusterARN generates an ECS cluster ARN

@@ -950,8 +950,8 @@ func (api *DefaultECSAPI) UpdateServicePrimaryTaskSet(ctx context.Context, req *
 		ComputedDesiredCount: ptr.Int32(taskSet.ComputedDesiredCount),
 		PendingCount:         ptr.Int32(taskSet.PendingCount),
 		RunningCount:         ptr.Int32(taskSet.RunningCount),
-		CreatedAt:            ptr.Time(taskSet.CreatedAt),
-		UpdatedAt:            ptr.Time(taskSet.UpdatedAt),
+		CreatedAt:            ptr.UnixTime(taskSet.CreatedAt),
+		UpdatedAt:            ptr.UnixTime(taskSet.UpdatedAt),
 	}
 
 	// Set optional fields
@@ -1036,8 +1036,8 @@ func (api *DefaultECSAPI) DescribeServiceDeployments(ctx context.Context, req *g
 			ServiceArn:           ptr.String(service.ARN),
 			ClusterArn:           ptr.String(cluster.ARN),
 			Status:               &status,
-			CreatedAt:            ptr.Time(service.CreatedAt),
-			UpdatedAt:            ptr.Time(service.UpdatedAt),
+			CreatedAt:            ptr.UnixTime(service.CreatedAt),
+			UpdatedAt:            ptr.UnixTime(service.UpdatedAt),
 		}
 
 		// Set deployment configuration if available
@@ -1135,7 +1135,7 @@ func (api *DefaultECSAPI) DescribeServiceRevisions(ctx context.Context, req *gen
 			ServiceArn:         ptr.String(service.ARN),
 			ClusterArn:         ptr.String(cluster.ARN),
 			TaskDefinition:     ptr.String(service.TaskDefinitionARN),
-			CreatedAt:          ptr.Time(service.CreatedAt),
+			CreatedAt:          ptr.UnixTime(service.CreatedAt),
 		}
 
 		// Set capacity provider strategy if available
@@ -1246,8 +1246,8 @@ func (api *DefaultECSAPI) ListServiceDeployments(ctx context.Context, req *gener
 		ServiceArn:               ptr.String(service.ARN),
 		ClusterArn:               ptr.String(cluster.ARN),
 		Status:                   &currentStatus,
-		CreatedAt:                ptr.Time(service.UpdatedAt),
-		StartedAt:                ptr.Time(service.UpdatedAt),
+		CreatedAt:                ptr.UnixTime(service.UpdatedAt),
+		StartedAt:                ptr.UnixTime(service.UpdatedAt),
 		TargetServiceRevisionArn: ptr.String(fmt.Sprintf("arn:aws:ecs:%s:%s:service-revision/%s/%s/current", api.region, api.accountID, clusterName, service.ServiceName)),
 	}
 	deployments = append(deployments, currentDeployment)
@@ -1261,9 +1261,9 @@ func (api *DefaultECSAPI) ListServiceDeployments(ctx context.Context, req *gener
 			ServiceArn:               ptr.String(service.ARN),
 			ClusterArn:               ptr.String(cluster.ARN),
 			Status:                   &prevStatus,
-			CreatedAt:                ptr.Time(service.CreatedAt),
-			StartedAt:                ptr.Time(service.CreatedAt),
-			FinishedAt:               ptr.Time(service.UpdatedAt.Add(-1 * time.Hour)), // Simulate finished 1 hour before update
+			CreatedAt:                ptr.UnixTime(service.CreatedAt),
+			StartedAt:                ptr.UnixTime(service.CreatedAt),
+			FinishedAt:               ptr.UnixTime(service.UpdatedAt.Add(-1 * time.Hour)), // Simulate finished 1 hour before update
 			TargetServiceRevisionArn: ptr.String(fmt.Sprintf("arn:aws:ecs:%s:%s:service-revision/%s/%s/previous-1", api.region, api.accountID, clusterName, service.ServiceName)),
 		}
 		deployments = append(deployments, prevDeployment)
@@ -1364,7 +1364,7 @@ func storageServiceToGeneratedService(storageService *storage.Service) *generate
 		EnableECSManagedTags:          ptr.Bool(storageService.EnableECSManagedTags),
 		EnableExecuteCommand:          ptr.Bool(storageService.EnableExecuteCommand),
 		HealthCheckGracePeriodSeconds: ptr.Int32(int32(storageService.HealthCheckGracePeriodSeconds)),
-		CreatedAt:                     ptr.Time(storageService.CreatedAt),
+		CreatedAt:                     ptr.UnixTime(storageService.CreatedAt),
 	}
 
 	// Set optional fields
@@ -1454,8 +1454,8 @@ func storageServiceToGeneratedService(storageService *storage.Service) *generate
 		DesiredCount:   ptr.Int32(int32(storageService.DesiredCount)),
 		RunningCount:   ptr.Int32(int32(storageService.RunningCount)),
 		PendingCount:   ptr.Int32(int32(storageService.PendingCount)),
-		CreatedAt:      ptr.Time(storageService.CreatedAt),
-		UpdatedAt:      ptr.Time(storageService.UpdatedAt),
+		CreatedAt:      ptr.UnixTime(storageService.CreatedAt),
+		UpdatedAt:      ptr.UnixTime(storageService.UpdatedAt),
 	}
 
 	if storageService.LaunchType != "" {

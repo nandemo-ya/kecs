@@ -6,6 +6,10 @@ package generated
 type AgentUpdateStatus string
 
 const (
+	AgentUpdateStatusUPDATING AgentUpdateStatus = "UPDATING"
+
+	AgentUpdateStatusUPDATED AgentUpdateStatus = "UPDATED"
+
 	AgentUpdateStatusFAILED AgentUpdateStatus = "FAILED"
 
 	AgentUpdateStatusPENDING AgentUpdateStatus = "PENDING"
@@ -13,21 +17,17 @@ const (
 	AgentUpdateStatusSTAGING AgentUpdateStatus = "STAGING"
 
 	AgentUpdateStatusSTAGED AgentUpdateStatus = "STAGED"
-
-	AgentUpdateStatusUPDATING AgentUpdateStatus = "UPDATING"
-
-	AgentUpdateStatusUPDATED AgentUpdateStatus = "UPDATED"
 )
 
 // ApplicationProtocol represents the ApplicationProtocol enum type
 type ApplicationProtocol string
 
 const (
-	ApplicationProtocolHTTP ApplicationProtocol = "HTTP"
+	ApplicationProtocolHTTP ApplicationProtocol = "http"
 
-	ApplicationProtocolHTTP2 ApplicationProtocol = "HTTP2"
+	ApplicationProtocolHTTP2 ApplicationProtocol = "http2"
 
-	ApplicationProtocolGRPC ApplicationProtocol = "GRPC"
+	ApplicationProtocolGRPC ApplicationProtocol = "grpc"
 )
 
 // AssignPublicIp represents the AssignPublicIp enum type
@@ -77,8 +77,6 @@ const (
 type CapacityProviderUpdateStatus string
 
 const (
-	CapacityProviderUpdateStatusUPDATE_COMPLETE CapacityProviderUpdateStatus = "UPDATE_COMPLETE"
-
 	CapacityProviderUpdateStatusUPDATE_FAILED CapacityProviderUpdateStatus = "UPDATE_FAILED"
 
 	CapacityProviderUpdateStatusDELETE_IN_PROGRESS CapacityProviderUpdateStatus = "DELETE_IN_PROGRESS"
@@ -88,6 +86,8 @@ const (
 	CapacityProviderUpdateStatusDELETE_FAILED CapacityProviderUpdateStatus = "DELETE_FAILED"
 
 	CapacityProviderUpdateStatusUPDATE_IN_PROGRESS CapacityProviderUpdateStatus = "UPDATE_IN_PROGRESS"
+
+	CapacityProviderUpdateStatusUPDATE_COMPLETE CapacityProviderUpdateStatus = "UPDATE_COMPLETE"
 )
 
 // ClusterField represents the ClusterField enum type
@@ -109,7 +109,7 @@ const (
 type ClusterSettingName string
 
 const (
-	ClusterSettingNameCONTAINER_INSIGHTS ClusterSettingName = "CONTAINER_INSIGHTS"
+	ClusterSettingNameCONTAINER_INSIGHTS ClusterSettingName = "containerInsights"
 )
 
 // Compatibility represents the Compatibility enum type
@@ -127,9 +127,9 @@ const (
 type Connectivity string
 
 const (
-	ConnectivityCONNECTED Connectivity = "CONNECTED"
-
 	ConnectivityDISCONNECTED Connectivity = "DISCONNECTED"
+
+	ConnectivityCONNECTED Connectivity = "CONNECTED"
 )
 
 // ContainerCondition represents the ContainerCondition enum type
@@ -149,9 +149,9 @@ const (
 type ContainerInstanceField string
 
 const (
-	ContainerInstanceFieldCONTAINER_INSTANCE_HEALTH ContainerInstanceField = "CONTAINER_INSTANCE_HEALTH"
-
 	ContainerInstanceFieldTAGS ContainerInstanceField = "TAGS"
+
+	ContainerInstanceFieldCONTAINER_INSTANCE_HEALTH ContainerInstanceField = "CONTAINER_INSTANCE_HEALTH"
 )
 
 // ContainerInstanceStatus represents the ContainerInstanceStatus enum type
@@ -173,11 +173,30 @@ const (
 type DeploymentControllerType string
 
 const (
+	DeploymentControllerTypeEXTERNAL DeploymentControllerType = "EXTERNAL"
+
 	DeploymentControllerTypeECS DeploymentControllerType = "ECS"
 
 	DeploymentControllerTypeCODE_DEPLOY DeploymentControllerType = "CODE_DEPLOY"
+)
 
-	DeploymentControllerTypeEXTERNAL DeploymentControllerType = "EXTERNAL"
+// DeploymentLifecycleHookStage represents the DeploymentLifecycleHookStage enum type
+type DeploymentLifecycleHookStage string
+
+const (
+	DeploymentLifecycleHookStagePOST_PRODUCTION_TRAFFIC_SHIFT DeploymentLifecycleHookStage = "POST_PRODUCTION_TRAFFIC_SHIFT"
+
+	DeploymentLifecycleHookStageRECONCILE_SERVICE DeploymentLifecycleHookStage = "RECONCILE_SERVICE"
+
+	DeploymentLifecycleHookStagePRE_SCALE_UP DeploymentLifecycleHookStage = "PRE_SCALE_UP"
+
+	DeploymentLifecycleHookStagePOST_SCALE_UP DeploymentLifecycleHookStage = "POST_SCALE_UP"
+
+	DeploymentLifecycleHookStageTEST_TRAFFIC_SHIFT DeploymentLifecycleHookStage = "TEST_TRAFFIC_SHIFT"
+
+	DeploymentLifecycleHookStagePOST_TEST_TRAFFIC_SHIFT DeploymentLifecycleHookStage = "POST_TEST_TRAFFIC_SHIFT"
+
+	DeploymentLifecycleHookStagePRODUCTION_TRAFFIC_SHIFT DeploymentLifecycleHookStage = "PRODUCTION_TRAFFIC_SHIFT"
 )
 
 // DeploymentRolloutState represents the DeploymentRolloutState enum type
@@ -189,6 +208,15 @@ const (
 	DeploymentRolloutStateFAILED DeploymentRolloutState = "FAILED"
 
 	DeploymentRolloutStateIN_PROGRESS DeploymentRolloutState = "IN_PROGRESS"
+)
+
+// DeploymentStrategy represents the DeploymentStrategy enum type
+type DeploymentStrategy string
+
+const (
+	DeploymentStrategyROLLING DeploymentStrategy = "ROLLING"
+
+	DeploymentStrategyBLUE_GREEN DeploymentStrategy = "BLUE_GREEN"
 )
 
 // DesiredStatus represents the DesiredStatus enum type
@@ -206,18 +234,18 @@ const (
 type DeviceCgroupPermission string
 
 const (
-	DeviceCgroupPermissionWRITE DeviceCgroupPermission = "WRITE"
+	DeviceCgroupPermissionREAD DeviceCgroupPermission = "read"
 
-	DeviceCgroupPermissionMKNOD DeviceCgroupPermission = "MKNOD"
+	DeviceCgroupPermissionWRITE DeviceCgroupPermission = "write"
 
-	DeviceCgroupPermissionREAD DeviceCgroupPermission = "READ"
+	DeviceCgroupPermissionMKNOD DeviceCgroupPermission = "mknod"
 )
 
 // EBSResourceType represents the EBSResourceType enum type
 type EBSResourceType string
 
 const (
-	EBSResourceTypeVOLUME EBSResourceType = "VOLUME"
+	EBSResourceTypeVOLUME EBSResourceType = "volume"
 )
 
 // EFSAuthorizationConfigIAM represents the EFSAuthorizationConfigIAM enum type
@@ -242,51 +270,51 @@ const (
 type EnvironmentFileType string
 
 const (
-	EnvironmentFileTypeS3 EnvironmentFileType = "S3"
+	EnvironmentFileTypeS3 EnvironmentFileType = "s3"
 )
 
 // ExecuteCommandLogging represents the ExecuteCommandLogging enum type
 type ExecuteCommandLogging string
 
 const (
+	ExecuteCommandLoggingNONE ExecuteCommandLogging = "NONE"
+
 	ExecuteCommandLoggingDEFAULT ExecuteCommandLogging = "DEFAULT"
 
 	ExecuteCommandLoggingOVERRIDE ExecuteCommandLogging = "OVERRIDE"
-
-	ExecuteCommandLoggingNONE ExecuteCommandLogging = "NONE"
 )
 
 // FirelensConfigurationType represents the FirelensConfigurationType enum type
 type FirelensConfigurationType string
 
 const (
-	FirelensConfigurationTypeFLUENTBIT FirelensConfigurationType = "FLUENTBIT"
+	FirelensConfigurationTypeFLUENTBIT FirelensConfigurationType = "fluentbit"
 
-	FirelensConfigurationTypeFLUENTD FirelensConfigurationType = "FLUENTD"
+	FirelensConfigurationTypeFLUENTD FirelensConfigurationType = "fluentd"
 )
 
 // HealthStatus represents the HealthStatus enum type
 type HealthStatus string
 
 const (
-	HealthStatusUNKNOWN HealthStatus = "UNKNOWN"
-
 	HealthStatusHEALTHY HealthStatus = "HEALTHY"
 
 	HealthStatusUNHEALTHY HealthStatus = "UNHEALTHY"
+
+	HealthStatusUNKNOWN HealthStatus = "UNKNOWN"
 )
 
 // InstanceHealthCheckState represents the InstanceHealthCheckState enum type
 type InstanceHealthCheckState string
 
 const (
+	InstanceHealthCheckStateINITIALIZING InstanceHealthCheckState = "INITIALIZING"
+
 	InstanceHealthCheckStateOK InstanceHealthCheckState = "OK"
 
 	InstanceHealthCheckStateIMPAIRED InstanceHealthCheckState = "IMPAIRED"
 
 	InstanceHealthCheckStateINSUFFICIENT_DATA InstanceHealthCheckState = "INSUFFICIENT_DATA"
-
-	InstanceHealthCheckStateINITIALIZING InstanceHealthCheckState = "INITIALIZING"
 )
 
 // InstanceHealthCheckType represents the InstanceHealthCheckType enum type
@@ -300,11 +328,11 @@ const (
 type IpcMode string
 
 const (
-	IpcModeHOST IpcMode = "HOST"
+	IpcModeNONE IpcMode = "none"
 
-	IpcModeTASK IpcMode = "TASK"
+	IpcModeHOST IpcMode = "host"
 
-	IpcModeNONE IpcMode = "NONE"
+	IpcModeTASK IpcMode = "task"
 )
 
 // LaunchType represents the LaunchType enum type
@@ -322,21 +350,21 @@ const (
 type LogDriver string
 
 const (
-	LogDriverAWSFIRELENS LogDriver = "AWSFIRELENS"
+	LogDriverFLUENTD LogDriver = "fluentd"
 
-	LogDriverJSON_FILE LogDriver = "JSON_FILE"
+	LogDriverAWSLOGS LogDriver = "awslogs"
 
-	LogDriverSYSLOG LogDriver = "SYSLOG"
+	LogDriverSPLUNK LogDriver = "splunk"
 
-	LogDriverJOURNALD LogDriver = "JOURNALD"
+	LogDriverAWSFIRELENS LogDriver = "awsfirelens"
 
-	LogDriverGELF LogDriver = "GELF"
+	LogDriverJSON_FILE LogDriver = "json-file"
 
-	LogDriverFLUENTD LogDriver = "FLUENTD"
+	LogDriverSYSLOG LogDriver = "syslog"
 
-	LogDriverAWSLOGS LogDriver = "AWSLOGS"
+	LogDriverJOURNALD LogDriver = "journald"
 
-	LogDriverSPLUNK LogDriver = "SPLUNK"
+	LogDriverGELF LogDriver = "gelf"
 )
 
 // ManagedAgentName represents the ManagedAgentName enum type
@@ -359,9 +387,9 @@ const (
 type ManagedScalingStatus string
 
 const (
-	ManagedScalingStatusDISABLED ManagedScalingStatus = "DISABLED"
-
 	ManagedScalingStatusENABLED ManagedScalingStatus = "ENABLED"
+
+	ManagedScalingStatusDISABLED ManagedScalingStatus = "DISABLED"
 )
 
 // ManagedTerminationProtection represents the ManagedTerminationProtection enum type
@@ -377,22 +405,30 @@ const (
 type NetworkMode string
 
 const (
-	NetworkModeBRIDGE NetworkMode = "BRIDGE"
+	NetworkModeBRIDGE NetworkMode = "bridge"
 
-	NetworkModeHOST NetworkMode = "HOST"
+	NetworkModeHOST NetworkMode = "host"
 
-	NetworkModeAWSVPC NetworkMode = "AWSVPC"
+	NetworkModeAWSVPC NetworkMode = "awsvpc"
 
-	NetworkModeNONE NetworkMode = "NONE"
+	NetworkModeNONE NetworkMode = "none"
 )
 
 // OSFamily represents the OSFamily enum type
 type OSFamily string
 
 const (
+	OSFamilyWINDOWS_SERVER_2004_CORE OSFamily = "WINDOWS_SERVER_2004_CORE"
+
+	OSFamilyWINDOWS_SERVER_2022_CORE OSFamily = "WINDOWS_SERVER_2022_CORE"
+
 	OSFamilyWINDOWS_SERVER_2022_FULL OSFamily = "WINDOWS_SERVER_2022_FULL"
 
+	OSFamilyWINDOWS_SERVER_2025_FULL OSFamily = "WINDOWS_SERVER_2025_FULL"
+
 	OSFamilyWINDOWS_SERVER_20H2_CORE OSFamily = "WINDOWS_SERVER_20H2_CORE"
+
+	OSFamilyWINDOWS_SERVER_2025_CORE OSFamily = "WINDOWS_SERVER_2025_CORE"
 
 	OSFamilyLINUX OSFamily = "LINUX"
 
@@ -401,39 +437,35 @@ const (
 	OSFamilyWINDOWS_SERVER_2019_CORE OSFamily = "WINDOWS_SERVER_2019_CORE"
 
 	OSFamilyWINDOWS_SERVER_2016_FULL OSFamily = "WINDOWS_SERVER_2016_FULL"
-
-	OSFamilyWINDOWS_SERVER_2004_CORE OSFamily = "WINDOWS_SERVER_2004_CORE"
-
-	OSFamilyWINDOWS_SERVER_2022_CORE OSFamily = "WINDOWS_SERVER_2022_CORE"
 )
 
 // PidMode represents the PidMode enum type
 type PidMode string
 
 const (
-	PidModeHOST PidMode = "HOST"
+	PidModeHOST PidMode = "host"
 
-	PidModeTASK PidMode = "TASK"
+	PidModeTASK PidMode = "task"
 )
 
 // PlacementConstraintType represents the PlacementConstraintType enum type
 type PlacementConstraintType string
 
 const (
-	PlacementConstraintTypeMEMBER_OF PlacementConstraintType = "MEMBER_OF"
+	PlacementConstraintTypeDISTINCT_INSTANCE PlacementConstraintType = "distinctInstance"
 
-	PlacementConstraintTypeDISTINCT_INSTANCE PlacementConstraintType = "DISTINCT_INSTANCE"
+	PlacementConstraintTypeMEMBER_OF PlacementConstraintType = "memberOf"
 )
 
 // PlacementStrategyType represents the PlacementStrategyType enum type
 type PlacementStrategyType string
 
 const (
-	PlacementStrategyTypeRANDOM PlacementStrategyType = "RANDOM"
+	PlacementStrategyTypeBINPACK PlacementStrategyType = "binpack"
 
-	PlacementStrategyTypeSPREAD PlacementStrategyType = "SPREAD"
+	PlacementStrategyTypeRANDOM PlacementStrategyType = "random"
 
-	PlacementStrategyTypeBINPACK PlacementStrategyType = "BINPACK"
+	PlacementStrategyTypeSPREAD PlacementStrategyType = "spread"
 )
 
 // PlatformDeviceType represents the PlatformDeviceType enum type
@@ -467,7 +499,7 @@ type ResourceType string
 const (
 	ResourceTypeGPU ResourceType = "GPU"
 
-	ResourceTypeINFERENCE_ACCELERATOR ResourceType = "INFERENCE_ACCELERATOR"
+	ResourceTypeINFERENCE_ACCELERATOR ResourceType = "InferenceAccelerator"
 )
 
 // ScaleUnit represents the ScaleUnit enum type
@@ -481,18 +513,43 @@ const (
 type SchedulingStrategy string
 
 const (
-	SchedulingStrategyREPLICA SchedulingStrategy = "REPLICA"
-
 	SchedulingStrategyDAEMON SchedulingStrategy = "DAEMON"
+
+	SchedulingStrategyREPLICA SchedulingStrategy = "REPLICA"
 )
 
 // Scope represents the Scope enum type
 type Scope string
 
 const (
-	ScopeTASK Scope = "TASK"
+	ScopeSHARED Scope = "shared"
 
-	ScopeSHARED Scope = "SHARED"
+	ScopeTASK Scope = "task"
+)
+
+// ServiceDeploymentLifecycleStage represents the ServiceDeploymentLifecycleStage enum type
+type ServiceDeploymentLifecycleStage string
+
+const (
+	ServiceDeploymentLifecycleStagePRE_SCALE_UP ServiceDeploymentLifecycleStage = "PRE_SCALE_UP"
+
+	ServiceDeploymentLifecycleStageSCALE_UP ServiceDeploymentLifecycleStage = "SCALE_UP"
+
+	ServiceDeploymentLifecycleStagePRODUCTION_TRAFFIC_SHIFT ServiceDeploymentLifecycleStage = "PRODUCTION_TRAFFIC_SHIFT"
+
+	ServiceDeploymentLifecycleStageRECONCILE_SERVICE ServiceDeploymentLifecycleStage = "RECONCILE_SERVICE"
+
+	ServiceDeploymentLifecycleStagePOST_SCALE_UP ServiceDeploymentLifecycleStage = "POST_SCALE_UP"
+
+	ServiceDeploymentLifecycleStageTEST_TRAFFIC_SHIFT ServiceDeploymentLifecycleStage = "TEST_TRAFFIC_SHIFT"
+
+	ServiceDeploymentLifecycleStagePOST_TEST_TRAFFIC_SHIFT ServiceDeploymentLifecycleStage = "POST_TEST_TRAFFIC_SHIFT"
+
+	ServiceDeploymentLifecycleStagePOST_PRODUCTION_TRAFFIC_SHIFT ServiceDeploymentLifecycleStage = "POST_PRODUCTION_TRAFFIC_SHIFT"
+
+	ServiceDeploymentLifecycleStageBAKE_TIME ServiceDeploymentLifecycleStage = "BAKE_TIME"
+
+	ServiceDeploymentLifecycleStageCLEAN_UP ServiceDeploymentLifecycleStage = "CLEAN_UP"
 )
 
 // ServiceDeploymentRollbackMonitorsStatus represents the ServiceDeploymentRollbackMonitorsStatus enum type
@@ -516,19 +573,19 @@ const (
 
 	ServiceDeploymentStatusROLLBACK_REQUESTED ServiceDeploymentStatus = "ROLLBACK_REQUESTED"
 
-	ServiceDeploymentStatusROLLBACK_IN_PROGRESS ServiceDeploymentStatus = "ROLLBACK_IN_PROGRESS"
+	ServiceDeploymentStatusROLLBACK_SUCCESSFUL ServiceDeploymentStatus = "ROLLBACK_SUCCESSFUL"
 
-	ServiceDeploymentStatusROLLBACK_FAILED ServiceDeploymentStatus = "ROLLBACK_FAILED"
+	ServiceDeploymentStatusPENDING ServiceDeploymentStatus = "PENDING"
 
 	ServiceDeploymentStatusSUCCESSFUL ServiceDeploymentStatus = "SUCCESSFUL"
 
 	ServiceDeploymentStatusSTOPPED ServiceDeploymentStatus = "STOPPED"
 
-	ServiceDeploymentStatusROLLBACK_SUCCESSFUL ServiceDeploymentStatus = "ROLLBACK_SUCCESSFUL"
-
-	ServiceDeploymentStatusPENDING ServiceDeploymentStatus = "PENDING"
-
 	ServiceDeploymentStatusSTOP_REQUESTED ServiceDeploymentStatus = "STOP_REQUESTED"
+
+	ServiceDeploymentStatusROLLBACK_IN_PROGRESS ServiceDeploymentStatus = "ROLLBACK_IN_PROGRESS"
+
+	ServiceDeploymentStatusROLLBACK_FAILED ServiceDeploymentStatus = "ROLLBACK_FAILED"
 )
 
 // ServiceField represents the ServiceField enum type
@@ -542,34 +599,34 @@ const (
 type SettingName string
 
 const (
-	SettingNameSERVICE_LONG_ARN_FORMAT SettingName = "SERVICE_LONG_ARN_FORMAT"
+	SettingNameTAG_RESOURCE_AUTHORIZATION SettingName = "tagResourceAuthorization"
 
-	SettingNameTASK_LONG_ARN_FORMAT SettingName = "TASK_LONG_ARN_FORMAT"
+	SettingNameFARGATE_TASK_RETIREMENT_WAIT_PERIOD SettingName = "fargateTaskRetirementWaitPeriod"
 
-	SettingNameCONTAINER_INSTANCE_LONG_ARN_FORMAT SettingName = "CONTAINER_INSTANCE_LONG_ARN_FORMAT"
+	SettingNameDEFAULT_LOG_DRIVER_MODE SettingName = "defaultLogDriverMode"
 
-	SettingNameFARGATE_FIPS_MODE SettingName = "FARGATE_FIPS_MODE"
+	SettingNameSERVICE_LONG_ARN_FORMAT SettingName = "serviceLongArnFormat"
 
-	SettingNameFARGATE_TASK_RETIREMENT_WAIT_PERIOD SettingName = "FARGATE_TASK_RETIREMENT_WAIT_PERIOD"
+	SettingNameAWSVPC_TRUNKING SettingName = "awsvpcTrunking"
 
-	SettingNameGUARD_DUTY_ACTIVATE SettingName = "GUARD_DUTY_ACTIVATE"
+	SettingNameGUARD_DUTY_ACTIVATE SettingName = "guardDutyActivate"
 
-	SettingNameDEFAULT_LOG_DRIVER_MODE SettingName = "DEFAULT_LOG_DRIVER_MODE"
+	SettingNameTASK_LONG_ARN_FORMAT SettingName = "taskLongArnFormat"
 
-	SettingNameAWSVPC_TRUNKING SettingName = "AWSVPC_TRUNKING"
+	SettingNameCONTAINER_INSTANCE_LONG_ARN_FORMAT SettingName = "containerInstanceLongArnFormat"
 
-	SettingNameCONTAINER_INSIGHTS SettingName = "CONTAINER_INSIGHTS"
+	SettingNameCONTAINER_INSIGHTS SettingName = "containerInsights"
 
-	SettingNameTAG_RESOURCE_AUTHORIZATION SettingName = "TAG_RESOURCE_AUTHORIZATION"
+	SettingNameFARGATE_FIPS_MODE SettingName = "fargateFIPSMode"
 )
 
 // SettingType represents the SettingType enum type
 type SettingType string
 
 const (
-	SettingTypeUSER SettingType = "USER"
+	SettingTypeUSER SettingType = "user"
 
-	SettingTypeAWS_MANAGED SettingType = "AWS_MANAGED"
+	SettingTypeAWS_MANAGED SettingType = "aws_managed"
 )
 
 // SortOrder represents the SortOrder enum type
@@ -603,7 +660,7 @@ const (
 type TargetType string
 
 const (
-	TargetTypeCONTAINER_INSTANCE TargetType = "CONTAINER_INSTANCE"
+	TargetTypeCONTAINER_INSTANCE TargetType = "container-instance"
 )
 
 // TaskDefinitionFamilyStatus represents the TaskDefinitionFamilyStatus enum type
@@ -628,18 +685,18 @@ const (
 type TaskDefinitionPlacementConstraintType string
 
 const (
-	TaskDefinitionPlacementConstraintTypeMEMBER_OF TaskDefinitionPlacementConstraintType = "MEMBER_OF"
+	TaskDefinitionPlacementConstraintTypeMEMBER_OF TaskDefinitionPlacementConstraintType = "memberOf"
 )
 
 // TaskDefinitionStatus represents the TaskDefinitionStatus enum type
 type TaskDefinitionStatus string
 
 const (
+	TaskDefinitionStatusACTIVE TaskDefinitionStatus = "ACTIVE"
+
 	TaskDefinitionStatusINACTIVE TaskDefinitionStatus = "INACTIVE"
 
 	TaskDefinitionStatusDELETE_IN_PROGRESS TaskDefinitionStatus = "DELETE_IN_PROGRESS"
-
-	TaskDefinitionStatusACTIVE TaskDefinitionStatus = "ACTIVE"
 )
 
 // TaskField represents the TaskField enum type
@@ -653,13 +710,13 @@ const (
 type TaskFilesystemType string
 
 const (
-	TaskFilesystemTypeEXT3 TaskFilesystemType = "EXT3"
+	TaskFilesystemTypeNTFS TaskFilesystemType = "ntfs"
 
-	TaskFilesystemTypeEXT4 TaskFilesystemType = "EXT4"
+	TaskFilesystemTypeEXT3 TaskFilesystemType = "ext3"
 
-	TaskFilesystemTypeXFS TaskFilesystemType = "XFS"
+	TaskFilesystemTypeEXT4 TaskFilesystemType = "ext4"
 
-	TaskFilesystemTypeNTFS TaskFilesystemType = "NTFS"
+	TaskFilesystemTypeXFS TaskFilesystemType = "xfs"
 )
 
 // TaskSetField represents the TaskSetField enum type
@@ -673,68 +730,68 @@ const (
 type TaskStopCode string
 
 const (
-	TaskStopCodeSERVICE_SCHEDULER_INITIATED TaskStopCode = "SERVICE_SCHEDULER_INITIATED"
+	TaskStopCodeTERMINATION_NOTICE TaskStopCode = "TerminationNotice"
 
-	TaskStopCodeSPOT_INTERRUPTION TaskStopCode = "SPOT_INTERRUPTION"
+	TaskStopCodeTASK_FAILED_TO_START TaskStopCode = "TaskFailedToStart"
 
-	TaskStopCodeTERMINATION_NOTICE TaskStopCode = "TERMINATION_NOTICE"
+	TaskStopCodeESSENTIAL_CONTAINER_EXITED TaskStopCode = "EssentialContainerExited"
 
-	TaskStopCodeTASK_FAILED_TO_START TaskStopCode = "TASK_FAILED_TO_START"
+	TaskStopCodeUSER_INITIATED TaskStopCode = "UserInitiated"
 
-	TaskStopCodeESSENTIAL_CONTAINER_EXITED TaskStopCode = "ESSENTIAL_CONTAINER_EXITED"
+	TaskStopCodeSERVICE_SCHEDULER_INITIATED TaskStopCode = "ServiceSchedulerInitiated"
 
-	TaskStopCodeUSER_INITIATED TaskStopCode = "USER_INITIATED"
+	TaskStopCodeSPOT_INTERRUPTION TaskStopCode = "SpotInterruption"
 )
 
 // TransportProtocol represents the TransportProtocol enum type
 type TransportProtocol string
 
 const (
-	TransportProtocolTCP TransportProtocol = "TCP"
+	TransportProtocolTCP TransportProtocol = "tcp"
 
-	TransportProtocolUDP TransportProtocol = "UDP"
+	TransportProtocolUDP TransportProtocol = "udp"
 )
 
 // UlimitName represents the UlimitName enum type
 type UlimitName string
 
 const (
-	UlimitNameLOCKS UlimitName = "LOCKS"
+	UlimitNameNPROC UlimitName = "nproc"
 
-	UlimitNameNICE UlimitName = "NICE"
+	UlimitNameRSS UlimitName = "rss"
 
-	UlimitNameMEMLOCK UlimitName = "MEMLOCK"
+	UlimitNameRTTIME UlimitName = "rttime"
 
-	UlimitNameRSS UlimitName = "RSS"
+	UlimitNameCORE UlimitName = "core"
 
-	UlimitNameRTPRIO UlimitName = "RTPRIO"
+	UlimitNameCPU UlimitName = "cpu"
 
-	UlimitNameCORE UlimitName = "CORE"
+	UlimitNameDATA UlimitName = "data"
 
-	UlimitNameFSIZE UlimitName = "FSIZE"
+	UlimitNameFSIZE UlimitName = "fsize"
 
-	UlimitNameNOFILE UlimitName = "NOFILE"
+	UlimitNameLOCKS UlimitName = "locks"
 
-	UlimitNameNPROC UlimitName = "NPROC"
+	UlimitNameMEMLOCK UlimitName = "memlock"
 
-	UlimitNameSTACK UlimitName = "STACK"
+	UlimitNameNICE UlimitName = "nice"
 
-	UlimitNameCPU UlimitName = "CPU"
+	UlimitNameMSGQUEUE UlimitName = "msgqueue"
 
-	UlimitNameMSGQUEUE UlimitName = "MSGQUEUE"
+	UlimitNameRTPRIO UlimitName = "rtprio"
 
-	UlimitNameRTTIME UlimitName = "RTTIME"
+	UlimitNameSIGPENDING UlimitName = "sigpending"
 
-	UlimitNameSIGPENDING UlimitName = "SIGPENDING"
+	UlimitNameSTACK UlimitName = "stack"
 
-	UlimitNameDATA UlimitName = "DATA"
+	UlimitNameNOFILE UlimitName = "nofile"
 )
 
 // VersionConsistency represents the VersionConsistency enum type
 type VersionConsistency string
 
 const (
-	VersionConsistencyENABLED VersionConsistency = "ENABLED"
+	VersionConsistencyENABLED VersionConsistency = "enabled"
 
-	VersionConsistencyDISABLED VersionConsistency = "DISABLED"
+	VersionConsistencyDISABLED VersionConsistency = "disabled"
 )

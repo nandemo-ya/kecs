@@ -36,7 +36,7 @@ func (api *DefaultECSAPI) RegisterContainerInstance(ctx context.Context, req *ge
 			RunningTasksCount:    ptr.Int32(0),
 			PendingTasksCount:    ptr.Int32(0),
 			AgentUpdateStatus:    (*generated.AgentUpdateStatus)(ptr.String("NOT_STAGED")),
-			RegisteredAt:         ptr.Time(time.Now()),
+			RegisteredAt:         ptr.UnixTime(time.Now()),
 			RegisteredResources: []generated.Resource{
 				{
 					Name:         ptr.String("CPU"),
@@ -122,7 +122,7 @@ func (api *DefaultECSAPI) DescribeContainerInstances(ctx context.Context, req *g
 			AgentConnected:       ptr.Bool(true),
 			RunningTasksCount:    ptr.Int32(0),
 			PendingTasksCount:    ptr.Int32(0),
-			RegisteredAt:         ptr.Time(time.Now().Add(-24 * time.Hour)),
+			RegisteredAt:         ptr.UnixTime(time.Now().Add(-24 * time.Hour)),
 			RegisteredResources: []generated.Resource{
 				{
 					Name:         ptr.String("CPU"),

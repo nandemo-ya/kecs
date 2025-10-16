@@ -512,7 +512,7 @@ func storageTaskDefinitionToGenerated(taskDef *storage.TaskDefinition) *generate
 		Family:            ptr.String(taskDef.Family),
 		Revision:          ptr.Int32(int32(taskDef.Revision)),
 		Status:            (*generated.TaskDefinitionStatus)(ptr.String(taskDef.Status)),
-		RegisteredAt:      ptr.Time(taskDef.RegisteredAt),
+		RegisteredAt:      ptr.UnixTime(taskDef.RegisteredAt),
 		// Initialize with empty slices to ensure they're always included in JSON
 		ContainerDefinitions: []generated.ContainerDefinition{},
 		Volumes:              []generated.Volume{},
@@ -541,7 +541,7 @@ func storageTaskDefinitionToGenerated(taskDef *storage.TaskDefinition) *generate
 		response.NetworkMode = (*generated.NetworkMode)(ptr.String(taskDef.NetworkMode))
 	}
 	if taskDef.DeregisteredAt != nil {
-		response.DeregisteredAt = ptr.Time(*taskDef.DeregisteredAt)
+		response.DeregisteredAt = ptr.UnixTime(*taskDef.DeregisteredAt)
 	}
 
 	// Parse JSON fields

@@ -169,7 +169,7 @@ func (api *DefaultECSAPI) CreateTaskSet(ctx context.Context, req *generated.Crea
 			LaunchType:               req.LaunchType,
 			Scale:                    scale,
 			StabilityStatus:          (*generated.StabilityStatus)(ptr.String("STEADY_STATE")),
-			CreatedAt:                ptr.Time(storageTaskSet.CreatedAt),
+			CreatedAt:                ptr.UnixTime(storageTaskSet.CreatedAt),
 			LoadBalancers:            req.LoadBalancers,
 			ServiceRegistries:        req.ServiceRegistries,
 			NetworkConfiguration:     req.NetworkConfiguration,
@@ -243,7 +243,7 @@ func (api *DefaultECSAPI) DeleteTaskSet(ctx context.Context, req *generated.Dele
 			ServiceArn: ptr.String(storageTaskSet.ServiceARN),
 			ClusterArn: ptr.String(storageTaskSet.ClusterARN),
 			Status:     ptr.String("DRAINING"),
-			UpdatedAt:  ptr.Time(storageTaskSet.UpdatedAt),
+			UpdatedAt:  ptr.UnixTime(storageTaskSet.UpdatedAt),
 		},
 	}
 
@@ -310,8 +310,8 @@ func (api *DefaultECSAPI) DescribeTaskSets(ctx context.Context, req *generated.D
 			PendingCount:         ptr.Int32(pendingCount),
 			RunningCount:         ptr.Int32(runningCount),
 			StabilityStatus:      (*generated.StabilityStatus)(ptr.String(stabilityStatus)),
-			CreatedAt:            ptr.Time(ts.CreatedAt),
-			UpdatedAt:            ptr.Time(ts.UpdatedAt),
+			CreatedAt:            ptr.UnixTime(ts.CreatedAt),
+			UpdatedAt:            ptr.UnixTime(ts.UpdatedAt),
 		}
 
 		// Set launch type if specified
@@ -469,7 +469,7 @@ func (api *DefaultECSAPI) UpdateTaskSet(ctx context.Context, req *generated.Upda
 		TaskDefinition:       ptr.String(storageTaskSet.TaskDefinition),
 		Scale:                &req.Scale,
 		StabilityStatus:      (*generated.StabilityStatus)(ptr.String("STABILIZING")),
-		UpdatedAt:            ptr.Time(storageTaskSet.UpdatedAt),
+		UpdatedAt:            ptr.UnixTime(storageTaskSet.UpdatedAt),
 		ComputedDesiredCount: ptr.Int32(storageTaskSet.ComputedDesiredCount),
 		PendingCount:         ptr.Int32(storageTaskSet.PendingCount),
 		RunningCount:         ptr.Int32(storageTaskSet.RunningCount),
