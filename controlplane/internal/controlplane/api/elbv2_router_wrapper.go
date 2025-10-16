@@ -307,6 +307,18 @@ type DescribeLoadBalancerAttributesResult struct {
 	Attributes []Attribute `xml:"Attributes>member"`
 }
 
+// ModifyLoadBalancerAttributes response structures
+type ModifyLoadBalancerAttributesResponse struct {
+	XMLName          xml.Name                           `xml:"ModifyLoadBalancerAttributesResponse"`
+	XMLNS            string                             `xml:"xmlns,attr"`
+	Result           ModifyLoadBalancerAttributesResult `xml:"ModifyLoadBalancerAttributesResult"`
+	ResponseMetadata ResponseMetadata                   `xml:"ResponseMetadata"`
+}
+
+type ModifyLoadBalancerAttributesResult struct {
+	Attributes []Attribute `xml:"Attributes>member"`
+}
+
 // DescribeTargetGroupAttributes response structures
 type DescribeTargetGroupAttributesResponse struct {
 	XMLName          xml.Name                            `xml:"DescribeTargetGroupAttributesResponse"`
@@ -369,6 +381,13 @@ type TagDescription struct {
 type ELBv2Tag struct {
 	Key   string `xml:"Key"`
 	Value string `xml:"Value"`
+}
+
+// AddTags response structures
+type AddTagsResponse struct {
+	XMLName          xml.Name         `xml:"AddTagsResponse"`
+	XMLNS            string           `xml:"xmlns,attr"`
+	ResponseMetadata ResponseMetadata `xml:"ResponseMetadata"`
 }
 
 // NewELBv2RouterWrapper creates a new wrapper for the ELBv2 router
@@ -1119,6 +1138,42 @@ func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) 
 			w.writeXML(resp, xmlResp)
 			return
 
+		case "ModifyLoadBalancerAttributes":
+			// Convert form data to ModifyLoadBalancerAttributesInput
+			input := &generated_elbv2.ModifyLoadBalancerAttributesInput{}
+
+			// Parse LoadBalancerArn (required)
+			input.LoadBalancerArn = values.Get("LoadBalancerArn")
+
+			// Parse Attributes
+			attributes := []generated_elbv2.LoadBalancerAttribute{}
+			for i := 1; ; i++ {
+				keyParam := fmt.Sprintf("Attributes.member.%d.Key", i)
+				valueParam := fmt.Sprintf("Attributes.member.%d.Value", i)
+				key := values.Get(keyParam)
+				value := values.Get(valueParam)
+				if key == "" {
+					break
+				}
+				attributes = append(attributes, generated_elbv2.LoadBalancerAttribute{
+					Key:   &key,
+					Value: &value,
+				})
+			}
+			input.Attributes = attributes
+
+			// Call the API
+			output, err := w.api.ModifyLoadBalancerAttributes(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertModifyLoadBalancerAttributesToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
 		case "DescribeTargetGroupAttributes":
 			// Convert form data to DescribeTargetGroupAttributesInput
 			input := &generated_elbv2.DescribeTargetGroupAttributesInput{}
@@ -1216,6 +1271,52 @@ func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) 
 
 			// Convert to XML response
 			xmlResp := w.convertDescribeTagsToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
+		case "AddTags":
+			// Convert form data to AddTagsInput
+			input := &generated_elbv2.AddTagsInput{}
+
+			// Parse ResourceArns
+			if arns := values["ResourceArns.member.1"]; len(arns) > 0 {
+				input.ResourceArns = []string{}
+				for i := 1; ; i++ {
+					key := fmt.Sprintf("ResourceArns.member.%d", i)
+					if val := values.Get(key); val != "" {
+						input.ResourceArns = append(input.ResourceArns, val)
+					} else {
+						break
+					}
+				}
+			}
+
+			// Parse Tags
+			tags := []generated_elbv2.Tag{}
+			for i := 1; ; i++ {
+				keyParam := fmt.Sprintf("Tags.member.%d.Key", i)
+				valueParam := fmt.Sprintf("Tags.member.%d.Value", i)
+				key := values.Get(keyParam)
+				value := values.Get(valueParam)
+				if key == "" {
+					break
+				}
+				tags = append(tags, generated_elbv2.Tag{
+					Key:   key,
+					Value: &value,
+				})
+			}
+			input.Tags = tags
+
+			// Call the API
+			output, err := w.api.AddTags(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertAddTagsToXML(output)
 			w.writeXML(resp, xmlResp)
 			return
 
@@ -1930,6 +2031,31 @@ func (w *ELBv2RouterWrapper) convertDescribeLoadBalancerAttributesToXML(output *
 	return resp
 }
 
+// convertModifyLoadBalancerAttributesToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertModifyLoadBalancerAttributesToXML(output *generated_elbv2.ModifyLoadBalancerAttributesOutput) *ModifyLoadBalancerAttributesResponse {
+	resp := &ModifyLoadBalancerAttributesResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil && output.Attributes != nil {
+		for _, attr := range output.Attributes {
+			xmlAttr := Attribute{}
+			if attr.Key != nil {
+				xmlAttr.Key = *attr.Key
+			}
+			if attr.Value != nil {
+				xmlAttr.Value = *attr.Value
+			}
+			resp.Result.Attributes = append(resp.Result.Attributes, xmlAttr)
+		}
+	}
+
+	return resp
+}
+
 // convertDescribeTargetGroupAttributesToXML converts the API output to XML format
 func (w *ELBv2RouterWrapper) convertDescribeTargetGroupAttributesToXML(output *generated_elbv2.DescribeTargetGroupAttributesOutput) *DescribeTargetGroupAttributesResponse {
 	resp := &DescribeTargetGroupAttributesResponse{
@@ -2024,5 +2150,16 @@ func (w *ELBv2RouterWrapper) convertDescribeTagsToXML(output *generated_elbv2.De
 		}
 	}
 
+	return resp
+}
+
+// convertAddTagsToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertAddTagsToXML(output *generated_elbv2.AddTagsOutput) *AddTagsResponse {
+	resp := &AddTagsResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
 	return resp
 }

@@ -1430,7 +1430,29 @@ func (api *ELBv2APIImpl) ModifyListenerAttributes(ctx context.Context, input *ge
 }
 
 func (api *ELBv2APIImpl) ModifyLoadBalancerAttributes(ctx context.Context, input *generated_elbv2.ModifyLoadBalancerAttributesInput) (*generated_elbv2.ModifyLoadBalancerAttributesOutput, error) {
-	return &generated_elbv2.ModifyLoadBalancerAttributesOutput{}, nil
+	if input.LoadBalancerArn == "" {
+		return nil, fmt.Errorf("LoadBalancerArn is required")
+	}
+
+	// Verify load balancer exists
+	lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, input.LoadBalancerArn)
+	if err != nil {
+		if err == storage.ErrResourceNotFound {
+			return nil, fmt.Errorf("load balancer not found: %s", input.LoadBalancerArn)
+		}
+		return nil, fmt.Errorf("failed to get load balancer: %w", err)
+	}
+	if lb == nil {
+		return nil, fmt.Errorf("load balancer not found: %s", input.LoadBalancerArn)
+	}
+
+	// For now, we simply acknowledge the attributes without storing them
+	// This is sufficient for Terraform which just needs a successful response
+	// In the future, we can extend the storage model to persist these attributes
+
+	return &generated_elbv2.ModifyLoadBalancerAttributesOutput{
+		Attributes: input.Attributes,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) ModifyRule(ctx context.Context, input *generated_elbv2.ModifyRuleInput) (*generated_elbv2.ModifyRuleOutput, error) {
