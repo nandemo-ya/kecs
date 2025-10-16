@@ -1760,7 +1760,39 @@ func (api *ELBv2APIImpl) SetRulePriorities(ctx context.Context, input *generated
 }
 
 func (api *ELBv2APIImpl) SetSecurityGroups(ctx context.Context, input *generated_elbv2.SetSecurityGroupsInput) (*generated_elbv2.SetSecurityGroupsOutput, error) {
-	return &generated_elbv2.SetSecurityGroupsOutput{}, nil
+	if input.LoadBalancerArn == "" {
+		return nil, fmt.Errorf("LoadBalancerArn is required")
+	}
+	if len(input.SecurityGroups) == 0 {
+		return nil, fmt.Errorf("SecurityGroups is required")
+	}
+
+	// Verify load balancer exists
+	lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, input.LoadBalancerArn)
+	if err != nil {
+		if err == storage.ErrResourceNotFound {
+			return nil, fmt.Errorf("load balancer not found: %s", input.LoadBalancerArn)
+		}
+		return nil, fmt.Errorf("failed to get load balancer: %w", err)
+	}
+	if lb == nil {
+		return nil, fmt.Errorf("load balancer not found: %s", input.LoadBalancerArn)
+	}
+
+	// Update security groups
+	lb.SecurityGroups = input.SecurityGroups
+	lb.UpdatedAt = time.Now()
+
+	// Save to storage
+	if err := api.storage.ELBv2Store().UpdateLoadBalancer(ctx, lb); err != nil {
+		return nil, fmt.Errorf("failed to update load balancer security groups: %w", err)
+	}
+
+	// Return updated security groups
+	return &generated_elbv2.SetSecurityGroupsOutput{
+		SecurityGroupIds: input.SecurityGroups,
+		EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic: input.EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) SetSubnets(ctx context.Context, input *generated_elbv2.SetSubnetsInput) (*generated_elbv2.SetSubnetsOutput, error) {

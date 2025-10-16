@@ -319,6 +319,18 @@ type ModifyLoadBalancerAttributesResult struct {
 	Attributes []Attribute `xml:"Attributes>member"`
 }
 
+// SetSecurityGroups response structures
+type SetSecurityGroupsResponse struct {
+	XMLName          xml.Name                `xml:"SetSecurityGroupsResponse"`
+	XMLNS            string                  `xml:"xmlns,attr"`
+	Result           SetSecurityGroupsResult `xml:"SetSecurityGroupsResult"`
+	ResponseMetadata ResponseMetadata        `xml:"ResponseMetadata"`
+}
+
+type SetSecurityGroupsResult struct {
+	SecurityGroupIds []string `xml:"SecurityGroups>member"`
+}
+
 // DescribeTargetGroupAttributes response structures
 type DescribeTargetGroupAttributesResponse struct {
 	XMLName          xml.Name                            `xml:"DescribeTargetGroupAttributesResponse"`
@@ -1176,6 +1188,38 @@ func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) 
 
 			// Convert to XML response
 			xmlResp := w.convertModifyLoadBalancerAttributesToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
+		case "SetSecurityGroups":
+			// Convert form data to SetSecurityGroupsInput
+			input := &generated_elbv2.SetSecurityGroupsInput{}
+
+			// Parse LoadBalancerArn (required)
+			input.LoadBalancerArn = values.Get("LoadBalancerArn")
+
+			// Parse SecurityGroups
+			if sgs := values["SecurityGroups.member.1"]; len(sgs) > 0 {
+				input.SecurityGroups = []string{}
+				for i := 1; ; i++ {
+					key := fmt.Sprintf("SecurityGroups.member.%d", i)
+					if val := values.Get(key); val != "" {
+						input.SecurityGroups = append(input.SecurityGroups, val)
+					} else {
+						break
+					}
+				}
+			}
+
+			// Call the API
+			output, err := w.api.SetSecurityGroups(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertSetSecurityGroupsToXML(output)
 			w.writeXML(resp, xmlResp)
 			return
 
@@ -2166,5 +2210,21 @@ func (w *ELBv2RouterWrapper) convertAddTagsToXML(output *generated_elbv2.AddTags
 			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
 		},
 	}
+	return resp
+}
+
+// convertSetSecurityGroupsToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertSetSecurityGroupsToXML(output *generated_elbv2.SetSecurityGroupsOutput) *SetSecurityGroupsResponse {
+	resp := &SetSecurityGroupsResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil && output.SecurityGroupIds != nil {
+		resp.Result.SecurityGroupIds = output.SecurityGroupIds
+	}
+
 	return resp
 }
