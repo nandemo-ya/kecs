@@ -1796,7 +1796,49 @@ func (api *ELBv2APIImpl) SetSecurityGroups(ctx context.Context, input *generated
 }
 
 func (api *ELBv2APIImpl) SetSubnets(ctx context.Context, input *generated_elbv2.SetSubnetsInput) (*generated_elbv2.SetSubnetsOutput, error) {
-	return &generated_elbv2.SetSubnetsOutput{}, nil
+	if input.LoadBalancerArn == "" {
+		return nil, fmt.Errorf("LoadBalancerArn is required")
+	}
+
+	// Verify load balancer exists
+	lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, input.LoadBalancerArn)
+	if err != nil {
+		if err == storage.ErrResourceNotFound {
+			return nil, fmt.Errorf("load balancer not found: %s", input.LoadBalancerArn)
+		}
+		return nil, fmt.Errorf("failed to get load balancer: %w", err)
+	}
+	if lb == nil {
+		return nil, fmt.Errorf("load balancer not found: %s", input.LoadBalancerArn)
+	}
+
+	// Update subnets if provided
+	if input.Subnets != nil {
+		lb.Subnets = input.Subnets
+	}
+
+	// Update IP address type if provided
+	if input.IpAddressType != nil {
+		lb.IpAddressType = string(*input.IpAddressType)
+	}
+
+	lb.UpdatedAt = time.Now()
+
+	// Save to storage
+	if err := api.storage.ELBv2Store().UpdateLoadBalancer(ctx, lb); err != nil {
+		return nil, fmt.Errorf("failed to update load balancer subnets: %w", err)
+	}
+
+	// Return updated subnets and IP address type
+	output := &generated_elbv2.SetSubnetsOutput{
+		AvailabilityZones: []generated_elbv2.AvailabilityZone{},
+	}
+
+	if input.IpAddressType != nil {
+		output.IpAddressType = input.IpAddressType
+	}
+
+	return output, nil
 }
 
 func convertToLoadBalancer(lb *storage.ELBv2LoadBalancer) generated_elbv2.LoadBalancer {

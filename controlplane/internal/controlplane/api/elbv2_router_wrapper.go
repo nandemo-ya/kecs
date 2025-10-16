@@ -331,6 +331,24 @@ type SetSecurityGroupsResult struct {
 	SecurityGroupIds []string `xml:"SecurityGroups>member"`
 }
 
+// SetSubnets response structures
+type SetSubnetsResponse struct {
+	XMLName          xml.Name         `xml:"SetSubnetsResponse"`
+	XMLNS            string           `xml:"xmlns,attr"`
+	Result           SetSubnetsResult `xml:"SetSubnetsResult"`
+	ResponseMetadata ResponseMetadata `xml:"ResponseMetadata"`
+}
+
+type SetSubnetsResult struct {
+	AvailabilityZones []AvailabilityZone `xml:"AvailabilityZones>member"`
+	IpAddressType     string             `xml:"IpAddressType,omitempty"`
+}
+
+type AvailabilityZone struct {
+	ZoneName string `xml:"ZoneName"`
+	SubnetId string `xml:"SubnetId"`
+}
+
 // DescribeTargetGroupAttributes response structures
 type DescribeTargetGroupAttributesResponse struct {
 	XMLName          xml.Name                            `xml:"DescribeTargetGroupAttributesResponse"`
@@ -1220,6 +1238,44 @@ func (w *ELBv2RouterWrapper) Route(resp http.ResponseWriter, req *http.Request) 
 
 			// Convert to XML response
 			xmlResp := w.convertSetSecurityGroupsToXML(output)
+			w.writeXML(resp, xmlResp)
+			return
+
+		case "SetSubnets":
+			// Convert form data to SetSubnetsInput
+			input := &generated_elbv2.SetSubnetsInput{}
+
+			// Parse LoadBalancerArn (required)
+			input.LoadBalancerArn = values.Get("LoadBalancerArn")
+
+			// Parse Subnets
+			if subnets := values["Subnets.member.1"]; len(subnets) > 0 {
+				input.Subnets = []string{}
+				for i := 1; ; i++ {
+					key := fmt.Sprintf("Subnets.member.%d", i)
+					if val := values.Get(key); val != "" {
+						input.Subnets = append(input.Subnets, val)
+					} else {
+						break
+					}
+				}
+			}
+
+			// Parse IpAddressType if present
+			if ipType := values.Get("IpAddressType"); ipType != "" {
+				ipTypeEnum := generated_elbv2.IpAddressType(ipType)
+				input.IpAddressType = &ipTypeEnum
+			}
+
+			// Call the API
+			output, err := w.api.SetSubnets(req.Context(), input)
+			if err != nil {
+				w.writeAPIError(resp, err)
+				return
+			}
+
+			// Convert to XML response
+			xmlResp := w.convertSetSubnetsToXML(output)
 			w.writeXML(resp, xmlResp)
 			return
 
@@ -2224,6 +2280,36 @@ func (w *ELBv2RouterWrapper) convertSetSecurityGroupsToXML(output *generated_elb
 
 	if output != nil && output.SecurityGroupIds != nil {
 		resp.Result.SecurityGroupIds = output.SecurityGroupIds
+	}
+
+	return resp
+}
+
+// convertSetSubnetsToXML converts the API output to XML format
+func (w *ELBv2RouterWrapper) convertSetSubnetsToXML(output *generated_elbv2.SetSubnetsOutput) *SetSubnetsResponse {
+	resp := &SetSubnetsResponse{
+		XMLNS: "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/",
+		ResponseMetadata: ResponseMetadata{
+			RequestId: "generated-" + fmt.Sprintf("%d", time.Now().Unix()),
+		},
+	}
+
+	if output != nil {
+		if output.AvailabilityZones != nil {
+			for _, az := range output.AvailabilityZones {
+				xmlAZ := AvailabilityZone{}
+				if az.ZoneName != nil {
+					xmlAZ.ZoneName = *az.ZoneName
+				}
+				if az.SubnetId != nil {
+					xmlAZ.SubnetId = *az.SubnetId
+				}
+				resp.Result.AvailabilityZones = append(resp.Result.AvailabilityZones, xmlAZ)
+			}
+		}
+		if output.IpAddressType != nil {
+			resp.Result.IpAddressType = string(*output.IpAddressType)
+		}
 	}
 
 	return resp
