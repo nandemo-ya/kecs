@@ -390,10 +390,12 @@ func (g *Generator) getGoTypeWithFieldName(shapeName string, shape *parser.Smith
 	name := parser.GetShapeName(shapeName)
 
 	// Check if this is a timestamp field that needs UnixTime handling
-	// This applies to SSM and Secrets Manager services for fields containing "Date" or "Time"
+	// This applies to ECS, SSM and Secrets Manager services for fields containing "Date", "Time", or "At"
 	isTimestampField := false
-	if fieldName != "" && (g.service == "ssm" || g.service == "secretsmanager") {
-		if strings.Contains(fieldName, "Date") || strings.Contains(fieldName, "Time") {
+	if fieldName != "" && (g.service == "ecs" || g.service == "ssm" || g.service == "secretsmanager") {
+		// Check for common timestamp field name patterns
+		lowerFieldName := strings.ToLower(fieldName)
+		if strings.Contains(lowerFieldName, "date") || strings.Contains(lowerFieldName, "time") || strings.Contains(lowerFieldName, "at") {
 			isTimestampField = true
 		}
 	}

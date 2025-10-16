@@ -165,7 +165,7 @@ func TestGeneratedTypesIntegration(t *testing.T) {
 		assert.Len(t, cluster.Settings, 1)
 		// Name is *ClusterSettingName, so we need to dereference and convert to string
 		if cluster.Settings[0].Name != nil {
-			assert.Equal(t, "CONTAINER_INSIGHTS", string(*cluster.Settings[0].Name))
+			assert.Equal(t, "containerInsights", string(*cluster.Settings[0].Name))
 		}
 		assert.Equal(t, "enabled", *cluster.Settings[0].Value)
 
@@ -227,7 +227,7 @@ func TestGeneratedTypesJSONCompatibility(t *testing.T) {
 		settings := jsonMap["settings"].([]interface{})
 		assert.Len(t, settings, 1)
 		setting := settings[0].(map[string]interface{})
-		assert.Equal(t, "CONTAINER_INSIGHTS", setting["name"])
+		assert.Equal(t, "containerInsights", setting["name"])
 		assert.Equal(t, "enabled", setting["value"])
 	})
 

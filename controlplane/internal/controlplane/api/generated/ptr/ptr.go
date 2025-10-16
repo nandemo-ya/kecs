@@ -3,7 +3,11 @@
 // to work with pointer types in the generated ECS API code.
 package ptr
 
-import "time"
+import (
+	"time"
+
+	"github.com/nandemo-ya/kecs/controlplane/internal/common"
+)
 
 // String returns a pointer to the string value passed in.
 func String(v string) *string {
@@ -126,6 +130,12 @@ func ToTime(p *time.Time) time.Time {
 // time.Time{} if the pointer is nil. This is an alias for ToTime.
 func ToTimeValue(p *time.Time) time.Time {
 	return ToTime(p)
+}
+
+// UnixTime returns a pointer to the common.UnixTime value passed in.
+// This is used for ECS API timestamp fields that require Unix timestamps.
+func UnixTime(v time.Time) *common.UnixTime {
+	return &common.UnixTime{Time: v}
 }
 
 // StringSlice returns a slice of string pointers from the values passed in.

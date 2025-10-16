@@ -526,7 +526,7 @@ func storageTaskToGenerated(task *storage.Task) *generated.Task {
 		DesiredStatus:     ptr.String(task.DesiredStatus),
 		LaunchType:        (*generated.LaunchType)(ptr.String(task.LaunchType)),
 		Version:           ptr.Int64(task.Version),
-		CreatedAt:         ptr.Time(task.CreatedAt),
+		CreatedAt:         ptr.UnixTime(task.CreatedAt),
 		Cpu:               ptr.String(task.CPU),
 		Memory:            ptr.String(task.Memory),
 	}
@@ -545,28 +545,28 @@ func storageTaskToGenerated(task *storage.Task) *generated.Task {
 		genTask.StoppedReason = ptr.String(task.StoppedReason)
 	}
 	if task.StoppingAt != nil {
-		genTask.StoppingAt = ptr.Time(*task.StoppingAt)
+		genTask.StoppingAt = ptr.UnixTime(*task.StoppingAt)
 	}
 	if task.StoppedAt != nil {
-		genTask.StoppedAt = ptr.Time(*task.StoppedAt)
+		genTask.StoppedAt = ptr.UnixTime(*task.StoppedAt)
 	}
 	if task.StartedAt != nil {
-		genTask.StartedAt = ptr.Time(*task.StartedAt)
+		genTask.StartedAt = ptr.UnixTime(*task.StartedAt)
 	}
 	if task.Connectivity != "" {
 		genTask.Connectivity = (*generated.Connectivity)(ptr.String(task.Connectivity))
 	}
 	if task.ConnectivityAt != nil {
-		genTask.ConnectivityAt = ptr.Time(*task.ConnectivityAt)
+		genTask.ConnectivityAt = ptr.UnixTime(*task.ConnectivityAt)
 	}
 	if task.PullStartedAt != nil {
-		genTask.PullStartedAt = ptr.Time(*task.PullStartedAt)
+		genTask.PullStartedAt = ptr.UnixTime(*task.PullStartedAt)
 	}
 	if task.PullStoppedAt != nil {
-		genTask.PullStoppedAt = ptr.Time(*task.PullStoppedAt)
+		genTask.PullStoppedAt = ptr.UnixTime(*task.PullStoppedAt)
 	}
 	if task.ExecutionStoppedAt != nil {
-		genTask.ExecutionStoppedAt = ptr.Time(*task.ExecutionStoppedAt)
+		genTask.ExecutionStoppedAt = ptr.UnixTime(*task.ExecutionStoppedAt)
 	}
 	if task.PlatformVersion != "" {
 		genTask.PlatformVersion = ptr.String(task.PlatformVersion)
