@@ -6,86 +6,86 @@ package generated_elbv2
 type ActionTypeEnum string
 
 const (
-	ActionTypeEnumREDIRECT ActionTypeEnum = "REDIRECT"
+	ActionTypeEnumREDIRECT ActionTypeEnum = "redirect"
 
-	ActionTypeEnumFIXED_RESPONSE ActionTypeEnum = "FIXED_RESPONSE"
+	ActionTypeEnumFIXED_RESPONSE ActionTypeEnum = "fixed-response"
 
-	ActionTypeEnumFORWARD ActionTypeEnum = "FORWARD"
+	ActionTypeEnumFORWARD ActionTypeEnum = "forward"
 
-	ActionTypeEnumAUTHENTICATE_OIDC ActionTypeEnum = "AUTHENTICATE_OIDC"
+	ActionTypeEnumAUTHENTICATE_OIDC ActionTypeEnum = "authenticate-oidc"
 
-	ActionTypeEnumAUTHENTICATE_COGNITO ActionTypeEnum = "AUTHENTICATE_COGNITO"
+	ActionTypeEnumAUTHENTICATE_COGNITO ActionTypeEnum = "authenticate-cognito"
 )
 
 // AdvertiseTrustStoreCaNamesEnum represents the AdvertiseTrustStoreCaNamesEnum enum type
 type AdvertiseTrustStoreCaNamesEnum string
 
 const (
-	AdvertiseTrustStoreCaNamesEnumoff AdvertiseTrustStoreCaNamesEnum = "off"
-
 	AdvertiseTrustStoreCaNamesEnumon AdvertiseTrustStoreCaNamesEnum = "on"
+
+	AdvertiseTrustStoreCaNamesEnumoff AdvertiseTrustStoreCaNamesEnum = "off"
 )
 
 // AnomalyResultEnum represents the AnomalyResultEnum enum type
 type AnomalyResultEnum string
 
 const (
-	AnomalyResultEnumNORMAL AnomalyResultEnum = "NORMAL"
+	AnomalyResultEnumANOMALOUS AnomalyResultEnum = "anomalous"
 
-	AnomalyResultEnumANOMALOUS AnomalyResultEnum = "ANOMALOUS"
+	AnomalyResultEnumNORMAL AnomalyResultEnum = "normal"
 )
 
 // AuthenticateCognitoActionConditionalBehaviorEnum represents the AuthenticateCognitoActionConditionalBehaviorEnum enum type
 type AuthenticateCognitoActionConditionalBehaviorEnum string
 
 const (
-	AuthenticateCognitoActionConditionalBehaviorEnumALLOW AuthenticateCognitoActionConditionalBehaviorEnum = "ALLOW"
+	AuthenticateCognitoActionConditionalBehaviorEnumDENY AuthenticateCognitoActionConditionalBehaviorEnum = "deny"
 
-	AuthenticateCognitoActionConditionalBehaviorEnumAUTHENTICATE AuthenticateCognitoActionConditionalBehaviorEnum = "AUTHENTICATE"
+	AuthenticateCognitoActionConditionalBehaviorEnumALLOW AuthenticateCognitoActionConditionalBehaviorEnum = "allow"
 
-	AuthenticateCognitoActionConditionalBehaviorEnumDENY AuthenticateCognitoActionConditionalBehaviorEnum = "DENY"
+	AuthenticateCognitoActionConditionalBehaviorEnumAUTHENTICATE AuthenticateCognitoActionConditionalBehaviorEnum = "authenticate"
 )
 
 // AuthenticateOidcActionConditionalBehaviorEnum represents the AuthenticateOidcActionConditionalBehaviorEnum enum type
 type AuthenticateOidcActionConditionalBehaviorEnum string
 
 const (
-	AuthenticateOidcActionConditionalBehaviorEnumAUTHENTICATE AuthenticateOidcActionConditionalBehaviorEnum = "AUTHENTICATE"
+	AuthenticateOidcActionConditionalBehaviorEnumDENY AuthenticateOidcActionConditionalBehaviorEnum = "deny"
 
-	AuthenticateOidcActionConditionalBehaviorEnumDENY AuthenticateOidcActionConditionalBehaviorEnum = "DENY"
+	AuthenticateOidcActionConditionalBehaviorEnumALLOW AuthenticateOidcActionConditionalBehaviorEnum = "allow"
 
-	AuthenticateOidcActionConditionalBehaviorEnumALLOW AuthenticateOidcActionConditionalBehaviorEnum = "ALLOW"
+	AuthenticateOidcActionConditionalBehaviorEnumAUTHENTICATE AuthenticateOidcActionConditionalBehaviorEnum = "authenticate"
 )
 
 // CapacityReservationStateEnum represents the CapacityReservationStateEnum enum type
 type CapacityReservationStateEnum string
 
 const (
-	CapacityReservationStateEnumPROVISIONED CapacityReservationStateEnum = "PROVISIONED"
+	CapacityReservationStateEnumREBALANCING CapacityReservationStateEnum = "rebalancing"
 
-	CapacityReservationStateEnumPENDING CapacityReservationStateEnum = "PENDING"
+	CapacityReservationStateEnumFAILED CapacityReservationStateEnum = "failed"
 
-	CapacityReservationStateEnumREBALANCING CapacityReservationStateEnum = "REBALANCING"
+	CapacityReservationStateEnumPROVISIONED CapacityReservationStateEnum = "provisioned"
 
-	CapacityReservationStateEnumFAILED CapacityReservationStateEnum = "FAILED"
+	CapacityReservationStateEnumPENDING CapacityReservationStateEnum = "pending"
 )
 
 // DescribeTargetHealthInputIncludeEnum represents the DescribeTargetHealthInputIncludeEnum enum type
 type DescribeTargetHealthInputIncludeEnum string
 
 const (
-	DescribeTargetHealthInputIncludeEnumALL DescribeTargetHealthInputIncludeEnum = "ALL"
+	DescribeTargetHealthInputIncludeEnumANOMALY DescribeTargetHealthInputIncludeEnum = "AnomalyDetection"
 
-	DescribeTargetHealthInputIncludeEnumANOMALY DescribeTargetHealthInputIncludeEnum = "ANOMALY"
+	DescribeTargetHealthInputIncludeEnumALL DescribeTargetHealthInputIncludeEnum = "All"
 )
 
 // EnablePrefixForIpv6SourceNatEnum represents the EnablePrefixForIpv6SourceNatEnum enum type
 type EnablePrefixForIpv6SourceNatEnum string
 
 const (
-	EnablePrefixForIpv6SourceNatEnumOFF EnablePrefixForIpv6SourceNatEnum = "OFF"
+	EnablePrefixForIpv6SourceNatEnumON EnablePrefixForIpv6SourceNatEnum = "on"
 
-	EnablePrefixForIpv6SourceNatEnumON EnablePrefixForIpv6SourceNatEnum = "ON"
+	EnablePrefixForIpv6SourceNatEnumOFF EnablePrefixForIpv6SourceNatEnum = "off"
 )
 
 // EnforceSecurityGroupInboundRulesOnPrivateLinkTrafficEnum represents the EnforceSecurityGroupInboundRulesOnPrivateLinkTrafficEnum enum type
@@ -101,59 +101,65 @@ const (
 type IpAddressType string
 
 const (
-	IpAddressTypeIPV4 IpAddressType = "IPV4"
+	IpAddressTypeDUALSTACK_WITHOUT_PUBLIC_IPV4 IpAddressType = "dualstack-without-public-ipv4"
 
-	IpAddressTypeDUALSTACK IpAddressType = "DUALSTACK"
+	IpAddressTypeIPV4 IpAddressType = "ipv4"
 
-	IpAddressTypeDUALSTACK_WITHOUT_PUBLIC_IPV4 IpAddressType = "DUALSTACK_WITHOUT_PUBLIC_IPV4"
+	IpAddressTypeDUALSTACK IpAddressType = "dualstack"
 )
 
 // LoadBalancerSchemeEnum represents the LoadBalancerSchemeEnum enum type
 type LoadBalancerSchemeEnum string
 
 const (
-	LoadBalancerSchemeEnumINTERNET_FACING LoadBalancerSchemeEnum = "INTERNET_FACING"
+	LoadBalancerSchemeEnumINTERNET_FACING LoadBalancerSchemeEnum = "internet-facing"
 
-	LoadBalancerSchemeEnumINTERNAL LoadBalancerSchemeEnum = "INTERNAL"
+	LoadBalancerSchemeEnumINTERNAL LoadBalancerSchemeEnum = "internal"
 )
 
 // LoadBalancerStateEnum represents the LoadBalancerStateEnum enum type
 type LoadBalancerStateEnum string
 
 const (
+	LoadBalancerStateEnumACTIVE LoadBalancerStateEnum = "active"
+
 	LoadBalancerStateEnumPROVISIONING LoadBalancerStateEnum = "provisioning"
 
 	LoadBalancerStateEnumACTIVE_IMPAIRED LoadBalancerStateEnum = "active_impaired"
 
 	LoadBalancerStateEnumFAILED LoadBalancerStateEnum = "failed"
-
-	LoadBalancerStateEnumACTIVE LoadBalancerStateEnum = "active"
 )
 
 // LoadBalancerTypeEnum represents the LoadBalancerTypeEnum enum type
 type LoadBalancerTypeEnum string
 
 const (
-	LoadBalancerTypeEnumAPPLICATION LoadBalancerTypeEnum = "APPLICATION"
+	LoadBalancerTypeEnumGATEWAY LoadBalancerTypeEnum = "gateway"
 
-	LoadBalancerTypeEnumNETWORK LoadBalancerTypeEnum = "NETWORK"
+	LoadBalancerTypeEnumAPPLICATION LoadBalancerTypeEnum = "application"
 
-	LoadBalancerTypeEnumGATEWAY LoadBalancerTypeEnum = "GATEWAY"
+	LoadBalancerTypeEnumNETWORK LoadBalancerTypeEnum = "network"
 )
 
 // MitigationInEffectEnum represents the MitigationInEffectEnum enum type
 type MitigationInEffectEnum string
 
 const (
-	MitigationInEffectEnumYES MitigationInEffectEnum = "YES"
+	MitigationInEffectEnumYES MitigationInEffectEnum = "yes"
 
-	MitigationInEffectEnumNO MitigationInEffectEnum = "NO"
+	MitigationInEffectEnumNO MitigationInEffectEnum = "no"
 )
 
 // ProtocolEnum represents the ProtocolEnum enum type
 type ProtocolEnum string
 
 const (
+	ProtocolEnumHTTP ProtocolEnum = "HTTP"
+
+	ProtocolEnumHTTPS ProtocolEnum = "HTTPS"
+
+	ProtocolEnumTCP ProtocolEnum = "TCP"
+
 	ProtocolEnumTLS ProtocolEnum = "TLS"
 
 	ProtocolEnumUDP ProtocolEnum = "UDP"
@@ -161,12 +167,6 @@ const (
 	ProtocolEnumTCP_UDP ProtocolEnum = "TCP_UDP"
 
 	ProtocolEnumGENEVE ProtocolEnum = "GENEVE"
-
-	ProtocolEnumHTTP ProtocolEnum = "HTTP"
-
-	ProtocolEnumHTTPS ProtocolEnum = "HTTPS"
-
-	ProtocolEnumTCP ProtocolEnum = "TCP"
 )
 
 // RedirectActionStatusCodeEnum represents the RedirectActionStatusCodeEnum enum type
@@ -196,105 +196,105 @@ const (
 type TargetAdministrativeOverrideReasonEnum string
 
 const (
-	TargetAdministrativeOverrideReasonEnumINTERNAL_ERROR TargetAdministrativeOverrideReasonEnum = "INTERNAL_ERROR"
+	TargetAdministrativeOverrideReasonEnumINTERNAL_ERROR TargetAdministrativeOverrideReasonEnum = "AdministrativeOverride.Unknown"
 
-	TargetAdministrativeOverrideReasonEnumNO_OVERRIDE_ENGAGED TargetAdministrativeOverrideReasonEnum = "NO_OVERRIDE_ENGAGED"
+	TargetAdministrativeOverrideReasonEnumNO_OVERRIDE_ENGAGED TargetAdministrativeOverrideReasonEnum = "AdministrativeOverride.NoOverride"
 
-	TargetAdministrativeOverrideReasonEnumZONAL_SHIFT_ENGAGED TargetAdministrativeOverrideReasonEnum = "ZONAL_SHIFT_ENGAGED"
+	TargetAdministrativeOverrideReasonEnumZONAL_SHIFT_ENGAGED TargetAdministrativeOverrideReasonEnum = "AdministrativeOverride.ZonalShiftActive"
 
-	TargetAdministrativeOverrideReasonEnumZONAL_SHIFT_DELEGATED_TO_DNS TargetAdministrativeOverrideReasonEnum = "ZONAL_SHIFT_DELEGATED_TO_DNS"
+	TargetAdministrativeOverrideReasonEnumZONAL_SHIFT_DELEGATED_TO_DNS TargetAdministrativeOverrideReasonEnum = "AdministrativeOverride.ZonalShiftDelegatedToDns"
 )
 
 // TargetAdministrativeOverrideStateEnum represents the TargetAdministrativeOverrideStateEnum enum type
 type TargetAdministrativeOverrideStateEnum string
 
 const (
-	TargetAdministrativeOverrideStateEnumZONAL_SHIFT_DELEGATED_TO_DNS TargetAdministrativeOverrideStateEnum = "ZONAL_SHIFT_DELEGATED_TO_DNS"
+	TargetAdministrativeOverrideStateEnumUNKNOWN TargetAdministrativeOverrideStateEnum = "unknown"
 
-	TargetAdministrativeOverrideStateEnumUNKNOWN TargetAdministrativeOverrideStateEnum = "UNKNOWN"
+	TargetAdministrativeOverrideStateEnumNO_OVERRIDE TargetAdministrativeOverrideStateEnum = "no_override"
 
-	TargetAdministrativeOverrideStateEnumNO_OVERRIDE TargetAdministrativeOverrideStateEnum = "NO_OVERRIDE"
+	TargetAdministrativeOverrideStateEnumZONAL_SHIFT_ACTIVE TargetAdministrativeOverrideStateEnum = "zonal_shift_active"
 
-	TargetAdministrativeOverrideStateEnumZONAL_SHIFT_ACTIVE TargetAdministrativeOverrideStateEnum = "ZONAL_SHIFT_ACTIVE"
+	TargetAdministrativeOverrideStateEnumZONAL_SHIFT_DELEGATED_TO_DNS TargetAdministrativeOverrideStateEnum = "zonal_shift_delegated_to_dns"
 )
 
 // TargetGroupIpAddressTypeEnum represents the TargetGroupIpAddressTypeEnum enum type
 type TargetGroupIpAddressTypeEnum string
 
 const (
-	TargetGroupIpAddressTypeEnumIPV4 TargetGroupIpAddressTypeEnum = "IPV4"
+	TargetGroupIpAddressTypeEnumIPV4 TargetGroupIpAddressTypeEnum = "ipv4"
 
-	TargetGroupIpAddressTypeEnumIPV6 TargetGroupIpAddressTypeEnum = "IPV6"
+	TargetGroupIpAddressTypeEnumIPV6 TargetGroupIpAddressTypeEnum = "ipv6"
 )
 
 // TargetHealthReasonEnum represents the TargetHealthReasonEnum enum type
 type TargetHealthReasonEnum string
 
 const (
-	TargetHealthReasonEnumTIMEOUT TargetHealthReasonEnum = "TIMEOUT"
+	TargetHealthReasonEnumNOT_REGISTERED TargetHealthReasonEnum = "Target.NotRegistered"
 
-	TargetHealthReasonEnumFAILED_HEALTH_CHECKS TargetHealthReasonEnum = "FAILED_HEALTH_CHECKS"
+	TargetHealthReasonEnumNOT_IN_USE TargetHealthReasonEnum = "Target.NotInUse"
 
-	TargetHealthReasonEnumNOT_REGISTERED TargetHealthReasonEnum = "NOT_REGISTERED"
+	TargetHealthReasonEnumDEREGISTRATION_IN_PROGRESS TargetHealthReasonEnum = "Target.DeregistrationInProgress"
 
-	TargetHealthReasonEnumINVALID_STATE TargetHealthReasonEnum = "INVALID_STATE"
+	TargetHealthReasonEnumINVALID_STATE TargetHealthReasonEnum = "Target.InvalidState"
 
-	TargetHealthReasonEnumHEALTH_CHECK_DISABLED TargetHealthReasonEnum = "HEALTH_CHECK_DISABLED"
+	TargetHealthReasonEnumINTERNAL_ERROR TargetHealthReasonEnum = "Elb.InternalError"
 
-	TargetHealthReasonEnumREGISTRATION_IN_PROGRESS TargetHealthReasonEnum = "REGISTRATION_IN_PROGRESS"
+	TargetHealthReasonEnumREGISTRATION_IN_PROGRESS TargetHealthReasonEnum = "Elb.RegistrationInProgress"
 
-	TargetHealthReasonEnumRESPONSE_CODE_MISMATCH TargetHealthReasonEnum = "RESPONSE_CODE_MISMATCH"
+	TargetHealthReasonEnumINITIAL_HEALTH_CHECKING TargetHealthReasonEnum = "Elb.InitialHealthChecking"
 
-	TargetHealthReasonEnumNOT_IN_USE TargetHealthReasonEnum = "NOT_IN_USE"
+	TargetHealthReasonEnumFAILED_HEALTH_CHECKS TargetHealthReasonEnum = "Target.FailedHealthChecks"
 
-	TargetHealthReasonEnumDEREGISTRATION_IN_PROGRESS TargetHealthReasonEnum = "DEREGISTRATION_IN_PROGRESS"
+	TargetHealthReasonEnumIP_UNUSABLE TargetHealthReasonEnum = "Target.IpUnusable"
 
-	TargetHealthReasonEnumIP_UNUSABLE TargetHealthReasonEnum = "IP_UNUSABLE"
+	TargetHealthReasonEnumHEALTH_CHECK_DISABLED TargetHealthReasonEnum = "Target.HealthCheckDisabled"
 
-	TargetHealthReasonEnumINTERNAL_ERROR TargetHealthReasonEnum = "INTERNAL_ERROR"
+	TargetHealthReasonEnumRESPONSE_CODE_MISMATCH TargetHealthReasonEnum = "Target.ResponseCodeMismatch"
 
-	TargetHealthReasonEnumINITIAL_HEALTH_CHECKING TargetHealthReasonEnum = "INITIAL_HEALTH_CHECKING"
+	TargetHealthReasonEnumTIMEOUT TargetHealthReasonEnum = "Target.Timeout"
 )
 
 // TargetHealthStateEnum represents the TargetHealthStateEnum enum type
 type TargetHealthStateEnum string
 
 const (
-	TargetHealthStateEnumUNHEALTHY_DRAINING TargetHealthStateEnum = "UNHEALTHY_DRAINING"
+	TargetHealthStateEnumUNHEALTHY_DRAINING TargetHealthStateEnum = "unhealthy.draining"
 
-	TargetHealthStateEnumUNUSED TargetHealthStateEnum = "UNUSED"
+	TargetHealthStateEnumUNUSED TargetHealthStateEnum = "unused"
 
-	TargetHealthStateEnumDRAINING TargetHealthStateEnum = "DRAINING"
+	TargetHealthStateEnumDRAINING TargetHealthStateEnum = "draining"
 
-	TargetHealthStateEnumUNAVAILABLE TargetHealthStateEnum = "UNAVAILABLE"
+	TargetHealthStateEnumUNAVAILABLE TargetHealthStateEnum = "unavailable"
 
-	TargetHealthStateEnumINITIAL TargetHealthStateEnum = "INITIAL"
+	TargetHealthStateEnumINITIAL TargetHealthStateEnum = "initial"
 
-	TargetHealthStateEnumHEALTHY TargetHealthStateEnum = "HEALTHY"
+	TargetHealthStateEnumHEALTHY TargetHealthStateEnum = "healthy"
 
-	TargetHealthStateEnumUNHEALTHY TargetHealthStateEnum = "UNHEALTHY"
+	TargetHealthStateEnumUNHEALTHY TargetHealthStateEnum = "unhealthy"
 )
 
 // TargetTypeEnum represents the TargetTypeEnum enum type
 type TargetTypeEnum string
 
 const (
-	TargetTypeEnumINSTANCE TargetTypeEnum = "INSTANCE"
+	TargetTypeEnumINSTANCE TargetTypeEnum = "instance"
 
-	TargetTypeEnumIP TargetTypeEnum = "IP"
+	TargetTypeEnumIP TargetTypeEnum = "ip"
 
-	TargetTypeEnumLAMBDA TargetTypeEnum = "LAMBDA"
+	TargetTypeEnumLAMBDA TargetTypeEnum = "lambda"
 
-	TargetTypeEnumALB TargetTypeEnum = "ALB"
+	TargetTypeEnumALB TargetTypeEnum = "alb"
 )
 
 // TrustStoreAssociationStatusEnum represents the TrustStoreAssociationStatusEnum enum type
 type TrustStoreAssociationStatusEnum string
 
 const (
-	TrustStoreAssociationStatusEnumREMOVED TrustStoreAssociationStatusEnum = "REMOVED"
+	TrustStoreAssociationStatusEnumACTIVE TrustStoreAssociationStatusEnum = "active"
 
-	TrustStoreAssociationStatusEnumACTIVE TrustStoreAssociationStatusEnum = "ACTIVE"
+	TrustStoreAssociationStatusEnumREMOVED TrustStoreAssociationStatusEnum = "removed"
 )
 
 // TrustStoreStatus represents the TrustStoreStatus enum type
