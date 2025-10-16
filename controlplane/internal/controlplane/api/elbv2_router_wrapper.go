@@ -387,7 +387,12 @@ type ELBv2Tag struct {
 type AddTagsResponse struct {
 	XMLName          xml.Name         `xml:"AddTagsResponse"`
 	XMLNS            string           `xml:"xmlns,attr"`
+	Result           AddTagsResult    `xml:"AddTagsResult"`
 	ResponseMetadata ResponseMetadata `xml:"ResponseMetadata"`
+}
+
+type AddTagsResult struct {
+	// Empty result
 }
 
 // NewELBv2RouterWrapper creates a new wrapper for the ELBv2 router
