@@ -1830,8 +1830,16 @@ func (api *ELBv2APIImpl) SetSubnets(ctx context.Context, input *generated_elbv2.
 	}
 
 	// Return updated subnets and IP address type
+	// Build availability zones from subnets (ZoneName is not available in our storage)
+	azs := []generated_elbv2.AvailabilityZone{}
+	for _, subnetId := range lb.Subnets {
+		azs = append(azs, generated_elbv2.AvailabilityZone{
+			SubnetId: &subnetId,
+			// ZoneName is not set as we don't have subnet-to-AZ mapping information
+		})
+	}
 	output := &generated_elbv2.SetSubnetsOutput{
-		AvailabilityZones: []generated_elbv2.AvailabilityZone{},
+		AvailabilityZones: azs,
 	}
 
 	if input.IpAddressType != nil {
