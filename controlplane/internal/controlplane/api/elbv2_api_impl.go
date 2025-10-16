@@ -1430,7 +1430,29 @@ func (api *ELBv2APIImpl) ModifyListenerAttributes(ctx context.Context, input *ge
 }
 
 func (api *ELBv2APIImpl) ModifyLoadBalancerAttributes(ctx context.Context, input *generated_elbv2.ModifyLoadBalancerAttributesInput) (*generated_elbv2.ModifyLoadBalancerAttributesOutput, error) {
-	return &generated_elbv2.ModifyLoadBalancerAttributesOutput{}, nil
+	if input.LoadBalancerArn == "" {
+		return nil, fmt.Errorf("LoadBalancerArn is required")
+	}
+
+	// Verify load balancer exists
+	lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, input.LoadBalancerArn)
+	if err != nil {
+		if err == storage.ErrResourceNotFound {
+			return nil, fmt.Errorf("load balancer not found: %s", input.LoadBalancerArn)
+		}
+		return nil, fmt.Errorf("failed to get load balancer: %w", err)
+	}
+	if lb == nil {
+		return nil, fmt.Errorf("load balancer not found: %s", input.LoadBalancerArn)
+	}
+
+	// For now, we simply acknowledge the attributes without storing them
+	// This is sufficient for Terraform which just needs a successful response
+	// In the future, we can extend the storage model to persist these attributes
+
+	return &generated_elbv2.ModifyLoadBalancerAttributesOutput{
+		Attributes: input.Attributes,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) ModifyRule(ctx context.Context, input *generated_elbv2.ModifyRuleInput) (*generated_elbv2.ModifyRuleOutput, error) {
@@ -1738,11 +1760,93 @@ func (api *ELBv2APIImpl) SetRulePriorities(ctx context.Context, input *generated
 }
 
 func (api *ELBv2APIImpl) SetSecurityGroups(ctx context.Context, input *generated_elbv2.SetSecurityGroupsInput) (*generated_elbv2.SetSecurityGroupsOutput, error) {
-	return &generated_elbv2.SetSecurityGroupsOutput{}, nil
+	if input.LoadBalancerArn == "" {
+		return nil, fmt.Errorf("LoadBalancerArn is required")
+	}
+	if len(input.SecurityGroups) == 0 {
+		return nil, fmt.Errorf("SecurityGroups is required")
+	}
+
+	// Verify load balancer exists
+	lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, input.LoadBalancerArn)
+	if err != nil {
+		if err == storage.ErrResourceNotFound {
+			return nil, fmt.Errorf("load balancer not found: %s", input.LoadBalancerArn)
+		}
+		return nil, fmt.Errorf("failed to get load balancer: %w", err)
+	}
+	if lb == nil {
+		return nil, fmt.Errorf("load balancer not found: %s", input.LoadBalancerArn)
+	}
+
+	// Update security groups
+	lb.SecurityGroups = input.SecurityGroups
+	lb.UpdatedAt = time.Now()
+
+	// Save to storage
+	if err := api.storage.ELBv2Store().UpdateLoadBalancer(ctx, lb); err != nil {
+		return nil, fmt.Errorf("failed to update load balancer security groups: %w", err)
+	}
+
+	// Return updated security groups
+	return &generated_elbv2.SetSecurityGroupsOutput{
+		SecurityGroupIds: input.SecurityGroups,
+		EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic: input.EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic,
+	}, nil
 }
 
 func (api *ELBv2APIImpl) SetSubnets(ctx context.Context, input *generated_elbv2.SetSubnetsInput) (*generated_elbv2.SetSubnetsOutput, error) {
-	return &generated_elbv2.SetSubnetsOutput{}, nil
+	if input.LoadBalancerArn == "" {
+		return nil, fmt.Errorf("LoadBalancerArn is required")
+	}
+
+	// Verify load balancer exists
+	lb, err := api.storage.ELBv2Store().GetLoadBalancer(ctx, input.LoadBalancerArn)
+	if err != nil {
+		if err == storage.ErrResourceNotFound {
+			return nil, fmt.Errorf("load balancer not found: %s", input.LoadBalancerArn)
+		}
+		return nil, fmt.Errorf("failed to get load balancer: %w", err)
+	}
+	if lb == nil {
+		return nil, fmt.Errorf("load balancer not found: %s", input.LoadBalancerArn)
+	}
+
+	// Update subnets if provided
+	if input.Subnets != nil {
+		lb.Subnets = input.Subnets
+	}
+
+	// Update IP address type if provided
+	if input.IpAddressType != nil {
+		lb.IpAddressType = string(*input.IpAddressType)
+	}
+
+	lb.UpdatedAt = time.Now()
+
+	// Save to storage
+	if err := api.storage.ELBv2Store().UpdateLoadBalancer(ctx, lb); err != nil {
+		return nil, fmt.Errorf("failed to update load balancer subnets: %w", err)
+	}
+
+	// Return updated subnets and IP address type
+	// Build availability zones from subnets (ZoneName is not available in our storage)
+	azs := []generated_elbv2.AvailabilityZone{}
+	for _, subnetId := range lb.Subnets {
+		azs = append(azs, generated_elbv2.AvailabilityZone{
+			SubnetId: &subnetId,
+			// ZoneName is not set as we don't have subnet-to-AZ mapping information
+		})
+	}
+	output := &generated_elbv2.SetSubnetsOutput{
+		AvailabilityZones: azs,
+	}
+
+	if input.IpAddressType != nil {
+		output.IpAddressType = input.IpAddressType
+	}
+
+	return output, nil
 }
 
 func convertToLoadBalancer(lb *storage.ELBv2LoadBalancer) generated_elbv2.LoadBalancer {

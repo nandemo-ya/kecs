@@ -121,13 +121,13 @@ const (
 type LoadBalancerStateEnum string
 
 const (
-	LoadBalancerStateEnumPROVISIONING LoadBalancerStateEnum = "PROVISIONING"
+	LoadBalancerStateEnumPROVISIONING LoadBalancerStateEnum = "provisioning"
 
-	LoadBalancerStateEnumACTIVE_IMPAIRED LoadBalancerStateEnum = "ACTIVE_IMPAIRED"
+	LoadBalancerStateEnumACTIVE_IMPAIRED LoadBalancerStateEnum = "active_impaired"
 
-	LoadBalancerStateEnumFAILED LoadBalancerStateEnum = "FAILED"
+	LoadBalancerStateEnumFAILED LoadBalancerStateEnum = "failed"
 
-	LoadBalancerStateEnumACTIVE LoadBalancerStateEnum = "ACTIVE"
+	LoadBalancerStateEnumACTIVE LoadBalancerStateEnum = "active"
 )
 
 // LoadBalancerTypeEnum represents the LoadBalancerTypeEnum enum type
