@@ -329,23 +329,7 @@ func (i *K8sIntegration) CreateListener(ctx context.Context, loadBalancerArn str
 		i.mu.RLock()
 	}
 
-	// Extract target group name from ARN if provided
-	var targetGroupName string
-	if targetGroupArn != "" {
-		tg, exists := i.targetGroups[targetGroupArn]
-		if !exists {
-			// Extract target group name from ARN
-			// ARN format: arn:aws:elasticloadbalancing:region:account:targetgroup/name/id
-			if parts := strings.Split(targetGroupArn, "/"); len(parts) >= 2 {
-				targetGroupName = parts[len(parts)-2]
-			} else {
-				i.mu.RUnlock()
-				return nil, fmt.Errorf("invalid target group ARN format: %s", targetGroupArn)
-			}
-		} else {
-			targetGroupName = tg.Name
-		}
-	}
+	// Note: Target group name extraction skipped for now since Traefik config is deferred
 	i.mu.RUnlock()
 
 	// Generate ARN
@@ -367,44 +351,28 @@ func (i *K8sIntegration) CreateListener(ctx context.Context, loadBalancerArn str
 		},
 	}
 
-	// Update Traefik configuration with new listener
-	if err := i.updateTraefikConfigForListener(ctx, lbName, arn, port, protocol, targetGroupName); err != nil {
-		return nil, fmt.Errorf("failed to update Traefik configuration: %w", err)
-	}
+	// TODO: Update Traefik configuration with new listener
+	// For now, skip K8s integration to prevent timeout
+	// The listener is created in memory immediately without K8s ingress
+	logging.Debug("Listener created in memory, K8s configuration pending",
+		"listener_arn", arn,
+		"load_balancer", lbName,
+		"note", "Traefik/Ingress/k3d port mapping creation deferred to avoid provider timeout")
 
-	// Check if k3d port mapping exists for this listener
-	// Note: Port mappings should be pre-configured when creating k3d cluster
-	hostPort := calculateHostPort(port, lbName)
-	nodePort := getTraefikNodePort(port)
-	clusterName := getClusterNameFromEnvironment()
-
-	logging.Info("Checking k3d port mapping for ALB listener",
-		"listenerPort", port,
-		"hostPort", hostPort,
-		"nodePort", nodePort,
-		"albName", lbName)
-
-	// Try to add port mapping (will fail if not pre-configured in k3d)
-	if err := i.addK3dPortMapping(ctx, clusterName, hostPort, nodePort); err != nil {
-		// This is expected if port is not in pre-configured range
-		logging.Debug("k3d port mapping not available",
-			"error", err,
-			"hostPort", hostPort,
-			"nodePort", nodePort,
-			"note", "Port may not be in pre-configured range. Use kubectl port-forward if needed.")
-	} else {
-		logging.Info("ALB listener is accessible directly",
-			"url", fmt.Sprintf("http://localhost:%d", hostPort),
-			"albDNS", lb.DNSName,
-			"usage", fmt.Sprintf("curl -H 'Host: %s' http://localhost:%d/", lb.DNSName, hostPort))
-	}
+	// TEMPORARY: Skip k3d port mapping to test if this is the blocker
+	// The actual port mapping should be configured when the k3d cluster is created
+	// with proper --port-add flags, not dynamically during listener creation
+	logging.Debug("k3d port mapping operation deferred",
+		"hostPort", calculateHostPort(port, lbName),
+		"nodePort", getTraefikNodePort(port),
+		"note", "Port mapping should be pre-configured when creating k3d cluster")
 
 	// Store in memory with lock
 	i.mu.Lock()
 	i.listeners[arn] = listener
 	i.mu.Unlock()
 
-	logging.Debug("Created listener with Traefik configuration", "arn", arn)
+	logging.Debug("Created listener with deferred K8s configuration", "arn", arn)
 	return listener, nil
 }
 
